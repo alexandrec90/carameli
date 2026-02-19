@@ -1,0 +1,53 @@
+# Rule: Python / FastAPI Code Style
+
+## General
+
+- Target **Python 3.12**. Use `from __future__ import annotations` in all modules.
+- Type-annotate every function signature — parameters and return types.
+- Prefer `async def` for all route handlers and anything that touches the DB or
+  Twilio SDK.
+- Keep route handlers thin (≤ ~15 lines). Delegate logic to the service or
+  repository layer.
+- No raw dicts returned from routes — always return a typed Pydantic response model.
+
+## FastAPI Patterns
+
+- Use `Annotated[..., Depends(...)]` for dependency injection (not the older
+  `param: Type = Depends(...)` form).
+- Define request bodies as Pydantic `BaseModel` subclasses in `app/schemas/`.
+- Group related routes into `APIRouter` instances in their own files; include
+  them in `app/api/vsapi/__init__.py` with the correct prefix.
+- Decorate with explicit `status_code` where it differs from 200:
+  `@router.post("/Add", status_code=201)`.
+- Add a one-line docstring to each route handler — FastAPI surfaces it in the
+  auto-generated OpenAPI docs.
+
+## Error Handling
+
+- Raise `HTTPException` for client errors (4xx). Include a descriptive `detail`.
+- Twilio errors caught in the service layer should be logged then re-raised as
+  `HTTPException(status_code=502, detail="Twilio error: <message>")`.
+- Never let unhandled exceptions reach VanillaSoft without a meaningful HTTP
+  status code.
+
+## Async / Concurrency
+
+- Use `httpx.AsyncClient` for outbound HTTP — never `requests` inside an async
+  route.
+- Use `asyncio.sleep` — never `time.sleep` inside async code.
+- Repository functions always accept `session: AsyncSession` and commit
+  internally; callers do not manage transactions directly.
+
+## Imports and Module Structure
+
+```
+app/
+  api/vsapi/<domain>.py   — router + thin handlers
+  schemas/<domain>.py     — Pydantic request/response models
+  models/<domain>.py      — SQLAlchemy ORM model
+  repositories/<domain>_repo.py — DB queries
+  services/twilio_provider.py   — Twilio SDK calls
+  core/config.py          — pydantic-settings Settings singleton
+  core/auth.py            — bearer token dependency
+  core/database.py        — async engine + get_session dependency
+```
