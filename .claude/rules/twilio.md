@@ -30,6 +30,7 @@
   VanillaSoft API calls) to an APScheduler job or background task to avoid
   Twilio timeout retries.
 - Return TwiML as:
+
   ```python
   Response(content=twiml_string, media_type="text/xml")
   ```

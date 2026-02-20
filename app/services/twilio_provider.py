@@ -15,6 +15,13 @@ class TwilioProvider:
         self.client = client
         self.webhook_base_url = webhook_base_url.rstrip("/")
 
+    @staticmethod
+    def _require_str(value: object | None, field_name: str) -> str:
+        """Return a required string value from Twilio SDK objects."""
+        if value is None:
+            raise ValueError(f"Twilio response missing required field: {field_name}")
+        return str(value)
+
     # ─── Phone Lines (DIDs) ───────────────────────────────────────────────
 
     async def purchase_did(
@@ -40,7 +47,10 @@ class TwilioProvider:
                 raise ValueError("Must specify area_code or phone_number")
 
             result = self.client.incoming_phone_numbers.create(**kwargs)
-            return {"sid": result.sid, "phone_number": result.phone_number}
+            return {
+                "sid": self._require_str(result.sid, "sid"),
+                "phone_number": self._require_str(result.phone_number, "phone_number"),
+            }
         except TwilioRestException as exc:
             logger.error("Twilio error purchasing DID: code=%s msg=%s", exc.code, exc.msg)
             raise
@@ -96,7 +106,10 @@ class TwilioProvider:
                 from_=from_number,
                 body=body,
             )
-            return {"sid": message.sid, "status": message.status}
+            return {
+                "sid": self._require_str(message.sid, "sid"),
+                "status": self._require_str(message.status, "status"),
+            }
         except TwilioRestException as exc:
             logger.error("Twilio error sending SMS: code=%s msg=%s", exc.code, exc.msg)
             raise
@@ -117,7 +130,10 @@ class TwilioProvider:
                 status_callback=f"{self.webhook_base_url}/webhooks/twilio/call-status",
                 status_callback_method="POST",
             )
-            return {"call_sid": call.sid, "status": call.status}
+            return {
+                "call_sid": self._require_str(call.sid, "sid"),
+                "status": self._require_str(call.status, "status"),
+            }
         except TwilioRestException as exc:
             logger.error(
                 "Twilio error initiating voicemail drop: code=%s msg=%s",
@@ -135,13 +151,13 @@ class TwilioProvider:
             domains = self.client.sip.domains.list()
             for d in domains:
                 if d.domain_name == domain_name:
-                    return d.sid
+                    return self._require_str(d.sid, "sid")
             domain = self.client.sip.domains.create(
                 domain_name=domain_name,
                 friendly_name=f"VoiceGateway {customer_id[:8]}",
                 sip_registration=True,
             )
-            return domain.sid
+            return self._require_str(domain.sid, "sid")
         except TwilioRestException as exc:
             logger.error(
                 "Twilio error creating SIP domain: code=%s msg=%s", exc.code, exc.msg
@@ -155,9 +171,9 @@ class TwilioProvider:
             cred_lists = self.client.sip.credential_lists.list()
             for cl in cred_lists:
                 if cl.friendly_name == name:
-                    return cl.sid
+                    return self._require_str(cl.sid, "sid")
             cred_list = self.client.sip.credential_lists.create(friendly_name=name)
-            return cred_list.sid
+            return self._require_str(cred_list.sid, "sid")
         except TwilioRestException as exc:
             logger.error(
                 "Twilio error creating credential list: code=%s msg=%s",
@@ -175,7 +191,7 @@ class TwilioProvider:
                 self.client.sip.credential_lists(credential_list_sid)
                 .credentials.create(username=username, password=password)
             )
-            return cred.sid
+            return self._require_str(cred.sid, "sid")
         except TwilioRestException as exc:
             logger.error(
                 "Twilio error creating SIP credential: code=%s msg=%s",
@@ -214,9 +230,12 @@ class TwilioProvider:
             numbers = self.client.available_phone_numbers(country).local.list(**kwargs)
             area_codes: dict[str, str] = {}
             for n in numbers:
-                ac = n.phone_number[2:5]  # E.164 +1NXX → strip +1
+                phone_number = n.phone_number
+                if not phone_number:
+                    continue
+                ac = phone_number[2:5]  # E.164 +1NXX → strip +1
                 if ac not in area_codes:
-                    area_codes[ac] = n.iso_country
+                    area_codes[ac] = self._require_str(n.iso_country, "iso_country")
             return [
                 {"area_code": ac, "country": c} for ac, c in sorted(area_codes.items())
             ]

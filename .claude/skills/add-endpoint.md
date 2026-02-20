@@ -56,10 +56,12 @@ File: `app/repositories/<domain>_repo.py`
 ## Step 6 — Write Tests
 
 Unit test (`tests/unit/test_<domain>.py`):
+
 - Mock `twilio_provider` at the service boundary
 - Test the handler logic, auth, and error paths
 
 Integration test (`tests/integration/test_<domain>.py`):
+
 - Use Twilio test credentials
 - Hit the actual endpoint via `httpx.AsyncClient`
 

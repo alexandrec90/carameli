@@ -5,19 +5,19 @@
 - All models live in `app/models/`. Import every model in `app/models/__init__.py`
   so Alembic autogenerate picks them up.
 - Use **UUID primary keys**:
-  ```python
-  id: Mapped[uuid.UUID] = mapped_column(
-      UUID(as_uuid=True), primary_key=True,
-      server_default=text("gen_random_uuid()")
-  )
-  ```
+
+      id: Mapped[uuid.UUID] = mapped_column(
+          UUID(as_uuid=True), primary_key=True,
+          server_default=text("gen_random_uuid()")
+      )
+
 - Always include `created_at` and `updated_at` with server defaults:
-  ```python
-  created_at: Mapped[datetime] = mapped_column(server_default=func.now())
-  updated_at: Mapped[datetime] = mapped_column(
-      server_default=func.now(), onupdate=func.now()
-  )
-  ```
+
+      created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+      updated_at: Mapped[datetime] = mapped_column(
+          server_default=func.now(), onupdate=func.now()
+      )
+
 - **Soft-delete** with `active: Mapped[bool] = mapped_column(default=True)`.
   Never hard-delete `customers`, `phone_lines`, or `extensions` rows.
   Hard-deletes are only acceptable for `call_events` rows older than the

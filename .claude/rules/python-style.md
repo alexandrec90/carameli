@@ -26,7 +26,7 @@
 
 - Raise `HTTPException` for client errors (4xx). Include a descriptive `detail`.
 - Twilio errors caught in the service layer should be logged then re-raised as
-  `HTTPException(status_code=502, detail="Twilio error: <message>")`.
+  `HTTPException(status_code=502, detail="Twilio error from provider")`.
 - Never let unhandled exceptions reach VanillaSoft without a meaningful HTTP
   status code.
 
@@ -40,14 +40,6 @@
 
 ## Imports and Module Structure
 
-```
-app/
-  api/vsapi/<domain>.py   — router + thin handlers
-  schemas/<domain>.py     — Pydantic request/response models
-  models/<domain>.py      — SQLAlchemy ORM model
-  repositories/<domain>_repo.py — DB queries
-  services/twilio_provider.py   — Twilio SDK calls
-  core/config.py          — pydantic-settings Settings singleton
-  core/auth.py            — bearer token dependency
-  core/database.py        — async engine + get_session dependency
-```
+- Keep routers, schemas, models, repositories, services, and core configuration
+  modules in their dedicated folders, following the project layout documented in
+  `CLAUDE.md`.

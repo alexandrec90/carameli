@@ -1,0 +1,164 @@
+# VoiceGateway — Local Development Guide
+
+Self-hosted VoIP microservice built on Twilio. Drop-in replacement for Cloudli/CMV.
+
+---
+
+## Prerequisites
+
+- **Docker Desktop** (running)
+- That's it — everything else runs inside containers
+
+---
+
+## Starting the Stack
+
+```bash
+docker compose up --build
+```
+
+This starts three services:
+
+| Service | URL | Description |
+| --- | --- | --- |
+| VoiceGateway API | <http://localhost:8000> | FastAPI backend |
+| Carameli UI | <http://localhost:5173> | React admin dashboard |
+| PostgreSQL | localhost:5432 | Database |
+
+To run in the background (detached):
+
+```bash
+docker compose up -d --build
+```
+
+---
+
+## Running the Database Migration
+
+The `app` service must be running before you run migrations.
+
+```bash
+docker compose exec app alembic upgrade head
+```
+
+If the `app` service isn't running, use a one-off container instead:
+
+```bash
+docker compose run --rm app alembic upgrade head
+```
+
+---
+
+## Exploring the API
+
+FastAPI auto-generates interactive docs at:
+
+**<http://localhost:8000/docs>**
+
+Authenticate with the Bearer token from `.env`:
+
+```text
+Authorization: Bearer hlUnmWwpQVyGbg8oV2sgBsMMypjoPI6Q7fq9xgj6nb8VrnKIonewB4fWspqnEtfq
+```
+
+---
+
+## Using the Dashboard
+
+1. Open **<http://localhost:5173>**
+2. Click **"Seed Demo Customer"** on the Dashboard to create the first customer record (`vs_customer_id = 1`)
+3. Navigate to **Phone Lines** or **Extensions** to provision resources
+
+---
+
+## Running Tests
+
+Tests run against the live PostgreSQL container — make sure the stack is up first.
+
+```bash
+docker compose exec app pytest -v
+```
+
+---
+
+## Connecting Real Twilio (Optional)
+
+Your `.env` already has credentials. To test live Twilio calls (no charges with test credentials):
+
+1. Update `.env` with your actual Twilio Account SID + Auth Token
+2. For webhooks (call status, voice, SMS), expose the API via ngrok:
+
+   ```bash
+   ngrok http 8000
+   ```
+
+3. Set `TWILIO_WEBHOOK_BASE_URL` in `.env` to the ngrok HTTPS URL
+4. Restart the app:
+
+   ```bash
+   docker compose restart app
+   ```
+
+---
+
+## Useful Commands
+
+```bash
+# View logs
+docker compose logs app
+docker compose logs -f app   # follow / tail
+
+# Stop everything
+docker compose down
+
+# Stop and delete the database volume (full reset)
+docker compose down -v
+
+# Open a shell inside the app container
+docker compose exec app bash
+
+# Generate a new Alembic migration after changing models
+docker compose exec app alembic revision --autogenerate -m "describe change"
+
+# Roll back one migration
+docker compose exec app alembic downgrade -1
+```
+
+---
+
+## Route Reference
+
+All API routes are prefixed with `/vsapi/1.0.0/`.
+
+| Group | Prefix | Key Endpoints |
+| --- | --- | --- |
+| Customers | `/VsCustomer/` | `POST /Create`, `GET /Get/{id}`, `GET /GetPhoneLines/{id}` |
+| Phone Lines | `/PhoneLine/` | `POST /Add`, `GET /GetCount/{id}`, `PUT /Deactivate`, `PUT /UpdateCallRecording` |
+| Extensions | `/VsExtension/` | `POST /Add`, `GET /GetAvailable/{id}/{start}/{end}`, `PUT /Deactivate/{id}/{ext}` |
+| SMS | `/VsMessaging/Sms/` | `PUT /Enable/{id}/{number}`, `PUT /Disable/{id}/{number}`, `POST /Send/{id}` |
+| Voicemail Drop | `/VsMessageDrop` | `POST /VsMessageDrop` |
+| SCI Routing | `/` | `POST /PostSCIbyZipCode`, `POST /UpdateSCIUserOption` |
+| Pointers | `/` | `POST /AddPointerToExtension`, `DELETE /DeletePointerToExtension` |
+| Area Codes | `/GetAreaCodes` | `GET /GetAreaCodes`, `GET /GetAreaCodes/{country}/{state}` |
+| Webhooks | `/webhooks/twilio/` | `POST /call-status`, `POST /voice`, `POST /sms` |
+| Health | `/health` | `GET /health` |
+
+---
+
+## What's Not Yet Wired Up
+
+| Feature | Status |
+| --- | --- |
+| VanillaSoft write-back on call events | Stubbed — marks `posted=true`, no actual write to VS SQL Server |
+| Inbound TwiML routing (SCI / pointers) | Webhooks receive calls but routing logic not implemented |
+| SMS, Call Events, Settings pages | UI placeholders — API endpoints are fully functional |
+| Recording → S3 storage | Dev: recording URLs stored from Twilio callback, no S3 copy |
+
+---
+
+## MCP Tools
+
+No relevant MCP tools are currently configured. Tools that would help if added:
+
+- **PostgreSQL MCP** — direct DB inspection without `docker compose exec`
+- **Docker MCP** — container management from Claude
