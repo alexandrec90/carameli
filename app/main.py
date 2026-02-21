@@ -8,12 +8,14 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from twilio.rest import Client
 
+from app.api.vg.frontend_logs import router as frontend_logs_router
 from app.api.vsapi import vsapi_router
 from app.api.webhooks.call_status import router as webhooks_router
 from app.core.config import settings
+from app.core.logging_config import configure_logging
 from app.services.call_sync import start_scheduler, stop_scheduler
 
-logging.basicConfig(level=logging.INFO)
+configure_logging(log_level=settings.log_level, log_file=settings.log_file)
 logger = logging.getLogger(__name__)
 
 
@@ -48,6 +50,7 @@ app.add_middleware(
 
 app.include_router(vsapi_router)
 app.include_router(webhooks_router)
+app.include_router(frontend_logs_router)
 
 
 @app.get("/health")

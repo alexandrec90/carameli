@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -12,6 +13,8 @@ from app.repositories.extension_repo import ExtensionRepo
 from app.repositories.sci_rule_repo import SciRuleRepo
 from app.schemas.sci import PostSciByZipCodeRequest, SciResponse, UpdateSciUserOptionRequest
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(tags=["sci"])
 
 
@@ -22,14 +25,17 @@ async def post_sci_by_zip_code(
     _: Annotated[str, Depends(verify_api_key)],
 ) -> SciResponse:
     """Store a zip-code routing rule for Selective Call Interception."""
+    logger.info("SCI zip rule vs_customer_id=%s ext=%s zip=%s enabled=%s", body.vs_customer_id, body.extension_number, body.zip_code, body.enabled)
     customer_repo = CustomerRepo(session)
     customer = await customer_repo.get_by_vs_id(body.vs_customer_id)
     if not customer:
+        logger.warning("Customer not found vs_customer_id=%s", body.vs_customer_id)
         raise HTTPException(status_code=404, detail="Customer not found")
 
     ext_repo = ExtensionRepo(session)
     ext = await ext_repo.get_by_number(customer.id, body.extension_number)
     if not ext:
+        logger.warning("Extension not found vs_customer_id=%s ext=%s", body.vs_customer_id, body.extension_number)
         raise HTTPException(status_code=404, detail="Extension not found")
 
     sci_repo = SciRuleRepo(session)
@@ -49,14 +55,17 @@ async def update_sci_user_option(
     _: Annotated[str, Depends(verify_api_key)],
 ) -> SciResponse:
     """Enable or disable all SCI rules for an extension."""
+    logger.info("SCI user option vs_customer_id=%s ext=%s enabled=%s", body.vs_customer_id, body.extension_number, body.enabled)
     customer_repo = CustomerRepo(session)
     customer = await customer_repo.get_by_vs_id(body.vs_customer_id)
     if not customer:
+        logger.warning("Customer not found vs_customer_id=%s", body.vs_customer_id)
         raise HTTPException(status_code=404, detail="Customer not found")
 
     ext_repo = ExtensionRepo(session)
     ext = await ext_repo.get_by_number(customer.id, body.extension_number)
     if not ext:
+        logger.warning("Extension not found vs_customer_id=%s ext=%s", body.vs_customer_id, body.extension_number)
         raise HTTPException(status_code=404, detail="Extension not found")
 
     sci_repo = SciRuleRepo(session)

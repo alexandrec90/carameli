@@ -23,7 +23,12 @@ File: `app/schemas/<domain>.py`
 
 File: `app/api/vsapi/<domain>.py`
 
+Add `logger = logging.getLogger(__name__)` once at module scope (not inside the function), then log entry, warnings, and errors inside the handler:
+
 ```python
+import logging
+logger = logging.getLogger(__name__)
+
 @router.put("/UpdateCallRecording")
 async def update_call_recording(
     body: UpdateCallRecordingRequest,
@@ -31,10 +36,16 @@ async def update_call_recording(
     _: Annotated[None, Depends(verify_api_key)],
 ) -> UpdateCallRecordingResponse:
     """Toggle call recording on a DID."""
+    logger.info("UpdateCallRecording vs_customer_id=%s number=%s enabled=%s",
+                body.vs_customer_id, body.phone_number, body.enabled)
+    # log WARNING before any 404/409 raise
+    # log ERROR before any 502 raise
+    logger.info("Recording updated number=%s", body.phone_number)
     return await phone_line_service.update_recording(session, body)
 ```
 
 Keep the handler under ~15 lines; delegate to the service layer.
+See `.claude/rules/logging.md` for the full logging convention.
 
 ## Step 4 — Implement the Service Method
 

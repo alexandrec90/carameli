@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -19,6 +20,8 @@ from app.schemas.phone_line import (
 )
 from app.services.twilio_provider import TwilioProvider
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/PhoneLine", tags=["phone-lines"])
 
 
@@ -30,9 +33,11 @@ async def add_phone_line(
     _: Annotated[str, Depends(verify_api_key)],
 ) -> PhoneLineResponse:
     """Purchase a new DID from Twilio and register it for the customer."""
+    logger.info("Adding phone line vs_customer_id=%s area_code=%s number=%s", body.vs_customer_id, body.area_code, body.phone_number)
     customer_repo = CustomerRepo(session)
     customer = await customer_repo.get_by_vs_id(body.vs_customer_id)
     if not customer:
+        logger.warning("Customer not found vs_customer_id=%s", body.vs_customer_id)
         raise HTTPException(status_code=404, detail="Customer not found")
 
     provider: TwilioProvider = request.app.state.twilio
@@ -42,8 +47,10 @@ async def add_phone_line(
             phone_number=body.phone_number,
         )
     except TwilioRestException as exc:
+        logger.error("Twilio error purchasing DID vs_customer_id=%s: %s", body.vs_customer_id, exc.msg)
         raise HTTPException(status_code=502, detail=f"Twilio error: {exc.msg}")
     except ValueError as exc:
+        logger.warning("Invalid DID request vs_customer_id=%s: %s", body.vs_customer_id, exc)
         raise HTTPException(status_code=400, detail=str(exc))
 
     line_repo = PhoneLineRepo(session)
@@ -52,6 +59,7 @@ async def add_phone_line(
         phone_number=result["phone_number"],
         twilio_sid=result["sid"],
     )
+    logger.info("Phone line added number=%s sid=%s vs_customer_id=%s", line.phone_number, line.twilio_sid, body.vs_customer_id)
     return PhoneLineResponse.model_validate(line)
 
 

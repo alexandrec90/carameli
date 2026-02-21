@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from typing import Annotated, List
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -17,6 +18,8 @@ from app.schemas.extension import (
 )
 from app.services.twilio_provider import TwilioProvider
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/VsExtension", tags=["extensions"])
 
 
@@ -28,14 +31,17 @@ async def add_extension(
     _: Annotated[str, Depends(verify_api_key)],
 ) -> ExtensionResponse:
     """Create a SIP credential for the extension."""
+    logger.info("Adding extension vs_customer_id=%s ext=%s", body.vs_customer_id, body.extension_number)
     customer_repo = CustomerRepo(session)
     customer = await customer_repo.get_by_vs_id(body.vs_customer_id)
     if not customer:
+        logger.warning("Customer not found vs_customer_id=%s", body.vs_customer_id)
         raise HTTPException(status_code=404, detail="Customer not found")
 
     ext_repo = ExtensionRepo(session)
     existing = await ext_repo.get_by_number(customer.id, body.extension_number)
     if existing:
+        logger.warning("Extension already exists vs_customer_id=%s ext=%s", body.vs_customer_id, body.extension_number)
         raise HTTPException(status_code=409, detail="Extension already exists")
 
     provider: TwilioProvider = request.app.state.twilio
@@ -49,6 +55,7 @@ async def add_extension(
             cred_list_sid, sip_username, password
         )
     except TwilioRestException as exc:
+        logger.error("Twilio error creating SIP credential vs_customer_id=%s ext=%s: %s", body.vs_customer_id, body.extension_number, exc.msg)
         raise HTTPException(status_code=502, detail=f"Twilio error: {exc.msg}")
 
     ext = await ext_repo.create(
@@ -58,6 +65,7 @@ async def add_extension(
         sip_credential_sid=cred_sid,
         twilio_domain_sid=domain_sid,
     )
+    logger.info("Extension created id=%s sip_username=%s", ext.id, sip_username)
     return ExtensionResponse.model_validate(ext)
 
 

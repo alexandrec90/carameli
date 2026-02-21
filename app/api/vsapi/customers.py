@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from typing import Annotated, List
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -12,6 +13,8 @@ from app.repositories.phone_line_repo import PhoneLineRepo
 from app.schemas.customer import CustomerCreate, CustomerIdResponse, CustomerResponse
 from app.schemas.phone_line import PhoneLineResponse
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/VsCustomer", tags=["customers"])
 
 
@@ -22,8 +25,10 @@ async def create_customer(
     _: Annotated[str, Depends(verify_api_key)],
 ) -> CustomerResponse:
     """Create a new customer record in VoiceGateway."""
+    logger.info("Creating customer vs_customer_id=%s", body.vs_customer_id)
     repo = CustomerRepo(session)
     customer = await repo.create(body)
+    logger.info("Customer created id=%s vs_customer_id=%s", customer.id, customer.vs_customer_id)
     return CustomerResponse.model_validate(customer)
 
 
@@ -37,6 +42,7 @@ async def get_customer(
     repo = CustomerRepo(session)
     customer = await repo.get_by_vs_id(customerId)
     if not customer:
+        logger.warning("Customer not found vs_customer_id=%s", customerId)
         raise HTTPException(status_code=404, detail="Customer not found")
     return CustomerResponse.model_validate(customer)
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -13,6 +14,8 @@ from app.repositories.phone_line_repo import PhoneLineRepo
 from app.schemas.sms import SendSmsRequest, SmsEnableDisableResponse, SmsStatusResponse
 from app.services.twilio_provider import TwilioProvider
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/VsMessaging/Sms", tags=["sms"])
 
 
@@ -25,22 +28,27 @@ async def enable_sms(
     _: Annotated[str, Depends(verify_api_key)],
 ) -> SmsEnableDisableResponse:
     """Enable SMS on a DID by attaching the Twilio SMS webhook."""
+    logger.info("Enabling SMS vs_customer_id=%s number=%s", customerId, smsPhoneNumber)
     customer_repo = CustomerRepo(session)
     customer = await customer_repo.get_by_vs_id(customerId)
     if not customer:
+        logger.warning("Customer not found vs_customer_id=%s", customerId)
         raise HTTPException(status_code=404, detail="Customer not found")
     line_repo = PhoneLineRepo(session)
     line = await line_repo.get_by_number(customer.id, smsPhoneNumber)
     if not line:
+        logger.warning("Phone line not found vs_customer_id=%s number=%s", customerId, smsPhoneNumber)
         raise HTTPException(status_code=404, detail="Phone line not found")
 
     provider: TwilioProvider = request.app.state.twilio
     try:
         await provider.enable_sms(line.twilio_sid)
     except TwilioRestException as exc:
+        logger.error("Twilio error enabling SMS number=%s: %s", smsPhoneNumber, exc.msg)
         raise HTTPException(status_code=502, detail=f"Twilio error: {exc.msg}")
 
     line = await line_repo.update_sms_enabled(line, True)
+    logger.info("SMS enabled number=%s", smsPhoneNumber)
     return SmsEnableDisableResponse(
         success=True, phone_number=smsPhoneNumber, sms_enabled=True
     )

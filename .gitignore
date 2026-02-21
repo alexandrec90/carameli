@@ -42,6 +42,7 @@ htmlcov/
 
 # Logs
 *.log
+logs/
 
 # Node / frontend
 node_modules/
@@ -49,6 +50,3 @@ frontend/node_modules/
 frontend/.next/
 frontend/dist/
 frontend/build/
-
-# VS Code
-.vscode/

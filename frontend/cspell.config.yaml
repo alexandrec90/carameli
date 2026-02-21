@@ -1,0 +1,15 @@
+version: '0.2'
+language: en
+allowCompoundWords: true
+ignorePaths:
+  - node_modules
+  - dist
+  - ../alembic
+  - ../logs
+words:
+  - carameli
+  - twilio
+  - vsapi
+  - ngrok
+  - sip
+  - twiml

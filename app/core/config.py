@@ -14,5 +14,8 @@ class Settings(BaseSettings):
     twilio_api_key_secret: str = ""
     api_key_secret: str = "change_me"
 
+    log_level: str = "INFO"
+    log_file: str = "logs/voicegateway.log"
+
 
 settings = Settings()

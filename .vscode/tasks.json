@@ -1,0 +1,228 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Start: Full Stack (Docker Compose)",
+      "type": "shell",
+      "command": "docker compose up --build",
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "new",
+        "showReuseMessage": false,
+        "close": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Start: Frontend Dev Server",
+      "type": "shell",
+      "command": "npm run dev",
+      "options": {
+        "cwd": "${workspaceFolder}/frontend"
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "new",
+        "showReuseMessage": false,
+        "close": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "DB: Apply Migrations",
+      "type": "shell",
+      "command": "docker compose exec app alembic upgrade head",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "showReuseMessage": false,
+        "close": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Test: Run pytest",
+      "type": "shell",
+      "command": "docker compose exec app pytest",
+      "group": "test",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "showReuseMessage": false,
+        "close": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Lint: Everything",
+      "dependsOn": [
+        "Lint: JS",
+        "Lint: TypeScript",
+        "Lint: CSS",
+        "Lint: Spelling",
+        "Lint: Python",
+        "Lint: Markdown",
+        "Lint: Env"
+      ],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      }
+    },
+    {
+      "label": "Lint: JS",
+      "type": "shell",
+      "command": "npm run lint:eslint",
+      "options": {
+        "cwd": "${workspaceFolder}/frontend"
+      },
+      "presentation": {
+        "showReuseMessage": false,
+        "close": true
+      },
+      "problemMatcher": "$eslint-stylish"
+    },
+    {
+      "label": "Lint: TypeScript",
+      "type": "shell",
+      "command": "npm run lint:types",
+      "options": {
+        "cwd": "${workspaceFolder}/frontend"
+      },
+      "presentation": {
+        "showReuseMessage": false,
+        "close": true
+      },
+      "problemMatcher": "$tsc"
+    },
+    {
+      "label": "Lint: Python",
+      "type": "shell",
+      "command": "ruff check .",
+      "presentation": {
+        "showReuseMessage": false,
+        "close": true
+      },
+      "problemMatcher": {
+        "owner": "python",
+        "fileLocation": [
+          "relative",
+          "${workspaceFolder}"
+        ],
+        "pattern": {
+          "regexp": "^(.+):(\\d+):(\\d+): (\\w+) (.+)$",
+          "file": 1,
+          "line": 2,
+          "column": 3,
+          "code": 4,
+          "message": 5
+        }
+      }
+    },
+    {
+      "label": "Lint: CSS",
+      "type": "shell",
+      "command": "npm run lint:css",
+      "options": {
+        "cwd": "${workspaceFolder}/frontend"
+      },
+      "presentation": {
+        "showReuseMessage": false,
+        "close": true
+      },
+      "problemMatcher": {
+        "owner": "css",
+        "fileLocation": "absolute",
+        "pattern": {
+          "regexp": "^(.+):(\\d+):(\\d+):\\s+(.+)$",
+          "file": 1,
+          "line": 2,
+          "column": 3,
+          "message": 4
+        }
+      }
+    },
+    {
+      "label": "Lint: Spelling",
+      "type": "shell",
+      "command": "npm run lint:spelling",
+      "options": {
+        "cwd": "${workspaceFolder}/frontend"
+      },
+      "presentation": {
+        "showReuseMessage": false,
+        "close": true
+      },
+      "problemMatcher": {
+        "owner": "cspell",
+        "fileLocation": [
+          "relative",
+          "${workspaceFolder}/frontend"
+        ],
+        "pattern": {
+          "regexp": "^(.+):(\\d+):(\\d+) - (.+)$",
+          "file": 1,
+          "line": 2,
+          "column": 3,
+          "message": 4
+        }
+      }
+    },
+    {
+      "label": "Lint: Env",
+      "type": "shell",
+      "command": "dotenv-linter",
+      "presentation": {
+        "showReuseMessage": false,
+        "close": true
+      },
+      "problemMatcher": {
+        "owner": "env",
+        "severity": "error",
+        "fileLocation": [
+          "relative",
+          "${workspaceFolder}"
+        ],
+        "pattern": [
+          {
+            "regexp": "^/?([^\\r\\n]+)$",
+            "file": 1,
+            "kind": "file"
+          },
+          {
+            "regexp": "^\\s*-\\s+error\\s+(.+?)\\s{2,}(\\S+)$",
+            "message": 1,
+            "code": 2,
+            "loop": true
+          }
+        ]
+      }
+    },
+    {
+      "label": "Lint: Markdown",
+      "type": "shell",
+      "command": "npm --prefix frontend exec markdownlint . --ext md",
+      "presentation": {
+        "showReuseMessage": false,
+        "close": true
+      },
+      "problemMatcher": {
+        "owner": "markdown",
+        "fileLocation": [
+          "relative",
+          "${workspaceFolder}"
+        ],
+        "pattern": {
+          "regexp": "^(.+):(\\d+): (.+)$",
+          "file": 1,
+          "line": 2,
+          "message": 3
+        }
+      }
+    }
+  ]
+}
