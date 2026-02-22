@@ -1,3 +1,13 @@
+---
+description: Carameli UI design system conventions
+paths:
+  - frontend/src/**/*.ts
+  - frontend/src/**/*.tsx
+  - frontend/src/**/*.css
+  - frontend/index.html
+  - frontend/tailwind.config.js
+---
+
 # Rule: Carameli UI Design System ("Liquid Luxury")
 
 The Carameli front-end follows a **Neumorphism + Glassmorphism** hybrid aesthetic.
@@ -94,6 +104,39 @@ background: rgba(26, 15, 0, 0.55);
 
 ---
 
+## Candlelight Flicker (Glass Animation)
+
+All glass surfaces (cards, panels, nav) carry a perpetual ambient glow that simulates candlelight — organic and irregular, never mechanical.
+
+```css
+@keyframes candleflicker {
+  0%,  100% { box-shadow: 0 0 20px rgba(255,159,28,0.12), 0 0 45px rgba(255,159,28,0.06); }
+  15%        { box-shadow: 0 0 26px rgba(255,159,28,0.18), 0 0 55px rgba(255,159,28,0.09); }
+  30%        { box-shadow: 0 0 17px rgba(255,159,28,0.10), 0 0 38px rgba(255,159,28,0.05); }
+  50%        { box-shadow: 0 0 30px rgba(255,159,28,0.22), 0 0 60px rgba(255,159,28,0.11); }
+  70%        { box-shadow: 0 0 15px rgba(255,159,28,0.08), 0 0 32px rgba(255,159,28,0.04); }
+  85%        { box-shadow: 0 0 24px rgba(255,159,28,0.16), 0 0 50px rgba(255,159,28,0.08); }
+}
+
+.glass-flicker {
+  animation: candleflicker 4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+```
+
+- Keyframe stops are **deliberately irregular** — avoid even spacing so the flicker feels alive, not pulsing.
+- Duration: `4s`. Stagger siblings with `animation-delay` (`0.3s`, `0.7s`, `1.1s`) so panels do not breathe in unison.
+- Intensity cap: outer glow never exceeds `rgba(255,159,28,0.25)` — warmth, not neon.
+- Combines with the standard card shadow; the flicker animates only the **outer ambient glow layer**, leaving the structural drop-shadow static.
+
+In Tailwind (register `candleflicker` in `tailwind.config.theme.extend.keyframes`):
+
+```html
+<div class="animate-[candleflicker_4s_cubic-bezier(0.4,0,0.2,1)_infinite] [animation-delay:0.3s]
+            bg-[rgba(26,15,0,0.55)] backdrop-blur-[25px] rounded-[32px]">
+```
+
+---
+
 ## Motion & Easing
 
 **All transitions** must use the custom cubic-bezier — never `ease`, `ease-in-out`, or `linear`.
@@ -134,6 +177,45 @@ Animate a gradient sweep left-to-right to simulate "liquid gold flowing":
   animation: shimmer 1.6s cubic-bezier(0.4, 0, 0.2, 1) infinite;
 }
 ```
+
+### Hover & Active Glow States
+
+Every interactive surface must expose two **categorically different** glow states — never collapse them into one.
+
+| State | Glow direction | Transform | Speed |
+| --- | --- | --- | --- |
+| `:hover` | Outward amber halo | `translateY(-1px)` | `250ms` |
+| `:active` | Inward press + `#FFD275` corona | `scale(0.97)` | `80ms` |
+
+```css
+/* Hover — surface lifts toward the user with a warm amber halo */
+.interactive:hover {
+  box-shadow:
+    0 0 30px rgba(255, 159, 28, 0.28),
+    0 12px 40px -5px rgba(26, 15, 0, 0.45);
+  border-top-color: rgba(255, 244, 224, 0.28);
+  border-left-color: rgba(255, 244, 224, 0.28);
+  transform: translateY(-1px);
+  transition: all 250ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Active / click — press-and-sink + soft-glow (#FFD275) corona flash */
+.interactive:active {
+  transform: scale(0.97) translateY(0);
+  box-shadow:
+    inset 0 3px 8px rgba(26, 15, 0, 0.6),
+    0 0 18px rgba(255, 210, 117, 0.45);   /* #FFD275 corona, not #FF9F1C */
+  border-top-color: rgba(255, 244, 224, 0.08);
+  border-left-color: rgba(255, 244, 224, 0.08);
+  transition: all 80ms cubic-bezier(0.4, 0, 0.2, 1);  /* snappy on strike */
+}
+```
+
+Rules:
+- Hover uses `translateY(-1px)` lift — **never** `scale()` (scale is reserved for active only).
+- Active corona uses `#FFD275` (`soft-glow`) — **not** `#FF9F1C` — to signal a different energy from the resting amber.
+- The asymmetric timing (250 ms hover, 80 ms active) makes clicks feel physical: slow approach, instant strike.
+- Non-clickable cards: apply hover state only. Add active state only if the card navigates or triggers an action.
 
 ---
 
@@ -200,6 +282,127 @@ Load order preference: `Satoshi` → `Outfit` → `Inter` (fallback).
 }
 ```
 
+### Dashboard Widgets (Gauges, Graphs, Counters)
+
+Minimalist data surfaces. No axis borders, no tick marks. Grid lines only when essential, at ≤4% opacity.
+
+#### Design Rules
+
+- **Container**: Amber Tray card + `candleflicker` animation on the wrapper.
+- **Data fills**: amber gradient (`#FF9F1C` → `#FFD275`) for filled regions; `rgba(255,244,224,0.06)` for empty tracks/backgrounds.
+- **Labels**: `#FFD275`, `font-medium`. Values: `#FFF4E0`, `font-extrabold`.
+- **All values animate from zero on mount** — nothing renders statically without first drawing in.
+
+#### Load-In Animations
+
+```css
+/* SVG arc / gauge draw-in */
+@keyframes arc-draw {
+  from { stroke-dashoffset: var(--arc-total); }
+  to   { stroke-dashoffset: var(--arc-offset); }
+}
+
+/* Bar / column grow from baseline */
+@keyframes bar-grow {
+  from { transform: scaleY(0); }
+  to   { transform: scaleY(1); }
+}
+/* Always set transform-origin: bottom on bar elements */
+
+/* Number count-up: driven by JS requestAnimationFrame,
+   eased by the same cubic-bezier(0.4, 0, 0.2, 1) */
+```
+
+Timing:
+- Bars and arcs: `800ms`, `cubic-bezier(0.4, 0, 0.2, 1)`, `animation-fill-mode: forwards`.
+- Count-up numbers: `1200ms`.
+- Stagger siblings `100ms` per element — bars and arc segments cascade in left-to-right.
+
+#### Radial Gauge (SVG)
+
+```tsx
+export function RadialGauge({ value, max, label }: GaugeProps) {
+  const R = 54;
+  const arc = Math.PI * R;                          // half-circle circumference
+  const offset = ((max - value) / max) * arc;
+
+  return (
+    <article
+      className="
+        bg-[rgba(26,15,0,0.55)] backdrop-blur-[25px]
+        rounded-[32px] p-6
+        border border-[rgba(255,244,224,0.1)]
+        border-t-[rgba(255,244,224,0.15)] border-l-[rgba(255,244,224,0.15)]
+        shadow-[0_10px_30px_-5px_rgba(26,15,0,0.5)]
+        animate-[candleflicker_4s_cubic-bezier(0.4,0,0.2,1)_infinite]
+      "
+    >
+      <svg viewBox="0 0 120 70" className="w-full overflow-visible">
+        <defs>
+          <linearGradient id="gauge-fill" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor="#FF9F1C" />
+            <stop offset="100%" stopColor="#FFD275" />
+          </linearGradient>
+        </defs>
+        {/* Empty track */}
+        <path d="M 10 60 A 54 54 0 0 1 110 60"
+          fill="none" stroke="rgba(255,244,224,0.06)" strokeWidth="8" strokeLinecap="round" />
+        {/* Filled arc — draws in on mount */}
+        <path d="M 10 60 A 54 54 0 0 1 110 60"
+          fill="none" stroke="url(#gauge-fill)" strokeWidth="8" strokeLinecap="round"
+          strokeDasharray={arc} strokeDashoffset={arc}
+          className="animate-[arc-draw_800ms_cubic-bezier(0.4,0,0.2,1)_forwards]"
+          style={{ '--arc-total': arc, '--arc-offset': offset } as React.CSSProperties}
+        />
+      </svg>
+      <p className="text-[#FFF4E0] font-extrabold text-3xl text-center -mt-2">{value}</p>
+      <p className="text-[#FFD275] font-medium text-sm text-center mt-1">{label}</p>
+    </article>
+  );
+}
+```
+
+#### Bar Chart
+
+```tsx
+export function BarChart({ data }: { data: { label: string; value: number }[] }) {
+  const max = Math.max(...data.map(d => d.value));
+
+  return (
+    <article
+      className="
+        bg-[rgba(26,15,0,0.55)] backdrop-blur-[25px]
+        rounded-[32px] p-6
+        border border-[rgba(255,244,224,0.1)]
+        border-t-[rgba(255,244,224,0.15)] border-l-[rgba(255,244,224,0.15)]
+        shadow-[0_10px_30px_-5px_rgba(26,15,0,0.5)]
+      "
+    >
+      <div className="flex items-end gap-3 h-32">
+        {data.map((d, i) => (
+          <div key={d.label} className="flex-1 flex flex-col items-center gap-2">
+            <div
+              className="
+                w-full rounded-t-[8px]
+                bg-gradient-to-t from-[#FF9F1C] to-[#FFD275]
+                origin-bottom
+                animate-[bar-grow_800ms_cubic-bezier(0.4,0,0.2,1)_forwards]
+              "
+              style={{
+                height: `${(d.value / max) * 100}%`,
+                animationDelay: `${i * 100}ms`,
+                animationFillMode: 'both',
+              }}
+            />
+            <span className="text-[#FFD275] text-xs font-medium">{d.label}</span>
+          </div>
+        ))}
+      </div>
+    </article>
+  );
+}
+```
+
 ---
 
 ## Tailwind Implementation Rules
@@ -233,3 +436,6 @@ Only add tokens to `tailwind.config` when a value is used in 4+ places.
 6. **Top-left light source** — bright top/left border, shadow bottom-right.
 7. **Press-and-sink on all buttons** — `scale(0.97)` + inset shadow on `:active`.
 8. **Shimmer loaders** — use the amber gradient shimmer, not gray skeleton bars.
+9. **Candlelight flicker on all glass** — `candleflicker` keyframe, `4s`, stagger siblings by `0.3s+`; outer glow only, never the structural shadow.
+10. **Hover ≠ active** — hover lifts outward (`translateY(-1px)` + amber halo, `250ms`); active strikes inward (`scale(0.97)` + `#FFD275` corona, `80ms`). These must feel categorically different.
+11. **Dashboard widgets animate from zero** — arcs draw in via `stroke-dashoffset`, bars grow via `scaleY`, numbers count up in JS; stagger siblings `100ms` per element.

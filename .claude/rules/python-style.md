@@ -1,3 +1,11 @@
+---
+description: Python and FastAPI coding style conventions
+paths:
+  - app/**/*.py
+  - tests/**/*.py
+  - alembic/**/*.py
+---
+
 # Rule: Python / FastAPI Code Style
 
 ## General

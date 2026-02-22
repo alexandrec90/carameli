@@ -1,3 +1,13 @@
+---
+description: Database / SQLAlchemy / Alembic conventions
+paths:
+  - app/models/**/*.py
+  - app/repositories/**/*.py
+  - app/core/database.py
+  - app/schemas/**/*.py
+  - alembic/**/*.py
+---
+
 # Rule: Database / SQLAlchemy / Alembic
 
 ## ORM Models (`app/models/`)

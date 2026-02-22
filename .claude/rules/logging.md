@@ -1,3 +1,11 @@
+---
+description: Backend and frontend structured logging conventions
+paths:
+   - app/**/*.py
+   - frontend/src/**/*.ts
+   - frontend/src/**/*.tsx
+---
+
 # Rule: Logging
 
 All modules — backend and frontend — must emit structured, machine-readable logs

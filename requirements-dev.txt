@@ -1,0 +1,5 @@
+-r requirements.txt
+
+# Local developer tooling (host machine)
+# Used by VS Code tasks such as "Lint: Python"
+ruff>=0.9.0

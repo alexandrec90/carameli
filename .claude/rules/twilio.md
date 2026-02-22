@@ -1,3 +1,15 @@
+---
+description: Twilio SDK and webhook handling conventions
+paths:
+  - app/services/twilio_provider.py
+  - app/api/vsapi/phone_lines.py
+  - app/api/vsapi/extensions.py
+  - app/api/vsapi/sms.py
+  - app/api/vsapi/voicemail_drop.py
+  - app/api/webhooks/**/*.py
+  - tests/**/*.py
+---
+
 # Rule: Twilio SDK Usage
 
 ## Client Lifecycle

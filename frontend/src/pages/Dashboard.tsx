@@ -58,8 +58,8 @@ export default function Dashboard() {
     <div className="space-y-8">
       {/* Header */}
       <div>
-        <h1 className="text-[#FFF4E0] text-4xl font-extrabold">Dashboard</h1>
-        <p className="text-[rgba(255,244,224,0.6)] text-base font-medium mt-1">
+        <h1 className="page-title text-4xl font-extrabold">Dashboard</h1>
+        <p className="page-subtitle text-base font-medium mt-1">
           VoiceGateway status overview
         </p>
       </div>
@@ -71,8 +71,8 @@ export default function Dashboard() {
           style={{ background: 'rgba(220, 60, 40, 0.15)', border: '1px solid rgba(220,60,40,0.3)' }}
         >
           <div className="w-2.5 h-2.5 rounded-full bg-red-400" />
-          <p className="text-[#FFF4E0] font-medium">
-            API is offline — make sure <code className="text-[#FFD275]">docker compose up</code> is running on port 8000.
+          <p className="text-body-soft font-medium">
+            API is offline — make sure <code className="text-code-accent">docker compose up</code> is running on port 8000.
           </p>
         </div>
       )}
@@ -108,7 +108,7 @@ export default function Dashboard() {
       {/* Customer card */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
-          <h2 className="text-[#FFF4E0] font-bold text-xl mb-4">Demo Customer</h2>
+          <h2 className="section-title font-bold text-xl mb-4">Demo Customer</h2>
           {customer ? (
             <div className="space-y-3">
               <Row label="VS Customer ID" value={String(customer.vs_customer_id)} />
@@ -118,7 +118,7 @@ export default function Dashboard() {
             </div>
           ) : (
             <div className="space-y-4">
-              <p className="text-[rgba(255,244,224,0.5)] text-sm">
+              <p className="text-body-soft text-sm">
                 No customer seeded yet. Click below to create a demo customer (vs_customer_id = 1).
               </p>
               <Button size="sm" onClick={seedDemoCustomer}>
@@ -129,9 +129,9 @@ export default function Dashboard() {
         </Card>
 
         <Card>
-          <h2 className="text-[#FFF4E0] font-bold text-xl mb-4">Phone Lines</h2>
+          <h2 className="section-title font-bold text-xl mb-4">Phone Lines</h2>
           {phoneLines.length === 0 ? (
-            <p className="text-[rgba(255,244,224,0.5)] text-sm">
+            <p className="text-body-soft text-sm">
               No phone lines provisioned yet. Go to Phone Lines to add one.
             </p>
           ) : (
@@ -142,13 +142,13 @@ export default function Dashboard() {
                   className="flex items-center justify-between rounded-[12px] px-4 py-2"
                   style={{ background: 'rgba(255,159,28,0.06)' }}
                 >
-                  <span className="text-[#FFF4E0] font-medium text-sm">{line.phone_number}</span>
+                  <span className="field-value text-sm">{line.phone_number}</span>
                   <div className="flex gap-2">
                     {line.sms_enabled && (
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-[6px] bg-[rgba(255,159,28,0.2)] text-[#FFD275]">SMS</span>
+                      <span className="ui-badge">SMS</span>
                     )}
                     {line.recording_enabled && (
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-[6px] bg-[rgba(255,159,28,0.2)] text-[#FFD275]">REC</span>
+                      <span className="ui-badge">REC</span>
                     )}
                   </div>
                 </div>
@@ -164,8 +164,8 @@ export default function Dashboard() {
 function Row({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex justify-between items-center">
-      <span className="text-[#FFD275] text-sm font-medium">{label}</span>
-      <span className="text-[#FFF4E0] text-sm font-medium font-mono">{value}</span>
+      <span className="field-label">{label}</span>
+      <span className="field-value font-mono">{value}</span>
     </div>
   )
 }

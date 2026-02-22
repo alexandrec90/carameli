@@ -7,6 +7,7 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/vsapi': 'http://localhost:8000',
+      '/vg': 'http://localhost:8000',
       '/health': 'http://localhost:8000',
     },
   },

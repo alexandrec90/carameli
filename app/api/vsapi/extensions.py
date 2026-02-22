@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Annotated, List
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession

@@ -22,7 +22,7 @@ export default function Extensions() {
     api.extensions
       .getAvailable(CUSTOMER_ID, 100, 199)
       .then(setAvailable)
-      .catch(() => {})
+      .catch(() => { })
   }, [])
 
   async function addExtension() {
@@ -49,22 +49,22 @@ export default function Extensions() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-[#FFF4E0] text-4xl font-extrabold">Extensions</h1>
-        <p className="text-[rgba(255,244,224,0.6)] text-base font-medium mt-1">
+        <h1 className="page-title text-4xl font-extrabold">Extensions</h1>
+        <p className="page-subtitle text-base font-medium mt-1">
           Manage SIP extensions and credentials
         </p>
       </div>
 
       {/* Add extension */}
       <Card>
-        <h2 className="text-[#FFF4E0] font-bold text-lg mb-4">Create Extension</h2>
+        <h2 className="section-title font-bold text-lg mb-4">Create Extension</h2>
         <div className="flex gap-3 items-center flex-wrap">
           <input
             type="text"
             placeholder="Extension number (e.g. 101)"
             value={extNumber}
             onChange={(e) => setExtNumber(e.target.value)}
-            className="px-4 py-2.5 rounded-[16px] text-[#FFF4E0] placeholder-[rgba(255,244,224,0.3)] font-medium text-sm outline-none focus:ring-2 focus:ring-[#FF9F1C]/40 w-56"
+            className="ui-input px-4 py-2.5 rounded-[16px] outline-none focus:ring-2 focus:ring-[#FF9F1C]/40 w-56"
             style={{
               background: 'rgba(255,159,28,0.08)',
               border: '1px solid rgba(255,244,224,0.1)',
@@ -78,14 +78,14 @@ export default function Extensions() {
         </div>
         {error && <p className="text-red-400 text-sm mt-3">{error}</p>}
         {success && <p className="text-green-400 text-sm mt-3">{success}</p>}
-        <p className="text-[rgba(255,244,224,0.35)] text-xs mt-3">
+        <p className="text-helper mt-3">
           Creates a Twilio SIP credential — requires valid Twilio credentials
         </p>
       </Card>
 
       {/* Available extensions */}
       <Card>
-        <h2 className="text-[#FFF4E0] font-bold text-lg mb-4">
+        <h2 className="section-title font-bold text-lg mb-4">
           Available in Range 100–199
         </h2>
         {!available ? (
@@ -96,7 +96,7 @@ export default function Extensions() {
               <button
                 key={n}
                 onClick={() => setExtNumber(n)}
-                className="px-3 py-1.5 rounded-[10px] text-[#FFD275] text-sm font-medium hover:text-[#FFF4E0] transition-all duration-[250ms]"
+                className="ui-chip ui-button-label px-3 py-1.5 rounded-[10px] text-[#FFD275] hover:text-[#FFF4E0] transition-all duration-[250ms]"
                 style={{
                   background: 'rgba(255,159,28,0.1)',
                   border: '1px solid rgba(255,244,224,0.08)',
@@ -106,7 +106,7 @@ export default function Extensions() {
               </button>
             ))}
             {available.available.length === 0 && (
-              <p className="text-[rgba(255,244,224,0.4)] text-sm">All extensions in this range are in use</p>
+              <p className="text-body-soft text-sm">All extensions in this range are in use</p>
             )}
           </div>
         )}
@@ -117,11 +117,11 @@ export default function Extensions() {
         <div className="flex gap-4">
           <PhoneCall size={24} className="text-[#FF9F1C] flex-shrink-0 mt-0.5" />
           <div>
-            <h3 className="text-[#FFF4E0] font-bold mb-1">SIP Credentials</h3>
-            <p className="text-[rgba(255,244,224,0.6)] text-sm leading-relaxed">
+            <h3 className="section-title font-bold mb-1">SIP Credentials</h3>
+            <p className="text-body-soft text-sm leading-relaxed">
               Each extension creates a Twilio SIP credential. Configure your SIP phone
-              with the generated <code className="text-[#FFD275]">sip_username</code> and the
-              domain <code className="text-[#FFD275]">vg-&lt;id&gt;.sip.twilio.com</code>.
+              with the generated <code className="text-code-accent">sip_username</code> and the
+              domain <code className="text-code-accent">vg-&lt;id&gt;.sip.twilio.com</code>.
               Passwords are auto-generated unless provided.
             </p>
           </div>

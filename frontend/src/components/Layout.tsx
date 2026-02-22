@@ -24,16 +24,10 @@ interface LayoutProps {
 
 export function Layout({ children }: LayoutProps) {
   return (
-    <div className="min-h-screen flex" style={{ background: '#1A0F00' }}>
-      {/* Sidebar */}
+    <div className="min-h-screen flex">
+      {/* Sidebar — static glass surface, lit by global ambient candlelight */}
       <aside
-        className="w-64 flex-shrink-0 flex flex-col"
-        style={{
-          background: 'rgba(26, 15, 0, 0.8)',
-          backdropFilter: 'blur(25px)',
-          WebkitBackdropFilter: 'blur(25px)',
-          borderRight: '1px solid rgba(255, 244, 224, 0.06)',
-        }}
+        className="w-64 flex-shrink-0 flex flex-col glass-sidebar"
       >
         {/* Logo */}
         <div className="px-6 py-8">
@@ -45,8 +39,8 @@ export function Layout({ children }: LayoutProps) {
               <Phone size={18} className="text-[#1A0F00]" />
             </div>
             <div>
-              <h1 className="text-[#FFF4E0] font-extrabold text-lg leading-none">Carameli</h1>
-              <p className="text-[#FFD275] text-xs font-medium opacity-70">VoiceGateway</p>
+              <h1 className="carameli-wordmark text-[2.15rem] leading-none" data-text="Carameli">Carameli</h1>
+              <p className="field-label opacity-70">VoiceGateway</p>
             </div>
           </div>
         </div>
@@ -59,19 +53,18 @@ export function Layout({ children }: LayoutProps) {
               to={to}
               end={to === '/'}
               className={({ isActive }) =>
-                `flex items-center gap-3 px-4 py-3 rounded-[16px] font-medium text-sm transition-all duration-[250ms] ${
-                  isActive
-                    ? 'text-[#1A0F00]'
-                    : 'text-[rgba(255,244,224,0.6)] hover:text-[#FFF4E0]'
+                `flex items-center gap-3 px-4 py-3 rounded-[16px] font-medium text-sm ${isActive
+                  ? 'text-[#1A0F00]'
+                  : 'text-[rgba(255,244,224,0.6)] nav-item'
                 }`
               }
               style={({ isActive }) =>
                 isActive
                   ? {
-                      background: 'linear-gradient(to right, #FF9F1C, #E68A00)',
-                      boxShadow: '0 4px 12px -2px rgba(255, 159, 28, 0.35)',
-                    }
-                  : { background: 'transparent' }
+                    background: 'linear-gradient(to right, #FF9F1C, #E68A00)',
+                    boxShadow: '0 4px 12px -2px rgba(255, 159, 28, 0.35)',
+                  }
+                  : {}
               }
             >
               <Icon size={16} />
@@ -87,7 +80,7 @@ export function Layout({ children }: LayoutProps) {
             style={{ background: 'rgba(255,159,28,0.08)' }}
           >
             <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-            <span className="text-[#FFD275] text-xs font-medium">API Online</span>
+            <span className="field-label">API Online</span>
           </div>
         </div>
       </aside>

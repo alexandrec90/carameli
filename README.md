@@ -9,6 +9,27 @@ Self-hosted VoIP microservice built on Twilio. Drop-in replacement for Cloudli/C
 - **Docker Desktop** (running)
 - That's it — everything else runs inside containers
 
+If you only run Docker-based tasks (`Start: Full Stack`, `DB: Apply Migrations`, `Test: Run pytest`), Docker is enough.
+
+If you also want to run all local lint/dev tasks from VS Code, install these host tools once:
+
+| Task(s) | Required tool |
+| --- | --- |
+| `Start: Frontend Dev Server`, `Lint: JS`, `Lint: TypeScript`, `Lint: CSS`, `Lint: Spelling`, `Lint: Markdown` | Node.js + npm (then run `npm --prefix frontend install`) |
+| `Lint: Python` | Python 3.12 + `pip install -r requirements-dev.txt` |
+| `Lint: Env` | `dotenv-linter` CLI on host machine |
+
+### VS Code Extensions (recommended)
+
+This repo now includes `.vscode/extensions.json`. VS Code will prompt to install recommended extensions when the workspace opens.
+
+### `dotenv-linter` install notes
+
+`dotenv-linter` is a standalone CLI (not bundled in `requirements.txt`):
+
+- **Windows**: install with your preferred package manager (for example, Chocolatey or Scoop)
+- **Cross-platform**: install via Cargo (`cargo install dotenv-linter`) if you already use Rust tooling
+
 ---
 
 ## Starting the Stack

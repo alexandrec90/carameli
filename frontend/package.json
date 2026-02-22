@@ -13,6 +13,7 @@
     "lint:spelling": "cspell \"../**/*.md\" \"src/**/*.{ts,tsx,js,jsx,json,yml,yaml}\" --no-progress --relative"
   },
   "dependencies": {
+    "@fontsource/outfit": "^5.2.8",
     "lucide-react": "^0.462.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",

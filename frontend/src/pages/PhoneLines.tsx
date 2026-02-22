@@ -54,15 +54,15 @@ export default function PhoneLines() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-[#FFF4E0] text-4xl font-extrabold">Phone Lines</h1>
-        <p className="text-[rgba(255,244,224,0.6)] text-base font-medium mt-1">
+        <h1 className="page-title text-4xl font-extrabold">Phone Lines</h1>
+        <p className="page-subtitle text-base font-medium mt-1">
           Manage DIDs (Direct Inward Dialing numbers)
         </p>
       </div>
 
       {/* Add line form */}
       <Card>
-        <h2 className="text-[#FFF4E0] font-bold text-lg mb-4">Provision New DID</h2>
+        <h2 className="section-title font-bold text-lg mb-4">Provision New DID</h2>
         <div className="flex gap-3 items-center flex-wrap">
           <input
             type="text"
@@ -70,7 +70,7 @@ export default function PhoneLines() {
             value={areaCode}
             onChange={(e) => setAreaCode(e.target.value)}
             maxLength={3}
-            className="px-4 py-2.5 rounded-[16px] text-[#FFF4E0] placeholder-[rgba(255,244,224,0.3)] font-medium text-sm outline-none focus:ring-2 focus:ring-[#FF9F1C]/40 w-48"
+            className="ui-input px-4 py-2.5 rounded-[16px] outline-none focus:ring-2 focus:ring-[#FF9F1C]/40 w-48"
             style={{
               background: 'rgba(255,159,28,0.08)',
               border: '1px solid rgba(255,244,224,0.1)',
@@ -83,14 +83,14 @@ export default function PhoneLines() {
           </Button>
         </div>
         {error && <p className="text-red-400 text-sm mt-3">{error}</p>}
-        <p className="text-[rgba(255,244,224,0.35)] text-xs mt-3">
+        <p className="text-helper mt-3">
           Requires valid Twilio credentials in .env — uses real Twilio API
         </p>
       </Card>
 
       {/* Lines table */}
       <Card>
-        <h2 className="text-[#FFF4E0] font-bold text-lg mb-4">
+        <h2 className="section-title font-bold text-lg mb-4">
           Active Lines {!loading && <span className="text-[#FFD275]">({lines.length})</span>}
         </h2>
         {loading ? (
@@ -102,7 +102,7 @@ export default function PhoneLines() {
         ) : lines.length === 0 ? (
           <div className="text-center py-12">
             <Phone size={40} className="mx-auto mb-3 text-[rgba(255,159,28,0.3)]" />
-            <p className="text-[rgba(255,244,224,0.4)] font-medium">No phone lines yet</p>
+            <p className="text-body-soft font-medium">No phone lines yet</p>
           </div>
         ) : (
           <div className="space-y-2">
@@ -114,7 +114,7 @@ export default function PhoneLines() {
               >
                 <div className="flex items-center gap-4">
                   <Phone size={16} className="text-[#FF9F1C]" />
-                  <span className="text-[#FFF4E0] font-medium">{line.phone_number}</span>
+                  <span className="field-value">{line.phone_number}</span>
                 </div>
                 <div className="flex items-center gap-3">
                   {line.sms_enabled && <Badge>SMS</Badge>}
@@ -139,10 +139,7 @@ export default function PhoneLines() {
 
 function Badge({ children }: { children: React.ReactNode }) {
   return (
-    <span
-      className="text-[10px] font-bold px-2 py-0.5 rounded-[6px] text-[#FFD275]"
-      style={{ background: 'rgba(255,159,28,0.2)' }}
-    >
+    <span className="ui-badge">
       {children}
     </span>
   )

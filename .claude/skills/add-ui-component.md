@@ -10,6 +10,7 @@ Use this skill when asked to build a new front-end component for the Carameli UI
    - Form input → rounded-[16px], glass background, soft-glow focus ring
    - Modal / overlay → backdrop-blur(25px) + Amber Tray card
    - Navigation bar → backdrop-blur(25px), sticky, deep-base background
+   - Dashboard widget (gauge, graph, counter) → Amber Tray card + candleflicker + load-in animation
 
 2. **Read the relevant rule** before writing any code:
    - `.claude/rules/ui-design.md` — color tokens, shadow patterns, animation rules
@@ -22,6 +23,9 @@ Use this skill when asked to build a new front-end component for the Carameli UI
    - Press-and-sink `:active` state on all buttons
    - Duo-tone icons if icons are included
    - Shimmer skeleton if the component has a loading state
+   - Candlelight flicker animation on all glass surfaces
+   - Distinct hover (outward lift + amber halo) and active (inward press + `#FFD275` corona) states
+   - Load-in animation from zero if the component contains data visualizations (arc-draw, bar-grow, count-up)
 
 4. **Write the component** following the project's chosen framework/stack:
    - If Tailwind: use bracket syntax for design-token values
@@ -36,6 +40,9 @@ Use this skill when asked to build a new front-end component for the Carameli UI
    - [ ] Loading state uses amber shimmer (not gray bars)
    - [ ] Corners match radii spec (32px card, 20px/pill button, 16px input)
    - [ ] Backdrop blur on any overlay or nav element
+   - [ ] Glass surfaces have `candleflicker` animation; siblings staggered with `animation-delay`
+   - [ ] Hover state is outward glow + `translateY(-1px)` (250ms); active state is `scale(0.97)` + `#FFD275` corona (80ms)
+   - [ ] Dashboard widget values animate from zero on mount (arc-draw / bar-grow / count-up), siblings staggered 100ms
 
 ## Example Output (Tailwind)
 

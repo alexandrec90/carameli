@@ -3,6 +3,11 @@ import ReactDOM from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import App from './App'
 import { logger } from './lib/logger'
+import '@fontsource/outfit/400.css'
+import '@fontsource/outfit/500.css'
+import '@fontsource/outfit/600.css'
+import '@fontsource/outfit/700.css'
+import '@fontsource/outfit/800.css'
 import './index.css'
 
 // Capture uncaught JS errors and unhandled promise rejections into the log file
