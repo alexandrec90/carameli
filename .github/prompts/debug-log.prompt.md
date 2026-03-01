@@ -31,6 +31,7 @@ Group what you find into three buckets:
 | **[FRONTEND]** | Lines containing `[FRONTEND]` | Browser-side errors — fix in `frontend/src/` |
 
 For each entry note:
+
 - Timestamp
 - Module and line number (third `|`-delimited field)
 - The full message and any `context=` payload
@@ -58,18 +59,22 @@ For each ERROR/WARNING:
 After applying fixes:
 
 1. Run the test suite:
+
    ```bash
    docker compose exec app pytest
    ```
+
 2. Tail the log to confirm the fixed errors no longer appear under normal operation:
+
    ```bash
    tail -f logs/voicegateway.log
    ```
+
 3. If frontend errors were present, check the browser console as well.
 
 ## Log format reference
 
-```
+```text
 2026-02-21 14:30:00.123 | ERROR    | app.api.vsapi.phone_lines:56 | Twilio error purchasing DID vs_customer_id=42: Invalid phone number
                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
                                       open this file at this line   this is the message to fix

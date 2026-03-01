@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from twilio.base.exceptions import TwilioRestException
 
-from app.core.auth import verify_api_key
+from app.core.auth import AuthContext, enforce_customer_scope, get_auth_context
 from app.core.database import get_session
 from app.repositories.customer_repo import CustomerRepo
 from app.repositories.phone_line_repo import PhoneLineRepo
@@ -30,9 +30,10 @@ async def add_phone_line(
     body: AddPhoneLineRequest,
     request: Request,
     session: Annotated[AsyncSession, Depends(get_session)],
-    _: Annotated[str, Depends(verify_api_key)],
+    auth: Annotated[AuthContext, Depends(get_auth_context)],
 ) -> PhoneLineResponse:
     """Purchase a new DID from Twilio and register it for the customer."""
+    enforce_customer_scope(auth, body.vs_customer_id)
     logger.info("Adding phone line vs_customer_id=%s area_code=%s number=%s", body.vs_customer_id, body.area_code, body.phone_number)
     customer_repo = CustomerRepo(session)
     customer = await customer_repo.get_by_vs_id(body.vs_customer_id)
@@ -68,9 +69,10 @@ async def get_phone_line(
     customerId: int,
     phoneNumber: str,
     session: Annotated[AsyncSession, Depends(get_session)],
-    _: Annotated[str, Depends(verify_api_key)],
+    auth: Annotated[AuthContext, Depends(get_auth_context)],
 ) -> PhoneLineResponse:
     """Get info for a specific DID."""
+    enforce_customer_scope(auth, customerId)
     customer_repo = CustomerRepo(session)
     customer = await customer_repo.get_by_vs_id(customerId)
     if not customer:
@@ -86,9 +88,10 @@ async def get_phone_line(
 async def get_phone_line_count(
     customerId: int,
     session: Annotated[AsyncSession, Depends(get_session)],
-    _: Annotated[str, Depends(verify_api_key)],
+    auth: Annotated[AuthContext, Depends(get_auth_context)],
 ) -> PhoneLineCountResponse:
     """Return the count of active DIDs for a customer."""
+    enforce_customer_scope(auth, customerId)
     customer_repo = CustomerRepo(session)
     customer = await customer_repo.get_by_vs_id(customerId)
     if not customer:
@@ -103,9 +106,10 @@ async def deactivate_phone_line(
     body: DeactivatePhoneLineRequest,
     request: Request,
     session: Annotated[AsyncSession, Depends(get_session)],
-    _: Annotated[str, Depends(verify_api_key)],
+    auth: Annotated[AuthContext, Depends(get_auth_context)],
 ) -> PhoneLineResponse:
     """Release a DID from Twilio and mark it inactive."""
+    enforce_customer_scope(auth, body.vs_customer_id)
     customer_repo = CustomerRepo(session)
     customer = await customer_repo.get_by_vs_id(body.vs_customer_id)
     if not customer:
@@ -130,9 +134,10 @@ async def update_call_recording(
     body: UpdateRecordingRequest,
     request: Request,
     session: Annotated[AsyncSession, Depends(get_session)],
-    _: Annotated[str, Depends(verify_api_key)],
+    auth: Annotated[AuthContext, Depends(get_auth_context)],
 ) -> PhoneLineResponse:
     """Toggle call recording for a DID."""
+    enforce_customer_scope(auth, body.vs_customer_id)
     customer_repo = CustomerRepo(session)
     customer = await customer_repo.get_by_vs_id(body.vs_customer_id)
     if not customer:

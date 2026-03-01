@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from twilio.base.exceptions import TwilioRestException
 
-from app.core.auth import verify_api_key
+from app.core.auth import AuthContext, enforce_customer_scope, get_auth_context
 from app.core.database import get_session
 from app.repositories.customer_repo import CustomerRepo
 from app.repositories.phone_line_repo import PhoneLineRepo
@@ -25,9 +25,10 @@ async def enable_sms(
     smsPhoneNumber: str,
     request: Request,
     session: Annotated[AsyncSession, Depends(get_session)],
-    _: Annotated[str, Depends(verify_api_key)],
+    auth: Annotated[AuthContext, Depends(get_auth_context)],
 ) -> SmsEnableDisableResponse:
     """Enable SMS on a DID by attaching the Twilio SMS webhook."""
+    enforce_customer_scope(auth, customerId)
     logger.info("Enabling SMS vs_customer_id=%s number=%s", customerId, smsPhoneNumber)
     customer_repo = CustomerRepo(session)
     customer = await customer_repo.get_by_vs_id(customerId)
@@ -60,9 +61,10 @@ async def disable_sms(
     smsPhoneNumber: str,
     request: Request,
     session: Annotated[AsyncSession, Depends(get_session)],
-    _: Annotated[str, Depends(verify_api_key)],
+    auth: Annotated[AuthContext, Depends(get_auth_context)],
 ) -> SmsEnableDisableResponse:
     """Disable SMS on a DID by removing the Twilio SMS webhook."""
+    enforce_customer_scope(auth, customerId)
     customer_repo = CustomerRepo(session)
     customer = await customer_repo.get_by_vs_id(customerId)
     if not customer:
@@ -90,9 +92,10 @@ async def send_sms(
     body: SendSmsRequest,
     request: Request,
     session: Annotated[AsyncSession, Depends(get_session)],
-    _: Annotated[str, Depends(verify_api_key)],
+    auth: Annotated[AuthContext, Depends(get_auth_context)],
 ) -> SmsStatusResponse:
     """Send an SMS via Twilio Messaging."""
+    enforce_customer_scope(auth, customerId)
     customer_repo = CustomerRepo(session)
     customer = await customer_repo.get_by_vs_id(customerId)
     if not customer:

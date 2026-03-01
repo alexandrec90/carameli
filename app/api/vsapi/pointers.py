@@ -6,7 +6,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.auth import verify_api_key
+from app.core.auth import AuthContext, enforce_customer_scope, get_auth_context
 from app.core.database import get_session
 from app.repositories.customer_repo import CustomerRepo
 from app.repositories.did_pointer_repo import DidPointerRepo
@@ -23,9 +23,10 @@ router = APIRouter(tags=["pointers"])
 async def add_pointer(
     body: AddPointerRequest,
     session: Annotated[AsyncSession, Depends(get_session)],
-    _: Annotated[str, Depends(verify_api_key)],
+    auth: Annotated[AuthContext, Depends(get_auth_context)],
 ) -> PointerResponse:
     """Map a DID to a SIP extension for call forwarding."""
+    enforce_customer_scope(auth, body.vs_customer_id)
     logger.info("Adding pointer vs_customer_id=%s number=%s ext=%s", body.vs_customer_id, body.phone_number, body.extension_number)
     customer_repo = CustomerRepo(session)
     customer = await customer_repo.get_by_vs_id(body.vs_customer_id)
@@ -55,9 +56,10 @@ async def add_pointer(
 async def delete_pointer(
     body: DeletePointerRequest,
     session: Annotated[AsyncSession, Depends(get_session)],
-    _: Annotated[str, Depends(verify_api_key)],
+    auth: Annotated[AuthContext, Depends(get_auth_context)],
 ) -> PointerResponse:
     """Remove the DID→extension mapping."""
+    enforce_customer_scope(auth, body.vs_customer_id)
     logger.info("Deleting pointer vs_customer_id=%s number=%s ext=%s", body.vs_customer_id, body.phone_number, body.extension_number)
     customer_repo = CustomerRepo(session)
     customer = await customer_repo.get_by_vs_id(body.vs_customer_id)

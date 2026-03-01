@@ -127,24 +127,49 @@ APScheduler runs a retry job every 30 seconds for any failed writes.
 
 ## Front-End (Carameli UI)
 
-The admin dashboard and any customer-facing UI follow the **"Liquid Luxury"** design system
-documented in `ui-design-style-guide.md` and enforced by `.claude/rules/ui-design.md`.
+The frontend uses a **skin system** that fully decouples data logic from visual layout.
+Skins can use completely different tech stacks (CSS, Three.js, etc.) without touching shared code.
+See `.claude/rules/skin-architecture.md` for the authoritative spec.
 
 | Layer | Choice |
 | --- | --- |
-| Styling | Tailwind CSS (bracket syntax for design tokens) |
 | Component framework | React (TSX) |
-| Font | Satoshi → Outfit → Inter (fallback) |
-| Icons | Duo-tone, rounded caps (`#FF9F1C` primary / 35% opacity secondary) |
+| Build / bundler | Vite (per-skin code splitting via dynamic import) |
+| Active skin | `carameli` (3D canvas, React Three Fiber) |
 
-**Key design constraints (see `.claude/rules/ui-design.md` for full spec):**
+### Frontend Layout
 
-- Aesthetic: Neumorphism + Glassmorphism hybrid on a dark warm (`#1A0F00`) background
-- Colors: always gradients — never flat fills on interactive/branded elements
-- Shadows: warm `rgba(26, 15, 0, ...)` tones; never plain black shadows
-- Motion: `cubic-bezier(0.4, 0, 0.2, 1)`, press-and-sink buttons (`scale(0.97)`)
-- Glass overlays: `backdrop-filter: blur(25px)` minimum
-- Loading states: amber shimmer animation (not gray skeleton bars)
+```text
+frontend/src/
+  hooks/               # Data layer — one hook per page, no JSX
+    useDashboard.ts
+    usePhoneLines.ts
+    useExtensions.ts
+  skins/
+    types.ts           # Skin / SkinViews TypeScript interfaces
+    registry.ts        # Dynamic import map (one Vite chunk per skin)
+    context.tsx        # SkinProvider + useSkin()
+    carameli/          # Active skin (3D "Liquid Candy Maximalism")
+      index.ts         # Skin entry point / chunk boundary
+      Layout.tsx
+      views/           # Skin-specific page renderers (props only, no API calls)
+  pages/               # Thin orchestrators: call hook → call useSkin() → render view
+  api/                 # API client + TypeScript types
+  lib/                 # logger, utilities
+```
+
+### Skin Design Constraints (carameli skin)
+
+See `.claude/rules/skin-carameli.md` for the full 3D canvas spec. Quick reference:
+
+- Entire UI inside `<Canvas>` (React Three Fiber) — no CSS-styled DOM for primary surfaces
+- `MeshPhysicalMaterial` on all interactive surfaces — `meshBasicMaterial` forbidden
+- Real panel depth via `RoundedBox` (z ≥ `0.18`) — no flat planes as UI panels
+- 3D extruded text (`Text3D` with `bevelEnabled`, `height ≥ 0.2`)
+- Spring physics for all motion (`@react-spring/three`) — no CSS transitions
+- Warm lights only — minimum 3 colored point lights, no cold/white lights
+- Fluid vertex-shader background, always moving
+- Post-processing always on: Bloom + ChromaticAberration + Vignette
 
 Use the `add-ui-component` skill when building new components to get a step-by-step
 checklist and copy-paste examples for buttons, cards, modals, and nav elements.

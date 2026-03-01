@@ -19,6 +19,7 @@ services:
   app:
     build: .
     restart: unless-stopped
+    # In production remove the host port binding; nginx proxies to app:8000 internally.
     ports:
       - "8000:8000"
     env_file:
@@ -30,6 +31,21 @@ services:
         condition: service_healthy
     volumes:
       - .:/app
+
+  # nginx — TLS termination and reverse proxy.
+  # To enable: fill in your domain and cert paths in nginx.conf, then uncomment this block.
+  # nginx:
+  #   image: nginx:stable-alpine
+  #   restart: unless-stopped
+  #   ports:
+  #     - "80:80"
+  #     - "443:443"
+  #   volumes:
+  #     - ./nginx.conf:/etc/nginx/conf.d/carameli.conf:ro
+  #     - /etc/ssl/certs/carameli.crt:/etc/ssl/certs/carameli.crt:ro
+  #     - /etc/ssl/private/carameli.key:/etc/ssl/private/carameli.key:ro
+  #   depends_on:
+  #     - app
 
   frontend:
     image: node:20-slim

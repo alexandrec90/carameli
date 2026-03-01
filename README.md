@@ -19,6 +19,8 @@ If you also want to run all local lint/dev tasks from VS Code, install these hos
 | `Lint: Python` | Python 3.12 + `pip install -r requirements-dev.txt` |
 | `Lint: Env` | `dotenv-linter` CLI on host machine |
 
+Note: if you plan to work on 3‑D UI components, the `three`/`@react-three` packages are included as dependencies.
+
 ### VS Code Extensions (recommended)
 
 This repo now includes `.vscode/extensions.json`. VS Code will prompt to install recommended extensions when the workspace opens.

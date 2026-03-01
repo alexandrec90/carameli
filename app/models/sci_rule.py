@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, ForeignKey, String, text
+from sqlalchemy import Boolean, ForeignKey, String, UniqueConstraint, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func
@@ -13,6 +13,14 @@ from app.core.database import Base
 
 class SciRule(Base):
     __tablename__ = "sci_rules"
+    __table_args__ = (
+        UniqueConstraint(
+            "customer_id",
+            "extension_id",
+            "zip_code",
+            name="uq_sci_rules_customer_extension_zip",
+        ),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()")

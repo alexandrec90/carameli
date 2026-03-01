@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from twilio.base.exceptions import TwilioRestException
 
-from app.core.auth import verify_api_key
+from app.core.auth import AuthContext, enforce_customer_scope, get_auth_context
 from app.core.database import get_session
 from app.repositories.customer_repo import CustomerRepo
 from app.repositories.extension_repo import ExtensionRepo
@@ -28,9 +28,10 @@ async def add_extension(
     body: AddExtensionRequest,
     request: Request,
     session: Annotated[AsyncSession, Depends(get_session)],
-    _: Annotated[str, Depends(verify_api_key)],
+    auth: Annotated[AuthContext, Depends(get_auth_context)],
 ) -> ExtensionResponse:
     """Create a SIP credential for the extension."""
+    enforce_customer_scope(auth, body.vs_customer_id)
     logger.info("Adding extension vs_customer_id=%s ext=%s", body.vs_customer_id, body.extension_number)
     customer_repo = CustomerRepo(session)
     customer = await customer_repo.get_by_vs_id(body.vs_customer_id)
@@ -78,9 +79,10 @@ async def get_available_extensions(
     startExt: int,
     endExt: int,
     session: Annotated[AsyncSession, Depends(get_session)],
-    _: Annotated[str, Depends(verify_api_key)],
+    auth: Annotated[AuthContext, Depends(get_auth_context)],
 ) -> AvailableExtensionsResponse:
     """List free extension numbers in the given range for this customer."""
+    enforce_customer_scope(auth, customerId)
     customer_repo = CustomerRepo(session)
     customer = await customer_repo.get_by_vs_id(customerId)
     if not customer:
@@ -100,9 +102,10 @@ async def deactivate_extension(
     extension: str,
     request: Request,
     session: Annotated[AsyncSession, Depends(get_session)],
-    _: Annotated[str, Depends(verify_api_key)],
+    auth: Annotated[AuthContext, Depends(get_auth_context)],
 ) -> ExtensionResponse:
     """Delete the SIP credential and mark the extension inactive."""
+    enforce_customer_scope(auth, customerId)
     customer_repo = CustomerRepo(session)
     customer = await customer_repo.get_by_vs_id(customerId)
     if not customer:

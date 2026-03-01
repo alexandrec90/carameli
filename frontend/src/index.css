@@ -44,23 +44,6 @@
   to   { transform: scaleY(1); }
 }
 
-/* Brand wordmark hover shimmer */
-@keyframes wordmark-shimmer {
-  0% {
-    background-position: -240% 0;
-    opacity: 0;
-  }
-
-  24% {
-    opacity: 0.92;
-  }
-
-  100% {
-    background-position: 240% 0;
-    opacity: 0;
-  }
-}
-
 /* ─── Base layer ─────────────────────────────────────────────────────────────── */
 
 @layer base {
@@ -288,39 +271,6 @@
     opacity: 0.95;
     pointer-events: none;
     transform: translateY(-0.02em);
-  }
-
-  .carameli-wordmark::after {
-    content: attr(data-text);
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(
-      112deg,
-      rgb(255 244 224 / 0%) 28%,
-      rgb(255 244 224 / 92%) 47%,
-      rgb(var(--shadow-gold) / 82%) 53%,
-      rgb(255 244 224 / 0%) 70%
-    );
-    background-size: 240% 100%;
-    background-position: -240% 0;
-    background-clip: text;
-    color: transparent;
-    mix-blend-mode: screen;
-    opacity: 0;
-    pointer-events: none;
-  }
-
-  .carameli-wordmark:hover::after,
-  .carameli-wordmark:focus-visible::after {
-    animation: wordmark-shimmer 900ms cubic-bezier(0.4, 0, 0.2, 1) 1;
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .carameli-wordmark:hover::after,
-    .carameli-wordmark:focus-visible::after {
-      animation: none;
-      opacity: 0;
-    }
   }
 
   /* ─── Typography ───────────────────────────────────────────────────────── */

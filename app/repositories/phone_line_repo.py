@@ -77,3 +77,13 @@ class PhoneLineRepo:
         await self.session.commit()
         await self.session.refresh(line)
         return line
+
+    async def get_by_phone_number_global(self, phone_number: str) -> PhoneLine | None:
+        """Look up an active phone line by number without knowing the customer."""
+        result = await self.session.execute(
+            select(PhoneLine).where(
+                PhoneLine.phone_number == phone_number,
+                PhoneLine.active.is_(True),
+            )
+        )
+        return result.scalar_one_or_none()

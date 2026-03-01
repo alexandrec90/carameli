@@ -6,12 +6,16 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.auth import verify_api_key
+from app.core.auth import AuthContext, enforce_customer_scope, get_auth_context
 from app.core.database import get_session
 from app.repositories.customer_repo import CustomerRepo
 from app.repositories.extension_repo import ExtensionRepo
 from app.repositories.sci_rule_repo import SciRuleRepo
-from app.schemas.sci import PostSciByZipCodeRequest, SciResponse, UpdateSciUserOptionRequest
+from app.schemas.sci import (
+    PostSciByZipCodeRequest,
+    SciResponse,
+    UpdateSciUserOptionRequest,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -22,10 +26,17 @@ router = APIRouter(tags=["sci"])
 async def post_sci_by_zip_code(
     body: PostSciByZipCodeRequest,
     session: Annotated[AsyncSession, Depends(get_session)],
-    _: Annotated[str, Depends(verify_api_key)],
+    auth: Annotated[AuthContext, Depends(get_auth_context)],
 ) -> SciResponse:
     """Store a zip-code routing rule for Selective Call Interception."""
-    logger.info("SCI zip rule vs_customer_id=%s ext=%s zip=%s enabled=%s", body.vs_customer_id, body.extension_number, body.zip_code, body.enabled)
+    enforce_customer_scope(auth, body.vs_customer_id)
+    logger.info(
+        "SCI zip rule vs_customer_id=%s ext=%s zip=%s enabled=%s",
+        body.vs_customer_id,
+        body.extension_number,
+        body.zip_code,
+        body.enabled,
+    )
     customer_repo = CustomerRepo(session)
     customer = await customer_repo.get_by_vs_id(body.vs_customer_id)
     if not customer:
@@ -35,8 +46,20 @@ async def post_sci_by_zip_code(
     ext_repo = ExtensionRepo(session)
     ext = await ext_repo.get_by_number(customer.id, body.extension_number)
     if not ext:
-        logger.warning("Extension not found vs_customer_id=%s ext=%s", body.vs_customer_id, body.extension_number)
+        logger.warning(
+            "Extension not found vs_customer_id=%s ext=%s",
+            body.vs_customer_id,
+            body.extension_number,
+        )
         raise HTTPException(status_code=404, detail="Extension not found")
+
+    if len(body.zip_code) == 3:
+        logger.warning(
+            "SCI zip_code provided as 3-digit area prefix vs_customer_id=%s ext=%s zip_code=%s",
+            body.vs_customer_id,
+            body.extension_number,
+            body.zip_code,
+        )
 
     sci_repo = SciRuleRepo(session)
     await sci_repo.upsert(
@@ -52,10 +75,16 @@ async def post_sci_by_zip_code(
 async def update_sci_user_option(
     body: UpdateSciUserOptionRequest,
     session: Annotated[AsyncSession, Depends(get_session)],
-    _: Annotated[str, Depends(verify_api_key)],
+    auth: Annotated[AuthContext, Depends(get_auth_context)],
 ) -> SciResponse:
     """Enable or disable all SCI rules for an extension."""
-    logger.info("SCI user option vs_customer_id=%s ext=%s enabled=%s", body.vs_customer_id, body.extension_number, body.enabled)
+    enforce_customer_scope(auth, body.vs_customer_id)
+    logger.info(
+        "SCI user option vs_customer_id=%s ext=%s enabled=%s",
+        body.vs_customer_id,
+        body.extension_number,
+        body.enabled,
+    )
     customer_repo = CustomerRepo(session)
     customer = await customer_repo.get_by_vs_id(body.vs_customer_id)
     if not customer:
@@ -65,7 +94,11 @@ async def update_sci_user_option(
     ext_repo = ExtensionRepo(session)
     ext = await ext_repo.get_by_number(customer.id, body.extension_number)
     if not ext:
-        logger.warning("Extension not found vs_customer_id=%s ext=%s", body.vs_customer_id, body.extension_number)
+        logger.warning(
+            "Extension not found vs_customer_id=%s ext=%s",
+            body.vs_customer_id,
+            body.extension_number,
+        )
         raise HTTPException(status_code=404, detail="Extension not found")
 
     sci_repo = SciRuleRepo(session)

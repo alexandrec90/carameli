@@ -41,6 +41,18 @@ class SciRuleRepo:
         await self.session.refresh(rule)
         return rule
 
+    async def get_enabled_for_extension(
+        self, extension_id: uuid.UUID
+    ) -> list[SciRule]:
+        """Return all enabled SCI rules for an extension (used for inbound call filtering)."""
+        result = await self.session.execute(
+            select(SciRule).where(
+                SciRule.extension_id == extension_id,
+                SciRule.enabled.is_(True),
+            )
+        )
+        return list(result.scalars().all())
+
     async def update_extension_option(
         self, customer_id: uuid.UUID, extension_id: uuid.UUID, enabled: bool
     ) -> list[SciRule]:

@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from twilio.base.exceptions import TwilioRestException
 
-from app.core.auth import verify_api_key
+from app.core.auth import AuthContext, enforce_customer_scope, get_auth_context
 from app.core.database import get_session
 from app.repositories.customer_repo import CustomerRepo
 from app.schemas.voicemail import VoicemailDropRequest, VoicemailDropResponse
@@ -23,10 +23,16 @@ async def voicemail_drop(
     body: VoicemailDropRequest,
     request: Request,
     session: Annotated[AsyncSession, Depends(get_session)],
-    _: Annotated[str, Depends(verify_api_key)],
+    auth: Annotated[AuthContext, Depends(get_auth_context)],
 ) -> VoicemailDropResponse:
     """Initiate an outbound call with AMD; play audio if answered by machine."""
-    logger.info("Voicemail drop vs_customer_id=%s to=%s from=%s", body.vs_customer_id, body.msg_drop_number, body.extension)
+    enforce_customer_scope(auth, body.vs_customer_id)
+    logger.info(
+        "Voicemail drop vs_customer_id=%s to=%s from=%s",
+        body.vs_customer_id,
+        body.msg_drop_number,
+        body.extension,
+    )
     customer_repo = CustomerRepo(session)
     customer = await customer_repo.get_by_vs_id(body.vs_customer_id)
     if not customer:
@@ -38,11 +44,20 @@ async def voicemail_drop(
         result = await provider.initiate_voicemail_drop(
             to_number=body.msg_drop_number,
             from_number=body.extension,
-            audio_url=body.audio_url,
+            audio_url=str(body.audio_url),
         )
     except TwilioRestException as exc:
-        logger.error("Twilio error initiating voicemail drop vs_customer_id=%s to=%s: %s", body.vs_customer_id, body.msg_drop_number, exc.msg)
+        logger.error(
+            "Twilio error initiating voicemail drop vs_customer_id=%s to=%s: %s",
+            body.vs_customer_id,
+            body.msg_drop_number,
+            exc.msg,
+        )
         raise HTTPException(status_code=502, detail=f"Twilio error: {exc.msg}")
 
-    logger.info("Voicemail drop initiated call_sid=%s status=%s", result["call_sid"], result["status"])
+    logger.info(
+        "Voicemail drop initiated call_sid=%s status=%s",
+        result["call_sid"],
+        result["status"],
+    )
     return VoicemailDropResponse(call_sid=result["call_sid"], status=result["status"])

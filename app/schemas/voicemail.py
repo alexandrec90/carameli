@@ -1,13 +1,34 @@
 from __future__ import annotations
 
-from pydantic import BaseModel
+from pydantic import (
+    AliasChoices,
+    BaseModel,
+    ConfigDict,
+    Field,
+    HttpUrl,
+    field_validator,
+)
+
+_E164_PATTERN = r"^\+[1-9]\d{6,14}$"
 
 
 class VoicemailDropRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     vs_customer_id: int
-    extension: str
-    msg_drop_number: str
-    audio_url: str
+    extension: str = Field(
+        validation_alias=AliasChoices("extension", "from_number", "voip_phone_number"),
+        pattern=_E164_PATTERN,
+    )
+    msg_drop_number: str = Field(pattern=_E164_PATTERN)
+    audio_url: HttpUrl
+
+    @field_validator("extension", "msg_drop_number", mode="before")
+    @classmethod
+    def normalize_phone_number(cls, value: object) -> object:
+        if isinstance(value, str):
+            return value.strip()
+        return value
 
 
 class VoicemailDropResponse(BaseModel):

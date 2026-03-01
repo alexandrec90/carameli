@@ -14,6 +14,7 @@ from app.api.webhooks.call_status import router as webhooks_router
 from app.core.config import settings
 from app.core.logging_config import configure_logging
 from app.services.call_sync import start_scheduler, stop_scheduler
+from app.services.twilio_provider import TwilioProvider
 
 configure_logging(log_level=settings.log_level, log_file=settings.log_file)
 logger = logging.getLogger(__name__)
@@ -23,8 +24,12 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Startup
     logger.info("Starting VoiceGateway…")
-    app.state.twilio = Client(
+    twilio_client = Client(
         settings.twilio_account_sid, settings.twilio_auth_token
+    )
+    app.state.twilio = TwilioProvider(
+        client=twilio_client,
+        webhook_base_url=settings.twilio_webhook_base_url,
     )
     start_scheduler()
     yield
@@ -42,10 +47,10 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.cors_origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
 )
 
 app.include_router(vsapi_router)

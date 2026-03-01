@@ -50,11 +50,15 @@ async def client(db_session: AsyncSession):
     mock_twilio = MagicMock()
     app.state.twilio = mock_twilio
 
+    original_twilio_auth_token = settings.twilio_auth_token
+    settings.twilio_auth_token = ""
+
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac
 
     app.dependency_overrides.clear()
+    settings.twilio_auth_token = original_twilio_auth_token
 
 
 API_KEY = settings.api_key_secret

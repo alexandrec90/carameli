@@ -18,30 +18,21 @@ const navItems = [
   { to: '/settings', label: 'Settings', icon: Settings },
 ]
 
-interface LayoutProps {
-  children: React.ReactNode
-}
-
-export function Layout({ children }: LayoutProps) {
+export function Layout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen flex">
       {/* Sidebar — static glass surface, lit by global ambient candlelight */}
-      <aside
-        className="w-64 flex-shrink-0 flex flex-col glass-sidebar"
-      >
+      <aside className="w-64 flex-shrink-0 flex flex-col glass-sidebar">
         {/* Logo */}
         <div className="px-6 py-8">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             <div
               className="w-10 h-10 rounded-[12px] flex items-center justify-center"
               style={{ background: 'linear-gradient(to bottom right, #FF9F1C, #E68A00)' }}
             >
               <Phone size={18} className="text-[#1A0F00]" />
             </div>
-            <div>
-              <h1 className="carameli-wordmark text-[2.15rem] leading-none" data-text="Carameli">Carameli</h1>
-              <p className="field-label opacity-70">VoiceGateway</p>
-            </div>
+            <h1 className="carameli-wordmark text-[2.15rem] leading-none" data-text="Carameli">Carameli</h1>
           </div>
         </div>
 

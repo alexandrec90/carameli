@@ -1,11 +1,10 @@
-````prompt
+# Fix problems
+
 ---
 agent: agent
 tools: [problems, read/readFile]
 description: Fix all issues surfaced in #problems and verify they are resolved.
 ---
-
-# Fix `#problems`
 
 Use `#problems` as the source of truth and fix every active diagnostic.
 
@@ -42,4 +41,3 @@ Use `#problems` as the source of truth and fix every active diagnostic.
   - Root cause per issue
   - Validation performed
   - Any follow-up items
-````

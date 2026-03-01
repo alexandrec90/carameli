@@ -62,6 +62,15 @@ class ExtensionRepo:
         )
         return {row[0] for row in result.all()}
 
+    async def get_by_id(self, extension_id: uuid.UUID) -> Extension | None:
+        result = await self.session.execute(
+            select(Extension).where(
+                Extension.id == extension_id,
+                Extension.active.is_(True),
+            )
+        )
+        return result.scalar_one_or_none()
+
     async def deactivate(self, ext: Extension) -> Extension:
         ext.active = False
         await self.session.commit()

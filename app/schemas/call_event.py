@@ -21,3 +21,9 @@ class CallEventResponse(BaseModel):
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class CallRecordingResponse(BaseModel):
+    call_sid: str
+    recording_url: str
+    duration_seconds: int | None

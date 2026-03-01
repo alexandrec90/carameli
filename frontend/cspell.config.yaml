@@ -9,7 +9,38 @@ ignorePaths:
 words:
   - carameli
   - twilio
+  - vanillasoft
+  - vonage
+  - voip
   - vsapi
   - ngrok
   - sip
   - twiml
+  # Three.js / R3F / 3D rendering terms
+  - drei
+  - glsl
+  - lerp
+  - metalness
+  - clearcoat
+  - envmap
+  - mipmap
+  - vignette
+  - subsurface
+  - shadermaterial
+  - buffergeometry
+  - instanced
+  - wireframe
+  - uvs
+  - raycaster
+  - postprocessing
+  # Font names
+  - Pacifico
+  - Lobster
+  # Design / motion terms
+  - maximalism
+  - maximalist
+  - neumorphism
+  - glassmorphism
+  - squash
+  # Possessives / proper nouns
+  - Wonka

@@ -1,45 +1,50 @@
 import { Routes, Route } from 'react-router-dom'
-import { Layout } from './components/Layout'
+import { useSkin } from './skins/context'
+import { SkinSwitcher } from './components/SkinSwitcher'
 import Dashboard from './pages/Dashboard'
 import PhoneLines from './pages/PhoneLines'
 import Extensions from './pages/Extensions'
 import Placeholder from './pages/Placeholder'
 
 export default function App() {
+  const { Layout } = useSkin()
   return (
-    <Layout>
-      <Routes>
-        <Route path="/" element={<Dashboard />} />
-        <Route path="/phone-lines" element={<PhoneLines />} />
-        <Route path="/extensions" element={<Extensions />} />
-        <Route
-          path="/sms"
-          element={
-            <Placeholder
-              title="SMS"
-              description="Enable, disable, and send SMS messages via Twilio"
-            />
-          }
-        />
-        <Route
-          path="/calls"
-          element={
-            <Placeholder
-              title="Call Events"
-              description="Real-time call tracking and status history"
-            />
-          }
-        />
-        <Route
-          path="/settings"
-          element={
-            <Placeholder
-              title="Settings"
-              description="Configure VoiceGateway and Twilio credentials"
-            />
-          }
-        />
-      </Routes>
-    </Layout>
+    <>
+      <Layout>
+        <Routes>
+          <Route path="/" element={<Dashboard />} />
+          <Route path="/phone-lines" element={<PhoneLines />} />
+          <Route path="/extensions" element={<Extensions />} />
+          <Route
+            path="/sms"
+            element={
+              <Placeholder
+                title="SMS"
+                description="Enable, disable, and send SMS messages via Twilio"
+              />
+            }
+          />
+          <Route
+            path="/calls"
+            element={
+              <Placeholder
+                title="Call Events"
+                description="Real-time call tracking and status history"
+              />
+            }
+          />
+          <Route
+            path="/settings"
+            element={
+              <Placeholder
+                title="Settings"
+                description="Configure VoiceGateway and Twilio credentials"
+              />
+            }
+          />
+        </Routes>
+      </Layout>
+      <SkinSwitcher />
+    </>
   )
 }

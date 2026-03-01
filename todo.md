@@ -7,7 +7,7 @@
 * [X] ~~*Custom prompt to debug*~~ [2026-02-21]
 * [X] ~~*Custom prompt to fix problems*~~ [2026-02-21]
 * [ ] Integrate into Vanillasoft
-* [ ] Deploy to server so it's always accessible to Vanillasoft?
+* [ ] Deploy to ngrok so it's accessible to Vanillasoft
 * [ ] Make it easy to switch underlying provider - vonage, twilio (can multiple be implemented at once as fallback?)
 * [X] ~~*Can I test UI without launching whole process? Just to see what it looks like live, while making changes?*~~ [2026-02-21]
 * [X] ~~*useless md rules referenced in copilot - why?*~~ [2026-02-21]
@@ -15,5 +15,11 @@
 * [X] ~~*cappucino streaks ui*~~ [2026-02-21]
 * [X] ~~*make scrollbar blend*~~ [2026-02-21]
 * [X] ~~*refactor index.css*~~ [2026-02-21]
-* [ ] Axe gemini what it thinks about ui
+* [X] ~~*Axe gemini what it thinks about ui*~~ [2026-03-01]
 * [X] ~~*Remove blue text highlighting*~~ [2026-02-21]
+* [ ] React three fiber - revisit this later
+* [X] ~~*Claude rules-  why are they always referenced in copilot*~~ [2026-02-22]
+* [X] ~~*Do Claude skills need more resources?*~~ [2026-03-01]
+* [ ] Load up vanillaland locally
+* [ ] Full refactor skill (only files with new commits)
+* [ ] Tasks - is there a point to having separate ts and js linting?

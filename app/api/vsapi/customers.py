@@ -4,9 +4,15 @@ import logging
 from typing import Annotated, List
 
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.auth import verify_api_key
+from app.core.auth import (
+    AuthContext,
+    enforce_customer_scope,
+    get_auth_context,
+    verify_api_key,
+)
 from app.core.database import get_session
 from app.repositories.customer_repo import CustomerRepo
 from app.repositories.phone_line_repo import PhoneLineRepo
@@ -27,8 +33,18 @@ async def create_customer(
     """Create a new customer record in VoiceGateway."""
     logger.info("Creating customer vs_customer_id=%s", body.vs_customer_id)
     repo = CustomerRepo(session)
-    customer = await repo.create(body)
-    logger.info("Customer created id=%s vs_customer_id=%s", customer.id, customer.vs_customer_id)
+    try:
+        customer = await repo.create(body)
+    except IntegrityError:
+        await session.rollback()
+        logger.warning(
+            "Customer already exists or API key conflict vs_customer_id=%s",
+            body.vs_customer_id,
+        )
+        raise HTTPException(status_code=409, detail="Customer already exists")
+    logger.info(
+        "Customer created id=%s vs_customer_id=%s", customer.id, customer.vs_customer_id
+    )
     return CustomerResponse.model_validate(customer)
 
 
@@ -36,9 +52,10 @@ async def create_customer(
 async def get_customer(
     customerId: int,
     session: Annotated[AsyncSession, Depends(get_session)],
-    _: Annotated[str, Depends(verify_api_key)],
+    auth: Annotated[AuthContext, Depends(get_auth_context)],
 ) -> CustomerResponse:
     """Return stored customer info by VanillaSoft customer ID."""
+    enforce_customer_scope(auth, customerId)
     repo = CustomerRepo(session)
     customer = await repo.get_by_vs_id(customerId)
     if not customer:
@@ -51,9 +68,10 @@ async def get_customer(
 async def get_customer_id(
     customerId: int,
     session: Annotated[AsyncSession, Depends(get_session)],
-    _: Annotated[str, Depends(verify_api_key)],
+    auth: Annotated[AuthContext, Depends(get_auth_context)],
 ) -> CustomerIdResponse:
     """Return VoiceGateway's internal customer UUID for a VanillaSoft customer ID."""
+    enforce_customer_scope(auth, customerId)
     repo = CustomerRepo(session)
     customer = await repo.get_by_vs_id(customerId)
     if not customer:
@@ -67,9 +85,10 @@ async def get_customer_id(
 async def get_customer_phone_lines(
     customerId: int,
     session: Annotated[AsyncSession, Depends(get_session)],
-    _: Annotated[str, Depends(verify_api_key)],
+    auth: Annotated[AuthContext, Depends(get_auth_context)],
 ) -> List[PhoneLineResponse]:
     """Return all active DIDs for the customer."""
+    enforce_customer_scope(auth, customerId)
     customer_repo = CustomerRepo(session)
     customer = await customer_repo.get_by_vs_id(customerId)
     if not customer:

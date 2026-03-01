@@ -2,6 +2,7 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import App from './App'
+import { SkinProvider } from './skins/context'
 import { logger } from './lib/logger'
 import '@fontsource/outfit/400.css'
 import '@fontsource/outfit/500.css'
@@ -26,7 +27,9 @@ window.addEventListener('unhandledrejection', (event) => {
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <BrowserRouter>
-      <App />
+      <SkinProvider>
+        <App />
+      </SkinProvider>
     </BrowserRouter>
   </React.StrictMode>
 )

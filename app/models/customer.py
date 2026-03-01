@@ -27,3 +27,6 @@ class Customer(Base):
         server_default=func.now(), onupdate=func.now()
     )
     active: Mapped[bool] = mapped_column(Boolean, default=True)
+
+    def __repr__(self) -> str:
+        return f"<Customer vs_customer_id={self.vs_customer_id} active={self.active}>"

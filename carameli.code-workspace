@@ -1,0 +1,14 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"path": "../VanillaLand"
+		}
+	],
+	"settings": {
+		"dotnet.preferCSharpExtension": true,
+		"dotnet.defaultSolution": "VanillaLand/AppCode/VS.sln"
+	}
+}

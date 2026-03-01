@@ -2,6 +2,7 @@ from fastapi import APIRouter
 
 from app.api.vsapi import (
     area_codes,
+    calls,
     customers,
     extensions,
     phone_lines,
@@ -21,3 +22,4 @@ vsapi_router.include_router(voicemail_drop.router)
 vsapi_router.include_router(sci.router)
 vsapi_router.include_router(pointers.router)
 vsapi_router.include_router(area_codes.router)
+vsapi_router.include_router(calls.router)
