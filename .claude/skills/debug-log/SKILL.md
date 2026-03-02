@@ -1,10 +1,11 @@
-# Debug Log Cleanup
+# Skill: Debug Log Cleanup
 
-Read `logs/voicegateway.log` and fix every ERROR and WARNING found in it.
+Use this skill to read `logs/voicegateway.log` and fix every ERROR and WARNING found in it.
 
 ## Step 1 — Read the log
 
-Use the Read tool on `logs/voicegateway.log`. If it is very long (>500 lines), read only the last 500 lines using the `offset` parameter.
+Use the Read tool on `logs/voicegateway.log`. If it is very long (>500 lines), read only the
+last 500 lines using the `offset` parameter.
 
 Also grep for the most severe lines first so you can prioritise:
 
@@ -40,7 +41,8 @@ Convert the module path to a file path:
 - `app.api.vsapi.phone_lines:56` → open `app/api/vsapi/phone_lines.py` at line 56
 - `frontend` + `[FRONTEND]` tag → the error came from `frontend/src/` (check `context=` for the URL/component)
 
-Read the source file at that line, then read enough surrounding context to understand what condition triggered the log entry.
+Read the source file at that line, then read enough surrounding context to understand what
+condition triggered the log entry.
 
 ## Step 4 — Fix code bugs
 
@@ -64,4 +66,5 @@ Then tail the log briefly to confirm the fixed errors are gone:
 tail -n 100 logs/voicegateway.log
 ```
 
-Report the outcome: which errors are resolved, which are transient/config issues that need operator attention.
+Report the outcome: which errors are resolved, which are transient/config issues that need
+operator attention.

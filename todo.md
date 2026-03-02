@@ -21,5 +21,8 @@
 * [X] ~~*Claude rules-  why are they always referenced in copilot*~~ [2026-02-22]
 * [X] ~~*Do Claude skills need more resources?*~~ [2026-03-01]
 * [X] ~~*Load up vanillaland locally*~~ [2026-03-01]
-* [ ] Full refactor skill (only files with new commits)
+* [X] ~~*Full refactor skill (only files with new commits)*~~ [2026-03-01]
 * [X] ~~*Tasks - is there a point to having separate ts and js linting?*~~ [2026-03-01]
+* [X] ~~*Refactor claude commands to skills*~~ [2026-03-01]
+* [ ] Is notif complaining about python venv still there?
+* [ ] Check out new skin
