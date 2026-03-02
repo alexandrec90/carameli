@@ -1,5 +1,7 @@
 # Carameli Migration — Known Concerns & Shortcomings
 
+<!-- markdownlint-disable MD024 MD036 MD040 MD060 -->
+
 These are open issues identified during the Cloudli → Carameli migration that require follow-up work before the integration can be considered complete.
 
 ---
@@ -17,6 +19,7 @@ The old Cloudli `VsMessageDrop` endpoint accepted a `msgDropNumber` integer (a c
 The current implementation passes `voiceDropCode.ToString()` as `msg_drop_number` and an empty string as `audio_url`. This will not produce a working voicemail drop.
 
 **Required fix:**
+
 1. Determine where VanillaSoft stores voice drop recordings and their associated destination phone numbers (likely a database table keyed by the integer voice drop code).
 2. Either:
    - Resolve the `audio_url` and `msg_drop_number` before calling `CloudliClient.MessageDrop` (e.g. in `CloudliService` or the caller), and update the method signature to accept them directly, or
@@ -39,6 +42,7 @@ The old Cloudli `VsCustomer/Add` endpoint created a Cloudli account from standar
 None of these are present in `ContactInfoVS`. The current implementation throws `NotImplementedException`.
 
 **Required fix:**
+
 1. Identify where VanillaSoft stores each customer's Twilio credentials (SID and token).
 2. Create a new method or extend the existing one so that Twilio credentials can be passed alongside the customer ID.
 3. Update `ICloudliClient`, `ICloudliService`, `ContactInfoVS` (or introduce a new DTO), and all callers.
@@ -55,6 +59,7 @@ Carameli does not expose an auto-attendant provisioning endpoint. The current im
 
 **Required fix:**
 Decide on one of:
+
 - Implement auto-attendant configuration directly via the Twilio API from VanillaSoft.
 - Disable the auto-attendant feature until Carameli adds support.
 - Remove the method from `ICloudliClient` and `ICloudliService` and update all callers to handle the missing capability gracefully.
@@ -70,6 +75,7 @@ Carameli does not have a branch/extension assignment endpoint. The current imple
 
 **Required fix:**
 Decide on one of:
+
 - Manage branch-to-extension assignment entirely within VanillaSoft's own database (without a VoIP provider call).
 - Remove the method from the interface and update all callers.
 
@@ -84,6 +90,7 @@ Carameli does not expose a callback-by-extension endpoint. The current implement
 
 **Required fix:**
 Decide on one of:
+
 - Implement callback initiation directly via the Twilio API.
 - Disable the callback feature until Carameli adds support.
 - Remove the method from the interface and update all callers.
@@ -99,6 +106,7 @@ Carameli does not expose an archive/export endpoint for audio recordings. The cu
 
 **Required fix:**
 Decide on one of:
+
 - Fetch recording URLs directly from the Twilio API using the customer's stored credentials.
 - Wait for Carameli to expose a recording retrieval endpoint and implement it at that time.
 - Disable the recording export feature and communicate the limitation to affected customers.
@@ -112,11 +120,13 @@ Decide on one of:
 **Problem:**
 The old Cloudli `Precall/Add` endpoint was called once per outbound call to set up real-time area-code routing for that specific call. Carameli's `PostSCIbyZipCode` stores **persistent** routing rules in Carameli's database and is not designed for per-call invocation.
 
+<!-- markdownlint-disable MD024 MD036 MD040 MD060 -->
 The current migration loops over each area code and stores a persistent rule for it, which is functionally different from the original behaviour. Calling this once per outbound call will create duplicate/redundant rules over time.
 
 Additionally, the original parameter is called `areaCodes` (3-digit strings), while Carameli's field is `zip_code` (typically 5-digit). Whether these represent the same data depends on how the calling code populates the list.
 
 **Required fix:**
+
 1. Clarify whether `areaCodes` in the old code actually contained zip codes or area codes.
 2. If these are per-call routing codes, rework the SCI integration so persistent rules are stored once at configuration time (not on every call).
 3. Add deduplication or an upsert mechanism if the endpoint may be called repeatedly with the same zip codes.
@@ -131,6 +141,7 @@ Additionally, the original parameter is called `areaCodes` (3-digit strings), wh
 The old Cloudli `VsPointer/Add` endpoint accepted an `areacode` parameter (3-digit area code). Carameli's `AddPointerToExtension` endpoint expects a full `phone_number` (e.g. `+14155550100`). The current implementation passes the `areaCode` parameter directly as `phone_number`, which will be incorrect if callers are still passing a 3-digit area code.
 
 **Required fix:**
+
 1. Determine whether callers already pass a full phone number or just an area code.
 2. If an area code is passed, either update callers to supply the full DID number, or perform a DID lookup by area code before calling Carameli.
 3. Consider renaming the parameter from `areaCode` to `phoneNumber` in the interface to clarify the expected format.
@@ -143,11 +154,9 @@ The old Cloudli `VsPointer/Add` endpoint accepted an `areacode` parameter (3-dig
 
 The placeholder values `https://<carameli-host>/vsapi/1.0.0/` and empty `CarameliApiKey` must be replaced with real values before deploying to any environment.
 
-| Environment | `CarameliApiBaseUrl` | `CarameliApiKey` |
-|---|---|---|
-| Development | `http://localhost:8000/vsapi/1.0.0/` | value from Carameli's local `.env` (`API_KEY_SECRET`) |
-| Staging | `https://<staging-host>/vsapi/1.0.0/` | staging key |
-| Production | `https://<prod-host>/vsapi/1.0.0/` | production key |
+- **Development:** `CARAMELI_BASE_URL=http://localhost:8000/vsapi/1.0.0/`, key from local `.env` (`API_KEY_SECRET`)
+- **Staging:** `CARAMELI_BASE_URL=https://<staging-host>/vsapi/1.0.0/`, staging key
+- **Production:** `CARAMELI_BASE_URL=https://<prod-host>/vsapi/1.0.0/`, production key
 
 ---
 

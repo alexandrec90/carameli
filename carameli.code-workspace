@@ -4,11 +4,18 @@
 			"path": "."
 		},
 		{
-			"path": "../VanillaLand"
+			"path": "../VanillaLand",
+			"settings": {
+				"eslint.enable": false,
+				"python.analysis.enabled": false
+			}
 		}
 	],
 	"settings": {
 		"dotnet.preferCSharpExtension": true,
-		"dotnet.defaultSolution": "VanillaLand/AppCode/VS.sln"
+		"dotnet.defaultSolution": "VanillaLand/AppCode/VS.sln",
+		"python.analysis.exclude": [
+			"../VanillaLand/**"
+		]
 	}
 }

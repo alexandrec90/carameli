@@ -20,6 +20,6 @@
 * [ ] React three fiber - revisit this later
 * [X] ~~*Claude rules-  why are they always referenced in copilot*~~ [2026-02-22]
 * [X] ~~*Do Claude skills need more resources?*~~ [2026-03-01]
-* [ ] Load up vanillaland locally
+* [X] ~~*Load up vanillaland locally*~~ [2026-03-01]
 * [ ] Full refactor skill (only files with new commits)
-* [ ] Tasks - is there a point to having separate ts and js linting?
+* [X] ~~*Tasks - is there a point to having separate ts and js linting?*~~ [2026-03-01]

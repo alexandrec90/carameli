@@ -143,6 +143,9 @@
       "label": "Lint: Python",
       "type": "shell",
       "command": "ruff check . --fix",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
       "presentation": {
         "showReuseMessage": false,
         "close": true
@@ -190,6 +193,9 @@
       "label": "Lint: Env",
       "type": "shell",
       "command": "dotenv-linter",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
       "presentation": {
         "showReuseMessage": false,
         "close": true
@@ -220,6 +226,9 @@
       "label": "Lint: Markdown",
       "type": "shell",
       "command": "npm --prefix frontend exec --yes -- markdownlint \"**/*.md\" --ignore \"**/node_modules/**\" --ignore \"**/.git/**\" --ignore \"**/.venv/**\" -c \".markdownlint.json\" --fix",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
       "presentation": {
         "reveal": "always",
         "showReuseMessage": false,

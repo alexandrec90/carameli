@@ -1,5 +1,7 @@
 # Carameli: VanillaSoft Readiness Plan
 
+<!-- markdownlint-disable MD024 MD036 MD040 MD060 -->
+
 **Target audience:** AI coding agent working on this Carameli (VoiceGateway) repository.
 
 This document lists every gap that must be closed before VanillaSoft can rely on Carameli
@@ -10,7 +12,7 @@ in production. Work through the sections in order — earlier items unblock late
 ## Status Snapshot
 
 | Area | State |
-|---|---|
+| --- | --- |
 | Customer CRUD + auth | ✅ Done |
 | DID provisioning | ✅ Done |
 | SMS send/enable/disable | ✅ Done |
@@ -329,7 +331,7 @@ def __repr__(self):
     return f"<Customer vs_customer_id={self.vs_customer_id} active={self.active}>"
 ```
 
-3. In `app/services/twilio_provider.py`, confirm that exception messages logged on
+1. In `app/services/twilio_provider.py`, confirm that exception messages logged on
    Twilio errors do not echo full request bodies containing auth tokens.
 
 ---
@@ -348,7 +350,7 @@ httpx>=0.27
 ## Summary — Recommended Work Order
 
 | Priority | Task | Effort |
-|---|---|---|
+| --- | --- | --- |
 | 1 | Task 1 — Inbound call routing (TwiML) | Medium |
 | 2 | Task 2 — CORS for VanillaSoft origin | Low |
 | 3 | Task 4 — Call write-back webhook | Medium |

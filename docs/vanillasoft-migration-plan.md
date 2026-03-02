@@ -1,5 +1,7 @@
 # VanillaSoft: Replace Cloudli with Carameli (VoiceGateway)
 
+<!-- markdownlint-disable MD024 MD036 MD040 MD060 -->
+
 **Target audience:** AI coding agent working on the VanillaSoft CRM codebase.
 
 This document tells you exactly what to change, where to look, and what the replacement
@@ -12,7 +14,7 @@ call tracking) via a REST API with Bearer token authentication.
 ## 1. Orientation
 
 | Aspect | Cloudli | Carameli (replacement) |
-|---|---|---|
+| --- | --- | --- |
 | Type | Third-party SaaS VoIP | Self-hosted FastAPI microservice |
 | Auth | (check existing code) | `Authorization: Bearer <api_key>` |
 | Base URL config key | (check existing code) | `CARAMELI_BASE_URL` (you will add this) |
@@ -44,6 +46,7 @@ grep -ri "GetAreaCodes" . -l
 ```
 
 Likely locations to check:
+
 - Environment / config files (`.env`, `appsettings.json`, `config.yaml`)
 - HTTP client service class (e.g., `CloudliClient.cs`, `VoipService.js`, `cloudli.py`)
 - Any service-registration / dependency-injection wiring
@@ -96,6 +99,7 @@ All endpoints are prefixed with `/vsapi/1.0.0/`. All require
 ### 4.1 Customer Management
 
 #### Create customer
+
 ```
 POST /vsapi/1.0.0/VsCustomer/Create
 Content-Type: application/json
@@ -119,6 +123,7 @@ Content-Type: application/json
 ```
 
 #### Get customer
+
 ```
 GET /vsapi/1.0.0/VsCustomer/Get/{vs_customer_id}
 
@@ -127,6 +132,7 @@ GET /vsapi/1.0.0/VsCustomer/Get/{vs_customer_id}
 ```
 
 #### Get internal UUID from vs_customer_id
+
 ```
 GET /vsapi/1.0.0/VsCustomer/GetCustid/{vs_customer_id}
 
@@ -134,6 +140,7 @@ GET /vsapi/1.0.0/VsCustomer/GetCustid/{vs_customer_id}
 ```
 
 #### Get all active phone lines for customer
+
 ```
 GET /vsapi/1.0.0/VsCustomer/GetPhoneLines/{vs_customer_id}
 
@@ -145,6 +152,7 @@ GET /vsapi/1.0.0/VsCustomer/GetPhoneLines/{vs_customer_id}
 ### 4.2 Phone Lines (DIDs)
 
 #### Add (purchase) a DID
+
 ```
 POST /vsapi/1.0.0/PhoneLine/Add
 Content-Type: application/json
@@ -169,6 +177,7 @@ Content-Type: application/json
 ```
 
 #### Get a specific DID
+
 ```
 GET /vsapi/1.0.0/PhoneLine/Get/{vs_customer_id}/{phone_number}
 
@@ -177,6 +186,7 @@ GET /vsapi/1.0.0/PhoneLine/Get/{vs_customer_id}/{phone_number}
 ```
 
 #### Get count of active DIDs
+
 ```
 GET /vsapi/1.0.0/PhoneLine/GetCount/{vs_customer_id}
 
@@ -184,6 +194,7 @@ GET /vsapi/1.0.0/PhoneLine/GetCount/{vs_customer_id}
 ```
 
 #### Deactivate (release) a DID
+
 ```
 PUT /vsapi/1.0.0/PhoneLine/Deactivate
 Content-Type: application/json
@@ -194,6 +205,7 @@ Content-Type: application/json
 ```
 
 #### Toggle call recording on a DID
+
 ```
 PUT /vsapi/1.0.0/PhoneLine/UpdateCallRecording
 Content-Type: application/json
@@ -208,6 +220,7 @@ Content-Type: application/json
 ### 4.3 Extensions (SIP)
 
 #### Add extension
+
 ```
 POST /vsapi/1.0.0/VsExtension/Add
 Content-Type: application/json
@@ -232,6 +245,7 @@ Content-Type: application/json
 ```
 
 #### Get available extension numbers in a range
+
 ```
 GET /vsapi/1.0.0/VsExtension/GetAvailable/{vs_customer_id}/{start_ext}/{end_ext}
 
@@ -239,6 +253,7 @@ GET /vsapi/1.0.0/VsExtension/GetAvailable/{vs_customer_id}/{start_ext}/{end_ext}
 ```
 
 #### Deactivate extension
+
 ```
 PUT /vsapi/1.0.0/VsExtension/Deactivate/{vs_customer_id}/{extension_number}
 
@@ -250,6 +265,7 @@ PUT /vsapi/1.0.0/VsExtension/Deactivate/{vs_customer_id}/{extension_number}
 ### 4.4 SMS
 
 #### Enable SMS on a DID
+
 ```
 PUT /vsapi/1.0.0/VsMessaging/Sms/Enable/{vs_customer_id}/{phone_number}
 
@@ -257,6 +273,7 @@ PUT /vsapi/1.0.0/VsMessaging/Sms/Enable/{vs_customer_id}/{phone_number}
 ```
 
 #### Disable SMS on a DID
+
 ```
 PUT /vsapi/1.0.0/VsMessaging/Sms/Disable/{vs_customer_id}/{phone_number}
 
@@ -264,6 +281,7 @@ PUT /vsapi/1.0.0/VsMessaging/Sms/Disable/{vs_customer_id}/{phone_number}
 ```
 
 #### Send SMS
+
 ```
 POST /vsapi/1.0.0/VsMessaging/Sms/Send/{vs_customer_id}
 Content-Type: application/json
@@ -304,6 +322,7 @@ answering machine is detected.
 ### 4.6 SCI — Selective Call Interception (zip-code routing)
 
 #### Store zip-code routing rule
+
 ```
 POST /vsapi/1.0.0/PostSCIbyZipCode
 Content-Type: application/json
@@ -319,6 +338,7 @@ Content-Type: application/json
 ```
 
 #### Enable / disable all SCI rules for an extension
+
 ```
 POST /vsapi/1.0.0/UpdateSCIUserOption
 Content-Type: application/json
@@ -333,6 +353,7 @@ Content-Type: application/json
 ### 4.7 Pointers — DID → Extension mapping
 
 #### Map a DID to an extension (call forwarding)
+
 ```
 POST /vsapi/1.0.0/AddPointerToExtension
 Content-Type: application/json
@@ -343,6 +364,7 @@ Content-Type: application/json
 ```
 
 #### Remove a DID → extension mapping
+
 ```
 DELETE /vsapi/1.0.0/DeletePointerToExtension
 Content-Type: application/json
@@ -442,7 +464,7 @@ though `vs_customer_id` is sufficient for all subsequent calls.
 ### 5c. Remove / replace Cloudli-specific concepts
 
 | Cloudli concept | Carameli equivalent |
-|---|---|
+| --- | --- |
 | Cloudli account / org ID | `vs_customer_id` (same integer VanillaSoft already has) |
 | Cloudli DID object | `PhoneLineResponse` (see §4.2) |
 | Cloudli agent / user | `ExtensionResponse` (SIP credential, see §4.3) |
@@ -456,7 +478,7 @@ though `vs_customer_id` is sufficient for all subsequent calls.
 All Carameli endpoints return standard HTTP status codes:
 
 | Code | Meaning |
-|---|---|
+| --- | --- |
 | 200 | Success |
 | 400 | Bad request (validation error) — body contains `{ "detail": "..." }` |
 | 401 | Missing or invalid Bearer token |
