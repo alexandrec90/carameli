@@ -44,7 +44,7 @@ async def get_area_codes_filtered(
         codes = await carrier.get_available_area_codes(
             country=country.upper(), state=state.upper()
         )
-    except Exception as exc:
+    except Exception:
         raise HTTPException(status_code=502, detail="Provider error fetching area codes")
     items = [AreaCodeInfo(area_code=c["area_code"], country=c["country"]) for c in codes]
     return AreaCodesResponse(area_codes=items, count=len(items))

@@ -62,3 +62,30 @@ async def test_create_duplicate_customer_returns_409(client) -> None:
     }
     resp = await client.post(f"{_BASE}/Create", json=payload, headers=AUTH_HEADERS)
     assert resp.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_get_phone_lines_returns_active_only(client, db_session) -> None:
+    """GetPhoneLines should only return active DIDs for the customer."""
+    import uuid
+    from app.repositories.phone_line_repo import PhoneLineRepo
+
+    data = await _create(client, 4005)
+    customer_id = uuid.UUID(data["id"])
+
+    line_repo = PhoneLineRepo(db_session)
+    await line_repo.create(customer_id=customer_id, phone_number="+14005550001", twilio_sid="PNcust4005a")
+    inactive = await line_repo.create(customer_id=customer_id, phone_number="+14005550002", twilio_sid="PNcust4005b")
+    await line_repo.deactivate(inactive)
+
+    resp = await client.get(f"{_BASE}/GetPhoneLines/4005", headers=AUTH_HEADERS)
+    assert resp.status_code == 200
+    numbers = [item["phone_number"] for item in resp.json()]
+    assert "+14005550001" in numbers
+    assert "+14005550002" not in numbers
+
+
+@pytest.mark.asyncio
+async def test_get_phone_lines_unknown_customer_returns_404(client) -> None:
+    resp = await client.get(f"{_BASE}/GetPhoneLines/99993", headers=AUTH_HEADERS)
+    assert resp.status_code == 404

@@ -1,14 +1,19 @@
 from __future__ import annotations
 
+import json
+from typing import Annotated
+
 from pydantic import Field, field_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
-    database_url: str = "postgresql+asyncpg://carameli:carameli_local_dev@localhost:5432/carameli"
-    carrier_provider: str = "telnyx"       # or: twilio (legacy)
+    database_url: str = (
+        "postgresql+asyncpg://carameli:carameli_local_dev@localhost:5432/carameli"
+    )
+    carrier_provider: str = "telnyx"  # or: twilio (legacy)
     call_engine_provider: str = "jambonz"  # or: twilio (legacy)
 
     twilio_account_sid: str = ""
@@ -29,7 +34,7 @@ class Settings(BaseSettings):
 
     # S3-compatible media / recording storage (Track F)
     s3_bucket: str = ""
-    s3_endpoint: str = ""          # blank = real AWS S3; set for MinIO or other S3-compatible
+    s3_endpoint: str = ""  # blank = real AWS S3; set for MinIO or other S3-compatible
     s3_access_key_id: str = ""
     s3_secret_access_key: str = ""
     s3_region: str = "us-east-1"
@@ -39,7 +44,7 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     log_file: str = "logs/carameli.log"
 
-    cors_origins: list[str] = Field(
+    cors_origins: Annotated[list[str], NoDecode] = Field(
         default=["http://localhost:3000"],
         description="Comma-separated list of allowed CORS origins",
     )
@@ -54,8 +59,21 @@ class Settings(BaseSettings):
     @classmethod
     def parse_cors_origins(cls, v: str | list[str]) -> list[str]:
         if isinstance(v, str):
-            return [origin.strip() for origin in v.split(",") if origin.strip()]
-        return v
+            raw_value = v.strip()
+            if not raw_value:
+                return []
+
+            if raw_value.startswith("["):
+                try:
+                    parsed = json.loads(raw_value)
+                except json.JSONDecodeError:
+                    parsed = None
+                if isinstance(parsed, list):
+                    return [s for origin in parsed if (s := str(origin).strip())]
+
+            return [origin.strip() for origin in raw_value.split(",") if origin.strip()]
+
+        return [origin.strip() for origin in v if origin.strip()]
 
 
 settings = Settings()

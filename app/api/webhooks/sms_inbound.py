@@ -5,7 +5,6 @@ import logging
 import time
 from typing import Any
 
-from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 from fastapi import APIRouter, HTTPException, Request, Response
 
 from app.core.config import settings
@@ -14,6 +13,12 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/webhooks/telnyx", tags=["webhooks"])
 
 _MAX_TIMESTAMP_AGE_SECONDS = 300
+
+try:
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey as _Ed25519PublicKey
+except ImportError:
+    logger.error("Missing cryptography dependency required for Telnyx signature validation")
+    _Ed25519PublicKey = None  # type: ignore[assignment,misc]
 
 
 def _validate_telnyx_signature(raw_body: bytes, signature: str, timestamp: str) -> None:
@@ -31,19 +36,29 @@ def _validate_telnyx_signature(raw_body: bytes, signature: str, timestamp: str) 
     if not settings.telnyx_webhook_secret:
         return  # dev mode — skip
 
+    if _Ed25519PublicKey is None:
+        raise HTTPException(
+            status_code=500,
+            detail="Server misconfiguration: missing cryptography dependency",
+        )
+
     try:
         ts = int(timestamp)
     except (ValueError, TypeError):
-        raise HTTPException(status_code=403, detail="Missing or invalid telnyx-timestamp header")
+        raise HTTPException(
+            status_code=403, detail="Missing or invalid telnyx-timestamp header"
+        )
 
     if abs(time.time() - ts) > _MAX_TIMESTAMP_AGE_SECONDS:
-        raise HTTPException(status_code=403, detail="Timestamp too old (replay protection)")
+        raise HTTPException(
+            status_code=403, detail="Timestamp too old (replay protection)"
+        )
 
     signed_payload = f"{timestamp}|".encode() + raw_body
 
     try:
         pub_bytes = base64.b64decode(settings.telnyx_webhook_secret)
-        public_key = Ed25519PublicKey.from_public_bytes(pub_bytes)
+        public_key = _Ed25519PublicKey.from_public_bytes(pub_bytes)
         sig_bytes = base64.b64decode(signature)
         public_key.verify(sig_bytes, signed_payload)
     except Exception:

@@ -4,6 +4,7 @@ import logging
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
+import httpx
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -14,7 +15,10 @@ from app.api.webhooks.sms_inbound import router as sms_inbound_router
 from app.core.config import settings
 from app.core.logging_config import configure_logging
 from app.services.call_sync import start_scheduler, stop_scheduler
-from app.services.providers.factory import get_call_engine_provider, get_carrier_provider
+from app.services.providers.factory import (
+    get_call_engine_provider,
+    get_carrier_provider,
+)
 
 configure_logging(log_level=settings.log_level, log_file=settings.log_file)
 logger = logging.getLogger(__name__)
@@ -56,27 +60,20 @@ app.include_router(frontend_logs_router)
 
 @app.get("/health")
 async def health_check() -> dict:
-    """Health probe — checks Jambonz reachability.
-
-    Returns 200 when all dependencies are up, 503 when Jambonz is unreachable.
-    Load balancers and orchestrators should poll this endpoint.
-    """
-    import httpx
-
+    """Health probe — returns liveness and Jambonz reachability state."""
     ping_url = settings.jambonz_base_url.rstrip("/") + "/v1/ping"
+    jambonz_status = "ok"
+
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:
             resp = await client.get(ping_url)
         if resp.is_error:
-            raise httpx.HTTPStatusError("non-2xx", request=resp.request, response=resp)
-        jambonz_status = "ok"
+            logger.warning(
+                "Jambonz health probe returned non-2xx status=%s", resp.status_code
+            )
+            jambonz_status = "unreachable"
     except Exception as exc:
         logger.warning("Jambonz health probe failed: %s", exc)
-        from fastapi import Response
-        from fastapi.responses import JSONResponse
-        return JSONResponse(
-            status_code=503,
-            content={"status": "degraded", "service": "Carameli", "jambonz": "unreachable"},
-        )
+        jambonz_status = "unreachable"
 
     return {"status": "ok", "service": "Carameli", "jambonz": jambonz_status}

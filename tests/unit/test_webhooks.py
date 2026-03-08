@@ -6,6 +6,27 @@ from app.repositories.call_event_repo import CallEventRepo
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("terminal_status", ["no-answer", "busy", "failed", "canceled"])
+async def test_call_status_all_terminal_statuses_persist(
+    client, db_session, terminal_status: str
+) -> None:
+    """Each Jambonz terminal call status should be stored to call_events."""
+    call_sid = f"CAterminal_{terminal_status.replace('-', '_')}"
+    payload = {
+        "call_sid": call_sid,
+        "call_status": terminal_status,
+        "from": "+14155550010",
+        "to": "+14155550011",
+    }
+    resp = await client.post("/webhooks/jambonz/call-status", json=payload)
+    assert resp.status_code == 200
+
+    event = await CallEventRepo(db_session).get_by_call_sid(call_sid)
+    assert event is not None
+    assert event.status == terminal_status
+
+
+@pytest.mark.asyncio
 async def test_call_status_webhook_writes_event(client, db_session) -> None:
     """Jambonz call-status POST should persist the event to call_events."""
     payload = {

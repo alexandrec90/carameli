@@ -8,7 +8,7 @@
 * [X] ~~*Custom prompt to fix problems*~~ [2026-02-21]
 * [ ] Integrate into Vanillasoft
 * [ ] Deploy to ngrok so it's accessible to Vanillasoft
-* [ ] Make it easy to switch underlying provider - vonage, twilio (can multiple be implemented at once as fallback?)
+* [X] ~~*Make it easy to switch underlying provider - vonage, twilio (can multiple be implemented at once as fallback?)*~~ [2026-03-08]
 * [X] ~~*Can I test UI without launching whole process? Just to see what it looks like live, while making changes?*~~ [2026-02-21]
 * [X] ~~*useless md rules referenced in copilot - why?*~~ [2026-02-21]
 * [ ] does it still ask to configure formatter?
@@ -26,3 +26,5 @@
 * [X] ~~*Refactor claude commands to skills*~~ [2026-03-01]
 * [ ] Is notif complaining about python venv still there?
 * [ ] Check out new skin
+* [ ] eliminate twilio
+* [ ] eliminate voicegateway

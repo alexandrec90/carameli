@@ -125,7 +125,7 @@ async def deactivate_phone_line(
     carrier = request.app.state.carrier
     try:
         await carrier.release_number(line.twilio_sid)
-    except Exception as exc:
+    except Exception:
         raise HTTPException(status_code=502, detail="Provider error releasing DID")
 
     line = await line_repo.deactivate(line)

@@ -131,3 +131,41 @@ async def test_get_phone_line_count(client) -> None:
     resp = await client.get(f"{_LINE_BASE}/GetCount/5005", headers=AUTH_HEADERS)
     assert resp.status_code == 200
     assert resp.json()["count"] == 1
+
+
+@pytest.mark.asyncio
+async def test_update_call_recording(client) -> None:
+    await _create_customer(client, 5006)
+
+    from app.main import app
+
+    app.state.carrier.search_numbers = AsyncMock(
+        return_value=[{"phone_number": "+15065550100"}]
+    )
+    app.state.carrier.provision_number = AsyncMock(
+        return_value={"sid": "PNtest5006", "phone_number": "+15065550100"}
+    )
+
+    await client.post(
+        f"{_LINE_BASE}/Add",
+        json={"vs_customer_id": 5006, "area_code": "506"},
+        headers=AUTH_HEADERS,
+    )
+
+    # Enable recording
+    resp = await client.put(
+        f"{_LINE_BASE}/UpdateCallRecording",
+        json={"vs_customer_id": 5006, "phone_number": "+15065550100", "enabled": True},
+        headers=AUTH_HEADERS,
+    )
+    assert resp.status_code == 200
+    assert resp.json()["recording_enabled"] is True
+
+    # Disable recording
+    resp = await client.put(
+        f"{_LINE_BASE}/UpdateCallRecording",
+        json={"vs_customer_id": 5006, "phone_number": "+15065550100", "enabled": False},
+        headers=AUTH_HEADERS,
+    )
+    assert resp.status_code == 200
+    assert resp.json()["recording_enabled"] is False

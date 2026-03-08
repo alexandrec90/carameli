@@ -75,7 +75,7 @@ async def disable_sms(
     carrier = request.app.state.carrier
     try:
         await carrier.disable_sms(line.twilio_sid)
-    except Exception as exc:
+    except Exception:
         raise HTTPException(status_code=502, detail="Provider error disabling SMS")
 
     line = await line_repo.update_sms_enabled(line, False)
@@ -106,7 +106,7 @@ async def send_sms(
             to=body.to_number,
             body=body.body,
         )
-    except Exception as exc:
+    except Exception:
         raise HTTPException(status_code=502, detail="Provider error sending SMS")
 
     return SmsStatusResponse(success=True, message_sid=result["sid"])

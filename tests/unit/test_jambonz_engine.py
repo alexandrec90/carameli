@@ -413,3 +413,22 @@ async def test_telnyx_sms_inbound_replay_attack_returns_403(client) -> None:
     assert resp.status_code == 403
 
     settings.telnyx_webhook_secret = original
+
+
+@pytest.mark.asyncio
+async def test_telnyx_sms_inbound_unknown_event_type_returns_204(client) -> None:
+    """Unrecognised event_type should be silently accepted and return 204 (no-op)."""
+    from app.core.config import settings
+
+    original = settings.telnyx_webhook_secret
+    settings.telnyx_webhook_secret = ""
+
+    unknown_payload = {"data": {"event_type": "some.future.event", "payload": {}}}
+    resp = await client.post(
+        "/webhooks/telnyx/sms-inbound",
+        content=json.dumps(unknown_payload).encode(),
+        headers={"Content-Type": "application/json"},
+    )
+    assert resp.status_code == 204
+
+    settings.telnyx_webhook_secret = original
