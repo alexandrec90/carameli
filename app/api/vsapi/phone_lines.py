@@ -5,7 +5,6 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
-from twilio.base.exceptions import TwilioRestException
 
 from app.core.auth import AuthContext, enforce_customer_scope, get_auth_context
 from app.core.database import get_session
@@ -18,7 +17,6 @@ from app.schemas.phone_line import (
     PhoneLineResponse,
     UpdateRecordingRequest,
 )
-from app.services.twilio_provider import TwilioProvider
 
 logger = logging.getLogger(__name__)
 
@@ -41,15 +39,20 @@ async def add_phone_line(
         logger.warning("Customer not found vs_customer_id=%s", body.vs_customer_id)
         raise HTTPException(status_code=404, detail="Customer not found")
 
-    provider: TwilioProvider = request.app.state.twilio
+    carrier = request.app.state.carrier
     try:
-        result = await provider.purchase_did(
-            area_code=body.area_code,
-            phone_number=body.phone_number,
-        )
-    except TwilioRestException as exc:
-        logger.error("Twilio error purchasing DID vs_customer_id=%s: %s", body.vs_customer_id, exc.msg)
-        raise HTTPException(status_code=502, detail=f"Twilio error: {exc.msg}")
+        if body.phone_number:
+            result = await carrier.provision_number(body.phone_number)
+        elif body.area_code:
+            numbers = await carrier.search_numbers(body.area_code, 1)
+            if not numbers:
+                raise ValueError(f"No numbers available in area code {body.area_code}")
+            result = await carrier.provision_number(numbers[0]["phone_number"])
+        else:
+            raise ValueError("Must specify area_code or phone_number")
+    except Exception as exc:
+        logger.error("Provider error purchasing DID vs_customer_id=%s: %s", body.vs_customer_id, exc)
+        raise HTTPException(status_code=502, detail="Provider error purchasing DID")
     except ValueError as exc:
         logger.warning("Invalid DID request vs_customer_id=%s: %s", body.vs_customer_id, exc)
         raise HTTPException(status_code=400, detail=str(exc))
@@ -119,11 +122,11 @@ async def deactivate_phone_line(
     if not line:
         raise HTTPException(status_code=404, detail="Phone line not found")
 
-    provider: TwilioProvider = request.app.state.twilio
+    carrier = request.app.state.carrier
     try:
-        await provider.release_did(line.twilio_sid)
-    except TwilioRestException as exc:
-        raise HTTPException(status_code=502, detail=f"Twilio error: {exc.msg}")
+        await carrier.release_number(line.twilio_sid)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail="Provider error releasing DID")
 
     line = await line_repo.deactivate(line)
     return PhoneLineResponse.model_validate(line)
@@ -132,11 +135,10 @@ async def deactivate_phone_line(
 @router.put("/UpdateCallRecording", response_model=PhoneLineResponse)
 async def update_call_recording(
     body: UpdateRecordingRequest,
-    request: Request,
     session: Annotated[AsyncSession, Depends(get_session)],
     auth: Annotated[AuthContext, Depends(get_auth_context)],
 ) -> PhoneLineResponse:
-    """Toggle call recording for a DID."""
+    """Toggle call recording preference for a DID (applied per-call by the engine)."""
     enforce_customer_scope(auth, body.vs_customer_id)
     customer_repo = CustomerRepo(session)
     customer = await customer_repo.get_by_vs_id(body.vs_customer_id)
@@ -146,12 +148,6 @@ async def update_call_recording(
     line = await line_repo.get_by_number(customer.id, body.phone_number)
     if not line:
         raise HTTPException(status_code=404, detail="Phone line not found")
-
-    provider: TwilioProvider = request.app.state.twilio
-    try:
-        await provider.update_recording(line.twilio_sid, body.enabled)
-    except TwilioRestException as exc:
-        raise HTTPException(status_code=502, detail=f"Twilio error: {exc.msg}")
 
     line = await line_repo.update_recording_enabled(line, body.enabled)
     return PhoneLineResponse.model_validate(line)

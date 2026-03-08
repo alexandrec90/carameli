@@ -1,4 +1,4 @@
-# VoiceGateway — Local Development Guide
+# Carameli — Local Development Guide
 
 Self-hosted VoIP microservice built on Twilio. Drop-in replacement for Cloudli/CMV.
 
@@ -44,7 +44,7 @@ This starts three services:
 
 | Service | URL | Description |
 | --- | --- | --- |
-| VoiceGateway API | <http://localhost:8000> | FastAPI backend |
+| Carameli API | <http://localhost:8000> | FastAPI backend |
 | Carameli UI | <http://localhost:5173> | React admin dashboard |
 | PostgreSQL | localhost:5432 | Database |
 

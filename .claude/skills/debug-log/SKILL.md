@@ -1,23 +1,23 @@
 ---
 name: debug-log
-description: 'Clean up WARNING/ERROR entries in logs/voicegateway.log with minimal fixes.'
+description: 'Clean up WARNING/ERROR entries in logs/carameli.log with minimal fixes.'
 argument-hint: 'Optional focus area (e.g., "frontend", "backend", "webhooks")'
 ---
 
 # Skill: Debug Log Cleanup
 
-Use this skill to read `logs/voicegateway.log` and fix every ERROR and WARNING found in it.
+Use this skill to read `logs/carameli.log` and fix every ERROR and WARNING found in it.
 
 ## Step 1 — Read the log
 
-Use the Read tool on `logs/voicegateway.log`. If it is very long (>500 lines), read only the
+Use the Read tool on `logs/carameli.log`. If it is very long (>500 lines), read only the
 last 500 lines using the `offset` parameter.
 
 Also grep for the most severe lines first so you can prioritise:
 
-- Grep `logs/voicegateway.log` for `| ERROR` — these must be fixed
-- Grep `logs/voicegateway.log` for `| WARNING` — investigate each one
-- Grep `logs/voicegateway.log` for `[FRONTEND]` — browser-side issues, fix in `frontend/src/`
+- Grep `logs/carameli.log` for `| ERROR` — these must be fixed
+- Grep `logs/carameli.log` for `| WARNING` — investigate each one
+- Grep `logs/carameli.log` for `[FRONTEND]` — browser-side issues, fix in `frontend/src/`
 
 ## Step 2 — Triage
 
@@ -69,7 +69,7 @@ docker compose exec app pytest
 Then tail the log briefly to confirm the fixed errors are gone:
 
 ```bash
-tail -n 100 logs/voicegateway.log
+tail -n 100 logs/carameli.log
 ```
 
 Report the outcome: which errors are resolved, which are transient/config issues that need

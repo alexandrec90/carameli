@@ -7,16 +7,16 @@ from app.repositories.call_event_repo import CallEventRepo
 
 @pytest.mark.asyncio
 async def test_call_status_webhook_writes_event(client, db_session) -> None:
-    """Twilio call-status POST should persist the event to call_events."""
+    """Jambonz call-status POST should persist the event to call_events."""
     payload = {
-        "CallSid": "CAtestwebhook001",
-        "CallStatus": "completed",
-        "Direction": "outbound",
-        "From": "+14155550000",
-        "To": "+14155550001",
-        "CallDuration": "45",
+        "call_sid": "CAtestwebhook001",
+        "call_status": "completed",
+        "direction": "outbound",
+        "from": "+14155550000",
+        "to": "+14155550001",
+        "duration": "45",
     }
-    resp = await client.post("/webhooks/twilio/call-status", data=payload)
+    resp = await client.post("/webhooks/jambonz/call-status", json=payload)
     assert resp.status_code == 200
 
     repo = CallEventRepo(db_session)
@@ -28,24 +28,24 @@ async def test_call_status_webhook_writes_event(client, db_session) -> None:
 
 @pytest.mark.asyncio
 async def test_call_status_missing_sid_is_noop(client) -> None:
-    """A call-status webhook without a CallSid should return 200 without crashing."""
+    """A call-status webhook without a call_sid should return 200 without crashing."""
     resp = await client.post(
-        "/webhooks/twilio/call-status", data={"CallStatus": "completed"}
+        "/webhooks/jambonz/call-status", json={"call_status": "completed"}
     )
     assert resp.status_code == 200
 
 
 @pytest.mark.asyncio
 async def test_call_status_duplicate_sid_is_idempotent(client, db_session) -> None:
-    """Posting the same CallSid twice should not create a duplicate event."""
+    """Posting the same call_sid twice should not create a duplicate event."""
     payload = {
-        "CallSid": "CAtestdupe001",
-        "CallStatus": "completed",
-        "From": "+14155550000",
-        "To": "+14155550001",
+        "call_sid": "CAtestdupe001",
+        "call_status": "completed",
+        "from": "+14155550000",
+        "to": "+14155550001",
     }
-    await client.post("/webhooks/twilio/call-status", data=payload)
-    await client.post("/webhooks/twilio/call-status", data=payload)
+    await client.post("/webhooks/jambonz/call-status", json=payload)
+    await client.post("/webhooks/jambonz/call-status", json=payload)
 
     from sqlalchemy import select
     from app.models.call_event import CallEvent
@@ -59,25 +59,25 @@ async def test_call_status_duplicate_sid_is_idempotent(client, db_session) -> No
 
 @pytest.mark.asyncio
 async def test_call_status_duplicate_sid_updates_existing_event(client, db_session) -> None:
-    """Subsequent callbacks for same CallSid should update status/duration/recording fields."""
+    """Subsequent callbacks for same call_sid should update status/duration/recording fields."""
     await client.post(
-        "/webhooks/twilio/call-status",
-        data={
-            "CallSid": "CAtestupdate001",
-            "CallStatus": "ringing",
-            "From": "+14155550000",
-            "To": "+14155550001",
+        "/webhooks/jambonz/call-status",
+        json={
+            "call_sid": "CAtestupdate001",
+            "call_status": "ringing",
+            "from": "+14155550000",
+            "to": "+14155550001",
         },
     )
     await client.post(
-        "/webhooks/twilio/call-status",
-        data={
-            "CallSid": "CAtestupdate001",
-            "CallStatus": "completed",
-            "From": "+14155550000",
-            "To": "+14155550001",
-            "CallDuration": "31",
-            "RecordingUrl": "https://api.twilio.com/recordings/REtest001",
+        "/webhooks/jambonz/call-status",
+        json={
+            "call_sid": "CAtestupdate001",
+            "call_status": "completed",
+            "from": "+14155550000",
+            "to": "+14155550001",
+            "duration": "31",
+            "recording_url": "https://recordings.example.com/REtest001",
         },
     )
 
@@ -86,4 +86,4 @@ async def test_call_status_duplicate_sid_updates_existing_event(client, db_sessi
     assert event is not None
     assert event.status == "completed"
     assert event.duration_seconds == 31
-    assert event.recording_url == "https://api.twilio.com/recordings/REtest001"
+    assert event.recording_url == "https://recordings.example.com/REtest001"

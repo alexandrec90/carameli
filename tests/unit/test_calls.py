@@ -18,13 +18,13 @@ async def test_get_recording_not_found(client) -> None:
 @pytest.mark.asyncio
 async def test_get_recording_no_recording(client) -> None:
     await client.post(
-        "/webhooks/twilio/call-status",
-        data={
-            "CallSid": "CAnorecording001",
-            "CallStatus": "completed",
-            "From": "+14155550000",
-            "To": "+14155550001",
-            "CallDuration": "12",
+        "/webhooks/jambonz/call-status",
+        json={
+            "call_sid": "CAnorecording001",
+            "call_status": "completed",
+            "from": "+14155550000",
+            "to": "+14155550001",
+            "duration": "12",
         },
     )
 
@@ -39,14 +39,14 @@ async def test_get_recording_no_recording(client) -> None:
 @pytest.mark.asyncio
 async def test_get_recording_success(client) -> None:
     await client.post(
-        "/webhooks/twilio/call-status",
-        data={
-            "CallSid": "CArecording001",
-            "CallStatus": "completed",
-            "From": "+14155550000",
-            "To": "+14155550001",
-            "CallDuration": "120",
-            "RecordingUrl": "https://api.twilio.com/recordings/RErecording001",
+        "/webhooks/jambonz/call-status",
+        json={
+            "call_sid": "CArecording001",
+            "call_status": "completed",
+            "from": "+14155550000",
+            "to": "+14155550001",
+            "duration": "120",
+            "recording_url": "https://recordings.example.com/RErecording001",
         },
     )
 
@@ -57,5 +57,5 @@ async def test_get_recording_success(client) -> None:
     assert resp.status_code == 200
     body = resp.json()
     assert body["call_sid"] == "CArecording001"
-    assert body["recording_url"] == "https://api.twilio.com/recordings/RErecording001"
+    assert body["recording_url"] == "https://recordings.example.com/RErecording001"
     assert body["duration_seconds"] == 120

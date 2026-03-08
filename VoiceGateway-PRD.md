@@ -1,4 +1,4 @@
-# PRD: VoiceGateway — Homemade VoIP Service to Replace Cloudli/CMV
+# PRD: Carameli — Homemade VoIP Service to Replace Cloudli/CMV
 
 ## Context
 
@@ -12,7 +12,7 @@ VanillaSoft currently uses two VoIP providers: **Cloudli** and **CMV (ConnectMeV
 - Selective Call Interception (SCI) routing by zip code
 - Call tracking (talk time, call attempts) fed into VanillaSoft's database
 
-The goal is to replace both providers with a single, self-hosted microservice (**VoiceGateway**) built on top of **Twilio**, which exposes the same REST contract that VanillaSoft's backend already calls — requiring only a config URL change in VanillaSoft, not a new C# client.
+The goal is to replace both providers with a single, self-hosted microservice (**Carameli**) built on top of **Twilio**, which exposes the same REST contract that VanillaSoft's backend already calls — requiring only a config URL change in VanillaSoft, not a new C# client.
 
 ---
 
@@ -40,7 +40,7 @@ VanillaSoft Backend (.NET)
   │  HTTP REST (same Cloudli API contract)
   ▼
 ┌────────────────────────────────┐
-│         VoiceGateway           │
+│         Carameli           │
 │   FastAPI  +  APScheduler      │
 │                                │
 │  /vsapi/1.0.0/...  ← routes   │
@@ -57,7 +57,7 @@ VanillaSoft Backend (.NET)
              │  Webhooks (status callbacks)
              └─────────────────────────────┐
                                            ▼
-                              VoiceGateway /webhooks/...
+                              Carameli /webhooks/...
                                            │
                                            ▼
                                      PostgreSQL DB
@@ -71,7 +71,7 @@ VanillaSoft Backend (.NET)
 
 ## API Contract (Drop-in Replacement)
 
-VoiceGateway mounts all routes under `/vsapi/1.0.0/` to match the existing `CloudliApiBaseUrl` config. Only `Web.config` / `App.config` base URL values need to change.
+Carameli mounts all routes under `/vsapi/1.0.0/` to match the existing `CloudliApiBaseUrl` config. Only `Web.config` / `App.config` base URL values need to change.
 
 ### Authentication
 
@@ -81,7 +81,7 @@ Each request must include header:
 Authorization: Bearer <api_key>
 ```
 
-VoiceGateway validates this key against its own customer table.
+Carameli validates this key against its own customer table.
 
 ---
 
@@ -139,10 +139,10 @@ VoiceGateway validates this key against its own customer table.
 | Method | Path | Description |
 | --- | --- | --- |
 | GET | `/VsCustomer/Get/{customerId}` | Return stored customer info |
-| GET | `/VsCustomer/GetCustid/{customerId}` | Return VoiceGateway's internal customer ID |
+| GET | `/VsCustomer/GetCustid/{customerId}` | Return Carameli's internal customer ID |
 | GET | `/VsCustomer/GetPhoneLines/{customerId}` | Return all DIDs for the customer |
 
-These are served from VoiceGateway's own PostgreSQL database (no Twilio call needed for reads).
+These are served from Carameli's own PostgreSQL database (no Twilio call needed for reads).
 
 ---
 
@@ -170,7 +170,7 @@ Query params: `vscustomerId`, `extension`, `msgDropNumber`
 
 **Implementation:**
 
-- SCI rules stored in VoiceGateway's PostgreSQL database
+- SCI rules stored in Carameli's PostgreSQL database
 - On inbound call webhook, look up zip code of caller (via reverse-geocoding or stored DID geography), then route call via TwiML `<Dial><Number>` to the assigned agent extension
 
 ---
@@ -201,12 +201,12 @@ Implemented as a DB table + dynamic TwiML generator called by Twilio webhook.
 
 The current Windows service polls the database every 30 seconds / 1 second looking for unmatched call records.
 
-**VoiceGateway replaces this with Twilio webhooks:**
+**Carameli replaces this with Twilio webhooks:**
 
 1. Twilio fires `statusCallback` with `CallStatus`, `Duration`, `RecordingUrl` when a call ends
-2. VoiceGateway's `/webhooks/twilio/call-status` handler:
+2. Carameli's `/webhooks/twilio/call-status` handler:
 
-   - Stores the raw event in `voicegateway.call_events` PostgreSQL table
+   - Stores the raw event in `carameli.call_events` PostgreSQL table
    - Calls VanillaSoft's internal API (or writes directly to `tblCMVCallNotification` / `tblCMVTalkTime`) to insert the call record
    - Matching logic (outbound vs inbound, time padding) is ported from `CMVCallData.cs` into a Python function
 
@@ -250,15 +250,15 @@ call_events
 
 ## Integration with VanillaSoft (Migration Steps)
 
-1. **Deploy VoiceGateway** (Docker Compose, single server or Azure App Service)
+1. **Deploy Carameli** (Docker Compose, single server or Azure App Service)
 2. **Provision Twilio sub-accounts** per customer (or use one account with tags)
 3. **Migrate phone numbers** from Cloudli/CMV to Twilio (port or repurchase)
 4. **Change one config value** per deployed VanillaSoft component:
 
-   - `Web.config`, `App.config`: `CloudliApiBaseUrl` → `https://your-voicegateway-host/vsapi/1.0.0/`
+   - `Web.config`, `App.config`: `CloudliApiBaseUrl` → `https://your-carameli-host/vsapi/1.0.0/`
 
-5. **Update CloudliService.cs** to remove the CMV/Cloudli conditional routing — both providers now point to VoiceGateway (or keep the existing routing; VoiceGateway handles both paths)
-6. **Retire** the old `CMV Call Data Service` Windows service (VoiceGateway webhooks replace it)
+5. **Update CloudliService.cs** to remove the CMV/Cloudli conditional routing — both providers now point to Carameli (or keep the existing routing; Carameli handles both paths)
+6. **Retire** the old `CMV Call Data Service` Windows service (Carameli webhooks replace it)
 
 ---
 
@@ -296,24 +296,24 @@ call_events
 
 | File | Change Needed |
 | --- | --- |
-| `AppCode/VanillaSoft.Backend/Cloudli/CloudliClient.cs` | Point base URL to VoiceGateway; or no change if config-driven |
+| `AppCode/VanillaSoft.Backend/Cloudli/CloudliClient.cs` | Point base URL to Carameli; or no change if config-driven |
 | `AppCode/VanillaSoft.Backend/Cloudli/CloudliService.cs` | Remove CMV vs Cloudli branching; always use new client |
 | `AppCode/Vanillasoft.Webservice/Web.config` (line 503) | Update `CloudliApiBaseUrl` |
 | `AppCode/VoipLineCountUpdate/App.config` (line 34) | Update `CloudliApiBaseUrl` |
 | `AppCode/SMSDripService/App.config` | Update `CloudliApiBaseUrl` |
 | `AppCode/NotificationService/App.config` | Update `CloudliApiBaseUrl` |
 | `AppCode/SMS Service/App.config` | Update `CloudliApiBaseUrl` |
-| `CMV Call Data Service` | Retire (replaced by VoiceGateway webhooks + APScheduler) |
+| `CMV Call Data Service` | Retire (replaced by Carameli webhooks + APScheduler) |
 
 ---
 
 ## Verification Plan
 
-1. **Local dev:** `docker compose up` — VoiceGateway + Postgres + ngrok tunnel for Twilio webhooks
+1. **Local dev:** `docker compose up` — Carameli + Postgres + ngrok tunnel for Twilio webhooks
 2. **Unit tests:** pytest for each endpoint with mocked Twilio SDK
 3. **Integration tests:** Use Twilio test credentials (no real charges) to exercise DID provisioning, SMS, call status webhooks
-4. **VanillaSoft smoke test:** Point a dev VanillaSoft instance at local VoiceGateway; create a phone line, send an SMS, place a test call, verify `tblCallHistory` is updated
-5. **Replay production traffic:** Capture real Cloudli webhook payloads, replay them against VoiceGateway, verify matching results are identical to current behavior
+4. **VanillaSoft smoke test:** Point a dev VanillaSoft instance at local Carameli; create a phone line, send an SMS, place a test call, verify `tblCallHistory` is updated
+5. **Replay production traffic:** Capture real Cloudli webhook payloads, replay them against Carameli, verify matching results are identical to current behavior
 
 ---
 

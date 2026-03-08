@@ -23,12 +23,15 @@ async def _setup(client, vs_id: int, phone_number: str) -> None:
 
     from app.main import app
 
-    app.state.twilio.purchase_did = AsyncMock(
+    app.state.carrier.search_numbers = AsyncMock(
+        return_value=[{"phone_number": phone_number}]
+    )
+    app.state.carrier.provision_number = AsyncMock(
         return_value={"sid": f"PNtest{vs_id}", "phone_number": phone_number}
     )
-    app.state.twilio.enable_sms = AsyncMock(return_value=None)
-    app.state.twilio.disable_sms = AsyncMock(return_value=None)
-    app.state.twilio.send_sms = AsyncMock(
+    app.state.carrier.enable_sms = AsyncMock(return_value=None)
+    app.state.carrier.disable_sms = AsyncMock(return_value=None)
+    app.state.carrier.send_sms = AsyncMock(
         return_value={"sid": f"SMtest{vs_id}", "status": "sent"}
     )
 

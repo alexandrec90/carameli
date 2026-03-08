@@ -5,13 +5,10 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
-from twilio.base.exceptions import TwilioRestException
-
 from app.core.auth import AuthContext, enforce_customer_scope, get_auth_context
 from app.core.database import get_session
 from app.repositories.customer_repo import CustomerRepo
 from app.schemas.voicemail import VoicemailDropRequest, VoicemailDropResponse
-from app.services.twilio_provider import TwilioProvider
 
 logger = logging.getLogger(__name__)
 
@@ -39,21 +36,21 @@ async def voicemail_drop(
         logger.warning("Customer not found vs_customer_id=%s", body.vs_customer_id)
         raise HTTPException(status_code=404, detail="Customer not found")
 
-    provider: TwilioProvider = request.app.state.twilio
+    engine = request.app.state.engine
     try:
-        result = await provider.initiate_voicemail_drop(
-            to_number=body.msg_drop_number,
-            from_number=body.extension,
+        result = await engine.initiate_voicemail_drop(
+            to=body.msg_drop_number,
+            from_=body.extension,
             audio_url=str(body.audio_url),
         )
-    except TwilioRestException as exc:
+    except Exception as exc:
         logger.error(
-            "Twilio error initiating voicemail drop vs_customer_id=%s to=%s: %s",
+            "Provider error initiating voicemail drop vs_customer_id=%s to=%s: %s",
             body.vs_customer_id,
             body.msg_drop_number,
-            exc.msg,
+            exc,
         )
-        raise HTTPException(status_code=502, detail=f"Twilio error: {exc.msg}")
+        raise HTTPException(status_code=502, detail="Provider error initiating voicemail drop")
 
     logger.info(
         "Voicemail drop initiated call_sid=%s status=%s",

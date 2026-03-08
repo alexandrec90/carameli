@@ -38,7 +38,7 @@ export default function App() {
             element={
               <Placeholder
                 title="Settings"
-                description="Configure VoiceGateway and Twilio credentials"
+                description="Configure Carameli and Twilio credentials"
               />
             }
           />

@@ -47,18 +47,16 @@ async def client(db_session: AsyncSession):
         yield db_session
 
     app.dependency_overrides[get_session] = override_session
-    mock_twilio = MagicMock()
-    app.state.twilio = mock_twilio
-
-    original_twilio_auth_token = settings.twilio_auth_token
-    settings.twilio_auth_token = ""
+    # Pre-populate state so the lifespan override lands on top; individual tests
+    # replace specific methods with AsyncMock as needed.
+    app.state.carrier = MagicMock()
+    app.state.engine = MagicMock()
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac
 
     app.dependency_overrides.clear()
-    settings.twilio_auth_token = original_twilio_auth_token
 
 
 API_KEY = settings.api_key_secret

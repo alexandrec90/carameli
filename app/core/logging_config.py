@@ -5,11 +5,11 @@ import logging.handlers
 from pathlib import Path
 
 
-def configure_logging(log_level: str = "INFO", log_file: str = "logs/voicegateway.log") -> None:
+def configure_logging(log_level: str = "INFO", log_file: str = "logs/carameli.log") -> None:
     """Set up console + rotating file logging.
 
     Format is intentionally structured for easy machine parsing:
-        2026-02-21 14:30:00.123 | INFO     | app.main:23 | Starting VoiceGateway…
+        2026-02-21 14:30:00.123 | INFO     | app.main:23 | Starting Carameli…
     """
     level = getattr(logging, log_level.upper(), logging.INFO)
 

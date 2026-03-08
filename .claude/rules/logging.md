@@ -27,7 +27,7 @@ configure_logging(log_level=settings.log_level, log_file=settings.log_file)
 
 `app/core/logging_config.py` attaches two handlers to the root logger:
 - **Console** (`StreamHandler`) — for docker logs / terminal
-- **RotatingFileHandler** — writes to `logs/voicegateway.log`, 10 MB cap, 5 backups
+- **RotatingFileHandler** — writes to `logs/carameli.log`, 10 MB cap, 5 backups
 
 ### Log format
 
@@ -76,7 +76,7 @@ Use `%s`-style lazy formatting — never f-strings inside `logger.*()` calls.
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `LOG_LEVEL` | `INFO` | Root log level (`DEBUG`, `INFO`, `WARNING`, `ERROR`) |
-| `LOG_FILE` | `logs/voicegateway.log` | Path for the rotating file |
+| `LOG_FILE` | `logs/carameli.log` | Path for the rotating file |
 
 ---
 
@@ -141,6 +141,6 @@ Returns `204 No Content`.
    at least entry (`INFO`) and any caught errors (`ERROR`).
 5. **Do not log secrets** — never log `api_key`, `twilio_auth_token`, or any
    credential. Log the identifier (SID, customer ID) instead.
-6. **Do not create new log files** — everything goes to `logs/voicegateway.log`
+6. **Do not create new log files** — everything goes to `logs/carameli.log`
    via the root handler. The `[FRONTEND]` prefix on the `frontend` logger
    sub-namespace is the only namespacing needed.

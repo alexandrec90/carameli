@@ -4,11 +4,9 @@ import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from twilio.base.exceptions import TwilioRestException
 
 from app.core.auth import verify_api_key
 from app.schemas.area_code import AreaCodeInfo, AreaCodesResponse
-from app.services.twilio_provider import TwilioProvider
 
 logger = logging.getLogger(__name__)
 
@@ -20,14 +18,14 @@ async def get_area_codes(
     request: Request,
     _: Annotated[str, Depends(verify_api_key)],
 ) -> AreaCodesResponse:
-    """Return all US area codes available from Twilio."""
+    """Return all US area codes available from the active carrier provider."""
     logger.info("Fetching US area codes")
-    provider: TwilioProvider = request.app.state.twilio
+    carrier = request.app.state.carrier
     try:
-        codes = await provider.get_available_area_codes(country="US")
-    except TwilioRestException as exc:
-        logger.error("Twilio error fetching area codes: %s", exc.msg)
-        raise HTTPException(status_code=502, detail=f"Twilio error: {exc.msg}")
+        codes = await carrier.get_available_area_codes(country="US")
+    except Exception as exc:
+        logger.error("Provider error fetching area codes: %s", exc)
+        raise HTTPException(status_code=502, detail="Provider error fetching area codes")
     items = [AreaCodeInfo(area_code=c["area_code"], country=c["country"]) for c in codes]
     logger.info("Returned %d area codes", len(items))
     return AreaCodesResponse(area_codes=items, count=len(items))
@@ -41,12 +39,12 @@ async def get_area_codes_filtered(
     _: Annotated[str, Depends(verify_api_key)],
 ) -> AreaCodesResponse:
     """Return area codes filtered by country and state."""
-    provider: TwilioProvider = request.app.state.twilio
+    carrier = request.app.state.carrier
     try:
-        codes = await provider.get_available_area_codes(
+        codes = await carrier.get_available_area_codes(
             country=country.upper(), state=state.upper()
         )
-    except TwilioRestException as exc:
-        raise HTTPException(status_code=502, detail=f"Twilio error: {exc.msg}")
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail="Provider error fetching area codes")
     items = [AreaCodeInfo(area_code=c["area_code"], country=c["country"]) for c in codes]
     return AreaCodesResponse(area_codes=items, count=len(items))

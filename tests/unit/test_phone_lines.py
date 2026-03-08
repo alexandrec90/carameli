@@ -28,7 +28,10 @@ async def test_add_phone_line_by_area_code(client) -> None:
 
     from app.main import app
 
-    app.state.twilio.purchase_did = AsyncMock(
+    app.state.carrier.search_numbers = AsyncMock(
+        return_value=[{"phone_number": "+15005550100"}]
+    )
+    app.state.carrier.provision_number = AsyncMock(
         return_value={"sid": "PNtest5001", "phone_number": "+15005550100"}
     )
 
@@ -48,7 +51,10 @@ async def test_get_phone_line(client) -> None:
 
     from app.main import app
 
-    app.state.twilio.purchase_did = AsyncMock(
+    app.state.carrier.search_numbers = AsyncMock(
+        return_value=[{"phone_number": "+15025550100"}]
+    )
+    app.state.carrier.provision_number = AsyncMock(
         return_value={"sid": "PNtest5002", "phone_number": "+15025550100"}
     )
 
@@ -80,10 +86,13 @@ async def test_deactivate_phone_line(client) -> None:
 
     from app.main import app
 
-    app.state.twilio.purchase_did = AsyncMock(
+    app.state.carrier.search_numbers = AsyncMock(
+        return_value=[{"phone_number": "+15045550100"}]
+    )
+    app.state.carrier.provision_number = AsyncMock(
         return_value={"sid": "PNtest5004", "phone_number": "+15045550100"}
     )
-    app.state.twilio.release_did = AsyncMock(return_value=None)
+    app.state.carrier.release_number = AsyncMock(return_value=None)
 
     await client.post(
         f"{_LINE_BASE}/Add",
@@ -106,7 +115,10 @@ async def test_get_phone_line_count(client) -> None:
 
     from app.main import app
 
-    app.state.twilio.purchase_did = AsyncMock(
+    app.state.carrier.search_numbers = AsyncMock(
+        return_value=[{"phone_number": "+15055550100"}]
+    )
+    app.state.carrier.provision_number = AsyncMock(
         return_value={"sid": "PNtest5005", "phone_number": "+15055550100"}
     )
 

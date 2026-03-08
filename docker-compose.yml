@@ -3,15 +3,15 @@ services:
     image: postgres:16
     restart: unless-stopped
     environment:
-      POSTGRES_USER: voicegateway
-      POSTGRES_PASSWORD: voicegateway_local_dev
-      POSTGRES_DB: voicegateway
+      POSTGRES_USER: carameli
+      POSTGRES_PASSWORD: carameli_local_dev
+      POSTGRES_DB: carameli
     ports:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U voicegateway"]
+      test: ["CMD-SHELL", "pg_isready -U carameli"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -25,7 +25,7 @@ services:
     env_file:
       - .env
     environment:
-      DATABASE_URL: postgresql+asyncpg://voicegateway:voicegateway_local_dev@db:5432/voicegateway
+      DATABASE_URL: postgresql+asyncpg://carameli:carameli_local_dev@db:5432/carameli
     depends_on:
       db:
         condition: service_healthy
@@ -57,6 +57,93 @@ services:
       - ./frontend:/app
     environment:
       - VITE_API_BASE_URL=http://localhost:8000
+
+  # --- Jambonz call engine stack ---
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  freeswitch:
+    image: drachtio/drachtio-freeswitch-mrf
+    restart: unless-stopped
+    ports:
+      - "5060:5060/udp"
+      - "5061:5061/tcp"   # SIP TLS
+    environment:
+      # TLS: set to "true" to enable SIP TLS on port 5061 + SRTP for media.
+      # Mount your certificate and key via the volumes below.
+      FREESWITCH_TLS_ENABLE: "${FREESWITCH_TLS_ENABLE:-false}"
+      FREESWITCH_TLS_CERT_FILE: /etc/freeswitch/tls/tls.crt
+      FREESWITCH_TLS_KEY_FILE: /etc/freeswitch/tls/tls.key
+      FREESWITCH_SRTP_ENABLE: "${FREESWITCH_SRTP_ENABLE:-false}"
+    volumes:
+      # Mount TLS certs from host. Generate with:
+      #   openssl req -x509 -newkey rsa:4096 -keyout tls/tls.key \
+      #     -out tls/tls.crt -days 365 -nodes -subj "/CN=<your-sip-domain>"
+      # Or mount a cert from Let's Encrypt / your CA.
+      - ./tls:/etc/freeswitch/tls:ro
+    healthcheck:
+      test: ["CMD-SHELL", "fs_cli -x 'status' | grep -q 'UP'"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+
+  rtpengine:
+    image: drachtio/rtpengine
+    restart: unless-stopped
+    command: >
+      rtpengine
+      --interface=${RTPENGINE_PUBLIC_IP}
+      --listen-ng=127.0.0.1:2223
+      --port-min=10000
+      --port-max=20000
+    ports:
+      - "10000-20000:10000-20000/udp"
+    healthcheck:
+      test: ["CMD-SHELL", "ss -ulnp | grep -q 2223 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  jambonz:
+    image: ghcr.io/jambonz/api-server
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      JAMBONZ_REDIS_HOST: redis
+      JAMBONZ_REDIS_PORT: 6379
+      DRACHTIO_HOST: freeswitch
+      DRACHTIO_PORT: 9022
+      JAMBONZ_LISTEN_PORT: 3000
+      # Call recording — push to the same S3-compatible bucket used by the app.
+      # Set S3_* vars in .env; leave blank to disable remote recording storage.
+      JAMBONZ_RECORD_ALL_CALLS: "${JAMBONZ_RECORD_ALL_CALLS:-false}"
+      AWS_ACCESS_KEY_ID: "${S3_ACCESS_KEY_ID:-}"
+      AWS_SECRET_ACCESS_KEY: "${S3_SECRET_ACCESS_KEY:-}"
+      AWS_REGION: "${S3_REGION:-us-east-1}"
+      AWS_S3_BUCKET: "${S3_BUCKET:-}"
+      # Non-AWS S3 endpoint (e.g. MinIO). Leave blank for real AWS S3.
+      AWS_S3_ENDPOINT_URL: "${S3_ENDPOINT:-}"
+    depends_on:
+      redis:
+        condition: service_healthy
+      freeswitch:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:3000/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
 
 volumes:
   pgdata:

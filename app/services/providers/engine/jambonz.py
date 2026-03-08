@@ -1,0 +1,138 @@
+from __future__ import annotations
+
+import logging
+
+import httpx
+
+logger = logging.getLogger(__name__)
+
+
+class JambonzEngine:
+    """CallEngineProvider implementation backed by a self-hosted Jambonz instance."""
+
+    def __init__(
+        self,
+        base_url: str,
+        api_key: str,
+        account_sid: str,
+        webhook_base_url: str,
+    ) -> None:
+        self._account_sid = account_sid
+        self._webhook_base_url = webhook_base_url.rstrip("/")
+        self._client = httpx.AsyncClient(
+            base_url=base_url.rstrip("/") + "/v1",
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+            },
+            timeout=30.0,
+        )
+
+    def _calls_url(self, call_id: str | None = None) -> str:
+        base = f"/Accounts/{self._account_sid}/Calls"
+        return f"{base}/{call_id}" if call_id else base
+
+    async def aclose(self) -> None:
+        await self._client.aclose()
+
+    async def initiate_call(self, from_: str, to: str, webhook_url: str, **opts) -> dict:
+        payload = {
+            "from": from_,
+            "to": {"type": "phone", "number": to},
+            "call_hook": {"url": webhook_url, "method": "POST"},
+            "call_status_hook": {
+                "url": f"{self._webhook_base_url}/webhooks/jambonz/call-status",
+                "method": "POST",
+            },
+        }
+        resp = await self._client.post(self._calls_url(), json=payload)
+        if resp.is_error:
+            logger.error(
+                "Jambonz initiate_call failed: from=%s to=%s status=%s body=%s",
+                from_, to, resp.status_code, resp.text,
+            )
+            resp.raise_for_status()
+        data = resp.json()
+        call_sid = data.get("sid", data.get("call_sid", ""))
+        logger.info("Jambonz call initiated: call_id=%s from=%s to=%s", call_sid, from_, to)
+        return {"call_id": call_sid, "status": "queued"}
+
+    async def hangup_call(self, call_id: str) -> None:
+        resp = await self._client.delete(self._calls_url(call_id))
+        if resp.is_error:
+            logger.error(
+                "Jambonz hangup_call failed: call_id=%s status=%s body=%s",
+                call_id, resp.status_code, resp.text,
+            )
+            resp.raise_for_status()
+        logger.info("Jambonz call hung up: call_id=%s", call_id)
+
+    async def start_recording(self, call_id: str) -> dict:
+        resp = await self._client.put(
+            self._calls_url(call_id),
+            json={"record": {"action": "startCallRecording"}},
+        )
+        if resp.is_error:
+            logger.error(
+                "Jambonz start_recording failed: call_id=%s status=%s body=%s",
+                call_id, resp.status_code, resp.text,
+            )
+            resp.raise_for_status()
+        logger.info("Jambonz recording started: call_id=%s", call_id)
+        return {"call_id": call_id, "recording": "started"}
+
+    async def stop_recording(self, call_id: str) -> None:
+        resp = await self._client.put(
+            self._calls_url(call_id),
+            json={"record": {"action": "stopCallRecording"}},
+        )
+        if resp.is_error:
+            logger.error(
+                "Jambonz stop_recording failed: call_id=%s status=%s body=%s",
+                call_id, resp.status_code, resp.text,
+            )
+            resp.raise_for_status()
+        logger.info("Jambonz recording stopped: call_id=%s", call_id)
+
+    async def get_call_status(self, call_id: str) -> dict:
+        resp = await self._client.get(self._calls_url(call_id))
+        if resp.is_error:
+            logger.error(
+                "Jambonz get_call_status failed: call_id=%s status=%s body=%s",
+                call_id, resp.status_code, resp.text,
+            )
+            resp.raise_for_status()
+        data = resp.json()
+        return {
+            "call_id": call_id,
+            "status": data.get("call_status", data.get("status", "unknown")),
+            "duration": data.get("duration"),
+        }
+
+    async def initiate_voicemail_drop(self, to: str, from_: str, audio_url: str) -> dict:
+        """Initiate a call that plays an audio file (voicemail drop)."""
+        payload = {
+            "from": from_,
+            "to": {"type": "phone", "number": to},
+            "call_hook": {
+                "url": f"{self._webhook_base_url}/webhooks/jambonz/voicemail-hook",
+                "method": "POST",
+            },
+            "call_status_hook": {
+                "url": f"{self._webhook_base_url}/webhooks/jambonz/call-status",
+                "method": "POST",
+            },
+            "tag": {"audio_url": audio_url},
+        }
+        resp = await self._client.post(self._calls_url(), json=payload)
+        if resp.is_error:
+            logger.error(
+                "Jambonz initiate_voicemail_drop failed: to=%s status=%s body=%s",
+                to, resp.status_code, resp.text,
+            )
+            resp.raise_for_status()
+        data = resp.json()
+        call_sid = data.get("sid", data.get("call_sid", ""))
+        logger.info("Jambonz voicemail drop initiated: call_id=%s to=%s", call_sid, to)
+        return {"call_id": call_sid, "status": "queued"}

@@ -1,4 +1,15 @@
 .env
+.env.*
+!.env.example
+
+# Secrets / certificates
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+*.cer
+.npmrc
 
 # Python
 __pycache__/
@@ -44,11 +55,35 @@ htmlcov/
 *.log
 logs/
 
+# OS / editor
+.DS_Store
+Thumbs.db
+Desktop.ini
+.idea/
+.vscode/
+
 # Node / frontend
 node_modules/
 frontend/node_modules/
 frontend/.next/
 frontend/dist/
 frontend/build/
+frontend/.vite/
+.vite/
+.cache/
+.eslintcache
+.stylelintcache
+.turbo/
+.parcel-cache/
+*.tsbuildinfo
+.npm/
+.pnpm-store/
+.yarn/
+
+# Coverage outputs
+coverage/
+coverage.xml
+*.lcov
+.nyc_output/
 
 docs/

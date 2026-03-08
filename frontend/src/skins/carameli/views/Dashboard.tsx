@@ -17,7 +17,7 @@ export default function DashboardView({
       <div>
         <h1 className="page-title text-4xl font-extrabold">Dashboard</h1>
         <p className="page-subtitle text-base font-medium mt-1">
-          VoiceGateway status overview
+          Carameli status overview
         </p>
       </div>
 

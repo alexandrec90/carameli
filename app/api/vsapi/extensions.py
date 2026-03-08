@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import logging
+import secrets
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from twilio.base.exceptions import TwilioRestException
 
 from app.core.auth import AuthContext, enforce_customer_scope, get_auth_context
 from app.core.database import get_session
@@ -16,7 +16,6 @@ from app.schemas.extension import (
     AvailableExtensionsResponse,
     ExtensionResponse,
 )
-from app.services.twilio_provider import TwilioProvider
 
 logger = logging.getLogger(__name__)
 
@@ -26,11 +25,10 @@ router = APIRouter(prefix="/VsExtension", tags=["extensions"])
 @router.post("/Add", status_code=201, response_model=ExtensionResponse)
 async def add_extension(
     body: AddExtensionRequest,
-    request: Request,
     session: Annotated[AsyncSession, Depends(get_session)],
     auth: Annotated[AuthContext, Depends(get_auth_context)],
 ) -> ExtensionResponse:
-    """Create a SIP credential for the extension."""
+    """Create a SIP extension record with locally-managed credentials."""
     enforce_customer_scope(auth, body.vs_customer_id)
     logger.info("Adding extension vs_customer_id=%s ext=%s", body.vs_customer_id, body.extension_number)
     customer_repo = CustomerRepo(session)
@@ -45,26 +43,15 @@ async def add_extension(
         logger.warning("Extension already exists vs_customer_id=%s ext=%s", body.vs_customer_id, body.extension_number)
         raise HTTPException(status_code=409, detail="Extension already exists")
 
-    provider: TwilioProvider = request.app.state.twilio
     sip_username = f"ext{body.extension_number}_{str(customer.id)[:8]}"
-    password = body.password or TwilioProvider.generate_sip_password()
-
-    try:
-        cred_list_sid = await provider.ensure_credential_list(str(customer.id))
-        domain_sid = await provider.ensure_sip_domain(str(customer.id))
-        cred_sid = await provider.create_sip_credential(
-            cred_list_sid, sip_username, password
-        )
-    except TwilioRestException as exc:
-        logger.error("Twilio error creating SIP credential vs_customer_id=%s ext=%s: %s", body.vs_customer_id, body.extension_number, exc.msg)
-        raise HTTPException(status_code=502, detail=f"Twilio error: {exc.msg}")
+    _ = body.password or secrets.token_urlsafe(24)  # password stored by caller; not persisted here
 
     ext = await ext_repo.create(
         customer_id=customer.id,
         extension_number=body.extension_number,
         sip_username=sip_username,
-        sip_credential_sid=cred_sid,
-        twilio_domain_sid=domain_sid,
+        sip_credential_sid=None,
+        twilio_domain_sid=None,
     )
     logger.info("Extension created id=%s sip_username=%s", ext.id, sip_username)
     return ExtensionResponse.model_validate(ext)
@@ -100,11 +87,10 @@ async def get_available_extensions(
 async def deactivate_extension(
     customerId: int,
     extension: str,
-    request: Request,
     session: Annotated[AsyncSession, Depends(get_session)],
     auth: Annotated[AuthContext, Depends(get_auth_context)],
 ) -> ExtensionResponse:
-    """Delete the SIP credential and mark the extension inactive."""
+    """Mark the extension inactive."""
     enforce_customer_scope(auth, customerId)
     customer_repo = CustomerRepo(session)
     customer = await customer_repo.get_by_vs_id(customerId)
@@ -115,16 +101,6 @@ async def deactivate_extension(
     ext = await ext_repo.get_by_number(customer.id, extension)
     if not ext:
         raise HTTPException(status_code=404, detail="Extension not found")
-
-    provider: TwilioProvider = request.app.state.twilio
-    if ext.sip_credential_sid and ext.twilio_domain_sid:
-        try:
-            cred_list_sid = await provider.ensure_credential_list(str(customer.id))
-            await provider.delete_sip_credential(
-                cred_list_sid, ext.sip_credential_sid
-            )
-        except TwilioRestException as exc:
-            raise HTTPException(status_code=502, detail=f"Twilio error: {exc.msg}")
 
     ext = await ext_repo.deactivate(ext)
     return ExtensionResponse.model_validate(ext)

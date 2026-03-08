@@ -30,7 +30,7 @@ async def create_customer(
     session: Annotated[AsyncSession, Depends(get_session)],
     _: Annotated[str, Depends(verify_api_key)],
 ) -> CustomerResponse:
-    """Create a new customer record in VoiceGateway."""
+    """Create a new customer record in Carameli."""
     logger.info("Creating customer vs_customer_id=%s", body.vs_customer_id)
     repo = CustomerRepo(session)
     try:
@@ -70,7 +70,7 @@ async def get_customer_id(
     session: Annotated[AsyncSession, Depends(get_session)],
     auth: Annotated[AuthContext, Depends(get_auth_context)],
 ) -> CustomerIdResponse:
-    """Return VoiceGateway's internal customer UUID for a VanillaSoft customer ID."""
+    """Return Carameli's internal customer UUID for a VanillaSoft customer ID."""
     enforce_customer_scope(auth, customerId)
     repo = CustomerRepo(session)
     customer = await repo.get_by_vs_id(customerId)

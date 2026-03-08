@@ -1,4 +1,4 @@
-# VoiceGateway
+# Carameli
 
 A self-hosted VoIP microservice. Manages phone lines, extensions, SMS, call recording, and call tracking via a REST API.
 
@@ -21,7 +21,7 @@ A self-hosted VoIP microservice. Manages phone lines, extensions, SMS, call reco
 ## Project Layout
 
 ```text
-voicegateway/
+carameli/
   app/
     api/
       vsapi/              # API routes (/vsapi/1.0.0/...)
@@ -80,7 +80,7 @@ docker compose exec app alembic upgrade head
 # Run tests
 docker compose exec app pytest
 
-# Expose webhook endpoints publicly (Jambonz + Telnyx need to reach VoiceGateway)
+# Expose webhook endpoints publicly (Jambonz + Telnyx need to reach Carameli)
 ngrok http 8000
 # Then set JAMBONZ_WEBHOOK_BASE_URL and TELNYX_WEBHOOK_BASE_URL in .env to the ngrok HTTPS URL
 ```
@@ -105,11 +105,11 @@ See `.env.example`. Key vars:
 | `TWILIO_AUTH_TOKEN` | Twilio auth token (legacy fallback only) |
 | `API_KEY_SECRET` | Validates bearer tokens from API clients |
 | `LOG_LEVEL` | Root log level (`DEBUG`/`INFO`/`WARNING`/`ERROR`), default `INFO` |
-| `LOG_FILE` | Rotating log file path, default `logs/voicegateway.log` |
+| `LOG_FILE` | Rotating log file path, default `logs/carameli.log` |
 
 ## Route Prefixes
 
-All routes mount under `/vsapi/1.0.0/`. Native VoiceGateway-only extensions use `/vg/1.0.0/`.
+All routes mount under `/vsapi/1.0.0/`. Native Carameli-only extensions use `/vg/1.0.0/`.
 
 | Route Group | Prefix |
 | --- | --- |
@@ -127,7 +127,7 @@ Provider webhook callbacks live under `/webhooks/<provider>/...` (e.g. `/webhook
 
 ## Call Tracking
 
-The active call engine (Jambonz) fires a status webhook when a call ends. VoiceGateway:
+The active call engine (Jambonz) fires a status webhook when a call ends. Carameli:
 
 1. Validates the webhook signature
 2. Writes the raw event to the `call_events` PostgreSQL table
@@ -202,7 +202,7 @@ See `.claude/rules/logging.md` for the full spec.
 
 **Quick reference:**
 
-- Log file: `logs/voicegateway.log` (10 MB cap, 5 backups)
+- Log file: `logs/carameli.log` (10 MB cap, 5 backups)
 - Format: `YYYY-MM-DD HH:MM:SS.mmm | LEVEL | module:line | message`
 - Every Python module: `logger = logging.getLogger(__name__)` at module scope
 - Every route handler: log entry at `INFO`, 404s at `WARNING`, errors at `ERROR`

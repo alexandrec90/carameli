@@ -7,16 +7,37 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
-    database_url: str = "postgresql+asyncpg://voicegateway:voicegateway_local_dev@localhost:5432/voicegateway"
+    database_url: str = "postgresql+asyncpg://carameli:carameli_local_dev@localhost:5432/carameli"
+    carrier_provider: str = "telnyx"       # or: twilio (legacy)
+    call_engine_provider: str = "jambonz"  # or: twilio (legacy)
+
     twilio_account_sid: str = ""
     twilio_auth_token: str = ""
     twilio_webhook_base_url: str = "http://localhost:8000"
-    twilio_api_key_sid: str = ""
-    twilio_api_key_secret: str = ""
+
+    # Telnyx (populated by Track B)
+    telnyx_api_key: str = ""
+    telnyx_webhook_base_url: str = "http://localhost:8000"
+    telnyx_webhook_secret: str = ""
+
+    # Jambonz (populated by Track C)
+    jambonz_base_url: str = "http://localhost:3000"
+    jambonz_api_key: str = ""
+    jambonz_account_sid: str = ""
+    jambonz_webhook_base_url: str = "http://localhost:8000"
+    jambonz_webhook_secret: str = ""
+
+    # S3-compatible media / recording storage (Track F)
+    s3_bucket: str = ""
+    s3_endpoint: str = ""          # blank = real AWS S3; set for MinIO or other S3-compatible
+    s3_access_key_id: str = ""
+    s3_secret_access_key: str = ""
+    s3_region: str = "us-east-1"
+
     api_key_secret: str = "change_me"
 
     log_level: str = "INFO"
-    log_file: str = "logs/voicegateway.log"
+    log_file: str = "logs/carameli.log"
 
     cors_origins: list[str] = Field(
         default=["http://localhost:3000"],

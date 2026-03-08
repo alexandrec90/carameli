@@ -118,7 +118,7 @@ export default function Dashboard({
           Dashboard
         </h1>
         <p className="mt-1 text-base" style={{ color: '#8B4513' }}>
-          Welcome to your VoiceGateway command centre.
+          Welcome to your Carameli command centre.
         </p>
       </div>
 

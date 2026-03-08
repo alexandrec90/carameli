@@ -5,14 +5,12 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
-from twilio.base.exceptions import TwilioRestException
 
 from app.core.auth import AuthContext, enforce_customer_scope, get_auth_context
 from app.core.database import get_session
 from app.repositories.customer_repo import CustomerRepo
 from app.repositories.phone_line_repo import PhoneLineRepo
 from app.schemas.sms import SendSmsRequest, SmsEnableDisableResponse, SmsStatusResponse
-from app.services.twilio_provider import TwilioProvider
 
 logger = logging.getLogger(__name__)
 
@@ -41,12 +39,12 @@ async def enable_sms(
         logger.warning("Phone line not found vs_customer_id=%s number=%s", customerId, smsPhoneNumber)
         raise HTTPException(status_code=404, detail="Phone line not found")
 
-    provider: TwilioProvider = request.app.state.twilio
+    carrier = request.app.state.carrier
     try:
-        await provider.enable_sms(line.twilio_sid)
-    except TwilioRestException as exc:
-        logger.error("Twilio error enabling SMS number=%s: %s", smsPhoneNumber, exc.msg)
-        raise HTTPException(status_code=502, detail=f"Twilio error: {exc.msg}")
+        await carrier.enable_sms(line.twilio_sid)
+    except Exception as exc:
+        logger.error("Provider error enabling SMS number=%s: %s", smsPhoneNumber, exc)
+        raise HTTPException(status_code=502, detail="Provider error enabling SMS")
 
     line = await line_repo.update_sms_enabled(line, True)
     logger.info("SMS enabled number=%s", smsPhoneNumber)
@@ -74,11 +72,11 @@ async def disable_sms(
     if not line:
         raise HTTPException(status_code=404, detail="Phone line not found")
 
-    provider: TwilioProvider = request.app.state.twilio
+    carrier = request.app.state.carrier
     try:
-        await provider.disable_sms(line.twilio_sid)
-    except TwilioRestException as exc:
-        raise HTTPException(status_code=502, detail=f"Twilio error: {exc.msg}")
+        await carrier.disable_sms(line.twilio_sid)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail="Provider error disabling SMS")
 
     line = await line_repo.update_sms_enabled(line, False)
     return SmsEnableDisableResponse(
@@ -101,14 +99,14 @@ async def send_sms(
     if not customer:
         raise HTTPException(status_code=404, detail="Customer not found")
 
-    provider: TwilioProvider = request.app.state.twilio
+    carrier = request.app.state.carrier
     try:
-        result = await provider.send_sms(
-            from_number=body.from_number,
-            to_number=body.to_number,
+        result = await carrier.send_sms(
+            from_=body.from_number,
+            to=body.to_number,
             body=body.body,
         )
-    except TwilioRestException as exc:
-        raise HTTPException(status_code=502, detail=f"Twilio error: {exc.msg}")
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail="Provider error sending SMS")
 
     return SmsStatusResponse(success=True, message_sid=result["sid"])

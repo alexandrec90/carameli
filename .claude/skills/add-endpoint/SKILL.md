@@ -1,10 +1,10 @@
 ---
 name: add-endpoint
-description: 'Add a VoiceGateway API endpoint following logging and provider conventions.'
+description: 'Add a Carameli API endpoint following logging and provider conventions.'
 argument-hint: 'Optional endpoint name or route path (e.g., "/PhoneLine/UpdateCallRecording")'
 ---
 
-# Skill: Add a VoiceGateway API Endpoint
+# Skill: Add a Carameli API Endpoint
 
 Use this skill when adding a new route. Work through each step in order.
 
@@ -16,7 +16,7 @@ Answer these before writing any code:
   (e.g., `PUT /vsapi/1.0.0/PhoneLine/UpdateCallRecording`)
 - What does the request body / query params look like?
 - What should the response JSON contain, and what are the exact field names?
-- Is this route under `/vsapi/1.0.0/` (standard) or `/vg/1.0.0/` (VoiceGateway-native extension)?
+- Is this route under `/vsapi/1.0.0/` (standard) or `/vg/1.0.0/` (Carameli-native extension)?
 
 ## Step 2 — Add Pydantic Schemas
 
