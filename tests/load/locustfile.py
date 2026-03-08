@@ -20,6 +20,7 @@ Environment variables used by the test:
   LOAD_TEST_TO_DID    — E.164 destination, e.g. +12025550199
   LOAD_TEST_AUDIO_URL — Public URL to an audio file for voicemail drop
 """
+
 from __future__ import annotations
 
 import os
@@ -36,7 +37,7 @@ _FROM_DID = os.getenv("LOAD_TEST_FROM_DID", "+12025550100")
 _TO_DID = os.getenv("LOAD_TEST_TO_DID", "+12025550199")
 _AUDIO_URL = os.getenv(
     "LOAD_TEST_AUDIO_URL",
-    "https://demo.twilio.com/docs/classic.mp3",
+    "https://www2.cs.uic.edu/~i101/SoundFiles/StarWars3.wav",
 )
 
 _HEADERS = {"Authorization": f"Bearer {_API_KEY}"}
@@ -45,6 +46,7 @@ _HEADERS = {"Authorization": f"Bearer {_API_KEY}"}
 # ---------------------------------------------------------------------------
 # Scenario 1 — Concurrent outbound calls (voicemail drop pattern)
 # ---------------------------------------------------------------------------
+
 
 class ConcurrentCallUser(HttpUser):
     """Simulates agents triggering voicemail drops concurrently."""
@@ -75,6 +77,7 @@ class ConcurrentCallUser(HttpUser):
 # ---------------------------------------------------------------------------
 # Scenario 2 — Inbound call routing (SIP → extension lookup)
 # ---------------------------------------------------------------------------
+
 
 class InboundCallUser(HttpUser):
     """Simulates the webhook Jambonz fires when an inbound call arrives.
@@ -114,6 +117,7 @@ class InboundCallUser(HttpUser):
 # ---------------------------------------------------------------------------
 # Scenario 3 — SMS send throughput
 # ---------------------------------------------------------------------------
+
 
 class SmsUser(HttpUser):
     """Simulates bulk SMS sends (e.g. appointment reminders or follow-ups)."""

@@ -13,12 +13,8 @@ class Settings(BaseSettings):
     database_url: str = (
         "postgresql+asyncpg://carameli:carameli_local_dev@localhost:5432/carameli"
     )
-    carrier_provider: str = "telnyx"  # or: twilio (legacy)
-    call_engine_provider: str = "jambonz"  # or: twilio (legacy)
-
-    twilio_account_sid: str = ""
-    twilio_auth_token: str = ""
-    twilio_webhook_base_url: str = "http://localhost:8000"
+    carrier_provider: str = "telnyx"
+    call_engine_provider: str = "jambonz"
 
     # Telnyx (populated by Track B)
     telnyx_api_key: str = ""

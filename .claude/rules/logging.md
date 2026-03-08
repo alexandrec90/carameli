@@ -53,7 +53,7 @@ logger = logging.getLogger(__name__)
 | --- | --- | --- |
 | Handler entry | `INFO` | all key identifiers (customer ID, phone number, ext, etc.) |
 | 404 / 409 not found / conflict | `WARNING` | the missing identifier |
-| Twilio error | `ERROR` | `vs_customer_id`, target number, `exc.code`, `exc.msg` |
+| Provider error | `ERROR` | `vs_customer_id`, target number, provider error details |
 | Validation / bad-request error | `WARNING` | the offending value |
 | Successful mutation | `INFO` | result identifiers (new ID, SID, etc.) |
 
@@ -64,9 +64,9 @@ logger.info("Adding phone line vs_customer_id=%s area_code=%s number=%s", body.v
 # ... logic ...
 logger.warning("Customer not found vs_customer_id=%s", body.vs_customer_id)
 # ... or ...
-logger.error("Twilio error purchasing DID vs_customer_id=%s: %s", body.vs_customer_id, exc.msg)
+logger.error("Provider error purchasing DID vs_customer_id=%s: %s", body.vs_customer_id, exc)
 # ... or ...
-logger.info("Phone line added number=%s sid=%s", line.phone_number, line.twilio_sid)
+logger.info("Phone line added number=%s sid=%s", line.phone_number, line.provider_sid)
 ```
 
 Use `%s`-style lazy formatting — never f-strings inside `logger.*()` calls.
@@ -91,7 +91,7 @@ import { logger } from '../lib/logger'
 
 logger.info('Page loaded', { route: '/phone-lines' })
 logger.warn('Retrying request', { attempt: 2 })
-logger.error('API call failed', { status: 502, body: 'Twilio error' })
+logger.error('API call failed', { status: 502, body: 'Provider error' })
 ```
 
 Internally it:
@@ -139,7 +139,7 @@ Returns `204 No Content`.
 3. **Every new route handler** must log entry at `INFO` and failures at `WARNING`/`ERROR`.
 4. **Every new frontend page or major component** should import `logger` and log
    at least entry (`INFO`) and any caught errors (`ERROR`).
-5. **Do not log secrets** — never log `api_key`, `twilio_auth_token`, or any
+5. **Do not log secrets** — never log `api_key`, provider tokens, or any
    credential. Log the identifier (SID, customer ID) instead.
 6. **Do not create new log files** — everything goes to `logs/carameli.log`
    via the root handler. The `[FRONTEND]` prefix on the `frontend` logger

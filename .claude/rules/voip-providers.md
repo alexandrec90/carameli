@@ -22,10 +22,10 @@ See `docs/voip-migration-plan.md` for the full migration rationale and phased pl
 
 ## Provider Layers
 
-| Layer | Env var | Active impl | Fallback |
-|---|---|---|---|
-| Carrier (DIDs, SMS, SIP trunk) | `CARRIER_PROVIDER` | `telnyx` | `twilio` |
-| Call engine (call control, recording) | `CALL_ENGINE_PROVIDER` | `jambonz` | `twilio` |
+| Layer | Env var | Active impl |
+|---|---|---|
+| Carrier (DIDs, SMS, SIP trunk) | `CARRIER_PROVIDER` | `telnyx` |
+| Call engine (call control, recording) | `CALL_ENGINE_PROVIDER` | `jambonz` |
 
 ## Directory Layout
 
@@ -35,10 +35,8 @@ app/services/providers/
   factory.py           ← reads env vars, returns provider singletons
   carrier/
     telnyx.py          ← active carrier
-    twilio.py          ← legacy / fallback
   engine/
     jambonz.py         ← active engine
-    twilio.py          ← legacy / fallback
 ```
 
 Business logic in `call_control.py` and `did_manager.py` only imports from
@@ -68,7 +66,6 @@ class CallEngineProvider(Protocol):
 - Re-raise all provider errors as `HTTPException(502)` so callers get a clean non-2xx.
 - Telnyx: catch `telnyx.error.TelnyxError`
 - Jambonz: catch `httpx.HTTPStatusError` (Jambonz REST API is HTTP-based)
-- Twilio (legacy): catch `twilio.base.exceptions.TwilioRestException`
 
 ## Client Lifecycle
 
@@ -76,7 +73,7 @@ class CallEngineProvider(Protocol):
   store on `app.state`, inject via a FastAPI dependency.
 - Never instantiate a provider client inside a route handler or per-request.
 - In unit tests, always mock at the provider interface boundary — never make real
-  API calls to Telnyx, Jambonz, or Twilio.
+  API calls to Telnyx or Jambonz.
 - In integration tests, use sandbox/test credentials for the active provider.
 
 ## Phone Numbers

@@ -1,6 +1,6 @@
 # Carameli — Local Development Guide
 
-Self-hosted VoIP microservice built on Twilio. Drop-in replacement for Cloudli/CMV.
+Self-hosted VoIP microservice powered by Telnyx + Jambonz. Drop-in replacement for Cloudli/CMV.
 
 ---
 
@@ -104,18 +104,18 @@ docker compose exec app pytest -v
 
 ---
 
-## Connecting Real Twilio (Optional)
+## Connecting Live Providers (Optional)
 
-Your `.env` already has credentials. To test live Twilio calls (no charges with test credentials):
+Your `.env` already has provider placeholders. To test live calls and SMS:
 
-1. Update `.env` with your actual Twilio Account SID + Auth Token
-2. For webhooks (call status, voice, SMS), expose the API via ngrok:
+1. Update `.env` with valid Telnyx + Jambonz credentials
+2. For webhooks (call status and SMS inbound), expose the API via ngrok:
 
    ```bash
    ngrok http 8000
    ```
 
-3. Set `TWILIO_WEBHOOK_BASE_URL` in `.env` to the ngrok HTTPS URL
+3. Set `JAMBONZ_WEBHOOK_BASE_URL` and `TELNYX_WEBHOOK_BASE_URL` in `.env` to the ngrok HTTPS URL
 4. Restart the app:
 
    ```bash
@@ -163,7 +163,7 @@ All API routes are prefixed with `/vsapi/1.0.0/`.
 | SCI Routing | `/` | `POST /PostSCIbyZipCode`, `POST /UpdateSCIUserOption` |
 | Pointers | `/` | `POST /AddPointerToExtension`, `DELETE /DeletePointerToExtension` |
 | Area Codes | `/GetAreaCodes` | `GET /GetAreaCodes`, `GET /GetAreaCodes/{country}/{state}` |
-| Webhooks | `/webhooks/twilio/` | `POST /call-status`, `POST /voice`, `POST /sms` |
+| Webhooks | `/webhooks/` | `POST /jambonz/call-status`, `POST /telnyx/sms-inbound` |
 | Health | `/health` | `GET /health` |
 
 ---
@@ -173,9 +173,9 @@ All API routes are prefixed with `/vsapi/1.0.0/`.
 | Feature | Status |
 | --- | --- |
 | VanillaSoft write-back on call events | Stubbed — marks `posted=true`, no actual write to VS SQL Server |
-| Inbound TwiML routing (SCI / pointers) | Webhooks receive calls but routing logic not implemented |
+| Inbound routing orchestration (SCI / pointers) | Webhooks receive calls but advanced routing logic is still evolving |
 | SMS, Call Events, Settings pages | UI placeholders — API endpoints are fully functional |
-| Recording → S3 storage | Dev: recording URLs stored from Twilio callback, no S3 copy |
+| Recording → S3 storage | Dev: recording URLs stored from call-status callbacks, no S3 copy |
 
 ---
 

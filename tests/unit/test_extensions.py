@@ -12,8 +12,6 @@ async def _create_customer(client, vs_id: int) -> dict:
     payload = {
         "vs_customer_id": vs_id,
         "api_key": f"key-{vs_id}",
-        "twilio_account_sid": f"ACtest{vs_id}",
-        "twilio_auth_token": f"token{vs_id}",
     }
     resp = await client.post(f"{_CUST_BASE}/Create", json=payload, headers=AUTH_HEADERS)
     assert resp.status_code == 201
@@ -89,9 +87,7 @@ async def test_deactivate_extension(client) -> None:
         json={"vs_customer_id": 7004, "extension_number": "300"},
         headers=AUTH_HEADERS,
     )
-    resp = await client.put(
-        f"{_EXT_BASE}/Deactivate/7004/300", headers=AUTH_HEADERS
-    )
+    resp = await client.put(f"{_EXT_BASE}/Deactivate/7004/300", headers=AUTH_HEADERS)
     assert resp.status_code == 200
     assert resp.json()["active"] is False
 
@@ -99,7 +95,5 @@ async def test_deactivate_extension(client) -> None:
 @pytest.mark.asyncio
 async def test_deactivate_extension_not_found_returns_404(client) -> None:
     await _create_customer(client, 7005)
-    resp = await client.put(
-        f"{_EXT_BASE}/Deactivate/7005/999", headers=AUTH_HEADERS
-    )
+    resp = await client.put(f"{_EXT_BASE}/Deactivate/7005/999", headers=AUTH_HEADERS)
     assert resp.status_code == 404

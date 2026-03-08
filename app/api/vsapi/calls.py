@@ -31,7 +31,7 @@ async def get_recording(
     if not event.recording_url:
         raise HTTPException(status_code=404, detail="No recording for this call")
     return CallRecordingResponse(
-        call_sid=event.twilio_call_sid,
+        call_sid=event.call_sid,
         recording_url=event.recording_url,
         duration_seconds=event.duration_seconds,
     )

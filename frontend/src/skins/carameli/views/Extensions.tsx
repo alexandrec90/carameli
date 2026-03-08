@@ -45,7 +45,7 @@ export default function ExtensionsView({
         {error && <p className="text-red-400 text-sm mt-3">{error}</p>}
         {success && <p className="text-green-400 text-sm mt-3">{success}</p>}
         <p className="text-helper mt-3">
-          Creates a Twilio SIP credential — requires valid Twilio credentials
+          Creates SIP credentials managed by the active provider
         </p>
       </Card>
 
@@ -85,9 +85,9 @@ export default function ExtensionsView({
           <div>
             <h3 className="section-title font-bold mb-1">SIP Credentials</h3>
             <p className="text-body-soft text-sm leading-relaxed">
-              Each extension creates a Twilio SIP credential. Configure your SIP phone
-              with the generated <code className="text-code-accent">sip_username</code> and the
-              domain <code className="text-code-accent">vg-&lt;id&gt;.sip.twilio.com</code>.
+              Each extension creates a provider-managed SIP credential. Configure your SIP phone
+              with the generated <code className="text-code-accent">sip_username</code> and your
+              configured SIP domain.
               Passwords are auto-generated unless provided.
             </p>
           </div>

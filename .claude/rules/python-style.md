@@ -13,7 +13,7 @@ paths:
 - Target **Python 3.12**. Use `from __future__ import annotations` in all modules.
 - Type-annotate every function signature — parameters and return types.
 - Prefer `async def` for all route handlers and anything that touches the DB or
-  Twilio SDK.
+  provider clients.
 - Keep route handlers thin (≤ ~15 lines). Delegate logic to the service or
   repository layer.
 - No raw dicts returned from routes — always return a typed Pydantic response model.
@@ -33,8 +33,8 @@ paths:
 ## Error Handling
 
 - Raise `HTTPException` for client errors (4xx). Include a descriptive `detail`.
-- Twilio errors caught in the service layer should be logged then re-raised as
-  `HTTPException(status_code=502, detail="Twilio error from provider")`.
+- Provider errors caught in the service layer should be logged then re-raised as
+  `HTTPException(status_code=502, detail="Provider error")`.
 - Never let unhandled exceptions reach VanillaSoft without a meaningful HTTP
   status code.
 
@@ -57,12 +57,12 @@ paths:
 - Use `%s`-style lazy formatting — never f-strings inside `logger.*()` calls:
 
       # correct
-      logger.info("Phone line added number=%s sid=%s", line.phone_number, line.twilio_sid)
+      logger.info("Phone line added number=%s sid=%s", line.phone_number, line.provider_sid)
       # wrong
       logger.info(f"Phone line added number={line.phone_number}")
 
-- In every route handler log: entry at `INFO`, 404/409 at `WARNING`, Twilio/5xx errors at `ERROR`.
-- Never log secrets: no `api_key`, `twilio_auth_token`, or SIP passwords.
+    - In every route handler log: entry at `INFO`, 404/409 at `WARNING`, provider/5xx errors at `ERROR`.
+    - Never log secrets: no `api_key`, provider credentials, or SIP passwords.
 - Full spec: `.claude/rules/logging.md`.
 
 ## Imports and Module Structure

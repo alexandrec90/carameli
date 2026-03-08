@@ -72,14 +72,16 @@ async def test_call_status_duplicate_sid_is_idempotent(client, db_session) -> No
     from app.models.call_event import CallEvent
 
     result = await db_session.execute(
-        select(CallEvent).where(CallEvent.twilio_call_sid == "CAtestdupe001")
+        select(CallEvent).where(CallEvent.call_sid == "CAtestdupe001")
     )
     events = result.scalars().all()
     assert len(events) == 1
 
 
 @pytest.mark.asyncio
-async def test_call_status_duplicate_sid_updates_existing_event(client, db_session) -> None:
+async def test_call_status_duplicate_sid_updates_existing_event(
+    client, db_session
+) -> None:
     """Subsequent callbacks for same call_sid should update status/duration/recording fields."""
     await client.post(
         "/webhooks/jambonz/call-status",

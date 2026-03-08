@@ -70,7 +70,6 @@ export interface Customer {
   id: string
   vs_customer_id: number
   api_key: string
-  twilio_account_sid: string
   active: boolean
   created_at: string
 }
@@ -78,15 +77,13 @@ export interface Customer {
 export interface CustomerCreate {
   vs_customer_id: number
   api_key: string
-  twilio_account_sid: string
-  twilio_auth_token: string
 }
 
 export interface PhoneLine {
   id: string
   customer_id: string
   phone_number: string
-  twilio_sid: string
+  provider_sid: string
   sms_enabled: boolean
   recording_enabled: boolean
   active: boolean
@@ -99,7 +96,7 @@ export interface Extension {
   extension_number: string
   sip_username: string
   sip_credential_sid: string | null
-  twilio_domain_sid: string | null
+  sip_domain_sid: string | null
   active: boolean
   created_at: string
 }

@@ -9,8 +9,6 @@ async def _create_customer(client, vs_id: int, api_key: str) -> dict:
     payload = {
         "vs_customer_id": vs_id,
         "api_key": api_key,
-        "twilio_account_sid": f"ACtest{vs_id}",
-        "twilio_auth_token": f"token{vs_id}",
     }
     resp = await client.post(
         "/vsapi/1.0.0/VsCustomer/Create",

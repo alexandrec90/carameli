@@ -51,10 +51,8 @@ carameli/
         factory.py          # Reads env vars, returns provider singletons
         carrier/
           telnyx.py         # DID buy/release, SMS send (active)
-          twilio.py         # Legacy fallback
         engine/
           jambonz.py        # Call initiation, recording, IVR (active)
-          twilio.py         # Legacy fallback
       call_control.py     # Engine-agnostic call business logic
       did_manager.py      # Carrier-agnostic DID business logic
       call_sync.py        # APScheduler job for call tracking retries
@@ -92,8 +90,8 @@ See `.env.example`. Key vars:
 | Variable | Purpose |
 | --- | --- |
 | `DATABASE_URL` | Async PostgreSQL DSN (`postgresql+asyncpg://...`) |
-| `CARRIER_PROVIDER` | Active carrier impl (`telnyx` or `twilio`), default `telnyx` |
-| `CALL_ENGINE_PROVIDER` | Active call engine impl (`jambonz` or `twilio`), default `jambonz` |
+| `CARRIER_PROVIDER` | Active carrier impl (`telnyx`), default `telnyx` |
+| `CALL_ENGINE_PROVIDER` | Active call engine impl (`jambonz`), default `jambonz` |
 | `TELNYX_API_KEY` | Telnyx API key for DID + SMS |
 | `TELNYX_WEBHOOK_BASE_URL` | Public base URL for Telnyx callbacks (ngrok in dev) |
 | `TELNYX_WEBHOOK_SECRET` | Signing secret for inbound Telnyx webhook validation |
@@ -101,8 +99,6 @@ See `.env.example`. Key vars:
 | `JAMBONZ_API_KEY` | Jambonz REST API key |
 | `JAMBONZ_WEBHOOK_BASE_URL` | Public base URL for Jambonz call status callbacks (ngrok in dev) |
 | `JAMBONZ_WEBHOOK_SECRET` | HMAC secret for inbound Jambonz webhook validation |
-| `TWILIO_ACCOUNT_SID` | Twilio account SID (legacy fallback only) |
-| `TWILIO_AUTH_TOKEN` | Twilio auth token (legacy fallback only) |
 | `API_KEY_SECRET` | Validates bearer tokens from API clients |
 | `LOG_LEVEL` | Root log level (`DEBUG`/`INFO`/`WARNING`/`ERROR`), default `INFO` |
 | `LOG_FILE` | Rotating log file path, default `logs/carameli.log` |
@@ -207,7 +203,7 @@ See `.claude/rules/logging.md` for the full spec.
 - Every Python module: `logger = logging.getLogger(__name__)` at module scope
 - Every route handler: log entry at `INFO`, 404s at `WARNING`, errors at `ERROR`
 - Frontend: `import { logger } from '../lib/logger'` — auto-ships to backend log file
-- Never log secrets (`api_key`, `twilio_auth_token`, credentials)
+- Never log secrets (`api_key`, credentials)
 
 ## Testing Strategy
 

@@ -8,7 +8,7 @@ from pydantic import BaseModel
 
 class CallEventResponse(BaseModel):
     id: uuid.UUID
-    twilio_call_sid: str
+    call_sid: str
     direction: str
     from_number: str | None
     to_number: str | None

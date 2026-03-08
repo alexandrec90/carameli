@@ -19,8 +19,6 @@ class CustomerRepo:
         customer = Customer(
             vs_customer_id=data.vs_customer_id,
             api_key=api_key,
-            twilio_account_sid=data.twilio_account_sid,
-            twilio_auth_token=data.twilio_auth_token,
         )
         self.session.add(customer)
         await self.session.commit()

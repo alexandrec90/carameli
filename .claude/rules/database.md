@@ -39,12 +39,12 @@ Core tables from the PRD:
 
 | Table | Key Columns |
 | --- | --- |
-| `customers` | `external_customer_id`, `api_key`, `twilio_account_sid`, `twilio_auth_token` |
-| `phone_lines` | `customer_id`, `phone_number` (E.164), `twilio_sid`, `sms_enabled`, `recording_enabled` |
-| `extensions` | `customer_id`, `extension_number`, `sip_username`, `sip_credential_sid`, `twilio_domain_sid` |
+| `customers` | `vs_customer_id`, `api_key`, `active` |
+| `phone_lines` | `customer_id`, `phone_number` (E.164), `provider_sid`, `sms_enabled`, `recording_enabled` |
+| `extensions` | `customer_id`, `extension_number`, `sip_username`, `sip_credential_sid`, `sip_domain_sid` |
 | `sci_rules` | `customer_id`, `extension_id`, `zip_code`, `enabled` |
 | `did_pointers` | `phone_line_id`, `extension_id` |
-| `call_events` | `twilio_call_sid`, `direction`, `started_at`, `ended_at`, `duration_seconds`, `matched_at` |
+| `call_events` | `call_sid`, `direction`, `started_at`, `ended_at`, `duration_seconds`, `matched_at` |
 
 ## Migrations (Alembic)
 

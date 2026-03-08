@@ -70,7 +70,6 @@ export default function DashboardView({
             <div className="space-y-3">
               <Row label="VS Customer ID" value={String(customer.vs_customer_id)} />
               <Row label="Internal ID" value={customer.id.slice(0, 8) + '…'} />
-              <Row label="Twilio SID" value={customer.twilio_account_sid} />
               <Row label="Status" value={customer.active ? 'Active' : 'Inactive'} />
             </div>
           ) : (

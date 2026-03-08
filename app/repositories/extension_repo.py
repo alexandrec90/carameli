@@ -18,14 +18,14 @@ class ExtensionRepo:
         extension_number: str,
         sip_username: str,
         sip_credential_sid: str | None = None,
-        twilio_domain_sid: str | None = None,
+        sip_domain_sid: str | None = None,
     ) -> Extension:
         ext = Extension(
             customer_id=customer_id,
             extension_number=extension_number,
             sip_username=sip_username,
             sip_credential_sid=sip_credential_sid,
-            twilio_domain_sid=twilio_domain_sid,
+            sip_domain_sid=sip_domain_sid,
         )
         self.session.add(ext)
         await self.session.commit()

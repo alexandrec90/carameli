@@ -12,12 +12,10 @@ _SMS_BASE = "/vsapi/1.0.0/VsMessaging/Sms"
 
 
 async def _setup(client, vs_id: int, phone_number: str) -> None:
-    """Create a customer and a phone line, with Twilio mocked."""
+    """Create a customer and a phone line with carrier/engine mocks."""
     payload = {
         "vs_customer_id": vs_id,
         "api_key": f"key-{vs_id}",
-        "twilio_account_sid": f"ACtest{vs_id}",
-        "twilio_auth_token": f"token{vs_id}",
     }
     await client.post(f"{_CUST_BASE}/Create", json=payload, headers=AUTH_HEADERS)
 

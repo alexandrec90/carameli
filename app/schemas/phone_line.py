@@ -16,7 +16,7 @@ class PhoneLineResponse(BaseModel):
     id: uuid.UUID
     customer_id: uuid.UUID
     phone_number: str
-    twilio_sid: str
+    provider_sid: str
     sms_enabled: bool
     recording_enabled: bool
     active: bool

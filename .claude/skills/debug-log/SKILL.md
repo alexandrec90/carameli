@@ -25,14 +25,14 @@ For each distinct error or warning pattern, record:
 
 | # | Level | Module:line                  | Message summary             | Action   |
 | - | ----- | ---------------------------- | --------------------------- | -------- |
-| 1 | ERROR | app.api.vsapi.phone_lines:56 | Twilio error purchasing DID | Fix code |
+| 1 | ERROR | app.api.vsapi.phone_lines:56 | Provider error purchasing DID | Fix code |
 | … |       |                              |                             |          |
 
 Classify each as one of:
 
 - **Code bug** — wrong logic, missing guard, unhandled case → fix it
-- **Config issue** — missing/wrong env var, misconfigured Twilio SID → report clearly, fix if possible
-- **Transient external failure** — Twilio 5xx, DB timeout → note it, do NOT force-fix
+- **Config issue** — missing/wrong env var, misconfigured provider identifier → report clearly, fix if possible
+- **Transient external failure** — provider 5xx, DB timeout → note it, do NOT force-fix
 
 ## Step 3 — Diagnose each code bug
 

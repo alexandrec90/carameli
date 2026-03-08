@@ -17,8 +17,6 @@ _CUST_BASE = "/vsapi/1.0.0/VsCustomer"
 async def _create_customer(client, vs_id: int, include_api_key: bool = True) -> dict:
     payload: dict[str, str | int] = {
         "vs_customer_id": vs_id,
-        "twilio_account_sid": f"ACtest{vs_id}",
-        "twilio_auth_token": f"token{vs_id}",
     }
     if include_api_key:
         payload["api_key"] = f"key-{vs_id}"
@@ -79,7 +77,7 @@ async def test_post_sci_by_zip_code_is_upsert_not_duplicate(client, db_session) 
         extension_number="201",
         sip_username="ext201_test8104",
         sip_credential_sid="CRtest8104",
-        twilio_domain_sid="SDtest8104",
+        sip_domain_sid="SDtest8104",
     )
 
     url = "/vsapi/1.0.0/PostSCIbyZipCode"
@@ -129,7 +127,7 @@ async def test_add_pointer_same_mapping_is_idempotent(client, db_session) -> Non
     phone_line = await line_repo.create(
         customer_id=customer_id,
         phone_number="+14155558105",
-        twilio_sid="PNtest8105",
+        provider_sid="PNtest8105",
     )
 
     ext_repo = ExtensionRepo(db_session)
@@ -138,7 +136,7 @@ async def test_add_pointer_same_mapping_is_idempotent(client, db_session) -> Non
         extension_number="301",
         sip_username="ext301_test8105",
         sip_credential_sid="CRtest8105",
-        twilio_domain_sid="SDtest8105",
+        sip_domain_sid="SDtest8105",
     )
 
     payload = {

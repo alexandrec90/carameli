@@ -47,7 +47,7 @@ export default function PhoneLinesView({
         </div>
         {error && <p className="text-red-400 text-sm mt-3">{error}</p>}
         <p className="text-helper mt-3">
-          Requires valid Twilio credentials in .env — uses real Twilio API
+          Uses your configured carrier provider credentials from <code>.env</code>
         </p>
       </Card>
 

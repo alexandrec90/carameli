@@ -16,12 +16,12 @@ class PhoneLineRepo:
         self,
         customer_id: uuid.UUID,
         phone_number: str,
-        twilio_sid: str,
+        provider_sid: str,
     ) -> PhoneLine:
         line = PhoneLine(
             customer_id=customer_id,
             phone_number=phone_number,
-            twilio_sid=twilio_sid,
+            provider_sid=provider_sid,
         )
         self.session.add(line)
         await self.session.commit()
@@ -51,7 +51,9 @@ class PhoneLineRepo:
 
     async def count_for_customer(self, customer_id: uuid.UUID) -> int:
         result = await self.session.execute(
-            select(func.count()).select_from(PhoneLine).where(
+            select(func.count())
+            .select_from(PhoneLine)
+            .where(
                 PhoneLine.customer_id == customer_id,
                 PhoneLine.active.is_(True),
             )

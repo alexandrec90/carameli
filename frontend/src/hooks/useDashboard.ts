@@ -49,8 +49,6 @@ export function useDashboard(): UseDashboardResult {
       await api.customers.create({
         vs_customer_id: DEMO_CUSTOMER_ID,
         api_key: 'demo-customer-key',
-        twilio_account_sid: 'ACtest000000000000000000000000000000',
-        twilio_auth_token: 'test_auth_token',
       })
       const c = await api.customers.get(DEMO_CUSTOMER_ID)
       setCustomer(c)

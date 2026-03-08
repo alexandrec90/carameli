@@ -35,8 +35,6 @@ async def _create_customer(client, vs_id: int) -> dict:
         json={
             "vs_customer_id": vs_id,
             "api_key": f"key-{vs_id}",
-            "twilio_account_sid": f"ACtest{vs_id}",
-            "twilio_auth_token": f"token{vs_id}",
         },
         headers=AUTH_HEADERS,
     )
@@ -170,7 +168,7 @@ async def test_extension_pointer_lifecycle(client, db_session) -> None:
     await line_repo.create(
         customer_id=customer_id,
         phone_number="+19035550103",
-        twilio_sid="PNflow9003",
+        provider_sid="PNflow9003",
     )
 
     pointer_payload = {
@@ -213,12 +211,12 @@ async def test_get_phone_lines_filters_inactive(client, db_session) -> None:
     await line_repo.create(
         customer_id=customer_id,
         phone_number="+19045550001",
-        twilio_sid="PNflow9004a",
+        provider_sid="PNflow9004a",
     )
     inactive_line = await line_repo.create(
         customer_id=customer_id,
         phone_number="+19045550002",
-        twilio_sid="PNflow9004b",
+        provider_sid="PNflow9004b",
     )
     await line_repo.deactivate(inactive_line)
 

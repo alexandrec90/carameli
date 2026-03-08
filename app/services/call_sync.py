@@ -45,7 +45,7 @@ async def retry_unposted_events() -> None:
                     customer = await customer_repo.get_by_id(event.customer_id)
 
                 vs_payload = {
-                    "call_sid": event.twilio_call_sid,
+                    "call_sid": event.call_sid,
                     "vs_customer_id": customer.vs_customer_id if customer else None,
                     "from": event.from_number,
                     "to": event.to_number,
@@ -53,7 +53,9 @@ async def retry_unposted_events() -> None:
                     "duration_seconds": event.duration_seconds,
                     "recording_url": event.recording_url,
                     "status": event.status,
-                    "started_at": event.started_at.isoformat() if event.started_at else None,
+                    "started_at": event.started_at.isoformat()
+                    if event.started_at
+                    else None,
                     "ended_at": event.ended_at.isoformat() if event.ended_at else None,
                 }
 
@@ -69,18 +71,16 @@ async def retry_unposted_events() -> None:
                     await repo.mark_posted(event.id)
                     logger.info(
                         "Retry: posted call event %s to VanillaSoft",
-                        event.twilio_call_sid,
+                        event.call_sid,
                     )
                 else:
                     logger.warning(
                         "Retry: VanillaSoft webhook returned %s for call_sid=%s",
                         resp.status_code,
-                        event.twilio_call_sid,
+                        event.call_sid,
                     )
             except Exception:
-                logger.exception(
-                    "Retry: failed to post call event %s", event.twilio_call_sid
-                )
+                logger.exception("Retry: failed to post call event %s", event.call_sid)
 
 
 def start_scheduler() -> None:

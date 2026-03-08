@@ -20,7 +20,7 @@ export default function App() {
             element={
               <Placeholder
                 title="SMS"
-                description="Enable, disable, and send SMS messages via Twilio"
+                description="Enable, disable, and send SMS messages via the active carrier"
               />
             }
           />
@@ -38,7 +38,7 @@ export default function App() {
             element={
               <Placeholder
                 title="Settings"
-                description="Configure Carameli and Twilio credentials"
+                description="Configure Carameli runtime and provider settings"
               />
             }
           />

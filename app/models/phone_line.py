@@ -21,7 +21,7 @@ class PhoneLine(Base):
         UUID(as_uuid=True), ForeignKey("customers.id"), nullable=False
     )
     phone_number: Mapped[str] = mapped_column(String(20), nullable=False)
-    twilio_sid: Mapped[str] = mapped_column(String(64), nullable=False)
+    provider_sid: Mapped[str] = mapped_column(String(64), nullable=False)
     sms_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
     recording_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())

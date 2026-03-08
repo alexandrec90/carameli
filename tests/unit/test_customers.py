@@ -11,8 +11,6 @@ async def _create(client, vs_id: int) -> dict:
     payload = {
         "vs_customer_id": vs_id,
         "api_key": f"key-{vs_id}",
-        "twilio_account_sid": f"ACtest{vs_id}",
-        "twilio_auth_token": f"token{vs_id}",
     }
     resp = await client.post(f"{_BASE}/Create", json=payload, headers=AUTH_HEADERS)
     assert resp.status_code == 201
@@ -57,8 +55,6 @@ async def test_create_duplicate_customer_returns_409(client) -> None:
     payload = {
         "vs_customer_id": 4004,
         "api_key": "key-4004-dup",
-        "twilio_account_sid": "ACtest4004",
-        "twilio_auth_token": "token4004",
     }
     resp = await client.post(f"{_BASE}/Create", json=payload, headers=AUTH_HEADERS)
     assert resp.status_code == 409
@@ -74,8 +70,12 @@ async def test_get_phone_lines_returns_active_only(client, db_session) -> None:
     customer_id = uuid.UUID(data["id"])
 
     line_repo = PhoneLineRepo(db_session)
-    await line_repo.create(customer_id=customer_id, phone_number="+14005550001", twilio_sid="PNcust4005a")
-    inactive = await line_repo.create(customer_id=customer_id, phone_number="+14005550002", twilio_sid="PNcust4005b")
+    await line_repo.create(
+        customer_id=customer_id, phone_number="+14005550001", provider_sid="PNcust4005a"
+    )
+    inactive = await line_repo.create(
+        customer_id=customer_id, phone_number="+14005550002", provider_sid="PNcust4005b"
+    )
     await line_repo.deactivate(inactive)
 
     resp = await client.get(f"{_BASE}/GetPhoneLines/4005", headers=AUTH_HEADERS)

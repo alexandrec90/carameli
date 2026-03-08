@@ -16,8 +16,6 @@ async def _create_customer(client, vs_id: int) -> dict:
     payload = {
         "vs_customer_id": vs_id,
         "api_key": f"key-{vs_id}",
-        "twilio_account_sid": f"ACtest{vs_id}",
-        "twilio_auth_token": f"token{vs_id}",
     }
     resp = await client.post(f"{_CUST_BASE}/Create", json=payload, headers=AUTH_HEADERS)
     assert resp.status_code == 201
@@ -31,7 +29,7 @@ async def _seed_extension(db_session, customer_id: uuid.UUID, ext_number: str) -
         extension_number=ext_number,
         sip_username=f"ext{ext_number}_{str(customer_id)[:8]}",
         sip_credential_sid=None,
-        twilio_domain_sid=None,
+        sip_domain_sid=None,
     )
 
 
@@ -42,7 +40,12 @@ async def test_post_sci_by_zip_code(client, db_session) -> None:
 
     resp = await client.post(
         _SCI_ZIP,
-        json={"vs_customer_id": 7201, "extension_number": "500", "zip_code": "90210", "enabled": True},
+        json={
+            "vs_customer_id": 7201,
+            "extension_number": "500",
+            "zip_code": "90210",
+            "enabled": True,
+        },
         headers=AUTH_HEADERS,
     )
     assert resp.status_code == 200
@@ -57,12 +60,22 @@ async def test_post_sci_by_zip_code_update(client, db_session) -> None:
 
     await client.post(
         _SCI_ZIP,
-        json={"vs_customer_id": 7202, "extension_number": "501", "zip_code": "10001", "enabled": True},
+        json={
+            "vs_customer_id": 7202,
+            "extension_number": "501",
+            "zip_code": "10001",
+            "enabled": True,
+        },
         headers=AUTH_HEADERS,
     )
     resp = await client.post(
         _SCI_ZIP,
-        json={"vs_customer_id": 7202, "extension_number": "501", "zip_code": "10001", "enabled": False},
+        json={
+            "vs_customer_id": 7202,
+            "extension_number": "501",
+            "zip_code": "10001",
+            "enabled": False,
+        },
         headers=AUTH_HEADERS,
     )
     assert resp.status_code == 200
@@ -72,7 +85,12 @@ async def test_post_sci_by_zip_code_update(client, db_session) -> None:
 async def test_post_sci_by_zip_unknown_customer_returns_404(client) -> None:
     resp = await client.post(
         _SCI_ZIP,
-        json={"vs_customer_id": 99995, "extension_number": "500", "zip_code": "00000", "enabled": True},
+        json={
+            "vs_customer_id": 99995,
+            "extension_number": "500",
+            "zip_code": "00000",
+            "enabled": True,
+        },
         headers=AUTH_HEADERS,
     )
     assert resp.status_code == 404
@@ -83,7 +101,12 @@ async def test_post_sci_by_zip_unknown_extension_returns_404(client) -> None:
     await _create_customer(client, 7203)
     resp = await client.post(
         _SCI_ZIP,
-        json={"vs_customer_id": 7203, "extension_number": "999", "zip_code": "12345", "enabled": True},
+        json={
+            "vs_customer_id": 7203,
+            "extension_number": "999",
+            "zip_code": "12345",
+            "enabled": True,
+        },
         headers=AUTH_HEADERS,
     )
     assert resp.status_code == 404

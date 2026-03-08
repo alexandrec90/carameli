@@ -19,9 +19,6 @@ class Customer(Base):
     )
     vs_customer_id: Mapped[int] = mapped_column(Integer, unique=True, nullable=False)
     api_key: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
-    twilio_account_sid: Mapped[str] = mapped_column(String(64), nullable=False)
-    twilio_auth_token: Mapped[str] = mapped_column(String(128), nullable=False)
-    twilio_sip_domain_sid: Mapped[str | None] = mapped_column(String(64), nullable=True)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         server_default=func.now(), onupdate=func.now()

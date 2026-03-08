@@ -64,7 +64,7 @@ class CallEventRepo:
 
         event = CallEvent(
             customer_id=customer_id,
-            twilio_call_sid=call_sid,
+            call_sid=call_sid,
             direction=payload.get("Direction", "outbound"),
             from_number=payload.get("From"),
             to_number=payload.get("To"),
@@ -91,7 +91,7 @@ class CallEventRepo:
 
     async def get_by_call_sid(self, call_sid: str) -> CallEvent | None:
         result = await self.session.execute(
-            select(CallEvent).where(CallEvent.twilio_call_sid == call_sid)
+            select(CallEvent).where(CallEvent.call_sid == call_sid)
         )
         return result.scalar_one_or_none()
 

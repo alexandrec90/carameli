@@ -19,7 +19,7 @@ class ExtensionResponse(BaseModel):
     extension_number: str
     sip_username: str
     sip_credential_sid: str | None
-    twilio_domain_sid: str | None
+    sip_domain_sid: str | None
     active: bool
     created_at: datetime
 

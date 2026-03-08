@@ -30,9 +30,14 @@ async def add_phone_line(
     session: Annotated[AsyncSession, Depends(get_session)],
     auth: Annotated[AuthContext, Depends(get_auth_context)],
 ) -> PhoneLineResponse:
-    """Purchase a new DID from Twilio and register it for the customer."""
+    """Purchase a new DID from the active carrier and register it for the customer."""
     enforce_customer_scope(auth, body.vs_customer_id)
-    logger.info("Adding phone line vs_customer_id=%s area_code=%s number=%s", body.vs_customer_id, body.area_code, body.phone_number)
+    logger.info(
+        "Adding phone line vs_customer_id=%s area_code=%s number=%s",
+        body.vs_customer_id,
+        body.area_code,
+        body.phone_number,
+    )
     customer_repo = CustomerRepo(session)
     customer = await customer_repo.get_by_vs_id(body.vs_customer_id)
     if not customer:
@@ -50,20 +55,31 @@ async def add_phone_line(
             result = await carrier.provision_number(numbers[0]["phone_number"])
         else:
             raise ValueError("Must specify area_code or phone_number")
-    except Exception as exc:
-        logger.error("Provider error purchasing DID vs_customer_id=%s: %s", body.vs_customer_id, exc)
-        raise HTTPException(status_code=502, detail="Provider error purchasing DID")
     except ValueError as exc:
-        logger.warning("Invalid DID request vs_customer_id=%s: %s", body.vs_customer_id, exc)
+        logger.warning(
+            "Invalid DID request vs_customer_id=%s: %s", body.vs_customer_id, exc
+        )
         raise HTTPException(status_code=400, detail=str(exc))
+    except Exception as exc:
+        logger.error(
+            "Provider error purchasing DID vs_customer_id=%s: %s",
+            body.vs_customer_id,
+            exc,
+        )
+        raise HTTPException(status_code=502, detail="Provider error purchasing DID")
 
     line_repo = PhoneLineRepo(session)
     line = await line_repo.create(
         customer_id=customer.id,
         phone_number=result["phone_number"],
-        twilio_sid=result["sid"],
+        provider_sid=result["sid"],
     )
-    logger.info("Phone line added number=%s sid=%s vs_customer_id=%s", line.phone_number, line.twilio_sid, body.vs_customer_id)
+    logger.info(
+        "Phone line added number=%s sid=%s vs_customer_id=%s",
+        line.phone_number,
+        line.provider_sid,
+        body.vs_customer_id,
+    )
     return PhoneLineResponse.model_validate(line)
 
 
@@ -111,7 +127,7 @@ async def deactivate_phone_line(
     session: Annotated[AsyncSession, Depends(get_session)],
     auth: Annotated[AuthContext, Depends(get_auth_context)],
 ) -> PhoneLineResponse:
-    """Release a DID from Twilio and mark it inactive."""
+    """Release a DID from the active carrier and mark it inactive."""
     enforce_customer_scope(auth, body.vs_customer_id)
     customer_repo = CustomerRepo(session)
     customer = await customer_repo.get_by_vs_id(body.vs_customer_id)
@@ -124,7 +140,7 @@ async def deactivate_phone_line(
 
     carrier = request.app.state.carrier
     try:
-        await carrier.release_number(line.twilio_sid)
+        await carrier.release_number(line.provider_sid)
     except Exception:
         raise HTTPException(status_code=502, detail="Provider error releasing DID")
 

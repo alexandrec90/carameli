@@ -30,7 +30,11 @@ async def add_extension(
 ) -> ExtensionResponse:
     """Create a SIP extension record with locally-managed credentials."""
     enforce_customer_scope(auth, body.vs_customer_id)
-    logger.info("Adding extension vs_customer_id=%s ext=%s", body.vs_customer_id, body.extension_number)
+    logger.info(
+        "Adding extension vs_customer_id=%s ext=%s",
+        body.vs_customer_id,
+        body.extension_number,
+    )
     customer_repo = CustomerRepo(session)
     customer = await customer_repo.get_by_vs_id(body.vs_customer_id)
     if not customer:
@@ -40,18 +44,24 @@ async def add_extension(
     ext_repo = ExtensionRepo(session)
     existing = await ext_repo.get_by_number(customer.id, body.extension_number)
     if existing:
-        logger.warning("Extension already exists vs_customer_id=%s ext=%s", body.vs_customer_id, body.extension_number)
+        logger.warning(
+            "Extension already exists vs_customer_id=%s ext=%s",
+            body.vs_customer_id,
+            body.extension_number,
+        )
         raise HTTPException(status_code=409, detail="Extension already exists")
 
     sip_username = f"ext{body.extension_number}_{str(customer.id)[:8]}"
-    _ = body.password or secrets.token_urlsafe(24)  # password stored by caller; not persisted here
+    _ = body.password or secrets.token_urlsafe(
+        24
+    )  # password stored by caller; not persisted here
 
     ext = await ext_repo.create(
         customer_id=customer.id,
         extension_number=body.extension_number,
         sip_username=sip_username,
         sip_credential_sid=None,
-        twilio_domain_sid=None,
+        sip_domain_sid=None,
     )
     logger.info("Extension created id=%s sip_username=%s", ext.id, sip_username)
     return ExtensionResponse.model_validate(ext)
@@ -77,9 +87,7 @@ async def get_available_extensions(
 
     ext_repo = ExtensionRepo(session)
     used = await ext_repo.get_used_numbers(customer.id)
-    available = [
-        str(n) for n in range(startExt, endExt + 1) if str(n) not in used
-    ]
+    available = [str(n) for n in range(startExt, endExt + 1) if str(n) not in used]
     return AvailableExtensionsResponse(available=available, vs_customer_id=customerId)
 
 

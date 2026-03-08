@@ -11,12 +11,8 @@ class CustomerCreate(BaseModel):
 
     vs_customer_id: int
     api_key: str | None = None
-    twilio_account_sid: str
-    twilio_auth_token: str
 
-    @field_validator(
-        "api_key", "twilio_account_sid", "twilio_auth_token", mode="before"
-    )
+    @field_validator("api_key", mode="before")
     @classmethod
     def normalize_string_fields(cls, value: object) -> object:
         if isinstance(value, str):
@@ -28,7 +24,6 @@ class CustomerResponse(BaseModel):
     id: uuid.UUID
     vs_customer_id: int
     api_key: str
-    twilio_account_sid: str
     active: bool
     created_at: datetime
 

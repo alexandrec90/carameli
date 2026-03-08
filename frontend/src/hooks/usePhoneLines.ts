@@ -50,7 +50,7 @@ export function usePhoneLines(): UsePhoneLinesResult {
   }
 
   async function deactivate(phone_number: string) {
-    if (!confirm(`Deactivate ${phone_number}? This releases it from Twilio.`)) return
+    if (!confirm(`Deactivate ${phone_number}? This releases it from the active carrier.`)) return
     try {
       await api.phoneLines.deactivate({ vs_customer_id: CUSTOMER_ID, phone_number })
       await load()

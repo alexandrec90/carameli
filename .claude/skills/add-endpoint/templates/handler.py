@@ -9,7 +9,7 @@ Rules enforced here:
   - Handler body ≤ ~15 lines — delegate logic to repo / service layer.
   - Auth via Depends(verify_api_key) for admin-only routes,
     or Depends(get_auth_context) + enforce_customer_scope() for customer-scoped ones.
-  - Never catch bare Exception — catch specific errors (IntegrityError, TwilioRestException).
+    - Never catch bare Exception — catch specific errors (IntegrityError, provider SDK errors).
 
 Steps:
   1. Rename MyDomain, MyEntityCreate, MyEntityResponse to your domain names.
@@ -17,6 +17,7 @@ Steps:
   3. Implement the service/repo call inside the handler body.
   4. Add the router to app/main.py if this is a new router file.
 """
+
 from __future__ import annotations
 
 import logging
@@ -34,7 +35,10 @@ from app.core.auth import (
 )
 from app.core.database import get_session
 from app.repositories.my_entity_repo import MyEntityRepo  # TODO: update import
-from app.schemas.my_entity import MyEntityCreate, MyEntityResponse  # TODO: update imports
+from app.schemas.my_entity import (
+    MyEntityCreate,
+    MyEntityResponse,
+)  # TODO: update imports
 
 logger = logging.getLogger(__name__)
 
@@ -80,6 +84,7 @@ async def get_my_entity(
     """Return a MyEntity by ID, scoped to the requesting customer."""
     enforce_customer_scope(auth, customerId)
     import uuid  # noqa: PLC0415 — inline import keeps template self-contained
+
     repo = MyEntityRepo(session)
     entity = await repo.get_by_id(uuid.UUID(entityId))
     if not entity:

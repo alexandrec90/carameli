@@ -20,7 +20,7 @@ class CallEvent(Base):
     customer_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("customers.id"), nullable=True
     )
-    twilio_call_sid: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    call_sid: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
     direction: Mapped[str] = mapped_column(String(20), default="outbound")
     from_number: Mapped[str | None] = mapped_column(String(20), nullable=True)
     to_number: Mapped[str | None] = mapped_column(String(20), nullable=True)

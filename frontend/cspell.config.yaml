@@ -1,4 +1,4 @@
-version: '0.2'
+version: "0.2"
 language: en
 allowCompoundWords: true
 ignorePaths:
@@ -8,7 +8,6 @@ ignorePaths:
   - ../logs
 words:
   - carameli
-  - twilio
   - vanillasoft
   - vonage
   - voip

@@ -102,7 +102,9 @@ async def jambonz_call_status_webhook(
             customer_id=customer_id, payload=payload
         )
     except Exception:
-        logger.exception("Failed to persist Jambonz call event for call_sid=%s", call_sid)
+        logger.exception(
+            "Failed to persist Jambonz call event for call_sid=%s", call_sid
+        )
         return Response(status_code=200)
 
     # Write-back to VanillaSoft for terminal call states.
@@ -112,7 +114,7 @@ async def jambonz_call_status_webhook(
         if call_event.customer_id:
             customer = await customer_repo.get_by_id(call_event.customer_id)
         vs_payload = {
-            "call_sid": call_event.twilio_call_sid,
+            "call_sid": call_event.call_sid,
             "vs_customer_id": customer.vs_customer_id if customer else None,
             "from": call_event.from_number,
             "to": call_event.to_number,
@@ -120,8 +122,12 @@ async def jambonz_call_status_webhook(
             "duration_seconds": call_event.duration_seconds,
             "recording_url": call_event.recording_url,
             "status": call_event.status,
-            "started_at": call_event.started_at.isoformat() if call_event.started_at else None,
-            "ended_at": call_event.ended_at.isoformat() if call_event.ended_at else None,
+            "started_at": call_event.started_at.isoformat()
+            if call_event.started_at
+            else None,
+            "ended_at": call_event.ended_at.isoformat()
+            if call_event.ended_at
+            else None,
         }
         try:
             async with httpx.AsyncClient() as http_client:
@@ -142,7 +148,8 @@ async def jambonz_call_status_webhook(
                 )
         except Exception:
             logger.exception(
-                "Failed to post Jambonz call event %s to VanillaSoft; will retry", call_sid
+                "Failed to post Jambonz call event %s to VanillaSoft; will retry",
+                call_sid,
             )
 
     return Response(status_code=200)

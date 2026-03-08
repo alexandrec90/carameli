@@ -23,7 +23,7 @@ class Extension(Base):
     extension_number: Mapped[str] = mapped_column(String(20), nullable=False)
     sip_username: Mapped[str] = mapped_column(String(64), nullable=False)
     sip_credential_sid: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    twilio_domain_sid: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    sip_domain_sid: Mapped[str | None] = mapped_column(String(64), nullable=True)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         server_default=func.now(), onupdate=func.now()
