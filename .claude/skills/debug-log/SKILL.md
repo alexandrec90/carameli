@@ -1,3 +1,9 @@
+---
+name: debug-log
+description: 'Clean up WARNING/ERROR entries in logs/voicegateway.log with minimal fixes.'
+argument-hint: 'Optional focus area (e.g., "frontend", "backend", "webhooks")'
+---
+
 # Skill: Debug Log Cleanup
 
 Use this skill to read `logs/voicegateway.log` and fix every ERROR and WARNING found in it.

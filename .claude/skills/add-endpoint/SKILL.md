@@ -1,3 +1,9 @@
+---
+name: add-endpoint
+description: 'Add a VoiceGateway API endpoint following logging and provider conventions.'
+argument-hint: 'Optional endpoint name or route path (e.g., "/PhoneLine/UpdateCallRecording")'
+---
+
 # Skill: Add a VoiceGateway API Endpoint
 
 Use this skill when adding a new route. Work through each step in order.
@@ -49,12 +55,13 @@ See `.claude/rules/logging.md` for the full logging convention.
 
 ## Step 4 — Implement the Service Method
 
-File: `app/services/twilio_provider.py` (for Twilio ops)
+File: `app/services/call_control.py` or `app/services/did_manager.py` (for VoIP ops)
 or `app/services/<domain>_service.py` (for pure logic)
 
 - `async def` only
-- Wrap Twilio SDK calls in `try/except TwilioRestException`
-- Log and re-raise Twilio errors as `HTTPException(502)`
+- Accept a provider instance injected via FastAPI dependency — **never import a concrete provider directly**
+- Wrap provider calls in `try/except` for the provider's exception type and re-raise as `HTTPException(502)`
+- See `.claude/rules/voip-providers.md` for error handling conventions per provider
 
 ## Step 5 — Implement the Repository Method (if DB access needed)
 
@@ -68,12 +75,12 @@ File: `app/repositories/<domain>_repo.py`
 
 Unit test (`tests/unit/test_<domain>.py`):
 
-- Mock `twilio_provider` at the service boundary
-- Test the handler logic, auth, and error paths
+- Mock at the `CarrierProvider` / `CallEngineProvider` interface boundary — never mock internal SDK details
+- Test the handler logic, auth, and error paths (including 502 on provider failure)
 
 Integration test (`tests/integration/test_<domain>.py`):
 
-- Use Twilio test credentials
+- Use Telnyx sandbox credentials + local Jambonz
 - Hit the actual endpoint via `httpx.AsyncClient`
 
 ## Step 7 — Verify OpenAPI Docs

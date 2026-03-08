@@ -1,3 +1,9 @@
+---
+name: add-db-model
+description: 'Add a database model and Alembic migration with repository and schema guidance.'
+argument-hint: 'Optional entity name or table (e.g., "call_event")'
+---
+
 # Skill: Add a Database Model + Migration
 
 Use this skill when introducing a new table or adding columns to an existing one.

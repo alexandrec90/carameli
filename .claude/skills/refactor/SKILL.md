@@ -1,3 +1,9 @@
+---
+name: refactor
+description: 'Refactor first-party source files using the state.json workflow.'
+argument-hint: 'Optional focus path or file (e.g., "frontend/src/pages")'
+---
+
 # Skill: Refactor Codebase
 
 Clean up and reorganize first-party source files. Skip libraries, generated

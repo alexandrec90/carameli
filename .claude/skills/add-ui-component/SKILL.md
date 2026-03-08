@@ -1,3 +1,9 @@
+---
+name: add-ui-component
+description: 'Build a Carameli 3D UI component using React Three Fiber conventions.'
+argument-hint: 'Component type or purpose (e.g., "stats card", "cta button")'
+---
+
 # Skill: Add a UI Component
 
 Use this skill when asked to build a new front-end component for the Carameli UI.

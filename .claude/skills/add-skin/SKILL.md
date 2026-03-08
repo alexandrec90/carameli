@@ -1,3 +1,9 @@
+---
+name: add-skin
+description: 'Scaffold a new frontend skin and register it in the skin system.'
+argument-hint: 'Skin name (e.g., "candy-shop")'
+---
+
 # Skill: Add a New Skin
 
 Use this skill when scaffolding a new skin from scratch.

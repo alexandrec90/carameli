@@ -1,6 +1,6 @@
 # VoiceGateway
 
-A self-hosted VoIP microservice built on Twilio. Manages phone lines, extensions, SMS, call recording, and call tracking via a REST API.
+A self-hosted VoIP microservice. Manages phone lines, extensions, SMS, call recording, and call tracking via a REST API.
 
 ## Tech Stack
 
@@ -11,7 +11,8 @@ A self-hosted VoIP microservice built on Twilio. Manages phone lines, extensions
 | Background jobs | APScheduler (in-process) |
 | Database | PostgreSQL 18 |
 | ORM / Migrations | SQLAlchemy 2 (async) + Alembic |
-| VoIP provider | Twilio |
+| Call engine | Jambonz (self-hosted, on FreeSWITCH) |
+| Carrier / SIP trunk | Telnyx (wholesale) — provider-abstracted |
 | Media storage | S3-compatible blob (local disk in dev) |
 | Container | Docker + Docker Compose |
 | Auth | Bearer API key (`Authorization: Bearer <key>`) |
@@ -33,7 +34,8 @@ voicegateway/
         pointers.py       # /AddPointerToExtension, /DeletePointerToExtension
         area_codes.py     # /GetAreaCodes
       webhooks/
-        call_status.py    # POST /webhooks/twilio/call-status
+        call_status.py    # POST /webhooks/jambonz/call-status
+        sms_inbound.py    # POST /webhooks/telnyx/sms-inbound
       vg/
         frontend_logs.py  # POST /vg/1.0.0/frontend-logs (browser log ingestion)
     core/
@@ -44,7 +46,17 @@ voicegateway/
     models/               # SQLAlchemy ORM models
     schemas/              # Pydantic request/response models
     services/
-      twilio_provider.py  # All Twilio SDK calls
+      providers/
+        base.py             # CarrierProvider + CallEngineProvider Protocol interfaces
+        factory.py          # Reads env vars, returns provider singletons
+        carrier/
+          telnyx.py         # DID buy/release, SMS send (active)
+          twilio.py         # Legacy fallback
+        engine/
+          jambonz.py        # Call initiation, recording, IVR (active)
+          twilio.py         # Legacy fallback
+      call_control.py     # Engine-agnostic call business logic
+      did_manager.py      # Carrier-agnostic DID business logic
       call_sync.py        # APScheduler job for call tracking retries
     repositories/         # DB query layer (CustomerRepo, LineRepo, etc.)
   alembic/                # DB migrations
@@ -59,7 +71,7 @@ voicegateway/
 ## Local Development
 
 ```bash
-# Start everything
+# Start everything (includes Jambonz + FreeSWITCH + rtpengine)
 docker compose up
 
 # Apply DB migrations
@@ -68,9 +80,9 @@ docker compose exec app alembic upgrade head
 # Run tests
 docker compose exec app pytest
 
-# Expose webhook endpoint to Twilio (needs a public URL)
+# Expose webhook endpoints publicly (Jambonz + Telnyx need to reach VoiceGateway)
 ngrok http 8000
-# Then set TWILIO_WEBHOOK_BASE_URL in .env to the ngrok HTTPS URL
+# Then set JAMBONZ_WEBHOOK_BASE_URL and TELNYX_WEBHOOK_BASE_URL in .env to the ngrok HTTPS URL
 ```
 
 ## Environment Variables
@@ -80,9 +92,17 @@ See `.env.example`. Key vars:
 | Variable | Purpose |
 | --- | --- |
 | `DATABASE_URL` | Async PostgreSQL DSN (`postgresql+asyncpg://...`) |
-| `TWILIO_ACCOUNT_SID` | Twilio account (use test SID in dev) |
-| `TWILIO_AUTH_TOKEN` | Twilio auth token |
-| `TWILIO_WEBHOOK_BASE_URL` | Public base URL for Twilio callbacks (ngrok in dev) |
+| `CARRIER_PROVIDER` | Active carrier impl (`telnyx` or `twilio`), default `telnyx` |
+| `CALL_ENGINE_PROVIDER` | Active call engine impl (`jambonz` or `twilio`), default `jambonz` |
+| `TELNYX_API_KEY` | Telnyx API key for DID + SMS |
+| `TELNYX_WEBHOOK_BASE_URL` | Public base URL for Telnyx callbacks (ngrok in dev) |
+| `TELNYX_WEBHOOK_SECRET` | Signing secret for inbound Telnyx webhook validation |
+| `JAMBONZ_BASE_URL` | Internal URL of the Jambonz API server (e.g. `http://jambonz:3000`) |
+| `JAMBONZ_API_KEY` | Jambonz REST API key |
+| `JAMBONZ_WEBHOOK_BASE_URL` | Public base URL for Jambonz call status callbacks (ngrok in dev) |
+| `JAMBONZ_WEBHOOK_SECRET` | HMAC secret for inbound Jambonz webhook validation |
+| `TWILIO_ACCOUNT_SID` | Twilio account SID (legacy fallback only) |
+| `TWILIO_AUTH_TOKEN` | Twilio auth token (legacy fallback only) |
 | `API_KEY_SECRET` | Validates bearer tokens from API clients |
 | `LOG_LEVEL` | Root log level (`DEBUG`/`INFO`/`WARNING`/`ERROR`), default `INFO` |
 | `LOG_FILE` | Rotating log file path, default `logs/voicegateway.log` |
@@ -103,14 +123,15 @@ All routes mount under `/vsapi/1.0.0/`. Native VoiceGateway-only extensions use 
 | Area codes | `/vsapi/1.0.0/GetAreaCodes` |
 | Frontend log ingestion | `/vg/1.0.0/frontend-logs` |
 
-Twilio webhook callbacks live under `/webhooks/twilio/...`.
+Provider webhook callbacks live under `/webhooks/<provider>/...` (e.g. `/webhooks/jambonz/call-status`, `/webhooks/telnyx/sms-inbound`).
 
 ## Call Tracking
 
-Twilio fires `statusCallback` when a call ends. VoiceGateway:
+The active call engine (Jambonz) fires a status webhook when a call ends. VoiceGateway:
 
-1. Writes the raw event to the `call_events` PostgreSQL table
-2. Matches it to a call record and updates talk time / call attempt counters
+1. Validates the webhook signature
+2. Writes the raw event to the `call_events` PostgreSQL table
+3. Matches it to a call record and updates talk time / call attempt counters
 
 APScheduler runs a retry job every 30 seconds for any failed writes.
 
@@ -190,5 +211,5 @@ See `.claude/rules/logging.md` for the full spec.
 
 ## Testing Strategy
 
-- **Unit tests**: pytest with mocked Twilio SDK (`unittest.mock.patch`)
-- **Integration tests**: Twilio test credentials (no real charges, predictable magic numbers)
+- **Unit tests**: pytest with mocked provider interfaces (`unittest.mock.patch` at the `CarrierProvider` / `CallEngineProvider` boundary — never mock internal SDK details)
+- **Integration tests**: Telnyx sandbox credentials + a local Jambonz instance (no real charges)
