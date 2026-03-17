@@ -9,6 +9,7 @@ Rules:
   - Commit inside write methods; caller should not need to commit.
   - Filter by active=True on every read unless intentionally including inactive rows.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -44,9 +45,7 @@ class MyEntityRepo:  # TODO: rename
         return result.scalar_one_or_none()
 
     async def list_all(self) -> list[MyEntity]:
-        result = await self.session.execute(
-            select(MyEntity).where(MyEntity.active.is_(True))
-        )
+        result = await self.session.execute(select(MyEntity).where(MyEntity.active.is_(True)))
         return list(result.scalars().all())
 
     async def deactivate(self, entity_id: uuid.UUID) -> MyEntity | None:

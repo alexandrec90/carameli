@@ -1,0 +1,62 @@
+.git
+.venv
+__pycache__
+*.pyc
+*.pyo
+.pytest_cache
+.mypy_cache
+.ruff_cache
+.hypothesis
+
+# Frontend — runs in its own node:20-slim container; Python image needs none of it
+frontend/
+
+# Logs
+logs/
+
+# Tests — run on host or via docker compose exec, not baked into image
+tests/
+
+# AI / editor config
+.claude/
+.claudeignore
+.vscode
+.idea
+*.code-workspace
+
+# CI/CD
+.github/
+
+# Host-only dev scripts and tooling
+scripts/
+playwright.config.ts
+.pre-commit-config.yaml
+.markdownlint.json
+.markdownlintignore
+Dockerfile
+ruff.toml
+mypy.ini
+pytest.ini
+.testmondata*
+tls/
+
+# Root-level Node (Playwright, commitlint, etc.)
+node_modules/
+package.json
+package-lock.json
+
+# Docs and notes
+*.md
+charts/
+docs/
+todo.md
+
+# Compose-mounted files (not needed baked into image)
+prometheus.yml
+docker-compose.yml
+nginx.conf
+
+# Local dev
+.env
+.env.*
+!.env.example

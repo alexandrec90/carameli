@@ -3,13 +3,11 @@ from __future__ import annotations
 import logging
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Path, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth import AuthContext, enforce_customer_scope, get_auth_context
 from app.core.database import get_session
-from app.repositories.customer_repo import CustomerRepo
-from app.repositories.phone_line_repo import PhoneLineRepo
 from app.schemas.phone_line import (
     AddPhoneLineRequest,
     DeactivatePhoneLineRequest,
@@ -17,13 +15,23 @@ from app.schemas.phone_line import (
     PhoneLineResponse,
     UpdateRecordingRequest,
 )
+from app.services import customer_service, phone_line_service
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/PhoneLine", tags=["phone-lines"])
 
 
-@router.post("/Add", status_code=201, response_model=PhoneLineResponse)
+@router.post(
+    "/Add",
+    status_code=201,
+    response_model=PhoneLineResponse,
+    responses={
+        400: {"description": "Invalid request"},
+        404: {"description": "Customer not found"},
+        502: {"description": "Provider error"},
+    },
+)
 async def add_phone_line(
     body: AddPhoneLineRequest,
     request: Request,
@@ -38,8 +46,7 @@ async def add_phone_line(
         body.area_code,
         body.phone_number,
     )
-    customer_repo = CustomerRepo(session)
-    customer = await customer_repo.get_by_vs_id(body.vs_customer_id)
+    customer = await customer_service.get_by_vs_id(session, body.vs_customer_id)
     if not customer:
         logger.warning("Customer not found vs_customer_id=%s", body.vs_customer_id)
         raise HTTPException(status_code=404, detail="Customer not found")
@@ -56,9 +63,7 @@ async def add_phone_line(
         else:
             raise ValueError("Must specify area_code or phone_number")
     except ValueError as exc:
-        logger.warning(
-            "Invalid DID request vs_customer_id=%s: %s", body.vs_customer_id, exc
-        )
+        logger.warning("Invalid DID request vs_customer_id=%s: %s", body.vs_customer_id, exc)
         raise HTTPException(status_code=400, detail=str(exc))
     except Exception as exc:
         logger.error(
@@ -68,8 +73,8 @@ async def add_phone_line(
         )
         raise HTTPException(status_code=502, detail="Provider error purchasing DID")
 
-    line_repo = PhoneLineRepo(session)
-    line = await line_repo.create(
+    line = await phone_line_service.create(
+        session,
         customer_id=customer.id,
         phone_number=result["phone_number"],
         provider_sid=result["sid"],
@@ -83,44 +88,52 @@ async def add_phone_line(
     return PhoneLineResponse.model_validate(line)
 
 
-@router.get("/Get/{customerId}/{phoneNumber:path}", response_model=PhoneLineResponse)
+@router.get(
+    "/Get/{customerId}/{phoneNumber:path}",
+    response_model=PhoneLineResponse,
+    responses={404: {"description": "Not found"}},
+)
 async def get_phone_line(
-    customerId: int,
-    phoneNumber: str,
+    customerId: Annotated[int, Path(ge=1, le=2147483647)],
+    phoneNumber: Annotated[str, Path()],
     session: Annotated[AsyncSession, Depends(get_session)],
     auth: Annotated[AuthContext, Depends(get_auth_context)],
 ) -> PhoneLineResponse:
     """Get info for a specific DID."""
     enforce_customer_scope(auth, customerId)
-    customer_repo = CustomerRepo(session)
-    customer = await customer_repo.get_by_vs_id(customerId)
+    customer = await customer_service.get_by_vs_id(session, customerId)
     if not customer:
         raise HTTPException(status_code=404, detail="Customer not found")
-    line_repo = PhoneLineRepo(session)
-    line = await line_repo.get_by_number(customer.id, phoneNumber)
+    line = await phone_line_service.get_by_number(session, customer.id, phoneNumber)
     if not line:
         raise HTTPException(status_code=404, detail="Phone line not found")
     return PhoneLineResponse.model_validate(line)
 
 
-@router.get("/GetCount/{customerId}", response_model=PhoneLineCountResponse)
+@router.get(
+    "/GetCount/{customerId}",
+    response_model=PhoneLineCountResponse,
+    responses={404: {"description": "Customer not found"}},
+)
 async def get_phone_line_count(
-    customerId: int,
+    customerId: Annotated[int, Path(ge=1, le=2147483647)],
     session: Annotated[AsyncSession, Depends(get_session)],
     auth: Annotated[AuthContext, Depends(get_auth_context)],
 ) -> PhoneLineCountResponse:
     """Return the count of active DIDs for a customer."""
     enforce_customer_scope(auth, customerId)
-    customer_repo = CustomerRepo(session)
-    customer = await customer_repo.get_by_vs_id(customerId)
+    customer = await customer_service.get_by_vs_id(session, customerId)
     if not customer:
         raise HTTPException(status_code=404, detail="Customer not found")
-    line_repo = PhoneLineRepo(session)
-    count = await line_repo.count_for_customer(customer.id)
+    count = await phone_line_service.count_for_customer(session, customer.id)
     return PhoneLineCountResponse(count=count, vs_customer_id=customerId)
 
 
-@router.put("/Deactivate", response_model=PhoneLineResponse)
+@router.put(
+    "/Deactivate",
+    response_model=PhoneLineResponse,
+    responses={404: {"description": "Not found"}, 502: {"description": "Provider error"}},
+)
 async def deactivate_phone_line(
     body: DeactivatePhoneLineRequest,
     request: Request,
@@ -129,12 +142,10 @@ async def deactivate_phone_line(
 ) -> PhoneLineResponse:
     """Release a DID from the active carrier and mark it inactive."""
     enforce_customer_scope(auth, body.vs_customer_id)
-    customer_repo = CustomerRepo(session)
-    customer = await customer_repo.get_by_vs_id(body.vs_customer_id)
+    customer = await customer_service.get_by_vs_id(session, body.vs_customer_id)
     if not customer:
         raise HTTPException(status_code=404, detail="Customer not found")
-    line_repo = PhoneLineRepo(session)
-    line = await line_repo.get_by_number(customer.id, body.phone_number)
+    line = await phone_line_service.get_by_number(session, customer.id, body.phone_number)
     if not line:
         raise HTTPException(status_code=404, detail="Phone line not found")
 
@@ -144,11 +155,15 @@ async def deactivate_phone_line(
     except Exception:
         raise HTTPException(status_code=502, detail="Provider error releasing DID")
 
-    line = await line_repo.deactivate(line)
+    line = await phone_line_service.deactivate(session, line)
     return PhoneLineResponse.model_validate(line)
 
 
-@router.put("/UpdateCallRecording", response_model=PhoneLineResponse)
+@router.put(
+    "/UpdateCallRecording",
+    response_model=PhoneLineResponse,
+    responses={404: {"description": "Not found"}},
+)
 async def update_call_recording(
     body: UpdateRecordingRequest,
     session: Annotated[AsyncSession, Depends(get_session)],
@@ -156,14 +171,12 @@ async def update_call_recording(
 ) -> PhoneLineResponse:
     """Toggle call recording preference for a DID (applied per-call by the engine)."""
     enforce_customer_scope(auth, body.vs_customer_id)
-    customer_repo = CustomerRepo(session)
-    customer = await customer_repo.get_by_vs_id(body.vs_customer_id)
+    customer = await customer_service.get_by_vs_id(session, body.vs_customer_id)
     if not customer:
         raise HTTPException(status_code=404, detail="Customer not found")
-    line_repo = PhoneLineRepo(session)
-    line = await line_repo.get_by_number(customer.id, body.phone_number)
+    line = await phone_line_service.get_by_number(session, customer.id, body.phone_number)
     if not line:
         raise HTTPException(status_code=404, detail="Phone line not found")
 
-    line = await line_repo.update_recording_enabled(line, body.enabled)
+    line = await phone_line_service.update_recording_enabled(session, line, body.enabled)
     return PhoneLineResponse.model_validate(line)

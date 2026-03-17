@@ -7,13 +7,12 @@ from typing import Annotated, Any
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.database import get_session
-from app.repositories.call_event_repo import CallEventRepo
-from app.repositories.customer_repo import CustomerRepo
-from app.repositories.phone_line_repo import PhoneLineRepo
+from app.services import call_event_service, customer_service, phone_line_service
 
 logger = logging.getLogger(__name__)
 jambonz_router = APIRouter(prefix="/webhooks/jambonz", tags=["webhooks"])
@@ -56,7 +55,19 @@ def _normalize_jambonz_payload(data: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-@jambonz_router.post("/call-status")
+@jambonz_router.post(
+    "/call-status",
+    responses={
+        400: {"description": "Bad request (non-JSON body)"},
+        403: {"description": "Forbidden (invalid signature)"},
+    },
+    openapi_extra={
+        "requestBody": {
+            "required": True,
+            "content": {"application/json": {"schema": {"type": "object"}}},
+        }
+    },
+)
 async def jambonz_call_status_webhook(
     request: Request,
     session: Annotated[AsyncSession, Depends(get_session)],
@@ -72,9 +83,15 @@ async def jambonz_call_status_webhook(
         logger.warning("Jambonz call-status webhook received non-JSON body")
         return Response(status_code=400)
 
+    if not isinstance(data, dict):
+        logger.warning(
+            "Jambonz call-status webhook received non-dict payload type: %s", type(data).__name__
+        )
+        return Response(status_code=400)
+
     call_sid = data.get("call_sid", "")
     if not call_sid:
-        return Response(status_code=200)
+        return JSONResponse({"status": "ok"})
 
     logger.info(
         "Jambonz call-status webhook: call_sid=%s status=%s duration=%s",
@@ -87,32 +104,27 @@ async def jambonz_call_status_webhook(
 
     # Resolve customer_id from To/From numbers when available.
     customer_id = None
-    line_repo = PhoneLineRepo(session)
     for phone_number in (data.get("to", ""), data.get("from", "")):
         if not phone_number:
             continue
-        phone_line = await line_repo.get_by_phone_number_global(phone_number)
+        phone_line = await phone_line_service.get_by_phone_number_global(session, phone_number)
         if phone_line:
             customer_id = phone_line.customer_id
             break
 
-    repo = CallEventRepo(session)
     try:
-        call_event = await repo.create_from_webhook(
-            customer_id=customer_id, payload=payload
+        call_event = await call_event_service.create_from_webhook(
+            session, customer_id=customer_id, payload=payload
         )
     except Exception:
-        logger.exception(
-            "Failed to persist Jambonz call event for call_sid=%s", call_sid
-        )
-        return Response(status_code=200)
+        logger.exception("Failed to persist Jambonz call event for call_sid=%s", call_sid)
+        return JSONResponse({"status": "ok"})
 
     # Write-back to VanillaSoft for terminal call states.
     if settings.vanillasoft_webhook_url and _is_terminal_call_status(call_event.status):
-        customer_repo = CustomerRepo(session)
         customer = None
         if call_event.customer_id:
-            customer = await customer_repo.get_by_id(call_event.customer_id)
+            customer = await customer_service.get_by_id(session, call_event.customer_id)
         vs_payload = {
             "call_sid": call_event.call_sid,
             "vs_customer_id": customer.vs_customer_id if customer else None,
@@ -122,12 +134,8 @@ async def jambonz_call_status_webhook(
             "duration_seconds": call_event.duration_seconds,
             "recording_url": call_event.recording_url,
             "status": call_event.status,
-            "started_at": call_event.started_at.isoformat()
-            if call_event.started_at
-            else None,
-            "ended_at": call_event.ended_at.isoformat()
-            if call_event.ended_at
-            else None,
+            "started_at": call_event.started_at.isoformat() if call_event.started_at else None,
+            "ended_at": call_event.ended_at.isoformat() if call_event.ended_at else None,
         }
         try:
             async with httpx.AsyncClient() as http_client:
@@ -138,7 +146,7 @@ async def jambonz_call_status_webhook(
                     timeout=10.0,
                 )
             if resp.is_success:
-                await repo.mark_posted(call_event.id)
+                await call_event_service.mark_posted(session, call_event.id)
                 logger.info("Posted Jambonz call event %s to VanillaSoft", call_sid)
             else:
                 logger.warning(
@@ -152,4 +160,4 @@ async def jambonz_call_status_webhook(
                 call_sid,
             )
 
-    return Response(status_code=200)
+    return JSONResponse({"status": "ok"})

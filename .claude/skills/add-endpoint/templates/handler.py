@@ -23,6 +23,7 @@ from __future__ import annotations
 import logging
 from typing import Annotated
 
+# TODO: update imports
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -38,7 +39,7 @@ from app.repositories.my_entity_repo import MyEntityRepo  # TODO: update import
 from app.schemas.my_entity import (
     MyEntityCreate,
     MyEntityResponse,
-)  # TODO: update imports
+)
 
 logger = logging.getLogger(__name__)
 

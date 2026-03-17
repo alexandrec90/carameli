@@ -1,18 +1,19 @@
 from __future__ import annotations
 
 import json
+import logging
 from typing import Annotated
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
+logger = logging.getLogger(__name__)
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
-    database_url: str = (
-        "postgresql+asyncpg://carameli:carameli_local_dev@localhost:5432/carameli"
-    )
+    database_url: str = "postgresql+asyncpg://carameli:carameli_local_dev@localhost:5432/carameli"
     carrier_provider: str = "telnyx"
     call_engine_provider: str = "jambonz"
 
@@ -35,10 +36,15 @@ class Settings(BaseSettings):
     s3_secret_access_key: str = ""
     s3_region: str = "us-east-1"
 
+    redis_url: str = "redis://redis:6379"
+
+    rate_limit_sms: str = "60/minute"
+    rate_limit_calls: str = "30/minute"
+
     api_key_secret: str = "change_me"
 
     log_level: str = "INFO"
-    log_file: str = "logs/carameli.log"
+    log_file: str = "logs/runtime/carameli.log"
 
     cors_origins: Annotated[list[str], NoDecode] = Field(
         default=["http://localhost:3000"],

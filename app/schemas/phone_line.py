@@ -1,13 +1,16 @@
 from __future__ import annotations
 
+import logging
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+
+logger = logging.getLogger(__name__)
 
 
 class AddPhoneLineRequest(BaseModel):
-    vs_customer_id: int
+    vs_customer_id: int = Field(ge=1, le=2147483647)
     area_code: str | None = None
     phone_number: str | None = None
 
@@ -31,11 +34,11 @@ class PhoneLineCountResponse(BaseModel):
 
 
 class UpdateRecordingRequest(BaseModel):
-    vs_customer_id: int
+    vs_customer_id: int = Field(ge=1, le=2147483647)
     phone_number: str
     enabled: bool
 
 
 class DeactivatePhoneLineRequest(BaseModel):
-    vs_customer_id: int
+    vs_customer_id: int = Field(ge=1, le=2147483647)
     phone_number: str

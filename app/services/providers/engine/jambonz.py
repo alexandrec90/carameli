@@ -50,7 +50,10 @@ class JambonzEngine:
         if resp.is_error:
             logger.error(
                 "Jambonz initiate_call failed: from=%s to=%s status=%s body=%s",
-                from_, to, resp.status_code, resp.text,
+                from_,
+                to,
+                resp.status_code,
+                resp.text,
             )
             resp.raise_for_status()
         data = resp.json()
@@ -63,7 +66,9 @@ class JambonzEngine:
         if resp.is_error:
             logger.error(
                 "Jambonz hangup_call failed: call_id=%s status=%s body=%s",
-                call_id, resp.status_code, resp.text,
+                call_id,
+                resp.status_code,
+                resp.text,
             )
             resp.raise_for_status()
         logger.info("Jambonz call hung up: call_id=%s", call_id)
@@ -76,7 +81,9 @@ class JambonzEngine:
         if resp.is_error:
             logger.error(
                 "Jambonz start_recording failed: call_id=%s status=%s body=%s",
-                call_id, resp.status_code, resp.text,
+                call_id,
+                resp.status_code,
+                resp.text,
             )
             resp.raise_for_status()
         logger.info("Jambonz recording started: call_id=%s", call_id)
@@ -90,7 +97,9 @@ class JambonzEngine:
         if resp.is_error:
             logger.error(
                 "Jambonz stop_recording failed: call_id=%s status=%s body=%s",
-                call_id, resp.status_code, resp.text,
+                call_id,
+                resp.status_code,
+                resp.text,
             )
             resp.raise_for_status()
         logger.info("Jambonz recording stopped: call_id=%s", call_id)
@@ -100,7 +109,9 @@ class JambonzEngine:
         if resp.is_error:
             logger.error(
                 "Jambonz get_call_status failed: call_id=%s status=%s body=%s",
-                call_id, resp.status_code, resp.text,
+                call_id,
+                resp.status_code,
+                resp.text,
             )
             resp.raise_for_status()
         data = resp.json()
@@ -129,7 +140,9 @@ class JambonzEngine:
         if resp.is_error:
             logger.error(
                 "Jambonz initiate_voicemail_drop failed: to=%s status=%s body=%s",
-                to, resp.status_code, resp.text,
+                to,
+                resp.status_code,
+                resp.text,
             )
             resp.raise_for_status()
         data = resp.json()

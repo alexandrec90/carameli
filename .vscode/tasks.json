@@ -1,0 +1,326 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Start: Full Stack (Docker Compose)",
+      "type": "shell",
+      "command": "pwsh -ExecutionPolicy Bypass -File scripts/docker-up.ps1 -Build; $_ec = $LASTEXITCODE; pwsh -ExecutionPolicy Bypass -File scripts/notify.ps1 -Label 'Start: Full Stack' -ExitCode $_ec; exit $_ec",
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "new",
+        "showReuseMessage": false,
+        "close": false
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Install: Frontend Dependencies",
+      "type": "shell",
+      "command": "npm install; $_ec = $LASTEXITCODE; pwsh -ExecutionPolicy Bypass -File ../scripts/notify.ps1 -Label 'Install: Frontend Dependencies' -ExitCode $_ec; exit $_ec",
+      "options": {
+        "cwd": "${workspaceFolder}/frontend"
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "showReuseMessage": false,
+        "close": false
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Start: Frontend Dev Server",
+      "type": "shell",
+      "command": "npm run dev",
+      "group": {
+        "kind": "build"
+      },
+      "options": {
+        "cwd": "${workspaceFolder}/frontend"
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "new",
+        "showReuseMessage": false,
+        "close": false
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Open: Frontend Preview (Simple Browser)",
+      "type": "shell",
+      "command": "echo ${input:openFrontendSimpleBrowser}",
+      "presentation": {
+        "reveal": "silent",
+        "panel": "dedicated",
+        "showReuseMessage": false,
+        "close": false
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Start: Frontend + Preview",
+      "dependsOn": [
+        "Start: Frontend Dev Server",
+        "Open: Frontend Preview (Simple Browser)"
+      ],
+      "dependsOrder": "parallel",
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      }
+    },
+    {
+      "label": "Start: ngrok Tunnel (port 8000)",
+      "type": "shell",
+      "command": "ngrok http 8000",
+      "presentation": {
+        "reveal": "always",
+        "panel": "new",
+        "showReuseMessage": false,
+        "close": false
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Start: ngrok + Patch .env + Restart App",
+      "type": "shell",
+      "command": "pwsh -ExecutionPolicy Bypass -File scripts/start-ngrok.ps1",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "showReuseMessage": false,
+        "close": false
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Stop: Docker Stack",
+      "type": "shell",
+      "command": "pwsh -ExecutionPolicy Bypass -File scripts/docker-down.ps1; $_ec = $LASTEXITCODE; pwsh -ExecutionPolicy Bypass -File scripts/notify.ps1 -Label 'Stop: Docker Stack' -ExitCode $_ec; exit $_ec",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "showReuseMessage": false,
+        "close": false
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Restart: App Container",
+      "type": "shell",
+      "command": "pwsh -ExecutionPolicy Bypass -File scripts/docker-restart-app.ps1; $_ec = $LASTEXITCODE; pwsh -ExecutionPolicy Bypass -File scripts/notify.ps1 -Label 'Restart: App Container' -ExitCode $_ec; exit $_ec",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "showReuseMessage": false,
+        "close": false
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Docker: Rebuild App",
+      "type": "shell",
+      "command": "pwsh -ExecutionPolicy Bypass -Command 'docker compose build app'; $_ec = $LASTEXITCODE; pwsh -ExecutionPolicy Bypass -File scripts/notify.ps1 -Label 'Docker: Rebuild App' -ExitCode $_ec; exit $_ec",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "showReuseMessage": false,
+        "close": false
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Docker: Stack Status",
+      "type": "shell",
+      "command": "pwsh -ExecutionPolicy Bypass -File scripts/docker-status.ps1; $_ec = $LASTEXITCODE; pwsh -ExecutionPolicy Bypass -File scripts/notify.ps1 -Label 'Docker: Stack Status' -ExitCode $_ec; exit $_ec",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "showReuseMessage": false,
+        "close": false
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "DB: Apply Migrations",
+      "type": "shell",
+      "command": "pwsh -ExecutionPolicy Bypass -File scripts/docker-migrate.ps1; $_ec = $LASTEXITCODE; pwsh -ExecutionPolicy Bypass -File scripts/notify.ps1 -Label 'DB: Apply Migrations' -ExitCode $_ec; exit $_ec",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "showReuseMessage": false,
+        "close": false
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Docker: Prune + Compact VHDX",
+      "type": "shell",
+      "command": "pwsh -ExecutionPolicy Bypass -File scripts/docker-prune.ps1; $_ec = $LASTEXITCODE; pwsh -ExecutionPolicy Bypass -File scripts/notify.ps1 -Label 'Docker: Prune + Compact VHDX' -ExitCode $_ec; exit $_ec",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "showReuseMessage": false,
+        "close": false
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Test: Run pytest",
+      "type": "shell",
+      "command": "pwsh -ExecutionPolicy Bypass -File scripts/run-tests.ps1; $_ec = $LASTEXITCODE; pwsh -ExecutionPolicy Bypass -File scripts/notify.ps1 -Label 'Test: Run pytest' -ExitCode $_ec; exit $_ec",
+      "group": "test",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "showReuseMessage": false,
+        "close": false
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Test: Run pytest (fast, changed only)",
+      "type": "shell",
+      "command": "pwsh -ExecutionPolicy Bypass -File scripts/run-tests.ps1 -Fast; $_ec = $LASTEXITCODE; pwsh -ExecutionPolicy Bypass -File scripts/notify.ps1 -Label 'Test: Run pytest (fast)' -ExitCode $_ec; exit $_ec",
+      "group": "test",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "showReuseMessage": false,
+        "close": false
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Test: Run Frontend",
+      "type": "shell",
+      "command": "npm run test; $_ec = $LASTEXITCODE; pwsh -ExecutionPolicy Bypass -File ../scripts/notify.ps1 -Label 'Test: Run Frontend' -ExitCode $_ec; exit $_ec",
+      "group": "test",
+      "options": {
+        "cwd": "${workspaceFolder}/frontend"
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "showReuseMessage": false,
+        "close": false
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Test: Run E2E (headless)",
+      "type": "shell",
+      "command": "pwsh -ExecutionPolicy Bypass -File scripts/run-e2e.ps1; $_ec = $LASTEXITCODE; pwsh -ExecutionPolicy Bypass -File scripts/notify.ps1 -Label 'Test: Run E2E (headless)' -ExitCode $_ec; exit $_ec",
+      "group": "test",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "showReuseMessage": false,
+        "close": false
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Test: Run E2E (headed)",
+      "type": "shell",
+      "command": "pwsh -ExecutionPolicy Bypass -File scripts/run-e2e.ps1 -Headed; $_ec = $LASTEXITCODE; pwsh -ExecutionPolicy Bypass -File scripts/notify.ps1 -Label 'Test: Run E2E (headed)' -ExitCode $_ec; exit $_ec",
+      "group": "test",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "showReuseMessage": false,
+        "close": false
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Log: Extract Errors",
+      "type": "shell",
+      "command": "pwsh -ExecutionPolicy Bypass -File scripts/extract-log-errors.ps1; $_ec = $LASTEXITCODE; pwsh -ExecutionPolicy Bypass -File scripts/notify.ps1 -Label 'Log: Extract Errors' -ExitCode $_ec; exit $_ec",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "showReuseMessage": false,
+        "close": false
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Lint: Everything",
+      "type": "shell",
+      "command": "pwsh -ExecutionPolicy Bypass -File scripts/lint-all.ps1; $_ec = $LASTEXITCODE; pwsh -ExecutionPolicy Bypass -File scripts/notify.ps1 -Label 'Lint: Everything' -ExitCode $_ec; exit $_ec",
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "showReuseMessage": false,
+        "close": false
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Pre-Commit: Install + Patch Hook",
+      "type": "shell",
+      "command": "pwsh -ExecutionPolicy Bypass -File scripts/install-pre-commit.ps1; $_ec = $LASTEXITCODE; pwsh -ExecutionPolicy Bypass -File scripts/notify.ps1 -Label 'Pre-Commit: Install + Patch Hook' -ExitCode $_ec; exit $_ec",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "showReuseMessage": false,
+        "close": false
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Pre-Commit: Run All Hooks",
+      "type": "shell",
+      "command": "pwsh -ExecutionPolicy Bypass -File scripts/pre-commit.ps1; $_ec = $LASTEXITCODE; pwsh -ExecutionPolicy Bypass -File scripts/notify.ps1 -Label 'Pre-Commit: Run All Hooks' -ExitCode $_ec; exit $_ec",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "showReuseMessage": false,
+        "close": false
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Docker: Fix Stalled Desktop",
+      "type": "shell",
+      "command": "pwsh -ExecutionPolicy Bypass -File scripts/docker-fix.ps1; $_ec = $LASTEXITCODE; pwsh -ExecutionPolicy Bypass -File scripts/notify.ps1 -Label 'Docker: Fix Stalled Desktop' -ExitCode $_ec; exit $_ec",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "showReuseMessage": false,
+        "close": false
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Docker: Restart Engine",
+      "type": "shell",
+      "command": "pwsh -ExecutionPolicy Bypass -File scripts/docker-restart-engine.ps1; $_ec = $LASTEXITCODE; pwsh -ExecutionPolicy Bypass -File scripts/notify.ps1 -Label 'Docker: Restart Engine' -ExitCode $_ec; exit $_ec",
+      "presentation": {
+        "reveal": "always",
+        "panel": "new",
+        "showReuseMessage": false,
+        "close": false
+      },
+      "problemMatcher": []
+    }
+  ],
+  "inputs": [
+    {
+      "id": "openFrontendSimpleBrowser",
+      "type": "command",
+      "command": "simpleBrowser.show",
+      "args": "http://localhost:5173/"
+    }
+  ]
+}

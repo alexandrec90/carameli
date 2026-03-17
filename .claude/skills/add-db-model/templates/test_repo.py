@@ -14,6 +14,7 @@ Steps:
   2. Adjust create_payload to match your schema fields.
   3. Add test cases for any custom query methods in your repo.
 """
+
 from __future__ import annotations
 
 import pytest
@@ -66,6 +67,7 @@ async def test_get_by_id(client) -> None:
 @pytest.mark.asyncio
 async def test_get_not_found(client) -> None:
     import uuid
+
     fake_id = str(uuid.uuid4())
     resp = await client.get(f"{_BASE}/Get/{fake_id}", headers=AUTH_HEADERS)
     assert resp.status_code == 404

@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import logging
 import uuid
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.extension import Extension
+
+logger = logging.getLogger(__name__)
 
 
 class ExtensionRepo:

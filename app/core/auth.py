@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import uuid
 from dataclasses import dataclass
 from typing import Annotated
@@ -11,6 +12,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.core.database import get_session
 from app.repositories.customer_repo import CustomerRepo
+
+logger = logging.getLogger(__name__)
 
 bearer_scheme = HTTPBearer(auto_error=False)
 
@@ -31,9 +34,7 @@ def _raise_unauthorized() -> None:
 
 
 def verify_api_key(
-    credentials: Annotated[
-        HTTPAuthorizationCredentials | None, Security(bearer_scheme)
-    ],
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Security(bearer_scheme)],
 ) -> str:
     """Validate the Bearer API key against the configured secret."""
     if credentials is None or credentials.credentials != settings.api_key_secret:
@@ -42,9 +43,7 @@ def verify_api_key(
 
 
 async def get_auth_context(
-    credentials: Annotated[
-        HTTPAuthorizationCredentials | None, Security(bearer_scheme)
-    ],
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Security(bearer_scheme)],
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> AuthContext:
     """Authenticate using either the global service key or a customer API key."""

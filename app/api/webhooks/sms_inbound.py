@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import base64
 import logging
-import time
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request, Response
@@ -15,7 +15,9 @@ router = APIRouter(prefix="/webhooks/telnyx", tags=["webhooks"])
 _MAX_TIMESTAMP_AGE_SECONDS = 300
 
 try:
-    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey as _Ed25519PublicKey
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import (
+        Ed25519PublicKey as _Ed25519PublicKey,
+    )
 except ImportError:
     logger.error("Missing cryptography dependency required for Telnyx signature validation")
     _Ed25519PublicKey = None  # type: ignore[assignment,misc]
@@ -45,14 +47,11 @@ def _validate_telnyx_signature(raw_body: bytes, signature: str, timestamp: str) 
     try:
         ts = int(timestamp)
     except (ValueError, TypeError):
-        raise HTTPException(
-            status_code=403, detail="Missing or invalid telnyx-timestamp header"
-        )
+        raise HTTPException(status_code=403, detail="Missing or invalid telnyx-timestamp header")
 
-    if abs(time.time() - ts) > _MAX_TIMESTAMP_AGE_SECONDS:
-        raise HTTPException(
-            status_code=403, detail="Timestamp too old (replay protection)"
-        )
+    now = datetime.now(tz=UTC).timestamp()
+    if abs(now - ts) > _MAX_TIMESTAMP_AGE_SECONDS:
+        raise HTTPException(status_code=403, detail="Timestamp too old (replay protection)")
 
     signed_payload = f"{timestamp}|".encode() + raw_body
 
@@ -65,7 +64,20 @@ def _validate_telnyx_signature(raw_body: bytes, signature: str, timestamp: str) 
         raise HTTPException(status_code=403, detail="Invalid Telnyx signature")
 
 
-@router.post("/sms-inbound")
+@router.post(
+    "/sms-inbound",
+    status_code=204,
+    responses={
+        400: {"description": "Bad request (non-JSON body)"},
+        403: {"description": "Forbidden (invalid signature)"},
+    },
+    openapi_extra={
+        "requestBody": {
+            "required": True,
+            "content": {"application/json": {"schema": {"type": "object"}}},
+        }
+    },
+)
 async def telnyx_sms_inbound(request: Request) -> Response:
     """Receive inbound SMS messages from Telnyx, validate their signature, and log them.
 
@@ -95,6 +107,10 @@ async def telnyx_sms_inbound(request: Request) -> Response:
         body: dict[str, Any] = await request.json()
     except Exception:
         logger.warning("Telnyx sms-inbound webhook received non-JSON body")
+        return Response(status_code=400)
+
+    if not isinstance(body, dict):
+        logger.warning("Telnyx sms-inbound webhook received non-object JSON body")
         return Response(status_code=400)
 
     event_type = body.get("data", {}).get("event_type", "")

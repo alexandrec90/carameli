@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -8,6 +9,8 @@ from sqlalchemy import and_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.call_event import CallEvent
+
+logger = logging.getLogger(__name__)
 
 _TERMINAL_CALL_STATUSES = {"completed", "no-answer", "busy", "failed", "canceled"}
 
@@ -90,9 +93,7 @@ class CallEventRepo:
             return None
 
     async def get_by_call_sid(self, call_sid: str) -> CallEvent | None:
-        result = await self.session.execute(
-            select(CallEvent).where(CallEvent.call_sid == call_sid)
-        )
+        result = await self.session.execute(select(CallEvent).where(CallEvent.call_sid == call_sid))
         return result.scalar_one_or_none()
 
     async def get_unposted(self) -> list[CallEvent]:

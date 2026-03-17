@@ -7,6 +7,8 @@ import pytest
 from app.repositories.extension_repo import ExtensionRepo
 from tests.conftest import AUTH_HEADERS
 
+pytestmark = pytest.mark.asyncio(loop_scope="session")
+
 _CUST_BASE = "/vsapi/1.0.0/VsCustomer"
 _SCI_ZIP = "/vsapi/1.0.0/PostSCIbyZipCode"
 _SCI_OPT = "/vsapi/1.0.0/UpdateSCIUserOption"
@@ -33,7 +35,6 @@ async def _seed_extension(db_session, customer_id: uuid.UUID, ext_number: str) -
     )
 
 
-@pytest.mark.asyncio
 async def test_post_sci_by_zip_code(client, db_session) -> None:
     data = await _create_customer(client, 7201)
     await _seed_extension(db_session, uuid.UUID(data["id"]), "500")
@@ -52,7 +53,6 @@ async def test_post_sci_by_zip_code(client, db_session) -> None:
     assert resp.json()["success"] is True
 
 
-@pytest.mark.asyncio
 async def test_post_sci_by_zip_code_update(client, db_session) -> None:
     """Second call with same customer/ext/zip should update in place (upsert)."""
     data = await _create_customer(client, 7202)
@@ -81,7 +81,6 @@ async def test_post_sci_by_zip_code_update(client, db_session) -> None:
     assert resp.status_code == 200
 
 
-@pytest.mark.asyncio
 async def test_post_sci_by_zip_unknown_customer_returns_404(client) -> None:
     resp = await client.post(
         _SCI_ZIP,
@@ -96,7 +95,6 @@ async def test_post_sci_by_zip_unknown_customer_returns_404(client) -> None:
     assert resp.status_code == 404
 
 
-@pytest.mark.asyncio
 async def test_post_sci_by_zip_unknown_extension_returns_404(client) -> None:
     await _create_customer(client, 7203)
     resp = await client.post(
@@ -112,7 +110,6 @@ async def test_post_sci_by_zip_unknown_extension_returns_404(client) -> None:
     assert resp.status_code == 404
 
 
-@pytest.mark.asyncio
 async def test_update_sci_user_option(client, db_session) -> None:
     data = await _create_customer(client, 7204)
     await _seed_extension(db_session, uuid.UUID(data["id"]), "502")
@@ -126,7 +123,6 @@ async def test_update_sci_user_option(client, db_session) -> None:
     assert resp.json()["success"] is True
 
 
-@pytest.mark.asyncio
 async def test_update_sci_user_option_unknown_customer_returns_404(client) -> None:
     resp = await client.post(
         _SCI_OPT,
@@ -136,7 +132,6 @@ async def test_update_sci_user_option_unknown_customer_returns_404(client) -> No
     assert resp.status_code == 404
 
 
-@pytest.mark.asyncio
 async def test_update_sci_user_option_unknown_extension_returns_404(client) -> None:
     await _create_customer(client, 7205)
     resp = await client.post(

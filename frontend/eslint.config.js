@@ -31,6 +31,7 @@ export default [
       react: {
         version: 'detect',
       },
+      'import/core-modules': ['vitest'],
       'import/resolver': {
         typescript: true,
       },

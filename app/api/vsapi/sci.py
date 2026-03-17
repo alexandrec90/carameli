@@ -8,21 +8,21 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth import AuthContext, enforce_customer_scope, get_auth_context
 from app.core.database import get_session
-from app.repositories.customer_repo import CustomerRepo
-from app.repositories.extension_repo import ExtensionRepo
-from app.repositories.sci_rule_repo import SciRuleRepo
 from app.schemas.sci import (
     PostSciByZipCodeRequest,
     SciResponse,
     UpdateSciUserOptionRequest,
 )
+from app.services import customer_service, extension_service, sci_service
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["sci"])
 
 
-@router.post("/PostSCIbyZipCode", response_model=SciResponse)
+@router.post(
+    "/PostSCIbyZipCode", response_model=SciResponse, responses={404: {"description": "Not found"}}
+)
 async def post_sci_by_zip_code(
     body: PostSciByZipCodeRequest,
     session: Annotated[AsyncSession, Depends(get_session)],
@@ -37,14 +37,12 @@ async def post_sci_by_zip_code(
         body.zip_code,
         body.enabled,
     )
-    customer_repo = CustomerRepo(session)
-    customer = await customer_repo.get_by_vs_id(body.vs_customer_id)
+    customer = await customer_service.get_by_vs_id(session, body.vs_customer_id)
     if not customer:
         logger.warning("Customer not found vs_customer_id=%s", body.vs_customer_id)
         raise HTTPException(status_code=404, detail="Customer not found")
 
-    ext_repo = ExtensionRepo(session)
-    ext = await ext_repo.get_by_number(customer.id, body.extension_number)
+    ext = await extension_service.get_by_number(session, customer.id, body.extension_number)
     if not ext:
         logger.warning(
             "Extension not found vs_customer_id=%s ext=%s",
@@ -61,8 +59,8 @@ async def post_sci_by_zip_code(
             body.zip_code,
         )
 
-    sci_repo = SciRuleRepo(session)
-    await sci_repo.upsert(
+    await sci_service.upsert(
+        session,
         customer_id=customer.id,
         extension_id=ext.id,
         zip_code=body.zip_code,
@@ -71,7 +69,11 @@ async def post_sci_by_zip_code(
     return SciResponse(success=True)
 
 
-@router.post("/UpdateSCIUserOption", response_model=SciResponse)
+@router.post(
+    "/UpdateSCIUserOption",
+    response_model=SciResponse,
+    responses={404: {"description": "Not found"}},
+)
 async def update_sci_user_option(
     body: UpdateSciUserOptionRequest,
     session: Annotated[AsyncSession, Depends(get_session)],
@@ -85,14 +87,12 @@ async def update_sci_user_option(
         body.extension_number,
         body.enabled,
     )
-    customer_repo = CustomerRepo(session)
-    customer = await customer_repo.get_by_vs_id(body.vs_customer_id)
+    customer = await customer_service.get_by_vs_id(session, body.vs_customer_id)
     if not customer:
         logger.warning("Customer not found vs_customer_id=%s", body.vs_customer_id)
         raise HTTPException(status_code=404, detail="Customer not found")
 
-    ext_repo = ExtensionRepo(session)
-    ext = await ext_repo.get_by_number(customer.id, body.extension_number)
+    ext = await extension_service.get_by_number(session, customer.id, body.extension_number)
     if not ext:
         logger.warning(
             "Extension not found vs_customer_id=%s ext=%s",
@@ -101,8 +101,8 @@ async def update_sci_user_option(
         )
         raise HTTPException(status_code=404, detail="Extension not found")
 
-    sci_repo = SciRuleRepo(session)
-    await sci_repo.update_extension_option(
+    await sci_service.update_extension_option(
+        session,
         customer_id=customer.id,
         extension_id=ext.id,
         enabled=body.enabled,

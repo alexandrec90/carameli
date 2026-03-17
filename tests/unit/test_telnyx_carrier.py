@@ -6,6 +6,8 @@ import pytest
 
 from app.services.providers.carrier.telnyx import TelnyxCarrier
 
+pytestmark = pytest.mark.asyncio(loop_scope="session")
+
 
 def _make_carrier() -> TelnyxCarrier:
     return TelnyxCarrier(api_key="test-key", webhook_base_url="http://localhost:8000")
@@ -26,15 +28,17 @@ def _mock_response(status_code: int, json_data: dict) -> MagicMock:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.asyncio
 async def test_search_numbers_returns_phone_list() -> None:
     carrier = _make_carrier()
-    fake_resp = _mock_response(200, {
-        "data": [
-            {"phone_number": "+14155550100"},
-            {"phone_number": "+14155550101"},
-        ]
-    })
+    fake_resp = _mock_response(
+        200,
+        {
+            "data": [
+                {"phone_number": "+14155550100"},
+                {"phone_number": "+14155550101"},
+            ]
+        },
+    )
     carrier._client.get = AsyncMock(return_value=fake_resp)
 
     result = await carrier.search_numbers("415", 2)
@@ -46,7 +50,6 @@ async def test_search_numbers_returns_phone_list() -> None:
     carrier._client.get.assert_awaited_once()
 
 
-@pytest.mark.asyncio
 async def test_search_numbers_raises_on_error() -> None:
     carrier = _make_carrier()
     fake_resp = _mock_response(400, {"errors": [{"detail": "bad request"}]})
@@ -62,12 +65,9 @@ async def test_search_numbers_raises_on_error() -> None:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.asyncio
 async def test_provision_number_returns_sid_and_number() -> None:
     carrier = _make_carrier()
-    fake_resp = _mock_response(200, {
-        "data": {"id": "PN123abc", "phone_number": "+14155550100"}
-    })
+    fake_resp = _mock_response(200, {"data": {"id": "PN123abc", "phone_number": "+14155550100"}})
     carrier._client.post = AsyncMock(return_value=fake_resp)
 
     result = await carrier.provision_number("+14155550100")
@@ -75,7 +75,6 @@ async def test_provision_number_returns_sid_and_number() -> None:
     assert result == {"provider_sid": "PN123abc", "phone_number": "+14155550100"}
 
 
-@pytest.mark.asyncio
 async def test_provision_number_raises_on_error() -> None:
     carrier = _make_carrier()
     fake_resp = _mock_response(422, {"errors": [{"detail": "number unavailable"}]})
@@ -91,7 +90,6 @@ async def test_provision_number_raises_on_error() -> None:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.asyncio
 async def test_release_number_succeeds() -> None:
     carrier = _make_carrier()
     fake_resp = _mock_response(200, {})
@@ -102,7 +100,6 @@ async def test_release_number_succeeds() -> None:
     carrier._client.delete.assert_awaited_once_with("/phone_numbers/PN123abc")
 
 
-@pytest.mark.asyncio
 async def test_release_number_raises_on_error() -> None:
     carrier = _make_carrier()
     fake_resp = _mock_response(404, {"errors": [{"detail": "not found"}]})
@@ -118,15 +115,17 @@ async def test_release_number_raises_on_error() -> None:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.asyncio
 async def test_send_sms_returns_sid_and_status() -> None:
     carrier = _make_carrier()
-    fake_resp = _mock_response(200, {
-        "data": {
-            "id": "SM999",
-            "to": [{"status": "queued"}],
-        }
-    })
+    fake_resp = _mock_response(
+        200,
+        {
+            "data": {
+                "id": "SM999",
+                "to": [{"status": "queued"}],
+            }
+        },
+    )
     carrier._client.post = AsyncMock(return_value=fake_resp)
 
     result = await carrier.send_sms("+14155550100", "+12125550199", "hello")
@@ -135,7 +134,6 @@ async def test_send_sms_returns_sid_and_status() -> None:
     assert result["status"] == "queued"
 
 
-@pytest.mark.asyncio
 async def test_send_sms_raises_on_error() -> None:
     carrier = _make_carrier()
     fake_resp = _mock_response(400, {"errors": [{"detail": "invalid from number"}]})
@@ -151,7 +149,6 @@ async def test_send_sms_raises_on_error() -> None:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.asyncio
 async def test_enable_sms_calls_patch() -> None:
     carrier = _make_carrier()
     fake_resp = _mock_response(200, {"data": {}})
@@ -164,7 +161,6 @@ async def test_enable_sms_calls_patch() -> None:
     assert "/phone_numbers/PN123abc" in call_args[0][0]
 
 
-@pytest.mark.asyncio
 async def test_disable_sms_calls_patch() -> None:
     carrier = _make_carrier()
     fake_resp = _mock_response(200, {"data": {}})
@@ -177,7 +173,6 @@ async def test_disable_sms_calls_patch() -> None:
     assert "/phone_numbers/PN123abc" in call_args[0][0]
 
 
-@pytest.mark.asyncio
 async def test_enable_sms_raises_on_error() -> None:
     carrier = _make_carrier()
     fake_resp = _mock_response(404, {"errors": [{"detail": "not found"}]})
@@ -193,16 +188,18 @@ async def test_enable_sms_raises_on_error() -> None:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.asyncio
 async def test_get_available_area_codes_deduplicates_npas() -> None:
     carrier = _make_carrier()
-    fake_resp = _mock_response(200, {
-        "data": [
-            {"phone_number": "+14155550100"},
-            {"phone_number": "+14155550101"},
-            {"phone_number": "+16505550200"},
-        ]
-    })
+    fake_resp = _mock_response(
+        200,
+        {
+            "data": [
+                {"phone_number": "+14155550100"},
+                {"phone_number": "+14155550101"},
+                {"phone_number": "+16505550200"},
+            ]
+        },
+    )
     carrier._client.get = AsyncMock(return_value=fake_resp)
 
     result = await carrier.get_available_area_codes("US", "CA")
@@ -212,7 +209,6 @@ async def test_get_available_area_codes_deduplicates_npas() -> None:
     assert all(r["country"] == "US" for r in result)
 
 
-@pytest.mark.asyncio
 async def test_get_available_area_codes_no_state() -> None:
     carrier = _make_carrier()
     fake_resp = _mock_response(200, {"data": [{"phone_number": "+18005550000"}]})
@@ -225,7 +221,6 @@ async def test_get_available_area_codes_no_state() -> None:
     assert "filter[administrative_area]" not in call_kwargs
 
 
-@pytest.mark.asyncio
 async def test_get_available_area_codes_raises_on_error() -> None:
     carrier = _make_carrier()
     fake_resp = _mock_response(500, {"errors": [{"detail": "server error"}]})

@@ -13,7 +13,11 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["area-codes"])
 
 
-@router.get("/GetAreaCodes", response_model=AreaCodesResponse)
+@router.get(
+    "/GetAreaCodes",
+    response_model=AreaCodesResponse,
+    responses={502: {"description": "Provider error"}},
+)
 async def get_area_codes(
     request: Request,
     _: Annotated[str, Depends(verify_api_key)],
@@ -31,7 +35,11 @@ async def get_area_codes(
     return AreaCodesResponse(area_codes=items, count=len(items))
 
 
-@router.get("/GetAreaCodes/{country}/{state}", response_model=AreaCodesResponse)
+@router.get(
+    "/GetAreaCodes/{country}/{state}",
+    response_model=AreaCodesResponse,
+    responses={502: {"description": "Provider error"}},
+)
 async def get_area_codes_filtered(
     country: str,
     state: str,
@@ -41,9 +49,7 @@ async def get_area_codes_filtered(
     """Return area codes filtered by country and state."""
     carrier = request.app.state.carrier
     try:
-        codes = await carrier.get_available_area_codes(
-            country=country.upper(), state=state.upper()
-        )
+        codes = await carrier.get_available_area_codes(country=country.upper(), state=state.upper())
     except Exception:
         raise HTTPException(status_code=502, detail="Provider error fetching area codes")
     items = [AreaCodeInfo(area_code=c["area_code"], country=c["country"]) for c in codes]

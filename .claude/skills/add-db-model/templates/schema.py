@@ -10,6 +10,7 @@ Steps:
   4. Use model_config = {"from_attributes": True} on response models so
      SQLAlchemy ORM objects can be passed directly to model_validate().
 """
+
 from __future__ import annotations
 
 import uuid

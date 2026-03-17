@@ -4,6 +4,8 @@ import pytest
 
 from tests.conftest import AUTH_HEADERS
 
+pytestmark = pytest.mark.asyncio(loop_scope="session")
+
 _BASE = "/vsapi/1.0.0/VsCustomer"
 
 
@@ -17,7 +19,6 @@ async def _create(client, vs_id: int) -> dict:
     return resp.json()
 
 
-@pytest.mark.asyncio
 async def test_create_customer(client) -> None:
     data = await _create(client, 4001)
     assert data["vs_customer_id"] == 4001
@@ -25,7 +26,6 @@ async def test_create_customer(client) -> None:
     assert data["active"] is True
 
 
-@pytest.mark.asyncio
 async def test_get_customer(client) -> None:
     await _create(client, 4002)
     resp = await client.get(f"{_BASE}/Get/4002", headers=AUTH_HEADERS)
@@ -33,13 +33,11 @@ async def test_get_customer(client) -> None:
     assert resp.json()["vs_customer_id"] == 4002
 
 
-@pytest.mark.asyncio
 async def test_get_customer_not_found(client) -> None:
     resp = await client.get(f"{_BASE}/Get/99999", headers=AUTH_HEADERS)
     assert resp.status_code == 404
 
 
-@pytest.mark.asyncio
 async def test_get_customer_internal_id(client) -> None:
     data = await _create(client, 4003)
     resp = await client.get(f"{_BASE}/GetCustid/4003", headers=AUTH_HEADERS)
@@ -49,7 +47,6 @@ async def test_get_customer_internal_id(client) -> None:
     assert body["internal_id"] == data["id"]
 
 
-@pytest.mark.asyncio
 async def test_create_duplicate_customer_returns_409(client) -> None:
     await _create(client, 4004)
     payload = {
@@ -60,10 +57,10 @@ async def test_create_duplicate_customer_returns_409(client) -> None:
     assert resp.status_code == 409
 
 
-@pytest.mark.asyncio
 async def test_get_phone_lines_returns_active_only(client, db_session) -> None:
     """GetPhoneLines should only return active DIDs for the customer."""
     import uuid
+
     from app.repositories.phone_line_repo import PhoneLineRepo
 
     data = await _create(client, 4005)
@@ -85,7 +82,6 @@ async def test_get_phone_lines_returns_active_only(client, db_session) -> None:
     assert "+14005550002" not in numbers
 
 
-@pytest.mark.asyncio
 async def test_get_phone_lines_unknown_customer_returns_404(client) -> None:
     resp = await client.get(f"{_BASE}/GetPhoneLines/99993", headers=AUTH_HEADERS)
     assert resp.status_code == 404

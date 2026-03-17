@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import secrets
 import uuid
 
@@ -8,6 +9,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.customer import Customer
 from app.schemas.customer import CustomerCreate
+
+logger = logging.getLogger(__name__)
 
 
 class CustomerRepo:
@@ -53,7 +56,5 @@ class CustomerRepo:
         return result.scalar_one_or_none()
 
     async def list_all(self) -> list[Customer]:
-        result = await self.session.execute(
-            select(Customer).where(Customer.active.is_(True))
-        )
+        result = await self.session.execute(select(Customer).where(Customer.active.is_(True)))
         return list(result.scalars().all())

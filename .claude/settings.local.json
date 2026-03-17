@@ -1,8 +1,22 @@
 {
+  "effortLevel": "high",
   "permissions": {
     "allow": [
       "Bash(npm show:*)",
-      "Bash(python3:*)"
+      "Bash(python3:*)",
+      "Bash(git log:*)",
+      "Bash(git diff:*)",
+      "Bash(git status:*)",
+      "Bash(git branch:*)",
+      "Bash(git ls-files:*)",
+      "Bash(git blame:*)",
+      "Bash(pytest:*)",
+      "Bash(alembic history:*)",
+      "Bash(alembic heads:*)",
+      "Bash(alembic current:*)",
+      "Bash(npx vitest:*)",
+      "Bash(pwsh:*)",
+      "Bash(ls:*)"
     ]
   }
 }

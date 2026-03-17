@@ -2,6 +2,25 @@ import React, { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useNavigate, useLocation } from 'react-router-dom'
 
+// ─── Mobile menu toggle ──────────────────────────────────────────────────────
+
+function MenuToggle({ open, onToggle }: { open: boolean; onToggle: () => void }) {
+  return (
+    <button
+      onClick={onToggle}
+      className="md:hidden flex items-center justify-center w-12 h-12 rounded-full"
+      style={{
+        border: '3px solid #5C3317',
+        background: 'linear-gradient(135deg, #FFF8E7, #E8D09E)',
+        boxShadow: '0 4px 12px rgba(92,51,23,0.2)',
+      }}
+      aria-label={open ? 'Close menu' : 'Open menu'}
+    >
+      <span className="text-xl">{open ? '\u2715' : '\u2630'}</span>
+    </button>
+  )
+}
+
 // ─── Drip SVG ────────────────────────────────────────────────────────────────
 
 function DripEdge() {
@@ -106,7 +125,7 @@ function Logo() {
     <div className="relative select-none">
       {/* Shadow layer */}
       <span
-        className="absolute inset-0 text-5xl font-bold"
+        className="absolute inset-0 text-3xl md:text-5xl font-bold"
         style={{
           fontFamily: "'Pacifico', 'Comic Sans MS', cursive",
           color: '#8B4513',
@@ -120,7 +139,7 @@ function Logo() {
       </span>
       {/* Gradient text */}
       <span
-        className="relative text-5xl font-bold"
+        className="relative text-3xl md:text-5xl font-bold"
         style={{
           fontFamily: "'Pacifico', 'Comic Sans MS', cursive",
           backgroundImage: 'linear-gradient(to bottom, #FFFFFF, #FFD37E)',
@@ -138,11 +157,15 @@ function Logo() {
 // ─── Header ──────────────────────────────────────────────────────────────────
 
 function Header() {
+  const [menuOpen, setMenuOpen] = useState(false)
+  const navigate = useNavigate()
+  const location = useLocation()
+
   return (
     <div className="sticky top-0 z-50">
       {/* Caramel pour body */}
       <div
-        className="relative px-8 pt-6 pb-16"
+        className="relative px-4 md:px-8 pt-4 md:pt-6 pb-12 md:pb-16"
         style={{
           background: '#C15A10',
           borderBottom: '4px solid rgba(255,243,204,0.3)',
@@ -158,12 +181,51 @@ function Header() {
         />
         <div className="relative flex items-center justify-between max-w-7xl mx-auto">
           <Logo />
-          <nav className="flex items-center gap-4">
+          {/* Desktop nav */}
+          <nav className="hidden md:flex items-center gap-4">
             {NAV_ITEMS.map((item) => (
               <NavCircle key={item.path} {...item} />
             ))}
           </nav>
+          {/* Mobile menu toggle */}
+          <MenuToggle open={menuOpen} onToggle={() => setMenuOpen(!menuOpen)} />
         </div>
+
+        {/* Mobile dropdown nav */}
+        <AnimatePresence>
+          {menuOpen && (
+            <motion.nav
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+              className="relative overflow-hidden mt-4 md:hidden"
+            >
+              <div className="flex flex-col gap-2">
+                {NAV_ITEMS.map(({ label, path, icon }) => {
+                  const active = location.pathname === path
+                  return (
+                    <button
+                      key={path}
+                      onClick={() => { navigate(path); setMenuOpen(false) }}
+                      className="flex items-center gap-3 px-4 py-3 rounded-full text-left font-bold"
+                      style={{
+                        background: active
+                          ? 'linear-gradient(135deg, rgba(255,248,231,0.3), rgba(232,160,74,0.3))'
+                          : 'rgba(255,248,231,0.1)',
+                        color: '#FFF8E7',
+                        border: active ? '2px solid rgba(255,248,231,0.4)' : '2px solid transparent',
+                      }}
+                    >
+                      <span className="text-lg">{icon}</span>
+                      <span>{label}</span>
+                    </button>
+                  )
+                })}
+              </div>
+            </motion.nav>
+          )}
+        </AnimatePresence>
 
         {/* Drip edge */}
         <DripEdge />
@@ -181,7 +243,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
       style={{ background: 'linear-gradient(160deg, #FFF8E7 0%, #F0D9AE 100%)' }}
     >
       <Header />
-      <main className="max-w-7xl mx-auto px-8 pt-20 pb-12">{children}</main>
+      <main className="max-w-7xl mx-auto px-4 md:px-8 pt-12 md:pt-20 pb-12">{children}</main>
     </div>
   )
 }

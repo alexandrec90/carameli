@@ -4,8 +4,9 @@ import pytest
 
 from tests.conftest import AUTH_HEADERS
 
+pytestmark = pytest.mark.asyncio(loop_scope="session")
 
-@pytest.mark.asyncio
+
 async def test_get_recording_not_found(client) -> None:
     resp = await client.get(
         "/vsapi/1.0.0/VsCall/Recording/CAmissing001",
@@ -15,7 +16,6 @@ async def test_get_recording_not_found(client) -> None:
     assert resp.json()["detail"] == "Call not found"
 
 
-@pytest.mark.asyncio
 async def test_get_recording_no_recording(client) -> None:
     await client.post(
         "/webhooks/jambonz/call-status",
@@ -36,7 +36,6 @@ async def test_get_recording_no_recording(client) -> None:
     assert resp.json()["detail"] == "No recording for this call"
 
 
-@pytest.mark.asyncio
 async def test_get_recording_success(client) -> None:
     await client.post(
         "/webhooks/jambonz/call-status",

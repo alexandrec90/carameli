@@ -8,7 +8,7 @@ A self-hosted VoIP microservice. Manages phone lines, extensions, SMS, call reco
 | --- | --- |
 | Language | Python 3.12 |
 | Framework | FastAPI |
-| Background jobs | APScheduler (in-process) |
+| Background jobs | ARQ (async, Redis-backed, separate worker process) |
 | Database | PostgreSQL 18 |
 | ORM / Migrations | SQLAlchemy 2 (async) + Alembic |
 | Call engine | Jambonz (self-hosted, on FreeSWITCH) |
@@ -17,54 +17,6 @@ A self-hosted VoIP microservice. Manages phone lines, extensions, SMS, call reco
 | Container | Docker + Docker Compose |
 | Auth | Bearer API key (`Authorization: Bearer <key>`) |
 | Tests | pytest + pytest-asyncio |
-
-## Project Layout
-
-```text
-carameli/
-  app/
-    api/
-      vsapi/              # API routes (/vsapi/1.0.0/...)
-        phone_lines.py    # /PhoneLine/...
-        extensions.py     # /VsExtension/...
-        sms.py            # /VsMessaging/Sms/...
-        customers.py      # /VsCustomer/...
-        voicemail_drop.py # /VsMessageDrop
-        sci.py            # /PostSCIbyZipCode, /UpdateSCIUserOption
-        pointers.py       # /AddPointerToExtension, /DeletePointerToExtension
-        area_codes.py     # /GetAreaCodes
-      webhooks/
-        call_status.py    # POST /webhooks/jambonz/call-status
-        sms_inbound.py    # POST /webhooks/telnyx/sms-inbound
-      vg/
-        frontend_logs.py  # POST /vg/1.0.0/frontend-logs (browser log ingestion)
-    core/
-      config.py           # Settings via pydantic-settings
-      auth.py             # API key validation dependency
-      database.py         # Async engine + session factory
-      logging_config.py   # Rotating file + console handler setup
-    models/               # SQLAlchemy ORM models
-    schemas/              # Pydantic request/response models
-    services/
-      providers/
-        base.py             # CarrierProvider + CallEngineProvider Protocol interfaces
-        factory.py          # Reads env vars, returns provider singletons
-        carrier/
-          telnyx.py         # DID buy/release, SMS send (active)
-        engine/
-          jambonz.py        # Call initiation, recording, IVR (active)
-      call_control.py     # Engine-agnostic call business logic
-      did_manager.py      # Carrier-agnostic DID business logic
-      call_sync.py        # APScheduler job for call tracking retries
-    repositories/         # DB query layer (CustomerRepo, LineRepo, etc.)
-  alembic/                # DB migrations
-  tests/
-    unit/
-    integration/
-  docker-compose.yml
-  Dockerfile
-  .env.example
-```
 
 ## Local Development
 
@@ -85,41 +37,7 @@ ngrok http 8000
 
 ## Environment Variables
 
-See `.env.example`. Key vars:
-
-| Variable | Purpose |
-| --- | --- |
-| `DATABASE_URL` | Async PostgreSQL DSN (`postgresql+asyncpg://...`) |
-| `CARRIER_PROVIDER` | Active carrier impl (`telnyx`), default `telnyx` |
-| `CALL_ENGINE_PROVIDER` | Active call engine impl (`jambonz`), default `jambonz` |
-| `TELNYX_API_KEY` | Telnyx API key for DID + SMS |
-| `TELNYX_WEBHOOK_BASE_URL` | Public base URL for Telnyx callbacks (ngrok in dev) |
-| `TELNYX_WEBHOOK_SECRET` | Signing secret for inbound Telnyx webhook validation |
-| `JAMBONZ_BASE_URL` | Internal URL of the Jambonz API server (e.g. `http://jambonz:3000`) |
-| `JAMBONZ_API_KEY` | Jambonz REST API key |
-| `JAMBONZ_WEBHOOK_BASE_URL` | Public base URL for Jambonz call status callbacks (ngrok in dev) |
-| `JAMBONZ_WEBHOOK_SECRET` | HMAC secret for inbound Jambonz webhook validation |
-| `API_KEY_SECRET` | Validates bearer tokens from API clients |
-| `LOG_LEVEL` | Root log level (`DEBUG`/`INFO`/`WARNING`/`ERROR`), default `INFO` |
-| `LOG_FILE` | Rotating log file path, default `logs/carameli.log` |
-
-## Route Prefixes
-
-All routes mount under `/vsapi/1.0.0/`. Native Carameli-only extensions use `/vg/1.0.0/`.
-
-| Route Group | Prefix |
-| --- | --- |
-| Phone lines (DIDs) | `/vsapi/1.0.0/PhoneLine/` |
-| Extensions (SIP) | `/vsapi/1.0.0/VsExtension/` |
-| SMS | `/vsapi/1.0.0/VsMessaging/Sms/` |
-| Customers | `/vsapi/1.0.0/VsCustomer/` |
-| Voicemail drop | `/vsapi/1.0.0/VsMessageDrop` |
-| SCI routing | `/vsapi/1.0.0/PostSCIbyZipCode`, `/vsapi/1.0.0/UpdateSCIUserOption` |
-| Pointers | `/vsapi/1.0.0/AddPointerToExtension`, `/vsapi/1.0.0/DeletePointerToExtension` |
-| Area codes | `/vsapi/1.0.0/GetAreaCodes` |
-| Frontend log ingestion | `/vg/1.0.0/frontend-logs` |
-
-Provider webhook callbacks live under `/webhooks/<provider>/...` (e.g. `/webhooks/jambonz/call-status`, `/webhooks/telnyx/sms-inbound`).
+See `.env.example` for all vars. All settings are loaded via pydantic-settings in `app/core/config.py`.
 
 ## Call Tracking
 
@@ -131,16 +49,49 @@ The active call engine (Jambonz) fires a status webhook when a call ends. Carame
 
 APScheduler runs a retry job every 30 seconds for any failed writes.
 
-## MVP Scope (Phase 1)
+## VanillaLand Reference
 
-- Customer CRUD + API key auth
-- DID provisioning (add, get, deactivate)
-- SMS enable/disable/send
-- Outbound calling with call recording
-- Call status webhook → `call_events` DB write
-- Talk time / call attempt tracking
-- Extension (SIP credential) management
-- Docker deployment
+`../VanillaLand/` is the legacy .NET/SQL Server CRM+VoIP monolith that Carameli is designed to
+replace at the telephony layer. Use it to understand existing feature contracts before implementing
+or extending Carameli endpoints. Everything outside the table below is excluded from the context
+window via `.claudeignore`.
+
+### Technology mapping
+
+| VanillaLand (legacy) | Carameli equivalent |
+| --- | --- |
+| ConnectMeVoice (CMV) / CloudLi | Jambonz call engine (`app/services/providers/engine/jambonz.py`) |
+| Telnyx carrier (same) | Telnyx carrier provider (`app/services/providers/carrier/telnyx.py`) |
+| `tblPhoneNumber` / `VoIPEntities` | `phone_lines` + `extensions` DB tables |
+| `tblCallHistory` | `call_events` DB table |
+| `SMSWS.asmx` web service | `/vsapi/1.0.0/VsMessaging/Sms/` routes |
+| `CMVCallInfo.asmx` web service | `/webhooks/jambonz/call-status` webhook |
+| `VoiceMailDropHistory` | voicemail_drop service + `/vsapi/1.0.0/VsMessageDrop` |
+| IntellectiveRouting / CallerRouting | SCI routing (`app/api/vsapi/sci.py`) |
+| DID provisioning (phone number lifecycle) | `app/services/did_manager.py` |
+
+### Relevant VanillaLand paths
+
+| Path | What to look for |
+| --- | --- |
+| `AppCode/VanillaSoft.Backend/ConnectMeVoice/` | Call initiation, recording, IVR, voicemail-drop business logic |
+| `AppCode/VanillaSoft.Backend/SMS/` | SMS send/receive, opt-out handling |
+| `AppCode/VanillaSoft.Backend/Phone/`, `PhoneNumber/` | DID provisioning, number lifecycle |
+| `AppCode/VanillaSoft.Backend/Routing/`, `IntellectiveRouting/` | SCI / zip-code routing rules |
+| `AppCode/VanillaSoft.Backend/Recording/` | Recording storage, retrieval, cleanup |
+| `AppCode/VanillaSoft.Backend/Customer/` | Customer account structure |
+| `AppCode/VanillaSoft.Model/VoIP/` | `VoIPEntities` — canonical VoIP data shapes |
+| `AppCode/VanillaSoft.Model/SMS/`, `User/SMS/` | SMS message and user-level config models |
+| `AppCode/VanillaSoft.Model/Recording/`, `Contact/CallHistory/` | Call record and recording models |
+| `AppCode/VanillaSoft.Model/PhoneNumber/` | Phone number entity |
+| `AppCode/VanillaSoft.Model/Customer/` | Customer entity |
+| `AppCode/Vanillasoft.Webservice/` | ASMX service contracts Carameli's REST API replaces |
+| `AppCode/ConnectMeVoice/` | CMV client — call + message-drop API surface |
+| `AppCode/CMVAgentStatus*/` | Agent presence (potential future feature) |
+| `AppCode/CMVRecordings*/`, `CMVUrlUploader*/` | Recording storage/upload patterns |
+| `AppCode/InBoundMessaging*/` | Inbound SMS webhook handling patterns |
+| `AppCode/SMSService/` | SMS processing queue |
+| `AppCode/vsoft_CallComplianceSvr/` | Call compliance server |
 
 ## Front-End (Carameli UI)
 
@@ -198,12 +149,22 @@ See `.claude/rules/logging.md` for the full spec.
 
 **Quick reference:**
 
-- Log file: `logs/carameli.log` (10 MB cap, 5 backups)
+- Log file: `logs/runtime/carameli.log` (10 MB cap, 5 backups)
 - Format: `YYYY-MM-DD HH:MM:SS.mmm | LEVEL | module:line | message`
 - Every Python module: `logger = logging.getLogger(__name__)` at module scope
 - Every route handler: log entry at `INFO`, 404s at `WARNING`, errors at `ERROR`
 - Frontend: `import { logger } from '../lib/logger'` — auto-ships to backend log file
 - Never log secrets (`api_key`, credentials)
+- A global `@app.exception_handler(Exception)` in `app/main.py` ensures all unhandled 500s are written to the log file with full stack traces — **do not remove it**; it is the primary signal for AI-assisted debugging via `logs/runtime/carameli.log`
+
+## Tooling
+
+See `.claude/rules/tooling.md` for VS Code task script conventions.
+
+- Task scripts live in `scripts/` and must be PowerShell (`.ps1`) — not Bash/`.sh`
+- Always invoke scripts with `pwsh` (PowerShell 7), never `powershell` (Windows PowerShell 5.1)
+- Use only ASCII characters in `.ps1` files — no em-dashes, curly quotes, or other non-ASCII (they cause parse errors when the file encoding is misread)
+- **Never run `docker` or `docker compose` commands directly** — provide the commands for the user to run instead
 
 ## Testing Strategy
 

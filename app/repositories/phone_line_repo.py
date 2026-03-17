@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import logging
 import uuid
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.phone_line import PhoneLine
+
+logger = logging.getLogger(__name__)
 
 
 class PhoneLineRepo:
@@ -28,9 +31,7 @@ class PhoneLineRepo:
         await self.session.refresh(line)
         return line
 
-    async def get_by_number(
-        self, customer_id: uuid.UUID, phone_number: str
-    ) -> PhoneLine | None:
+    async def get_by_number(self, customer_id: uuid.UUID, phone_number: str) -> PhoneLine | None:
         result = await self.session.execute(
             select(PhoneLine).where(
                 PhoneLine.customer_id == customer_id,
@@ -72,9 +73,7 @@ class PhoneLineRepo:
         await self.session.refresh(line)
         return line
 
-    async def update_recording_enabled(
-        self, line: PhoneLine, enabled: bool
-    ) -> PhoneLine:
+    async def update_recording_enabled(self, line: PhoneLine, enabled: bool) -> PhoneLine:
         line.recording_enabled = enabled
         await self.session.commit()
         await self.session.refresh(line)

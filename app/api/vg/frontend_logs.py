@@ -37,7 +37,7 @@ async def ingest_frontend_logs(
     batch: FrontendLogBatch,
     _: Annotated[str, Depends(verify_api_key)],
 ) -> None:
-    """Receive structured log entries from the React frontend and write them to the server log file."""
+    """Receive structured React frontend logs and write them to the server log file."""
     for entry in batch.entries:
         level = _LEVEL_MAP.get(entry.level.lower(), logging.INFO)
         extra = f" | context={entry.context}" if entry.context else ""

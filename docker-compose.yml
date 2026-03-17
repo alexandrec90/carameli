@@ -1,6 +1,6 @@
 services:
   db:
-    image: postgres:16
+    image: postgres:18
     restart: unless-stopped
     environment:
       POSTGRES_USER: carameli
@@ -9,25 +9,79 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - pgdata:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U carameli"]
       interval: 5s
       timeout: 5s
       retries: 10
 
+  pgbouncer:
+    image: edoburu/pgbouncer:latest
+    restart: unless-stopped
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USER: carameli
+      DB_PASSWORD: carameli_local_dev
+      DB_NAME: carameli
+      POOL_MODE: transaction
+      MAX_CLIENT_CONN: 100
+      DEFAULT_POOL_SIZE: 20
+      AUTH_TYPE: plain
+    depends_on:
+      db:
+        condition: service_healthy
+
   app:
     build: .
+    image: carameli-app
     restart: unless-stopped
+    stop_grace_period: 3s
     # In production remove the host port binding; nginx proxies to app:8000 internally.
     ports:
       - "8000:8000"
     env_file:
       - .env
     environment:
-      DATABASE_URL: postgresql+asyncpg://carameli:carameli_local_dev@db:5432/carameli
+      # Routes through PgBouncer (transaction pool). Alembic uses DIRECT_DATABASE_URL
+      # to bypass PgBouncer for DDL-heavy migrations when needed.
+      DATABASE_URL: postgresql+asyncpg://carameli:carameli_local_dev@pgbouncer:5432/carameli
+      DIRECT_DATABASE_URL: postgresql+asyncpg://carameli:carameli_local_dev@db:5432/carameli
     depends_on:
       db:
+        condition: service_healthy
+      pgbouncer:
+        condition: service_started
+      redis:
+        condition: service_healthy
+    volumes:
+      - .:/app
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  worker:
+    build: .
+    image: carameli-app
+    restart: unless-stopped
+    stop_grace_period: 3s
+    command: arq app.services.call_sync.WorkerSettings
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://carameli:carameli_local_dev@pgbouncer:5432/carameli
+    depends_on:
+      app:
+        condition: service_started
+      db:
+        condition: service_healthy
+      pgbouncer:
+        condition: service_started
+      redis:
         condition: service_healthy
     volumes:
       - .:/app
@@ -49,16 +103,52 @@ services:
 
   frontend:
     image: node:20-slim
+    restart: unless-stopped
+    stop_grace_period: 3s
     working_dir: /app
     command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
     ports:
       - "5173:5173"
     volumes:
       - ./frontend:/app
+      - frontend_node_modules:/app/node_modules
     environment:
       - VITE_API_BASE_URL=http://localhost:8000
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"require('http').get('http://localhost:5173/',r=>process.exit(r.statusCode>=500?1:0)).on('error',()=>process.exit(1))\""]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
 
   # --- Jambonz call engine stack ---
+
+  influxdb:
+    image: influxdb:1.8
+    restart: unless-stopped
+    volumes:
+      - influxdata:/var/lib/influxdb
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8086/ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  jambonz-db:
+    image: mariadb:11
+    restart: unless-stopped
+    environment:
+      MARIADB_ROOT_PASSWORD: jambonz_root
+      MARIADB_DATABASE: jambonz
+      MARIADB_USER: jambonz
+      MARIADB_PASSWORD: jambonz_local_dev
+    volumes:
+      - jambonzdata:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "healthcheck.sh --connect --innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   redis:
     image: redis:7-alpine
@@ -72,6 +162,7 @@ services:
   freeswitch:
     image: drachtio/drachtio-freeswitch-mrf
     restart: unless-stopped
+    stop_grace_period: 3s
     ports:
       - "5060:5060/udp"
       - "5061:5061/tcp"   # SIP TLS
@@ -89,7 +180,8 @@ services:
       # Or mount a cert from Let's Encrypt / your CA.
       - ./tls:/etc/freeswitch/tls:ro
     healthcheck:
-      test: ["CMD-SHELL", "fs_cli -x 'status' | grep -q 'UP'"]
+      # Check that FreeSWITCH ESL (TCP 8021 = 0x1F55) is listening.
+      test: ["CMD-SHELL", "grep -q ':1F55' /proc/net/tcp 2>/dev/null || exit 1"]
       interval: 10s
       timeout: 10s
       retries: 10
@@ -98,16 +190,16 @@ services:
   rtpengine:
     image: drachtio/rtpengine
     restart: unless-stopped
+    network_mode: host
     command: >
       rtpengine
       --interface=${RTPENGINE_PUBLIC_IP}
       --listen-ng=127.0.0.1:2223
       --port-min=10000
-      --port-max=20000
-    ports:
-      - "10000-20000:10000-20000/udp"
+      --port-max=10100
+    stop_grace_period: 3s
     healthcheck:
-      test: ["CMD-SHELL", "ss -ulnp | grep -q 2223 || exit 1"]
+      test: ["CMD-SHELL", "grep -q '08AF' /proc/net/udp /proc/net/udp6 2>/dev/null || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -116,14 +208,25 @@ services:
   jambonz:
     image: ghcr.io/jambonz/api-server
     restart: unless-stopped
+    stop_grace_period: 3s
     ports:
       - "3000:3000"
     environment:
-      JAMBONZ_REDIS_HOST: redis
-      JAMBONZ_REDIS_PORT: 6379
+      JAMBONES_MYSQL_HOST: jambonz-db
+      JAMBONES_MYSQL_PORT: 3306
+      JAMBONES_MYSQL_USER: jambonz
+      JAMBONES_MYSQL_PASSWORD: jambonz_local_dev
+      JAMBONES_MYSQL_DATABASE: jambonz
+      JAMBONES_REDIS_HOST: redis
+      JAMBONES_REDIS_PORT: 6379
+      JAMBONES_TIME_SERIES_HOST: influxdb
       DRACHTIO_HOST: freeswitch
       DRACHTIO_PORT: 9022
-      JAMBONZ_LISTEN_PORT: 3000
+      HTTP_PORT: 3000
+      # Required: used by Jambonz to encrypt credentials stored in MySQL.
+      # Override in .env with a 32-char random string for production.
+      ENCRYPTION_SECRET: "${ENCRYPTION_SECRET:-carameli-local-dev-encryption-key!}"
+      JWT_SECRET: "${JWT_SECRET:-carameli-local-dev-jwt-secret-change-me!}"
       # Call recording — push to the same S3-compatible bucket used by the app.
       # Set S3_* vars in .env; leave blank to disable remote recording storage.
       JAMBONZ_RECORD_ALL_CALLS: "${JAMBONZ_RECORD_ALL_CALLS:-false}"
@@ -134,16 +237,51 @@ services:
       # Non-AWS S3 endpoint (e.g. MinIO). Leave blank for real AWS S3.
       AWS_S3_ENDPOINT_URL: "${S3_ENDPOINT:-}"
     depends_on:
+      jambonz-db:
+        condition: service_healthy
       redis:
         condition: service_healthy
       freeswitch:
         condition: service_healthy
+      influxdb:
+        condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:3000/health || exit 1"]
+      test: ["CMD-SHELL", "node -e \"require('http').get('http://localhost:3000/health',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))\""]
       interval: 10s
       timeout: 5s
       retries: 10
       start_period: 15s
 
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    restart: unless-stopped
+    profiles: ["monitoring"]
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - promdata:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.retention.time=15d"
+
+  grafana:
+    image: grafana/grafana:10.4.0
+    restart: unless-stopped
+    profiles: ["monitoring"]
+    ports:
+      - "3001:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: "${GRAFANA_ADMIN_PASSWORD:-admin}"
+    volumes:
+      - grafanadata:/var/lib/grafana
+    depends_on:
+      - prometheus
+
 volumes:
   pgdata:
+  jambonzdata:
+  influxdata:
+  frontend_node_modules:
+  promdata:
+  grafanadata:

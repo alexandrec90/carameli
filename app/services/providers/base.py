@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import logging
 from typing import Protocol, runtime_checkable
+
+logger = logging.getLogger(__name__)
 
 
 @runtime_checkable

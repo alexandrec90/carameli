@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+
 from pydantic import (
     AliasChoices,
     BaseModel,
@@ -9,13 +11,15 @@ from pydantic import (
     field_validator,
 )
 
+logger = logging.getLogger(__name__)
+
 _E164_PATTERN = r"^\+[1-9]\d{6,14}$"
 
 
 class VoicemailDropRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    vs_customer_id: int
+    vs_customer_id: int = Field(ge=1, le=2147483647)
     extension: str = Field(
         validation_alias=AliasChoices("extension", "from_number", "voip_phone_number"),
         pattern=_E164_PATTERN,

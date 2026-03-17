@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import uuid
 from datetime import datetime
 
@@ -9,6 +10,8 @@ from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func
 
 from app.core.database import Base
+
+logger = logging.getLogger(__name__)
 
 
 class Extension(Base):
@@ -25,7 +28,5 @@ class Extension(Base):
     sip_credential_sid: Mapped[str | None] = mapped_column(String(64), nullable=True)
     sip_domain_sid: Mapped[str | None] = mapped_column(String(64), nullable=True)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
-    updated_at: Mapped[datetime] = mapped_column(
-        server_default=func.now(), onupdate=func.now()
-    )
+    updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), onupdate=func.now())
     active: Mapped[bool] = mapped_column(Boolean, default=True)

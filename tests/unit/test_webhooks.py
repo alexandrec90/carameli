@@ -4,8 +4,9 @@ import pytest
 
 from app.repositories.call_event_repo import CallEventRepo
 
+pytestmark = pytest.mark.asyncio(loop_scope="session")
 
-@pytest.mark.asyncio
+
 @pytest.mark.parametrize("terminal_status", ["no-answer", "busy", "failed", "canceled"])
 async def test_call_status_all_terminal_statuses_persist(
     client, db_session, terminal_status: str
@@ -26,7 +27,6 @@ async def test_call_status_all_terminal_statuses_persist(
     assert event.status == terminal_status
 
 
-@pytest.mark.asyncio
 async def test_call_status_webhook_writes_event(client, db_session) -> None:
     """Jambonz call-status POST should persist the event to call_events."""
     payload = {
@@ -47,16 +47,41 @@ async def test_call_status_webhook_writes_event(client, db_session) -> None:
     assert event.status == "completed"
 
 
-@pytest.mark.asyncio
 async def test_call_status_missing_sid_is_noop(client) -> None:
     """A call-status webhook without a call_sid should return 200 without crashing."""
-    resp = await client.post(
-        "/webhooks/jambonz/call-status", json={"call_status": "completed"}
-    )
+    resp = await client.post("/webhooks/jambonz/call-status", json={"call_status": "completed"})
     assert resp.status_code == 200
 
 
-@pytest.mark.asyncio
+async def test_call_status_non_json_body_returns_400(client) -> None:
+    """A non-JSON request body should return 400 without crashing."""
+    resp = await client.post(
+        "/webhooks/jambonz/call-status",
+        content=b"this is not json",
+        headers={"Content-Type": "application/json"},
+    )
+    assert resp.status_code == 400
+
+
+async def test_call_status_missing_signature_header_returns_403(client) -> None:
+    """Missing X-Jambonz-Signature when a secret is configured should return 403."""
+    from app.core.config import settings
+
+    original_secret = settings.jambonz_webhook_secret
+    settings.jambonz_webhook_secret = "a-real-secret"
+
+    body = b'{"call_sid": "CAmissingsig", "call_status": "completed"}'
+    resp = await client.post(
+        "/webhooks/jambonz/call-status",
+        content=body,
+        headers={"Content-Type": "application/json"},
+        # No X-Jambonz-Signature header — defaults to empty string → HMAC mismatch
+    )
+    assert resp.status_code == 403
+
+    settings.jambonz_webhook_secret = original_secret
+
+
 async def test_call_status_duplicate_sid_is_idempotent(client, db_session) -> None:
     """Posting the same call_sid twice should not create a duplicate event."""
     payload = {
@@ -69,6 +94,7 @@ async def test_call_status_duplicate_sid_is_idempotent(client, db_session) -> No
     await client.post("/webhooks/jambonz/call-status", json=payload)
 
     from sqlalchemy import select
+
     from app.models.call_event import CallEvent
 
     result = await db_session.execute(
@@ -78,10 +104,7 @@ async def test_call_status_duplicate_sid_is_idempotent(client, db_session) -> No
     assert len(events) == 1
 
 
-@pytest.mark.asyncio
-async def test_call_status_duplicate_sid_updates_existing_event(
-    client, db_session
-) -> None:
+async def test_call_status_duplicate_sid_updates_existing_event(client, db_session) -> None:
     """Subsequent callbacks for same call_sid should update status/duration/recording fields."""
     await client.post(
         "/webhooks/jambonz/call-status",

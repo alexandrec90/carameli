@@ -5,7 +5,7 @@ import logging.handlers
 from pathlib import Path
 
 
-def configure_logging(log_level: str = "INFO", log_file: str = "logs/carameli.log") -> None:
+def configure_logging(log_level: str = "INFO", log_file: str = "logs/runtime/carameli.log") -> None:
     """Set up console + rotating file logging.
 
     Format is intentionally structured for easy machine parsing:

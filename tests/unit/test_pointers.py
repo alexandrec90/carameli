@@ -8,6 +8,8 @@ from app.repositories.extension_repo import ExtensionRepo
 from app.repositories.phone_line_repo import PhoneLineRepo
 from tests.conftest import AUTH_HEADERS
 
+pytestmark = pytest.mark.asyncio(loop_scope="session")
+
 _CUST_BASE = "/vsapi/1.0.0/VsCustomer"
 _ADD_PTR = "/vsapi/1.0.0/AddPointerToExtension"
 _DEL_PTR = "/vsapi/1.0.0/DeletePointerToExtension"
@@ -43,7 +45,6 @@ async def _seed_line_and_ext(
     )
 
 
-@pytest.mark.asyncio
 async def test_add_pointer(client, db_session) -> None:
     data = await _create_customer(client, 7101)
     customer_id = uuid.UUID(data["id"])
@@ -62,7 +63,6 @@ async def test_add_pointer(client, db_session) -> None:
     assert resp.json()["success"] is True
 
 
-@pytest.mark.asyncio
 async def test_add_pointer_unknown_customer_returns_404(client) -> None:
     resp = await client.post(
         _ADD_PTR,
@@ -76,7 +76,6 @@ async def test_add_pointer_unknown_customer_returns_404(client) -> None:
     assert resp.status_code == 404
 
 
-@pytest.mark.asyncio
 async def test_add_pointer_unknown_line_returns_404(client, db_session) -> None:
     data = await _create_customer(client, 7102)
     customer_id = uuid.UUID(data["id"])
@@ -101,7 +100,6 @@ async def test_add_pointer_unknown_line_returns_404(client, db_session) -> None:
     assert resp.status_code == 404
 
 
-@pytest.mark.asyncio
 async def test_add_pointer_unknown_extension_returns_404(client, db_session) -> None:
     data = await _create_customer(client, 7103)
     customer_id = uuid.UUID(data["id"])
@@ -124,7 +122,6 @@ async def test_add_pointer_unknown_extension_returns_404(client, db_session) -> 
     assert resp.status_code == 404
 
 
-@pytest.mark.asyncio
 async def test_delete_pointer(client, db_session) -> None:
     data = await _create_customer(client, 7104)
     customer_id = uuid.UUID(data["id"])
@@ -142,7 +139,6 @@ async def test_delete_pointer(client, db_session) -> None:
     assert resp.json()["success"] is True
 
 
-@pytest.mark.asyncio
 async def test_delete_pointer_not_found_returns_404(client, db_session) -> None:
     data = await _create_customer(client, 7105)
     customer_id = uuid.UUID(data["id"])

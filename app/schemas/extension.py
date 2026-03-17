@@ -1,16 +1,25 @@
 from __future__ import annotations
 
+import logging
 import uuid
 from datetime import datetime
-from typing import List
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
+
+logger = logging.getLogger(__name__)
 
 
 class AddExtensionRequest(BaseModel):
-    vs_customer_id: int
-    extension_number: str
+    vs_customer_id: int = Field(ge=1, le=2147483647)
+    extension_number: str = Field(max_length=20)
     password: str | None = None
+
+    @field_validator("extension_number", mode="before")
+    @classmethod
+    def reject_null_bytes(cls, value: object) -> object:
+        if isinstance(value, str) and "\x00" in value:
+            raise ValueError("extension_number must not contain null bytes")
+        return value
 
 
 class ExtensionResponse(BaseModel):
@@ -27,5 +36,5 @@ class ExtensionResponse(BaseModel):
 
 
 class AvailableExtensionsResponse(BaseModel):
-    available: List[str]
+    available: list[str]
     vs_customer_id: int

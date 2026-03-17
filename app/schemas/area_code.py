@@ -1,8 +1,10 @@
 from __future__ import annotations
 
-from typing import List
+import logging
 
 from pydantic import BaseModel
+
+logger = logging.getLogger(__name__)
 
 
 class AreaCodeInfo(BaseModel):
@@ -12,5 +14,5 @@ class AreaCodeInfo(BaseModel):
 
 
 class AreaCodesResponse(BaseModel):
-    area_codes: List[AreaCodeInfo]
+    area_codes: list[AreaCodeInfo]
     count: int

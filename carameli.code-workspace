@@ -6,8 +6,44 @@
 		{
 			"path": "../VanillaLand",
 			"settings": {
+				// ── JavaScript / TypeScript ───────────────────────────────
 				"eslint.enable": false,
-				"python.analysis.enabled": false
+				"typescript.validate.enable": false,
+				"javascript.validate.enable": false,
+				"typescript.tsdk": "",
+				// ── Python ───────────────────────────────────────────────
+				"python.analysis.enabled": false,
+				"python.linting.enabled": false,
+				"python.analysis.diagnosticMode": "off",
+				"python.analysis.typeCheckingMode": "off",
+				// ── CSS / HTML / JSON / XML ───────────────────────────────
+				"css.validate": false,
+				"scss.validate": false,
+				"less.validate": false,
+				"html.validate.scripts": false,
+				"html.validate.styles": false,
+				"json.validate.enable": false,
+				// ── C# / .NET (OmniSharp + new Roslyn LSP) ───────────────
+				"omnisharp.enableRoslynAnalyzers": false,
+				"omnisharp.enableEditorConfigSupport": false,
+				"omnisharp.diagnostics.enable": false,
+				"csharp.backgroundAnalysis.analyzerDiagnosticsScope": "none",
+				"csharp.backgroundAnalysis.compilerDiagnosticsScope": "none",
+				"dotnet.backgroundAnalysis.analyzerDiagnosticsScope": "none",
+				"dotnet.backgroundAnalysis.compilerDiagnosticsScope": "none",
+				// ── Generic editor / problems ─────────────────────────────
+				"files.watcherExclude": {
+					"**/.git/objects/**": true,
+					"**/node_modules/**": true,
+					"**/bin/**": true,
+					"**/obj/**": true,
+					"**/*.dll": true
+				},
+				"search.exclude": {
+					"**/bin": true,
+					"**/obj": true,
+					"**/node_modules": true
+				}
 			}
 		}
 	],
@@ -16,6 +52,7 @@
 		"dotnet.defaultSolution": "VanillaLand/AppCode/VS.sln",
 		"python.analysis.exclude": [
 			"../VanillaLand/**"
-		]
+		],
+		"powershell.cwd": "carameli"
 	}
 }

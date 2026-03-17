@@ -60,7 +60,6 @@ logs/
 Thumbs.db
 Desktop.ini
 .idea/
-.vscode/
 
 # Node / frontend
 node_modules/
@@ -87,3 +86,21 @@ coverage.xml
 .nyc_output/
 
 docs/
+
+# Charts folder (generated diagrams)
+charts/
+
+# Workspace metadata
+carameli.code-workspace
+
+# Ensure any references or accidental copies of the VanillaLand tree are ignored
+VanillaLand/
+**/VanillaLand/
+**/*VanillaLand*
+
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+/playwright/.auth/

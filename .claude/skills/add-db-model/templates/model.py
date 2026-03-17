@@ -11,6 +11,7 @@ Steps:
   6. Review the generated migration (check gen_random_uuid, foreign keys, indexes).
   7. Run: docker compose exec app alembic upgrade head
 """
+
 from __future__ import annotations
 
 import uuid
@@ -43,9 +44,7 @@ class MyEntity(Base):  # TODO: rename
 
     active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
-    updated_at: Mapped[datetime] = mapped_column(
-        server_default=func.now(), onupdate=func.now()
-    )
+    updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), onupdate=func.now())
 
     def __repr__(self) -> str:
         return f"<MyEntity id={self.id}>"

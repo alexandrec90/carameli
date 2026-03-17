@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 
 import httpx
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from arq import cron
+from arq.connections import RedisSettings
 
 from app.core.config import settings
 from app.core.database import async_session_factory
@@ -11,7 +13,6 @@ from app.repositories.call_event_repo import CallEventRepo
 from app.repositories.customer_repo import CustomerRepo
 
 logger = logging.getLogger(__name__)
-scheduler = AsyncIOScheduler()
 _TERMINAL_CALL_STATUSES = {"completed", "no-answer", "busy", "failed", "canceled"}
 
 
@@ -21,7 +22,7 @@ def _vanillasoft_headers() -> dict[str, str]:
     return {"Authorization": f"Bearer {settings.vanillasoft_webhook_secret}"}
 
 
-async def retry_unposted_events() -> None:
+async def retry_unposted_events(ctx: dict) -> None:
     """Retry posting call events (older than 1 min) to VanillaSoft that failed on first attempt."""
     if not settings.vanillasoft_webhook_url:
         return
@@ -35,14 +36,17 @@ async def retry_unposted_events() -> None:
         logger.info("Found %d unposted call events; retrying…", len(events))
         customer_repo = CustomerRepo(session)
 
+        # Pre-load all referenced customers in one round-trip batch.
+        unique_ids = {e.customer_id for e in events if e.customer_id}
+        fetched = await asyncio.gather(*[customer_repo.get_by_id(cid) for cid in unique_ids])
+        customer_map = {c.id: c for c in fetched if c}
+
         for event in events:
             try:
                 if (event.status or "").lower() not in _TERMINAL_CALL_STATUSES:
                     continue
 
-                customer = None
-                if event.customer_id:
-                    customer = await customer_repo.get_by_id(event.customer_id)
+                customer = customer_map.get(event.customer_id) if event.customer_id else None
 
                 vs_payload = {
                     "call_sid": event.call_sid,
@@ -53,9 +57,7 @@ async def retry_unposted_events() -> None:
                     "duration_seconds": event.duration_seconds,
                     "recording_url": event.recording_url,
                     "status": event.status,
-                    "started_at": event.started_at.isoformat()
-                    if event.started_at
-                    else None,
+                    "started_at": event.started_at.isoformat() if event.started_at else None,
                     "ended_at": event.ended_at.isoformat() if event.ended_at else None,
                 }
 
@@ -83,18 +85,7 @@ async def retry_unposted_events() -> None:
                 logger.exception("Retry: failed to post call event %s", event.call_sid)
 
 
-def start_scheduler() -> None:
-    scheduler.add_job(
-        retry_unposted_events,
-        trigger="interval",
-        seconds=30,
-        id="retry_call_events",
-        replace_existing=True,
-    )
-    scheduler.start()
-    logger.info("APScheduler started: retry_call_events every 30 seconds")
-
-
-def stop_scheduler() -> None:
-    scheduler.shutdown(wait=False)
-    logger.info("APScheduler stopped")
+class WorkerSettings:
+    functions = []
+    cron_jobs = [cron(retry_unposted_events, second={0, 30})]
+    redis_settings = RedisSettings.from_dsn(settings.redis_url)

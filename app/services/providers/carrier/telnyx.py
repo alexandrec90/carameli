@@ -135,9 +135,7 @@ class TelnyxCarrier:
     # Area codes
     # ------------------------------------------------------------------
 
-    async def get_available_area_codes(
-        self, country: str, state: str | None = None
-    ) -> list[dict]:
+    async def get_available_area_codes(self, country: str, state: str | None = None) -> list[dict]:
         params: dict = {
             "filter[country_code]": country,
             "filter[features][]": ["sms", "voice"],

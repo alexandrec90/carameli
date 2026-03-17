@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import uuid
 from datetime import datetime
 
@@ -9,6 +10,8 @@ from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func
 
 from app.core.database import Base
+
+logger = logging.getLogger(__name__)
 
 
 class Customer(Base):
@@ -20,9 +23,7 @@ class Customer(Base):
     vs_customer_id: Mapped[int] = mapped_column(Integer, unique=True, nullable=False)
     api_key: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
-    updated_at: Mapped[datetime] = mapped_column(
-        server_default=func.now(), onupdate=func.now()
-    )
+    updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), onupdate=func.now())
     active: Mapped[bool] = mapped_column(Boolean, default=True)
 
     def __repr__(self) -> str:

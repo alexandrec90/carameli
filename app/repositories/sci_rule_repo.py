@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import logging
 import uuid
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.sci_rule import SciRule
+
+logger = logging.getLogger(__name__)
 
 
 class SciRuleRepo:
@@ -41,9 +44,7 @@ class SciRuleRepo:
         await self.session.refresh(rule)
         return rule
 
-    async def get_enabled_for_extension(
-        self, extension_id: uuid.UUID
-    ) -> list[SciRule]:
+    async def get_enabled_for_extension(self, extension_id: uuid.UUID) -> list[SciRule]:
         """Return all enabled SCI rules for an extension (used for inbound call filtering)."""
         result = await self.session.execute(
             select(SciRule).where(

@@ -1,6 +1,10 @@
 from __future__ import annotations
 
+import logging
+
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+logger = logging.getLogger(__name__)
 
 _E164_PATTERN = r"^\+[1-9]\d{6,14}$"
 
@@ -8,7 +12,7 @@ _E164_PATTERN = r"^\+[1-9]\d{6,14}$"
 class _PointerBaseRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    vs_customer_id: int
+    vs_customer_id: int = Field(ge=1, le=2147483647)
     phone_number: str = Field(pattern=_E164_PATTERN)
     extension_number: str
 

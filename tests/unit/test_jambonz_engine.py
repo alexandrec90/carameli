@@ -7,12 +7,12 @@ import json
 import time
 from unittest.mock import AsyncMock, MagicMock
 
-from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
-
 import pytest
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from app.services.providers.engine.jambonz import JambonzEngine
 
+pytestmark = pytest.mark.asyncio(loop_scope="session")
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -47,7 +47,6 @@ def _jambonz_sig(secret: str, body: bytes) -> str:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.asyncio
 async def test_initiate_call_returns_call_id_and_status() -> None:
     engine = _make_engine()
     fake_resp = _mock_response(200, {"sid": "JC001"})
@@ -65,7 +64,6 @@ async def test_initiate_call_returns_call_id_and_status() -> None:
     assert "call_status_hook" in posted_json
 
 
-@pytest.mark.asyncio
 async def test_initiate_call_raises_on_error() -> None:
     engine = _make_engine()
     fake_resp = _mock_response(500, {"error": "internal error"})
@@ -81,7 +79,6 @@ async def test_initiate_call_raises_on_error() -> None:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.asyncio
 async def test_hangup_call_sends_delete() -> None:
     engine = _make_engine()
     fake_resp = _mock_response(200, {})
@@ -92,7 +89,6 @@ async def test_hangup_call_sends_delete() -> None:
     engine._client.delete.assert_awaited_once_with("/Accounts/ACC123/Calls/JC001")
 
 
-@pytest.mark.asyncio
 async def test_hangup_call_raises_on_error() -> None:
     engine = _make_engine()
     fake_resp = _mock_response(404, {"error": "not found"})
@@ -108,7 +104,6 @@ async def test_hangup_call_raises_on_error() -> None:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.asyncio
 async def test_start_recording_sends_put_with_action() -> None:
     engine = _make_engine()
     fake_resp = _mock_response(200, {})
@@ -121,7 +116,6 @@ async def test_start_recording_sends_put_with_action() -> None:
     assert call_kwargs[1]["json"]["record"]["action"] == "startCallRecording"
 
 
-@pytest.mark.asyncio
 async def test_start_recording_raises_on_error() -> None:
     engine = _make_engine()
     fake_resp = _mock_response(400, {"error": "bad request"})
@@ -137,7 +131,6 @@ async def test_start_recording_raises_on_error() -> None:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.asyncio
 async def test_stop_recording_sends_put_with_stop_action() -> None:
     engine = _make_engine()
     fake_resp = _mock_response(200, {})
@@ -154,7 +147,6 @@ async def test_stop_recording_sends_put_with_stop_action() -> None:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.asyncio
 async def test_get_call_status_returns_status_dict() -> None:
     engine = _make_engine()
     fake_resp = _mock_response(200, {"call_status": "completed", "duration": 42})
@@ -168,7 +160,6 @@ async def test_get_call_status_returns_status_dict() -> None:
     engine._client.get.assert_awaited_once_with("/Accounts/ACC123/Calls/JC001")
 
 
-@pytest.mark.asyncio
 async def test_get_call_status_raises_on_error() -> None:
     engine = _make_engine()
     fake_resp = _mock_response(404, {"error": "not found"})
@@ -184,7 +175,6 @@ async def test_get_call_status_raises_on_error() -> None:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.asyncio
 async def test_initiate_voicemail_drop_passes_audio_url_in_tag() -> None:
     engine = _make_engine()
     fake_resp = _mock_response(200, {"sid": "JC_vm001"})
@@ -204,7 +194,6 @@ async def test_initiate_voicemail_drop_passes_audio_url_in_tag() -> None:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.asyncio
 async def test_jambonz_call_status_webhook_writes_event(client, db_session) -> None:
     """POST /webhooks/jambonz/call-status should persist the event to call_events."""
     from app.core.config import settings
@@ -239,7 +228,6 @@ async def test_jambonz_call_status_webhook_writes_event(client, db_session) -> N
     assert event.status == "completed"
 
 
-@pytest.mark.asyncio
 async def test_jambonz_call_status_missing_sid_is_noop(client) -> None:
     from app.core.config import settings
 
@@ -256,7 +244,6 @@ async def test_jambonz_call_status_missing_sid_is_noop(client) -> None:
     settings.jambonz_webhook_secret = original_secret
 
 
-@pytest.mark.asyncio
 async def test_jambonz_call_status_invalid_signature_returns_403(client) -> None:
     from app.core.config import settings
 
@@ -311,7 +298,6 @@ _SMS_PAYLOAD = {
 }
 
 
-@pytest.mark.asyncio
 async def test_telnyx_sms_inbound_dev_mode_returns_204(client) -> None:
     """With no secret configured, validation is skipped and valid payloads return 204."""
     from app.core.config import settings
@@ -329,7 +315,6 @@ async def test_telnyx_sms_inbound_dev_mode_returns_204(client) -> None:
     settings.telnyx_webhook_secret = original
 
 
-@pytest.mark.asyncio
 async def test_telnyx_sms_inbound_valid_ed25519_signature_returns_204(client) -> None:
     """Valid Ed25519 signature and timestamp → 204."""
     from app.core.config import settings
@@ -348,7 +333,6 @@ async def test_telnyx_sms_inbound_valid_ed25519_signature_returns_204(client) ->
     settings.telnyx_webhook_secret = original
 
 
-@pytest.mark.asyncio
 async def test_telnyx_sms_inbound_tampered_payload_returns_403(client) -> None:
     """Signature is valid for the original body; sending a different body must return 403."""
     from app.core.config import settings
@@ -362,15 +346,12 @@ async def test_telnyx_sms_inbound_tampered_payload_returns_403(client) -> None:
     headers = _telnyx_sig_headers(private_key, original_body, ts)
 
     tampered_body = json.dumps({"data": {"event_type": "evil.payload"}}).encode()
-    resp = await client.post(
-        "/webhooks/telnyx/sms-inbound", content=tampered_body, headers=headers
-    )
+    resp = await client.post("/webhooks/telnyx/sms-inbound", content=tampered_body, headers=headers)
     assert resp.status_code == 403
 
     settings.telnyx_webhook_secret = original
 
 
-@pytest.mark.asyncio
 async def test_telnyx_sms_inbound_invalid_signature_returns_403(client) -> None:
     """Garbage signature with a real secret must return 403."""
     from app.core.config import settings
@@ -396,7 +377,6 @@ async def test_telnyx_sms_inbound_invalid_signature_returns_403(client) -> None:
     settings.telnyx_webhook_secret = original
 
 
-@pytest.mark.asyncio
 async def test_telnyx_sms_inbound_replay_attack_returns_403(client) -> None:
     """Valid signature but timestamp older than 300 s must return 403."""
     from app.core.config import settings
@@ -415,7 +395,6 @@ async def test_telnyx_sms_inbound_replay_attack_returns_403(client) -> None:
     settings.telnyx_webhook_secret = original
 
 
-@pytest.mark.asyncio
 async def test_telnyx_sms_inbound_unknown_event_type_returns_204(client) -> None:
     """Unrecognised event_type should be silently accepted and return 204 (no-op)."""
     from app.core.config import settings
@@ -430,5 +409,46 @@ async def test_telnyx_sms_inbound_unknown_event_type_returns_204(client) -> None
         headers={"Content-Type": "application/json"},
     )
     assert resp.status_code == 204
+
+    settings.telnyx_webhook_secret = original
+
+
+async def test_telnyx_sms_inbound_non_json_body_returns_400(client) -> None:
+    """Non-JSON body with no secret (dev mode) should return 400, not 500."""
+    from app.core.config import settings
+
+    original = settings.telnyx_webhook_secret
+    settings.telnyx_webhook_secret = ""
+
+    resp = await client.post(
+        "/webhooks/telnyx/sms-inbound",
+        content=b"not json at all",
+        headers={"Content-Type": "application/json"},
+    )
+    assert resp.status_code == 400
+
+    settings.telnyx_webhook_secret = original
+
+
+async def test_telnyx_sms_inbound_missing_timestamp_header_returns_403(client) -> None:
+    """Missing telnyx-timestamp header with a secret configured should return 403."""
+    from app.core.config import settings
+
+    private_key, pub_key_b64 = _make_ed25519_keypair()
+    original = settings.telnyx_webhook_secret
+    settings.telnyx_webhook_secret = pub_key_b64
+
+    body = json.dumps(_SMS_PAYLOAD).encode()
+    # Provide signature but omit telnyx-timestamp → timestamp becomes "" → int("") raises
+    resp = await client.post(
+        "/webhooks/telnyx/sms-inbound",
+        content=body,
+        headers={
+            "Content-Type": "application/json",
+            "telnyx-signature-ed25519": base64.b64encode(b"fakesig").decode(),
+            # no telnyx-timestamp header
+        },
+    )
+    assert resp.status_code == 403
 
     settings.telnyx_webhook_secret = original

@@ -1,0 +1,8 @@
+{
+  "css.lint.unknownAtRules": "ignore",
+  "builder.serverUrl": "http://localhost:5173",
+  "builder.command": "",
+  "builder.runDevServer": false,
+  "builder.autoDetectDevServer": true,
+  "builder.launchType": "editor",
+}

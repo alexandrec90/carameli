@@ -16,6 +16,8 @@ import pytest
 from app.repositories.phone_line_repo import PhoneLineRepo
 from tests.conftest import AUTH_HEADERS
 
+pytestmark = pytest.mark.asyncio(loop_scope="session")
+
 _CUST = "/vsapi/1.0.0/VsCustomer"
 _LINE = "/vsapi/1.0.0/PhoneLine"
 _SMS = "/vsapi/1.0.0/VsMessaging/Sms"
@@ -43,18 +45,14 @@ async def _create_customer(client, vs_id: int) -> dict:
 
 
 def _mock_carrier_provision(app, phone_number: str, sid: str) -> None:
-    app.state.carrier.search_numbers = AsyncMock(
-        return_value=[{"phone_number": phone_number}]
-    )
+    app.state.carrier.search_numbers = AsyncMock(return_value=[{"phone_number": phone_number}])
     app.state.carrier.provision_number = AsyncMock(
         return_value={"sid": sid, "phone_number": phone_number}
     )
     app.state.carrier.release_number = AsyncMock(return_value=None)
     app.state.carrier.enable_sms = AsyncMock(return_value=None)
     app.state.carrier.disable_sms = AsyncMock(return_value=None)
-    app.state.carrier.send_sms = AsyncMock(
-        return_value={"sid": f"SM{sid}", "status": "sent"}
-    )
+    app.state.carrier.send_sms = AsyncMock(return_value={"sid": f"SM{sid}", "status": "sent"})
 
 
 # ---------------------------------------------------------------------------
@@ -62,7 +60,6 @@ def _mock_carrier_provision(app, phone_number: str, sid: str) -> None:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.asyncio
 async def test_customer_did_sms_full_flow(client) -> None:
     """Create customer → add DID → enable SMS → send SMS → disable SMS."""
     from app.main import app
@@ -110,7 +107,6 @@ async def test_customer_did_sms_full_flow(client) -> None:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.asyncio
 async def test_did_add_deactivate_then_get_returns_empty(client) -> None:
     """Add a DID then deactivate it; GetPhoneLines should return an empty list."""
     from app.main import app
@@ -145,7 +141,6 @@ async def test_did_add_deactivate_then_get_returns_empty(client) -> None:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.asyncio
 async def test_extension_pointer_lifecycle(client, db_session) -> None:
     """Create customer → add extension via API → seed DID via repo.
 
@@ -183,16 +178,12 @@ async def test_extension_pointer_lifecycle(client, db_session) -> None:
     assert add_resp.json()["success"] is True
 
     # Delete pointer
-    del_resp = await client.request(
-        "DELETE", _DEL_PTR, json=pointer_payload, headers=AUTH_HEADERS
-    )
+    del_resp = await client.request("DELETE", _DEL_PTR, json=pointer_payload, headers=AUTH_HEADERS)
     assert del_resp.status_code == 200
     assert del_resp.json()["success"] is True
 
     # Second delete should 404 (pointer no longer exists)
-    del_again = await client.request(
-        "DELETE", _DEL_PTR, json=pointer_payload, headers=AUTH_HEADERS
-    )
+    del_again = await client.request("DELETE", _DEL_PTR, json=pointer_payload, headers=AUTH_HEADERS)
     assert del_again.status_code == 404
 
 
@@ -201,7 +192,6 @@ async def test_extension_pointer_lifecycle(client, db_session) -> None:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.asyncio
 async def test_get_phone_lines_filters_inactive(client, db_session) -> None:
     """Seed two lines directly; deactivate one; GetPhoneLines returns only the active one."""
     data = await _create_customer(client, 9004)
@@ -232,7 +222,6 @@ async def test_get_phone_lines_filters_inactive(client, db_session) -> None:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.asyncio
 async def test_webhook_then_query_call_event(client, db_session) -> None:
     """POST a call-status webhook, then verify the DB row has correct fields."""
     from app.repositories.call_event_repo import CallEventRepo

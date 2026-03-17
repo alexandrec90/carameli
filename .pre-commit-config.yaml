@@ -1,0 +1,58 @@
+repos:
+  # Secrets — baseline file committed at .secrets.baseline; update with: detect-secrets scan > .secrets.baseline
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.5.0
+    hooks:
+      - id: detect-secrets
+        args: ["--baseline", ".secrets.baseline"]
+        exclude: (\.secrets\.baseline|\.env\.example)$
+
+  # Security — bandit static analysis, medium+ severity only
+  - repo: https://github.com/PyCQA/bandit
+    rev: 1.8.3
+    hooks:
+      - id: bandit
+        args: ["-r", "app/", "-ll"]
+        pass_filenames: false
+
+  # Python — ruff installs its own isolated binary, reads ruff.toml automatically
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.4.0
+    hooks:
+      - id: ruff
+        args: [--fix]
+      - id: ruff-format
+
+  # .env files — dotenv-linter installed locally (cargo install dotenv-linter)
+  - repo: local
+    hooks:
+      - id: dotenv-linter
+        name: dotenv-linter
+        language: system
+        entry: dotenv-linter check
+        files: ^\.env
+        types: [file]
+
+  # Frontend — uses the project's own node_modules, reads existing ESLint/stylelint/markdownlint configs
+  - repo: local
+    hooks:
+      - id: eslint
+        name: ESLint
+        language: system
+        entry: npm --prefix frontend run lint:eslint
+        files: ^frontend/src/.*\.[jt]sx?$
+        pass_filenames: false
+
+      - id: stylelint
+        name: Stylelint
+        language: system
+        entry: npm --prefix frontend run lint:css
+        files: ^frontend/src/.*\.css$
+        pass_filenames: false
+
+      - id: markdownlint
+        name: Markdownlint
+        language: system
+        entry: npm --prefix frontend exec -- markdownlint "**/*.md" --ignore "**/node_modules/**" --ignore "**/.git/**" --ignore "**/.venv/**" -c ".markdownlint.json" --fix
+        files: \.md$
+        pass_filenames: false

@@ -1,15 +1,26 @@
 from __future__ import annotations
 
+import logging
+
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+logger = logging.getLogger(__name__)
 
 
 class PostSciByZipCodeRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    vs_customer_id: int
+    vs_customer_id: int = Field(ge=1, le=2147483647)
     extension_number: str
-    zip_code: str = Field(min_length=3, max_length=5)
+    zip_code: str = Field(pattern=r"^\d{3}(\d{2})?$")
     enabled: bool = True
+
+    @field_validator("extension_number", mode="before")
+    @classmethod
+    def reject_null_bytes_ext(cls, value: object) -> object:
+        if isinstance(value, str) and "\x00" in value:
+            raise ValueError("extension_number must not contain null bytes")
+        return value
 
     @field_validator("zip_code", mode="before")
     @classmethod
@@ -29,9 +40,16 @@ class PostSciByZipCodeRequest(BaseModel):
 class UpdateSciUserOptionRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    vs_customer_id: int
+    vs_customer_id: int = Field(ge=1, le=2147483647)
     extension_number: str
     enabled: bool
+
+    @field_validator("extension_number", mode="before")
+    @classmethod
+    def reject_null_bytes_ext(cls, value: object) -> object:
+        if isinstance(value, str) and "\x00" in value:
+            raise ValueError("extension_number must not contain null bytes")
+        return value
 
 
 class SciResponse(BaseModel):
