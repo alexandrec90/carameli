@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.auth import AuthContext, enforce_customer_scope, get_auth_context
 from app.core.database import get_session
 from app.schemas.phone_line import (
+    AddPhoneLineByNumber,
     AddPhoneLineRequest,
     DeactivatePhoneLineRequest,
     PhoneLineCountResponse,
@@ -41,10 +42,9 @@ async def add_phone_line(
     """Purchase a new DID from the active carrier and register it for the customer."""
     enforce_customer_scope(auth, body.vs_customer_id)
     logger.info(
-        "Adding phone line vs_customer_id=%s area_code=%s number=%s",
+        "Adding phone line vs_customer_id=%s body=%s",
         body.vs_customer_id,
-        body.area_code,
-        body.phone_number,
+        body.model_dump(),
     )
     customer = await customer_service.get_by_vs_id(session, body.vs_customer_id)
     if not customer:
@@ -53,25 +53,23 @@ async def add_phone_line(
 
     carrier = request.app.state.carrier
     try:
-        if body.phone_number:
+        if isinstance(body, AddPhoneLineByNumber):
             result = await carrier.provision_number(body.phone_number)
-        elif body.area_code:
+        else:
             numbers = await carrier.search_numbers(body.area_code, 1)
             if not numbers:
                 raise ValueError(f"No numbers available in area code {body.area_code}")
             result = await carrier.provision_number(numbers[0]["phone_number"])
-        else:
-            raise ValueError("Must specify area_code or phone_number")
     except ValueError as exc:
         logger.warning("Invalid DID request vs_customer_id=%s: %s", body.vs_customer_id, exc)
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise HTTPException(status_code=400, detail=str(exc)) from None
     except Exception as exc:
         logger.error(
             "Provider error purchasing DID vs_customer_id=%s: %s",
             body.vs_customer_id,
             exc,
         )
-        raise HTTPException(status_code=502, detail="Provider error purchasing DID")
+        raise HTTPException(status_code=502, detail="Provider error purchasing DID") from None
 
     line = await phone_line_service.create(
         session,
@@ -132,7 +130,11 @@ async def get_phone_line_count(
 @router.put(
     "/Deactivate",
     response_model=PhoneLineResponse,
-    responses={404: {"description": "Not found"}, 502: {"description": "Provider error"}},
+    responses={
+        400: {"description": "Bad request"},
+        404: {"description": "Not found"},
+        502: {"description": "Provider error"},
+    },
 )
 async def deactivate_phone_line(
     body: DeactivatePhoneLineRequest,
@@ -153,7 +155,7 @@ async def deactivate_phone_line(
     try:
         await carrier.release_number(line.provider_sid)
     except Exception:
-        raise HTTPException(status_code=502, detail="Provider error releasing DID")
+        raise HTTPException(status_code=502, detail="Provider error releasing DID") from None
 
     line = await phone_line_service.deactivate(session, line)
     return PhoneLineResponse.model_validate(line)
@@ -162,7 +164,7 @@ async def deactivate_phone_line(
 @router.put(
     "/UpdateCallRecording",
     response_model=PhoneLineResponse,
-    responses={404: {"description": "Not found"}},
+    responses={400: {"description": "Bad request"}, 404: {"description": "Not found"}},
 )
 async def update_call_recording(
     body: UpdateRecordingRequest,

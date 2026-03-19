@@ -2,11 +2,14 @@ target-version = "py312"
 line-length = 100
 
 [lint]
-select = ["E", "F", "I", "UP"]
+select = ["E", "F", "I", "UP", "B", "ASYNC", "S", "SIM", "T20", "N", "RUF"]
 
 [lint.per-file-ignores]
 "alembic/versions/*.py" = ["E501"]
-"tests/**/*.py" = ["E501"]
+"tests/**/*.py" = ["E501", "S101", "S105"]
+".claude/skills/**/*.py" = ["S101", "N803", "B904"]
+"app/api/**/*.py" = ["N803"]
+"app/core/config.py" = ["S105"]
 
 [format]
 quote-style = "double"

@@ -1,27 +1,50 @@
+fail_fast: true
+
 repos:
-  # Secrets — baseline file committed at .secrets.baseline; update with: detect-secrets scan > .secrets.baseline
-  - repo: https://github.com/Yelp/detect-secrets
-    rev: v1.5.0
+  # All hooks use language: system so they share the venv/local binaries
+  # with lint-all.ps1 — no version drift between the two scripts.
+  - repo: local
     hooks:
       - id: detect-secrets
-        args: ["--baseline", ".secrets.baseline"]
+        name: detect-secrets
+        language: system
+        entry: detect-secrets-hook --baseline .secrets.baseline
         exclude: (\.secrets\.baseline|\.env\.example)$
 
-  # Security — bandit static analysis, medium+ severity only
-  - repo: https://github.com/PyCQA/bandit
-    rev: 1.8.3
-    hooks:
-      - id: bandit
-        args: ["-r", "app/", "-ll"]
+      - id: ruff
+        name: ruff
+        language: system
+        entry: ruff check --fix --unsafe-fixes
+        types: [python]
+
+      - id: ruff-format
+        name: ruff-format
+        language: system
+        entry: ruff format
+        types: [python]
+
+      - id: mypy
+        name: mypy
+        language: system
+        entry: mypy app/
+        files: ^app/
+        types: [python]
         pass_filenames: false
 
-  # Python — ruff installs its own isolated binary, reads ruff.toml automatically
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.4.0
-    hooks:
-      - id: ruff
-        args: [--fix]
-      - id: ruff-format
+      - id: vulture
+        name: vulture
+        language: system
+        entry: vulture app/ --min-confidence 80 --ignore-names "cls,ctx,opts"
+        files: ^app/
+        types: [python]
+        pass_filenames: false
+
+      - id: pip-audit
+        name: pip-audit
+        language: system
+        entry: pip-audit
+        files: requirements.*\.txt$
+        pass_filenames: false
 
   # .env files — dotenv-linter installed locally (cargo install dotenv-linter)
   - repo: local
@@ -39,20 +62,25 @@ repos:
       - id: eslint
         name: ESLint
         language: system
-        entry: npm --prefix frontend run lint:eslint
+        entry: npm --prefix frontend run lint:eslint -- --fix
         files: ^frontend/src/.*\.[jt]sx?$
         pass_filenames: false
 
       - id: stylelint
         name: Stylelint
         language: system
-        entry: npm --prefix frontend run lint:css
+        entry: npm --prefix frontend exec -- stylelint --fix
         files: ^frontend/src/.*\.css$
+
+      - id: tsc
+        name: TypeScript
+        language: system
+        entry: npm --prefix frontend run lint:types
+        files: ^frontend/src/.*\.[jt]sx?$
         pass_filenames: false
 
       - id: markdownlint
         name: Markdownlint
         language: system
-        entry: npm --prefix frontend exec -- markdownlint "**/*.md" --ignore "**/node_modules/**" --ignore "**/.git/**" --ignore "**/.venv/**" -c ".markdownlint.json" --fix
+        entry: npm --prefix frontend exec -- markdownlint -c ".markdownlint.json" --fix
         files: \.md$
-        pass_filenames: false

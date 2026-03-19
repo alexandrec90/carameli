@@ -19,7 +19,7 @@ router = APIRouter(tags=["pointers"])
 @router.post(
     "/AddPointerToExtension",
     response_model=PointerResponse,
-    responses={404: {"description": "Not found"}},
+    responses={400: {"description": "Invalid request body"}, 404: {"description": "Not found"}},
 )
 async def add_pointer(
     body: AddPointerRequest,
@@ -57,7 +57,7 @@ async def add_pointer(
 @router.delete(
     "/DeletePointerToExtension",
     response_model=PointerResponse,
-    responses={404: {"description": "Not found"}},
+    responses={400: {"description": "Invalid request body"}, 404: {"description": "Not found"}},
 )
 async def delete_pointer(
     body: DeletePointerRequest,

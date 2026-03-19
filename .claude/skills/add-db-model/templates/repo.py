@@ -14,11 +14,10 @@ from __future__ import annotations
 
 import uuid
 
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from app.models.my_entity import MyEntity  # TODO: update import
 from app.schemas.my_entity import MyEntityCreate  # TODO: update import
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 
 class MyEntityRepo:  # TODO: rename

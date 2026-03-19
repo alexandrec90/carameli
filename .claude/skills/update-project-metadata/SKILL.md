@@ -101,7 +101,7 @@ covering rule and exhibit a consistent convention worth documenting.
 
 If nothing is stale, print:
 
-```
+```text
 All project metadata is up to date — no changes needed.
 ```
 
@@ -109,7 +109,7 @@ and stop.
 
 Otherwise, print a summary table:
 
-```
+```text
 ## Metadata Drift Report
 
 | File | Issue | Detail |
@@ -127,25 +127,30 @@ Otherwise, print a summary table:
 For each item in the drift report:
 
 ### Root `CLAUDE.md`
+
 - Update the Tech Stack table, Local Development commands, VanillaLand mapping, and
   Front-End section to match current source-of-truth files.
 - Keep the same structure, tone, and table format.
 
 ### Subdirectory CLAUDE.md files
+
 - Edit each file to reflect current state. Keep the same structure and tone.
 - If a new subdirectory warrants a CLAUDE.md, create one following the existing format.
 
 ### Rules files
+
 - Update stale `paths:` globs to match current file locations.
 - Update convention descriptions that no longer match the code.
 - Create new rule files for identified gaps (follow `.claude/rules/authoring.md`
   conventions: YAML frontmatter, focused single-domain).
 
 ### `.claudeignore`
+
 - Add patterns for newly identified noise files.
 - Remove patterns for files/directories that no longer exist.
 
 ### `settings.local.json`
+
 - Add new auto-allow entries for frequently used commands.
 - Remove entries for tools no longer in use.
 
@@ -153,7 +158,7 @@ For each item in the drift report:
 
 ## Step 5 — Final Report
 
-```
+```text
 ## Metadata Update — YYYY-MM-DD
 
 ### Changes Applied

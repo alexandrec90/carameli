@@ -81,7 +81,7 @@ Every route file should log at minimum one INFO entry per handler.
 
 Print results in this format:
 
-```
+```text
 ## Logging Check — YYYY-MM-DD
 
 ### Check 1: Silent except blocks
@@ -110,7 +110,8 @@ Summary: X violation(s) across Y check(s).
 ```
 
 If all checks pass, print:
-```
+
+```text
 All logging checks passed. No violations found.
 ```
 
@@ -121,19 +122,24 @@ All logging checks passed. No violations found.
 For each violation, apply the minimal correct fix:
 
 ### Silent except fix
+
 - Add `logger.error("...: %s", exc, exc_info=exc)` inside the except block.
 - Use `logger.warning` for expected/recoverable errors, `logger.error` for unexpected ones.
 - Do not restructure the surrounding try/except.
 
 ### Missing module logger fix
+
 - Add these two lines near the top of the file, after imports:
+
   ```python
   import logging
   logger = logging.getLogger(__name__)
   ```
+
 - If `import logging` already exists, add only the `logger =` line.
 
 ### Silent route handler fix
+
 - Add `logger.info(...)` at the start of each route handler function body.
 - Follow the convention: log the operation and key identifier (e.g. customer ID, phone number).
 - Example: `logger.info("GET phone line %s", line_id)`

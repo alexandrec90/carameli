@@ -32,7 +32,11 @@ class FrontendLogBatch(BaseModel):
     entries: list[FrontendLogEntry]
 
 
-@router.post("/frontend-logs", status_code=204)
+@router.post(
+    "/frontend-logs",
+    status_code=204,
+    responses={400: {"description": "Bad request"}},
+)
 async def ingest_frontend_logs(
     batch: FrontendLogBatch,
     _: Annotated[str, Depends(verify_api_key)],

@@ -64,6 +64,7 @@ For each error:
 - **dotenv-linter**: fix formatting/ordering issues in `.env` files.
 
 **Stop conditions:**
+
 - A fix would require a non-trivial refactor — propose a minimal safe fix and ask for
   confirmation.
 - Required context is missing — ask a single clarifying question and stop.
@@ -83,6 +84,7 @@ Never run additional diagnostics after edits — instruct the user to rerun the 
 ## Step 4 — Report
 
 State clearly:
+
 - Which errors were fixed (hook, file, line, what changed).
 - Which were skipped and why.
 - Next step: re-run `Pre-Commit: Run All Hooks` if fixes were applied.

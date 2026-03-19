@@ -82,7 +82,7 @@ Spawn one **Explore** agent with this prompt:
 >
 > Return results in this exact compact format — one line per violation, PASS if clean:
 >
-> ```
+> ```text
 > BOUNDARIES
 > B1: PASS  — or —  VIOLATION  file:line  matched text
 > B2: PASS  — or —  VIOLATION  file:line  matched text
@@ -118,6 +118,7 @@ After Phase 1 returns, inspect the result:
 Spawn in this order if the group has violations:
 
 ### Fix agent: Boundaries
+>
 > You are fixing boundary violations in the Carameli project at
 > `c:\Users\Administrator\Desktop\vs_code\carameli`.
 >
@@ -129,6 +130,7 @@ Spawn in this order if the group has violations:
 > Return: list of files changed and whether verification passed.
 
 ### Fix agent: Secrets
+>
 > You are fixing secret hygiene violations in the Carameli project at
 > `c:\Users\Administrator\Desktop\vs_code\carameli`.
 >
@@ -140,6 +142,7 @@ Spawn in this order if the group has violations:
 > Return: list of files changed and whether verification passed.
 
 ### Fix agent: Migrations
+>
 > You are fixing migration violations in the Carameli project at
 > `c:\Users\Administrator\Desktop\vs_code\carameli`.
 >
@@ -153,6 +156,7 @@ Spawn in this order if the group has violations:
 > Return: list of files changed and whether verification passed.
 
 ### Fix agent: Logging
+>
 > You are fixing logging violations in the Carameli project at
 > `c:\Users\Administrator\Desktop\vs_code\carameli`.
 >
@@ -167,7 +171,7 @@ Spawn in this order if the group has violations:
 
 ## Step 3 — Print Summary
 
-```
+```text
 # Code Review — YYYY-MM-DD
 
 | Check      | Result   | Violations | Files Changed |
@@ -182,7 +186,8 @@ Result values: `PASS` (no violations), `FIXED` (violations found and resolved),
 `MANUAL` (violations require human action), `ERROR — <reason>` (agent failed).
 
 If every check was PASS: print instead:
-```
+
+```text
 All checks passed — no violations, no migration drift, no secret leaks.
 ```
 

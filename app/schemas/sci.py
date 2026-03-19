@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, StrictBool, field_validator
 
 logger = logging.getLogger(__name__)
 
@@ -13,7 +13,7 @@ class PostSciByZipCodeRequest(BaseModel):
     vs_customer_id: int = Field(ge=1, le=2147483647)
     extension_number: str
     zip_code: str = Field(pattern=r"^\d{3}(\d{2})?$")
-    enabled: bool = True
+    enabled: StrictBool = True
 
     @field_validator("extension_number", mode="before")
     @classmethod
@@ -42,7 +42,7 @@ class UpdateSciUserOptionRequest(BaseModel):
 
     vs_customer_id: int = Field(ge=1, le=2147483647)
     extension_number: str
-    enabled: bool
+    enabled: StrictBool
 
     @field_validator("extension_number", mode="before")
     @classmethod

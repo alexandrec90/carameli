@@ -57,6 +57,7 @@ Read all of the following (in parallel where possible):
 | `alembic/versions/` (file count) | Migration sprawl — flag if > 30 revisions with no squash |
 
 Cross-reference findings against the state file:
+
 - Skip any recommendation whose `id` already exists with status `"implemented"` or `"dismissed"`.
 - Update an existing `"pending"` entry's rationale if new information strengthens or weakens it.
 
@@ -66,7 +67,7 @@ Cross-reference findings against the state file:
 
 Print a ranked table of new or updated `pending` recommendations:
 
-```
+```text
 ## Stack Review — YYYY-MM-DD
 
 ### High Priority
@@ -100,6 +101,7 @@ If running in implement mode for a specific `id`:
 5. Summarize what was changed.
 
 **Scope rules for implementation:**
+
 - Add the service to `docker-compose.yml` and `requirements.txt` if applicable.
 - Add config vars to `app/core/config.py` and document them in CLAUDE.md env table.
 - Wire up a client/singleton in `app/core/` following the existing `database.py` pattern.
@@ -138,7 +140,7 @@ Greedily assign items to waves using a greedy graph-colouring approach:
 
 Print the wave plan **before touching any files**, in this format:
 
-```
+```text
 ## Implementation Plan — implement-all
 
 Wave 1 (parallel):
@@ -180,7 +182,8 @@ For each wave in order:
 4. Save state.json after every wave (Step 6 rules apply).
 
 5. Print a wave completion summary before starting the next wave:
-   ```
+
+   ```text
    Wave 1 complete: postgres-upgrade ✓  vitest ✓
    Starting Wave 2…
    ```
@@ -189,7 +192,7 @@ For each wave in order:
 
 After all waves finish, print:
 
-```
+```text
 ## implement-all complete
 
 Implemented: postgres-upgrade, vitest, ruff, mypy, hypothesis

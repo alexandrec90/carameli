@@ -51,7 +51,7 @@ async def enable_sms(
         await carrier.enable_sms(line.provider_sid)
     except Exception as exc:
         logger.error("Provider error enabling SMS number=%s: %s", smsPhoneNumber, exc)
-        raise HTTPException(status_code=502, detail="Provider error enabling SMS")
+        raise HTTPException(status_code=502, detail="Provider error enabling SMS") from None
 
     line = await phone_line_service.update_sms_enabled(session, line, True)
     logger.info("SMS enabled number=%s", smsPhoneNumber)
@@ -83,7 +83,7 @@ async def disable_sms(
     try:
         await carrier.disable_sms(line.provider_sid)
     except Exception:
-        raise HTTPException(status_code=502, detail="Provider error disabling SMS")
+        raise HTTPException(status_code=502, detail="Provider error disabling SMS") from None
 
     line = await phone_line_service.update_sms_enabled(session, line, False)
     return SmsEnableDisableResponse(success=True, phone_number=smsPhoneNumber, sms_enabled=False)
@@ -92,7 +92,11 @@ async def disable_sms(
 @router.post(
     "/Send/{customerId}",
     response_model=SmsStatusResponse,
-    responses={404: {"description": "Customer not found"}, 502: {"description": "Provider error"}},
+    responses={
+        400: {"description": "Invalid request body"},
+        404: {"description": "Customer not found"},
+        502: {"description": "Provider error"},
+    },
 )
 @limiter.limit(settings.rate_limit_sms)
 async def send_sms(
@@ -116,6 +120,6 @@ async def send_sms(
             body=body.body,
         )
     except Exception:
-        raise HTTPException(status_code=502, detail="Provider error sending SMS")
+        raise HTTPException(status_code=502, detail="Provider error sending SMS") from None
 
     return SmsStatusResponse(success=True, message_sid=result["sid"])

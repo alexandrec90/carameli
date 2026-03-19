@@ -27,9 +27,7 @@ class CustomerCreate(BaseModel):
     @classmethod
     def normalize_string_fields(cls, value: object) -> object:
         if isinstance(value, str):
-            if "\x00" in value:
-                raise ValueError("api_key must not contain null bytes")
-            return value.strip()
+            return value.replace("\x00", "").strip()
         return value
 
 

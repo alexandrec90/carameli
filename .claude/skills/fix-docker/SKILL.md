@@ -46,6 +46,7 @@ Build a triage table from all non-empty, **non-addressed** artifacts:
 |---|---|---|---|---|---|
 
 Classify each entry as:
+
 - **config issue** — missing/invalid env var, bad port binding, missing `.env` file, invalid compose YAML
 - **build failure** — Dockerfile error, missing dependency, syntax error in app code
 - **dependency issue** — a service this one depends on is unhealthy or not started
@@ -70,6 +71,7 @@ Skip **addressed** artifacts (last line is `--- ADDRESSED`). For each remaining 
 7. For **transient failures**: note them and skip — these resolve on retry.
 
 **Stop conditions:**
+
 - The fix requires changing infrastructure (new Docker image, new service) — describe
   what is needed and ask for confirmation.
 - Required context is missing (e.g., missing credentials) — ask a single clarifying
@@ -128,6 +130,7 @@ Never run Docker commands directly from the agent — provide the commands for t
 ## Step 4 — Report
 
 State clearly:
+
 - Which artifacts had errors and from which task.
 - Which artifacts were already addressed (skipped).
 - Which errors were fixed (file, what changed).

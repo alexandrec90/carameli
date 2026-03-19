@@ -14,9 +14,11 @@ paths:
 - Use `"type": "process"` tasks in `tasks.json` so VS Code monitors the pwsh
   process directly (not wrapped in a bash shell). This ensures the task spinner
   stops and the exit-code icon (green checkmark / red X) appears reliably.
+
   ```jsonc
   { "type": "process", "command": "pwsh", "args": ["-ExecutionPolicy", "Bypass", "-File", "scripts/your-script.ps1"] }
   ```
+
 - Set `"close": false` in `presentation` so the terminal stays open for review
   after the task finishes.
 - Store all task helper scripts under `scripts/` in the workspace root.

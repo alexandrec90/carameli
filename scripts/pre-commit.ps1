@@ -3,6 +3,12 @@
 # On pass: clears the artifact. Terminal exits when done.
 $ErrorActionPreference = "Continue"
 
+# Ensure the venv is on PATH so language:system hooks resolve tools correctly
+if (-not $env:VIRTUAL_ENV -and (Test-Path ".venv/Scripts")) {
+    $env:VIRTUAL_ENV = (Resolve-Path ".venv").Path
+    $env:PATH = "$env:VIRTUAL_ENV\Scripts;$env:PATH"
+}
+
 $artifact = "logs/pre-commit-errors.log"
 if (-not (Test-Path "logs")) { New-Item -ItemType Directory -Path "logs" | Out-Null }
 
@@ -78,12 +84,13 @@ for ($i = 0; $i -lt $lines.Count; $i++) {
     # Hook result line (e.g. "ruff-format......Failed")
     if ($l -match "^(.+?)\.{3,}.*(Passed|Failed|Skipped)") {
         $hookName = $Matches[1].Trim()
-        $result   = $Matches[2]
+        $result = $Matches[2]
         if ($result -eq "Failed") {
             $currentHook = $hookName
             $hooks[$currentHook] = [System.Collections.Generic.List[string]]::new()
             $hookHeaders[$currentHook] = $l
-        } else {
+        }
+        else {
             $currentHook = $null
         }
         continue
@@ -97,7 +104,8 @@ for ($i = 0; $i -lt $lines.Count; $i++) {
 if ($hooks.Count -eq 0) {
     # Fallback: write raw output if parsing found nothing
     $lines | Set-Content $artifact
-} else {
+}
+else {
     # Capture files modified by auto-fix hooks (ruff --fix, ruff-format)
     $autoFixedFiles = @(git diff --name-only 2>$null)
 
@@ -118,9 +126,11 @@ if ($hooks.Count -eq 0) {
 
         if ($isMisconfigured) {
             $tag = "misconfigured"
-        } elseif ($isAutoFix) {
+        }
+        elseif ($isAutoFix) {
             $tag = "auto-fixed"
-        } else {
+        }
+        else {
             $tag = "error"
         }
 
@@ -136,7 +146,8 @@ if ($hooks.Count -eq 0) {
                     foreach ($f in $autoFixedFiles) {
                         $out.Add("  $f")
                     }
-                } else {
+                }
+                else {
                     # Include raw body as fallback
                     foreach ($bl in $body) { $out.Add("  $bl") }
                 }

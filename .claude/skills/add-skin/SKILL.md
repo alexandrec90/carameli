@@ -128,6 +128,7 @@ export default function Placeholder({ title, description }: PlaceholderProps) {
 Edit `frontend/src/skins/registry.ts`. Two changes:
 
 **1. Add to `SKIN_NAMES`:**
+
 ```ts
 // before
 export const SKIN_NAMES = ['carameli'] as const
@@ -137,6 +138,7 @@ export const SKIN_NAMES = ['carameli', '<name>'] as const
 ```
 
 **2. Add to `skinLoaders`:**
+
 ```ts
 // before
 export const skinLoaders: Record<SkinName, () => Promise<{ default: Skin }>> = {
@@ -185,6 +187,7 @@ Now build out `Layout.tsx` and the four views using the rule file as the spec.
 Use the `add-ui-component` skill for individual components within this skin.
 
 To preview the skin at runtime:
+
 ```ts
 localStorage.setItem('skin', '<name>')
 location.reload()

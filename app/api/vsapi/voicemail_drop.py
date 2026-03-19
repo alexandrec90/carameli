@@ -21,7 +21,11 @@ router = APIRouter(tags=["voicemail-drop"])
 @router.post(
     "/VsMessageDrop",
     response_model=VoicemailDropResponse,
-    responses={404: {"description": "Customer not found"}, 502: {"description": "Provider error"}},
+    responses={
+        400: {"description": "Bad request"},
+        404: {"description": "Customer not found"},
+        502: {"description": "Provider error"},
+    },
 )
 @limiter.limit(settings.rate_limit_calls)
 async def voicemail_drop(
@@ -57,7 +61,9 @@ async def voicemail_drop(
             body.msg_drop_number,
             exc,
         )
-        raise HTTPException(status_code=502, detail="Provider error initiating voicemail drop")
+        raise HTTPException(
+            status_code=502, detail="Provider error initiating voicemail drop"
+        ) from None
 
     logger.info(
         "Voicemail drop initiated call_sid=%s status=%s",

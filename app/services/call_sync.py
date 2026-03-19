@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from typing import ClassVar
 
 import httpx
 from arq import cron
@@ -86,6 +87,6 @@ async def retry_unposted_events(ctx: dict) -> None:
 
 
 class WorkerSettings:
-    functions = []
-    cron_jobs = [cron(retry_unposted_events, second={0, 30})]
+    functions: ClassVar[list] = []
+    cron_jobs: ClassVar[list] = [cron(retry_unposted_events, second={0, 30})]
     redis_settings = RedisSettings.from_dsn(settings.redis_url)

@@ -81,7 +81,7 @@ Compare the canonical list from Step 2 against the current
 
 If **no diff is found**, print:
 
-```
+```text
 Pricing table is up to date — no changes needed.
 ```
 

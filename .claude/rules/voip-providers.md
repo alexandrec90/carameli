@@ -29,7 +29,7 @@ See `docs/voip-migration-plan.md` for the full migration rationale and phased pl
 
 ## Directory Layout
 
-```
+```text
 app/services/providers/
   base.py              ← Protocol interfaces (CarrierProvider, CallEngineProvider)
   factory.py           ← reads env vars, returns provider singletons

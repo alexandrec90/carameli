@@ -99,7 +99,7 @@ Identify each of the following:
 
 If the diff is empty, print:
 
-```
+```text
 Meta-coding chart is up to date — no changes needed.
 ```
 
@@ -131,6 +131,7 @@ intro sentence …
 ```
 
 Rules:
+
 - Keep existing rows that are still accurate — do not rewrite them unless the
   description is materially wrong.
 - Add new rows in the correct layer section.
@@ -151,16 +152,19 @@ The diagram uses `flowchart TB`. Preserve all existing Mermaid syntax convention
 - The top-level developer node `dev(["👤 Developer"])` always appears first
 
 When adding a node:
+
 1. Place it inside the correct `subgraph`.
 2. Add it on its own line inside the `subgraph` block.
 3. If it has a `direction LR` group, add it to that group.
 4. Add any edges it needs to/from the `dev` node or task runner nodes.
 
 When removing a node:
+
 1. Delete its definition line inside the `subgraph`.
 2. Delete any edge lines that reference its identifier.
 
 When renaming a node (tool was updated, e.g. version bump that changes the label):
+
 1. Update the label text only — keep the Mermaid node identifier stable so
    existing edges don't break.
 
@@ -173,7 +177,7 @@ When renaming a node (tool was updated, e.g. version bump that changes the label
 
 After applying changes, print a summary in this format:
 
-```
+```text
 ## Meta-Coding Chart Update — YYYY-MM-DD
 
 ### Legend changes
@@ -191,6 +195,6 @@ No changes needed if diff was empty.
 
 If both files were already up to date, confirm:
 
-```
+```text
 Meta-coding chart is up to date — no changes needed.
 ```

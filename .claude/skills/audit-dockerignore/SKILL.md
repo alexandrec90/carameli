@@ -60,7 +60,7 @@ Compare candidates against existing `.dockerignore` patterns.
 
 If nothing is missing, print:
 
-```
+```text
 .dockerignore is up to date — no changes needed.
 ```
 
@@ -68,7 +68,7 @@ and stop.
 
 Otherwise, print:
 
-```
+```text
 ## .dockerignore Audit
 
 | Pattern | Reason | Status |

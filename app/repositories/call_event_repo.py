@@ -42,7 +42,7 @@ class CallEventRepo:
             if customer_id and not existing.customer_id:
                 existing.customer_id = customer_id
             if payload.get("Direction"):
-                existing.direction = payload.get("Direction")
+                existing.direction = payload.get("Direction")  # type: ignore[assignment]
             if payload.get("From"):
                 existing.from_number = payload.get("From")
             if payload.get("To"):

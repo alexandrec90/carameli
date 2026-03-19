@@ -15,9 +15,10 @@ if (-not (Test-Path "logs")) { New-Item -ItemType Directory -Path "logs" | Out-N
 
 # Build the pytest command based on mode.
 if ($Fast) {
-    # testmon is incompatible with xdist, so override addopts to drop -n/--dist.
-    # First, do a dry-run collect to see how many tests testmon would select.
-    # If testmon selects more than half the suite, fall back to xdist for speed.
+    # testmon selection (--testmon) is incompatible with xdist, so override addopts
+    # to drop -n/--dist during the dry-run collect.
+    # If testmon selects more than half the suite, fall back to xdist for speed
+    # but keep --testmon-noselect so the DB gets updated (breaks the stale-DB loop).
     $collectCmd = "pytest --collect-only -q -o addopts='--ignore=tests/e2e' --testmon 2>/dev/null | tail -1"
     $totalCmd   = "pytest --collect-only -q -o addopts='--ignore=tests/e2e' 2>/dev/null | tail -1"
 
@@ -30,8 +31,8 @@ if ($Fast) {
 
     if ($total -gt 0 -and $selected -gt [Math]::Ceiling($total / 2)) {
         Write-Host "  testmon selected $selected/$total tests -- falling back to xdist" -ForegroundColor Yellow
-        $pytestCmd = "pytest -v --tb=short --no-header"
-        $modeLabel = "full (parallel, xdist -- testmon selected too many)"
+        $pytestCmd = "pytest -v --tb=short --no-header -n auto --testmon-noselect"
+        $modeLabel = "full (xdist fallback -- testmon-noselect to update DB)"
     } elseif ($selected -eq 0) {
         Write-Host "  testmon: 0 tests to run (no changes detected)" -ForegroundColor Green
         $pytestCmd = "pytest -v --tb=short --no-header -o addopts='--ignore=tests/e2e' --testmon"
@@ -42,7 +43,7 @@ if ($Fast) {
         $modeLabel = "fast (changed-only, testmon)"
     }
 } else {
-    $pytestCmd = "pytest -v --tb=short --no-header"
+    $pytestCmd = "pytest -v --tb=short --no-header -n auto"
     $modeLabel = "full (parallel, xdist)"
 }
 
@@ -76,16 +77,20 @@ docker compose exec app bash -c "$pytestCmd" 2>&1 | ForEach-Object {
     }
 
     switch -Regex ($line) {
-        "PASSED" {
+        " PASSED" {
             $passed++
             Write-Host "  pass " -ForegroundColor Green -NoNewline
             Write-Host ($line -replace " PASSED.*$","")
             break
         }
-        "FAILED" {
+        " FAILED" {
             $failed++
             Write-Host "  FAIL " -ForegroundColor Red -NoNewline
             Write-Host ($line -replace " FAILED.*$","")
+            break
+        }
+        "^FAILED " {
+            # Summary line (e.g. "FAILED tests/...::test_name") -- already counted above
             break
         }
         "^ERROR " {
@@ -129,9 +134,11 @@ Write-Host "  [FAIL] pytest ($elapsed)" -ForegroundColor Red
 #   - the section header (test name)
 #   - frames pointing to YOUR code (tests/ or app/)
 #   - the E-prefixed error lines (the actual assertion / exception message)
-#   - the last 10 lines of 'Captured log call' (route-level exception context)
+#   - exception group content (schemathesis |/+ lines), minus library frames
+#   - WARNING/ERROR/CRITICAL captured log lines (INFO/DEBUG dropped as fixture noise)
 #   - the short-test-summary and final stats line
-# Library internals (sqlalchemy/, asyncpg/, pytest_asyncio/, etc.) are dropped.
+# Library internals (sqlalchemy/, asyncpg/, schemathesis/, etc.) are dropped.
+# INFO/DEBUG log output (app start/stop, routine messages) is dropped everywhere.
 # Each failure block is capped at 25 lines to keep the file readable but complete.
 # ---------------------------------------------------------------------------
 
@@ -172,6 +179,10 @@ for ($i = 0; $i -lt $lines.Count; $i++) {
     $l = $lines[$i]
 
     switch -Regex ($l) {
+        "^={3,}\s+test session starts" {
+            # Drop — adds no value for debugging
+            break
+        }
         "^={3,}\s+short test summary" {
             Flush-Block
             $inBlock = $false
@@ -190,22 +201,18 @@ for ($i = 0; $i -lt $lines.Count; $i++) {
             break
         }
         default {
-            if (-not $inBlock -and $l -match "^(FAILED |ERROR |=)") {
+            if (-not $inBlock -and $l -match "^(FAILED |ERROR |=)" -and $l -notmatch "^\s*=+\s+\d+\s+(failed|passed|error)") {
                 $filtered.Add($l)
             }
             elseif ($inBlock -and $null -ne $blockLines) {
                 if ($l -match "^-+ Captured log call") {
-                    # Keep the last 10 log lines — they contain route-level exception context
-                    $logLines = [System.Collections.Generic.List[string]]::new()
-                    $logLines.Add($l)
+                    # Keep only WARNING/ERROR/CRITICAL log lines — INFO/DEBUG are test fixture noise
                     while (++$i -lt $lines.Count) {
                         if ($lines[$i] -match "^(_{3,}|={3,}|-+ Captured)") { $i--; break }
-                        $logLines.Add($lines[$i])
-                    }
-                    $tail = [System.Math]::Max(0, $logLines.Count - 10)
-                    for ($j = $tail; $j -lt $logLines.Count; $j++) {
-                        $blockLines.Add($logLines[$j])
-                        $rawBlockLines.Add($logLines[$j])
+                        if ($lines[$i] -match "^(WARNING|ERROR|CRITICAL)\s+") {
+                            $blockLines.Add($lines[$i])
+                            $rawBlockLines.Add($lines[$i])
+                        }
                     }
                 } elseif ($l -match "^-+ Captured (stderr|stdout)") {
                     while (++$i -lt $lines.Count) {
@@ -213,12 +220,29 @@ for ($i = 0; $i -lt $lines.Count; $i++) {
                     }
                 }
                 else {
-                    # Always accumulate raw lines so the fallback path has full context
-                    $rawBlockLines.Add($l)
-                    if ($l -match "^E\s+") {
-                        $blockLines.Add($l)
-                    } elseif ($l -match "(tests/|app/).*\.py:\d+") {
-                        $blockLines.Add($l)
+                    # Drop INFO/DEBUG captured-log noise entirely (app start/stop, etc.)
+                    if ($l -match "^(INFO|DEBUG)\s+\S+:\S+\.py:\d+") {
+                        # Test fixture noise — skip even from raw fallback
+                    } else {
+                        $rawBlockLines.Add($l)
+                        if ($l -match "^E\s+") {
+                            $blockLines.Add($l)
+                        } elseif ($l -match "(tests/|app/).*\.py:\d+") {
+                            $blockLines.Add($l)
+                        } elseif ($l -match "^(WARNING|ERROR|CRITICAL)\s+") {
+                            # Captured log without header — keep WARNING+ for context
+                            $blockLines.Add($l)
+                        } elseif ($l -match "^\s*[|+]") {
+                            # Exception group lines (schemathesis, etc.)
+                            # Drop: blank spacers, library frames
+                            if ($l -match "^\s*\|\s*$") {
+                                # Blank spacer line — skip
+                            } elseif ($l -match 'File "' -and $l -notmatch "(tests/|app/)") {
+                                # Library internal frame — skip
+                            } else {
+                                $blockLines.Add($l)
+                            }
+                        }
                     }
                 }
             }

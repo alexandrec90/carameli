@@ -85,7 +85,7 @@ diagram:
 
 If the diff is empty, print:
 
-```
+```text
 Tech stack chart is up to date — no changes needed.
 ```
 
@@ -109,6 +109,7 @@ The legend must stay in the same format as the existing file:
 ```
 
 Rules:
+
 - Keep existing rows that are still accurate — do not rewrite them unless the
   role description is materially wrong.
 - Add new rows for missing components.
@@ -121,6 +122,7 @@ The diagram must stay valid Mermaid `flowchart LR` syntax. Keep the existing
 `subgraph server[...]` grouping for self-hosted components and extend it as needed.
 
 Rules:
+
 - Preserve all existing nodes and edges that are still accurate.
 - Add new nodes for missing components using the same naming convention:
   `technology[["Label · Tech"]]` for services/APIs, `technology(("Label · Tech"))`
@@ -134,7 +136,7 @@ Rules:
 
 Every node label must use this two-line format — **never** the `Label · Tech` inline format:
 
-```
+```text
 "<b>Label</b><br/>Tech"
 ```
 
@@ -142,7 +144,7 @@ Every node label must use this two-line format — **never** the `Label · Tech`
 - The tech name goes **below** it, separated by `<br/>`.
 - If a node has multiple co-deployed techs, stack them on separate lines with additional `<br/>` entries:
 
-```
+```text
 "<b>Call Engine</b><br/>Jambonz<br/>FreeSWITCH"
 ```
 
@@ -152,7 +154,7 @@ Every node label must use this two-line format — **never** the `Label · Tech`
 
 After applying updates, print:
 
-```
+```text
 ## Tech Stack Chart Update — YYYY-MM-DD
 
 ### Changes Applied

@@ -53,7 +53,7 @@ async def test_add_extension_unknown_customer_returns_404(client) -> None:
 
 async def test_get_available_extensions_excludes_used(client) -> None:
     await _create_customer(client, 7003)
-    # Add extension 200; it should NOT appear in the available range 200–205.
+    # Add extension 200; it should NOT appear in the available range 200-205.
     await client.post(
         f"{_EXT_BASE}/Add",
         json={"vs_customer_id": 7003, "extension_number": "200"},

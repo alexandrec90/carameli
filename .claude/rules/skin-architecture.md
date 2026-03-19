@@ -17,7 +17,7 @@ The frontend is split into three strictly separate layers. Never mix them.
 
 One hook per page. Owns all state, API calls, and derived values. Returns a typed result object. **No JSX.**
 
-```
+```text
 src/hooks/
   useDashboard.ts    → UseDashboardResult
   usePhoneLines.ts   → UsePhoneLinesResult
@@ -25,6 +25,7 @@ src/hooks/
 ```
 
 **Rules:**
+
 - Export a named `interface` for the return type (e.g. `UseDashboardResult`). This is the contract between logic and skin.
 - Never import anything from `skins/` or `components/` in a hook.
 - Never render JSX or use DOM refs in a hook.
@@ -33,7 +34,7 @@ src/hooks/
 
 Each skin is a self-contained directory that exports a `Skin` object. Skins are loaded via **dynamic import** so Vite splits them into separate chunks at build time.
 
-```
+```text
 src/skins/
   types.ts           # Skin / SkinViews interfaces — the shared contract
   registry.ts        # Dynamic import map (one entry per skin)
@@ -49,6 +50,7 @@ src/skins/
 ```
 
 **Rules:**
+
 - A skin's `index.ts` must be the **only** entry point. Never import individual view files from outside the skin.
 - Skin views receive data **only via props** from their hook result type. No `useState`, no `useEffect`, no `fetch` inside a view.
 - A skin's `Layout.tsx` owns its full provider tree. If the skin needs `<Canvas>`, `<ThemeProvider>`, etc., they go here — not in `App.tsx` or `main.tsx`.
@@ -72,6 +74,7 @@ export default function Dashboard() {
 ```
 
 **Rules:**
+
 - Pages must not contain JSX beyond the single `return <views.X {...data} />` line.
 - Pages must not import from `skins/carameli/` or any specific skin — always go through `useSkin()`.
 - `Placeholder` pages pass static props: `<views.Placeholder title="..." description="..." />`.
@@ -85,12 +88,15 @@ export default function Dashboard() {
    - Each view must accept the corresponding hook result type as props
 
 2. Add one line to `src/skins/registry.ts`:
+
    ```ts
    myskin: () => import('./myskin'),
    ```
+
    Also add `'myskin'` to `SKIN_NAMES`.
 
 3. Switch skins at runtime:
+
    ```ts
    localStorage.setItem('skin', 'myskin')
    location.reload()

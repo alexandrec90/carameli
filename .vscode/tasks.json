@@ -291,6 +291,18 @@
       "problemMatcher": []
     },
     {
+      "label": "Git: Untrack Ignored Files",
+      "type": "shell",
+      "command": "pwsh -ExecutionPolicy Bypass -Command 'git ls-files -i -c --exclude-standard | ForEach-Object { git rm --cached $_ }'; $_ec = $LASTEXITCODE; pwsh -ExecutionPolicy Bypass -File scripts/notify.ps1 -Label 'Git: Untrack Ignored Files' -ExitCode $_ec; exit $_ec",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "showReuseMessage": false,
+        "close": false
+      },
+      "problemMatcher": []
+    },
+    {
       "label": "Docker: Fix Stalled Desktop",
       "type": "shell",
       "command": "pwsh -ExecutionPolicy Bypass -File scripts/docker-fix.ps1; $_ec = $LASTEXITCODE; pwsh -ExecutionPolicy Bypass -File scripts/notify.ps1 -Label 'Docker: Fix Stalled Desktop' -ExitCode $_ec; exit $_ec",

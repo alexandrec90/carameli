@@ -166,15 +166,14 @@ async def test_add_phone_line_unknown_customer_returns_404(client) -> None:
     assert resp.json()["detail"] == "Customer not found"
 
 
-async def test_add_phone_line_no_area_code_or_number_returns_400(client) -> None:
+async def test_add_phone_line_no_area_code_or_number_returns_422(client) -> None:
     await _create_customer(client, 5020)
     resp = await client.post(
         f"{_LINE_BASE}/Add",
         json={"vs_customer_id": 5020},
         headers=AUTH_HEADERS,
     )
-    assert resp.status_code == 400
-    assert "area_code or phone_number" in resp.json()["detail"]
+    assert resp.status_code == 422
 
 
 async def test_add_phone_line_no_numbers_available_returns_400(client) -> None:

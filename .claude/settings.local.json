@@ -1,5 +1,4 @@
 {
-  "effortLevel": "high",
   "permissions": {
     "allow": [
       "Bash(npm show:*)",
@@ -16,7 +15,10 @@
       "Bash(alembic current:*)",
       "Bash(npx vitest:*)",
       "Bash(pwsh:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(pip install:*)",
+      "Bash(pip show:*)"
     ]
-  }
+  },
+  "effortLevel": "high"
 }

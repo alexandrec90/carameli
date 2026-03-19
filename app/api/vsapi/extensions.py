@@ -26,6 +26,7 @@ router = APIRouter(prefix="/VsExtension", tags=["extensions"])
     status_code=201,
     response_model=ExtensionResponse,
     responses={
+        400: {"description": "Invalid request body"},
         404: {"description": "Customer not found"},
         409: {"description": "Extension already exists"},
     },

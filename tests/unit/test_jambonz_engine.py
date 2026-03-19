@@ -434,12 +434,12 @@ async def test_telnyx_sms_inbound_missing_timestamp_header_returns_403(client) -
     """Missing telnyx-timestamp header with a secret configured should return 403."""
     from app.core.config import settings
 
-    private_key, pub_key_b64 = _make_ed25519_keypair()
+    _, pub_key_b64 = _make_ed25519_keypair()
     original = settings.telnyx_webhook_secret
     settings.telnyx_webhook_secret = pub_key_b64
 
     body = json.dumps(_SMS_PAYLOAD).encode()
-    # Provide signature but omit telnyx-timestamp → timestamp becomes "" → int("") raises
+    # Provide signature but omit telnyx-timestamp -- timestamp becomes "" -- int("") raises
     resp = await client.post(
         "/webhooks/telnyx/sms-inbound",
         content=body,

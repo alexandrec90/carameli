@@ -1,4 +1,4 @@
-# Skin Brief: <Name> (`<name>`)
+# Skin Brief: \<Name\> (`<name>`)
 
 > Copy this file to `skins/<name>.md` (or `.txt`) and fill in every section.
 > The `add-skin` skill reads this brief before writing any code.

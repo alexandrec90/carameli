@@ -26,12 +26,13 @@ configure_logging(log_level=settings.log_level, log_file=settings.log_file)
 ```
 
 `app/core/logging_config.py` attaches two handlers to the root logger:
+
 - **Console** (`StreamHandler`) — for docker logs / terminal
 - **RotatingFileHandler** — writes to `logs/runtime/carameli.log`, 10 MB cap, 5 backups
 
 ### Log format
 
-```
+```text
 2026-02-21 14:30:00.123 | INFO     | app.api.vsapi.phone_lines:56 | Phone line added number=+15551234567 sid=PN...
 ```
 
@@ -95,12 +96,14 @@ logger.error('API call failed', { status: 502, body: 'Provider error' })
 ```
 
 Internally it:
+
 1. Writes to `console.*` in all environments.
 2. Batches entries and POSTs them to `POST /vg/1.0.0/frontend-logs` every 2 s
    (errors flush immediately, `keepalive: true` covers page-unload).
 
 The backend writes these as:
-```
+
+```text
 2026-02-21 14:30:00.123 | ERROR    | frontend:42 | [FRONTEND] API POST /vsapi/1.0.0/PhoneLine/Add failed | context={'status': 502, ...}
 ```
 

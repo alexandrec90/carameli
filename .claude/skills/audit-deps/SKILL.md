@@ -60,6 +60,7 @@ For each requirement in both files, classify it:
 | **Transitive** | Not imported directly but is a known dependency of another package (e.g., `asyncpg` is required by `sqlalchemy[asyncio]`) |
 
 Also check for:
+
 - **Missing from requirements**: imported in source but not listed in either file.
 - **Misplaced**: listed in `requirements.txt` (prod) but only used in tests/dev.
 - **Misplaced**: listed in `requirements-dev.txt` but imported in `app/` (should be in prod).
@@ -70,7 +71,7 @@ Also check for:
 
 If everything is correct, print:
 
-```
+```text
 All dependencies are correctly placed — no changes needed.
 ```
 
@@ -78,7 +79,7 @@ and stop.
 
 Otherwise, print:
 
-```
+```text
 ## Dependency Audit
 
 | Package | Current File | Issue | Recommendation |

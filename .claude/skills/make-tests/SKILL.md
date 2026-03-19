@@ -87,6 +87,7 @@ In **targeted** mode, the session-skip rule is bypassed — always process the s
 For each module to process:
 
 **4a. Read the source file.** Identify:
+
 - Every route handler, service method, and repository method
 - Edge cases: missing records (404), invalid input, auth failure, provider errors
 - Webhook handlers: happy path, bad signature, replayed request, tampered payload
@@ -97,6 +98,7 @@ For each module to process:
 **4c. Identify gaps.** A gap is any of:
 
 **Standard gaps (existing):**
+
 - An untested route handler or method
 - A missing error/edge case (404, 422, 500, auth rejection)
 - Adversarial webhook cases (bad HMAC, missing signature header, replayed timestamp)
@@ -106,29 +108,34 @@ For each module to process:
 **Concurrency gaps** — check for any endpoint or repo method where two
 concurrent requests could race (e.g. duplicate creation, double-spend of a
 resource). Look for:
+
 - Upsert operations (pointer add, SCI rule post)
 - Resource creation that should be idempotent (customer create with same vs_customer_id)
 - Webhook handlers that may receive the same event simultaneously
 
 **DB integrity gaps** — for each model with `ForeignKey` columns, check
 whether the test suite verifies:
+
 - FK constraint enforcement (insert a child row with a non-existent parent → `IntegrityError`)
 - Unique constraint enforcement where `UniqueConstraint` is declared
 - Cascade / restrict behavior on parent deletion (Carameli uses default RESTRICT — deleting a customer with phone lines should fail, not silently cascade)
 
 **Migration gaps** — for each `alembic/versions/*.py` file, check whether:
+
 - `upgrade()` applies cleanly on an empty database
 - `downgrade()` reverses cleanly back to the prior revision
 - The migration is not empty (has at least one `op.*` call)
 - Round-trip: upgrade → downgrade → upgrade produces no diff
 
 **Config validation gaps** — for `app/core/config.py`, check whether:
+
 - Missing required env vars raise a clear error at startup
 - Invalid values (e.g. malformed `DATABASE_URL`, non-numeric `RATE_LIMIT`) are rejected
 - Default values are applied when optional vars are absent
 
 **Security / tenant isolation gaps** — for any endpoint that accepts a
 `vs_customer_id` or customer-scoped token, check whether:
+
 - A valid token for customer A cannot read/modify customer B's resources
 - Requests without `Authorization` header return 401, not 500
 - Oversized payloads are rejected (not silently truncated)
@@ -142,6 +149,7 @@ means the API contract changed and must be reviewed.
 path (webhook ingestion, SMS send, phone line search, health check), check
 whether a `pytest-benchmark` test exists. A benchmark test calls the
 endpoint repeatedly and asserts a time budget. Look for:
+
 - Webhook ingestion (`POST /webhooks/jambonz/call-status`) — high-volume, latency-sensitive
 - Health check (`GET /health`) — polled frequently by load balancers
 - Phone line search/list endpoints — may do DB queries with filters
@@ -152,7 +160,8 @@ is latency-sensitive. Do not add benchmarks for low-traffic admin endpoints
 (customer create, extension create, SCI rule post).
 
 Output a gap list before writing anything:
-```
+
+```text
 Module: app/api/vsapi/sms.py  →  tests/unit/test_sms.py
   GAP: POST /VsMessaging/Sms/Send — missing test for carrier.send_sms raising CarrierError
   GAP: POST /VsMessaging/Sms/Send — no property-based test for phone number formats
@@ -172,6 +181,7 @@ In **review** mode, stop here and print the full gap report. Do not write files.
 For each gap identified, append or create tests following these conventions:
 
 ### Fixture and async conventions
+
 ```python
 import pytest
 from httpx import AsyncClient
@@ -183,6 +193,7 @@ async def test_example(client: AsyncClient):
 ```
 
 ### Mock at the provider boundary — never mock SDK internals
+
 ```python
 # CORRECT — mock the CarrierProvider interface
 with patch("app.services.did_manager.carrier") as mock_carrier:
@@ -194,7 +205,9 @@ with patch("telnyx.Message.create") as mock:
 ```
 
 ### Adversarial webhook tests
+
 Every webhook test file must include:
+
 1. **Happy path** — valid signature, correct payload
 2. **Bad signature** — should return 401
 3. **Missing signature header** — should return 401
@@ -202,7 +215,9 @@ Every webhook test file must include:
 5. **Malformed payload** — should return 422 or 400, not 500
 
 ### Property-based tests (hypothesis)
+
 Use `hypothesis` for inputs with wide valid domains:
+
 ```python
 from hypothesis import given, strategies as st
 
@@ -216,8 +231,10 @@ varied (phone numbers, free-text fields, numeric IDs). Do not force it
 onto narrow enum-like inputs.
 
 ### Concurrency / race-condition tests
+
 Use `asyncio.gather` to fire competing requests and assert the outcome is
 safe (no duplicates, no 500s, correct final state):
+
 ```python
 import asyncio
 
@@ -240,12 +257,15 @@ async def test_concurrent_pointer_add_is_idempotent(client: AsyncClient, db_sess
     # Verify exactly one row exists
     ...
 ```
+
 Place concurrency tests in the same unit test file as the module they exercise.
 Tag with a comment `# concurrency` so they are easy to find.
 
 ### DB integrity tests
+
 Test FK constraints and unique constraints at the repository layer.
 These tests hit the real database (via the `db_session` fixture) — do not mock.
+
 ```python
 import pytest
 from sqlalchemy.exc import IntegrityError
@@ -270,10 +290,13 @@ async def test_delete_customer_with_phone_lines_raises(db_session):
         await db_session.delete(customer)
         await db_session.flush()
 ```
+
 Place DB integrity tests in `tests/unit/test_db_integrity.py`.
 
 ### Migration roundtrip tests
+
 Test that each Alembic migration applies and reverses cleanly.
+
 ```python
 from alembic.config import Config
 from alembic.command import upgrade, downgrade
@@ -284,12 +307,15 @@ async def test_migration_001_roundtrip(tmp_alembic_cfg):
     downgrade(tmp_alembic_cfg, "base")
     upgrade(tmp_alembic_cfg, "001")  # re-apply must not fail
 ```
+
 Place migration tests in `tests/unit/test_migrations.py`.
 Use a dedicated test database or the existing `test_engine` fixture.
 
 ### Config validation tests
+
 Test `app/core/config.py` `Settings` class with overridden env vars.
 Use `monkeypatch` to set or unset environment variables:
+
 ```python
 def test_missing_database_url_raises(monkeypatch):
     monkeypatch.delenv("DATABASE_URL", raising=False)
@@ -303,11 +329,14 @@ def test_invalid_rate_limit_format_raises(monkeypatch):
     with pytest.raises(ValidationError):
         Settings()
 ```
+
 Place config tests in `tests/unit/test_config.py`.
 
 ### Security / tenant isolation tests
+
 For any customer-scoped endpoint, verify that a token for customer A
 cannot access customer B's data:
+
 ```python
 @pytest.mark.asyncio
 async def test_customer_token_cannot_read_other_customer(client):
@@ -316,7 +345,9 @@ async def test_customer_token_cannot_read_other_customer(client):
     # Try to read customer B's phone lines → expect 403 or empty result
     ...
 ```
+
 Also test:
+
 - Missing `Authorization` header → 401 (not 500)
 - Malformed bearer token → 401
 - Oversized request body → 413 or 422
@@ -324,7 +355,9 @@ Also test:
 Place security tests in `tests/unit/test_security.py`.
 
 ### OpenAPI snapshot tests
+
 Pin the API contract so accidental breaking changes are caught:
+
 ```python
 import json
 from pathlib import Path
@@ -347,12 +380,15 @@ async def test_openapi_schema_snapshot(client: AsyncClient):
         "OpenAPI schema changed. If intentional, delete tests/snapshots/openapi.json and re-run to update."
     )
 ```
+
 Place in `tests/integration/test_openapi_snapshot.py`.
 The snapshot file `tests/snapshots/openapi.json` must be committed to git.
 
 ### Performance benchmark tests
+
 Use `pytest-benchmark` to assert response-time budgets on hot-path
 endpoints. Benchmarks use the same `client` fixture as unit tests.
+
 ```python
 import pytest
 
@@ -377,6 +413,7 @@ async def test_webhook_ingest_benchmark(client, benchmark):
 
     benchmark.pedantic(_call, iterations=50, rounds=5)
 ```
+
 Place all benchmarks in `tests/benchmark/test_benchmarks.py`.
 Do not mix benchmarks into unit test files — benchmark runs are opt-in
 (`pytest tests/benchmark/`) and should not slow down the main test suite.
@@ -387,6 +424,7 @@ regressions across runs via `--benchmark-compare`. The goal is to
 detect regressions, not enforce absolute thresholds.
 
 ### Naming conventions
+
 - File: `tests/unit/test_<module_name>.py` (standard unit tests)
 - File: `tests/unit/test_db_integrity.py` (all FK / constraint tests)
 - File: `tests/unit/test_migrations.py` (Alembic roundtrip tests)
@@ -398,6 +436,7 @@ detect regressions, not enforce absolute thresholds.
 - Concurrency tests: keep in the relevant module's test file, tagged with `# concurrency`
 
 ### What NOT to do
+
 - Do not import from `telnyx`, `jambonz`, or any third-party SDK directly in tests
 - Do not add fixtures to `conftest.py` unless they are reused across 3+ test files
 - Do not test framework behavior (FastAPI validation, SQLAlchemy session handling) —
@@ -411,6 +450,7 @@ detect regressions, not enforce absolute thresholds.
 ## Step 6 — Update State
 
 After processing each module, update `.claude/skills/make-tests/state.json`:
+
 - Set `last_reviewed` to today's date
 - Set `git_hash` to the current hash of the source module
 - Set `gaps_found` to the number of gaps discovered this run (0 if none)
@@ -422,7 +462,7 @@ After processing each module, update `.claude/skills/make-tests/state.json`:
 
 Print a summary table:
 
-```
+```text
 ## Test Coverage Pass — YYYY-MM-DD
 
 | Module | Test File | Gaps Found | Tests Added |
@@ -441,8 +481,10 @@ Total: X gaps found, Y tests added.
 ```
 
 ### Gap category breakdown
+
 After the module table, print a breakdown by gap type:
-```
+
+```text
 | Category | Gaps |
 |----------|------|
 | Standard (unit/error/property) | N |

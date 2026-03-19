@@ -29,7 +29,7 @@ async def get_area_codes(
         codes = await carrier.get_available_area_codes(country="US")
     except Exception as exc:
         logger.error("Provider error fetching area codes: %s", exc)
-        raise HTTPException(status_code=502, detail="Provider error fetching area codes")
+        raise HTTPException(status_code=502, detail="Provider error fetching area codes") from None
     items = [AreaCodeInfo(area_code=c["area_code"], country=c["country"]) for c in codes]
     logger.info("Returned %d area codes", len(items))
     return AreaCodesResponse(area_codes=items, count=len(items))
@@ -51,6 +51,6 @@ async def get_area_codes_filtered(
     try:
         codes = await carrier.get_available_area_codes(country=country.upper(), state=state.upper())
     except Exception:
-        raise HTTPException(status_code=502, detail="Provider error fetching area codes")
+        raise HTTPException(status_code=502, detail="Provider error fetching area codes") from None
     items = [AreaCodeInfo(area_code=c["area_code"], country=c["country"]) for c in codes]
     return AreaCodesResponse(area_codes=items, count=len(items))

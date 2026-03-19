@@ -77,6 +77,7 @@ modules, duplication worth extracting, dead code to delete.
 anything. For in-place cleanup, a one-line description suffices.
 
 **4c. Edit.**
+
 - `Edit` for in-place changes; `Write` only for new files from a split.
 - When splitting, update every import site that referenced moved symbols.
 - Do not change public interfaces, add comments, or reformat untouched code.

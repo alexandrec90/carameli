@@ -74,9 +74,14 @@ fi
 exit $EXIT_CODE
 '@
 
-if ($content.Contains($oldTail)) {
-    $patched = $content.Replace($oldTail, $newTail)
-    Set-Content $hookFile $patched -NoNewline
+# Normalize line endings for comparison (hook file is LF, here-strings are CRLF)
+$contentLF = $content.Replace("`r`n", "`n")
+$oldTailLF = $oldTail.Replace("`r`n", "`n")
+$newTailLF = $newTail.Replace("`r`n", "`n")
+
+if ($contentLF.Contains($oldTailLF)) {
+    $patched = $contentLF.Replace($oldTailLF, $newTailLF)
+    Set-Content $hookFile $patched -NoNewline -Encoding utf8NoBOM
     Write-Host "  [pass] hook patched (errors -> logs/pre-commit-errors.log)" -ForegroundColor Green
 } else {
     Write-Host "  [WARN] hook structure not recognized -- manual patch may be needed" -ForegroundColor Yellow

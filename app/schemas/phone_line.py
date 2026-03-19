@@ -2,17 +2,24 @@ from __future__ import annotations
 
 import logging
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_serializer
 
 logger = logging.getLogger(__name__)
 
 
-class AddPhoneLineRequest(BaseModel):
+class AddPhoneLineByNumber(BaseModel):
     vs_customer_id: int = Field(ge=1, le=2147483647)
-    area_code: str | None = None
-    phone_number: str | None = None
+    phone_number: str = Field(min_length=1)
+
+
+class AddPhoneLineByAreaCode(BaseModel):
+    vs_customer_id: int = Field(ge=1, le=2147483647)
+    area_code: str = Field(min_length=1)
+
+
+AddPhoneLineRequest = AddPhoneLineByNumber | AddPhoneLineByAreaCode
 
 
 class PhoneLineResponse(BaseModel):
@@ -26,6 +33,12 @@ class PhoneLineResponse(BaseModel):
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+    @field_serializer("created_at")
+    def serialize_created_at(self, dt: datetime) -> str:
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=UTC)
+        return dt.isoformat()
 
 
 class PhoneLineCountResponse(BaseModel):

@@ -61,8 +61,8 @@ paths:
       # wrong
       logger.info(f"Phone line added number={line.phone_number}")
 
-    - In every route handler log: entry at `INFO`, 404/409 at `WARNING`, provider/5xx errors at `ERROR`.
-    - Never log secrets: no `api_key`, provider credentials, or SIP passwords.
+  - In every route handler log: entry at `INFO`, 404/409 at `WARNING`, provider/5xx errors at `ERROR`.
+  - Never log secrets: no `api_key`, provider credentials, or SIP passwords.
 - Full spec: `.claude/rules/logging.md`.
 
 ## Imports and Module Structure

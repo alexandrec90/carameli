@@ -45,7 +45,7 @@ The palette stays in the caramel-amber family but is applied to 3D materials, no
 
 ## Scene Architecture
 
-```
+```jsx
 <Canvas>
   ├── <SceneLighting />         — multiple warm point lights + ambient
   ├── <CaramelFluidBackground /> — high-viscosity fluid sim background plane
@@ -170,6 +170,7 @@ import { Text3D, Center } from '@react-three/drei'
 ```
 
 **Text Rules:**
+
 - Font must be a rounded or script/cursive typeface — never a geometric sans on primary headings
 - `height` (extrusion) is always ≥ `0.2` — flat text is forbidden
 - `bevelEnabled: true` always — gives the candy-coated edge
@@ -231,6 +232,7 @@ The background is a subdivided plane with a custom vertex shader simulating slow
 ```
 
 **Rules:**
+
 - Fluid moves at all times — it never stops
 - Fluid surface must react to point lights (recalculate normals)
 - UI elements (panels, text, buttons) sit ~0.5–2 units above the fluid surface
@@ -273,6 +275,7 @@ function CandyButton({ children, onClick }) {
 ```
 
 **Squash Rules:**
+
 - Press: Y scale → `0.82`, held as long as pointer is down
 - Release: spring back to `[1, 1, 1]` with bounce (`friction: 10–14`)
 - Hover: gentle scale-up `[1.04, 1.04, 1.04]`, slow spring (`tension: 200, friction: 20`)
@@ -302,6 +305,7 @@ function BobGroup({ children, offset = 0 }) {
 ```
 
 **Bob Rules:**
+
 - Frequency: `0.5–0.7 Hz` — thick liquid bobs slowly
 - Y amplitude: `0.05–0.08` units
 - Rotation amplitude: `< 0.015 rad` — tilt, not tumble

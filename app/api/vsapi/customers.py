@@ -32,7 +32,10 @@ router = APIRouter(prefix="/VsCustomer", tags=["customers"])
     "/Create",
     status_code=201,
     response_model=CustomerCreateResponse,
-    responses={409: {"description": "Customer already exists"}},
+    responses={
+        400: {"description": "Invalid request body"},
+        409: {"description": "Customer already exists"},
+    },
 )
 async def create_customer(
     body: CustomerCreate,
@@ -49,7 +52,7 @@ async def create_customer(
             "Customer already exists or API key conflict vs_customer_id=%s",
             body.vs_customer_id,
         )
-        raise HTTPException(status_code=409, detail="Customer already exists")
+        raise HTTPException(status_code=409, detail="Customer already exists") from None
     logger.info("Customer created id=%s vs_customer_id=%s", customer.id, customer.vs_customer_id)
     return CustomerCreateResponse.model_validate(customer)
 

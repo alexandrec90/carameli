@@ -45,6 +45,7 @@ grep -rn "def downgrade" alembic/versions/*.py
 ```
 
 For each migration file, read the `downgrade()` function body. Flag it if:
+
 - The body is only `pass`
 - The body is only a comment (`# TODO` etc.)
 - The function is missing entirely (would be a syntax error, but worth checking)
@@ -65,7 +66,7 @@ not reflected in any migration. Capture and display the full output.
 
 ## Step 2 — Report
 
-```
+```text
 ## Migration Health Check — YYYY-MM-DD
 
 ### Check 1: Linear history
@@ -102,7 +103,8 @@ Summary: X violation(s), Y warning(s).
 ```
 
 If all checks pass, print:
-```
+
+```text
 All migration checks passed. History is linear, downgrades are complete, no model drift.
 ```
 
@@ -111,7 +113,9 @@ All migration checks passed. History is linear, downgrades are complete, no mode
 ## Step 3 — Fix (only if "fix" argument was passed)
 
 ### Downgrade body fix
+
 For each migration with a `pass`-only or missing downgrade:
+
 1. Read the corresponding `upgrade()` function to understand what was added.
 2. Write the inverse operations in `downgrade()`:
    - `op.create_table(...)` → `op.drop_table(...)`
@@ -121,10 +125,12 @@ For each migration with a `pass`-only or missing downgrade:
 3. Edit only the `downgrade()` function — do not touch `upgrade()` or metadata.
 
 ### Drift fix
+
 Do **not** auto-generate migrations here. Report the drift and instruct the user
 to run `/add-db-model` with the affected model name to scaffold the migration properly.
 
 ### Branch point
+
 Do **not** attempt to resolve branch points automatically. Report clearly and stop.
 Branch resolution requires human judgment about which chain is canonical.
 

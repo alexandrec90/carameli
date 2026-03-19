@@ -47,7 +47,9 @@ def _validate_telnyx_signature(raw_body: bytes, signature: str, timestamp: str) 
     try:
         ts = int(timestamp)
     except (ValueError, TypeError):
-        raise HTTPException(status_code=403, detail="Missing or invalid telnyx-timestamp header")
+        raise HTTPException(
+            status_code=403, detail="Missing or invalid telnyx-timestamp header"
+        ) from None
 
     now = datetime.now(tz=UTC).timestamp()
     if abs(now - ts) > _MAX_TIMESTAMP_AGE_SECONDS:
@@ -61,7 +63,7 @@ def _validate_telnyx_signature(raw_body: bytes, signature: str, timestamp: str) 
         sig_bytes = base64.b64decode(signature)
         public_key.verify(sig_bytes, signed_payload)
     except Exception:
-        raise HTTPException(status_code=403, detail="Invalid Telnyx signature")
+        raise HTTPException(status_code=403, detail="Invalid Telnyx signature") from None
 
 
 @router.post(

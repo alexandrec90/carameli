@@ -1,0 +1,24 @@
+---
+extends: default
+
+rules:
+  # Document-start "---" marker is optional for compose, CI, and Prometheus files
+  document-start: disable
+
+  # Docker Compose URLs, healthcheck commands, and GH Actions steps routinely
+  # exceed 80 chars; line-length enforcement belongs in language-specific linters
+  line-length: disable
+
+  # Windows dev environment writes CRLF line endings; suppress false positives
+  new-lines: disable
+
+  # GitHub Actions uses "on:" as a mapping key (not a boolean value);
+  # disable truthy check for keys to suppress the false positive
+  truthy:
+    allowed-values: ["true", "false"]
+    check-keys: false
+
+  # detect-secrets pragma comments (# pragma: allowlist secret) are appended
+  # with a single space by tooling; enforce min 1 to avoid false positives
+  comments:
+    min-spaces-from-content: 1

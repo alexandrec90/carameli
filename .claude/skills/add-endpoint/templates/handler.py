@@ -23,6 +23,12 @@ from __future__ import annotations
 import logging
 from typing import Annotated
 
+from app.repositories.my_entity_repo import MyEntityRepo  # TODO: update import
+from app.schemas.my_entity import (
+    MyEntityCreate,
+    MyEntityResponse,
+)
+
 # TODO: update imports
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.exc import IntegrityError
@@ -35,11 +41,6 @@ from app.core.auth import (
     verify_api_key,
 )
 from app.core.database import get_session
-from app.repositories.my_entity_repo import MyEntityRepo  # TODO: update import
-from app.schemas.my_entity import (
-    MyEntityCreate,
-    MyEntityResponse,
-)
 
 logger = logging.getLogger(__name__)
 
@@ -65,7 +66,7 @@ async def create_my_entity(
     except IntegrityError:
         await session.rollback()
         logger.warning("MyEntity already exists ...")  # TODO: log identifier
-        raise HTTPException(status_code=409, detail="Already exists")
+        raise HTTPException(status_code=409, detail="Already exists") from None
     logger.info("MyEntity created id=%s", entity.id)
     return MyEntityResponse.model_validate(entity)
 
@@ -84,7 +85,7 @@ async def get_my_entity(
 ) -> MyEntityResponse:
     """Return a MyEntity by ID, scoped to the requesting customer."""
     enforce_customer_scope(auth, customerId)
-    import uuid  # noqa: PLC0415 — inline import keeps template self-contained
+    import uuid
 
     repo = MyEntityRepo(session)
     entity = await repo.get_by_id(uuid.UUID(entityId))

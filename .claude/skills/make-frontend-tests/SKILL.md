@@ -93,6 +93,7 @@ In **targeted** mode, the session-skip rule is bypassed.
 For each module to process:
 
 **4a. Read the source file.** Identify:
+
 - Every exported function, hook, component, or type
 - State transitions (useState, useEffect dependencies)
 - API calls (fetch, client methods)
@@ -104,6 +105,7 @@ For each module to process:
 **4c. Identify gaps.** A gap is any of:
 
 **Hook gaps:**
+
 - Untested initial state (loading, error, data all at default)
 - Untested success path (API returns data, state updates)
 - Untested error path (API throws, error state set)
@@ -111,18 +113,21 @@ For each module to process:
 - Missing `act()` wrapper for state updates
 
 **API client gaps:**
+
 - Untested method (each exported function needs a success + error test)
 - Missing test for non-200 response (should throw or return error)
 - Missing test for network failure (fetch rejects)
 - Untested request shape (correct URL, method, headers, body)
 
 **Logger gaps:**
+
 - Queue batching not tested (logs accumulate, flush after interval)
 - Immediate flush on error-level log not tested
 - Console output not tested
 - Fetch failure in ship-to-backend not tested (should not throw)
 
 **Skin system gaps:**
+
 - `SkinProvider` initial load (shows fallback, then resolves skin)
 - `useSkin()` outside provider (should throw or return null)
 - `useSkinSwitcher()` persists to localStorage
@@ -130,27 +135,32 @@ For each module to process:
 - Dynamic import failure (skin chunk fails to load)
 
 **View gaps (carameli — R3F):**
+
 - Component renders without throwing when R3F is mocked
 - Correct props forwarded to child Three.js elements
 - Conditional branches render correct elements
 
 **View gaps (candy-shop — DOM):**
+
 - Component renders with given props
 - Conditional rendering (empty state, loading state, data state)
 - User interaction (click handlers fire, input updates state)
 
 **Page gaps:**
+
 - Page calls the correct hook
 - Page passes hook result to the correct skin view
 - Page renders without throwing
 
 **Component gaps:**
+
 - Each variant renders (e.g. Button `primary` vs `ghost`)
 - Disabled state prevents click handler
 - Props forwarded correctly
 
 Output a gap list before writing anything:
-```
+
+```text
 Module: frontend/src/hooks/useDashboard.ts  →  frontend/src/tests/useDashboard.test.ts
   GAP: initial loading state not tested
   GAP: API error sets error state
@@ -166,12 +176,14 @@ In **review** mode, stop here and print the full gap report. Do not write files.
 For each gap identified, append or create tests following these conventions:
 
 ### Test file location and naming
-```
+
+```text
 frontend/src/tests/<module-name>.test.ts   — for non-JSX (hooks, API, logger)
 frontend/src/tests/<module-name>.test.tsx  — for JSX (components, views, pages)
 ```
 
 ### Imports
+
 ```typescript
 import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
@@ -180,6 +192,7 @@ import { renderHook, act } from '@testing-library/react'
 ```
 
 ### Hook tests — use renderHook + mocked API client
+
 ```typescript
 import { renderHook, waitFor } from '@testing-library/react'
 
@@ -218,6 +231,7 @@ describe('useDashboard', () => {
 ```
 
 ### API client tests — mock global fetch
+
 ```typescript
 describe('api.customers.get', () => {
   beforeEach(() => {
@@ -245,8 +259,10 @@ describe('api.customers.get', () => {
 ```
 
 ### R3F component tests — mock at Canvas boundary
+
 For carameli skin views, mock React Three Fiber and drei at the module level.
 Never attempt to render actual WebGL content.
+
 ```typescript
 vi.mock('@react-three/fiber', () => ({
   Canvas: ({ children }: { children: React.ReactNode }) => <div data-testid="canvas">{children}</div>,
@@ -284,6 +300,7 @@ fixtures unless 3+ files" rule — R3F mocking is verbose and identical across a
 carameli view tests.
 
 ### Candy Shop view tests — standard DOM rendering
+
 ```typescript
 import { render, screen } from '@testing-library/react'
 import Dashboard from '../skins/candy-shop/views/Dashboard'
@@ -295,6 +312,7 @@ test('renders customer count', () => {
 ```
 
 ### SkinProvider tests — mock registry loaders
+
 ```typescript
 vi.mock('../skins/registry', () => ({
   skinLoaders: {
@@ -306,6 +324,7 @@ vi.mock('../skins/registry', () => ({
 ```
 
 ### Logger tests — mock fetch + fake timers
+
 ```typescript
 beforeEach(() => {
   vi.useFakeTimers()
@@ -327,6 +346,7 @@ test('batches logs and flushes after interval', async () => {
 ```
 
 ### Page tests — verify wiring
+
 ```typescript
 vi.mock('../hooks/useDashboard', () => ({
   useDashboard: () => ({ loading: false, customers: [], error: null }),
@@ -344,11 +364,13 @@ test('Dashboard page renders skin view', () => {
 ```
 
 ### Naming conventions
+
 - File: `frontend/src/tests/<module>.test.ts` or `.test.tsx`
 - Function: `test('<thing> <condition>')` — plain English, e.g. `test('sets error on API failure')`
 - Describe blocks: `describe('<ModuleName>')` — match the export name
 
 ### What NOT to do
+
 - Do not test WebGL rendering, material colors, lighting, or animation timing
 - Do not import Three.js objects directly in tests — always mock at module boundary
 - Do not add test utilities outside `frontend/src/tests/` (exception: `r3f-mocks.ts`)
@@ -361,6 +383,7 @@ test('Dashboard page renders skin view', () => {
 ## Step 6 — Update State
 
 After processing each module, update `.claude/skills/make-frontend-tests/state.json`:
+
 - Set `last_reviewed` to today's date
 - Set `git_hash` to the current hash of the source module
 - Set `gaps_found` to the number of gaps discovered this run (0 if none)
@@ -372,7 +395,7 @@ After processing each module, update `.claude/skills/make-frontend-tests/state.j
 
 Print a summary table:
 
-```
+```text
 ## Frontend Test Coverage Pass — YYYY-MM-DD
 
 | Module | Test File | Gaps Found | Tests Added |
@@ -386,7 +409,8 @@ Total: X gaps found, Y tests added.
 ```
 
 ### Gap category breakdown
-```
+
+```text
 | Category | Gaps |
 |----------|------|
 | Hook (state/API) | N |

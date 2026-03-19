@@ -57,12 +57,12 @@ Instrumentator().instrument(app).expose(
 )
 
 app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore[arg-type]
 
 
 @app.exception_handler(DataError)
 async def data_error_handler(request: Request, exc: DataError) -> JSONResponse:
-    logger.warning("Invalid data in request: %s %s – %s", request.method, request.url, exc)
+    logger.warning("Invalid data in request: %s %s -- %s", request.method, request.url, exc)
     return JSONResponse(status_code=422, content={"detail": "Invalid input data"})
 
 
@@ -88,10 +88,10 @@ app.add_middleware(
 )
 
 _UNAUTHORIZED = {401: {"description": "Unauthorized"}}
-app.include_router(vsapi_router, responses=_UNAUTHORIZED)
+app.include_router(vsapi_router, responses=_UNAUTHORIZED)  # type: ignore[arg-type]
 app.include_router(jambonz_router)
 app.include_router(sms_inbound_router)
-app.include_router(frontend_logs_router, responses=_UNAUTHORIZED)
+app.include_router(frontend_logs_router, responses=_UNAUTHORIZED)  # type: ignore[arg-type]
 
 
 @app.get("/health")

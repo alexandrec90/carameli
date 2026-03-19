@@ -27,9 +27,11 @@ Only code bugs get fixed. Config issues are reported clearly. Transient failures
 and skipped.
 
 The log format is:
-```
+
+```text
 YYYY-MM-DD HH:MM:SS.mmm | LEVEL    | module.path:lineno | message
 ```
+
 Convert module path to file: `app.api.vsapi.phone_lines:56` → `app/api/vsapi/phone_lines.py` line 56.
 `[FRONTEND]` entries originate in `frontend/src/` — check the `context=` field for the component.
 
@@ -51,6 +53,7 @@ For each code bug:
 4. If a fix requires a DB schema change, note it and stop — use `/add-db-model` instead.
 
 **Stop conditions:**
+
 - A fix would require a non-trivial refactor → propose a minimal safe fix and ask for
   confirmation.
 - Required context is missing → ask a single clarifying question and stop.
@@ -68,6 +71,7 @@ still contains code bugs.
 ## Step 4 — Report
 
 State clearly:
+
 - Which errors were fixed (file, line, what changed).
 - Which were skipped (transient / config / blocked).
 - Next step: re-run tests + extract errors if fixes were applied.

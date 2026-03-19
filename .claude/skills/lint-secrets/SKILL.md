@@ -57,7 +57,7 @@ grep -rn \
 
 ## Step 2 — Report
 
-```
+```text
 ## Secret Hygiene Check — YYYY-MM-DD
 
 ### Check 1: Credential fields in response schemas
@@ -80,7 +80,8 @@ Summary: X violation(s) across Y check(s).
 ```
 
 If all checks pass, print:
-```
+
+```text
 All secret hygiene checks passed. No violations found.
 ```
 
@@ -89,11 +90,13 @@ All secret hygiene checks passed. No violations found.
 ## Step 3 — Fix (only if "fix" argument was passed)
 
 ### Response schema leak fix
+
 - Remove the credential field from the response schema.
 - If the field is legitimately needed (e.g. initial API key display on create), add a
   `write_only: ClassVar = True` comment and gate it behind a dedicated one-time endpoint.
 
 ### Env var bypass fix
+
 - Move the `os.getenv(...)` call into `app/core/config.py` as a settings field.
 - Replace the call site with `settings.<field_name>`.
 

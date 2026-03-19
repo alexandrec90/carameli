@@ -70,7 +70,7 @@ Any match is a potential event-loop block. Async code must use `httpx.AsyncClien
 
 Print results in this format:
 
-```
+```text
 ## Boundary Check — YYYY-MM-DD
 
 ### Check 1: Provider boundary
@@ -100,7 +100,8 @@ Summary: X violation(s) across Y check(s).
 ```
 
 If all three checks pass, print:
-```
+
+```text
 All boundary checks passed. No violations found.
 ```
 
@@ -111,6 +112,7 @@ All boundary checks passed. No violations found.
 For each violation, apply the minimal correct fix:
 
 ### Provider leak fix
+
 - Remove the direct SDK import.
 - Replace usage with the injected provider instance (already available via
   `app/services/providers/factory.py`).
@@ -118,12 +120,14 @@ For each violation, apply the minimal correct fix:
   function argument following the pattern in `app/services/call_control.py`.
 
 ### Layer bypass fix
+
 - Move the repository call into an existing or new method in
   `app/services/<domain>_service.py`.
 - Update the route handler to call the service method instead.
 - Do not change the route's public contract (method, path, response schema).
 
 ### Blocking I/O fix
+
 - Replace `import requests` with `import httpx` and use `httpx.AsyncClient`.
 - Replace `time.sleep(n)` with `await asyncio.sleep(n)`.
 - Replace `subprocess.run(...)` with `await asyncio.create_subprocess_exec(...)`.

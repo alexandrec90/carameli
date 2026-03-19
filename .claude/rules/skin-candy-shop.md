@@ -44,7 +44,7 @@ uses gradients, shadows, or both to simulate depth.
 
 ## Layout System
 
-```
+```html
 <body>
   <Header>           ← sticky caramel pour with SVG drip bottom edge
     <Logo />
@@ -138,6 +138,7 @@ const variants = {
 ```
 
 **Rules:**
+
 - Spring params are fixed: `stiffness: 300, damping: 20` — bouncy but controlled
 - Label text color: `#5C3317` (dark chocolate), bold weight
 - Never use CSS `transition:` for the expand animation — always Framer Motion spring

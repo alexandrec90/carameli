@@ -21,7 +21,9 @@ router = APIRouter(tags=["sci"])
 
 
 @router.post(
-    "/PostSCIbyZipCode", response_model=SciResponse, responses={404: {"description": "Not found"}}
+    "/PostSCIbyZipCode",
+    response_model=SciResponse,
+    responses={400: {"description": "Invalid request body"}, 404: {"description": "Not found"}},
 )
 async def post_sci_by_zip_code(
     body: PostSciByZipCodeRequest,
@@ -72,7 +74,7 @@ async def post_sci_by_zip_code(
 @router.post(
     "/UpdateSCIUserOption",
     response_model=SciResponse,
-    responses={404: {"description": "Not found"}},
+    responses={400: {"description": "Invalid request body"}, 404: {"description": "Not found"}},
 )
 async def update_sci_user_option(
     body: UpdateSciUserOptionRequest,
