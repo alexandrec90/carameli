@@ -1,14 +1,13 @@
 import { logger } from '../lib/logger'
 
 const BASE = import.meta.env.VITE_API_BASE_URL ?? ''
-const API_KEY = import.meta.env.VITE_API_KEY ?? 'hlUnmWwpQVyGbg8oV2sgBsMMypjoPI6Q7fq9xgj6nb8VrnKIonewB4fWspqnEtfq'
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     ...options,
+    credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${API_KEY}`,
       ...options.headers,
     },
   })

@@ -46,6 +46,7 @@ function Patch-Env {
 
 Patch-Env "JAMBONZ_WEBHOOK_BASE_URL" $Url
 Patch-Env "TELNYX_WEBHOOK_BASE_URL"  $Url
+Patch-Env "NGROK_URL"               $Url
 
 # Restart the app so it picks up the new env
 Write-Host "Restarting app container..."
@@ -54,3 +55,9 @@ docker compose restart app
 Write-Host ""
 Write-Host "Done. Webhook base URL: $Url"
 Write-Host "ngrok dashboard: http://localhost:4040"
+Write-Host ""
+Write-Host "To run webhook e2e tests:"
+Write-Host "  docker compose exec -e NGROK_URL=$Url app pytest tests/integration/test_webhook_e2e.py -v"
+Write-Host ""
+Write-Host "To run Telnyx sandbox tests:"
+Write-Host "  docker compose exec -e TELNYX_SANDBOX=1 app pytest tests/integration/test_telnyx_sandbox.py -v"

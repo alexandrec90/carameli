@@ -21,7 +21,7 @@ skins/views/  ←  (props)
 - **pages/** — Thin orchestrators: call hook, call `useSkin()`, pass props to the skin's view.
 - **skins/** — Pluggable visual themes, loaded via dynamic import (Vite code-splitting).
   Each skin has its own `Layout.tsx` and `views/` directory. Views are pure (props only, no API calls).
-- **api/client.ts** — Centralized fetch client with Bearer auth and typed request/response objects.
+- **api/client.ts** — Centralized fetch client with cookie auth (`credentials: 'include'`) and typed request/response objects.
 - **components/** — Shared skin-agnostic UI (Button, Card, SkinSwitcher).
 - **lib/logger.ts** — Batched frontend logging shipped to `/vg/1.0.0/frontend-logs` every 2 s (errors flush immediately).
 
@@ -35,7 +35,7 @@ skins/views/  ←  (props)
 ## Gotchas
 
 - **Hardcoded `CUSTOMER_ID = 1`** in all hooks — no multi-tenancy in the UI yet.
-- **Demo API key** in `client.ts` for local dev — not a real secret.
+- **Cookie-based auth** — frontend authenticates via `/auth/session` (HttpOnly cookie), no API key in the JS bundle.
 - **Google Fonts preloaded** in `index.html` (Outfit, Inter, Lobster) to avoid FOUT.
 - **CSS design tokens** defined as `:root` variables in `index.css`, consumed by Tailwind and inline styles.
 - **ESLint uses flat config** (`eslint.config.js`), not legacy `.eslintrc`.

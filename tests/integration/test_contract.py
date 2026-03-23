@@ -46,7 +46,11 @@ async def _contract_env(test_engine):
     db_url = settings.database_url
 
     async def _session_override():
-        per_req_engine = create_async_engine(db_url, echo=False)
+        per_req_engine = create_async_engine(
+            db_url,
+            echo=False,
+            connect_args={"prepared_statement_cache_size": 0},
+        )
         try:
             async with async_sessionmaker(per_req_engine, expire_on_commit=False)() as session:
                 yield session

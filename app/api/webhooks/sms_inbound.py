@@ -69,6 +69,7 @@ def _validate_telnyx_signature(raw_body: bytes, signature: str, timestamp: str) 
 @router.post(
     "/sms-inbound",
     status_code=204,
+    response_model=None,
     responses={
         400: {"description": "Bad request (non-JSON body)"},
         403: {"description": "Forbidden (invalid signature)"},

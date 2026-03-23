@@ -109,12 +109,10 @@ else {
     # Capture files modified by auto-fix hooks (ruff --fix, ruff-format)
     $autoFixedFiles = @(git diff --name-only 2>$null)
 
-    $out = [System.Collections.Generic.List[string]]::new()
-
+    # Classify each hook before deciding what to do
+    $hookTags = [ordered]@{}
     foreach ($hookId in $hooks.Keys) {
         $body = $hooks[$hookId]
-
-        # Classify the failure
         $isAutoFix = $false
         $isMisconfigured = $false
         foreach ($bl in $body) {
@@ -123,16 +121,76 @@ else {
                 $isMisconfigured = $true
             }
         }
+        if ($isMisconfigured) { $hookTags[$hookId] = "misconfigured" }
+        elseif ($isAutoFix)   { $hookTags[$hookId] = "auto-fixed" }
+        else                  { $hookTags[$hookId] = "error" }
+    }
 
-        if ($isMisconfigured) {
-            $tag = "misconfigured"
-        }
-        elseif ($isAutoFix) {
-            $tag = "auto-fixed"
+    # If every failure is an auto-fix, stage any real changes and re-run (or
+    # treat as pass when the hook is a false positive with nothing to stage).
+    $allAutoFixed = ($hookTags.Values | Where-Object { $_ -ne "auto-fixed" }).Count -eq 0
+    if ($allAutoFixed) {
+        if ($autoFixedFiles.Count -gt 0) {
+            # Real auto-fixes on disk -- stage and re-run only the failed hooks
+            $failedIds = @($hookTags.Keys)
+            Write-Host "  Auto-fixed files detected -- staging and re-running: $($failedIds -join ', ')..." -ForegroundColor Yellow
+            foreach ($f in $autoFixedFiles) {
+                git add -- $f 2>$null
+            }
+
+            $retryAllPassed = $true
+            foreach ($hid in $failedIds) {
+                pre-commit run $hid --all-files 2>&1 | ForEach-Object {
+                    $rl = "$_"
+                    switch -Regex ($rl) {
+                        "Passed|passed" { Write-Host "  [pass] $rl" -ForegroundColor Green; break }
+                        "Failed|failed" { Write-Host "  [FAIL] $rl" -ForegroundColor Red;   break }
+                        "Skipped|skipped" { Write-Host "  [skip] $rl" -ForegroundColor Yellow; break }
+                        default { Write-Host "  $rl" }
+                    }
+                }
+                if ($LASTEXITCODE -ne 0) { $retryAllPassed = $false }
+            }
+
+            if ($retryAllPassed) {
+                $sw.Stop()
+                $elapsed = "{0:mm\:ss}" -f $sw.Elapsed
+                Set-Content $artifact ""
+                Write-Host ""
+                Write-Host "  [pass] pre-commit ($elapsed) -- auto-fixed and re-staged" -ForegroundColor Green
+                Write-Host ""
+                Write-Host "  ==========================================" -ForegroundColor Green
+                Write-Host "          PRE-COMMIT PASSED                  " -ForegroundColor Green
+                Write-Host "  ==========================================" -ForegroundColor Green
+                Write-Host ""
+                exit 0
+            }
+            # Retry still failed -- fall through to write artifact
         }
         else {
-            $tag = "error"
+            # Hook reports "files were modified" but git sees no changes --
+            # false positive (e.g. pip-audit touching pip cache). Treat as pass.
+            $falseHooks = ($hookTags.Keys | ForEach-Object { $_ }) -join ", "
+            Write-Host "  No actual file changes from auto-fix hooks ($falseHooks) -- treating as pass" -ForegroundColor Yellow
+            $sw.Stop()
+            $elapsed = "{0:mm\:ss}" -f $sw.Elapsed
+            Set-Content $artifact ""
+            Write-Host ""
+            Write-Host "  [pass] pre-commit ($elapsed)" -ForegroundColor Green
+            Write-Host ""
+            Write-Host "  ==========================================" -ForegroundColor Green
+            Write-Host "          PRE-COMMIT PASSED                  " -ForegroundColor Green
+            Write-Host "  ==========================================" -ForegroundColor Green
+            Write-Host ""
+            exit 0
         }
+    }
+
+    $out = [System.Collections.Generic.List[string]]::new()
+
+    foreach ($hookId in $hooks.Keys) {
+        $body = $hooks[$hookId]
+        $tag = $hookTags[$hookId]
 
         $out.Add("## $hookId [$tag]")
         $out.Add("")

@@ -166,7 +166,65 @@ See `.claude/rules/tooling.md` for VS Code task script conventions.
 - Use only ASCII characters in `.ps1` files — no em-dashes, curly quotes, or other non-ASCII (they cause parse errors when the file encoding is misread)
 - **Never run `docker` or `docker compose` commands directly** — provide the commands for the user to run instead
 
+## Guardrails (Vibe-Code Safety)
+
+This project is vibe-coded. The rules below exist to catch the mistakes that vibe coding produces most often. **Treat every item as mandatory** — not aspirational.
+
+### Auth & customer scoping
+
+- Every new route handler **must** depend on the auth dependency (`get_auth_context`) and call `enforce_customer_scope()` to filter queries by `vs_customer_id`
+- Never return data without scoping it to the authenticated customer — this is a multi-tenant system
+- If a route is intentionally public (e.g., health check), document why auth is skipped with a comment
+
+### Alembic migrations
+
+- Any change to a SQLAlchemy model (new column, changed type, new table, dropped column) **must** include a corresponding Alembic migration in the same commit
+- Generate with: `alembic revision --autogenerate -m "short_description"` — then review the generated file before committing
+- Every migration must have a working `downgrade()` — never leave it as `pass`
+- See `.claude/rules/migrations.md` for naming and safety conventions
+
+### Provider abstraction
+
+- Services and route handlers import **only** from `app/services/providers/base.py` (the Protocol interfaces)
+- Never import concrete providers (`telnyx.py`, `jambonz.py`) outside of `factory.py` and tests
+- When adding a new provider method, add it to the Protocol first, then implement it in every concrete provider
+
+### Pydantic schemas for all endpoints
+
+- Every route handler must declare a Pydantic model for its request body and response (`response_model=`)
+- Never return raw dicts or untyped data from an endpoint — this leaks internal fields and skips validation
+- Schemas live in `app/schemas/` — one module per resource
+
+### Async discipline
+
+- The entire backend is async (FastAPI + async SQLAlchemy + httpx). **Never use blocking calls** in async handlers:
+  - No `time.sleep()` — use `asyncio.sleep()`
+  - No `requests.get()` — use `httpx.AsyncClient`
+  - No synchronous file I/O in hot paths — use `aiofiles` or offload to a thread with `asyncio.to_thread()`
+- If you must call a blocking library, wrap it in `asyncio.to_thread()`
+
+### Webhook signature validation
+
+- Every webhook endpoint (Jambonz, Telnyx, or any future provider) **must** validate the request signature before processing the payload
+- Never trust webhook data without verification — see `.claude/rules/webhooks.md` for the pattern
+
+### Dependency management
+
+- When adding a new pip package, add it to `requirements.txt` (runtime) or `requirements-dev.txt` (dev/test only) in the same commit
+- Use the `audit-deps` skill periodically to detect unused, missing, or misplaced dependencies
+- Never leave an import that depends on a package not listed in requirements
+
 ## Testing Strategy
+
+**Mandatory test coverage**: Every code change that adds or modifies functionality **must** include corresponding tests in the same commit. This is non-negotiable — the project is vibe-coded and tests are the primary safety net against regressions.
+
+- When creating a new endpoint, service, or utility: write unit tests covering the happy path, error cases, and edge cases **before** considering the task complete
+- When modifying existing code: update or add tests to cover the changed behavior; never assume existing tests are sufficient
+- When fixing a bug: write a regression test that reproduces the bug first, then fix it
+- Proactively use the `make-tests` skill to identify and fill coverage gaps after any significant change
+- Aim for meaningful coverage — test business logic, validation, error handling, and provider interactions, not just that code runs without crashing
+
+### Test types
 
 - **Unit tests**: pytest with mocked provider interfaces (`unittest.mock.patch` at the `CarrierProvider` / `CallEngineProvider` boundary — never mock internal SDK details)
 - **Integration tests**: Telnyx sandbox credentials + a local Jambonz instance (no real charges)

@@ -15,6 +15,7 @@ from slowapi.middleware import SlowAPIMiddleware
 from sqlalchemy import text
 from sqlalchemy.exc import DataError
 
+from app.api.auth import router as auth_router
 from app.api.vg.frontend_logs import router as frontend_logs_router
 from app.api.vsapi import vsapi_router
 from app.api.webhooks.call_status import jambonz_router
@@ -88,6 +89,7 @@ app.add_middleware(
 )
 
 _UNAUTHORIZED = {401: {"description": "Unauthorized"}}
+app.include_router(auth_router)
 app.include_router(vsapi_router, responses=_UNAUTHORIZED)  # type: ignore[arg-type]
 app.include_router(jambonz_router)
 app.include_router(sms_inbound_router)

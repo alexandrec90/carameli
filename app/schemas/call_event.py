@@ -30,3 +30,9 @@ class CallRecordingResponse(BaseModel):
     call_sid: str
     recording_url: str
     duration_seconds: int | None
+
+
+class WebhookAck(BaseModel):
+    """Standard acknowledgement response for webhook handlers."""
+
+    status: str = "ok"

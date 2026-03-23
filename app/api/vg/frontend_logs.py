@@ -6,7 +6,7 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
-from app.core.auth import verify_api_key
+from app.core.auth import AuthContext, get_auth_context
 
 router = APIRouter(prefix="/vg/1.0.0", tags=["internal"])
 
@@ -35,11 +35,12 @@ class FrontendLogBatch(BaseModel):
 @router.post(
     "/frontend-logs",
     status_code=204,
+    response_model=None,
     responses={400: {"description": "Bad request"}},
 )
 async def ingest_frontend_logs(
     batch: FrontendLogBatch,
-    _: Annotated[str, Depends(verify_api_key)],
+    _: Annotated[AuthContext, Depends(get_auth_context)],
 ) -> None:
     """Receive structured React frontend logs and write them to the server log file."""
     for entry in batch.entries:

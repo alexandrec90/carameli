@@ -5,7 +5,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
-from app.core.auth import verify_api_key
+from app.core.auth import AuthContext, get_auth_context
 from app.schemas.area_code import AreaCodeInfo, AreaCodesResponse
 
 logger = logging.getLogger(__name__)
@@ -20,7 +20,7 @@ router = APIRouter(tags=["area-codes"])
 )
 async def get_area_codes(
     request: Request,
-    _: Annotated[str, Depends(verify_api_key)],
+    _: Annotated[AuthContext, Depends(get_auth_context)],
 ) -> AreaCodesResponse:
     """Return all US area codes available from the active carrier provider."""
     logger.info("Fetching US area codes")
@@ -44,7 +44,7 @@ async def get_area_codes_filtered(
     country: str,
     state: str,
     request: Request,
-    _: Annotated[str, Depends(verify_api_key)],
+    _: Annotated[AuthContext, Depends(get_auth_context)],
 ) -> AreaCodesResponse:
     """Return area codes filtered by country and state."""
     carrier = request.app.state.carrier

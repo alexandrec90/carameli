@@ -1,4 +1,4 @@
-# Runs all linters in parallel (ruff, ruff-format, eslint, tsc, stylelint, markdownlint, mypy, pip-audit, vulture, detect-secrets, dotenv-linter, alembic-check, yamllint).
+# Runs all linters in parallel (ruff, ruff-format, eslint, tsc, stylelint, markdownlint, mypy, pip-audit, vulture, detect-secrets, dotenv-linter, alembic-check, yamllint, actionlint).
 # On failure: writes actionable error details to logs/lint-errors.log for AI-agent consumption.
 # On pass: clears the artifact. Terminal exits when done.
 $ErrorActionPreference = "Continue"
@@ -20,7 +20,7 @@ $anyFailed = $false
 Write-Host ""
 Write-Host "=== Carameli Lint Suite ===" -ForegroundColor Cyan
 Write-Host "Artifact : $((Resolve-Path $artifact -ErrorAction SilentlyContinue) ?? (Join-Path $PWD $artifact))" -ForegroundColor DarkGray
-Write-Host "Linters  : ruff, ruff-format, eslint, tsc, stylelint, markdownlint, mypy, pip-audit, vulture, detect-secrets, dotenv-linter, alembic-check, yamllint" -ForegroundColor DarkGray
+Write-Host "Linters  : ruff, ruff-format, eslint, tsc, stylelint, markdownlint, mypy, pip-audit, vulture, detect-secrets, dotenv-linter, alembic-check, yamllint, actionlint" -ForegroundColor DarkGray
 Write-Host "Mode     : parallel" -ForegroundColor DarkGray
 Write-Host ""
 
@@ -191,6 +191,17 @@ $jobs["yamllint"] = Start-Job -WorkingDirectory $wd -ScriptBlock {
     ) | Where-Object { Test-Path $_ }
     if ($targets) {
         $out = yamllint --strict -f parsable @targets 2>&1
+        [PSCustomObject]@{ ExitCode = $LASTEXITCODE; Lines = @($out | ForEach-Object { "$_" }) }
+    }
+    else {
+        [PSCustomObject]@{ ExitCode = 0; Lines = @() }
+    }
+}
+
+$jobs["actionlint"] = Start-Job -WorkingDirectory $wd -ScriptBlock {
+    [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+    if (Test-Path ".github/workflows") {
+        $out = actionlint 2>&1
         [PSCustomObject]@{ ExitCode = $LASTEXITCODE; Lines = @($out | ForEach-Object { "$_" }) }
     }
     else {
@@ -371,6 +382,19 @@ if ($failed -and -not $skipReason) {
 }
 if ($skipReason) { Write-Host "  [skip] yamllint ($skipReason)" -ForegroundColor DarkGray }
 else { Write-LintResult "yamllint" $failed }
+
+# actionlint
+$r = Receive-Job $jobs["actionlint"]
+$failed = $r.ExitCode -ne 0
+$skipReason = if ($failed) { Get-SkipReason $r.Lines } else { $null }
+if ($failed -and -not $skipReason) {
+    $anyFailed = $true
+    $errs = @($r.Lines | Remove-Noise | Where-Object { $_ -match ":\d+:\d+:" })
+    if (-not $errs) { $errs = @($r.Lines | Remove-Noise | Where-Object { $_.Trim() -ne "" }) }
+    Add-Section "actionlint" "manual -- fix GitHub Actions workflow issues" $errs
+}
+if ($skipReason) { Write-Host "  [skip] actionlint ($skipReason)" -ForegroundColor DarkGray }
+else { Write-LintResult "actionlint" $failed }
 
 # --- Cleanup ---
 $jobs.Values | Remove-Job -Force

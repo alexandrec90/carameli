@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.database import get_session
+from app.schemas.call_event import WebhookAck
 from app.services import call_event_service, customer_service, phone_line_service
 
 logger = logging.getLogger(__name__)
@@ -57,6 +58,7 @@ def _normalize_jambonz_payload(data: dict[str, Any]) -> dict[str, Any]:
 
 @jambonz_router.post(
     "/call-status",
+    response_model=WebhookAck,
     responses={
         400: {"description": "Bad request (non-JSON body)"},
         403: {"description": "Forbidden (invalid signature)"},

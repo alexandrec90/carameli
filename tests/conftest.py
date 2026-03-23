@@ -9,6 +9,7 @@ from httpx import ASGITransport, AsyncClient
 from limits.storage import storage_from_string
 from limits.strategies import STRATEGIES as LIMIT_STRATEGIES
 from slowapi.middleware import SlowAPIMiddleware
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -16,6 +17,7 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
+import app.models
 from app.core.config import settings
 from app.core.database import Base, get_session
 from app.core.limiter import limiter as rate_limiter
@@ -31,15 +33,21 @@ pytestmark = pytest.mark.asyncio(loop_scope="session")
 
 @pytest_asyncio.fixture(scope="session")
 async def test_engine() -> AsyncGenerator[AsyncEngine, None]:
-    engine = create_async_engine(settings.database_url, echo=False)
+    engine = create_async_engine(
+        settings.database_url,
+        echo=False,
+        connect_args={"prepared_statement_cache_size": 0},
+    )
     async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
+        await conn.execute(text("DROP SCHEMA public CASCADE"))
+        await conn.execute(text("CREATE SCHEMA public"))
         await conn.run_sync(Base.metadata.create_all)
     try:
         yield engine
     finally:
         async with engine.begin() as conn:
-            await conn.run_sync(Base.metadata.drop_all)
+            await conn.execute(text("DROP SCHEMA public CASCADE"))
+            await conn.execute(text("CREATE SCHEMA public"))
         await engine.dispose()
 
 

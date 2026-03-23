@@ -1,12 +1,21 @@
 import { Routes, Route } from 'react-router-dom'
 import { useSkin } from './skins/context'
 import { SkinSwitcher } from './components/SkinSwitcher'
+import { useAuth } from './hooks/useAuth'
 import Dashboard from './pages/Dashboard'
 import PhoneLines from './pages/PhoneLines'
 import Extensions from './pages/Extensions'
 import Placeholder from './pages/Placeholder'
 
 export default function App() {
+  const { ready } = useAuth()
+
+  if (!ready) return null
+
+  return <AuthenticatedApp />
+}
+
+function AuthenticatedApp() {
   const { Layout } = useSkin()
   return (
     <>

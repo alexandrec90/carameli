@@ -58,7 +58,11 @@ services:
     volumes:
       - .:/app
     healthcheck:
-      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\""]
+      test:
+        [
+          "CMD-SHELL",
+          'python -c "import urllib.request; urllib.request.urlopen(''http://localhost:8000/health'')"',
+        ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -115,7 +119,11 @@ services:
     environment:
       - VITE_API_BASE_URL=http://localhost:8000
     healthcheck:
-      test: ["CMD-SHELL", "node -e \"require('http').get('http://localhost:5173/',r=>process.exit(r.statusCode>=500?1:0)).on('error',()=>process.exit(1))\""]
+      test:
+        [
+          "CMD-SHELL",
+          'node -e "require(''http'').get(''http://localhost:5173/'',r=>process.exit(r.statusCode>=500?1:0)).on(''error'',()=>process.exit(1))"',
+        ]
       interval: 15s
       timeout: 10s
       retries: 5
@@ -165,7 +173,7 @@ services:
     stop_grace_period: 3s
     ports:
       - "5060:5060/udp"
-      - "5061:5061/tcp"   # SIP TLS
+      - "5061:5061/tcp" # SIP TLS
     environment:
       # TLS: set to "true" to enable SIP TLS on port 5061 + SRTP for media.
       # Mount your certificate and key via the volumes below.
@@ -199,11 +207,32 @@ services:
       --port-max=10100
     stop_grace_period: 3s
     healthcheck:
-      test: ["CMD-SHELL", "grep -q '08AF' /proc/net/udp /proc/net/udp6 2>/dev/null || exit 1"]
+      test:
+        [
+          "CMD-SHELL",
+          "grep -q '08AF' /proc/net/udp /proc/net/udp6 2>/dev/null || exit 1",
+        ]
       interval: 10s
       timeout: 5s
       retries: 10
       start_period: 10s
+
+  # One-shot init container: creates/upgrades the Jambonz MySQL schema.
+  # Runs upgrade-jambonz-db.js which is a no-op for any already-applied migration.
+  jambonz-db-init:
+    image: ghcr.io/jambonz/api-server
+    restart: "no"
+    working_dir: /opt/app
+    command: node db/upgrade-jambonz-db.js
+    environment:
+      JAMBONES_MYSQL_HOST: jambonz-db
+      JAMBONES_MYSQL_PORT: 3306
+      JAMBONES_MYSQL_USER: jambonz
+      JAMBONES_MYSQL_PASSWORD: jambonz_local_dev
+      JAMBONES_MYSQL_DATABASE: jambonz
+    depends_on:
+      jambonz-db:
+        condition: service_healthy
 
   jambonz:
     image: ghcr.io/jambonz/api-server
@@ -237,16 +266,22 @@ services:
       # Non-AWS S3 endpoint (e.g. MinIO). Leave blank for real AWS S3.
       AWS_S3_ENDPOINT_URL: "${S3_ENDPOINT:-}"
     depends_on:
-      jambonz-db:
-        condition: service_healthy
+      jambonz-db-init:
+        condition: service_completed_successfully
       redis:
         condition: service_healthy
       freeswitch:
         condition: service_healthy
       influxdb:
         condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
     healthcheck:
-      test: ["CMD-SHELL", "node -e \"require('http').get('http://localhost:3000/health',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))\""]
+      test:
+        [
+          "CMD-SHELL",
+          'node -e "require(''http'').get(''http://localhost:3000/health'',r=>process.exit(r.statusCode===200?0:1)).on(''error'',()=>process.exit(1))"',
+        ]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -278,6 +313,39 @@ services:
     depends_on:
       - prometheus
 
+  minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    command: server /data --console-address ":9001"
+    volumes:
+      - miniodata:/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9000/minio/health/live || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+
+  # One-shot: creates the recordings bucket in MinIO if it doesn't exist.
+  minio-init:
+    image: minio/mc:latest
+    restart: "no"
+    entrypoint: >
+      sh -c "
+      mc alias set local http://minio:9000 minioadmin minioadmin &&
+      mc mb --ignore-existing local/carameli-recordings &&
+      echo 'Bucket ready'
+      "
+    depends_on:
+      minio:
+        condition: service_healthy
+
 volumes:
   pgdata:
   jambonzdata:
@@ -285,3 +353,4 @@ volumes:
   frontend_node_modules:
   promdata:
   grafanadata:
+  miniodata:

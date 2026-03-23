@@ -42,6 +42,7 @@ class Settings(BaseSettings):
     rate_limit_calls: str = "30/minute"
 
     api_key_secret: str = "change_me"
+    session_secret: str = "change_me_session_secret"
 
     log_level: str = "INFO"
     log_file: str = "logs/runtime/carameli.log"

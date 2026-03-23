@@ -117,8 +117,8 @@ The backend writes these as:
 
 ### Frontend log ingestion endpoint
 
-`POST /vg/1.0.0/frontend-logs` (no auth required from the browser; the
-`Authorization` header is sent automatically by `logger.ts` via `VITE_API_KEY`).
+`POST /vg/1.0.0/frontend-logs` (authenticated via the session cookie set
+by `/auth/session` — `logger.ts` sends `credentials: 'include'` automatically).
 
 Request body:
 

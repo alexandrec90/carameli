@@ -84,3 +84,13 @@ repos:
         language: system
         entry: npm --prefix frontend exec -- markdownlint -c ".markdownlint.json" --fix
         files: \.md$
+
+  # GitHub Actions workflow linter
+  - repo: local
+    hooks:
+      - id: actionlint
+        name: actionlint
+        language: system
+        entry: actionlint
+        files: ^\.github/workflows/.*\.ya?ml$
+        pass_filenames: false

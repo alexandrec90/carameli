@@ -5,12 +5,13 @@ import uuid
 from dataclasses import dataclass
 from typing import Annotated, NoReturn
 
-from fastapi import Depends, HTTPException, Security, status
+from fastapi import Depends, HTTPException, Request, Security, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.database import get_session
+from app.core.session import COOKIE_NAME, verify_signed_token
 from app.repositories.customer_repo import CustomerRepo
 
 logger = logging.getLogger(__name__)
@@ -45,12 +46,23 @@ def verify_api_key(
 async def get_auth_context(
     credentials: Annotated[HTTPAuthorizationCredentials | None, Security(bearer_scheme)],
     session: Annotated[AsyncSession, Depends(get_session)],
+    request: Request,
 ) -> AuthContext:
-    """Authenticate using either the global service key or a customer API key."""
-    if credentials is None:
+    """Authenticate using Bearer token, session cookie, or a customer API key."""
+    token: str | None = None
+
+    # 1) Try Bearer header (external API consumers)
+    if credentials is not None:
+        token = credentials.credentials
+    else:
+        # 2) Fall back to signed session cookie (frontend)
+        cookie = request.cookies.get(COOKIE_NAME)
+        if cookie:
+            token = verify_signed_token(cookie)
+
+    if token is None:
         _raise_unauthorized()
 
-    token = credentials.credentials
     if token == settings.api_key_secret:
         return AuthContext(is_admin=True, customer_id=None, vs_customer_id=None)
 

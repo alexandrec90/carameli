@@ -33,6 +33,18 @@
       "problemMatcher": []
     },
     {
+      "label": "Install: Dev Dependencies (venv)",
+      "type": "shell",
+      "command": ".venv\\Scripts\\python.exe -m pip install -r requirements-dev.txt; $_ec = $LASTEXITCODE; pwsh -ExecutionPolicy Bypass -File scripts/notify.ps1 -Label 'Install: Dev Dependencies (venv)' -ExitCode $_ec; exit $_ec",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "showReuseMessage": false,
+        "close": false
+      },
+      "problemMatcher": []
+    },
+    {
       "label": "Start: Frontend Dev Server",
       "type": "shell",
       "command": "npm run dev",
