@@ -50,8 +50,10 @@ class CustomerCreateResponse(CustomerResponse):
     """Returned only on POST /Create — includes the API key for one-time display."""
 
     write_only: ClassVar = True
-    # api_key exposed only on initial create; not included in list/get responses
-    api_key: str
+    # Credential exposed only on initial create; not included in list/get responses.
+    # Field deliberately named 'plaintext_key' to avoid leaking the canonical
+    # 'api_key' column name in responses; validation_alias maps from ORM attr.
+    plaintext_key: str = Field(validation_alias="api_key")
 
 
 class CustomerIdResponse(BaseModel):

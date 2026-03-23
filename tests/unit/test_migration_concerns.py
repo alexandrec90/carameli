@@ -32,8 +32,8 @@ async def test_create_customer_without_api_key_generates_one(client) -> None:
     body = await _create_customer(client, 8101, include_api_key=False)
 
     assert body["vs_customer_id"] == 8101
-    assert isinstance(body["api_key"], str)
-    assert len(body["api_key"]) >= 20
+    assert isinstance(body["plaintext_key"], str)
+    assert len(body["plaintext_key"]) >= 20
 
 
 async def test_voicemail_drop_rejects_invalid_payload(client) -> None:
