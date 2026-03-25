@@ -1,6 +1,6 @@
 ---
 name: update-pricing-table
-description: 'Audit the current tech stack and carrier integrations against charts/pricing/pricing table.md and update any sections that are missing, stale, or incorrectly priced. Covers Telnyx rates, infrastructure tiers, S3 storage, and scaling model.'
+description: 'Audits carrier integrations and infrastructure against charts/pricing/pricing table.md and updates any stale sections. Use after changing Telnyx plans, infrastructure tiers, S3 config, or the scaling model.'
 argument-hint: 'Optional: describe what changed (e.g., "added Twilio as second carrier", "added CDN layer"). If omitted, performs a full scan.'
 ---
 

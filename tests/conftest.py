@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from collections.abc import AsyncGenerator
 from unittest.mock import MagicMock
 
@@ -38,16 +39,48 @@ async def test_engine() -> AsyncGenerator[AsyncEngine, None]:
         echo=False,
         connect_args={"prepared_statement_cache_size": 0},
     )
+    # pytest-xdist spins up one worker per CPU, all sharing the same
+    # PostgreSQL database.  Two races must be prevented:
+    #
+    # 1. Concurrent create_all: SQLAlchemy's check-first is not atomic;
+    #    two workers can both pass the "table doesn't exist" check and then
+    #    both attempt CREATE TABLE, causing a pg_type_typname_nsp_index
+    #    UniqueViolationError.  Solved by a transaction-level advisory lock
+    #    (released on commit) that serialises all create_all calls.
+    #
+    # 2. Teardown race: if we drop tables at the end of each worker's
+    #    session, a fast worker (gw0) finishing unit tests can drop the
+    #    schema while a slow worker (gw1) is still running contract tests.
+    #    Solved by doing ALL cleanup at the START of the next run instead
+    #    of at the end — only the primary worker drops + recreates the
+    #    schema in the setup phase, ensuring a fresh state at run start
+    #    without touching anything during teardown.
+    #
+    # Advisory lock key 7654321987 is also acquired by _contract_env so
+    # that schemathesis tests serialise with this setup.
+    worker_id = os.environ.get("PYTEST_XDIST_WORKER", "master")
+    is_primary = worker_id in ("master", "gw0")
+
     async with engine.begin() as conn:
-        await conn.execute(text("DROP SCHEMA public CASCADE"))
-        await conn.execute(text("CREATE SCHEMA public"))
+        # Acquire lock first so non-primary workers block until the
+        # primary has finished dropping + creating.
+        await conn.execute(text("SELECT pg_advisory_xact_lock(7654321987)"))
+        if is_primary:
+            # Fresh schema at the beginning of each run so leftover data
+            # from a previous (possibly crashed) run cannot affect tests.
+            await conn.execute(text("DROP SCHEMA public CASCADE"))
+            await conn.execute(text("CREATE SCHEMA public"))
+        # create_all is a no-op for tables that already exist (primary
+        # created them above); for non-primary workers this is always a
+        # no-op.  Lock released when this transaction commits.
         await conn.run_sync(Base.metadata.create_all)
+
     try:
         yield engine
     finally:
-        async with engine.begin() as conn:
-            await conn.execute(text("DROP SCHEMA public CASCADE"))
-            await conn.execute(text("CREATE SCHEMA public"))
+        # No schema teardown here — the next run's primary worker will
+        # drop + recreate at startup (see above).  Dropping here would
+        # race with other workers that may still be executing tests.
         await engine.dispose()
 
 

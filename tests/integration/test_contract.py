@@ -18,10 +18,12 @@ from hypothesis import settings as h_settings
 from limits.storage import storage_from_string
 from limits.strategies import STRATEGIES as LIMIT_STRATEGIES
 from slowapi.middleware import SlowAPIMiddleware
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
+import app.models
 from app.core.config import settings
-from app.core.database import get_session
+from app.core.database import Base, get_session
 from app.core.limiter import limiter as rate_limiter
 from app.main import app
 
@@ -36,14 +38,32 @@ schema = schemathesis.openapi.from_asgi("/openapi.json", app)
 
 # ---------------------------------------------------------------------------
 # Module-scoped fixture: mocked carrier/engine boundaries
-# Tables are managed by the session-scoped test_engine in conftest.py.
+# Tables are created here (not via test_engine) to avoid event-loop conflicts
+# between schemathesis sync tests and the session-scoped async engine.
 # ---------------------------------------------------------------------------
 
 
 @pytest_asyncio.fixture(scope="module", autouse=True)
-async def _contract_env(test_engine):
-    """Mock providers, override DB session for all contract cases."""
+async def _contract_env():
+    """Mock providers, override DB session for all contract cases.
+
+    Schemathesis tests are sync — they run through anyio's blocking portal,
+    which uses a different event loop from the session-scoped test_engine.
+    We must NOT share test_engine; instead, create tables with a short-lived
+    engine and give each request its own engine + session.
+    """
     db_url = settings.database_url
+
+    # Ensure tables exist for the per-request engines schemathesis will use.
+    # Use the same advisory lock as test_engine (conftest.py) to serialise
+    # this create_all with any concurrent worker that is still setting up its
+    # schema.  The lock is released when the transaction commits, so the
+    # second caller always finds the tables already created (no-op).
+    _setup = create_async_engine(db_url, connect_args={"prepared_statement_cache_size": 0})
+    async with _setup.begin() as conn:
+        await conn.execute(text("SELECT pg_advisory_xact_lock(7654321987)"))
+        await conn.run_sync(Base.metadata.create_all)
+    await _setup.dispose()
 
     async def _session_override():
         per_req_engine = create_async_engine(

@@ -109,6 +109,21 @@ else {
     # Capture files modified by auto-fix hooks (ruff --fix, ruff-format)
     $autoFixedFiles = @(git diff --name-only 2>$null)
 
+    # Build display-name -> hook-id map from .pre-commit-config.yaml
+    # pre-commit run expects the hook id, not the display name
+    $hookNameToId = @{}
+    $configLines = Get-Content ".pre-commit-config.yaml" -ErrorAction SilentlyContinue
+    $lastId = $null
+    foreach ($cl in $configLines) {
+        if ($cl -match '^\s+-\s+id:\s+(\S+)') {
+            $lastId = $Matches[1].Trim()
+        }
+        elseif ($cl -match '^\s+name:\s+(.+)$' -and $lastId) {
+            $hookNameToId[$Matches[1].Trim()] = $lastId
+            $lastId = $null
+        }
+    }
+
     # Classify each hook before deciding what to do
     $hookTags = [ordered]@{}
     foreach ($hookId in $hooks.Keys) {
@@ -122,8 +137,8 @@ else {
             }
         }
         if ($isMisconfigured) { $hookTags[$hookId] = "misconfigured" }
-        elseif ($isAutoFix)   { $hookTags[$hookId] = "auto-fixed" }
-        else                  { $hookTags[$hookId] = "error" }
+        elseif ($isAutoFix) { $hookTags[$hookId] = "auto-fixed" }
+        else { $hookTags[$hookId] = "error" }
     }
 
     # If every failure is an auto-fix, stage any real changes and re-run (or
@@ -139,12 +154,15 @@ else {
             }
 
             $retryAllPassed = $true
+            $retryLines = [System.Collections.Generic.List[string]]::new()
             foreach ($hid in $failedIds) {
-                pre-commit run $hid --all-files 2>&1 | ForEach-Object {
+                $runId = if ($hookNameToId.ContainsKey($hid)) { $hookNameToId[$hid] } else { $hid }
+                pre-commit run $runId --all-files 2>&1 | ForEach-Object {
                     $rl = "$_"
+                    $retryLines.Add($rl)
                     switch -Regex ($rl) {
                         "Passed|passed" { Write-Host "  [pass] $rl" -ForegroundColor Green; break }
-                        "Failed|failed" { Write-Host "  [FAIL] $rl" -ForegroundColor Red;   break }
+                        "Failed|failed" { Write-Host "  [FAIL] $rl" -ForegroundColor Red; break }
                         "Skipped|skipped" { Write-Host "  [skip] $rl" -ForegroundColor Yellow; break }
                         default { Write-Host "  $rl" }
                     }
@@ -165,7 +183,33 @@ else {
                 Write-Host ""
                 exit 0
             }
-            # Retry still failed -- fall through to write artifact
+            # Retry still failed -- re-parse retry output so artifact reflects
+            # the actual errors, not the stale "auto-fixed" first-run data.
+            $hooks = [ordered]@{}
+            $hookHeaders = [ordered]@{}
+            $currentHook = $null
+            for ($ri = 0; $ri -lt $retryLines.Count; $ri++) {
+                $rl = $retryLines[$ri]
+                if ($rl -match "^(.+?)\.{3,}.*(Passed|Failed|Skipped)") {
+                    $hookName = $Matches[1].Trim()
+                    $result = $Matches[2]
+                    if ($result -eq "Failed") {
+                        $currentHook = $hookName
+                        $hooks[$currentHook] = [System.Collections.Generic.List[string]]::new()
+                        $hookHeaders[$currentHook] = $rl
+                    }
+                    else { $currentHook = $null }
+                    continue
+                }
+                if ($null -ne $currentHook -and $rl.Trim() -ne "") {
+                    $hooks[$currentHook].Add($rl)
+                }
+            }
+            $hookTags = [ordered]@{}
+            foreach ($hk in $hooks.Keys) {
+                $hookTags[$hk] = "error"
+            }
+            # fall through to write artifact
         }
         else {
             # Hook reports "files were modified" but git sees no changes --

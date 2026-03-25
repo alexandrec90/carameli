@@ -1,6 +1,6 @@
 ---
 name: add-endpoint
-description: 'Add a Carameli API endpoint following logging and provider conventions.'
+description: 'Adds a FastAPI route handler with Pydantic schemas, service wiring, and logging. Use when creating a new REST endpoint for the Carameli API.'
 argument-hint: 'Optional endpoint name or route path (e.g., "/PhoneLine/UpdateCallRecording")'
 ---
 
@@ -87,3 +87,13 @@ Integration test (`tests/integration/test_<domain>.py`):
 
 Run `docker compose up` and open `http://localhost:8000/docs`. Confirm the
 new route appears with correct method, path, and schema.
+
+## Checklist
+
+- [ ] Contract defined (method, path, request/response shape)
+- [ ] Pydantic schemas added in `app/schemas/<domain>.py`
+- [ ] Route handler added with auth dependency and logging
+- [ ] Service method implemented (async, provider-injected)
+- [ ] Repository method added (if DB access needed)
+- [ ] Unit + integration tests written
+- [ ] New endpoint visible in OpenAPI docs

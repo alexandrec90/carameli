@@ -1,6 +1,6 @@
 ---
 name: stack-review
-description: 'Audit the current tech stack and surface prioritized modernization recommendations.'
+description: 'Audits the current tech stack and surfaces prioritized modernization recommendations. Use when evaluating dependencies, frameworks, or infrastructure for upgrades or replacements.'
 argument-hint: 'Optional: "dismiss <id>" to remove a recommendation, "implement <id>" to action one, or "implement-all" to batch-implement all pending items via parallel agents'
 ---
 

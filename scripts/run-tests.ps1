@@ -148,7 +148,7 @@ $blockLines = $null        # filtered lines for the current single test
 $rawBlockLines = $null     # unfiltered lines for the current single test (fallback)
 $maxPerBlock = 25          # max lines kept per failure/error
 
-function Flush-Block {
+function Invoke-FlushBlock {
     if ($null -ne $script:blockLines -and $script:blockLines.Count -gt 0) {
         # If the filter produced nothing useful (only the ___ header), fall back to the
         # raw block lines so an AI agent always has traceback context to work from.
@@ -184,7 +184,7 @@ for ($i = 0; $i -lt $lines.Count; $i++) {
             break
         }
         "^={3,}\s+short test summary" {
-            Flush-Block
+            Invoke-FlushBlock
             $inBlock = $false
             $filtered.Add($l)
             break
@@ -195,7 +195,7 @@ for ($i = 0; $i -lt $lines.Count; $i++) {
             break
         }
         "^_{3,}\s+" {
-            Flush-Block
+            Invoke-FlushBlock
             $blockLines.Add($l)
             $rawBlockLines.Add($l)
             break
@@ -249,7 +249,7 @@ for ($i = 0; $i -lt $lines.Count; $i++) {
         }
     }
 }
-Flush-Block
+Invoke-FlushBlock
 
 # Append the final stats line (e.g. "=== 58 failed, 49 passed ... ===")
 for ($i = $lines.Count - 1; $i -ge 0; $i--) {

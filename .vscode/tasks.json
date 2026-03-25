@@ -337,6 +337,32 @@
         "close": false
       },
       "problemMatcher": []
+    },
+    {
+      "label": "Test: Run CI Locally",
+      "type": "shell",
+      "command": "pwsh -ExecutionPolicy Bypass -File scripts/run-ci.ps1; $_ec = $LASTEXITCODE; pwsh -ExecutionPolicy Bypass -File scripts/notify.ps1 -Label 'Test: Run CI Locally' -ExitCode $_ec; exit $_ec",
+      "group": "test",
+      "presentation": {
+        "reveal": "always",
+        "panel": "new",
+        "showReuseMessage": false,
+        "close": false
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Test: Run CI Locally (skip E2E)",
+      "type": "shell",
+      "command": "pwsh -ExecutionPolicy Bypass -File scripts/run-ci.ps1 -SkipE2E; $_ec = $LASTEXITCODE; pwsh -ExecutionPolicy Bypass -File scripts/notify.ps1 -Label 'Test: Run CI Locally (skip E2E)' -ExitCode $_ec; exit $_ec",
+      "group": "test",
+      "presentation": {
+        "reveal": "always",
+        "panel": "new",
+        "showReuseMessage": false,
+        "close": false
+      },
+      "problemMatcher": []
     }
   ],
   "inputs": [

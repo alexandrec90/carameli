@@ -1,6 +1,6 @@
 ---
 name: fix-lint
-description: 'Fix lint errors from logs/lint-errors.log (written by the Lint: Everything task).'
+description: 'Fixes lint errors from logs/lint-errors.log (written by the Lint: Everything task).'
 argument-hint: '(no arguments)'
 ---
 

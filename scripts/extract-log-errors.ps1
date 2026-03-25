@@ -32,7 +32,7 @@ if ($logFiles.Count -eq 0) {
 }
 
 # Grep for ERROR and WARNING lines
-$matches = [System.Collections.Generic.List[string]]::new()
+$logMatches = [System.Collections.Generic.List[string]]::new()
 $seen    = [System.Collections.Generic.HashSet[string]]::new()
 
 foreach ($file in $logFiles) {
@@ -41,7 +41,7 @@ foreach ($file in $logFiles) {
             # Dedupe key: module:line + message (strip timestamp so repeats collapse)
             $key = $line -replace "^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3} \| ", ""
             if ($seen.Add($key)) {
-                $matches.Add($line)
+                $logMatches.Add($line)
             }
         }
     }
@@ -57,7 +57,7 @@ if (Test-Path $mainLog) {
             while ($j -lt $lines.Count -and $lines[$j] -notmatch "^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3} \|") {
                 $tbLine = $lines[$j].Trim()
                 if ($tbLine -ne "" -and $seen.Add("tb:$tbLine")) {
-                    $matches.Add("  $($lines[$j])")
+                    $logMatches.Add("  $($lines[$j])")
                 }
                 $j++
             }
@@ -65,7 +65,7 @@ if (Test-Path $mainLog) {
     }
 }
 
-if ($matches.Count -eq 0) {
+if ($logMatches.Count -eq 0) {
     Write-Host "No errors or warnings found." -ForegroundColor Green
     Set-Content $artifact ""
     Write-Host ""
@@ -77,15 +77,15 @@ if ($matches.Count -eq 0) {
 }
 
 # Write artifact
-$matches | Set-Content $artifact -Encoding utf8
+$logMatches | Set-Content $artifact -Encoding utf8
 
 # Truncate the main log so next extraction only sees new entries
 if (Test-Path $mainLog) {
     Clear-Content $mainLog
 }
 
-$errorCount   = @($matches | Where-Object { $_ -match "\| ERROR\s+\|" }).Count
-$warningCount = @($matches | Where-Object { $_ -match "\| WARNING\s+\|" }).Count
+$errorCount   = @($logMatches | Where-Object { $_ -match "\| ERROR\s+\|" }).Count
+$warningCount = @($logMatches | Where-Object { $_ -match "\| WARNING\s+\|" }).Count
 
 Write-Host "  Errors   : $errorCount" -ForegroundColor Red
 Write-Host "  Warnings : $warningCount" -ForegroundColor Yellow

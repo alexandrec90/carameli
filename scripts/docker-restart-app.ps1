@@ -11,10 +11,10 @@ $projectFilter = "label=com.docker.compose.project=$project"
 $appServiceFilter = "label=com.docker.compose.service=app"
 
 # docker logs can hang on stuck containers; wrap with a 10-second timeout.
-function Get-DockerLogs([string]$Container, [int]$Tail = 40, [int]$Timeout = 10) {
+function Get-DockerLog([string]$Container, [int]$Tail = 40, [int]$Timeout = 10) {
     $job = Start-Job -ScriptBlock {
-        param($c, $t) docker logs $c --tail $t 2>&1
-    } -ArgumentList $Container, $Tail
+        docker logs $Using:Container --tail $Using:Tail 2>&1
+    }
     $done = $job | Wait-Job -Timeout $Timeout
     if ($done) {
         $result = Receive-Job $job
@@ -98,7 +98,7 @@ if ($health -match "unhealthy|Exited|exited|Dead|dead") {
         "App status after restart: $health"
         ""
         "=== docker ps (project containers) ==="
-    ) + (docker ps -a --filter $projectFilter --format "table {{.Names}}\t{{.Status}}" 2>&1) + @("", "=== logs: app (last 40 lines) ===") + (Get-DockerLogs "${project}-app-1" -Tail 40)
+    ) + (docker ps -a --filter $projectFilter --format "table {{.Names}}\t{{.Status}}" 2>&1) + @("", "=== logs: app (last 40 lines) ===") + (Get-DockerLog "${project}-app-1" -Tail 40)
     $errorLines | Set-Content $artifact
     Write-Host ""
     Write-Host "Errors written to: $artifact" -ForegroundColor Red

@@ -19,7 +19,7 @@ for ($i = 1; $i -le 20; $i++) {
         $response = Invoke-RestMethod -Uri "http://localhost:4040/api/tunnels" -ErrorAction SilentlyContinue
         $Url = $response.tunnels | Where-Object { $_.proto -eq "https" } | Select-Object -ExpandProperty public_url -First 1
         if ($Url) { break }
-    } catch { }
+    } catch { Write-Verbose "ngrok API not ready: $_" }
     Write-Host "Waiting for tunnel... ($i/20)"
 }
 
@@ -30,8 +30,8 @@ if (-not $Url) {
 
 Write-Host "Tunnel URL: $Url"
 
-# Patch .env — update existing line or append
-function Patch-Env {
+# Patch .env -- update existing line or append
+function Set-EnvVar {
     param($Key, $Val)
     $content = Get-Content $EnvFile -Raw
     if ($content -match "(?m)^${Key}=.*$") {
@@ -44,9 +44,9 @@ function Patch-Env {
     Set-Content $EnvFile $content -NoNewline
 }
 
-Patch-Env "JAMBONZ_WEBHOOK_BASE_URL" $Url
-Patch-Env "TELNYX_WEBHOOK_BASE_URL"  $Url
-Patch-Env "NGROK_URL"               $Url
+Set-EnvVar "JAMBONZ_WEBHOOK_BASE_URL" $Url
+Set-EnvVar "TELNYX_WEBHOOK_BASE_URL"  $Url
+Set-EnvVar "NGROK_URL"               $Url
 
 # Restart the app so it picks up the new env
 Write-Host "Restarting app container..."

@@ -1,6 +1,6 @@
 ---
 name: refactor
-description: 'Refactor first-party source files using the state.json workflow.'
+description: 'Refactors first-party source files using a state.json tracking workflow. Use when improving code quality, reducing complexity, or applying consistent style fixes across a set of files.'
 argument-hint: 'Optional focus path or file (e.g., "frontend/src/pages")'
 ---
 

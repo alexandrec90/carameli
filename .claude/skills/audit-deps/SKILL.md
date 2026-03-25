@@ -1,6 +1,6 @@
 ---
 name: audit-deps
-description: 'Audit requirements.txt and requirements-dev.txt for unused, missing, or misplaced Python dependencies. Detects prod deps that belong in dev, dev deps leaking into prod, and imports with no matching requirement.'
+description: 'Audits requirements.txt and requirements-dev.txt for unused, missing, or misplaced Python dependencies. Use when adding or removing packages, or when imports do not match listed requirements.'
 argument-hint: 'No arguments needed — always scans and applies any required updates.'
 ---
 
@@ -112,3 +112,13 @@ Preserve existing version specifiers, comments, and sort order.
 ## Step 6 — Verify
 
 Print a final summary of changes made and any packages flagged as uncertain.
+
+## Checklist
+
+- [ ] `requirements.txt` and `requirements-dev.txt` read
+- [ ] All `app/`, `tests/`, and `alembic/` imports scanned
+- [ ] Each dependency classified (prod / dev / unused / transitive / missing)
+- [ ] Misplaced dependencies moved to correct file
+- [ ] Missing dependencies added
+- [ ] Unused dependencies removed (or flagged if uncertain)
+- [ ] Final summary printed

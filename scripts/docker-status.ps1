@@ -30,7 +30,7 @@ function Invoke-DockerWithTimeout {
     return @{ Output = "[TIMEOUT] $Label timed out after ${Timeout}s"; ExitCode = 1; TimedOut = $true }
 }
 
-function Get-DockerLogs([string]$Container, [int]$Tail = 40, [int]$Timeout = 10) {
+function Get-DockerLog([string]$Container, [int]$Tail = 40, [int]$Timeout = 10) {
     $r = Invoke-DockerWithTimeout -Timeout $Timeout -Label "docker logs $Container" -ScriptBlock {
         param($c, $t) docker logs $c --tail $t 2>&1
     } -ArgumentList $Container, $Tail
@@ -191,7 +191,7 @@ else {
 
     foreach ($svc in $sick) {
         Write-Host "--- Logs: $svc (last 40 lines) ---" -ForegroundColor Yellow
-        $svcLogs = Get-DockerLogs "${project}-${svc}-1" -Tail 40
+        $svcLogs = Get-DockerLog "${project}-${svc}-1" -Tail 40
         $svcLogs | ForEach-Object { Write-Host "  $_" -ForegroundColor DarkGray }
         Write-Host ""
 
@@ -244,7 +244,7 @@ if ($appStatusResult.TimedOut -or $appStatus -notmatch "Up|running|Restarting|Ex
 }
 else {
     Write-Host "--- App Logs (last 100 lines) ---" -ForegroundColor Yellow
-    $appLogs = Get-DockerLogs "${project}-app-1" -Tail 100
+    $appLogs = Get-DockerLog "${project}-app-1" -Tail 100
     $appLogs | ForEach-Object { Write-Host "  $_" -ForegroundColor DarkGray }
 
     $appLogLines += "App status: $appStatus"

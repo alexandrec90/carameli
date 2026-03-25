@@ -18,6 +18,7 @@ If you also want to run all local lint/dev tasks from VS Code, install these hos
 | `Start: Frontend Dev Server`, `Lint: JS`, `Lint: TypeScript`, `Lint: CSS`, `Lint: Spelling`, `Lint: Markdown` | Node.js + npm (then run `npm --prefix frontend install`) |
 | `Lint: Python` | Python 3.12 + `pip install -r requirements-dev.txt` |
 | `Lint: Env` | `dotenv-linter` CLI on host machine |
+| `Lint: PowerShell` | PSScriptAnalyzer PowerShell module (see install notes below) |
 
 Note: if you plan to work on 3‑D UI components, the `three`/`@react-three` packages are included as dependencies.
 
@@ -31,6 +32,17 @@ This repo now includes `.vscode/extensions.json`. VS Code will prompt to install
 
 - **Windows**: install with your preferred package manager (for example, Chocolatey or Scoop)
 - **Cross-platform**: install via Cargo (`cargo install dotenv-linter`) if you already use Rust tooling
+
+### `PSScriptAnalyzer` install notes
+
+PSScriptAnalyzer is a PowerShell module (not a Python package — it is not in `requirements-dev.txt`):
+
+```powershell
+Install-Module PSScriptAnalyzer -Scope CurrentUser
+```
+
+Run once on any machine where you need the `Lint: Everything` task to check `scripts/*.ps1`.
+The linter will skip gracefully with `[skip]` if the module is not installed.
 
 ---
 

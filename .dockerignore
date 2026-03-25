@@ -16,6 +16,10 @@ logs/
 
 # Tests — run on host or via docker compose exec, not baked into image
 tests/
+coverage/
+htmlcov/
+.coverage
+.coverage.*
 
 # AI / editor config
 .claude/
@@ -55,6 +59,16 @@ todo.md
 prometheus.yml
 docker-compose.yml
 nginx.conf
+
+# Secrets / certificates (defense-in-depth; tls/ above handles the main dir)
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+*.cer
+.npmrc
+.pypirc
 
 # Local dev
 .env

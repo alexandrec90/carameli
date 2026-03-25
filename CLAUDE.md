@@ -70,28 +70,7 @@ window via `.claudeignore`.
 | IntellectiveRouting / CallerRouting | SCI routing (`app/api/vsapi/sci.py`) |
 | DID provisioning (phone number lifecycle) | `app/services/did_manager.py` |
 
-### Relevant VanillaLand paths
-
-| Path | What to look for |
-| --- | --- |
-| `AppCode/VanillaSoft.Backend/ConnectMeVoice/` | Call initiation, recording, IVR, voicemail-drop business logic |
-| `AppCode/VanillaSoft.Backend/SMS/` | SMS send/receive, opt-out handling |
-| `AppCode/VanillaSoft.Backend/Phone/`, `PhoneNumber/` | DID provisioning, number lifecycle |
-| `AppCode/VanillaSoft.Backend/Routing/`, `IntellectiveRouting/` | SCI / zip-code routing rules |
-| `AppCode/VanillaSoft.Backend/Recording/` | Recording storage, retrieval, cleanup |
-| `AppCode/VanillaSoft.Backend/Customer/` | Customer account structure |
-| `AppCode/VanillaSoft.Model/VoIP/` | `VoIPEntities` — canonical VoIP data shapes |
-| `AppCode/VanillaSoft.Model/SMS/`, `User/SMS/` | SMS message and user-level config models |
-| `AppCode/VanillaSoft.Model/Recording/`, `Contact/CallHistory/` | Call record and recording models |
-| `AppCode/VanillaSoft.Model/PhoneNumber/` | Phone number entity |
-| `AppCode/VanillaSoft.Model/Customer/` | Customer entity |
-| `AppCode/Vanillasoft.Webservice/` | ASMX service contracts Carameli's REST API replaces |
-| `AppCode/ConnectMeVoice/` | CMV client — call + message-drop API surface |
-| `AppCode/CMVAgentStatus*/` | Agent presence (potential future feature) |
-| `AppCode/CMVRecordings*/`, `CMVUrlUploader*/` | Recording storage/upload patterns |
-| `AppCode/InBoundMessaging*/` | Inbound SMS webhook handling patterns |
-| `AppCode/SMSService/` | SMS processing queue |
-| `AppCode/vsoft_CallComplianceSvr/` | Call compliance server |
+See `.claude/rules/vanillaland-paths.md` for the full path reference table.
 
 ## Front-End (Carameli UI)
 

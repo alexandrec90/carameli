@@ -4,14 +4,16 @@ import logging
 import uuid
 from datetime import UTC, datetime
 
-from pydantic import BaseModel, Field, field_serializer, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_serializer, field_validator
 
 logger = logging.getLogger(__name__)
 
 
 class AddExtensionRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     vs_customer_id: int = Field(ge=1, le=2147483647)
-    extension_number: str = Field(max_length=20)
+    extension_number: str = Field(max_length=20, pattern=r"^[^\x00]*$")
     password: str | None = None
 
     @field_validator("extension_number", mode="before")

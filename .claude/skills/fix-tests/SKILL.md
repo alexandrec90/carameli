@@ -1,6 +1,6 @@
 ---
 name: fix-tests
-description: 'Fix test failures from logs/test-failures.log (written by the Test: Run pytest task).'
+description: 'Fixes test failures from logs/test-failures.log (written by the Test: Run pytest task).'
 argument-hint: '(no arguments)'
 ---
 
@@ -30,6 +30,17 @@ Then **stop** — do not re-triage or re-fix anything.
 The `Test: Run pytest` task overwrites the entire file on each run, so the marker is
 naturally cleared whenever the user re-runs tests.
 
+### Known-fix lookup
+
+Before reasoning about each failure, read `.claude/skills/fix-tests/known-fixes.md`.
+For every collected error, check if any **Error pattern** substring appears in the
+traceback or error line. If a match is found, apply the documented fix directly as a
+one-shot — do not re-derive the solution from scratch.
+
+For every matched row, increment its **Hits** column by 1 and set **Last used** to
+today's date (`YYYY-MM-DD`). Do this in the same Edit call that stamps
+`--- ADDRESSED` — no extra tool call needed.
+
 ### Triage
 
 If the file is **not** addressed, collect lines starting with `FAILED` or `ERROR` and the
@@ -50,6 +61,29 @@ For each failure:
 **After fixing** all actionable failures, append the line `--- ADDRESSED` to the end of
 `logs/test-failures.log` using the Edit tool. This prevents the same failures from being
 re-triaged on the next `/fix-tests` invocation.
+
+### Update known-fixes table
+
+After all fixes are applied, review the failures you just fixed. If any failure
+**was not already covered** by a row in `known-fixes.md` and its error pattern is
+likely to recur (i.e., it is not a one-off typo), append a new row to the table in
+`.claude/skills/fix-tests/known-fixes.md` with:
+
+- **Error pattern** — the shortest distinctive substring from the traceback/error line
+- **Root cause** — one-line explanation
+- **Fix** — the action you took
+- **Hits** — `1`
+- **Last used** — today's date
+- **Added** — today's date
+
+Do **not** add entries for unique, non-recurring mistakes (e.g., a misspelled variable
+name in one test). Only add patterns that could plausibly appear again.
+
+### Prune stale entries
+
+While editing `known-fixes.md`, check for rows where **Hits = 0** and **Added** is
+more than 90 days ago. Delete those rows — they were seeded but never matched a real
+failure, so they just consume context tokens for no benefit.
 
 **Stop conditions:**
 

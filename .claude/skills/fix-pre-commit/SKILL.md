@@ -1,6 +1,6 @@
 ---
 name: fix-pre-commit
-description: 'Fix pre-commit hook errors from logs/pre-commit-errors.log (written by the git pre-commit hook or the Pre-Commit: Run All Hooks task).'
+description: 'Fixes pre-commit hook errors from logs/pre-commit-errors.log (written by the git pre-commit hook or the Pre-Commit: Run All Hooks task).'
 argument-hint: '(no arguments)'
 ---
 

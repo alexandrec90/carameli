@@ -1,6 +1,6 @@
 ---
 name: lint-secrets
-description: 'Grep-based Carameli-specific credential hygiene checker. Detects credential fields in response schemas and raw env-var bypass of pydantic-settings — fast, no file-reading loop.'
+description: 'Grep-based credential hygiene checker. Detects credential fields in response schemas and raw env-var bypass of pydantic-settings. Use when reviewing new endpoints or schemas for accidental secret exposure.'
 argument-hint: 'Optional: "fix" to auto-fix any violations found'
 ---
 

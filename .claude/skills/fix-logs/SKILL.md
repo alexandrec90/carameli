@@ -1,6 +1,6 @@
 ---
 name: fix-logs
-description: 'Fix runtime errors from logs/log-errors.log (written by the Log: Extract Errors task).'
+description: 'Fixes runtime errors from logs/log-errors.log (written by the Log: Extract Errors task).'
 argument-hint: '"backend" | "frontend" — optional scope filter'
 ---
 

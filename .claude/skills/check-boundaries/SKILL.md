@@ -1,6 +1,6 @@
 ---
 name: check-boundaries
-description: 'Grep-based structural invariant checker. Detects provider leaks, layer violations, and blocking I/O in async handlers — fast, no file-reading loop.'
+description: 'Grep-based checker for provider leaks, layer violations, and blocking I/O in async handlers. Use when reviewing code changes or running a pre-commit structural audit.'
 argument-hint: 'Optional: "fix" to auto-fix any violations found'
 ---
 

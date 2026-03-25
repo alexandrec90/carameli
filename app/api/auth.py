@@ -64,7 +64,11 @@ async def destroy_session(response: Response) -> SessionResponse:
     return SessionResponse(ok=True)
 
 
-@router.get("/me", response_model=MeResponse)
+@router.get(
+    "/me",
+    response_model=MeResponse,
+    responses={401: {"description": "Unauthorized"}},
+)
 async def get_current_user(
     auth: Annotated[AuthContext, Depends(get_auth_context)],
 ) -> MeResponse:

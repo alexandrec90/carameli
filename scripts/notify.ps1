@@ -63,7 +63,7 @@ if (-not $notified) {
         [console]::Beep(1200, 150)
     }
     catch {
-        # Ignore bell errors on hosts that do not support it.
+        Write-Verbose "Bell not supported on this host: $_"
     }
 
     Write-Host "[$title] $body"

@@ -1,6 +1,6 @@
 ---
 name: add-skin
-description: 'Scaffold a new frontend skin and register it in the skin system.'
+description: 'Scaffolds a new frontend skin and registers it in the skin system. Use when creating a new visual theme or UI layout variant for the frontend.'
 argument-hint: 'Skin name (e.g., "candy-shop")'
 ---
 

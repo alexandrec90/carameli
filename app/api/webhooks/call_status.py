@@ -106,13 +106,16 @@ async def jambonz_call_status_webhook(
 
     # Resolve customer_id from To/From numbers when available.
     customer_id = None
-    for phone_number in (data.get("to", ""), data.get("from", "")):
-        if not phone_number:
-            continue
-        phone_line = await phone_line_service.get_by_phone_number_global(session, phone_number)
-        if phone_line:
-            customer_id = phone_line.customer_id
-            break
+    try:
+        for phone_number in (data.get("to", ""), data.get("from", "")):
+            if not phone_number:
+                continue
+            phone_line = await phone_line_service.get_by_phone_number_global(session, phone_number)
+            if phone_line:
+                customer_id = phone_line.customer_id
+                break
+    except Exception:
+        logger.warning("Customer resolution failed for call_sid=%s", call_sid, exc_info=True)
 
     try:
         call_event = await call_event_service.create_from_webhook(

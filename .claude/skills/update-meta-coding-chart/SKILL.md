@@ -1,6 +1,6 @@
 ---
 name: update-meta-coding-chart
-description: 'Scan the Carameli codebase for meta-coding tools (linters, type checkers, test runners, security scanners, AI config, pre-commit hooks, VS Code tasks, scripts) and update charts/meta coding/meta coding chart.mmd and charts/meta coding/meta coding legend.md if needed.'
+description: 'Scans the Carameli codebase for meta-coding tools and updates charts/meta coding/ if needed. Use after adding linters, type checkers, test runners, security scanners, AI config, pre-commit hooks, VS Code tasks, or scripts.'
 argument-hint: 'No arguments needed — always scans and applies any required updates.'
 ---
 

@@ -11,7 +11,7 @@ class PostSciByZipCodeRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     vs_customer_id: int = Field(ge=1, le=2147483647)
-    extension_number: str
+    extension_number: str = Field(pattern=r"^[^\x00]*$")
     zip_code: str = Field(pattern=r"^\d{3}(\d{2})?$")
     enabled: StrictBool = True
 
@@ -41,7 +41,7 @@ class UpdateSciUserOptionRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     vs_customer_id: int = Field(ge=1, le=2147483647)
-    extension_number: str
+    extension_number: str = Field(pattern=r"^[^\x00]*$")
     enabled: StrictBool
 
     @field_validator("extension_number", mode="before")

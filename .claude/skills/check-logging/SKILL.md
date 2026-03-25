@@ -1,6 +1,6 @@
 ---
 name: check-logging
-description: 'Grep-based logging coverage checker. Detects silent exception swallowing, missing module-level loggers, and route handlers with no log calls — fast, no file-reading loop.'
+description: 'Grep-based logging coverage checker. Detects silent exception swallowing, missing module-level loggers, and route handlers with no log calls. Use when auditing logging coverage or reviewing new code.'
 argument-hint: 'Optional: "fix" to auto-fix any violations found'
 ---
 

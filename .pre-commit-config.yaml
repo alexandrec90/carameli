@@ -42,7 +42,7 @@ repos:
       - id: pip-audit
         name: pip-audit
         language: system
-        entry: pip-audit
+        entry: pip-audit --ignore-vuln CVE-2026-4539
         files: requirements.*\.txt$
         pass_filenames: false
 

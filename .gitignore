@@ -50,6 +50,9 @@ env/
 .coverage
 .coverage.*
 htmlcov/
+.testmondata
+.testmondata-shm
+.testmondata-wal
 
 # Logs
 *.log

@@ -17,7 +17,19 @@
       "Bash(pwsh:*)",
       "Bash(ls:*)",
       "Bash(pip install:*)",
-      "Bash(pip show:*)"
+      "Bash(pip show:*)",
+      "Edit(/.claude/skills/audit-skills/**)",
+      "Edit(/.claude/skills/audit-claude-md/**)",
+      "Edit(/.claude/skills/fix-tests/**)",
+      "Edit(/.claude/skills/fix-lint/**)",
+      "Edit(/.claude/skills/fix-logs/**)",
+      "Edit(/.claude/skills/fix-pre-commit/**)",
+      "Edit(/.claude/skills/update-project-metadata/**)",
+      "Edit(/.claude/skills/review/**)",
+      "Edit(/.claude/skills/add-endpoint/**)",
+      "Edit(/.claude/skills/audit-deps/**)",
+      "Edit(/.claude/skills/make-frontend-tests/**)",
+      "Edit(/.claude/skills/add-skin/**)"
     ]
   },
   "effortLevel": "high"

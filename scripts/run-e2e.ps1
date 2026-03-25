@@ -15,10 +15,10 @@ $ErrorActionPreference = "Continue"
 $artifact = "logs/e2e-failures.log"
 if (-not (Test-Path "logs")) { New-Item -ItemType Directory -Path "logs" | Out-Null }
 
-$args = @("tests/e2e/", "-v", "--tb=short")
-if ($Headed) { $args += "--headed" }
+$e2eArgs = @("tests/e2e/", "-v", "--tb=short")
+if ($Headed) { $e2eArgs += "--headed" }
 
-$output = & pytest @args 2>&1
+$output = & pytest @e2eArgs 2>&1
 $exitCode = $LASTEXITCODE
 
 if ($exitCode -eq 0) {

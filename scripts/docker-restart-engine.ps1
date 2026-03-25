@@ -28,7 +28,8 @@ if ($isAdmin) {
     Write-Host "Stopping com.docker.service Windows service..." -ForegroundColor Yellow
     Stop-Service com.docker.service -Force -ErrorAction SilentlyContinue
     Start-Sleep -Seconds 1
-} else {
+}
+else {
     Write-Host "  [WARN] Not running as Admin -- skipping service stop (process kill only)" -ForegroundColor DarkYellow
 }
 
@@ -48,7 +49,8 @@ if ($isAdmin) {
 if (Test-Path $dockerDesktopExe) {
     Write-Host "Launching Docker Desktop..." -ForegroundColor Yellow
     Start-Process $dockerDesktopExe
-} else {
+}
+else {
     Write-Host "  [ERROR] Docker Desktop not found at $dockerDesktopExe" -ForegroundColor Red
     Write-Host "  Set `$dockerDesktopExe at the top of this script if installed elsewhere." -ForegroundColor Red
     exit 1
@@ -68,7 +70,7 @@ while ($elapsed -lt $pollTimeout) {
     $job = Start-Job -ScriptBlock { docker info 2>&1 }
     $done = $job | Wait-Job -Timeout $probeTimeout
     if ($done) {
-        $result = Receive-Job $job
+        $null = Receive-Job $job
         $ok = $job.ChildJobs[0].JobStateInfo.Reason.ExitCode
         if ($null -eq $ok) { $ok = if ($job.State -eq 'Completed') { 0 } else { 1 } }
         Remove-Job $job -Force
@@ -81,7 +83,8 @@ while ($elapsed -lt $pollTimeout) {
             exit 0
         }
         Write-Host "  Not ready yet... (${elapsed}s)" -ForegroundColor DarkGray
-    } else {
+    }
+    else {
         Stop-Job $job; Remove-Job $job -Force
         Write-Host "  docker info timed out... (${elapsed}s)" -ForegroundColor DarkGray
     }

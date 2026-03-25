@@ -1,6 +1,6 @@
 ---
 name: update-project-metadata
-description: 'Audit and refresh all Claude Code project metadata: root and subdirectory CLAUDE.md files, .claude/rules/, .claudeignore, and settings.local.json permissions. Run after tech stack changes, folder restructures, or new integrations.'
+description: 'Audits and refreshes all Claude Code project metadata: root and subdirectory CLAUDE.md files, .claude/rules/, .claudeignore, and settings.local.json permissions. Use after tech stack changes, folder restructures, or new integrations.'
 argument-hint: 'No arguments needed — always scans and applies any required updates.'
 ---
 

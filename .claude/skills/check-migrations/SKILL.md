@@ -1,6 +1,6 @@
 ---
 name: check-migrations
-description: 'Audit Alembic migration health: linear history, no model drift, non-empty downgrade paths.'
+description: 'Audits Alembic migration health: linear history, no model drift, non-empty downgrade paths. Use after modifying SQLAlchemy models or before deploying to catch drift.'
 argument-hint: 'Optional: "fix" to scaffold missing downgrade bodies or stubs for drift'
 ---
 

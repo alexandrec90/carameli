@@ -1,6 +1,6 @@
 ---
 name: update-tech-stack-chart
-description: 'Scan the Carameli codebase for runtime tech components and update charts/tech stack/tech stack legend.md and charts/tech stack/tech stack chart.mmd if needed. Excludes meta/tooling software (linters, AI tools, formatters, test runners, etc.).'
+description: 'Scans the Carameli codebase for runtime tech components and updates charts/tech stack/ if needed. Use after adding, removing, or upgrading runtime dependencies or infrastructure components.'
 argument-hint: 'No arguments needed — always scans and applies any required updates.'
 ---
 

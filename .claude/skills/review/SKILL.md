@@ -1,6 +1,6 @@
 ---
 name: review
-description: 'Run all structural invariant checks (boundaries, secrets, migrations, logging) and fix any violations found.'
+description: 'Runs all structural invariant checks (boundaries, secrets, migrations, logging) and fixes any violations found. Use before committing or when performing a broad code review.'
 argument-hint: 'No arguments — always checks and fixes.'
 ---
 
@@ -16,7 +16,7 @@ spawn **only for checks that had violations** — sequentially to avoid write co
 Spawn one **Explore** agent with this prompt:
 
 > You are running detection-only passes for four structural checks on the Carameli project at
-> `c:\Users\Administrator\Desktop\vs_code\carameli`. **Do NOT modify any files.**
+> `c:/Users/Administrator/Desktop/vs_code/carameli`. **Do NOT modify any files.**
 >
 > Use the Grep tool for grep checks and Bash for docker commands. Run all checks.
 >
@@ -51,7 +51,7 @@ Spawn one **Explore** agent with this prompt:
 > ### MIGRATIONS (3 checks)
 >
 > **M1 — Linear history**
-> Run: `docker compose -f c:\Users\Administrator\Desktop\vs_code\carameli\docker-compose.yml exec app alembic history --verbose 2>&1`
+> Run: `docker compose -f c:/Users/Administrator/Desktop/vs_code/carameli\docker-compose.yml exec app alembic history --verbose 2>&1`
 > Flag any line containing `(branchpoint)` or `(mergepoint)`.
 >
 > **M2 — Downgrade completeness**
@@ -59,7 +59,7 @@ Spawn one **Explore** agent with this prompt:
 > the function body is only `pass` or a comment — flag those as WARNING.
 >
 > **M3 — Model drift**
-> Run: `docker compose -f c:\Users\Administrator\Desktop\vs_code\carameli\docker-compose.yml exec app alembic check 2>&1`
+> Run: `docker compose -f c:/Users/Administrator/Desktop/vs_code/carameli\docker-compose.yml exec app alembic check 2>&1`
 > Non-zero exit = VIOLATION.
 >
 > ---
@@ -120,7 +120,7 @@ Spawn in this order if the group has violations:
 ### Fix agent: Boundaries
 >
 > You are fixing boundary violations in the Carameli project at
-> `c:\Users\Administrator\Desktop\vs_code\carameli`.
+> `c:/Users/Administrator/Desktop/vs_code/carameli`.
 >
 > Violations identified:
 > [insert the BOUNDARIES lines from Phase 1 here]
@@ -132,7 +132,7 @@ Spawn in this order if the group has violations:
 ### Fix agent: Secrets
 >
 > You are fixing secret hygiene violations in the Carameli project at
-> `c:\Users\Administrator\Desktop\vs_code\carameli`.
+> `c:/Users/Administrator/Desktop/vs_code/carameli`.
 >
 > Violations identified:
 > [insert the SECRETS lines from Phase 1 here]
@@ -144,7 +144,7 @@ Spawn in this order if the group has violations:
 ### Fix agent: Migrations
 >
 > You are fixing migration violations in the Carameli project at
-> `c:\Users\Administrator\Desktop\vs_code\carameli`.
+> `c:/Users/Administrator/Desktop/vs_code/carameli`.
 >
 > Violations identified:
 > [insert the MIGRATIONS lines from Phase 1 here]
@@ -158,7 +158,7 @@ Spawn in this order if the group has violations:
 ### Fix agent: Logging
 >
 > You are fixing logging violations in the Carameli project at
-> `c:\Users\Administrator\Desktop\vs_code\carameli`.
+> `c:/Users/Administrator/Desktop/vs_code/carameli`.
 >
 > Violations identified:
 > [insert the LOGGING lines from Phase 1 here]

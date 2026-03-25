@@ -1,6 +1,6 @@
 ---
 name: update-skills-chart
-description: 'Scan the Carameli skill catalog and built-in skills, then update charts/skills/skills chart.md if any skills were added, removed, or changed.'
+description: 'Scans the Carameli skill catalog and updates charts/skills/skills chart.md if skills were added, removed, or changed. Use after creating, updating, or removing any skill file.'
 argument-hint: 'No arguments needed — always scans and applies any required updates.'
 ---
 

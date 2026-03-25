@@ -4,6 +4,20 @@
 > The `add-skin` skill reads this brief before writing any code.
 > Every decision — renderer choice, colors, motion — must be derivable from this doc alone.
 
+## Contents
+
+- [Identity](#identity)
+- [Renderer / Tech Stack](#renderer--tech-stack)
+- [Color Palette](#color-palette)
+- [Layout System](#layout-system)
+- [Component Patterns](#component-patterns)
+- [Typography](#typography)
+- [Motion & Animation](#motion--animation)
+- [Lighting (3D skins only)](#lighting-3d-skins-only)
+- [Post-Processing (3D skins only)](#post-processing-3d-skins-only)
+- [Hard Rules](#hard-rules)
+- [Notes / Open Questions](#notes--open-questions)
+
 ---
 
 ## Identity

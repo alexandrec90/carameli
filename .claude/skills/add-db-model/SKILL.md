@@ -1,6 +1,6 @@
 ---
 name: add-db-model
-description: 'Add a database model and Alembic migration with repository and schema guidance.'
+description: 'Adds a SQLAlchemy model and Alembic migration with repository and schema guidance. Use when introducing a new table or adding/changing columns in an existing one.'
 argument-hint: 'Optional entity name or table (e.g., "call_event")'
 ---
 
@@ -103,3 +103,13 @@ Test against a real test database (separate from the dev DB):
 ```bash
 docker compose exec app pytest tests/unit/test_my_entity_repo.py -v
 ```
+
+## Checklist
+
+- [ ] ORM model created in `app/models/<name>.py`
+- [ ] Model imported in `app/models/__init__.py`
+- [ ] Alembic migration generated and reviewed
+- [ ] Migration applied successfully
+- [ ] Pydantic schemas added in `app/schemas/<name>.py`
+- [ ] Repository created in `app/repositories/<name>_repo.py`
+- [ ] Repository tests written and passing

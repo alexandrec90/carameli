@@ -1,6 +1,6 @@
 ---
 name: audit-gitignore
-description: 'Review and update .gitignore for irrelevant/sensitive files and remove newly ignored files from the repo.'
+description: 'Reviews and updates .gitignore for sensitive or irrelevant files and removes newly ignored files from the repo. Use when adding new tools, build outputs, or secret files to the project.'
 argument-hint: 'Optional: scope (quick|deep), target paths, or ignore categories.'
 ---
 

@@ -18,8 +18,8 @@ $projectFilter = "label=com.docker.compose.project=$project"
 # Run a docker command with a timeout; returns $null on timeout.
 function Invoke-DockerWithTimeout([string[]]$DockerArgs, [int]$Timeout = 15) {
     $job = Start-Job -ScriptBlock {
-        param($a) & docker @a 2>&1
-    } -ArgumentList (,$DockerArgs)
+        & docker @Using:DockerArgs 2>&1
+    }
     $done = $job | Wait-Job -Timeout $Timeout
     if ($done) {
         $result = Receive-Job $job
@@ -31,10 +31,10 @@ function Invoke-DockerWithTimeout([string[]]$DockerArgs, [int]$Timeout = 15) {
 }
 
 # docker logs can hang on stuck containers; wrap with a 10-second timeout.
-function Get-DockerLogs([string]$Container, [int]$Tail = 40, [int]$Timeout = 10) {
+function Get-DockerLog([string]$Container, [int]$Tail = 40, [int]$Timeout = 10) {
     $job = Start-Job -ScriptBlock {
-        param($c, $t) docker logs $c --tail $t 2>&1
-    } -ArgumentList $Container, $Tail
+        docker logs $Using:Container --tail $Using:Tail 2>&1
+    }
     $done = $job | Wait-Job -Timeout $Timeout
     if ($done) {
         $result = Receive-Job $job
@@ -236,7 +236,7 @@ $errorLines.Add("")
 
 foreach ($svc in $failures) {
     $errorLines.Add("=== logs: $svc (last 40 lines) ===")
-    Get-DockerLogs "${project}-${svc}-1" -Tail 40 | ForEach-Object { $errorLines.Add("$_") }
+    Get-DockerLog "${project}-${svc}-1" -Tail 40 | ForEach-Object { $errorLines.Add("$_") }
     $errorLines.Add("")
 }
 

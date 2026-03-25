@@ -1,6 +1,6 @@
 ---
 name: fix-docker
-description: 'Fix Docker stack failures from logs/docker/ artifacts (health, config, build, migrate, ops).'
+description: 'Fixes Docker stack failures from logs/docker/ artifacts. Use when the Docker stack fails to start, a container is unhealthy, or the build/migrate step errors.'
 argument-hint: '(no arguments)'
 ---
 

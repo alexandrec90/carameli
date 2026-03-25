@@ -1,4 +1,4 @@
-# Runs all linters in parallel (ruff, ruff-format, eslint, tsc, stylelint, markdownlint, mypy, pip-audit, vulture, detect-secrets, dotenv-linter, alembic-check, yamllint, actionlint).
+# Runs all linters in parallel (ruff, ruff-format, eslint, tsc, stylelint, markdownlint, mypy, pip-audit, vulture, detect-secrets, dotenv-linter, alembic-check, yamllint, actionlint, psscriptanalyzer).
 # On failure: writes actionable error details to logs/lint-errors.log for AI-agent consumption.
 # On pass: clears the artifact. Terminal exits when done.
 $ErrorActionPreference = "Continue"
@@ -20,7 +20,7 @@ $anyFailed = $false
 Write-Host ""
 Write-Host "=== Carameli Lint Suite ===" -ForegroundColor Cyan
 Write-Host "Artifact : $((Resolve-Path $artifact -ErrorAction SilentlyContinue) ?? (Join-Path $PWD $artifact))" -ForegroundColor DarkGray
-Write-Host "Linters  : ruff, ruff-format, eslint, tsc, stylelint, markdownlint, mypy, pip-audit, vulture, detect-secrets, dotenv-linter, alembic-check, yamllint, actionlint" -ForegroundColor DarkGray
+Write-Host "Linters  : ruff, ruff-format, eslint, tsc, stylelint, markdownlint, mypy, pip-audit, vulture, detect-secrets, dotenv-linter, alembic-check, yamllint, actionlint, psscriptanalyzer" -ForegroundColor DarkGray
 Write-Host "Mode     : parallel" -ForegroundColor DarkGray
 Write-Host ""
 
@@ -45,7 +45,7 @@ function Get-SkipReason([string[]]$lines) {
         }).Count -gt 0
     if ($missing) { return "not installed" }
     $infra = ($lines | Where-Object {
-            $_ -match "ConnectionRefusedError|InvalidPasswordError|OperationalError|authentication failed|could not connect|connection refused|timeout expired"
+            $_ -match "ConnectionRefusedError|InvalidPasswordError|OperationalError|authentication failed|could not connect|connection refused|timeout expired|Cannot connect to the Docker daemon|No such container|No such service|is not running|error during connect"
         }).Count -gt 0
     if ($infra) { return "environment error" }
     return $null
@@ -118,8 +118,10 @@ $jobs["mypy"] = Start-Job -WorkingDirectory $wd -ScriptBlock {
 
 $jobs["pip-audit"] = Start-Job -WorkingDirectory $wd -ScriptBlock {
     # Auto-upgrade vulnerable packages first, then report any remaining
-    pip-audit --fix --quiet 2>&1 | Out-Null
-    $out = pip-audit 2>&1
+    # --ignore-vuln: suppress CVEs with no upstream fix yet (transitive deps)
+    $ignore = @("--ignore-vuln", "CVE-2026-4539")
+    pip-audit --fix --quiet @ignore 2>&1 | Out-Null
+    $out = pip-audit @ignore 2>&1
     [PSCustomObject]@{ ExitCode = $LASTEXITCODE; Lines = @($out | ForEach-Object { "$_" }) }
 }
 
@@ -166,7 +168,8 @@ $jobs["detect-secrets"] = Start-Job -WorkingDirectory $wd -ScriptBlock {
 
 $jobs["alembic-check"] = Start-Job -WorkingDirectory $wd -ScriptBlock {
     [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-    $out = alembic check 2>&1
+    # Run inside the app container so DATABASE_URL resolves correctly (pgbouncer is Docker-internal).
+    $out = docker compose exec -T app alembic check 2>&1
     [PSCustomObject]@{ ExitCode = $LASTEXITCODE; Lines = @($out | ForEach-Object { "$_" }) }
 }
 
@@ -203,6 +206,28 @@ $jobs["actionlint"] = Start-Job -WorkingDirectory $wd -ScriptBlock {
     if (Test-Path ".github/workflows") {
         $out = actionlint 2>&1
         [PSCustomObject]@{ ExitCode = $LASTEXITCODE; Lines = @($out | ForEach-Object { "$_" }) }
+    }
+    else {
+        [PSCustomObject]@{ ExitCode = 0; Lines = @() }
+    }
+}
+
+$jobs["psscriptanalyzer"] = Start-Job -WorkingDirectory $wd -ScriptBlock {
+    [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+    if (-not (Get-Module -ListAvailable PSScriptAnalyzer)) {
+        return [PSCustomObject]@{ ExitCode = 1; Lines = @("PSScriptAnalyzer module is not installed -- run: Install-Module PSScriptAnalyzer -Scope CurrentUser") }
+    }
+    Import-Module PSScriptAnalyzer -ErrorAction Stop
+    $root = $PWD.Path
+    $settings = if (Test-Path '.PSScriptAnalyzerSettings.psd1') { '.PSScriptAnalyzerSettings.psd1' } else { 'Default' }
+    $results = Invoke-ScriptAnalyzer -Path scripts/ -Recurse -Severity @('Error', 'Warning') -Settings $settings 2>&1
+    $diag = @($results | Where-Object { $_ -is [Microsoft.Windows.PowerShell.ScriptAnalyzer.Generic.DiagnosticRecord] })
+    if ($diag.Count -gt 0) {
+        $lines = $diag | ForEach-Object {
+            $rel = $_.ScriptPath -replace [regex]::Escape($root + '\'), ''
+            "$rel`:$($_.Line):$($_.Column): [$($_.Severity)] $($_.RuleName) -- $($_.Message)"
+        }
+        [PSCustomObject]@{ ExitCode = 1; Lines = @($lines) }
     }
     else {
         [PSCustomObject]@{ ExitCode = 0; Lines = @() }
@@ -395,6 +420,18 @@ if ($failed -and -not $skipReason) {
 }
 if ($skipReason) { Write-Host "  [skip] actionlint ($skipReason)" -ForegroundColor DarkGray }
 else { Write-LintResult "actionlint" $failed }
+
+# psscriptanalyzer
+$r = Receive-Job $jobs["psscriptanalyzer"]
+$failed = $r.ExitCode -ne 0
+$skipReason = if ($failed) { Get-SkipReason $r.Lines } else { $null }
+if ($failed -and -not $skipReason) {
+    $anyFailed = $true
+    $errs = @($r.Lines | Where-Object { $_.Trim() -ne "" })
+    Add-Section "psscriptanalyzer" "manual -- fix PowerShell style violations in scripts/" $errs
+}
+if ($skipReason) { Write-Host "  [skip] psscriptanalyzer ($skipReason)" -ForegroundColor DarkGray }
+else { Write-LintResult "psscriptanalyzer" $failed }
 
 # --- Cleanup ---
 $jobs.Values | Remove-Job -Force
