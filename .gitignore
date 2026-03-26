@@ -43,6 +43,7 @@ env/
 # Testing / coverage
 .pytest_cache/
 .mypy_cache/
+.dmypy.json
 .ruff_cache/
 .tox/
 .nox/
