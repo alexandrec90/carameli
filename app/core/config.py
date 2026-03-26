@@ -48,7 +48,7 @@ class Settings(BaseSettings):
     log_file: str = "logs/runtime/carameli.log"
 
     cors_origins: Annotated[list[str], NoDecode] = Field(
-        default=["http://localhost:3000"],
+        default=["http://localhost:5173"],
         description="Comma-separated list of allowed CORS origins",
     )
 

@@ -7,18 +7,22 @@ export function useAuth() {
 
   useEffect(() => {
     async function init() {
-      // Already have a valid session?
-      const me = await fetch(`${BASE}/auth/me`, { credentials: 'include' })
-      if (me.ok) {
+      try {
+        // Already have a valid session?
+        const me = await fetch(`${BASE}/auth/me`, { credentials: 'include' })
+        if (!me.ok) {
+          // No session — auto-acquire one
+          await fetch(`${BASE}/auth/session`, {
+            method: 'POST',
+            credentials: 'include',
+          })
+        }
+      } catch {
+        // Backend unreachable — allow the UI to render anyway (API calls
+        // inside hooks will fail gracefully with empty/error states).
+      } finally {
         setReady(true)
-        return
       }
-      // No session — auto-acquire one
-      await fetch(`${BASE}/auth/session`, {
-        method: 'POST',
-        credentials: 'include',
-      })
-      setReady(true)
     }
     init()
   }, [])

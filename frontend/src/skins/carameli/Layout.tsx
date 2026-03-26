@@ -11,16 +11,20 @@ import {
   X,
 } from 'lucide-react'
 
-const navItems = [
-  { to: '/', label: 'Dashboard', icon: LayoutDashboard },
-  { to: '/phone-lines', label: 'Phone Lines', icon: Phone },
-  { to: '/extensions', label: 'Extensions', icon: PhoneCall },
-  { to: '/sms', label: 'SMS', icon: MessageSquare },
-  { to: '/calls', label: 'Call Events', icon: Radio },
-  { to: '/settings', label: 'Settings', icon: Settings },
-]
+import type { LayoutProps } from '../types'
 
-export function Layout({ children }: { children: React.ReactNode }) {
+// Icons are carameli-specific; paths/labels come from the shared route list.
+const ICONS: Record<string, React.ComponentType<{ size?: number; className?: string }>> = {
+  '/': LayoutDashboard,
+  '/phone-lines': Phone,
+  '/extensions': PhoneCall,
+  '/sms': MessageSquare,
+  '/calls': Radio,
+  '/settings': Settings,
+}
+
+export function Layout({ children, navItems: rawNavItems }: LayoutProps) {
+  const navItems = rawNavItems.map((item) => ({ to: item.path, label: item.label, icon: ICONS[item.path] ?? Settings }))
   const [menuOpen, setMenuOpen] = useState(false)
 
   const sidebar = (
@@ -81,7 +85,23 @@ export function Layout({ children }: { children: React.ReactNode }) {
   )
 
   return (
-    <div className="min-h-screen flex">
+    <div
+      className="min-h-screen flex"
+      style={{
+        background: [
+          'radial-gradient(ellipse 130% 28% at 42% -10%, rgb(110 52 8 / 52%) 0%, transparent 68%)',
+          'radial-gradient(ellipse 62% 42% at -8% 44%, rgb(168 78 14 / 30%) 0%, transparent 66%)',
+          'radial-gradient(ellipse 52% 36% at 108% 56%, rgb(138 63 10 / 24%) 0%, transparent 62%)',
+          'radial-gradient(ellipse 88% 52% at 50% 52%, rgb(90 42 6 / 42%) 0%, transparent 74%)',
+          'radial-gradient(ellipse 72% 28% at 50% 112%, rgb(255 185 90 / 8%) 0%, transparent 66%)',
+          'linear-gradient(155deg, #070400 0%, #0e0600 15%, #180a00 35%, #1d0d00 52%, #1a0f00 70%, #160c00 100%)',
+        ].join(', '),
+        color: 'var(--color-accent-cream)',
+        minHeight: '100vh',
+        overflowX: 'hidden',
+        position: 'relative',
+      }}
+    >
       {/* Mobile header */}
       <div className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-4 py-3 glass-sidebar md:hidden">
         <div className="flex items-center gap-2">

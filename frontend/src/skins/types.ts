@@ -1,4 +1,5 @@
 import type React from 'react'
+import type { NavItem } from '../routes'
 import type { UseDashboardResult } from '../hooks/useDashboard'
 import type { UsePhoneLinesResult } from '../hooks/usePhoneLines'
 import type { UseExtensionsResult } from '../hooks/useExtensions'
@@ -15,7 +16,12 @@ export interface SkinViews {
   Placeholder: React.ComponentType<PlaceholderProps>
 }
 
+export interface LayoutProps {
+  children: React.ReactNode
+  navItems: NavItem[]
+}
+
 export interface Skin {
-  Layout: React.ComponentType<{ children: React.ReactNode }>
+  Layout: React.ComponentType<LayoutProps>
   views: SkinViews
 }

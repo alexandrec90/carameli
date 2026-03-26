@@ -26,11 +26,20 @@ if (-not (Test-Path $hookFile)) {
 # Step 3: patch — replace the exec calls with tee + artifact logic
 $content = Get-Content $hookFile -Raw
 
-# Already patched?
-if ($content -match "ARTIFACT=") {
-    Write-Host "  [skip] hook already patched" -ForegroundColor Green
+# Already patched with retry logic?
+if ($content -match "ARTIFACT=" -and $content -match "Auto-fix retry") {
+    Write-Host "  [skip] hook already patched (with retry)" -ForegroundColor Green
     Write-Host ""
     exit 0
+}
+
+# Has old patch (artifact but no retry)? Strip it back to the generated template
+# so the replacement below can match the standard exec block.
+if ($content -match "ARTIFACT=" -and $content -notmatch "Auto-fix retry") {
+    Write-Host "  [info] upgrading hook patch (adding auto-fix retry)..." -ForegroundColor Yellow
+    # Re-run pre-commit install to get a fresh hook, then re-read
+    pre-commit install | Out-Null
+    $content = Get-Content $hookFile -Raw
 }
 
 # The generated hook ends with an if/elif/else block using `exec`.
@@ -47,21 +56,68 @@ fi
 '@
 
 $newTail = @'
+# Activate the venv so language:system hooks find tools like detect-secrets-hook
+REPO_ROOT="$(cd "$HERE/../.." && pwd)"
+if [ -z "$VIRTUAL_ENV" ] && [ -d "$REPO_ROOT/.venv/Scripts" ]; then
+    export VIRTUAL_ENV="$REPO_ROOT/.venv"
+    export PATH="$VIRTUAL_ENV/Scripts:$PATH"
+fi
+
 ARTIFACT="logs/pre-commit-errors.log"
 mkdir -p logs
 
 TMPOUT=$(mktemp)
 trap 'rm -f "$TMPOUT"' EXIT
 
-if [ -x "$INSTALL_PYTHON" ]; then
-    "$INSTALL_PYTHON" -mpre_commit "${ARGS[@]}" 2>&1 | tee "$TMPOUT"
-elif command -v pre-commit > /dev/null; then
-    pre-commit "${ARGS[@]}" 2>&1 | tee "$TMPOUT"
-else
-    echo '`pre-commit` not found.  Did you forget to activate your virtualenv?' 1>&2
-    exit 1
-fi
+run_pre_commit() {
+    if [ -x "$INSTALL_PYTHON" ]; then
+        "$INSTALL_PYTHON" -mpre_commit "$@"
+    elif command -v pre-commit > /dev/null; then
+        pre-commit "$@"
+    else
+        echo '`pre-commit` not found.  Did you forget to activate your virtualenv?' 1>&2
+        return 1
+    fi
+}
+
+# Snapshot mtimes of currently dirty files so we can detect hook-only changes
+declare -A BEFORE_MTIME
+while IFS= read -r f; do
+    [ -f "$f" ] && BEFORE_MTIME["$f"]=$(stat -c %Y "$f" 2>/dev/null || stat -f %m "$f" 2>/dev/null)
+done < <(git diff --name-only 2>/dev/null)
+
+# --- First run ---
+run_pre_commit "${ARGS[@]}" 2>&1 | tee "$TMPOUT"
 EXIT_CODE=${PIPESTATUS[0]}
+
+# --- Auto-fix retry: if hooks only modified files, stage them and re-run ---
+if [ $EXIT_CODE -ne 0 ] && grep -q "files were modified by this hook" "$TMPOUT"; then
+    HOOK_MODIFIED=()
+    while IFS= read -r f; do
+        [ -f "$f" ] || continue
+        NOW_MTIME=$(stat -c %Y "$f" 2>/dev/null || stat -f %m "$f" 2>/dev/null)
+        if [ -z "${BEFORE_MTIME[$f]+x}" ]; then
+            HOOK_MODIFIED+=("$f")
+        elif [ "$NOW_MTIME" != "${BEFORE_MTIME[$f]}" ]; then
+            HOOK_MODIFIED+=("$f")
+        fi
+    done < <(git diff --name-only 2>/dev/null)
+
+    if [ ${#HOOK_MODIFIED[@]} -gt 0 ]; then
+        echo "" >&2
+        echo "Auto-fixed files detected -- staging and retrying:" >&2
+        for f in "${HOOK_MODIFIED[@]}"; do
+            echo "  $f" >&2
+            git add -- "$f"
+        done
+
+        TMPOUT2=$(mktemp)
+        trap 'rm -f "$TMPOUT" "$TMPOUT2"' EXIT
+        run_pre_commit "${ARGS[@]}" 2>&1 | tee "$TMPOUT2"
+        EXIT_CODE=${PIPESTATUS[0]}
+        cp "$TMPOUT2" "$TMPOUT"
+    fi
+fi
 
 if [ $EXIT_CODE -ne 0 ]; then
     cp "$TMPOUT" "$ARTIFACT"

@@ -4,6 +4,7 @@ import type { SkinName } from '../skins/registry'
 const SKIN_LABELS: Record<SkinName, string> = {
   carameli: 'Carameli',
   'candy-shop': 'Candy Shop',
+  barebone: 'Barebone',
 }
 
 export function SkinSwitcher() {

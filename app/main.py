@@ -80,9 +80,19 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
 
 app.add_middleware(SlowAPIMiddleware)
 
+# CORS spec forbids wildcard "*" when credentials are enabled — browsers reject
+# such responses.  Sanitize to the default frontend origin if misconfigured.
+_cors_origins = settings.cors_origins
+if "*" in _cors_origins:
+    logger.warning(
+        "CORS_ORIGINS contains '*' which is invalid with allow_credentials=True; "
+        "falling back to ['http://localhost:5173']"
+    )
+    _cors_origins = ["http://localhost:5173"]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.cors_origins,
+    allow_origins=_cors_origins,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type"],

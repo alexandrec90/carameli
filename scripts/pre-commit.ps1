@@ -15,11 +15,20 @@ if (-not (Test-Path "logs")) { New-Item -ItemType Directory -Path "logs" | Out-N
 Write-Host ""
 Write-Host "=== Carameli Pre-Commit Hooks ===" -ForegroundColor Cyan
 Write-Host "Artifact : $((Resolve-Path $artifact -ErrorAction SilentlyContinue) ?? (Join-Path $PWD $artifact))" -ForegroundColor DarkGray
-Write-Host "Hooks    : detect-secrets, bandit, ruff, ruff-format, dotenv-linter, eslint, stylelint, markdownlint" -ForegroundColor DarkGray
+Write-Host "Hooks    : detect-secrets, ruff, ruff-format, mypy(dmypy), dotenv-linter, eslint, stylelint, markdownlint" -ForegroundColor DarkGray
+Write-Host "Deferred : vulture, pip-audit, tsc (run on pre-push)" -ForegroundColor DarkGray
 Write-Host ""
 
 Write-Host "Running pre-commit on all files..." -ForegroundColor Yellow
 Write-Host ""
+
+# Snapshot file modification times BEFORE pre-commit so we can detect
+# which files hooks actually touched (vs pre-existing unstaged changes).
+$preRunMtimes = @{}
+git diff --name-only 2>$null | ForEach-Object {
+    $f = $_
+    if (Test-Path $f) { $preRunMtimes[$f] = (Get-Item $f).LastWriteTimeUtc }
+}
 
 $lines = [System.Collections.Generic.List[string]]::new()
 $sw = [System.Diagnostics.Stopwatch]::StartNew()
@@ -106,8 +115,19 @@ if ($hooks.Count -eq 0) {
     $lines | Set-Content $artifact
 }
 else {
-    # Capture files modified by auto-fix hooks (ruff --fix, ruff-format)
-    $autoFixedFiles = @(git diff --name-only 2>$null)
+    # Find files actually modified by hooks: new in diff or mtime changed
+    $postDiff = @(git diff --name-only 2>$null)
+    $autoFixedFiles = @($postDiff | Where-Object {
+        $f = $_
+        if (-not (Test-Path $f)) { return $false }
+        $mtime = (Get-Item $f).LastWriteTimeUtc
+        if (-not $preRunMtimes.ContainsKey($f)) {
+            # File was clean before pre-commit but now has unstaged changes
+            return $true
+        }
+        # File was already dirty -- only count it if mtime changed
+        return $mtime -ne $preRunMtimes[$f]
+    })
 
     # Build display-name -> hook-id map from .pre-commit-config.yaml
     # pre-commit run expects the hook id, not the display name

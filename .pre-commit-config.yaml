@@ -23,14 +23,17 @@ repos:
         entry: ruff format
         types: [python]
 
+      # dmypy (daemon mode) keeps analysis state across runs — subsequent
+      # commits only re-check changed files instead of the whole project.
       - id: mypy
         name: mypy
         language: system
-        entry: mypy app/
+        entry: dmypy run -- app/
         files: ^app/
         types: [python]
         pass_filenames: false
 
+      # Slow / advisory hooks — run on push, not every commit
       - id: vulture
         name: vulture
         language: system
@@ -38,6 +41,7 @@ repos:
         files: ^app/
         types: [python]
         pass_filenames: false
+        stages: [pre-push]
 
       - id: pip-audit
         name: pip-audit
@@ -45,6 +49,7 @@ repos:
         entry: pip-audit --ignore-vuln CVE-2026-4539
         files: requirements.*\.txt$
         pass_filenames: false
+        stages: [pre-push]
 
   # .env files — dotenv-linter installed locally (cargo install dotenv-linter)
   - repo: local
@@ -78,6 +83,7 @@ repos:
         entry: npm --prefix frontend run lint:types
         files: ^frontend/src/.*\.[jt]sx?$
         pass_filenames: false
+        stages: [pre-push]
 
       - id: markdownlint
         name: Markdownlint

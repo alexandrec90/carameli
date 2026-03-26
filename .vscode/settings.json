@@ -1,4 +1,10 @@
 {
+  "eslint.workingDirectories": [
+    {
+      "directory": "./frontend",
+      "changeProcessCWD": true
+    }
+  ],
   "css.lint.unknownAtRules": "ignore",
   "builder.serverUrl": "http://localhost:5173",
   "builder.command": "",

@@ -1,6 +1,7 @@
-import React, { useState } from 'react'
+import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useNavigate, useLocation } from 'react-router-dom'
+import type { LayoutProps } from '../types'
 
 // ─── Mobile menu toggle ──────────────────────────────────────────────────────
 
@@ -63,13 +64,22 @@ function DripEdge() {
 }
 
 // ─── Nav items ───────────────────────────────────────────────────────────────
+// Icons are candy-shop-specific; paths/labels come from the shared route list.
 
-const NAV_ITEMS = [
-  { label: 'Dashboard', path: '/', icon: '🏠' },
-  { label: 'Phone Lines', path: '/phone-lines', icon: '📞' },
-  { label: 'Extensions', path: '/extensions', icon: '🔌' },
-  { label: 'Settings', path: '/settings', icon: '⚙️' },
-]
+import type { NavItem } from '../../routes'
+
+const ICONS: Record<string, string> = {
+  '/': '🏠',
+  '/phone-lines': '📞',
+  '/extensions': '🔌',
+  '/sms': '✉️',
+  '/calls': '📋',
+  '/settings': '⚙️',
+}
+
+function mapNavItems(items: NavItem[]) {
+  return items.map((item) => ({ ...item, icon: ICONS[item.path] ?? '•' }))
+}
 
 function NavCircle({ label, path, icon }: { label: string; path: string; icon: string }) {
   const [hovered, setHovered] = useState(false)
@@ -156,7 +166,7 @@ function Logo() {
 
 // ─── Header ──────────────────────────────────────────────────────────────────
 
-function Header() {
+function Header({ navItems }: { navItems: { path: string; label: string; icon: string }[] }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const navigate = useNavigate()
   const location = useLocation()
@@ -183,7 +193,7 @@ function Header() {
           <Logo />
           {/* Desktop nav */}
           <nav className="hidden md:flex items-center gap-4">
-            {NAV_ITEMS.map((item) => (
+            {navItems.map((item) => (
               <NavCircle key={item.path} {...item} />
             ))}
           </nav>
@@ -202,7 +212,7 @@ function Header() {
               className="relative overflow-hidden mt-4 md:hidden"
             >
               <div className="flex flex-col gap-2">
-                {NAV_ITEMS.map(({ label, path, icon }) => {
+                {navItems.map(({ label, path, icon }) => {
                   const active = location.pathname === path
                   return (
                     <button
@@ -236,13 +246,14 @@ function Header() {
 
 // ─── Layout ───────────────────────────────────────────────────────────────────
 
-export function Layout({ children }: { children: React.ReactNode }) {
+export function Layout({ children, navItems: rawNavItems }: LayoutProps) {
+  const navItems = mapNavItems(rawNavItems)
   return (
     <div
       className="min-h-screen"
       style={{ background: 'linear-gradient(160deg, #FFF8E7 0%, #F0D9AE 100%)' }}
     >
-      <Header />
+      <Header navItems={navItems} />
       <main className="max-w-7xl mx-auto px-4 md:px-8 pt-12 md:pt-20 pb-12">{children}</main>
     </div>
   )
