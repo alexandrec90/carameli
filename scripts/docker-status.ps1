@@ -243,9 +243,7 @@ if ($appStatusResult.TimedOut -or $appStatus -notmatch "Up|running|Restarting|Ex
     $appLogLines += $appMsg
 }
 else {
-    Write-Host "--- App Logs (last 100 lines) ---" -ForegroundColor Yellow
     $appLogs = Get-DockerLog "${project}-app-1" -Tail 100
-    $appLogs | ForEach-Object { Write-Host "  $_" -ForegroundColor DarkGray }
 
     $appLogLines += "App status: $appStatus"
     $appLogLines += ""

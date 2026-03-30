@@ -39,6 +39,25 @@ Build a triage list grouping errors by hook:
 - **markdownlint**: lines matching `file:line:col CODE/message`
 - **dotenv-linter**: lines referencing `.env` files with the violation description
 
+### Log quality gate
+
+After parsing, check the triage list for these signals of incomplete diagnostics:
+
+| Signal | What it means |
+|---|---|
+| A hook listed as `Failed` has no error lines in the triage list (empty block) | The hook's output wasn't captured — root cause is invisible |
+| Error lines from `ruff`, `bandit`, `mypy`, or `eslint` lack a `file:line` reference | Not self-locating — the agent cannot find the source file |
+| Lines under a `Failed` hook are only `Fixing <file>` reformatter output | Auto-fixed by the hook — should be classified as resolved, not failed |
+
+If **any** quality problem is found:
+
+1. Identify which hook(s) are affected.
+2. Update `scripts/pre-commit.ps1` to fix the capture or classification logic (e.g.,
+   redirect hook stderr, filter out `Fixing ...` lines, ensure error output is flushed).
+3. Tell the user: what was wrong, what was changed, and ask them to re-run the
+   **Pre-Commit: Run All Hooks** task.
+4. **Stop** — do not attempt fixes on a low-quality log.
+
 ---
 
 ## Step 2 — Apply Fixes
@@ -96,3 +115,5 @@ State clearly:
 1. Edit only files directly implicated by the collected errors — never pre-emptive cleanup.
 2. Never run additional diagnostics after edits — instruct user to rerun the task.
 3. One error = one minimal fix. Do not restructure surrounding code.
+4. **Log quality gate is mandatory.** If any `Failed` hook has no captured error lines,
+   update `scripts/pre-commit.ps1` and stop — never attempt fixes when root cause is invisible.

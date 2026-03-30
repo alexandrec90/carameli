@@ -19,3 +19,5 @@ from scratch.
 | `pydantic.ValidationError` in response model | Endpoint returns fields that don't match the Pydantic schema | Update the schema in `app/schemas/` to match the actual response, or fix the endpoint return value | 0 | — | 2026-03-24 |
 | `AttributeError: 'NoneType' object has no attribute` | Query returned `None` — missing seed data or wrong filter | Add the required seed row in the test fixture, or fix the query filter | 0 | — | 2026-03-24 |
 | `alembic.util.exc.CommandError` | Migration head mismatch or missing migration | Run `alembic upgrade head`; if model was changed without a migration, generate one | 0 | — | 2026-03-24 |
+| `test_api_contract[PUT /vsapi/1.0.0/VsExtension/Deactivate` | Path param `extension` has no constraints — schemathesis sends null bytes, PostgreSQL throws 5xx | Add `max_length=20, pattern=r"^[^\x00]*$"` to the `extension = Path(...)` in the deactivate handler | 1 | 2026-03-30 | 2026-03-30 |
+| `ExceptionGroup: Hypothesis found 2 distinct failures in explicit examples` | (needs manual review) | (needs manual review) | 0 | — | 2026-03-30 |

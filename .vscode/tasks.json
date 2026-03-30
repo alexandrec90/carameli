@@ -363,6 +363,18 @@
         "close": false
       },
       "problemMatcher": []
+    },
+    {
+      "label": "Agent: Archive Copilot Session",
+      "type": "shell",
+      "command": "python scripts/hooks/archive-session-copilot.py '${input:sessionDescription}'; $_ec = $LASTEXITCODE; pwsh -ExecutionPolicy Bypass -File scripts/notify.ps1 -Label 'Agent: Archive Copilot Session' -ExitCode $_ec; exit $_ec",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "showReuseMessage": false,
+        "close": false
+      },
+      "problemMatcher": []
     }
   ],
   "inputs": [
@@ -371,6 +383,12 @@
       "type": "command",
       "command": "simpleBrowser.show",
       "args": "http://localhost:5173/"
+    },
+    {
+      "id": "sessionDescription",
+      "type": "promptString",
+      "description": "Brief description of work done in this Copilot session",
+      "default": ""
     }
   ]
 }

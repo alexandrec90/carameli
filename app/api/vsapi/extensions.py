@@ -104,7 +104,7 @@ async def deactivate_extension(
     session: Annotated[AsyncSession, Depends(get_session)],
     auth: Annotated[AuthContext, Depends(get_auth_context)],
     customerId: int = Path(ge=1, le=2147483647),
-    extension: str = Path(),
+    extension: str = Path(max_length=20, pattern=r"^[^\x00]*$"),
 ) -> ExtensionResponse:
     """Mark the extension inactive."""
     enforce_customer_scope(auth, customerId)

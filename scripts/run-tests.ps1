@@ -31,19 +31,19 @@ if ($Fast) {
 
     if ($total -gt 0 -and $selected -gt [Math]::Ceiling($total / 2)) {
         Write-Host "  testmon selected $selected/$total tests -- falling back to xdist" -ForegroundColor Yellow
-        $pytestCmd = "pytest -v --tb=short --no-header -n auto --testmon-noselect"
+        $pytestCmd = "pytest -v --tb=short --no-header --color=no -n auto --testmon-noselect"
         $modeLabel = "full (xdist fallback -- testmon-noselect to update DB)"
     } elseif ($selected -eq 0) {
         Write-Host "  testmon: 0 tests to run (no changes detected)" -ForegroundColor Green
-        $pytestCmd = "pytest -v --tb=short --no-header -o addopts='--ignore=tests/e2e' --testmon"
+        $pytestCmd = "pytest -v --tb=short --no-header --color=no -o addopts='--ignore=tests/e2e' --testmon"
         $modeLabel = "fast (changed-only, testmon -- 0 selected)"
     } else {
         Write-Host "  testmon: $selected/$total tests selected" -ForegroundColor Green
-        $pytestCmd = "pytest -v --tb=short --no-header -o addopts='--ignore=tests/e2e' --testmon"
+        $pytestCmd = "pytest -v --tb=short --no-header --color=no -o addopts='--ignore=tests/e2e' --testmon"
         $modeLabel = "fast (changed-only, testmon)"
     }
 } else {
-    $pytestCmd = "pytest -v --tb=short --no-header -n auto"
+    $pytestCmd = "pytest -v --tb=short --no-header --color=no -n auto"
     $modeLabel = "full (parallel, xdist)"
 }
 
@@ -64,7 +64,7 @@ $collecting = $true
 
 # Stream pytest output in real-time, showing progress per-test.
 # switch -Regex short-circuits on first match per line, avoiding redundant checks.
-docker compose exec app bash -c "$pytestCmd" 2>&1 | ForEach-Object {
+docker compose exec -T app bash -c "$pytestCmd" 2>&1 | ForEach-Object {
     $line = "$_"
     $lines.Add($line)
 
@@ -149,15 +149,23 @@ $rawBlockLines = $null     # unfiltered lines for the current single test (fallb
 $maxPerBlock = 25          # max lines kept per failure/error
 
 function Invoke-FlushBlock {
-    if ($null -ne $script:blockLines -and $script:blockLines.Count -gt 0) {
-        # If the filter produced nothing useful (only the ___ header), fall back to the
-        # raw block lines so an AI agent always has traceback context to work from.
-        $source = $script:blockLines
+    $bl  = if ($null -ne $script:blockLines)    { $script:blockLines }    else { [System.Collections.Generic.List[string]]::new() }
+    $raw = if ($null -ne $script:rawBlockLines) { $script:rawBlockLines } else { [System.Collections.Generic.List[string]]::new() }
+
+    if ($bl.Count -gt 0 -or $raw.Count -gt 0) {
+        $source = $bl
         $isRawFallback = $false
-        if ($script:blockLines.Count -le 1 -and $null -ne $script:rawBlockLines -and $script:rawBlockLines.Count -gt 1) {
-            $source = $script:rawBlockLines
+
+        # Fall back to raw when the filtered block has no actionable E-lines.
+        # This catches schemathesis/hypothesis failures whose tracebacks contain no
+        # first-party frames or E-prefixed lines, and also handles cases where the
+        # ___ separator was never matched (e.g. ANSI codes slipped through).
+        $hasELines = [bool]($source | Where-Object { $_ -match "^E\s+" })
+        if (-not $hasELines -and $raw.Count -gt $bl.Count) {
+            $source = $raw
             $isRawFallback = $true
         }
+
         if ($source.Count -gt $script:maxPerBlock) {
             $kept = $source.Count
             $source = [System.Collections.Generic.List[string]]::new(
@@ -166,12 +174,12 @@ function Invoke-FlushBlock {
             $source.Add("  ... ($kept lines total, truncated)")
         }
         if ($isRawFallback) {
-            $source.Add("  [raw fallback: no first-party frames matched filter]")
+            $source.Add("  [raw fallback: no E-lines in filtered output]")
         }
         foreach ($bl in $source) { $script:filtered.Add($bl) }
         $script:filtered.Add("")
     }
-    $script:blockLines = [System.Collections.Generic.List[string]]::new()
+    $script:blockLines    = [System.Collections.Generic.List[string]]::new()
     $script:rawBlockLines = [System.Collections.Generic.List[string]]::new()
 }
 
@@ -192,6 +200,12 @@ for ($i = 0; $i -lt $lines.Count; $i++) {
         "^={3,}\s+(FAILURES|ERRORS)\s+=" {
             $inBlock = $true
             $filtered.Add($l)
+            # Initialise lists here so body lines are captured even if the ___
+            # separator line is never matched (e.g. only one test, unusual format).
+            if ($null -eq $blockLines) {
+                $blockLines    = [System.Collections.Generic.List[string]]::new()
+                $rawBlockLines = [System.Collections.Generic.List[string]]::new()
+            }
             break
         }
         "^_{3,}\s+" {
@@ -204,7 +218,7 @@ for ($i = 0; $i -lt $lines.Count; $i++) {
             if (-not $inBlock -and $l -match "^(FAILED |ERROR |=)" -and $l -notmatch "^\s*=+\s+\d+\s+(failed|passed|error)") {
                 $filtered.Add($l)
             }
-            elseif ($inBlock -and $null -ne $blockLines) {
+            elseif ($inBlock -and $null -ne $rawBlockLines) {
                 if ($l -match "^-+ Captured log call") {
                     # Keep only WARNING/ERROR/CRITICAL log lines — INFO/DEBUG are test fixture noise
                     while (++$i -lt $lines.Count) {

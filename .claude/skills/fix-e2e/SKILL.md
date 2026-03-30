@@ -10,70 +10,101 @@ Fix Playwright E2E failures collected in `logs/e2e-failures.log`.
 
 ---
 
-## Step 1 — Collect Failures
+## Step 1 — Collect & Match Known Fixes
 
-Read `logs/e2e-failures.log` with the Read tool. If the file does not exist or is empty,
-tell the user to run the **Test: Run E2E (headless)** task first, then stop.
+Read these two files **in parallel** (single tool call):
+
+- `logs/e2e-failures.log`
+- `.claude/skills/fix-e2e/known-fixes.md`
+
+If the log file does not exist or is empty, tell the user to run the **Test: Run E2E
+(headless)** task first, then stop.
 
 ### Addressed check
 
-If the last line of `logs/e2e-failures.log` is `--- ADDRESSED`, the failures in this file
-have already been fixed in a prior run and the user has not re-run the E2E task since.
-Tell the user:
+If the last line of `logs/e2e-failures.log` is `--- ADDRESSED`, the failures have
+already been fixed. Tell the user:
 
-> These E2E failures were already addressed. Re-run the **Test: Run E2E (headless)** task
-> and invoke `/fix-e2e` again if new failures appear.
+> These E2E failures were already addressed. Re-run the **Test: Run E2E (headless)**
+> task and invoke `/fix-e2e` again if new failures appear.
 
-Then **stop** — do not re-triage or re-fix anything.
+Then **stop**.
 
-The `Test: Run E2E` task overwrites the entire file on each run, so the marker is
-naturally cleared whenever the user re-runs E2E tests.
+### Log quality gate
 
-### Known-fix lookup
+Before investing in fixes, scan the log for these signals of incomplete diagnostics:
 
-Before reasoning about each failure, read `.claude/skills/fix-e2e/known-fixes.md`.
-For every collected error, check if any **Error pattern** substring appears in the
-traceback, error line, or `# fix:` hint. If a match is found, apply the documented fix
-directly as a one-shot — do not re-derive the solution from scratch.
+| Signal | What it means |
+|---|---|
+| A `# test_name[browser]` block has no traceback or error message lines (only a header + `# fix:` line) | The failure body wasn't captured — root cause is invisible |
+| A failure block is missing a `# fix:` line entirely | Fix hint extraction failed — the block lacks actionability |
+| A test appears failed in a summary but has no corresponding `# test_name` block | Failure body was dropped by the script's filter |
 
-For every matched row, increment its **Hits** column by 1 and set **Last used** to
-today's date (`YYYY-MM-DD`). Do this in the same Edit call that stamps
-`--- ADDRESSED` — no extra tool call needed.
+If **any** quality problem is found:
 
-### Triage
+1. Identify which test(s) are affected and which output pattern is missing.
+2. Update `scripts/run-e2e.ps1` to preserve the missing content (e.g., always emit a
+   `# fix:` hint, widen the block-capture logic to include assertion output).
+3. Tell the user: what was wrong, what was changed, and ask them to re-run the
+   **Test: Run E2E (headless)** task.
+4. **Stop** — do not attempt fixes on a low-quality log.
 
-If the file is **not** addressed, collect lines starting with `FAILED` or `ERROR` (from
-the `# summary` section) and the structured failure blocks above them. Each block has:
+### Known-fix matching (mandatory — do this BEFORE any other file reads)
+
+For every failure block in the log, check if any **Error pattern** substring from
+`known-fixes.md` appears in the traceback, error line, or `# fix:` hint.
+
+**If a known fix matches: apply it immediately as a one-shot fix.** Do not read
+additional files to re-derive the solution. Do not investigate further. Just apply the
+documented fix, increment the **Hits** column by 1, set **Last used** to today's date,
+and move on to the next failure.
+
+Only proceed to Step 2 for failures that have **no known-fix match**.
+
+### Triage unmatched failures
+
+For any failure not matched by a known fix, collect its structured block:
 
 - `# test_name[browser]` — the failing test
-- `# fix: <hint>` — a machine-generated fix hint from the test runner
+- `# fix: <hint>` — machine-generated fix hint
 - Traceback / assertion lines
-
-Build a triage list from these blocks.
 
 ---
 
-## Step 2 — Diagnose
+## Step 2 — Diagnose (unmatched failures only)
 
-E2E failures usually indicate **application code** issues, not test bugs. Before editing:
+Skip this step entirely if all failures were resolved by known fixes in Step 1.
 
-1. Read the failing **test code** in `tests/e2e/` to understand what it asserts.
-2. Read the **application code** the test exercises (route handlers, frontend components,
-   Vite proxy config, CORS settings, etc.).
-3. Use the `# fix:` hint in each failure block as a starting point — these are generated
-   by the test runner's `Get-FixHint` function and point to the most common root causes.
+### Investigation budget
+
+You have a **hard cap of 5 file reads per failure**. Count every `read_file` and
+`grep_search` call against this budget. The 5 reads must be:
+
+1. The failing **test code** in `tests/e2e/`
+2. The **primary application file** the test exercises (use the fix hint to pick it)
+3–5. Up to 3 additional files if the root cause isn't clear from reads 1–2
+
+**After 5 reads, you must attempt a fix** based on what you know. Do not read more
+files. If you are genuinely stuck after 5 reads, propose your best-guess fix and ask
+the user for confirmation — do not keep investigating.
+
+### Do NOT read runtime logs speculatively
+
+Do not read `logs/runtime/carameli.log` unless the fix hint specifically says `5xx` /
+`backend endpoint` AND the test code + route handler don't reveal the cause. Runtime
+logs are large and usually add noise, not signal.
 
 ### Where to look by fix hint
 
-| Fix hint keyword | Likely location |
+| Fix hint keyword | Read first |
 |---|---|
-| `5xx` / `backend endpoint` | Route handler in `app/api/`, backend logs in `logs/runtime/carameli.log` |
-| `CORS` / `Access-Control` | CORS middleware in `app/main.py` or `app/core/` |
-| `4xx` / `auth` | Auth dependency, route registration, schema mismatch |
-| `Timeout` / `navigation` | Frontend component not rendering, missing route in `frontend/src/routes.ts` |
-| `connection refused` | Backend or frontend dev server not running (not a code fix — tell the user) |
-| `DOM element not found` | Selector mismatch between test and actual rendered markup |
-| `collection error` | Import error or missing fixture in `tests/e2e/` |
+| `5xx` / `backend endpoint` | Route handler in `app/api/` |
+| `CORS` / `Access-Control` | `app/main.py` CORS middleware section |
+| `4xx` / `auth` | Auth dependency in `app/core/auth.py`, then the route |
+| `Timeout` / `navigation` | Frontend component, then `frontend/src/routes.ts` |
+| `connection refused` | **Stop** — not a code fix, tell the user to start servers |
+| `DOM element not found` | The frontend component rendering the selector |
+| `collection error` | The test file imports and `conftest.py` |
 
 ---
 
@@ -86,39 +117,32 @@ For each failure:
    `.claude/rules/logging.md`.
 3. If a fix requires a DB schema change, note it and stop — use `/add-db-model` instead.
 
-**After fixing** all actionable failures, append the line `--- ADDRESSED` to the end of
-`logs/e2e-failures.log` using the Edit tool. This prevents the same failures from being
-re-triaged on the next `/fix-e2e` invocation.
+**After fixing** all actionable failures, append `--- ADDRESSED` to the end of
+`logs/e2e-failures.log`. This prevents re-triage on the next invocation.
 
 ### Update known-fixes table
 
-After all fixes are applied, review the failures you just fixed. If any failure
-**was not already covered** by a row in `known-fixes.md` and its error pattern is
-likely to recur (i.e., it is not a one-off typo), append a new row to the table in
-`.claude/skills/fix-e2e/known-fixes.md` with:
+After all fixes are applied, if any failure **was not already covered** by a row in
+`known-fixes.md` and its error pattern is likely to recur, append a new row with:
 
-- **Error pattern** — the shortest distinctive substring from the traceback/error line
+- **Error pattern** — shortest distinctive substring from the traceback/error line
 - **Root cause** — one-line explanation
 - **Fix** — the action you took
 - **Hits** — `1`
 - **Last used** — today's date
 - **Added** — today's date
 
-Do **not** add entries for unique, non-recurring mistakes (e.g., a misspelled variable
-name in one test). Only add patterns that could plausibly appear again.
+Do **not** add entries for one-off mistakes (e.g., a misspelled variable name).
 
 ### Prune stale entries
 
-While editing `known-fixes.md`, check for rows where **Hits = 0** and **Added** is
-more than 90 days ago. Delete those rows — they were seeded but never matched a real
-failure, so they just consume context tokens for no benefit.
+While editing `known-fixes.md`, delete rows where **Hits = 0** and **Added** is more
+than 90 days ago.
 
-**Stop conditions:**
+### Stop conditions
 
-- A fix would require a non-trivial refactor → propose a minimal safe fix and ask for
-  confirmation.
-- The fix hint is `connection refused` → this is an infra issue, not a code fix. Tell the
-  user to ensure both servers are running and stop.
+- A fix would require a non-trivial refactor → propose a minimal safe fix and ask.
+- The fix hint is `connection refused` → infra issue, tell the user and stop.
 - Required context is missing → ask a single clarifying question and stop.
 
 ---
@@ -130,16 +154,10 @@ State clearly:
 - Which failures were fixed (test name, what changed, which files were edited).
 - Which were skipped and why.
 - **Restart reminders** (as applicable):
-  - If any source files under `app/` were changed, tell the user to restart the backend:
-
-    ```sh
-    docker compose restart app
-    ```
-
-  - If any files under `frontend/src/` were changed, tell the user to check the Vite dev
-    server picked up the changes (usually automatic with HMR, but a manual restart may be
-    needed for config changes like `vite.config.ts`).
-- Tell the user to re-run the **Test: Run E2E (headless)** task and then invoke `/fix-e2e`
+  - Backend files changed (`app/`): tell the user to run `docker compose restart app`
+  - Frontend files changed (`frontend/src/`): note that Vite HMR should pick it up
+    (manual restart only needed for config changes like `vite.config.ts`)
+- Tell the user to re-run the **Test: Run E2E (headless)** task and invoke `/fix-e2e`
   again if failures remain.
 
 ---
@@ -154,3 +172,11 @@ State clearly:
 5. Only stamp the log after applying at least one code fix.
 6. E2E failures are usually app bugs, not test bugs — prefer fixing application code over
    modifying tests. Only edit test files if the test itself is genuinely wrong.
+7. **Known fixes are mandatory short-circuits.** If a known-fix pattern matches, apply it
+   immediately. Do not investigate, do not read additional files, do not re-derive the fix.
+8. **Hard cap: 5 file reads per unmatched failure.** After 5 reads, attempt a fix or ask
+   the user. Do not continue reading files hoping for more context.
+9. **Do not read runtime logs (`carameli.log`) unless the fix hint says `5xx` and the route
+   handler alone doesn't explain it.** Runtime logs are a last resort, not a first step.
+10. **Log quality gate is mandatory.** If any failure block has no error/traceback lines,
+    update `scripts/run-e2e.ps1` and stop — never attempt fixes when root cause is invisible.

@@ -110,3 +110,6 @@ VanillaLand/
 /playwright/.auth/
 
 todo.md
+
+# Claude Code local settings (personal permissions / preferences)
+.claude/settings.local.json

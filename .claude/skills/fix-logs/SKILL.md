@@ -10,21 +10,56 @@ Fix code bugs surfaced in `logs/log-errors.log` (runtime ERROR/WARNING entries).
 
 ---
 
-## Step 1 — Collect Errors
+## Step 1 — Collect & Match Known Fixes
 
-Read `logs/log-errors.log` with the Read tool. If the file does not exist or is empty,
-tell the user to run the `Log: Extract Errors` task first, then stop.
+Read these two files **in parallel** (single tool call):
 
-The file contains only ERROR and WARNING lines (with tracebacks) extracted from the
-runtime log. Duplicates have already been collapsed. Build a triage table:
+- `logs/log-errors.log`
+- `.claude/skills/fix-logs/known-fixes.md`
 
-| # | Level | Module:line | Message summary | Action |
-|---|---|---|---|---|
-| 1 | ERROR | app.api.vsapi.phone_lines:56 | Provider error purchasing DID | Fix code |
+If the log file does not exist or is empty, tell the user to run the **Log: Extract
+Errors** task first, then stop.
 
-Classify each entry as **code bug** / **config issue** / **transient external failure**.
-Only code bugs get fixed. Config issues are reported clearly. Transient failures are noted
-and skipped.
+### Addressed check
+
+If the last line of `logs/log-errors.log` is `--- ADDRESSED`, the errors have already
+been fixed. Tell the user:
+
+> These log errors were already addressed. Re-run the **Log: Extract Errors** task
+> and invoke `/fix-logs` again if new errors appear.
+
+Then **stop**.
+
+### Log quality gate
+
+Before investing in fixes, scan the log for these signals of incomplete diagnostics:
+
+| Signal | What it means |
+|---|---|
+| Lines that don't match `YYYY-MM-DD HH:MM:SS.mmm \| LEVEL \| module.path:lineno \| message` | Extractor captured raw/malformed lines — cannot map to source files |
+| `INFO` or `DEBUG` level lines are present | Level filter didn't work — log contains noise that should have been dropped |
+| Module path field is blank (e.g., `\|  \|` or `\| \|` with empty middle segment) | Module missing — cannot locate source file |
+
+If **any** quality problem is found:
+
+1. Identify which pattern is broken.
+2. Update `scripts/extract-log-errors.ps1` to fix the level filter or format parser.
+3. Tell the user: what was wrong, what was changed, and ask them to re-run the
+   **Log: Extract Errors** task.
+4. **Stop** — do not attempt fixes on a low-quality log.
+
+### Known-fix matching (mandatory — do this BEFORE any other file reads)
+
+For every error in the log, check if any **Error pattern** substring from
+`known-fixes.md` appears in the error message or traceback.
+
+**If a known fix matches: apply it immediately as a one-shot fix.** Do not read
+additional files to re-derive the solution. Just apply the documented fix, increment
+the **Hits** column by 1, set **Last used** to today's date, and move on.
+
+Only proceed to Step 2 for errors that have **no known-fix match**.
+
+### Triage unmatched errors
 
 The log format is:
 
@@ -32,8 +67,12 @@ The log format is:
 YYYY-MM-DD HH:MM:SS.mmm | LEVEL    | module.path:lineno | message
 ```
 
-Convert module path to file: `app.api.vsapi.phone_lines:56` → `app/api/vsapi/phone_lines.py` line 56.
-`[FRONTEND]` entries originate in `frontend/src/` — check the `context=` field for the component.
+Convert module path to file: `app.api.vsapi.phone_lines:56` → `app/api/vsapi/phone_lines.py`
+line 56. `[FRONTEND]` entries originate in `frontend/src/` — check the `context=` field.
+
+Build a triage table classifying each entry as **code bug** / **config issue** /
+**transient external failure**. Only code bugs get fixed. Config issues are reported.
+Transient failures are noted and skipped.
 
 ### Scope filter
 
@@ -42,38 +81,72 @@ If the argument contains `frontend`, only fix `[FRONTEND]` entries.
 
 ---
 
-## Step 2 — Apply Fixes
+## Step 2 — Diagnose & Fix (unmatched code bugs only)
+
+Skip this step entirely if all errors were resolved by known fixes in Step 1.
+
+### Investigation budget
+
+You have a **hard cap of 5 file reads per error**. The log already gives you the exact
+module and line number — start there.
+
+1. The **source file** at the reported line
+2. The **calling code** if the traceback points to it
+3–5. Up to 3 additional files if the root cause isn't clear
+
+**After 5 reads, you must attempt a fix.** If genuinely stuck, propose your best-guess
+fix and ask the user.
+
+### Applying fixes
 
 For each code bug:
 
-1. Open the relevant file and read enough context to understand the cause.
-2. Apply the **smallest reasonable fix** — no refactors, no unrelated cleanup.
-3. Preserve all existing `logger.*` calls; add any that are missing per
+1. Apply the **smallest reasonable fix** — no refactors, no unrelated cleanup.
+2. Preserve all existing `logger.*` calls; add any that are missing per
    `.claude/rules/logging.md`.
-4. If a fix requires a DB schema change, note it and stop — use `/add-db-model` instead.
+3. If a fix requires a DB schema change, note it and stop — use `/add-db-model` instead.
 
-**Stop conditions:**
+**After fixing** all actionable errors, append `--- ADDRESSED` to the end of
+`logs/log-errors.log`.
 
-- A fix would require a non-trivial refactor → propose a minimal safe fix and ask for
-  confirmation.
+### Update known-fixes table
+
+After all fixes are applied, if any error **was not already covered** by a row in
+`known-fixes.md` and its pattern is likely to recur, append a new row to
+`.claude/skills/fix-logs/known-fixes.md` with:
+
+- **Error pattern** — shortest distinctive substring from the error/traceback
+- **Root cause** — one-line explanation
+- **Fix** — the action you took
+- **Hits** — `1`
+- **Last used** — today's date
+- **Added** — today's date
+
+Do **not** add entries for one-off or transient errors.
+
+### Prune stale entries
+
+Delete rows where **Hits = 0** and **Added** is more than 90 days ago.
+
+### Stop conditions
+
+- A fix would require a non-trivial refactor → propose a minimal safe fix and ask.
 - Required context is missing → ask a single clarifying question and stop.
 
 ---
 
-## Step 3 — Verify
-
-Tell the user to re-run the `Test: Run pytest` task to exercise the code paths, then
-re-run the `Log: Extract Errors` task. Invoke `/fix-logs` again if `logs/log-errors.log`
-still contains code bugs.
-
----
-
-## Step 4 — Report
+## Step 3 — Report
 
 State clearly:
 
 - Which errors were fixed (file, line, what changed).
 - Which were skipped (transient / config / blocked).
+- **Restart reminder:** If any source files under `app/` were changed, tell the user:
+
+  ```sh
+  docker compose restart app
+  ```
+
 - Next step: re-run tests + extract errors if fixes were applied.
 
 ---
@@ -84,3 +157,11 @@ State clearly:
 2. Never force-fix transient external failures (provider 5xx, DB timeouts).
 3. Never modify source files in response to config issues — report them instead.
 4. One error = one minimal fix. Do not restructure surrounding code.
+5. Skip the log file if already stamped `--- ADDRESSED` — tell the user to re-run extraction first.
+6. Only stamp the log after applying at least one code fix.
+7. **Known fixes are mandatory short-circuits.** If a known-fix pattern matches, apply it
+   immediately. Do not investigate, do not read additional files, do not re-derive the fix.
+8. **Hard cap: 5 file reads per unmatched error.** After 5 reads, attempt a fix or ask
+   the user. Do not continue reading files hoping for more context.
+9. **Log quality gate is mandatory.** Lines without a `module.path:lineno` field cannot be
+   fixed — update `scripts/extract-log-errors.ps1` and stop.

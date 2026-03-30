@@ -38,6 +38,26 @@ refreshed by a task since.
 Task scripts overwrite the entire file on each run, so the marker is naturally cleared
 whenever the user re-runs the producing task (e.g., `Docker: Stack Status`).
 
+### Log quality gate
+
+Before building the triage table, check each non-empty artifact for these signals of
+incomplete diagnostics:
+
+| Signal | What it means |
+|---|---|
+| `health.log` is non-empty but has no container name, status, or service output | Docker status capture failed — the script got no usable output |
+| `app-logs.log` is empty or absent when `health.log` shows an unhealthy container | App log capture was skipped or failed |
+| An artifact contains only `Cannot connect to the Docker daemon` or `is the docker daemon running` | Docker is unreachable — infra issue, not a code fix |
+
+If **any** quality problem is found:
+
+- **Docker unreachable** (`Cannot connect`, `is the docker daemon running`): tell the user
+  to start Docker Desktop and re-run **Docker: Stack Status**, then **stop**.
+- **Empty capture when Docker is reachable**: update `scripts/docker-status.ps1` to fix the
+  capture logic (e.g., ensure `docker compose ps` output is written, ensure app logs are
+  collected for unhealthy containers), then ask the user to re-run **Docker: Stack Status**
+  and **stop**.
+
 ### Triage table
 
 Build a triage table from all non-empty, **non-addressed** artifacts:
@@ -148,3 +168,6 @@ State clearly:
 4. Never modify secrets or credentials in `.env` — report what is missing and let the user fill it in.
 5. Skip artifacts already stamped `--- ADDRESSED` — they were fixed in a prior run.
 6. Only stamp an artifact after applying at least one code fix from it (not for transient-only files).
+7. **Log quality gate is mandatory.** Docker-unreachable errors are infra, not code — stop
+   immediately and tell the user to start Docker Desktop. For empty captures when Docker is
+   reachable, fix `scripts/docker-status.ps1` and stop.
