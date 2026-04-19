@@ -65,6 +65,11 @@ class ExtensionRepo:
         )
         return {row[0] for row in result.all()}
 
+    async def get_all_active(self) -> list[Extension]:
+        """Return every active extension across all customers (used by the cron poller)."""
+        result = await self.session.execute(select(Extension).where(Extension.active.is_(True)))
+        return list(result.scalars().all())
+
     async def get_by_id(self, extension_id: uuid.UUID) -> Extension | None:
         result = await self.session.execute(
             select(Extension).where(

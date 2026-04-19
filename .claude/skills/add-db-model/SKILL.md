@@ -43,9 +43,8 @@ from app.models.my_entity import MyEntity  # noqa: F401
 
 ## Step 2 — Generate the Migration
 
-```bash
-docker compose exec app alembic revision --autogenerate -m "add my_entities table"
-```
+Ask the user to run:
+`docker compose exec app alembic revision --autogenerate -m "add my_entities table"`
 
 Open the generated file in `alembic/versions/` and verify:
 
@@ -56,15 +55,11 @@ Open the generated file in `alembic/versions/` and verify:
 
 ## Step 3 — Apply the Migration
 
-```bash
-docker compose exec app alembic upgrade head
-```
+Ask the user to run:
+`docker compose exec app alembic upgrade head`
 
 To roll back one step during development:
-
-```bash
-docker compose exec app alembic downgrade -1
-```
+`docker compose exec app alembic downgrade -1`
 
 ## Step 4 — Add Pydantic Schemas
 
@@ -98,11 +93,7 @@ class MyEntityRepo:
 
 ## Step 6 — Write Repository Tests
 
-Test against a real test database (separate from the dev DB):
-
-```bash
-docker compose exec app pytest tests/unit/test_my_entity_repo.py -v
-```
+Write tests in `tests/unit/test_<name>_repo.py` against a real test database (separate from the dev DB).
 
 ## Checklist
 

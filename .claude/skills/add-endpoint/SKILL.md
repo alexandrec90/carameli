@@ -85,8 +85,7 @@ Integration test (`tests/integration/test_<domain>.py`):
 
 ## Step 7 — Verify OpenAPI Docs
 
-Run `docker compose up` and open `http://localhost:8000/docs`. Confirm the
-new route appears with correct method, path, and schema.
+Ask the user to confirm the new route appears with correct method, path, and schema at `http://localhost:8000/docs`.
 
 ## Checklist
 

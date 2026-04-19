@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from typing import Literal
 
 from pydantic import BaseModel
 
@@ -11,6 +12,7 @@ class AreaCodeInfo(BaseModel):
     area_code: str
     state: str | None = None
     country: str = "US"
+    number_type: Literal["local", "toll-free"] = "local"
 
 
 class AreaCodesResponse(BaseModel):

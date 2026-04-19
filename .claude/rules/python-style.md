@@ -46,25 +46,6 @@ paths:
 - Repository functions always accept `session: AsyncSession` and commit
   internally; callers do not manage transactions directly.
 
-## Logging
-
-- Every module that emits log output must declare its logger at **module scope**:
-
-      import logging
-      logger = logging.getLogger(__name__)
-
-- Never instantiate a logger inside a function or route handler.
-- Use `%s`-style lazy formatting — never f-strings inside `logger.*()` calls:
-
-      # correct
-      logger.info("Phone line added number=%s sid=%s", line.phone_number, line.provider_sid)
-      # wrong
-      logger.info(f"Phone line added number={line.phone_number}")
-
-  - In every route handler log: entry at `INFO`, 404/409 at `WARNING`, provider/5xx errors at `ERROR`.
-  - Never log secrets: no `api_key`, provider credentials, or SIP passwords.
-- Full spec: `.claude/rules/logging.md`.
-
 ## Imports and Module Structure
 
 - Keep routers, schemas, models, repositories, services, and core configuration

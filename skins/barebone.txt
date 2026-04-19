@@ -1,0 +1,30 @@
+A structural reference skin — minimum viable styling, zero decoration.
+
+PURPOSE:
+- Reveals the raw layout hierarchy of every view so it can be understood before a styled skin is built.
+- Acts as the baseline smoke-test skin: if a view breaks here, the data layer is broken, not the skin.
+
+STYLE:
+- Inline styles only — no Tailwind, no CSS modules, no external stylesheets.
+- System-ui font stack everywhere; no custom fonts loaded.
+- Color philosophy: only what is necessary to distinguish interactive states.
+  bg #ffffff, surface #f5f5f5, border #cccccc, text #111111,
+  muted #666666, active #0057b8, danger #cc0000, ok #007700.
+- No border-radius. No shadows. No gradients.
+
+LAYOUT:
+- Full-height two-column shell: 160px fixed sidebar (left) + scrollable main area (right).
+- 40px header spanning full width above both columns.
+- All spacing in multiples of 8px.
+
+COMPONENTS:
+- Nav: plain <a>/<button> with padding 8px 12px, full sidebar width.
+  Active: font-weight bold, color #0057b8, background #e8e8e8.
+- Table: <table border-collapse>, <th> uppercase 12px #666666, <td> 6px 8px padding.
+- Form: 1px bordered inputs and buttons with no border-radius.
+- Status badge: small inline <span> 11px, background tint for ok/danger states.
+
+MOTION:
+- None. Zero transitions, zero keyframes. Every state change is instant.
+
+RENDERER: React DOM only. No canvas, no Three.js, no animation libraries.

@@ -16,6 +16,12 @@ async def get_by_call_sid(session: AsyncSession, call_sid: str) -> CallEvent | N
     return await CallEventRepo(session).get_by_call_sid(call_sid)
 
 
+async def get_by_call_sid_for_customer(
+    session: AsyncSession, call_sid: str, customer_id: uuid.UUID
+) -> CallEvent | None:
+    return await CallEventRepo(session).get_by_call_sid_for_customer(call_sid, customer_id)
+
+
 async def create_from_webhook(
     session: AsyncSession,
     customer_id: uuid.UUID | None,

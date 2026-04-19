@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import logging
+from typing import Any, cast
 
 import httpx
+
+from app.services.callback_state import pending_callbacks, pending_callbacks_lock
 
 logger = logging.getLogger(__name__)
 
@@ -148,4 +151,91 @@ class JambonzEngine:
         data = resp.json()
         call_sid = data.get("sid", data.get("call_sid", ""))
         logger.info("Jambonz voicemail drop initiated: call_id=%s to=%s", call_sid, to)
+        return {"call_id": call_sid, "status": "queued"}
+
+    async def get_active_calls(self) -> list[dict]:
+        """Return all active calls for this Jambonz account.
+
+        Each item includes at minimum: call_sid, call_status, sip_user (the SIP
+        username of the agent leg, if present), direction, from, to.
+
+        Endpoint: GET /v1/Accounts/{account_sid}/Calls
+        Verify the exact response shape against your Jambonz instance — the
+        ``sip_user`` field is populated only for SIP-terminated legs.
+        """
+        resp = await self._client.get(self._calls_url())
+        if resp.is_error:
+            logger.error(
+                "Jambonz get_active_calls failed: status=%s body=%s",
+                resp.status_code,
+                resp.text,
+            )
+            resp.raise_for_status()
+        data = resp.json()
+        # Jambonz may return a list directly or {"calls": [...]}
+        if isinstance(data, list):
+            return cast(list[dict[Any, Any]], data)
+        return cast(list[dict[Any, Any]], data.get("calls", data.get("data", [])))
+
+    async def get_registrations(self) -> list[dict]:
+        """Return SIP registrations for this Jambonz account.
+
+        Each item includes at minimum: sipUser (the SIP username).
+
+        Endpoint: GET /v1/Accounts/{account_sid}/registrations
+        NOTE: verify this path against your Jambonz version; some releases use
+        GET /v1/registrations (global) or a different casing.
+        """
+        url = f"/Accounts/{self._account_sid}/registrations"
+        resp = await self._client.get(url)
+        if resp.is_error:
+            logger.error(
+                "Jambonz get_registrations failed: status=%s body=%s",
+                resp.status_code,
+                resp.text,
+            )
+            resp.raise_for_status()
+        data = resp.json()
+        if isinstance(data, list):
+            return cast(list[dict[Any, Any]], data)
+        return cast(list[dict[Any, Any]], data.get("registrations", data.get("data", [])))
+
+    async def initiate_callback(
+        self, agent_sip_uri: str, contact_number: str, webhook_url: str
+    ) -> dict:
+        """Initiate a two-leg callback: call the agent first, then bridge to the contact.
+
+        When Jambonz fires the call-hook for the agent leg, the caller should POST
+        to webhook_url (i.e. /webhooks/jambonz/callback-answered) which looks up
+        the stored contact_number and returns a dial verb.
+        """
+        payload = {
+            "from": contact_number,
+            "to": {"type": "sip", "sipUri": agent_sip_uri},
+            "call_hook": {"url": webhook_url, "method": "POST"},
+            "call_status_hook": {
+                "url": f"{self._webhook_base_url}/webhooks/jambonz/call-status",
+                "method": "POST",
+            },
+        }
+        resp = await self._client.post(self._calls_url(), json=payload)
+        if resp.is_error:
+            logger.error(
+                "Jambonz initiate_callback failed: agent=%s contact=%s status=%s body=%s",
+                agent_sip_uri,
+                contact_number,
+                resp.status_code,
+                resp.text,
+            )
+            resp.raise_for_status()
+        data = resp.json()
+        call_sid = data.get("sid", data.get("call_sid", ""))
+        async with pending_callbacks_lock:
+            pending_callbacks[call_sid] = contact_number
+        logger.info(
+            "Jambonz callback initiated: call_sid=%s agent=%s contact=%s",
+            call_sid,
+            agent_sip_uri,
+            contact_number,
+        )
         return {"call_id": call_sid, "status": "queued"}

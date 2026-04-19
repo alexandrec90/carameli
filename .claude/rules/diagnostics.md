@@ -2,7 +2,6 @@
 description: Design rules for diagnostic scripts that produce log artifacts for AI-agent consumption
 paths:
   - scripts/**/*.ps1
-  - logs/**/*.log
 ---
 
 # Rule: Diagnostic Script Design

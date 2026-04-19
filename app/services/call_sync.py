@@ -12,6 +12,15 @@ from app.core.config import settings
 from app.core.database import async_session_factory
 from app.repositories.call_event_repo import CallEventRepo
 from app.repositories.customer_repo import CustomerRepo
+from app.services.agent_status_sync import (
+    poll_agent_status,
+)
+from app.services.agent_status_sync import (
+    shutdown as engine_shutdown,
+)
+from app.services.agent_status_sync import (
+    startup as engine_startup,
+)
 
 logger = logging.getLogger(__name__)
 _TERMINAL_CALL_STATUSES = {"completed", "no-answer", "busy", "failed", "canceled"}
@@ -88,5 +97,10 @@ async def retry_unposted_events(ctx: dict) -> None:
 
 class WorkerSettings:
     functions: ClassVar[list] = []
-    cron_jobs: ClassVar[list] = [cron(retry_unposted_events, second={0, 30})]
+    cron_jobs: ClassVar[list] = [
+        cron(retry_unposted_events, second={0, 30}),
+        cron(poll_agent_status, second={0, 30}),
+    ]
     redis_settings = RedisSettings.from_dsn(settings.redis_url)
+    on_startup = engine_startup
+    on_shutdown = engine_shutdown

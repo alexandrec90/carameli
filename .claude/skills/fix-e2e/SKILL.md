@@ -1,7 +1,6 @@
 ---
 name: fix-e2e
 description: 'Fixes E2E test failures from logs/e2e-failures.log (written by the Test: Run E2E task).'
-argument-hint: '(no arguments)'
 ---
 
 # Skill: Fix E2E Failures
@@ -75,19 +74,6 @@ For any failure not matched by a known fix, collect its structured block:
 
 Skip this step entirely if all failures were resolved by known fixes in Step 1.
 
-### Investigation budget
-
-You have a **hard cap of 5 file reads per failure**. Count every `read_file` and
-`grep_search` call against this budget. The 5 reads must be:
-
-1. The failing **test code** in `tests/e2e/`
-2. The **primary application file** the test exercises (use the fix hint to pick it)
-3–5. Up to 3 additional files if the root cause isn't clear from reads 1–2
-
-**After 5 reads, you must attempt a fix** based on what you know. Do not read more
-files. If you are genuinely stuck after 5 reads, propose your best-guess fix and ask
-the user for confirmation — do not keep investigating.
-
 ### Do NOT read runtime logs speculatively
 
 Do not read `logs/runtime/carameli.log` unless the fix hint specifically says `5xx` /
@@ -98,7 +84,7 @@ logs are large and usually add noise, not signal.
 
 | Fix hint keyword | Read first |
 |---|---|
-| `5xx` / `backend endpoint` | Route handler in `app/api/` |
+| `5xx` / `backend endpoint` | Route handler in `app/api/`; also check `app/api/vsapi/__init__.py` for route registration |
 | `CORS` / `Access-Control` | `app/main.py` CORS middleware section |
 | `4xx` / `auth` | Auth dependency in `app/core/auth.py`, then the route |
 | `Timeout` / `navigation` | Frontend component, then `frontend/src/routes.ts` |
@@ -174,9 +160,7 @@ State clearly:
    modifying tests. Only edit test files if the test itself is genuinely wrong.
 7. **Known fixes are mandatory short-circuits.** If a known-fix pattern matches, apply it
    immediately. Do not investigate, do not read additional files, do not re-derive the fix.
-8. **Hard cap: 5 file reads per unmatched failure.** After 5 reads, attempt a fix or ask
-   the user. Do not continue reading files hoping for more context.
-9. **Do not read runtime logs (`carameli.log`) unless the fix hint says `5xx` and the route
+8. **Do not read runtime logs (`carameli.log`) unless the fix hint says `5xx` and the route
    handler alone doesn't explain it.** Runtime logs are a last resort, not a first step.
-10. **Log quality gate is mandatory.** If any failure block has no error/traceback lines,
+9. **Log quality gate is mandatory.** If any failure block has no error/traceback lines,
     update `scripts/run-e2e.ps1` and stop — never attempt fixes when root cause is invisible.

@@ -24,8 +24,59 @@ should reflect the brief's tech stack, color palette, and motion choices.
 
 File: `.claude/rules/skin-<name>.md`
 
-Use the template from `.claude/rules/skin-architecture.md` (lines 127–179).
-Fill in every section from the design brief. Mandatory sections:
+Use this template as the skeleton, filling in every section from the design brief:
+
+````markdown
+---
+description: <Name> skin visual design conventions
+paths:
+  - frontend/src/skins/<name>/**/*.ts
+  - frontend/src/skins/<name>/**/*.tsx
+---
+
+# Rule: <Name> Skin — "<Tagline>"
+
+> **Scope:** This rule applies only to the `<name>` skin (`frontend/src/skins/<name>/`).
+> For the skin system architecture itself, see `.claude/rules/skin-architecture.md`.
+
+## Tech Stack
+
+**Renderer:** ...
+**Dependencies:** ...
+
+## Color Palette
+
+| Token | Hex | Role |
+| --- | --- | --- |
+| ... | ... | ... |
+
+## Layout System
+
+...
+
+## Component Patterns
+
+### Button
+...
+
+### Card / Panel
+...
+
+## Typography
+
+...
+
+## Motion & Animation
+
+...
+
+## Hard Rules Summary
+
+1. ...
+2. ...
+````
+
+Mandatory sections:
 
 - `description` and `paths:` frontmatter (scope to `frontend/src/skins/<name>/**`)
 - Tech stack / renderer
@@ -157,6 +208,28 @@ Run `npm run build` (or `npm run typecheck`) inside `frontend/` to confirm.
 
 ---
 
+## Step 4b — Add label to SkinSwitcher
+
+Edit `frontend/src/components/SkinSwitcher.tsx`. Add the display label to `SKIN_LABELS`:
+
+```ts
+// before
+const SKIN_LABELS: Record<SkinName, string> = {
+  carameli: 'Carameli',
+}
+
+// after
+const SKIN_LABELS: Record<SkinName, string> = {
+  carameli: 'Carameli',
+  '<name>': '<Display Name>',
+}
+```
+
+This is required — `SKIN_LABELS` is typed as `Record<SkinName, string>` so TypeScript will
+error if the new skin name is missing from the object.
+
+---
+
 ## Step 5 — Update the design brief index
 
 Edit `skins/README.md`. Add a row to the table:
@@ -207,5 +280,6 @@ location.reload()
 - [ ] `frontend/src/skins/<name>/views/Placeholder.tsx` created
 - [ ] `registry.ts` — skin added to `SKIN_NAMES`
 - [ ] `registry.ts` — skin added to `skinLoaders`
+- [ ] `SkinSwitcher.tsx` — display label added to `SKIN_LABELS`
 - [ ] `skins/README.md` table updated
 - [ ] `npm run typecheck` passes with no errors

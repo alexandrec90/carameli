@@ -14,6 +14,7 @@ from app.schemas.phone_line import (
     DeactivatePhoneLineRequest,
     PhoneLineCountResponse,
     PhoneLineResponse,
+    SetAutoAttendantRequest,
     UpdateRecordingRequest,
 )
 from app.services import customer_service, phone_line_service
@@ -54,12 +55,18 @@ async def add_phone_line(
     carrier = request.app.state.carrier
     try:
         if isinstance(body, AddPhoneLineByNumber):
-            result = await carrier.provision_number(body.phone_number)
+            result = await carrier.provision_number(
+                body.phone_number, country_code=body.country_code
+            )
         else:
-            numbers = await carrier.search_numbers(body.area_code, 1)
+            numbers = await carrier.search_numbers(
+                body.area_code, 1, country_code=body.country_code
+            )
             if not numbers:
                 raise ValueError(f"No numbers available in area code {body.area_code}")
-            result = await carrier.provision_number(numbers[0]["phone_number"])
+            result = await carrier.provision_number(
+                numbers[0]["phone_number"], country_code=body.country_code
+            )
     except ValueError as exc:
         logger.warning("Invalid DID request vs_customer_id=%s: %s", body.vs_customer_id, exc)
         raise HTTPException(status_code=400, detail=str(exc)) from None
@@ -181,4 +188,54 @@ async def update_call_recording(
         raise HTTPException(status_code=404, detail="Phone line not found")
 
     line = await phone_line_service.update_recording_enabled(session, line, body.enabled)
+    return PhoneLineResponse.model_validate(line)
+
+
+@router.put(
+    "/SetAutoAttendant",
+    response_model=PhoneLineResponse,
+    responses={400: {"description": "Bad request"}, 404: {"description": "Not found"}},
+)
+async def set_auto_attendant(
+    body: SetAutoAttendantRequest,
+    session: Annotated[AsyncSession, Depends(get_session)],
+    auth: Annotated[AuthContext, Depends(get_auth_context)],
+) -> PhoneLineResponse:
+    """Enable or disable simple DTMF auto-attendant on a phone line."""
+    enforce_customer_scope(auth, body.vs_customer_id)
+    logger.info(
+        "SetAutoAttendant vs_customer_id=%s phone_number=%s enabled=%s max_digits=%s",
+        body.vs_customer_id,
+        body.phone_number,
+        body.enabled,
+        body.max_digits,
+    )
+    if body.enabled and body.max_digits is None:
+        logger.warning(
+            "SetAutoAttendant missing max_digits vs_customer_id=%s phone_number=%s",
+            body.vs_customer_id,
+            body.phone_number,
+        )
+        raise HTTPException(status_code=400, detail="max_digits is required when enabled=true")
+    customer = await customer_service.get_by_vs_id(session, body.vs_customer_id)
+    if not customer:
+        logger.warning("Customer not found vs_customer_id=%s", body.vs_customer_id)
+        raise HTTPException(status_code=404, detail="Customer not found")
+    line = await phone_line_service.get_by_number(session, customer.id, body.phone_number)
+    if not line:
+        logger.warning(
+            "Phone line not found vs_customer_id=%s phone_number=%s",
+            body.vs_customer_id,
+            body.phone_number,
+        )
+        raise HTTPException(status_code=404, detail="Phone line not found")
+    line = await phone_line_service.update_auto_attendant(
+        session, line, body.enabled, body.max_digits
+    )
+    logger.info(
+        "AutoAttendant updated phone_number=%s enabled=%s max_digits=%s",
+        line.phone_number,
+        line.auto_attendant_enabled,
+        line.auto_attendant_max_digits,
+    )
     return PhoneLineResponse.model_validate(line)

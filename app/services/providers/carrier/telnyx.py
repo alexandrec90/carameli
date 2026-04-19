@@ -8,6 +8,9 @@ logger = logging.getLogger(__name__)
 
 _BASE_URL = "https://api.telnyx.com/v2"
 
+# NANP toll-free area-code prefixes (FCC-designated, fixed set).
+_TOLL_FREE_PREFIXES: frozenset[str] = frozenset({"800", "833", "844", "855", "866", "877", "888"})
+
 
 class TelnyxCarrier:
     """CarrierProvider implementation backed by the Telnyx REST API."""
@@ -31,18 +34,30 @@ class TelnyxCarrier:
     # DID management
     # ------------------------------------------------------------------
 
-    async def search_numbers(self, area_code: str, count: int) -> list[dict]:
-        resp = await self._client.get(
-            "/available_phone_numbers",
-            params={
+    async def search_numbers(
+        self, area_code: str, count: int, country_code: str = "US"
+    ) -> list[dict]:
+        is_toll_free = country_code == "US" and area_code in _TOLL_FREE_PREFIXES
+        if is_toll_free:
+            params: dict = {
+                "filter[number_type]": "toll_free",
                 "filter[national_destination_code]": area_code,
                 "filter[features][]": ["sms", "voice"],
                 "filter[limit]": count,
-            },
-        )
+            }
+        else:
+            params = {
+                "filter[national_destination_code]": area_code,
+                "filter[country_code]": country_code,
+                "filter[features][]": ["sms", "voice"],
+                "filter[limit]": count,
+            }
+        resp = await self._client.get("/available_phone_numbers", params=params)
         if resp.is_error:
             logger.error(
-                "Telnyx search_numbers failed: status=%s body=%s",
+                "Telnyx search_numbers failed: area_code=%s country_code=%s status=%s body=%s",
+                area_code,
+                country_code,
                 resp.status_code,
                 resp.text,
             )
@@ -50,7 +65,7 @@ class TelnyxCarrier:
         data = resp.json().get("data", [])
         return [{"phone_number": item["phone_number"]} for item in data]
 
-    async def provision_number(self, number: str) -> dict:
+    async def provision_number(self, number: str, country_code: str = "US") -> dict:
         resp = await self._client.post(
             "/phone_numbers",
             json={"phone_number": number},
@@ -160,7 +175,12 @@ class TelnyxCarrier:
         result: list[dict] = []
         for item in data:
             npa = item["phone_number"][2:5]  # strip +1, take next 3 digits
-            if npa not in seen:
+            # Exclude toll-free NPAs from local results; they're added explicitly below.
+            if npa not in seen and npa not in _TOLL_FREE_PREFIXES:
                 seen.add(npa)
-                result.append({"area_code": npa, "country": country})
+                result.append({"area_code": npa, "country": country, "number_type": "local"})
+        # For US, append the fixed set of FCC-designated toll-free prefixes.
+        if country == "US":
+            for prefix in sorted(_TOLL_FREE_PREFIXES):
+                result.append({"area_code": prefix, "country": "US", "number_type": "toll-free"})
         return result

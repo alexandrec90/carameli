@@ -41,9 +41,6 @@ Write-Host "Running alembic upgrade head..." -ForegroundColor Yellow
 $output = docker compose exec app alembic upgrade head 2>&1
 $exitCode = $LASTEXITCODE
 
-$output | ForEach-Object { Write-Host "  $_" -ForegroundColor DarkGray }
-Write-Host ""
-
 if ($exitCode -eq 0) {
     Set-Content $artifact ""
     Write-Host "  ==========================================" -ForegroundColor Green

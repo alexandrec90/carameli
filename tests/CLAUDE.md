@@ -11,12 +11,6 @@ pytestmark = pytest.mark.asyncio(loop_scope="session")
 
 This keeps the PostgreSQL connection pool valid across tests within a session.
 
-## Database & Transaction Isolation
-
-- Tests hit a **real PostgreSQL** instance (Docker).
-- `conftest.py` provides a session-scoped `test_engine` that drops/recreates all tables once.
-- Each test gets a function-scoped `db_session` wrapped in a transaction that **rolls back** after the test -- no manual cleanup needed.
-
 ## The `client` Fixture
 
 The global `client` fixture (`conftest.py`) builds an `AsyncClient` over the ASGI app with these overrides:

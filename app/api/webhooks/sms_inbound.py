@@ -3,11 +3,14 @@ from __future__ import annotations
 import base64
 import logging
 from datetime import UTC, datetime
-from typing import Any
+from typing import Annotated, Any
 
-from fastapi import APIRouter, HTTPException, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
+from app.core.database import get_session
+from app.services import sms_message_service
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/webhooks/telnyx", tags=["webhooks"])
@@ -81,24 +84,30 @@ def _validate_telnyx_signature(raw_body: bytes, signature: str, timestamp: str) 
         }
     },
 )
-async def telnyx_sms_inbound(request: Request) -> Response:
-    """Receive inbound SMS messages from Telnyx, validate their signature, and log them.
+async def telnyx_sms_inbound(
+    request: Request,
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> Response:
+    """Receive inbound SMS and delivery-receipt events from Telnyx.
 
-    Telnyx payload shape::
+    Telnyx routes two event types to this endpoint:
+
+    * ``message.received``  — inbound SMS (from a customer to our DID)
+    * ``message.finalized`` — delivery receipt for an outbound SMS we sent
+
+    Payload shape (both types)::
 
         {
           "data": {
-            "event_type": "message.received",
+            "event_type": "message.received" | "message.finalized",
             "payload": {
-              "from": { "phone_number": "+1..." },
-              "to":   [{ "phone_number": "+1..." }],
-              "text": "Hello"
+              "id": "<message_sid>",
+              "from": { "phone_number": "+1...", "status": "..." },
+              "to":   [{ "phone_number": "+1...", "status": "delivered" }],
+              "errors": [{ "code": "..." }]
             }
           }
         }
-
-    A future PR can add DB persistence or forwarding logic after the
-    ``logger.info`` call without touching the validation path.
     """
     raw_body = await request.body()
     signature = request.headers.get("telnyx-signature-ed25519", "")
@@ -119,6 +128,10 @@ async def telnyx_sms_inbound(request: Request) -> Response:
     event_type = body.get("data", {}).get("event_type", "")
     payload = body.get("data", {}).get("payload", {})
 
+    if event_type == "message.finalized":
+        await _handle_delivery_receipt(session, payload)
+        return Response(status_code=204)
+
     from_number = payload.get("from", {}).get("phone_number", "")
     to_numbers = [entry.get("phone_number", "") for entry in payload.get("to", [])]
     text = payload.get("text", "")
@@ -132,3 +145,37 @@ async def telnyx_sms_inbound(request: Request) -> Response:
     )
 
     return Response(status_code=204)
+
+
+async def _handle_delivery_receipt(session: AsyncSession, payload: dict[str, Any]) -> None:
+    """Update SmsMessage.delivery_status from a Telnyx message.finalized event.
+
+    The delivery status is reported per-recipient in ``payload.to[].status``.
+    We use the first recipient's status (Carameli sends point-to-point SMS).
+    Error codes come from ``payload.errors[].code`` if present.
+    """
+    message_sid: str = payload.get("id", "")
+    if not message_sid:
+        logger.warning("Telnyx delivery receipt missing message id; skipping")
+        return
+
+    to_entries: list[dict[str, Any]] = payload.get("to", [])
+    delivery_status: str = (to_entries[0].get("status", "") if to_entries else "") or ""
+
+    errors: list[dict[str, Any]] = payload.get("errors", [])
+    error_code: str | None = str(errors[0].get("code", "")) if errors else None
+
+    logger.info(
+        "Telnyx delivery receipt: message_sid=%s status=%s error_code=%s",
+        message_sid,
+        delivery_status,
+        error_code,
+    )
+
+    found = await sms_message_service.update_delivery_status(
+        session, message_sid, delivery_status, error_code
+    )
+    if not found:
+        logger.warning(
+            "Telnyx delivery receipt: no SmsMessage row found for message_sid=%s", message_sid
+        )

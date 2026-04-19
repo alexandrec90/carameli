@@ -204,21 +204,93 @@ async def test_get_available_area_codes_deduplicates_npas() -> None:
 
     result = await carrier.get_available_area_codes("US", "CA")
 
-    npas = [r["area_code"] for r in result]
-    assert npas == ["415", "650"]
+    local_npas = [r["area_code"] for r in result if r["number_type"] == "local"]
+    assert local_npas == ["415", "650"]
     assert all(r["country"] == "US" for r in result)
+    # Toll-free prefixes are always appended for US.
+    toll_free_npas = {r["area_code"] for r in result if r["number_type"] == "toll-free"}
+    assert toll_free_npas == {"800", "833", "844", "855", "866", "877", "888"}
 
 
 async def test_get_available_area_codes_no_state() -> None:
     carrier = _make_carrier()
+    # +18005550000 starts with toll-free NPA "800"; excluded from local, added as toll-free.
     fake_resp = _mock_response(200, {"data": [{"phone_number": "+18005550000"}]})
     carrier._client.get = AsyncMock(return_value=fake_resp)
 
     result = await carrier.get_available_area_codes("US", None)
 
-    assert result == [{"area_code": "800", "country": "US"}]
     call_kwargs = carrier._client.get.call_args[1]["params"]
     assert "filter[administrative_area]" not in call_kwargs
+    local_codes = [r for r in result if r["number_type"] == "local"]
+    assert local_codes == []  # "800" is a toll-free prefix, excluded from local
+    toll_free_npas = {r["area_code"] for r in result if r["number_type"] == "toll-free"}
+    assert toll_free_npas == {"800", "833", "844", "855", "866", "877", "888"}
+
+
+# ---------------------------------------------------------------------------
+# search_numbers — toll-free routing
+# ---------------------------------------------------------------------------
+
+
+async def test_search_numbers_toll_free_prefix_uses_toll_free_filter() -> None:
+    carrier = _make_carrier()
+    fake_resp = _mock_response(200, {"data": [{"phone_number": "+18005550100"}]})
+    carrier._client.get = AsyncMock(return_value=fake_resp)
+
+    result = await carrier.search_numbers("800", 1)
+
+    assert result == [{"phone_number": "+18005550100"}]
+    call_params = carrier._client.get.call_args[1]["params"]
+    assert call_params["filter[number_type]"] == "toll_free"
+    assert call_params["filter[national_destination_code]"] == "800"
+    assert "filter[country_code]" not in call_params
+
+
+async def test_search_numbers_local_prefix_uses_ndc_filter() -> None:
+    carrier = _make_carrier()
+    fake_resp = _mock_response(200, {"data": [{"phone_number": "+14155550100"}]})
+    carrier._client.get = AsyncMock(return_value=fake_resp)
+
+    result = await carrier.search_numbers("415", 1)
+
+    call_params = carrier._client.get.call_args[1]["params"]
+    assert "filter[number_type]" not in call_params
+    assert call_params["filter[national_destination_code]"] == "415"
+    assert call_params["filter[country_code]"] == "US"
+    assert result == [{"phone_number": "+14155550100"}]
+
+
+async def test_search_numbers_international_passes_country_code() -> None:
+    carrier = _make_carrier()
+    fake_resp = _mock_response(200, {"data": [{"phone_number": "+442071234567"}]})
+    carrier._client.get = AsyncMock(return_value=fake_resp)
+
+    result = await carrier.search_numbers("207", 1, country_code="GB")
+
+    call_params = carrier._client.get.call_args[1]["params"]
+    assert call_params["filter[country_code]"] == "GB"
+    assert call_params["filter[national_destination_code]"] == "207"
+    assert result == [{"phone_number": "+442071234567"}]
+
+
+# ---------------------------------------------------------------------------
+# get_available_area_codes — non-US countries omit toll-free block
+# ---------------------------------------------------------------------------
+
+
+async def test_get_available_area_codes_non_us_no_toll_free() -> None:
+    carrier = _make_carrier()
+    # "+442071234567"[2:5] == "420" — the NPA extraction is US-centric but the key
+    # assertion is that toll-free prefixes are NOT appended for non-US countries.
+    fake_resp = _mock_response(200, {"data": [{"phone_number": "+442071234567"}]})
+    carrier._client.get = AsyncMock(return_value=fake_resp)
+
+    result = await carrier.get_available_area_codes("GB", None)
+
+    toll_free = [r for r in result if r["number_type"] == "toll-free"]
+    assert toll_free == []
+    assert any(r["number_type"] == "local" for r in result)
 
 
 async def test_get_available_area_codes_raises_on_error() -> None:

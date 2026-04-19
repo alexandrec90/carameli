@@ -1,7 +1,6 @@
 ---
 name: fix-tests
 description: 'Fixes test failures from logs/test-failures.log (written by the Test: Run pytest task).'
-argument-hint: '(no arguments)'
 ---
 
 # Skill: Fix Test Failures
@@ -78,18 +77,6 @@ For any failure not matched by a known fix, collect lines starting with `FAILED`
 
 Skip this step entirely if all failures were resolved by known fixes in Step 1.
 
-### Investigation budget
-
-You have a **hard cap of 14 file reads per failure**. Count every `read_file` and
-`grep_search` call against this budget. The reads should be:
-
-1. The **failing test file** at the relevant line
-2. The **application file** the test exercises (from the traceback)
-3–14. Additional files as needed to trace the root cause
-
-**After 14 reads, you must attempt a fix.** If genuinely stuck, propose your best-guess
-fix and ask the user — do not keep reading files.
-
 ### Applying fixes
 
 For each failure:
@@ -156,8 +143,6 @@ State clearly:
 5. Only stamp the log after applying at least one code fix.
 6. **Known fixes are mandatory short-circuits.** If a known-fix pattern matches, apply it
    immediately. Do not investigate, do not read additional files, do not re-derive the fix.
-7. **Hard cap: 14 file reads per unmatched failure.** After 14 reads, attempt a fix or ask
-   the user. Do not continue reading files hoping for more context.
-8. **Log quality gate is mandatory.** If any failure block has no traceback (no `E` lines,
+7. **Log quality gate is mandatory.** If any failure block has no traceback (no `E` lines,
    no `app/`/`tests/` frames), update `scripts/run-tests.ps1` and stop — never attempt fixes
    on a log where the root cause is invisible.

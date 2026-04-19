@@ -12,7 +12,8 @@ import sys
 from datetime import UTC, datetime
 
 READ_TOOLS = {"Read", "Grep", "Glob", "WebFetch", "WebSearch", "ToolSearch"}
-WRITE_TOOLS = {"Edit", "Write", "NotebookEdit"}
+WRITE_TOOLS = {"Edit", "Write", "MultiEdit", "NotebookEdit"}
+COMMAND_TOOLS = {"Bash"}
 
 ERROR_LOG_NAMES = {
     "test-failures.log",
@@ -146,6 +147,8 @@ def analyze_segment(entries, start, end, project_root=""):
     tools = {}
     max_streak = 0
     streak = 0
+    max_bash_streak = 0
+    bash_streak = 0
 
     tool_use_map = {}
     tool_result_map = {}
@@ -171,7 +174,13 @@ def analyze_segment(entries, start, end, project_root=""):
                 if name in READ_TOOLS:
                     streak += 1
                     max_streak = max(max_streak, streak)
+                    bash_streak = 0
                 elif name in WRITE_TOOLS:
+                    streak = 0
+                    bash_streak = 0
+                elif name in COMMAND_TOOLS:
+                    bash_streak += 1
+                    max_bash_streak = max(max_bash_streak, bash_streak)
                     streak = 0
 
                 tool_use_map[tool_id] = {"name": name, "input": tool_input}
@@ -182,7 +191,7 @@ def analyze_segment(entries, start, end, project_root=""):
                     files_read.append(norm)
                     if fp.replace("\\", "/").endswith("known-fixes.md"):
                         checked_known_fixes = True
-                elif name in ("Edit", "Write") and fp:
+                elif name in ("Edit", "Write", "MultiEdit") and fp:
                     files_edited.append(normalize_path(fp, project_root))
 
         elif etype == "user":
@@ -209,6 +218,7 @@ def analyze_segment(entries, start, end, project_root=""):
 
     total_reads = sum(tools.get(t, 0) for t in READ_TOOLS)
     total_writes = sum(tools.get(t, 0) for t in WRITE_TOOLS)
+    total_bash = sum(tools.get(t, 0) for t in COMMAND_TOOLS)
 
     return {
         "skill": "",
@@ -216,8 +226,10 @@ def analyze_segment(entries, start, end, project_root=""):
         "total_tool_calls": sum(tools.values()),
         "total_reads": total_reads,
         "total_writes": total_writes,
+        "total_bash": total_bash,
         "read_to_write_ratio": round(total_reads / max(total_writes, 1), 1),
         "max_consecutive_reads": max_streak,
+        "max_consecutive_bash": max_bash_streak,
         "files_read": sorted(set(files_read)),
         "files_edited": sorted(set(files_edited)),
         "error_snippets": error_snippets[:20],
@@ -230,6 +242,8 @@ def analyze_session(entries, project_root=""):
     all_tools = {}
     max_streak = 0
     streak = 0
+    max_bash_streak = 0
+    bash_streak = 0
     user_prompts = []
     skills_invoked = []
 
@@ -246,7 +260,13 @@ def analyze_session(entries, project_root=""):
                         if name in READ_TOOLS:
                             streak += 1
                             max_streak = max(max_streak, streak)
+                            bash_streak = 0
                         elif name in WRITE_TOOLS:
+                            streak = 0
+                            bash_streak = 0
+                        elif name in COMMAND_TOOLS:
+                            bash_streak += 1
+                            max_bash_streak = max(max_bash_streak, bash_streak)
                             streak = 0
 
         elif etype == "user":
@@ -259,6 +279,7 @@ def analyze_session(entries, project_root=""):
 
     total_reads = sum(all_tools.get(t, 0) for t in READ_TOOLS)
     total_writes = sum(all_tools.get(t, 0) for t in WRITE_TOOLS)
+    total_bash = sum(all_tools.get(t, 0) for t in COMMAND_TOOLS)
 
     session_stats = {
         "skills_invoked": skills_invoked,
@@ -267,8 +288,10 @@ def analyze_session(entries, project_root=""):
         "total_tool_calls": sum(all_tools.values()),
         "total_reads": total_reads,
         "total_writes": total_writes,
+        "total_bash": total_bash,
         "read_to_write_ratio": round(total_reads / max(total_writes, 1), 1),
         "max_consecutive_reads": max_streak,
+        "max_consecutive_bash": max_bash_streak,
     }
 
     segments = find_skill_segments(entries)
@@ -304,8 +327,11 @@ def update_profile(agent_dir, skill_details):
                 "invocations": 0,
                 "total_reads_all": 0,
                 "total_writes_all": 0,
+                "total_bash_all": 0,
                 "max_consecutive_reads_ever": 0,
+                "max_consecutive_bash_ever": 0,
                 "spiral_count": 0,
+                "bash_spiral_count": 0,
                 "known_fixes_checked": 0,
                 "reads_history": [],
                 "error_patterns": {},
@@ -318,12 +344,19 @@ def update_profile(agent_dir, skill_details):
         p["invocations"] = p.get("invocations", 0) + 1
         p["total_reads_all"] = p.get("total_reads_all", 0) + seg["total_reads"]
         p["total_writes_all"] = p.get("total_writes_all", 0) + seg["total_writes"]
+        p["total_bash_all"] = p.get("total_bash_all", 0) + seg.get("total_bash", 0)
         p["max_consecutive_reads_ever"] = max(
             p.get("max_consecutive_reads_ever", 0),
             seg["max_consecutive_reads"],
         )
-        if seg["max_consecutive_reads"] >= 15:
+        p["max_consecutive_bash_ever"] = max(
+            p.get("max_consecutive_bash_ever", 0),
+            seg.get("max_consecutive_bash", 0),
+        )
+        if seg["max_consecutive_reads"] >= 10:
             p["spiral_count"] = p.get("spiral_count", 0) + 1
+        if seg.get("max_consecutive_bash", 0) >= 5:
+            p["bash_spiral_count"] = p.get("bash_spiral_count", 0) + 1
         if seg.get("checked_known_fixes"):
             p["known_fixes_checked"] = p.get("known_fixes_checked", 0) + 1
         p["last_seen"] = today
@@ -361,6 +394,7 @@ def update_profile(agent_dir, skill_details):
         inv = p["invocations"]
         p["avg_reads"] = round(p["total_reads_all"] / inv, 1)
         p["avg_writes"] = round(p["total_writes_all"] / inv, 1)
+        p["avg_bash"] = round(p["total_bash_all"] / inv, 1)
         p["avg_ratio"] = round(
             p["total_reads_all"] / max(p["total_writes_all"], 1),
             1,

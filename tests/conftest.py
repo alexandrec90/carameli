@@ -87,11 +87,15 @@ async def test_engine() -> AsyncGenerator[AsyncEngine, None]:
 @pytest_asyncio.fixture
 async def db_session(test_engine):
     async with test_engine.connect() as conn:
-        txn = await conn.begin()
-        session_factory = async_sessionmaker(bind=conn, expire_on_commit=False)
+        await conn.begin()
+        session_factory = async_sessionmaker(
+            bind=conn,
+            expire_on_commit=False,
+            join_transaction_mode="create_savepoint",
+        )
         async with session_factory() as session:
             yield session
-        await txn.rollback()
+        await conn.rollback()
 
 
 @pytest_asyncio.fixture

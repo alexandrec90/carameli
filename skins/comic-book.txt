@@ -1,0 +1,33 @@
+A Lichtenstein / pop-art comic book page UI.
+
+STYLE:
+- Lichtenstein-style pop art. Ben-Day dot halftone backgrounds in bold single accent color per panel.
+- Thick black ink panel-separator lines (hand-drawn feel, drawn on canvas — not CSS).
+- Color palette: yellow (#FFE033), red (#E8003D), blue (#0057B8), green (#00A651), cyan (#00AEEF), magenta (#EC008C), black (#111111), white (#FAFAF2).
+- Each page/route is assigned one accent color. The dot background shifts to that color.
+- Typography: Bangers (display/headings), Comic Neue bold (body). All headings/nav UPPERCASE.
+- NO border-radius anywhere. Flat ink-cut corners. Box-shadows at 45-degree offset (4px 4px 0 black).
+
+ASSETS:
+- Generated with Gemini (characters, objects, speech bubbles saved as PNGs to public/comic-book/).
+- At rest: CSS filter grayscale(1) contrast(1.1) — desaturated.
+- On hover: CSS filter sepia(1) saturate(4) hue-rotate(Xdeg) — re-colorized to panel accent.
+- No JS for colorization — pure CSS custom property (--cb-hue-deg).
+
+TRANSITIONS:
+- Page navigation uses a misregistration effect: four CMYK canvas layers (cyan, magenta, yellow, black)
+  drift apart in separate directions as the outgoing page fades out (300ms), hold briefly,
+  then collapse back as the incoming page fades in (300ms).
+- Ben-Day dots breathe continuously via requestAnimationFrame (radius ±0.5px, 3s sine).
+
+LAYOUT:
+- Nav: vertical sidebar — a caption box (yellow, Bangers, UPPERCASE) with nav buttons.
+- Panels: two-column comic panel grid drawn on canvas. Left = one tall panel, right = two stacked.
+- Each view fills inside the drawn panel regions (absolute positioned over canvas).
+
+COMPONENTS:
+- Buttons: flat color, 3px black border, 4px 4px 0 black offset shadow. Hover: shadow grows to 6px 6px.
+- Cards: white fill, 3px black border, 4px offset shadow, 8px accent color top bar.
+- Speech bubbles: CSS ellipse shape with tail, used for status/error messages.
+
+RENDERER: React DOM + Canvas 2D only. No WebGL, no Three.js, no R3F.

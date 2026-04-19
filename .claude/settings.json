@@ -1,4 +1,36 @@
 {
+  "env": {
+    "MAX_THINKING_TOKENS": "63999",
+    "CLAUDE_CODE_ALWAYS_ENABLE_EFFORT": "1",
+    "CLAUDE_CODE_DISABLE_ADAPTIVE_THINKING": "1",
+    "CLAUDE_CODE_EFFORT_LEVEL": "max"
+  },
+  "permissions": {
+    "allow": [
+      "Bash(*)",
+      "Read(*)",
+      "Edit(*)",
+      "Write(*)",
+      "WebFetch(*)",
+      "Grep(*)",
+      "Glob(*)",
+      "LS(*)",
+      "MultiEdit(*)",
+      "NotebookRead(*)",
+      "NotebookEdit(*)",
+      "TodoRead(*)",
+      "TodoWrite(*)",
+      "WebSearch(*)",
+      "Edit(/.claude/skills/fix-e2e/**)",
+      "Edit(/.claude/skills/optimize-fixers/**)"
+    ],
+    "defaultMode": "bypassPermissions",
+    "additionalDirectories": [
+      "C:\\Users\\Administrator\\.claude",
+      "C:\\Users\\Administrator\\.claude\\hooks",
+      "c:\\Users\\Administrator\\Desktop\\vs_code\\carameli\\.claude\\rules"
+    ]
+  },
   "hooks": {
     "Stop": [
       {
@@ -11,5 +43,7 @@
         ]
       }
     ]
-  }
+  },
+  "effortLevel": "high",
+  "defaultModel": "opus"
 }

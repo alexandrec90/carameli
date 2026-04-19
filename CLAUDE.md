@@ -18,26 +18,9 @@ A self-hosted VoIP microservice. Manages phone lines, extensions, SMS, call reco
 | Auth | Bearer API key (`Authorization: Bearer <key>`) |
 | Tests | pytest + pytest-asyncio |
 
-## Local Development
-
-```bash
-# Start everything (includes Jambonz + FreeSWITCH + rtpengine)
-docker compose up
-
-# Apply DB migrations
-docker compose exec app alembic upgrade head
-
-# Run tests
-docker compose exec app pytest
-
-# Expose webhook endpoints publicly (Jambonz + Telnyx need to reach Carameli)
-ngrok http 8000
-# Then set JAMBONZ_WEBHOOK_BASE_URL and TELNYX_WEBHOOK_BASE_URL in .env to the ngrok HTTPS URL
-```
-
 ## Environment Variables
 
-See `.env.example` for all vars. All settings are loaded via pydantic-settings in `app/core/config.py`.
+All settings are loaded via pydantic-settings in `app/core/config.py`. See `.env.example` for all vars.
 
 ## Call Tracking
 
@@ -70,13 +53,13 @@ window via `.claudeignore`.
 | IntellectiveRouting / CallerRouting | SCI routing (`app/api/vsapi/sci.py`) |
 | DID provisioning (phone number lifecycle) | `app/services/did_manager.py` |
 
-See `.claude/rules/vanillaland-paths.md` for the full path reference table.
+See `.claude/rules/vanillaland-paths.md` for the full mapping including not-yet-implemented features.
 
-## Front-End (Carameli UI)
+## Front-End
 
 The frontend uses a **skin system** that fully decouples data logic from visual layout.
-Skins can use completely different tech stacks (CSS, Three.js, etc.) without touching shared code.
-See `.claude/rules/skin-architecture.md` for the authoritative spec.
+See `.claude/rules/skin-architecture.md` for the spec and `.claude/rules/skin-carameli.md` for the
+active skin's 3D canvas design constraints. Use the `add-ui-component` skill when building new components.
 
 | Layer | Choice |
 | --- | --- |
@@ -84,126 +67,39 @@ See `.claude/rules/skin-architecture.md` for the authoritative spec.
 | Build / bundler | Vite (per-skin code splitting via dynamic import) |
 | Active skin | `carameli` (3D canvas, React Three Fiber) |
 
-### Frontend Layout
-
-```text
-frontend/src/
-  hooks/               # Data layer — one hook per page, no JSX
-    useDashboard.ts
-    usePhoneLines.ts
-    useExtensions.ts
-  skins/
-    types.ts           # Skin / SkinViews TypeScript interfaces
-    registry.ts        # Dynamic import map (one Vite chunk per skin)
-    context.tsx        # SkinProvider + useSkin()
-    carameli/          # Active skin (3D "Liquid Candy Maximalism")
-      index.ts         # Skin entry point / chunk boundary
-      Layout.tsx
-      views/           # Skin-specific page renderers (props only, no API calls)
-  pages/               # Thin orchestrators: call hook → call useSkin() → render view
-  api/                 # API client + TypeScript types
-  lib/                 # logger, utilities
-```
-
-### Skin Design Constraints (carameli skin)
-
-See `.claude/rules/skin-carameli.md` for the full 3D canvas spec. Quick reference:
-
-- Entire UI inside `<Canvas>` (React Three Fiber) — no CSS-styled DOM for primary surfaces
-- `MeshPhysicalMaterial` on all interactive surfaces — `meshBasicMaterial` forbidden
-- Real panel depth via `RoundedBox` (z ≥ `0.18`) — no flat planes as UI panels
-- 3D extruded text (`Text3D` with `bevelEnabled`, `height ≥ 0.2`)
-- Spring physics for all motion (`@react-spring/three`) — no CSS transitions
-- Warm lights only — minimum 3 colored point lights, no cold/white lights
-- Fluid vertex-shader background, always moving
-- Post-processing always on: Bloom + ChromaticAberration + Vignette
-
-Use the `add-ui-component` skill when building new components to get a step-by-step
-checklist and copy-paste examples for buttons, cards, modals, and nav elements.
-
 ## Logging
 
-All backend and frontend activity is written to a single rotating log file.
-See `.claude/rules/logging.md` for the full spec.
-
-**Quick reference:**
-
-- Log file: `logs/runtime/carameli.log` (10 MB cap, 5 backups)
-- Format: `YYYY-MM-DD HH:MM:SS.mmm | LEVEL | module:line | message`
-- Every Python module: `logger = logging.getLogger(__name__)` at module scope
-- Every route handler: log entry at `INFO`, 404s at `WARNING`, errors at `ERROR`
-- Frontend: `import { logger } from '../lib/logger'` — auto-ships to backend log file
-- Never log secrets (`api_key`, credentials)
-- A global `@app.exception_handler(Exception)` in `app/main.py` ensures all unhandled 500s are written to the log file with full stack traces — **do not remove it**; it is the primary signal for AI-assisted debugging via `logs/runtime/carameli.log`
+See `.claude/rules/logging-backend.md` and `.claude/rules/logging-frontend.md`. All activity lands in `logs/runtime/carameli.log`. The global
+exception handler in `app/main.py` writes all unhandled 500s to the log — do not remove it.
 
 ## Tooling
 
-See `.claude/rules/tooling.md` for VS Code task script conventions.
+See `.claude/rules/tooling.md`. Never run `docker` or `docker compose` commands directly — provide
+them for the user to run instead.
 
-- Task scripts live in `scripts/` and must be PowerShell (`.ps1`) — not Bash/`.sh`
-- Always invoke scripts with `pwsh` (PowerShell 7), never `powershell` (Windows PowerShell 5.1)
-- Use only ASCII characters in `.ps1` files — no em-dashes, curly quotes, or other non-ASCII (they cause parse errors when the file encoding is misread)
-- **Never run `docker` or `docker compose` commands directly** — provide the commands for the user to run instead
+## Guardrails
 
-## Guardrails (Vibe-Code Safety)
+This project is vibe-coded. **Every rule below is mandatory.**
 
-This project is vibe-coded. The rules below exist to catch the mistakes that vibe coding produces most often. **Treat every item as mandatory** — not aspirational.
+### Dependencies
 
-### Auth & customer scoping
+When adding a pip package, add it to `requirements.txt` (runtime) or `requirements-dev.txt` (dev/test only) in the same commit. Never leave an import that depends on an unlisted package.
 
-- Every new route handler **must** depend on the auth dependency (`get_auth_context`) and call `enforce_customer_scope()` to filter queries by `vs_customer_id`
-- Never return data without scoping it to the authenticated customer — this is a multi-tenant system
-- If a route is intentionally public (e.g., health check), document why auth is skipped with a comment
+### Cross-cutting rules (enforced by scoped rule files)
 
-### Alembic migrations
+- Auth + customer scoping on every route handler — `.claude/rules/security.md`
+- Model changes require a migration — `.claude/rules/migrations.md`
+- Provider imports only from `base.py` — `.claude/rules/voip-providers.md`
+- Webhook signatures validated before processing — `.claude/rules/webhooks.md`
+- Async-only I/O, Pydantic schemas on every endpoint — `.claude/rules/python-style.md`
 
-- Any change to a SQLAlchemy model (new column, changed type, new table, dropped column) **must** include a corresponding Alembic migration in the same commit
-- Generate with: `alembic revision --autogenerate -m "short_description"` — then review the generated file before committing
-- Every migration must have a working `downgrade()` — never leave it as `pass`
-- See `.claude/rules/migrations.md` for naming and safety conventions
+## Testing
 
-### Provider abstraction
+Every code change must include tests in the same commit.
 
-- Services and route handlers import **only** from `app/services/providers/base.py` (the Protocol interfaces)
-- Never import concrete providers (`telnyx.py`, `jambonz.py`) outside of `factory.py` and tests
-- When adding a new provider method, add it to the Protocol first, then implement it in every concrete provider
-
-### Pydantic schemas for all endpoints
-
-- Every route handler must declare a Pydantic model for its request body and response (`response_model=`)
-- Never return raw dicts or untyped data from an endpoint — this leaks internal fields and skips validation
-- Schemas live in `app/schemas/` — one module per resource
-
-### Async discipline
-
-- The entire backend is async (FastAPI + async SQLAlchemy + httpx). **Never use blocking calls** in async handlers:
-  - No `time.sleep()` — use `asyncio.sleep()`
-  - No `requests.get()` — use `httpx.AsyncClient`
-  - No synchronous file I/O in hot paths — use `aiofiles` or offload to a thread with `asyncio.to_thread()`
-- If you must call a blocking library, wrap it in `asyncio.to_thread()`
-
-### Webhook signature validation
-
-- Every webhook endpoint (Jambonz, Telnyx, or any future provider) **must** validate the request signature before processing the payload
-- Never trust webhook data without verification — see `.claude/rules/webhooks.md` for the pattern
-
-### Dependency management
-
-- When adding a new pip package, add it to `requirements.txt` (runtime) or `requirements-dev.txt` (dev/test only) in the same commit
-- Use the `audit-deps` skill periodically to detect unused, missing, or misplaced dependencies
-- Never leave an import that depends on a package not listed in requirements
-
-## Testing Strategy
-
-**Mandatory test coverage**: Every code change that adds or modifies functionality **must** include corresponding tests in the same commit. This is non-negotiable — the project is vibe-coded and tests are the primary safety net against regressions.
-
-- When creating a new endpoint, service, or utility: write unit tests covering the happy path, error cases, and edge cases **before** considering the task complete
-- When modifying existing code: update or add tests to cover the changed behavior; never assume existing tests are sufficient
-- When fixing a bug: write a regression test that reproduces the bug first, then fix it
-- Proactively use the `make-tests` skill to identify and fill coverage gaps after any significant change
-- Aim for meaningful coverage — test business logic, validation, error handling, and provider interactions, not just that code runs without crashing
-
-### Test types
-
-- **Unit tests**: pytest with mocked provider interfaces (`unittest.mock.patch` at the `CarrierProvider` / `CallEngineProvider` boundary — never mock internal SDK details)
-- **Integration tests**: Telnyx sandbox credentials + a local Jambonz instance (no real charges)
+- New endpoint/service: cover happy path, error cases, and edge cases
+- Bug fix: write a regression test first
+- Mock at the `CarrierProvider` / `CallEngineProvider` boundary — never mock internal SDK details
+- Integration tests use Telnyx sandbox + local Jambonz (no real charges)
+- Use the `make-tests` skill to identify coverage gaps after significant changes
+- DB isolation rules (savepoint fixture, no raw sessions, no teardown cleanup) — `.claude/rules/testing.md`

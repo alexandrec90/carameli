@@ -5,6 +5,7 @@ const SKIN_LABELS: Record<SkinName, string> = {
   carameli: 'Carameli',
   'candy-shop': 'Candy Shop',
   barebone: 'Barebone',
+  'comic-book': 'Comic Book',
 }
 
 export function SkinSwitcher() {

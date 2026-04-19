@@ -96,6 +96,17 @@ class CallEventRepo:
         result = await self.session.execute(select(CallEvent).where(CallEvent.call_sid == call_sid))
         return result.scalar_one_or_none()
 
+    async def get_by_call_sid_for_customer(
+        self, call_sid: str, customer_id: uuid.UUID
+    ) -> CallEvent | None:
+        result = await self.session.execute(
+            select(CallEvent).where(
+                CallEvent.call_sid == call_sid,
+                CallEvent.customer_id == customer_id,
+            )
+        )
+        return result.scalar_one_or_none()
+
     async def get_unposted(self) -> list[CallEvent]:
         """Return events not yet posted to VanillaSoft, created more than 1 minute ago."""
         cutoff = _utcnow_naive() - timedelta(minutes=1)

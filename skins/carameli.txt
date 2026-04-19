@@ -1,0 +1,53 @@
+A fully 3D interface — "Liquid Candy Maximalism". Dense, hyper-textured, tactile, edible.
+Think Candy Crush UI meets Willy Wonka's factory floor. Ignore minimalist trends entirely.
+
+PURPOSE:
+- The primary production skin. Every surface should look good enough to eat.
+- Demonstrates the skin system at full visual fidelity using WebGL / React Three Fiber.
+
+STYLE:
+- Entire UI lives inside a <Canvas> — no CSS-styled DOM for primary surfaces.
+- Palette (applied as MeshPhysicalMaterial properties, never as CSS):
+    deep-base       #1A0800  scene fog, void fill
+    caramel-core    #C8640A  primary extrusion, drip geometry
+    golden-gloss    #FF9F1C  panel base color
+    amber-highlight #FFD275  specular highlights, gloss peaks
+    burnt-shadow    #3D1A00  subsurface deep color, drip undersides
+    cream-white     #FFFDF5  text mesh color, candy coating
+    candy-pink      #FF6B9D  accent jewels, notification badges
+    licorice-black  #0D0500  panel edge bevels, deep shadow
+
+MATERIALS:
+- All interactive surfaces: MeshPhysicalMaterial with clearcoat 1.0, near-zero roughness.
+  meshStandardMaterial and meshBasicMaterial are forbidden on primary surfaces.
+- Panels: golden-gloss color, roughness 0.05, transmission 0.15, ior 1.52, reflectivity 0.9.
+- Text: cream-white, roughness 0.08, transmission 0.08, envMapIntensity 3.0.
+- Drips: caramel-core, roughness 0.12, transmission 0.25 (semi-translucent), ior 1.46.
+
+LIGHTING (minimum required):
+- Ambient: intensity 0.15, color #FF9F1C (very dim warm fill).
+- Point key: position [3,6,3], intensity 4, color #FFD275, castShadow.
+- Point fill: position [-4,2,1], intensity 2, color #FF6B3D.
+- Point rim: position [0,-2,4], intensity 1, color #FF9F1C.
+- RectArea overhead: position [0,8,0], 10x10, intensity 3, color #FFF4DC.
+Cold or white lights are forbidden.
+
+GEOMETRY:
+- Panels: RoundedBox with z >= 0.18 (real depth — flat planes forbidden as UI panels).
+- Text: Text3D from drei, bevelEnabled, height >= 0.2 (3D extrusion, not flat).
+- Drips: procedural bezier curves extruded downward from panel bottom edges.
+- Camera: slight downward tilt ~8 degrees ("looking at a table of candy" perspective).
+- Fog: color #1A0800, near 8, far 25.
+
+POST-PROCESSING (always on):
+- Bloom: intensity 0.6, luminanceThreshold 0.85 (only gloss peaks bloom).
+- ChromaticAberration: offset [0.0008, 0.0008] at screen edges.
+- Vignette: darkness ~0.5.
+
+MOTION:
+- Spring physics for all motion via @react-spring/three. No CSS transitions.
+- Background plane: continuous high-viscosity fluid vertex shader (always moving).
+- Panels bob gently on a sine wave when idle.
+
+RENDERER: React Three Fiber (@react-three/fiber) + @react-three/drei + @react-three/postprocessing.
+No flat DOM panels. No CSS animations. No cold lights.

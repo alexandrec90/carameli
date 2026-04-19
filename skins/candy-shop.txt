@@ -1,0 +1,41 @@
+A "Glossy Game UI" skin — mobile-game meets high-end confectionery. Heavy caramel theme.
+
+PURPOSE:
+- A polished, animated DOM skin sitting between the barebone reference and the full 3D carameli skin.
+- Proves the skin system works with CSS-based tools (Tailwind + Framer Motion) without WebGL.
+
+STYLE:
+- Everything feels 3D and liquid-smooth via gradients and shadows — never via flat colors.
+- Aesthetic: mobile game meets high-end candy brand.
+- Color palette:
+    caramel-pour  #C15A10  header background, primary caramel surface
+    dark-choc     #5C3317  nav borders, text shadow base
+    mid-choc      #8B4513  mid-layer text shadow
+    cream-highlight #FFF3CC bottom edge of header, light accents
+    cream-bg      #FFF8E7  nav circle gradient start
+    cream-warm    #E8D09E  nav circle gradient end
+    card-bg       #F5E6CC  card / content box background
+- All #C15A10 surfaces carry a gloss overlay:
+    ::after linear-gradient(to bottom, rgba(255,243,204,0.4) 0%, transparent 50%)
+  This is the signature "wet caramel" look — never omit it.
+
+LAYOUT:
+- Sticky caramel header with SVG drip bottom edge (deep "U" squiggle clip-path).
+- Four nav items rendered as 64px circles hanging off the header drip edge.
+- Below: card grid for content, each card with a chocolate drip overlay.
+
+LOGO:
+- Thick script/cursive font (Pacifico). Gradient text #ffffff → #FFD37E.
+- Text shadow stack: 2px 2px 0px #5C3317, 4px 4px 0px #8B4513, 0px 8px 15px rgba(0,0,0,0.4).
+
+TRANSITIONS:
+- All motion via Framer Motion spring physics (motion.div).
+- Nav circles: squish/scale on hover and active press.
+- Page transitions: fade + slight upward drift (y: 20 → 0).
+
+COMPONENTS:
+- Cards: card-bg fill, dark-choc border, inner chocolate drip SVG at top.
+- Buttons: caramel gradient background, cream highlight top edge, no sharp corners.
+- No flat-color surfaces on any interactive element.
+
+RENDERER: React DOM + Tailwind CSS + Framer Motion. No WebGL, no Three.js, no R3F.

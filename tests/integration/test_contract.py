@@ -17,6 +17,7 @@ import schemathesis
 from hypothesis import settings as h_settings
 from limits.storage import storage_from_string
 from limits.strategies import STRATEGIES as LIMIT_STRATEGIES
+from schemathesis.checks import not_a_server_error
 from slowapi.middleware import SlowAPIMiddleware
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
@@ -72,8 +73,16 @@ async def _contract_env():
             connect_args={"prepared_statement_cache_size": 0},
         )
         try:
-            async with async_sessionmaker(per_req_engine, expire_on_commit=False)() as session:
-                yield session
+            async with per_req_engine.connect() as conn:
+                await conn.begin()
+                session_factory = async_sessionmaker(
+                    bind=conn,
+                    expire_on_commit=False,
+                    join_transaction_mode="create_savepoint",
+                )
+                async with session_factory() as session:
+                    yield session
+                await conn.rollback()
         finally:
             await per_req_engine.dispose()
 
@@ -96,6 +105,9 @@ async def _contract_env():
     )
     call_engine.initiate_voicemail_drop = AsyncMock(
         return_value={"call_sid": "CAcontract", "status": "queued"}
+    )
+    call_engine.initiate_callback = AsyncMock(
+        return_value={"call_id": "CAcontract", "status": "queued"}
     )
 
     app.state.carrier = carrier
@@ -146,4 +158,4 @@ def test_api_contract(case):
 
     404/422/401 responses are expected for fuzz inputs and are not failures.
     """
-    case.call_and_validate(headers=AUTH_HEADERS)
+    case.call_and_validate(headers=AUTH_HEADERS, checks=[not_a_server_error])

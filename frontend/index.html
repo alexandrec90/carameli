@@ -1,22 +1,48 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#1A0F00" />
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <link rel="manifest" href="/manifest.json" />
-    <title>Carameli</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Lobster&family=Outfit:wght@400;500;700;800&display=swap"
-      rel="stylesheet"
-    />
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#1A0F00" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="manifest" href="/manifest.json" />
+  <title>Carameli</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Lobster&family=Outfit:wght@400;500;700;800&display=swap"
+    rel="stylesheet" />
+  <!-- Comic-book panel bubble fonts -->
+  <link
+    href="https://fonts.googleapis.com/css2?family=Bangers&family=Boogaloo&family=Fugaz+One&family=Permanent+Marker&display=swap"
+    rel="stylesheet" />
+  <!-- Preload comic-book panel images so the browser fetches them before JS executes -->
+  <link rel="preload" as="image" href="/comic-book/logo.webp" />
+  <link rel="preload" as="image" href="/comic-book/switchboard.webp" />
+  <link rel="preload" as="image" href="/comic-book/mailman1.webp" />
+  <link rel="preload" as="image" href="/comic-book/mechanic.webp" />
+  <link rel="preload" as="image" href="/comic-book/receptionist.webp" />
+  <link rel="preload" as="image" href="/comic-book/rolodex.webp" />
+  <link rel="preload" as="image" href="/comic-book/rotary%20phone.webp" />
+  <link rel="preload" as="image" href="/comic-book/mailman2.webp" />
+</head>
+
+<body>
+  <!-- Set background before React boots so there's no white flash during JS load -->
+  <script>
+    (function () {
+      var backgrounds = {
+        'carameli': '#1A0F00', 'candy-shop': '#1A0F00',
+        'barebone': '#ffffff', 'comic-book': '#FAFAF2',
+      };
+      var skin = localStorage.getItem('skin') || 'comic-book';
+      document.body.style.background = backgrounds[skin] || '#FFE033';
+    })();
+  </script>
+  <div id="root"></div>
+  <script type="module" src="/src/main.tsx"></script>
+</body>
+
 </html>

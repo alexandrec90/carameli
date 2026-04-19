@@ -1,0 +1,6 @@
+# Files tracked in git but not useful for code search
+# Leading / anchors to workspace root — avoids shadowing same-named dirs deeper in the tree
+
+/charts/
+/docs/
+/skins/

@@ -14,6 +14,7 @@ from app.core.config import settings
 from app.core.database import get_session
 from app.schemas.call_event import WebhookAck
 from app.services import call_event_service, customer_service, phone_line_service
+from app.services.callback_state import pending_callbacks, pending_callbacks_lock
 
 logger = logging.getLogger(__name__)
 jambonz_router = APIRouter(prefix="/webhooks/jambonz", tags=["webhooks"])
@@ -166,3 +167,140 @@ async def jambonz_call_status_webhook(
             )
 
     return JSONResponse({"status": "ok"})
+
+
+@jambonz_router.post(
+    "/incoming-call",
+    responses={
+        400: {"description": "Bad request (non-JSON body)"},
+        403: {"description": "Forbidden (invalid signature)"},
+    },
+    openapi_extra={
+        "requestBody": {
+            "required": True,
+            "content": {"application/json": {"schema": {"type": "object"}}},
+        }
+    },
+)
+async def jambonz_incoming_call_webhook(
+    request: Request,
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> Response:
+    """Return a Jambonz verb array for inbound calls — gather DTMF if auto-attendant is on."""
+    raw_body = await request.body()
+    signature = request.headers.get("X-Jambonz-Signature", "")
+    _validate_jambonz_signature(raw_body, signature)
+
+    try:
+        data: dict[str, Any] = await request.json()
+    except Exception:
+        logger.warning("Jambonz incoming-call webhook received non-JSON body")
+        return Response(status_code=400)
+
+    if not isinstance(data, dict):
+        logger.warning(
+            "Jambonz incoming-call webhook received non-dict payload type: %s",
+            type(data).__name__,
+        )
+        return Response(status_code=400)
+
+    to_number: str = data.get("to", "") or ""
+    call_sid: str = data.get("call_sid", "") or ""
+    logger.info("Jambonz incoming-call webhook: call_sid=%s to=%s", call_sid, to_number)
+
+    if not to_number:
+        logger.warning("Jambonz incoming-call webhook: missing 'to' field call_sid=%s", call_sid)
+        return JSONResponse([])
+
+    try:
+        phone_line = await phone_line_service.get_by_phone_number_global(session, to_number)
+    except Exception:
+        logger.warning(
+            "Failed to look up phone line for incoming call to=%s call_sid=%s",
+            to_number,
+            call_sid,
+            exc_info=True,
+        )
+        return JSONResponse([])
+
+    if (
+        phone_line is not None
+        and phone_line.auto_attendant_enabled
+        and phone_line.auto_attendant_max_digits
+    ):
+        action_hook = f"{settings.jambonz_webhook_base_url}/webhooks/jambonz/dtmf-result"
+        logger.info(
+            "Auto-attendant active for to=%s max_digits=%s call_sid=%s",
+            to_number,
+            phone_line.auto_attendant_max_digits,
+            call_sid,
+        )
+        return JSONResponse(
+            [
+                {
+                    "verb": "gather",
+                    "input": ["digits"],
+                    "numDigits": phone_line.auto_attendant_max_digits,
+                    "actionHook": action_hook,
+                }
+            ]
+        )
+
+    return JSONResponse([])
+
+
+@jambonz_router.post(
+    "/callback-answered",
+    responses={
+        400: {"description": "Bad request (non-JSON body)"},
+        403: {"description": "Forbidden (invalid signature)"},
+    },
+    openapi_extra={
+        "requestBody": {
+            "required": True,
+            "content": {"application/json": {"schema": {"type": "object"}}},
+        }
+    },
+)
+async def jambonz_callback_answered_webhook(
+    request: Request,
+) -> Response:
+    """Return a Jambonz dial verb to bridge the answered agent leg to the contact number."""
+    raw_body = await request.body()
+    signature = request.headers.get("X-Jambonz-Signature", "")
+    _validate_jambonz_signature(raw_body, signature)
+
+    try:
+        data: dict[str, Any] = await request.json()
+    except Exception:
+        logger.warning("Jambonz callback-answered webhook received non-JSON body")
+        return Response(status_code=400)
+
+    if not isinstance(data, dict):
+        logger.warning(
+            "Jambonz callback-answered webhook received non-dict payload type: %s",
+            type(data).__name__,
+        )
+        return Response(status_code=400)
+
+    call_sid: str = data.get("call_sid", "") or ""
+    from_number: str = data.get("from", "") or ""
+    logger.info("Jambonz callback-answered webhook: call_sid=%s from=%s", call_sid, from_number)
+
+    async with pending_callbacks_lock:
+        contact_number = pending_callbacks.pop(call_sid, None)
+
+    if not contact_number:
+        logger.warning("callback-answered: no pending callback for call_sid=%s", call_sid)
+        return JSONResponse([])
+
+    logger.info("Bridging agent call_sid=%s to contact=%s", call_sid, contact_number)
+    return JSONResponse(
+        [
+            {
+                "verb": "dial",
+                "callerId": from_number,
+                "target": [{"type": "phone", "number": contact_number}],
+            }
+        ]
+    )

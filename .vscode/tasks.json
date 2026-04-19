@@ -365,6 +365,72 @@
       "problemMatcher": []
     },
     {
+      "label": "Test: Lint + pytest + E2E",
+      "dependsOn": [
+        "Lint: Everything",
+        "Test: Run pytest",
+        "Test: Run E2E (headless)"
+      ],
+      "dependsOrder": "parallel",
+      "group": "test",
+      "presentation": {
+        "reveal": "always",
+        "panel": "new",
+        "showReuseMessage": false,
+        "close": false
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "CI: Check + Fix Known Issues",
+      "type": "shell",
+      "command": "pwsh -ExecutionPolicy Bypass -File scripts/check-and-fix-known.ps1; $_ec = $LASTEXITCODE; pwsh -ExecutionPolicy Bypass -File scripts/notify.ps1 -Label 'CI: Check + Fix Known Issues' -ExitCode $_ec; exit $_ec",
+      "group": "test",
+      "presentation": {
+        "reveal": "always",
+        "panel": "new",
+        "showReuseMessage": false,
+        "close": false
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Todo: Archive Done Items",
+      "type": "process",
+      "command": "pwsh",
+      "args": [
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "scripts/archive-done-todos.ps1"
+      ],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "showReuseMessage": false,
+        "close": false
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Images: Compress Comic Book (PNG/JPG -> WebP)",
+      "type": "process",
+      "command": "pwsh",
+      "args": [
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "scripts/compress-comic-book-images.ps1"
+      ],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "showReuseMessage": false,
+        "close": false
+      },
+      "problemMatcher": []
+    },
+    {
       "label": "Agent: Archive Copilot Session",
       "type": "shell",
       "command": "python scripts/hooks/archive-session-copilot.py '${input:sessionDescription}'; $_ec = $LASTEXITCODE; pwsh -ExecutionPolicy Bypass -File scripts/notify.ps1 -Label 'Agent: Archive Copilot Session' -ExitCode $_ec; exit $_ec",
@@ -382,7 +448,7 @@
       "id": "openFrontendSimpleBrowser",
       "type": "command",
       "command": "simpleBrowser.show",
-      "args": "http://localhost:5173/"
+      "args": "http://localhost:5174/"
     },
     {
       "id": "sessionDescription",

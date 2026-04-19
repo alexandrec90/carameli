@@ -70,21 +70,16 @@ uses gradients, shadows, or both to simulate depth.
 
 ## Logo
 
-```tsx
-// Font: thick script/cursive (e.g. Pacifico via Google Fonts)
-// Color: vertical gradient #FFFFFF → #FFD37E
-// Text shadow stack (applied via inline style or @layer utilities):
-style={{
-  backgroundImage: 'linear-gradient(to bottom, #FFFFFF, #FFD37E)',
-  WebkitBackgroundClip: 'text',
-  WebkitTextFillColor: 'transparent',
-  textShadow: '2px 2px 0px #5C3317, 4px 4px 0px #8B4513, 0px 8px 15px rgba(0,0,0,0.4)',
-}}
-```
+| Property | Value |
+| --- | --- |
+| Font | Pacifico or thick script/cursive |
+| `backgroundImage` | `linear-gradient(to bottom, #FFFFFF, #FFD37E)` |
+| `WebkitBackgroundClip` | `text` |
+| `WebkitTextFillColor` | `transparent` |
+| `textShadow` | `2px 2px 0 #5C3317, 4px 4px 0 #8B4513, 0 8px 15px rgba(0,0,0,0.4)` |
 
 > Note: `text-shadow` does not apply to `webkit-text-fill-color: transparent`. Wrap the logo
-> in a `<span>` with the shadow on the outer element and gradient on the inner element,
-> or use a filter/drop-shadow approach.
+> in a `<span>` with the shadow on the outer element and gradient on the inner element.
 
 ---
 
@@ -92,76 +87,34 @@ style={{
 
 Four nav items rendered as circles that appear attached to the bottom of the dripping header.
 
-### Default state
-
-```tsx
-<motion.div
-  className="
-    w-24 h-24 rounded-full
-    border-4 border-[#5C3317]
-    bg-gradient-to-br from-[#FFF8E7] to-[#E8D09E]
-    flex items-center justify-center
-    cursor-pointer overflow-hidden
-  "
->
-  {/* icon only in resting state */}
-</motion.div>
-```
-
-### Hover → expand to pill
-
-```tsx
-// Framer Motion spring — expands width to w-64, reveals label
-const variants = {
-  resting: { width: '6rem', borderRadius: '9999px' },
-  hovered: { width: '16rem', borderRadius: '9999px' },
-}
-
-<motion.div
-  variants={variants}
-  animate={isHovered ? 'hovered' : 'resting'}
-  transition={{ type: 'spring', stiffness: 300, damping: 20 }}
->
-  <AnimatePresence>
-    {isHovered && (
-      <motion.span
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        className="font-bold text-[#5C3317] whitespace-nowrap"
-      >
-        {label}
-      </motion.span>
-    )}
-  </AnimatePresence>
-</motion.div>
-```
+| Property | Resting | Hovered |
+| --- | --- | --- |
+| `width` | `6rem` (w-24) | `16rem` (w-64) |
+| `height` | `6rem` | `6rem` |
+| `borderRadius` | `9999px` | `9999px` |
+| `border` | `4px solid #5C3317` | same |
+| `background` | `gradient-to-br from-[#FFF8E7] to-[#E8D09E]` | same |
+| Spring `stiffness` | — | `300` |
+| Spring `damping` | — | `20` |
+| Label visibility | hidden | fade in via `AnimatePresence` |
+| Label color | — | `#5C3317`, bold |
 
 **Rules:**
 
-- Spring params are fixed: `stiffness: 300, damping: 20` — bouncy but controlled
-- Label text color: `#5C3317` (dark chocolate), bold weight
-- Never use CSS `transition:` for the expand animation — always Framer Motion spring
+- Spring params are fixed: `stiffness: 300, damping: 20`
+- Never use CSS `transition:` for expand — always Framer Motion spring
 - Circles must visually appear to hang from / be stuck to the drip edge of the header
 
 ---
 
 ## Cards / Content Boxes
 
-```tsx
-<div
-  className="bg-[#F5E6CC] relative overflow-hidden"
-  style={{
-    borderRadius: '32px',
-    boxShadow: 'inset 0 4px 10px rgba(255,255,255,0.5), 0 8px 24px rgba(92,51,23,0.2)',
-  }}
->
-  {/* Chocolate drip SVG overlay — covers top 1/3 of card */}
-  <DrippingOverlay />
-
-  {/* Content */}
-</div>
-```
+| Property | Value |
+| --- | --- |
+| `background` | `#F5E6CC` |
+| `borderRadius` | `32px` |
+| `boxShadow` | `inset 0 4px 10px rgba(255,255,255,0.5), 0 8px 24px rgba(92,51,23,0.2)` |
+| Drip overlay | SVG, absolute top-0, covers top 1/3, `pointer-events-none` |
 
 ### Drip overlay
 

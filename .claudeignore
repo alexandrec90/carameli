@@ -11,6 +11,8 @@
 #   AppCode/Vanillasoft.Webservice/  (ASMX contracts Carameli's REST API replaces)
 #   AppCode/ConnectMeVoice/          (CMV client — call + message-drop API surface)
 #   AppCode/CMV*                     (agent status, call data, recordings services)
+#   AppCode/VanillaSoft.CloudliApi/  (CloudLi API — call + SMS surface owned by CloudLi)
+#   AppCode/VanillaSoft.PubApi/      (Clarity API — call history, IR filters; CloudLi-owned)
 #   AppCode/InBoundMessaging*/       (inbound SMS webhook patterns)
 #   AppCode/SMSService/              (SMS processing queue)
 #   AppCode/VoipLineCountUpdate*/    (line usage tracking)
@@ -28,8 +30,6 @@
 ../VanillaLand/AppCode/VanillaSoft.Mobile/
 ../VanillaLand/AppCode/VanillaSoft.HudApi/
 ../VanillaLand/AppCode/VanillaSoft.AutokloseIntegration/
-../VanillaLand/AppCode/VanillaSoft.PubApi/
-../VanillaLand/AppCode/VanillaSoft.PubApi.Tests/
 
 # ── Main web app (WebForms/IIS — feature logic lives in Backend, not here) ───
 ../VanillaLand/AppCode/Vanillasoft.Web/

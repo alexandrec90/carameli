@@ -320,3 +320,134 @@ async def test_update_recording_unknown_line_returns_404(client) -> None:
     )
     assert resp.status_code == 404
     assert resp.json()["detail"] == "Phone line not found"
+
+
+# ---------------------------------------------------------------------------
+# Toll-free DID provisioning (Feature 1)
+# ---------------------------------------------------------------------------
+
+
+async def test_add_phone_line_toll_free_area_code(client) -> None:
+    """Toll-free prefix (800) is accepted and routed to the carrier."""
+    await _create_customer(client, 5100)
+
+    from app.main import app
+
+    app.state.carrier.search_numbers = AsyncMock(return_value=[{"phone_number": "+18005550100"}])
+    app.state.carrier.provision_number = AsyncMock(
+        return_value={"sid": "PNtf5100", "phone_number": "+18005550100"}
+    )
+
+    resp = await client.post(
+        f"{_LINE_BASE}/Add",
+        json={"vs_customer_id": 5100, "area_code": "800"},
+        headers=AUTH_HEADERS,
+    )
+    assert resp.status_code == 201
+    assert resp.json()["phone_number"] == "+18005550100"
+    app.state.carrier.search_numbers.assert_awaited_once_with("800", 1, country_code="US")
+
+
+async def test_add_phone_line_toll_free_prefixes_all_accepted(client) -> None:
+    """All 7 NANP toll-free prefixes are accepted as valid area codes."""
+    toll_free_prefixes = ["800", "833", "844", "855", "866", "877", "888"]
+    for i, prefix in enumerate(toll_free_prefixes):
+        vs_id = 5110 + i
+        await _create_customer(client, vs_id)
+
+        from app.main import app
+
+        number = f"+1{prefix}5550100"
+        app.state.carrier.search_numbers = AsyncMock(return_value=[{"phone_number": number}])
+        app.state.carrier.provision_number = AsyncMock(
+            return_value={"sid": f"PNtf{vs_id}", "phone_number": number}
+        )
+
+        resp = await client.post(
+            f"{_LINE_BASE}/Add",
+            json={"vs_customer_id": vs_id, "area_code": prefix},
+            headers=AUTH_HEADERS,
+        )
+        assert resp.status_code == 201, f"Failed for prefix {prefix}"
+        app.state.carrier.search_numbers.assert_awaited_with(prefix, 1, country_code="US")
+
+
+# ---------------------------------------------------------------------------
+# International DID provisioning (Feature 2)
+# ---------------------------------------------------------------------------
+
+
+async def test_add_phone_line_international_area_code(client) -> None:
+    """country_code=GB routes the search to the correct country."""
+    await _create_customer(client, 5120)
+
+    from app.main import app
+
+    app.state.carrier.search_numbers = AsyncMock(return_value=[{"phone_number": "+441614960000"}])
+    app.state.carrier.provision_number = AsyncMock(
+        return_value={"sid": "PNgb5120", "phone_number": "+441614960000"}
+    )
+
+    resp = await client.post(
+        f"{_LINE_BASE}/Add",
+        json={"vs_customer_id": 5120, "area_code": "161", "country_code": "GB"},
+        headers=AUTH_HEADERS,
+    )
+    assert resp.status_code == 201
+    assert resp.json()["phone_number"] == "+441614960000"
+    app.state.carrier.search_numbers.assert_awaited_once_with("161", 1, country_code="GB")
+    app.state.carrier.provision_number.assert_awaited_once_with("+441614960000", country_code="GB")
+
+
+async def test_add_phone_line_by_number_with_country_code(client) -> None:
+    """country_code passed with explicit phone_number is forwarded to provision_number."""
+    await _create_customer(client, 5121)
+
+    from app.main import app
+
+    app.state.carrier.provision_number = AsyncMock(
+        return_value={"sid": "PNca5121", "phone_number": "+16135550100"}
+    )
+
+    resp = await client.post(
+        f"{_LINE_BASE}/Add",
+        json={
+            "vs_customer_id": 5121,
+            "phone_number": "+16135550100",
+            "country_code": "CA",
+        },
+        headers=AUTH_HEADERS,
+    )
+    assert resp.status_code == 201
+    app.state.carrier.provision_number.assert_awaited_once_with("+16135550100", country_code="CA")
+
+
+async def test_add_phone_line_invalid_country_code_returns_422(client) -> None:
+    """country_code that is not 2 letters is rejected with 422."""
+    await _create_customer(client, 5122)
+    resp = await client.post(
+        f"{_LINE_BASE}/Add",
+        json={"vs_customer_id": 5122, "area_code": "415", "country_code": "USA"},
+        headers=AUTH_HEADERS,
+    )
+    assert resp.status_code == 422
+
+
+async def test_add_phone_line_country_code_lowercased_accepted(client) -> None:
+    """Lowercase country_code is auto-uppercased by the validator."""
+    await _create_customer(client, 5123)
+
+    from app.main import app
+
+    app.state.carrier.search_numbers = AsyncMock(return_value=[{"phone_number": "+15235550100"}])
+    app.state.carrier.provision_number = AsyncMock(
+        return_value={"sid": "PNus5123", "phone_number": "+15235550100"}
+    )
+
+    resp = await client.post(
+        f"{_LINE_BASE}/Add",
+        json={"vs_customer_id": 5123, "area_code": "523", "country_code": "us"},
+        headers=AUTH_HEADERS,
+    )
+    assert resp.status_code == 201
+    app.state.carrier.search_numbers.assert_awaited_once_with("523", 1, country_code="US")

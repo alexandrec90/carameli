@@ -38,26 +38,6 @@ paths:
 
 ## GitHub Secrets and Variables
 
-- When a workflow references `${{ secrets.* }}` or `${{ vars.* }}`, create or
-  update the value via the `gh` CLI — do not ask the user to use the GitHub web UI.
-- `gh` is installed, authenticated as `alexandrec90`, and has `repo` + `workflow`
-  scopes. Use it directly in the terminal.
-- Set a secret (value read from `.env` so it never appears in shell history):
-
-  ```powershell
-  $val = (Get-Content .env | Where-Object { $_ -match '^SECRET_NAME=' }) -replace '^SECRET_NAME=',''
-  gh secret set SECRET_NAME --body $val --repo alexandrec90/carameli
-  ```
-
-- Set a plain (non-secret) variable:
-
-  ```powershell
-  gh variable set VAR_NAME --body "value" --repo alexandrec90/carameli
-  ```
-
-- Verify after setting:
-
-  ```powershell
-  gh secret list --repo alexandrec90/carameli
-  gh variable list --repo alexandrec90/carameli
-  ```
+When a workflow references `${{ secrets.* }}` or `${{ vars.* }}`, use the `gh` CLI
+to create or update the value — do not ask the user to use the GitHub web UI.
+`gh` is installed, authenticated as `alexandrec90`, with `repo` + `workflow` scopes.

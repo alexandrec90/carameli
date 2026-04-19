@@ -196,3 +196,62 @@ async def test_sms_send_carrier_error_returns_502(client) -> None:
         headers=AUTH_HEADERS,
     )
     assert resp.status_code == 502
+
+
+# ---------------------------------------------------------------------------
+# International SMS block (Feature 2 — mirrors CmvSmsProvider.cs line 220)
+# ---------------------------------------------------------------------------
+
+
+async def test_sms_send_international_number_returns_400(client) -> None:
+    """to_number not starting with +1 must be rejected before any DB or carrier call."""
+    await _setup(client, 6030, "+16305550100")
+
+    resp = await client.post(
+        f"{_SMS_BASE}/Send/6030",
+        json={
+            "from_number": "+16305550100",
+            "to_number": "+442071234567",
+            "body": "Hello UK",
+        },
+        headers=AUTH_HEADERS,
+    )
+    assert resp.status_code == 400
+    assert resp.json()["detail"] == "International SMS is not supported"
+
+
+async def test_sms_send_international_number_carrier_not_called(client) -> None:
+    """Carrier send_sms must not be invoked when to_number is international."""
+    await _setup(client, 6031, "+16315550100")
+
+    from app.main import app
+
+    app.state.carrier.send_sms = AsyncMock()
+
+    await client.post(
+        f"{_SMS_BASE}/Send/6031",
+        json={
+            "from_number": "+16315550100",
+            "to_number": "+49301234567",
+            "body": "Hello Germany",
+        },
+        headers=AUTH_HEADERS,
+    )
+    app.state.carrier.send_sms.assert_not_awaited()
+
+
+async def test_sms_send_us_number_accepted(client) -> None:
+    """to_number starting with +1 passes the international check."""
+    await _setup(client, 6032, "+16325550100")
+
+    resp = await client.post(
+        f"{_SMS_BASE}/Send/6032",
+        json={
+            "from_number": "+16325550100",
+            "to_number": "+12125550199",
+            "body": "Domestic OK",
+        },
+        headers=AUTH_HEADERS,
+    )
+    assert resp.status_code == 200
+    assert resp.json()["success"] is True

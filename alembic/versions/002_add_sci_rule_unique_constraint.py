@@ -10,6 +10,8 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
+import sqlalchemy as sa
+
 from alembic import op
 
 revision: str = "002"
@@ -19,23 +21,26 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
-    # Keep one row for any duplicated customer/extension/zip tuple before adding the constraint.
-    op.execute(
-        """
-        DELETE FROM sci_rules a
-        USING sci_rules b
-        WHERE a.customer_id = b.customer_id
-          AND a.extension_id = b.extension_id
-          AND a.zip_code = b.zip_code
-          AND a.ctid < b.ctid
-        """
-    )
+    conn = op.get_bind()
+    existing = {c["name"] for c in sa.inspect(conn).get_unique_constraints("sci_rules")}
+    if "uq_sci_rules_customer_extension_zip" not in existing:
+        # Keep one row for any duplicated customer/extension/zip tuple before adding the constraint.
+        op.execute(
+            """
+            DELETE FROM sci_rules a
+            USING sci_rules b
+            WHERE a.customer_id = b.customer_id
+              AND a.extension_id = b.extension_id
+              AND a.zip_code = b.zip_code
+              AND a.ctid < b.ctid
+            """
+        )
 
-    op.create_unique_constraint(
-        "uq_sci_rules_customer_extension_zip",
-        "sci_rules",
-        ["customer_id", "extension_id", "zip_code"],
-    )
+        op.create_unique_constraint(
+            "uq_sci_rules_customer_extension_zip",
+            "sci_rules",
+            ["customer_id", "extension_id", "zip_code"],
+        )
 
 
 def downgrade() -> None:

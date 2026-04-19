@@ -6,25 +6,17 @@ export function useAuth() {
   const [ready, setReady] = useState(false)
 
   useEffect(() => {
-    async function init() {
-      try {
-        // Already have a valid session?
-        const me = await fetch(`${BASE}/auth/me`, { credentials: 'include' })
-        if (!me.ok) {
-          // No session — auto-acquire one
-          await fetch(`${BASE}/auth/session`, {
-            method: 'POST',
-            credentials: 'include',
-          })
-        }
-      } catch {
-        // Backend unreachable — allow the UI to render anyway (API calls
-        // inside hooks will fail gracefully with empty/error states).
-      } finally {
-        setReady(true)
-      }
-    }
-    init()
+    // Acquire or refresh a session before the app renders authenticated views.
+    // POST /auth/session is idempotent and requires no existing credentials
+    // (network-level trust model). Calling it directly avoids the GET /auth/me
+    // probe which always returns 401 on first load and triggers a browser
+    // "Failed to load resource" console error that breaks E2E smoke tests.
+    fetch(`${BASE}/auth/session`, {
+      method: 'POST',
+      credentials: 'include',
+    }).finally(() => {
+      setReady(true)
+    })
   }, [])
 
   return { ready }

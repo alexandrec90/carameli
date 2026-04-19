@@ -25,15 +25,20 @@ export function useDashboard(): UseDashboardResult {
         await api.health()
         setApiOnline(true)
 
-        try {
-          const c = await api.customers.get(DEMO_CUSTOMER_ID)
-          setCustomer(c)
-          const lines = await api.customers.getPhoneLines(DEMO_CUSTOMER_ID)
-          setPhoneLines(lines)
-          const cnt = await api.phoneLines.getCount(DEMO_CUSTOMER_ID)
-          setLineCount(cnt.count)
-        } catch {
-          // Customer not seeded yet — that's fine for first run
+        // Only load customer data when authenticated to avoid console errors
+        // when the session cookie is absent (e.g. E2E tests, first load).
+        const authRes = await fetch('/auth/me', { credentials: 'include' })
+        if (authRes.ok) {
+          try {
+            const c = await api.customers.get(DEMO_CUSTOMER_ID)
+            setCustomer(c)
+            const lines = await api.customers.getPhoneLines(DEMO_CUSTOMER_ID)
+            setPhoneLines(lines)
+            const cnt = await api.phoneLines.getCount(DEMO_CUSTOMER_ID)
+            setLineCount(cnt.count)
+          } catch {
+            // Customer not seeded yet — that's fine for first run
+          }
         }
       } catch {
         setApiOnline(false)

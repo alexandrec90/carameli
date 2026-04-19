@@ -8,9 +8,11 @@ Write-Host ""
 Write-Host "=== Install + Patch Pre-Commit Hook ===" -ForegroundColor Cyan
 Write-Host ""
 
-# Step 1: run pre-commit install
-Write-Host "Running pre-commit install..." -ForegroundColor Yellow
-pre-commit install
+# Step 1: run pre-commit install using the venv Python so INSTALL_PYTHON is
+# set to the venv interpreter, ensuring language:system hooks resolve tools
+# from the venv rather than from the system Python on PATH.
+Write-Host "Running pre-commit install (via venv Python)..." -ForegroundColor Yellow
+.venv\Scripts\python.exe -m pre_commit install --hook-type pre-commit --hook-type pre-push
 if ($LASTEXITCODE -ne 0) {
     Write-Host "pre-commit install failed." -ForegroundColor Red
     exit 1
@@ -38,7 +40,7 @@ if ($content -match "ARTIFACT=" -and $content -match "Auto-fix retry") {
 if ($content -match "ARTIFACT=" -and $content -notmatch "Auto-fix retry") {
     Write-Host "  [info] upgrading hook patch (adding auto-fix retry)..." -ForegroundColor Yellow
     # Re-run pre-commit install to get a fresh hook, then re-read
-    pre-commit install | Out-Null
+    .venv\Scripts\python.exe -m pre_commit install --hook-type pre-commit --hook-type pre-push | Out-Null
     $content = Get-Content $hookFile -Raw
 }
 
@@ -139,7 +141,8 @@ if ($contentLF.Contains($oldTailLF)) {
     $patched = $contentLF.Replace($oldTailLF, $newTailLF)
     Set-Content $hookFile $patched -NoNewline -Encoding utf8NoBOM
     Write-Host "  [pass] hook patched (errors -> logs/pre-commit-errors.log)" -ForegroundColor Green
-} else {
+}
+else {
     Write-Host "  [WARN] hook structure not recognized -- manual patch may be needed" -ForegroundColor Yellow
     Write-Host "         Expected the standard pre-commit exec block but did not find it." -ForegroundColor Yellow
     exit 1

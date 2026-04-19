@@ -1,12 +1,15 @@
 from fastapi import APIRouter
 
 from app.api.vsapi import (
+    agent_status,
     area_codes,
+    callback,
     calls,
     customers,
     extensions,
     phone_lines,
     pointers,
+    recordings,
     sci,
     sms,
     voicemail_drop,
@@ -14,6 +17,7 @@ from app.api.vsapi import (
 
 vsapi_router = APIRouter(prefix="/vsapi/1.0.0")
 
+vsapi_router.include_router(agent_status.router)
 vsapi_router.include_router(customers.router)
 vsapi_router.include_router(phone_lines.router)
 vsapi_router.include_router(extensions.router)
@@ -23,3 +27,5 @@ vsapi_router.include_router(sci.router)
 vsapi_router.include_router(pointers.router)
 vsapi_router.include_router(area_codes.router)
 vsapi_router.include_router(calls.router)
+vsapi_router.include_router(callback.router)
+vsapi_router.include_router(recordings.router)

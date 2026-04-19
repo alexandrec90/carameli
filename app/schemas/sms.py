@@ -2,14 +2,14 @@ from __future__ import annotations
 
 import logging
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
 
 
 class SendSmsRequest(BaseModel):
     from_number: str
-    to_number: str
+    to_number: str = Field(min_length=2)
     body: str
 
 

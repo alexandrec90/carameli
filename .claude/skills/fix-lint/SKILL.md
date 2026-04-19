@@ -1,7 +1,6 @@
 ---
 name: fix-lint
 description: 'Fixes lint errors from logs/lint-errors.log (written by the Lint: Everything task).'
-argument-hint: '(no arguments)'
 ---
 
 # Skill: Fix Lint Errors
@@ -73,17 +72,6 @@ treat each `Location:` line as the actionable pointer.
 
 Skip this step entirely if all errors were resolved by known fixes in Step 1.
 
-### Investigation budget
-
-You have a **hard cap of 6 file reads per error**. Lint errors already include
-file:line:col and rule ID, so you rarely need more than reading the file at that line.
-
-1. The **source file** at the reported line (with surrounding context)
-2–6. Up to 5 additional files if the fix requires understanding an import or type
-
-**After 6 reads, you must attempt a fix.** If genuinely stuck, propose your best-guess
-fix and ask the user.
-
 ### Applying fixes
 
 For each error:
@@ -150,7 +138,5 @@ Never run additional diagnostics after edits — instruct the user to rerun the 
 5. Only stamp the log after applying at least one code fix.
 6. **Known fixes are mandatory short-circuits.** If a known-fix pattern matches, apply it
    immediately. Do not investigate, do not read additional files, do not re-derive the fix.
-7. **Hard cap: 6 file reads per unmatched error.** Lint errors are self-locating — you should
-   rarely need more than the file at the reported line.
-8. **Log quality gate is mandatory.** If any section has no self-locating error lines, update
+7. **Log quality gate is mandatory.** If any section has no self-locating error lines, update
    `scripts/lint-all.ps1` and stop — never attempt fixes on a low-quality log.

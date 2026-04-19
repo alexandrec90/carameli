@@ -109,7 +109,6 @@ app.include_router(frontend_logs_router, responses=_UNAUTHORIZED)  # type: ignor
 @app.get("/health")
 async def health_check() -> dict:
     """Health probe — returns liveness, DB reachability, and Jambonz reachability."""
-    ping_url = settings.jambonz_base_url.rstrip("/") + "/health"
     jambonz_status = "ok"
     db_status = "ok"
 
@@ -121,11 +120,16 @@ async def health_check() -> dict:
         db_status = "unreachable"
 
     try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
-            resp = await client.get(ping_url)
-        if resp.is_error:
-            logger.warning("Jambonz health probe returned non-2xx status=%s", resp.status_code)
-            jambonz_status = "unreachable"
+        jambonz_url = settings.jambonz_base_url
+        if jambonz_url is not None:
+            ping_url = str(jambonz_url).rstrip("/") + "/health"
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                resp = await client.get(ping_url)
+            if resp.is_error:
+                logger.warning("Jambonz health probe returned non-2xx status=%s", resp.status_code)
+                jambonz_status = "unreachable"
+        else:
+            jambonz_status = "not_configured"
     except Exception as exc:
         logger.warning("Jambonz health probe failed: %s", exc)
         jambonz_status = "unreachable"

@@ -79,6 +79,15 @@ class PhoneLineRepo:
         await self.session.refresh(line)
         return line
 
+    async def update_auto_attendant(
+        self, line: PhoneLine, enabled: bool, max_digits: int | None
+    ) -> PhoneLine:
+        line.auto_attendant_enabled = enabled
+        line.auto_attendant_max_digits = max_digits
+        await self.session.commit()
+        await self.session.refresh(line)
+        return line
+
     async def get_by_phone_number_global(self, phone_number: str) -> PhoneLine | None:
         """Look up an active phone line by number without knowing the customer."""
         result = await self.session.execute(

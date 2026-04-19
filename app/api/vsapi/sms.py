@@ -11,7 +11,7 @@ from app.core.config import settings
 from app.core.database import get_session
 from app.core.limiter import limiter
 from app.schemas.sms import SendSmsRequest, SmsEnableDisableResponse, SmsStatusResponse
-from app.services import customer_service, phone_line_service
+from app.services import customer_service, phone_line_service, sms_message_service
 
 logger = logging.getLogger(__name__)
 
@@ -108,6 +108,10 @@ async def send_sms(
 ) -> SmsStatusResponse:
     """Send an SMS via the active carrier provider."""
     enforce_customer_scope(auth, customerId)
+    # Mirror CmvSmsProvider.cs: international SMS (non-US country code) is not supported.
+    if not body.to_number.startswith("+1"):
+        logger.warning("International SMS rejected to_number=%s", body.to_number)
+        raise HTTPException(status_code=400, detail="International SMS is not supported")
     customer = await customer_service.get_by_vs_id(session, customerId)
     if not customer:
         raise HTTPException(status_code=404, detail="Customer not found")
@@ -122,4 +126,25 @@ async def send_sms(
     except Exception:
         raise HTTPException(status_code=502, detail="Provider error sending SMS") from None
 
-    return SmsStatusResponse(success=True, message_sid=result["sid"])
+    message_sid: str | None = result.get("sid")
+
+    # Resolve phone_line_id for the from_number if it belongs to this customer.
+    line = await phone_line_service.get_by_number(session, customer.id, body.from_number)
+    await sms_message_service.create_outbound(
+        session,
+        customer_id=customer.id,
+        phone_line_id=line.id if line else None,
+        message_sid=message_sid,
+        from_number=body.from_number,
+        to_number=body.to_number,
+        body=body.body,
+    )
+    logger.info(
+        "Outbound SMS persisted vs_customer_id=%s from=%s to=%s sid=%s",
+        customerId,
+        body.from_number,
+        body.to_number,
+        message_sid,
+    )
+
+    return SmsStatusResponse(success=True, message_sid=message_sid)

@@ -42,7 +42,17 @@ async def create_customer(
     session: Annotated[AsyncSession, Depends(get_session)],
     _: Annotated[str, Depends(verify_api_key)],
 ) -> CustomerCreateResponse:
-    """Create a new customer record in Carameli."""
+    """Create a new customer record in Carameli.
+
+    No carrier or engine resources are provisioned here.
+
+    Investigation (CmvCustomer.cs -> CreateAccount): VanillaLand's CMVClient.CreateAccount()
+    simply POSTs a ContactInfoVS payload to the legacy CloudLi VsCustomer/Add endpoint,
+    which is exactly this handler. The .cs file is a thin HTTP client wrapper — it does not
+    call Telnyx, Jambonz, or any other provider directly. There are no durable carrier
+    resources (SIP credentials, sub-accounts) created per-customer in the VanillaLand flow,
+    so no provider calls are needed here beyond the DB insert.
+    """
     logger.info("Creating customer vs_customer_id=%s", body.vs_customer_id)
     try:
         customer = await customer_service.create(session, body)

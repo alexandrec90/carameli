@@ -1,6 +1,6 @@
 ---
 name: optimize-fixers
-description: 'Analyzes agent session data to optimize fix-* skill configurations. Use after accumulating several fixer skill invocations to tune investigation budgets, populate known-fixes tables, and update where-to-look hints.'
+description: 'Analyzes agent session data to optimize fix-* skill configurations. Use after accumulating several fixer skill invocations to populate known-fixes tables and update where-to-look hints.'
 argument-hint: '"fix-tests" | "fix-e2e" | "all" -- scope to one skill or all fixers (default: all)'
 ---
 
@@ -37,9 +37,9 @@ For each skill entry, compare the current profile against the snapshot:
 - **New invocations**: `current.invocations - snapshot.invocations` (0 if not in snapshot)
 - **New error patterns**: entries in `current.error_patterns` that either do not exist
   in the snapshot or have a higher count
-- **Changed budget recommendation**: `current.budget_recommendation` vs snapshot
 - **Changed files_read_freq**: files whose count increased or are new
 - **Changed known_fixes_checked**: compliance ratio may have shifted
+- **Bash behaviour**: `current.bash_spiral_count`, `current.avg_bash`, `current.max_consecutive_bash_ever` vs snapshot equivalents (treat missing snapshot fields as 0)
 
 If a skill has **zero new invocations** since the snapshot, skip it entirely --
 there is nothing new to optimize.
@@ -96,20 +96,7 @@ For each gap:
   `(needs manual review)` in those columns -- a placeholder is better than nothing
 - Set **Hits** to `0`, **Last used** to `--`, **Added** to today's date
 
-### 3c. Investigation budget tuning
-
-1. Extract the current budget from SKILL.md (look for "hard cap of N file reads"
-   or similar phrasing)
-2. Compare with the profile's `budget_recommendation` (p90 of actual reads)
-
-Rules:
-
-- If recommendation > current budget + 2: the budget is too tight, increase it
-- If recommendation < current budget - 3: the budget is too loose, decrease it
-- Otherwise: leave it alone (small differences are noise)
-- Never set a budget below 3
-
-### 3d. Where-to-look table updates
+### 3c. Where-to-look table updates
 
 Read the "Where to look by fix hint" table in SKILL.md (if one exists).
 
@@ -118,6 +105,21 @@ NOT mentioned in the table. These are frequently needed but undocumented.
 
 Only apply if you can clearly map the file to an existing fix-hint keyword. If not,
 note it in the report but do not modify the table.
+
+### 3d. Bash spiral detection
+
+Check `bash_spiral_count` and `avg_bash` in the delta.
+
+- If `bash_spiral_count > 0`: the skill ran ≥5 consecutive Bash calls in at least one
+  session. Check whether SKILL.md has a hard rule explicitly prohibiting self-initiated
+  command execution (e.g. running tests, docker commands, or the test runner).
+  If absent or weak, add or strengthen it: **"Never run `<tool>` yourself — all
+  execution is done by the user via the VS Code task."**
+- If `avg_bash > 3`: the skill is using Bash heavily on average. Check whether those
+  calls could be replaced with Read/Grep/Glob. If the SKILL.md encourages Bash-based
+  investigation (e.g. "check logs by running…"), rewrite those instructions to use
+  the log artifact instead.
+- If both are 0 in the delta, skip this check.
 
 ### 3e. Stale known-fixes pruning
 
@@ -139,7 +141,6 @@ current profile state as "optimized" so the next run only processes new data.
 Summarize what was changed per skill:
 
 - Known-fixes entries added (pattern, root cause)
-- Budget adjusted (old value -> new value, with p90 justification)
 - Where-to-look additions
 - Stale entries pruned
 - Compliance issues fixed
@@ -152,15 +153,13 @@ Summarize what was changed per skill:
 1. Only modify `fix-*` skills -- never touch other skill types.
 2. Never delete known-fixes entries that have **Hits > 0** -- only prune
    zero-hit entries older than 90 days.
-3. Budget changes must be justified by the `budget_recommendation` field --
-   never adjust based on guesswork.
-4. If error pattern inference is uncertain, use `(needs manual review)` --
+3. If error pattern inference is uncertain, use `(needs manual review)` --
    never fabricate root causes.
-5. Do not read full transcripts or session summaries -- the profile has all
+4. Do not read full transcripts or session summaries -- the profile has all
    the data you need. Keep token usage minimal.
-6. Maximum 3 file reads per skill (SKILL.md + known-fixes.md + profile).
+5. Maximum 3 file reads per skill (SKILL.md + known-fixes.md + profile).
    All data-driven decisions come from the pre-computed profile.
-7. **Always save the snapshot** after applying changes. Skipping this causes
+6. **Always save the snapshot** after applying changes. Skipping this causes
    the next run to re-process stale data and duplicate work.
-8. **Skip skills with zero new invocations** since the snapshot -- there is
+7. **Skip skills with zero new invocations** since the snapshot -- there is
    nothing new to act on.

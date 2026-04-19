@@ -23,8 +23,8 @@ if ($Fast) {
     $totalCmd   = "pytest --collect-only -q -o addopts='--ignore=tests/e2e' 2>/dev/null | tail -1"
 
     Write-Host "  Checking testmon selection..." -ForegroundColor DarkGray
-    $selectedRaw = docker compose exec -T app bash -c "$collectCmd" 2>&1 | Select-Object -Last 1
-    $totalRaw    = docker compose exec -T app bash -c "$totalCmd" 2>&1 | Select-Object -Last 1
+    $selectedRaw = docker compose exec -T app bash -c "$collectCmd" 2>&1 | ForEach-Object { "$_" } | Select-Object -Last 1
+    $totalRaw    = docker compose exec -T app bash -c "$totalCmd" 2>&1 | ForEach-Object { "$_" } | Select-Object -Last 1
 
     $selected = if ($selectedRaw -match "(\d+)\s+(selected|test)") { [int]$Matches[1] } else { 999 }
     $total    = if ($totalRaw    -match "(\d+)\s+(selected|test)") { [int]$Matches[1] } else { 1 }
@@ -64,8 +64,8 @@ $collecting = $true
 
 # Stream pytest output in real-time, showing progress per-test.
 # switch -Regex short-circuits on first match per line, avoiding redundant checks.
-docker compose exec -T app bash -c "$pytestCmd" 2>&1 | ForEach-Object {
-    $line = "$_"
+docker compose exec -T app bash -c "$pytestCmd" 2>&1 | ForEach-Object { "$_" } | ForEach-Object {
+    $line = $_
     $lines.Add($line)
 
     # First real output line means collection is done
@@ -149,8 +149,8 @@ $rawBlockLines = $null     # unfiltered lines for the current single test (fallb
 $maxPerBlock = 25          # max lines kept per failure/error
 
 function Invoke-FlushBlock {
-    $bl  = if ($null -ne $script:blockLines)    { $script:blockLines }    else { [System.Collections.Generic.List[string]]::new() }
-    $raw = if ($null -ne $script:rawBlockLines) { $script:rawBlockLines } else { [System.Collections.Generic.List[string]]::new() }
+    $bl  = $script:blockLines    ?? [System.Collections.Generic.List[string]]::new()
+    $raw = $script:rawBlockLines ?? [System.Collections.Generic.List[string]]::new()
 
     if ($bl.Count -gt 0 -or $raw.Count -gt 0) {
         $source = $bl

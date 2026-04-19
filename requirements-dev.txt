@@ -3,7 +3,7 @@
 # Local developer tooling (host machine)
 pre-commit>=3.7.0
 limits>=2.0.0
-pytest>=8.3.0
+pytest>=9.0.3
 pytest-asyncio>=0.24.0
 pytest-xdist>=3.5.0
 pytest-testmon>=2.1.0

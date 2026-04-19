@@ -48,13 +48,10 @@ Core tables from the PRD:
 
 ## Migrations (Alembic)
 
-- Generate: `alembic revision --autogenerate -m "<present-tense description>"`
 - Always **review** the generated file — autogenerate misses some things (custom
   indexes, check constraints, `gen_random_uuid()` defaults).
 - Never edit a migration that has already been applied to any non-local environment.
 - Name migrations descriptively: the message becomes part of the filename.
-- Apply: `alembic upgrade head`
-- Rollback one step: `alembic downgrade -1`
 
 ## Repositories (`app/repositories/`)
 

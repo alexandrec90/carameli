@@ -1,7 +1,7 @@
 ---
 name: fix-logs
 description: 'Fixes runtime errors from logs/log-errors.log (written by the Log: Extract Errors task).'
-argument-hint: '"backend" | "frontend" — optional scope filter'
+argument-hint: '"backend" | "frontend" | "known-only" — optional scope filter'
 ---
 
 # Skill: Fix Log Errors
@@ -59,6 +59,17 @@ the **Hits** column by 1, set **Last used** to today's date, and move on.
 
 Only proceed to Step 2 for errors that have **no known-fix match**.
 
+### known-only mode
+
+If the argument is `known-only`, stop here after applying matched fixes:
+
+- Apply fixes for all matched errors. Update **Hits** and **Last used**.
+- If **all** errors matched: stamp `--- ADDRESSED` and report normally. Done.
+- If **any** errors are unmatched: **rewrite the log with only the unmatched errors**,
+  then stop. The expensive model reads the trimmed log and sees only what remains.
+
+Do not proceed to Step 2 under any circumstances when `known-only` is set.
+
 ### Triage unmatched errors
 
 The log format is:
@@ -84,18 +95,6 @@ If the argument contains `frontend`, only fix `[FRONTEND]` entries.
 ## Step 2 — Diagnose & Fix (unmatched code bugs only)
 
 Skip this step entirely if all errors were resolved by known fixes in Step 1.
-
-### Investigation budget
-
-You have a **hard cap of 5 file reads per error**. The log already gives you the exact
-module and line number — start there.
-
-1. The **source file** at the reported line
-2. The **calling code** if the traceback points to it
-3–5. Up to 3 additional files if the root cause isn't clear
-
-**After 5 reads, you must attempt a fix.** If genuinely stuck, propose your best-guess
-fix and ask the user.
 
 ### Applying fixes
 
@@ -161,7 +160,8 @@ State clearly:
 6. Only stamp the log after applying at least one code fix.
 7. **Known fixes are mandatory short-circuits.** If a known-fix pattern matches, apply it
    immediately. Do not investigate, do not read additional files, do not re-derive the fix.
-8. **Hard cap: 5 file reads per unmatched error.** After 5 reads, attempt a fix or ask
-   the user. Do not continue reading files hoping for more context.
-9. **Log quality gate is mandatory.** Lines without a `module.path:lineno` field cannot be
+8. **Log quality gate is mandatory.** Lines without a `module.path:lineno` field cannot be
    fixed — update `scripts/extract-log-errors.ps1` and stop.
+9. **known-only mode: never investigate.** When `known-only` is set, do not proceed past
+    Step 1. Rewrite the log with only the unmatched errors, then stop. The expensive model
+    reads the trimmed log as-is.

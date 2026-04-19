@@ -91,6 +91,7 @@ $jobs["ruff"] = Start-Job -WorkingDirectory $wd -ScriptBlock {
 }
 
 $jobs["eslint"] = Start-Job -WorkingDirectory $wd -ScriptBlock {
+    [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
     $out = npm --prefix frontend run lint:eslint -- --fix 2>&1
     [PSCustomObject]@{ ExitCode = $LASTEXITCODE; Lines = @($out | ForEach-Object { "$_" }) }
 }
@@ -117,10 +118,18 @@ $jobs["mypy"] = Start-Job -WorkingDirectory $wd -ScriptBlock {
 }
 
 $jobs["pip-audit"] = Start-Job -WorkingDirectory $wd -ScriptBlock {
-    # Auto-upgrade vulnerable packages first, then report any remaining
-    # --ignore-vuln: suppress CVEs with no upstream fix yet (transitive deps)
     $ignore = @("--ignore-vuln", "CVE-2026-4539")
-    pip-audit --fix --quiet @ignore 2>&1 | Out-Null
+
+    # First pass: parse tabular output for fixable packages, then upgrade in venv.
+    # Matches data rows: "name  current-ver  CVE-xxx  fix-ver"
+    $firstPass = pip-audit @ignore 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        $firstPass | Where-Object { $_ -match "^(\S+)\s+[\d.]+\s+\S+\s+([\d.]+)\s*$" } | ForEach-Object {
+            $null = $_ -match "^(\S+)\s+[\d.]+\s+\S+\s+([\d.]+)\s*$"
+            pip install "$($Matches[1])==$($Matches[2])" --quiet 2>&1 | Out-Null
+        }
+    }
+
     $out = pip-audit @ignore 2>&1
     [PSCustomObject]@{ ExitCode = $LASTEXITCODE; Lines = @($out | ForEach-Object { "$_" }) }
 }
@@ -203,7 +212,9 @@ $jobs["yamllint"] = Start-Job -WorkingDirectory $wd -ScriptBlock {
 
 $jobs["actionlint"] = Start-Job -WorkingDirectory $wd -ScriptBlock {
     [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-    if (Test-Path ".github/workflows") {
+    $hasWorkflows = (Test-Path ".github/workflows") -and
+                    (@(Get-ChildItem ".github/workflows" -Filter "*.yml" -ErrorAction SilentlyContinue).Count -gt 0)
+    if ($hasWorkflows) {
         $out = actionlint 2>&1
         [PSCustomObject]@{ ExitCode = $LASTEXITCODE; Lines = @($out | ForEach-Object { "$_" }) }
     }
@@ -249,7 +260,7 @@ if ($failed -and -not $skipReason) {
     # Full format includes: file:line:col, rule code, message, code snippet, and rule URL
     # Strip "Found N errors" summary -- every error is already listed with full detail
     $errs = @($ruffResult.CheckLines | Remove-Noise | Where-Object { $_.Trim() -ne "" -and $_ -notmatch "^Found \d+ error" })
-    Add-Section "ruff" "ruff check . --fix --unsafe-fixes" $errs
+    Add-Section "ruff" "" $errs
 }
 if ($skipReason) { Write-Host "  [skip] ruff ($skipReason)" -ForegroundColor DarkGray }
 else { Write-LintResult "ruff" $failed }
@@ -261,20 +272,28 @@ if ($failed -and -not $skipReason) {
     $anyFailed = $true
     $errs = @($ruffResult.FormatLines | Remove-Noise | Where-Object { $_ -match "Would reformat" -or $_ -match "^\d+ file" })
     if (-not $errs) { $errs = @($ruffResult.FormatLines | Remove-Noise | Where-Object { $_.Trim() -ne "" }) }
-    Add-Section "ruff-format" "ruff format ." $errs
+    Add-Section "ruff-format" "" $errs
 }
 if ($skipReason) { Write-Host "  [skip] ruff-format ($skipReason)" -ForegroundColor DarkGray }
 else { Write-LintResult "ruff-format" $failed }
 
 # eslint
 $r = Receive-Job $jobs["eslint"]
+if (-not $r) {
+    $jobErr = ($jobs["eslint"].ChildJobs | ForEach-Object { $_.Error } | ForEach-Object { "$_" }) -join "; "
+    $r = [PSCustomObject]@{ ExitCode = 1; Lines = @("eslint job error: $jobErr") }
+}
 $failed = $r.ExitCode -ne 0
 $skipReason = if ($failed) { Get-SkipReason $r.Lines } else { $null }
 if ($failed -and -not $skipReason) {
     $anyFailed = $true
     $errs = @($r.Lines | Remove-Noise | Where-Object { $_ -match "\s(error|warning)\s" -or $_ -match "^\S.*\.(ts|tsx|js)" })
-    if (-not $errs) { $errs = @($r.Lines | Remove-Noise | Where-Object { $_.Trim() -ne "" }) }
-    Add-Section "eslint" "npm --prefix frontend run lint:eslint -- --fix" $errs
+    if (-not $errs) { $errs = @($r.Lines | Where-Object { $null -ne $_ -and $_ -notmatch "^> " -and "$_".Trim() -ne "" }) }
+    if (-not $errs) {
+        $childErr = ($jobs["eslint"].ChildJobs | ForEach-Object { $_.Error } | ForEach-Object { "$_" }) -join "`n"
+        if ($childErr) { $errs = @($childErr) }
+    }
+    Add-Section "eslint" "" $errs
 }
 if ($skipReason) { Write-Host "  [skip] eslint ($skipReason)" -ForegroundColor DarkGray }
 else { Write-LintResult "eslint" $failed }
@@ -287,7 +306,7 @@ if ($failed -and -not $skipReason) {
     $anyFailed = $true
     $errs = @($r.Lines | Remove-Noise | Where-Object { $_ -match "error TS\d+" })
     if (-not $errs) { $errs = @($r.Lines | Remove-Noise | Where-Object { $_.Trim() -ne "" }) }
-    Add-Section "tsc" "manual -- type errors require code changes" $errs
+    Add-Section "tsc" "" $errs
 }
 if ($skipReason) { Write-Host "  [skip] tsc ($skipReason)" -ForegroundColor DarkGray }
 else { Write-LintResult "tsc" $failed }
@@ -300,7 +319,7 @@ if ($failed -and -not $skipReason) {
     $anyFailed = $true
     $errs = @($r.Lines | Remove-Noise | Where-Object { $_ -match ":\d+:\d+.*(error|warning)" })
     if (-not $errs) { $errs = @($r.Lines | Remove-Noise | Where-Object { $_.Trim() -ne "" }) }
-    Add-Section "stylelint" "npm --prefix frontend run lint:css -- --fix" $errs
+    Add-Section "stylelint" "" $errs
 }
 if ($skipReason) { Write-Host "  [skip] stylelint ($skipReason)" -ForegroundColor DarkGray }
 else { Write-LintResult "stylelint" $failed }
@@ -313,7 +332,7 @@ if ($failed -and -not $skipReason) {
     $anyFailed = $true
     $errs = @($r.Lines | Remove-Noise | Where-Object { $_ -match ":\d+:\d+" -or $_ -match ":\d+ " })
     if (-not $errs) { $errs = @($r.Lines | Remove-Noise | Where-Object { $_.Trim() -ne "" }) }
-    Add-Section "markdownlint" "manual -- remaining errors could not be auto-fixed" $errs
+    Add-Section "markdownlint" "" $errs
 }
 if ($skipReason) { Write-Host "  [skip] markdownlint ($skipReason)" -ForegroundColor DarkGray }
 else { Write-LintResult "markdownlint" $failed }
@@ -326,7 +345,7 @@ if ($failed -and -not $skipReason) {
     $anyFailed = $true
     $errs = @($r.Lines | Remove-Noise | Where-Object { $_ -match ": error:" -or $_ -match ": note:" })
     if (-not $errs) { $errs = @($r.Lines | Remove-Noise | Where-Object { $_.Trim() -ne "" }) }
-    Add-Section "mypy" "manual -- type errors require code changes" $errs
+    Add-Section "mypy" "" $errs
 }
 if ($skipReason) { Write-Host "  [skip] mypy ($skipReason)" -ForegroundColor DarkGray }
 else { Write-LintResult "mypy" $failed }
@@ -346,25 +365,41 @@ else { Write-LintResult "pip-audit" $failed }
 
 # vulture
 $r = Receive-Job $jobs["vulture"]
+if (-not $r) {
+    $jobErr = ($jobs["vulture"].ChildJobs | ForEach-Object { $_.Error } | ForEach-Object { "$_" }) -join "; "
+    $r = [PSCustomObject]@{ ExitCode = 1; Lines = @("vulture job error: $jobErr") }
+}
 $failed = $r.ExitCode -ne 0
 $skipReason = if ($failed) { Get-SkipReason $r.Lines } else { $null }
 if ($failed -and -not $skipReason) {
     $anyFailed = $true
     $errs = @($r.Lines | Remove-Noise | Where-Object { $_ -match "unused" })
-    if (-not $errs) { $errs = @($r.Lines | Remove-Noise | Where-Object { $_.Trim() -ne "" }) }
-    Add-Section "vulture" "manual -- remove or whitelist unused code" $errs
+    if (-not $errs) { $errs = @($r.Lines | Where-Object { $null -ne $_ -and "$_".Trim() -ne "" }) }
+    if (-not $errs) {
+        $childErr = ($jobs["vulture"].ChildJobs | ForEach-Object { $_.Error } | ForEach-Object { "$_" }) -join "`n"
+        if ($childErr) { $errs = @($childErr) }
+    }
+    Add-Section "vulture" "" $errs
 }
 if ($skipReason) { Write-Host "  [skip] vulture ($skipReason)" -ForegroundColor DarkGray }
 else { Write-LintResult "vulture" $failed }
 
 # detect-secrets
 $r = Receive-Job $jobs["detect-secrets"]
+if (-not $r) {
+    $jobErr = ($jobs["detect-secrets"].ChildJobs | ForEach-Object { $_.Error } | ForEach-Object { "$_" }) -join "; "
+    $r = [PSCustomObject]@{ ExitCode = 1; Lines = @("detect-secrets job error: $jobErr") }
+}
 $failed = $r.ExitCode -ne 0
 $skipReason = if ($failed) { Get-SkipReason $r.Lines } else { $null }
 if ($failed -and -not $skipReason) {
     $anyFailed = $true
     $errs = @($r.Lines | Where-Object { $_ -match "Secret|Potential|ERROR" -or $_ -match "Location:" })
-    if (-not $errs) { $errs = @($r.Lines | Where-Object { $_.Trim() -ne "" }) }
+    if (-not $errs) { $errs = @($r.Lines | Where-Object { $null -ne $_ -and "$_".Trim() -ne "" }) }
+    if (-not $errs) {
+        $childErr = ($jobs["detect-secrets"].ChildJobs | ForEach-Object { $_.Error } | ForEach-Object { "$_" }) -join "`n"
+        if ($childErr) { $errs = @($childErr) }
+    }
     Add-Section "detect-secrets" "detect-secrets scan --update .secrets.baseline" $errs
 }
 if ($skipReason) { Write-Host "  [skip] detect-secrets ($skipReason)" -ForegroundColor DarkGray }
@@ -372,11 +407,20 @@ else { Write-LintResult "detect-secrets" $failed }
 
 # alembic-check
 $r = Receive-Job $jobs["alembic-check"]
+if (-not $r) {
+    $jobErr = ($jobs["alembic-check"].ChildJobs | ForEach-Object { $_.Error } | ForEach-Object { "$_" }) -join "; "
+    $r = [PSCustomObject]@{ ExitCode = 1; Lines = @("alembic-check job error: $jobErr") }
+}
 $failed = $r.ExitCode -ne 0
 $skipReason = if ($failed) { Get-SkipReason $r.Lines } else { $null }
 if ($failed -and -not $skipReason) {
     $anyFailed = $true
-    $errs = @($r.Lines | Remove-Noise | Where-Object { $_.Trim() -ne "" })
+    $errs = @($r.Lines | Remove-Noise | Where-Object { $null -ne $_ -and "$_".Trim() -ne "" })
+    if (-not $errs) { $errs = @($r.Lines | Where-Object { $null -ne $_ -and "$_".Trim() -ne "" }) }
+    if (-not $errs) {
+        $childErr = ($jobs["alembic-check"].ChildJobs | ForEach-Object { $_.Error } | ForEach-Object { "$_" }) -join "`n"
+        if ($childErr) { $errs = @($childErr) }
+    }
     Add-Section "alembic-check" "alembic revision --autogenerate -m 'describe change'" $errs
 }
 if ($skipReason) { Write-Host "  [skip] alembic-check ($skipReason)" -ForegroundColor DarkGray }
@@ -390,7 +434,7 @@ if ($failed -and -not $skipReason) {
     $anyFailed = $true
     $errs = @($r.Lines | Where-Object { $_ -match "\.env" })
     if (-not $errs) { $errs = @($r.Lines | Where-Object { $_.Trim() -ne "" }) }
-    Add-Section "dotenv-linter" "manual -- edit .env files to fix" $errs
+    Add-Section "dotenv-linter" "" $errs
 }
 if ($skipReason) { Write-Host "  [skip] dotenv-linter ($skipReason)" -ForegroundColor DarkGray }
 else { Write-LintResult "dotenv-linter" $failed }
@@ -403,7 +447,7 @@ if ($failed -and -not $skipReason) {
     $anyFailed = $true
     $errs = @($r.Lines | Remove-Noise | Where-Object { $_ -match ":\d+:\d+:.*\[(warning|error)\]" })
     if (-not $errs) { $errs = @($r.Lines | Remove-Noise | Where-Object { $_.Trim() -ne "" }) }
-    Add-Section "yamllint" "manual -- fix YAML formatting issues" $errs
+    Add-Section "yamllint" "" $errs
 }
 if ($skipReason) { Write-Host "  [skip] yamllint ($skipReason)" -ForegroundColor DarkGray }
 else { Write-LintResult "yamllint" $failed }
@@ -416,7 +460,7 @@ if ($failed -and -not $skipReason) {
     $anyFailed = $true
     $errs = @($r.Lines | Remove-Noise | Where-Object { $_ -match ":\d+:\d+:" })
     if (-not $errs) { $errs = @($r.Lines | Remove-Noise | Where-Object { $_.Trim() -ne "" }) }
-    Add-Section "actionlint" "manual -- fix GitHub Actions workflow issues" $errs
+    Add-Section "actionlint" "" $errs
 }
 if ($skipReason) { Write-Host "  [skip] actionlint ($skipReason)" -ForegroundColor DarkGray }
 else { Write-LintResult "actionlint" $failed }
@@ -428,7 +472,7 @@ $skipReason = if ($failed) { Get-SkipReason $r.Lines } else { $null }
 if ($failed -and -not $skipReason) {
     $anyFailed = $true
     $errs = @($r.Lines | Where-Object { $_.Trim() -ne "" })
-    Add-Section "psscriptanalyzer" "manual -- fix PowerShell style violations in scripts/" $errs
+    Add-Section "psscriptanalyzer" "" $errs
 }
 if ($skipReason) { Write-Host "  [skip] psscriptanalyzer ($skipReason)" -ForegroundColor DarkGray }
 else { Write-LintResult "psscriptanalyzer" $failed }

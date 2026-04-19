@@ -35,6 +35,39 @@ Write-Host "Runner   : Playwright (chromium, $mode)" -ForegroundColor DarkGray
 Write-Host "Tests    : tests/e2e/" -ForegroundColor DarkGray
 Write-Host ""
 
+# --- Pre-flight: verify both servers are reachable before running tests ---
+# Vite dev server check (localhost:5173)
+$viteReady = $false
+try {
+    $null = Invoke-WebRequest -Uri "http://localhost:5173" -UseBasicParsing -TimeoutSec 3 -ErrorAction Stop
+    $viteReady = $true
+}
+catch { Write-Verbose "Vite server not reachable: $_" }
+
+# Backend health check (direct, bypassing Vite proxy)
+$backendReady = $false
+try {
+    $resp = Invoke-WebRequest -Uri "http://127.0.0.1:8000/health" -UseBasicParsing -TimeoutSec 5 -ErrorAction Stop
+    $backendReady = ($resp.StatusCode -eq 200)
+}
+catch { Write-Verbose "Backend not reachable: $_" }
+
+if (-not $viteReady -or -not $backendReady) {
+    Set-Content $artifact "" -Encoding utf8
+    Write-Host ""
+    Write-Host "  [environment] E2E skipped -- one or more servers are not reachable." -ForegroundColor Yellow
+    if (-not $viteReady) {
+        Write-Host "    Frontend (Vite) is DOWN at http://localhost:5173" -ForegroundColor DarkGray
+        Write-Host "      cd frontend && npm run dev" -ForegroundColor DarkGray
+    }
+    if (-not $backendReady) {
+        Write-Host "    Backend is DOWN or unhealthy at http://127.0.0.1:8000/health" -ForegroundColor DarkGray
+        Write-Host "      docker compose up" -ForegroundColor DarkGray
+    }
+    Write-Host ""
+    exit 0
+}
+
 # Run pytest with verbose + short tracebacks + no header/warnings for cleaner parsing
 $e2eArgs = @("-m", "pytest", "tests/e2e/", "-v", "--tb=short", "--no-header", "-p", "no:warnings")
 if ($Headed) { $e2eArgs += "--headed" }
@@ -122,8 +155,8 @@ function Get-FixHint([string[]]$errorLines) {
     if ($blob -match "Timeout|TimeoutError|waiting for selector|waiting for navigation") {
         return "page element or navigation timed out -- check that the app renders the expected DOM"
     }
-    if ($blob -match "net::ERR_CONNECTION_REFUSED|ECONNREFUSED") {
-        return "connection refused -- ensure the backend and frontend dev servers are running"
+    if ($blob -match "net::ERR_CONNECTION_REFUSED|ECONNREFUSED|net::ERR_EMPTY_RESPONSE|socket hang up") {
+        return "server not reachable -- ensure the backend and frontend dev servers are running before running E2E tests"
     }
     if ($blob -match "ElementNotFound|ElementHandle|locator\.") {
         return "DOM element not found -- check selectors against the current page markup"
@@ -178,6 +211,27 @@ function Remove-DiffNoise([System.Collections.Generic.List[string]]$block) {
         }
     }
     return $cleaned
+}
+
+# --- Detect environment errors (server not running) ---
+# Per diagnostics.md §3: environment errors must not be written to the artifact.
+# Detect them here and bail out with a terminal-only note.
+$allOutput = $lines -join "`n"
+$serverDown = (
+    $failCount -gt 0 -and
+    ($allOutput -match "net::ERR_EMPTY_RESPONSE|net::ERR_CONNECTION_REFUSED|ECONNREFUSED|socket hang up") -and
+    # All failures must be connection-type errors (no assertion errors or 4xx/5xx)
+    ($allOutput -notmatch "AssertionError|assert |status[=\s]+[45]\d\d")
+)
+if ($serverDown) {
+    Set-Content $artifact "" -Encoding utf8
+    Write-Host ""
+    Write-Host "  [environment] E2E skipped -- frontend or backend dev server is not reachable." -ForegroundColor Yellow
+    Write-Host "  Start both servers before running E2E tests:" -ForegroundColor Yellow
+    Write-Host "    docker compose up        # backend" -ForegroundColor DarkGray
+    Write-Host "    cd frontend && npm run dev  # Vite on :5173" -ForegroundColor DarkGray
+    Write-Host ""
+    exit $exitCode
 }
 
 # --- Build structured artifact for coding agent ---
@@ -248,22 +302,22 @@ if ($exitCode -ne 0 -and $failCount -gt 0) {
     else {
         # Fallback: write filtered output (strip warnings + docs links)
         $filtered = @($lines | Where-Object {
-            $_ -notmatch "^\.venv" -and
-            $_ -notmatch "^--\s+Docs:" -and
-            $_ -notmatch "Warning:" -and
-            $_ -notmatch "PytestConfigWarning" -and
-            $_.Trim() -ne ""
-        })
+                $_ -notmatch "^\.venv" -and
+                $_ -notmatch "^--\s+Docs:" -and
+                $_ -notmatch "Warning:" -and
+                $_ -notmatch "PytestConfigWarning" -and
+                $_.Trim() -ne ""
+            })
         $filtered | Set-Content $artifact -Encoding utf8
     }
 }
 elseif ($exitCode -ne 0) {
     # Non-test failure (e.g., import error, collection error)
     $filtered = @($lines | Where-Object {
-        $_ -notmatch "^\.venv" -and
-        $_ -notmatch "^--\s+Docs:" -and
-        $_.Trim() -ne ""
-    })
+            $_ -notmatch "^\.venv" -and
+            $_ -notmatch "^--\s+Docs:" -and
+            $_.Trim() -ne ""
+        })
     $sections = [System.Collections.Generic.List[string]]::new()
     $sections.Add("# e2e-collection-error")
     $sections.Add("# fix: check that all test imports resolve and fixtures are available")

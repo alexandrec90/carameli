@@ -38,6 +38,7 @@ services:
     image: carameli-app
     restart: unless-stopped
     stop_grace_period: 3s
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload", "--reload-dir", "/app/app"]
     # In production remove the host port binding; nginx proxies to app:8000 internally.
     ports:
       - "8000:8000"

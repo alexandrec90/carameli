@@ -1,0 +1,452 @@
+/* ─── Comic Book Skin — global styles ─────────────────────────────────────── */
+
+/* Google Fonts are loaded in index.html.  This file covers all shared tokens  */
+
+/* and utility classes consumed by Layout, views, and components.               */
+
+:root {
+  --cb-yellow:        #FFE033;
+  --cb-red:           #E8003D;
+  --cb-blue:          #0057B8;
+  --cb-green:         #00A651;
+  --cb-cyan:          #00AEEF;
+  --cb-magenta:       #EC008C;
+  --cb-black:         #111;
+  --cb-white:         #FAFAF2;
+  --cb-ink:           3px solid #111;
+  --cb-shadow:        4px 4px 0 #111;
+  --cb-dot-alpha:     0.18;
+  --cb-dot-hover-alpha: 0.35;
+  --cb-accent:        var(--cb-yellow);   /* overridden per-page */
+  --cb-hue-deg:       0deg;
+}
+
+/* ─── Fonts ─────────────────────────────────────────────────────────────────── */
+.cb-font-display {
+  font-family: Bangers, cursive;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+
+.cb-font-body {
+  font-family: 'Comic Neue', cursive;
+  font-weight: 700;
+}
+
+/* ─── Layout shell ───────────────────────────────────────────────────────────── */
+.cb-root {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background: var(--cb-white);
+  font-family: 'Comic Neue', cursive;
+  font-weight: 700;
+  color: var(--cb-black);
+}
+
+/* Per-panel Ben-Day dot canvas — clipped to the panel polygon via inline clip-path */
+.cb-dots-panel-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 0;
+  filter: grayscale(1) contrast(1.1);
+  transition: filter 200ms ease-out;
+}
+
+/* On hover the dots colorize, mirroring the image reveal */
+.cb-panel:hover .cb-dots-panel-canvas {
+  filter: none;
+}
+
+/* SVG overlay that draws panel outlines on top of all image panels */
+.cb-panel-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 3;
+  overflow: visible;
+}
+
+/* Misregistration overlay canvases (one per CMYK layer) */
+.cb-misreg-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 10;
+  mix-blend-mode: multiply;
+  opacity: 0;
+  transition: opacity 50ms linear;
+}
+.cb-misreg-layer.active { opacity: 0.6; }
+
+/* Nav caption box */
+.cb-nav {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.cb-nav-label {
+  background: var(--cb-yellow);
+  border: var(--cb-ink);
+  padding: 2px 8px;
+  font-family: Bangers, cursive;
+  font-size: 13px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--cb-black);
+  margin-bottom: 6px;
+}
+
+.cb-nav-btn {
+  background: var(--cb-white);
+  border: var(--cb-ink);
+  padding: 6px 14px;
+  font-family: Bangers, cursive;
+  font-size: 18px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--cb-black);
+  cursor: pointer;
+  box-shadow: var(--cb-shadow);
+  text-align: left;
+  transition: box-shadow 80ms ease-out, transform 80ms ease-out;
+}
+
+.cb-nav-btn:hover {
+  box-shadow: 6px 6px 0 #111;
+  transform: translate(-1px,-1px);
+}
+
+.cb-nav-btn:active {
+  box-shadow: 1px 1px 0 #111;
+  transform: translate(3px,3px);
+}
+.cb-nav-btn.active { background: var(--cb-accent); }
+
+/* ─── Image panels — overflow:visible set inline so images can bleed into gutters */
+.cb-panel {
+  z-index: 2;
+}
+
+.cb-panel.clickable {
+  cursor: pointer;
+}
+
+/* Positioning, sizing, object-fit and clip-path are set via inline style in JSX.
+   Only visual effects (filter, transition) live here. */
+.cb-panel-img {
+  display: block;
+  user-select: none;
+  filter: grayscale(1) contrast(1.1);
+  transition: filter 200ms ease-out, opacity 200ms ease-out;
+}
+
+/* All panels colorize on hover */
+.cb-panel:hover .cb-panel-img {
+  filter: none;
+}
+
+/* ─── Generic card / panel ──────────────────────────────────────────────────── */
+.cb-card {
+  background: var(--cb-white);
+  border: var(--cb-ink);
+  box-shadow: var(--cb-shadow);
+  position: relative;
+  overflow: hidden;
+}
+
+.cb-card-accent-bar {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 8px;
+  background: var(--cb-accent);
+}
+
+/* ─── Button ────────────────────────────────────────────────────────────────── */
+.cb-button {
+  display: inline-block;
+  background: var(--cb-accent);
+  border: var(--cb-ink);
+  box-shadow: var(--cb-shadow);
+  padding: 8px 20px;
+  font-family: Bangers, cursive;
+  font-size: 20px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--cb-black);
+  cursor: pointer;
+  transition: box-shadow 80ms ease-out, transform 80ms ease-out, filter 80ms ease-out;
+}
+
+.cb-button:hover {
+  box-shadow: 6px 6px 0 #111;
+  transform: translate(-1px,-1px);
+  filter: brightness(1.1);
+}
+
+.cb-button:active {
+  box-shadow: 1px 1px 0 #111;
+  transform: translate(3px,3px);
+}
+
+.cb-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  box-shadow: var(--cb-shadow);
+  transform: none;
+}
+
+/* ─── Speech bubble ─────────────────────────────────────────────────────────── */
+.cb-bubble {
+  position: relative;
+  display: inline-block;
+  background: var(--cb-white);
+  border: var(--cb-ink);
+  border-radius: 50%;
+  padding: 12px 20px;
+  font-family: Bangers, cursive;
+  font-size: 18px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--cb-black);
+  text-align: center;
+}
+
+/* tail */
+.cb-bubble::after {
+  content: '';
+  position: absolute;
+  bottom: -18px;
+  left: 24px;
+  width: 0;
+  height: 0;
+  border-left: 10px solid transparent;
+  border-right: 6px solid transparent;
+  border-top: 18px solid var(--cb-black);
+}
+
+.cb-bubble::before {
+  content: '';
+  position: absolute;
+  bottom: -14px;
+  left: 25px;
+  width: 0;
+  height: 0;
+  border-left: 9px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 17px solid var(--cb-white);
+  z-index: 1;
+}
+
+.cb-bubble.error {
+  background: var(--cb-red);
+  color: var(--cb-white);
+}
+
+.cb-bubble.shout {
+  border-radius: 0;
+  clip-path: polygon(8% 0%,92% 0%,100% 50%,92% 100%,8% 100%,0% 50%);
+}
+
+/* ─── Panel speech bubbles (hover reveal) ─────────────────────────────────── */
+
+/* Elevate the hovered panel above the SVG outline layer (z:3) so the
+   bubble, which lives inside the panel div, paints on top of the ink lines. */
+.cb-panel:hover {
+  z-index: 8;
+}
+
+.cb-panel-bubble {
+  position: absolute;
+  top: -35%;
+  right: -12%;
+  width: 55%;
+  pointer-events: none;
+  z-index: 5;
+  opacity: 0;
+  transform: scale(0.7) rotate(-5deg);
+  transform-origin: center center;
+
+  /* cubic-bezier gives a light spring-overshoot on appear */
+  transition: opacity 180ms ease-out, transform 200ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.cb-panel:hover .cb-panel-bubble {
+  opacity: 1;
+  transform: scale(1) rotate(-5deg);
+}
+
+.cb-panel-bubble-img {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+/* Text floats over the bubble image, centered in the main content area.
+   Bottom inset is larger to keep text clear of tails / lightning appendages. */
+.cb-panel-bubble-text {
+  position: absolute;
+  inset: 22% 18% 38%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-size: clamp(0.5rem, 1.6vw, 0.85rem);
+  color: #111;
+  line-height: 1.2;
+}
+
+/* ─── Asset images (Gemini-generated, desaturated → colorized on hover) ─────── */
+.cb-asset {
+  display: block;
+  filter: grayscale(1) contrast(1.1);
+  transition: filter 200ms ease-out;
+}
+
+.cb-asset:hover {
+  filter: sepia(1) saturate(4) hue-rotate(var(--cb-hue-deg, 0deg));
+}
+
+/* ─── Misregistration animation keyframes ───────────────────────────────────── */
+@keyframes cb-drift-cyan    { 0%,100%{transform:translate(0,0)}  50%{transform:translate(-8px,-4px)} }
+
+@keyframes cb-drift-magenta { 0%,100%{transform:translate(0,0)}  50%{transform:translate(6px,-6px)}  }
+
+@keyframes cb-drift-yellow  { 0%,100%{transform:translate(0,0)}  50%{transform:translate(4px,8px)}   }
+
+.cb-misreg-layer.drift-cyan    { animation: cb-drift-cyan    300ms ease-in-out forwards; }
+.cb-misreg-layer.drift-magenta { animation: cb-drift-magenta 300ms ease-in-out forwards; }
+.cb-misreg-layer.drift-yellow  { animation: cb-drift-yellow  300ms ease-in-out forwards; }
+
+/* ─── Utility ────────────────────────────────────────────────────────────────── */
+.cb-title {
+  font-family: Bangers, cursive;
+  font-size: 36px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: var(--cb-black);
+  line-height: 1;
+}
+
+.cb-label {
+  font-family: Bangers, cursive;
+  font-size: 14px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--cb-black);
+  background: var(--cb-accent);
+  border: 2px solid var(--cb-black);
+  padding: 1px 6px;
+  display: inline-block;
+}
+
+.cb-input {
+  border: var(--cb-ink);
+  box-shadow: var(--cb-shadow);
+  padding: 6px 10px;
+  font-family: 'Comic Neue', cursive;
+  font-weight: 700;
+  font-size: 15px;
+  background: var(--cb-white);
+  color: var(--cb-black);
+  outline: none;
+}
+.cb-input:focus { box-shadow: 5px 5px 0 #111; }
+
+.cb-error {
+  color: var(--cb-red);
+  font-family: Bangers, cursive;
+  font-size: 16px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.cb-success {
+  color: var(--cb-green);
+  font-family: Bangers, cursive;
+  font-size: 16px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+/* ─── Loading overlay — only shown if images take more than 400 ms ───────────── */
+.cb-loading-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  background: #FAFAF2; /* fallback until canvas first-paints */
+}
+
+.cb-loading-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.cb-loading-text {
+  position: relative; /* above canvas */
+  z-index: 1;
+  font-family: Bangers, cursive;
+  font-size: 48px;
+  letter-spacing: 6px;
+  color: var(--cb-black);
+  text-transform: uppercase;
+  background: var(--cb-yellow);
+  border: 4px solid var(--cb-black);
+  box-shadow: 6px 6px 0 var(--cb-black);
+  padding: 12px 32px;
+  transform-origin: center center;
+
+  /* pop-up on mount, then gentle bob */
+  animation:
+    cb-loading-pop  450ms cubic-bezier(0.34, 1.56, 0.64, 1) both,
+    cb-loading-bob  1.1s ease-in-out 450ms infinite alternate;
+}
+
+/* Dot spans transition width/opacity so the box doesn't jerk */
+.cb-loading-dots span {
+  display: inline-block;
+  transition: opacity 80ms step-start;
+}
+
+@keyframes cb-loading-pop {
+  0% {
+    transform: scale(0.35) rotate(-14deg);
+    opacity: 0;
+  }
+
+  60% {
+    transform: scale(1.10) rotate(3deg);
+    opacity: 1;
+  }
+  80%  { transform: scale(0.96) rotate(-2deg); }
+  100% { transform: scale(1)    rotate(-3deg); }
+}
+
+@keyframes cb-loading-bob {
+  from {
+    transform: scale(1) rotate(-3deg);
+    box-shadow: 6px 6px 0 var(--cb-black);
+  }
+
+  to {
+    transform: scale(1.04) rotate(-1deg);
+    box-shadow: 9px 9px 0 var(--cb-black);
+  }
+}

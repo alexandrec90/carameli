@@ -52,5 +52,11 @@ async def update_recording_enabled(
     return await PhoneLineRepo(session).update_recording_enabled(line, enabled)
 
 
+async def update_auto_attendant(
+    session: AsyncSession, line: PhoneLine, enabled: bool, max_digits: int | None
+) -> PhoneLine:
+    return await PhoneLineRepo(session).update_auto_attendant(line, enabled, max_digits)
+
+
 async def get_by_phone_number_global(session: AsyncSession, phone_number: str) -> PhoneLine | None:
     return await PhoneLineRepo(session).get_by_phone_number_global(phone_number)
