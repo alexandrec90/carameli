@@ -1,8 +1,8 @@
-# Runs `pre-commit install` then patches the generated hook to pipe errors
-# to logs/pre-commit-errors.log. Safe to re-run at any time.
+# Runs `pre-commit install` then patches the generated hooks to pipe errors
+# to logs/pre-commit-errors.log and activate the venv. Safe to re-run at any time.
 $ErrorActionPreference = "Stop"
 
-$hookFile = ".git/hooks/pre-commit"
+$hookFiles = @(".git/hooks/pre-commit", ".git/hooks/pre-push")
 
 Write-Host ""
 Write-Host "=== Install + Patch Pre-Commit Hook ===" -ForegroundColor Cyan
@@ -19,7 +19,8 @@ if ($LASTEXITCODE -ne 0) {
 }
 Write-Host "  [pass] pre-commit install" -ForegroundColor Green
 
-# Step 2: verify hook exists
+# Step 2 & 3: verify and patch each hook
+foreach ($hookFile in $hookFiles) {
 if (-not (Test-Path $hookFile)) {
     Write-Host "Hook file not found at $hookFile" -ForegroundColor Red
     exit 1
@@ -30,15 +31,14 @@ $content = Get-Content $hookFile -Raw
 
 # Already patched with retry logic?
 if ($content -match "ARTIFACT=" -and $content -match "Auto-fix retry") {
-    Write-Host "  [skip] hook already patched (with retry)" -ForegroundColor Green
-    Write-Host ""
-    exit 0
+    Write-Host "  [skip] $hookFile already patched (with retry)" -ForegroundColor Green
+    continue
 }
 
 # Has old patch (artifact but no retry)? Strip it back to the generated template
 # so the replacement below can match the standard exec block.
 if ($content -match "ARTIFACT=" -and $content -notmatch "Auto-fix retry") {
-    Write-Host "  [info] upgrading hook patch (adding auto-fix retry)..." -ForegroundColor Yellow
+    Write-Host "  [info] upgrading $hookFile patch (adding auto-fix retry)..." -ForegroundColor Yellow
     # Re-run pre-commit install to get a fresh hook, then re-read
     .venv\Scripts\python.exe -m pre_commit install --hook-type pre-commit --hook-type pre-push | Out-Null
     $content = Get-Content $hookFile -Raw
@@ -140,13 +140,14 @@ $newTailLF = $newTail.Replace("`r`n", "`n")
 if ($contentLF.Contains($oldTailLF)) {
     $patched = $contentLF.Replace($oldTailLF, $newTailLF)
     Set-Content $hookFile $patched -NoNewline -Encoding utf8NoBOM
-    Write-Host "  [pass] hook patched (errors -> logs/pre-commit-errors.log)" -ForegroundColor Green
+    Write-Host "  [pass] $hookFile patched (venv activation + errors -> logs/pre-commit-errors.log)" -ForegroundColor Green
 }
 else {
-    Write-Host "  [WARN] hook structure not recognized -- manual patch may be needed" -ForegroundColor Yellow
+    Write-Host "  [WARN] $hookFile structure not recognized -- manual patch may be needed" -ForegroundColor Yellow
     Write-Host "         Expected the standard pre-commit exec block but did not find it." -ForegroundColor Yellow
     exit 1
 }
+} # end foreach
 
 Write-Host ""
 Write-Host "  ==========================================" -ForegroundColor Green

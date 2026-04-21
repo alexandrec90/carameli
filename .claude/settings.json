@@ -20,15 +20,11 @@
       "NotebookEdit(*)",
       "TodoRead(*)",
       "TodoWrite(*)",
-      "WebSearch(*)",
-      "Edit(/.claude/skills/fix-e2e/**)",
-      "Edit(/.claude/skills/optimize-fixers/**)"
+      "WebSearch(*)"
     ],
     "defaultMode": "bypassPermissions",
     "additionalDirectories": [
-      "C:\\Users\\Administrator\\.claude",
-      "C:\\Users\\Administrator\\.claude\\hooks",
-      "c:\\Users\\Administrator\\Desktop\\vs_code\\carameli\\.claude\\rules"
+      "C:\\Users\\Administrator\\.claude"
     ]
   },
   "hooks": {

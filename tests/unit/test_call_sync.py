@@ -5,9 +5,29 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from app.services.call_sync import retry_unposted_events
+from app.services.call_sync import _vanillasoft_headers, retry_unposted_events
 
 pytestmark = pytest.mark.asyncio(loop_scope="session")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# _vanillasoft_headers
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def test_vanillasoft_headers_no_secret_returns_empty(monkeypatch) -> None:
+    from app.core.config import settings
+
+    monkeypatch.setattr(settings, "vanillasoft_webhook_secret", None)
+    assert _vanillasoft_headers() == {}
+
+
+def test_vanillasoft_headers_with_secret_returns_bearer(monkeypatch) -> None:
+    from app.core.config import settings
+
+    monkeypatch.setattr(settings, "vanillasoft_webhook_secret", "mysecret")
+    assert _vanillasoft_headers() == {"Authorization": "Bearer mysecret"}
+
 
 _CTX: dict = {}
 

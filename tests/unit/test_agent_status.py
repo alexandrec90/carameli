@@ -390,3 +390,55 @@ async def test_get_agent_status_requires_auth(client) -> None:
     """Unauthenticated request must be rejected."""
     resp = await client.get(f"{_AGENT_BASE}/9810")
     assert resp.status_code == 401
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# _map_call_status
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+@pytest.mark.parametrize(
+    "raw,expected",
+    [
+        ("trying", "ringing"),
+        ("ringing", "ringing"),
+        ("early", "ringing"),
+        ("in-progress", "on-call"),
+        ("completed", "idle"),
+        ("failed", "idle"),
+        ("TRYING", "ringing"),  # case-insensitive
+        ("unknown-state", "unknown-state"),  # passthrough
+    ],
+)
+def test_map_call_status(raw: str, expected: str) -> None:
+    from app.services.agent_status_sync import _map_call_status
+
+    assert _map_call_status(raw) == expected
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# startup / shutdown
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+async def test_startup_stores_engine_on_ctx() -> None:
+    from app.services.agent_status_sync import startup
+
+    ctx: dict = {}
+    await startup(ctx)
+    assert "engine" in ctx
+
+
+async def test_shutdown_calls_aclose() -> None:
+    from app.services.agent_status_sync import shutdown
+
+    mock_engine = MagicMock()
+    mock_engine.aclose = AsyncMock()
+    await shutdown({"engine": mock_engine})
+    mock_engine.aclose.assert_awaited_once()
+
+
+async def test_shutdown_no_engine_does_not_raise() -> None:
+    from app.services.agent_status_sync import shutdown
+
+    await shutdown({})  # must not raise

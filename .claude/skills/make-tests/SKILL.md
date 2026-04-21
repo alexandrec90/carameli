@@ -140,6 +140,27 @@ whether the test suite verifies:
 - Requests without `Authorization` header return 401, not 500
 - Oversized payloads are rejected (not silently truncated)
 
+**ARQ background job gaps** — for `app/services/call_sync.py` and
+`app/services/agent_status_sync.py`, check whether:
+
+- Each job function is tested by calling it directly with a mock `ctx` dict (no ARQ
+  infrastructure needed — they are plain async functions)
+- `retry_unposted_events`: no-URL early return, VanillaSoft 2xx marks event posted,
+  VanillaSoft non-2xx leaves event unposted, non-terminal status skipped, httpx error swallowed
+- `poll_agent_status`: no-engine-in-ctx early return, engine exception swallowed and logged,
+  happy-path upsert writes correct `call_state` and `sip_registered` values
+- Lifecycle hooks: `startup` stores provider on `ctx["engine"]`, `shutdown` calls `aclose`
+
+**Observability / log assertion gaps** — for any handler or service with documented log
+events in `.claude/rules/logging-backend.md`, check whether:
+
+- INFO log on successful mutation contains the key identifiers (customer ID, SID, number)
+- WARNING or ERROR log fires on provider failure
+- No secrets (API keys, bearer tokens, webhook secrets) appear in any log message
+
+Use `caplog.at_level(logging.INFO, logger="app.module.name")` scoped to the module under test.
+Scope narrowly — `caplog.at_level(logging.DEBUG)` without a logger arg captures too much noise.
+
 **Snapshot gaps** — check whether the OpenAPI schema is pinned. If no
 golden-file test exists for the schema, flag it. A snapshot test calls
 `GET /openapi.json` and compares against a checked-in baseline; any diff
@@ -243,6 +264,8 @@ After the module table, print a breakdown by gap type:
 | Migration roundtrip | N |
 | Config validation | N |
 | Security / isolation | N |
+| ARQ background jobs | N |
+| Observability / log assertions | N |
 | Snapshot | N |
 | Performance benchmark | N |
 ```

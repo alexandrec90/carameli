@@ -1,9 +1,14 @@
 from __future__ import annotations
 
+import ast
+import os
+import pathlib
+import subprocess
 import uuid
 
 import pytest
-from sqlalchemy import select
+from sqlalchemy import inspect as sa_inspect
+from sqlalchemy import select, text
 
 from app.models.did_pointer import DidPointer
 from app.models.sci_rule import SciRule
@@ -12,6 +17,21 @@ from app.repositories.phone_line_repo import PhoneLineRepo
 from tests.conftest import AUTH_HEADERS
 
 pytestmark = pytest.mark.asyncio(loop_scope="session")
+
+_PROJECT_ROOT = pathlib.Path(__file__).parents[2]
+_VERSIONS_DIR = _PROJECT_ROOT / "alembic" / "versions"
+_MIGRATION_SCHEMA = "migration_test_alembic"
+
+
+def _build_alembic_env(schema: str) -> dict[str, str]:
+    from app.core.config import settings
+
+    base_url = settings.database_url
+    sep = "&" if "?" in base_url else "?"
+    env = os.environ.copy()
+    env["DATABASE_URL"] = f"{base_url}{sep}server_settings[search_path]={schema}"
+    return env
+
 
 _CUST_BASE = "/vsapi/1.0.0/VsCustomer"
 
@@ -164,3 +184,123 @@ async def test_add_pointer_same_mapping_is_idempotent(client, db_session) -> Non
     rows = result.scalars().all()
 
     assert len(rows) == 1
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# A4 — Alembic migration safety tests (marked slow, excluded from default run)
+# Run explicitly: pytest --override-ini="addopts=--ignore=tests/e2e" -m slow
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+@pytest.mark.slow
+def test_downgrade_path_all_migrations_have_non_empty_downgrade() -> None:
+    """Every migration file must have a downgrade() with actual operations (not just pass)."""
+    for migration_file in sorted(_VERSIONS_DIR.glob("[0-9]*.py")):
+        source = migration_file.read_text()
+        tree = ast.parse(source)
+        found = False
+        for node in ast.walk(tree):
+            if isinstance(node, ast.FunctionDef) and node.name == "downgrade":
+                found = True
+                body = node.body
+                # Allow docstrings followed by statements, but reject lone pass / ...
+                real_stmts = [
+                    s
+                    for s in body
+                    if not (
+                        isinstance(s, ast.Expr)
+                        and isinstance(s.value, ast.Constant)
+                        and isinstance(s.value.value, str)
+                    )
+                ]
+                is_empty = len(real_stmts) == 1 and isinstance(real_stmts[0], ast.Pass)
+                assert not is_empty, (
+                    f"{migration_file.name}: downgrade() has no operations (just pass)"
+                )
+                break
+        assert found, f"{migration_file.name}: no downgrade() function found"
+
+
+@pytest.mark.slow
+async def test_schema_drift_no_model_columns_missing_from_db(test_engine) -> None:
+    """Every ORM model column must be present in the live test database."""
+    import app.models  # noqa: F401  — ensure all models are registered
+    from app.core.database import Base
+
+    async with test_engine.connect() as conn:
+
+        def _collect_db_schema(sync_conn):
+            insp = sa_inspect(sync_conn)
+            return {
+                tbl: {col["name"] for col in insp.get_columns(tbl)}
+                for tbl in insp.get_table_names(schema="public")
+            }
+
+        db_tables = await conn.run_sync(_collect_db_schema)
+
+    missing: list[str] = []
+    for table_name, table in Base.metadata.tables.items():
+        if table_name not in db_tables:
+            missing.append(f"Table '{table_name}' not in DB")
+            continue
+        db_cols = db_tables[table_name]
+        for col in table.columns:
+            if col.name not in db_cols:
+                missing.append(f"  {table_name}.{col.name} missing from DB")
+
+    assert not missing, "Schema drift detected:\n" + "\n".join(missing)
+
+
+@pytest.mark.slow
+async def test_upgrade_on_clean_schema(test_engine) -> None:
+    """alembic upgrade head must succeed on an empty migration_test schema."""
+    async with test_engine.begin() as conn:
+        await conn.execute(text(f"DROP SCHEMA IF EXISTS {_MIGRATION_SCHEMA} CASCADE"))
+        await conn.execute(text(f"CREATE SCHEMA {_MIGRATION_SCHEMA}"))
+
+    env = _build_alembic_env(_MIGRATION_SCHEMA)
+
+    try:
+        result = subprocess.run(  # noqa: ASYNC221
+            ["alembic", "upgrade", "head"],  # noqa: S607
+            cwd=str(_PROJECT_ROOT),
+            env=env,
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode == 0, (
+            f"alembic upgrade head failed:\nSTDOUT: {result.stdout}\nSTDERR: {result.stderr}"
+        )
+    finally:
+        async with test_engine.begin() as conn:
+            await conn.execute(text(f"DROP SCHEMA IF EXISTS {_MIGRATION_SCHEMA} CASCADE"))
+
+
+@pytest.mark.slow
+async def test_migration_round_trip(test_engine) -> None:
+    """upgrade head → downgrade base → upgrade head must all succeed without errors."""
+    async with test_engine.begin() as conn:
+        await conn.execute(text(f"DROP SCHEMA IF EXISTS {_MIGRATION_SCHEMA} CASCADE"))
+        await conn.execute(text(f"CREATE SCHEMA {_MIGRATION_SCHEMA}"))
+
+    env = _build_alembic_env(_MIGRATION_SCHEMA)
+
+    try:
+        for command in [
+            ["alembic", "upgrade", "head"],
+            ["alembic", "downgrade", "base"],
+            ["alembic", "upgrade", "head"],
+        ]:
+            result = subprocess.run(  # noqa: ASYNC221, S603
+                command,
+                cwd=str(_PROJECT_ROOT),
+                env=env,
+                capture_output=True,
+                text=True,
+            )
+            assert result.returncode == 0, (
+                f"{' '.join(command)} failed:\nSTDOUT: {result.stdout}\nSTDERR: {result.stderr}"
+            )
+    finally:
+        async with test_engine.begin() as conn:
+            await conn.execute(text(f"DROP SCHEMA IF EXISTS {_MIGRATION_SCHEMA} CASCADE"))

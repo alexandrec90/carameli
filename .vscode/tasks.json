@@ -251,6 +251,71 @@
       "problemMatcher": []
     },
     {
+      "label": "Test: Run pytest (slow)",
+      "type": "shell",
+      "command": "docker compose exec -T app pytest -m slow -v --tb=short; $_ec = $LASTEXITCODE; pwsh -ExecutionPolicy Bypass -File scripts/notify.ps1 -Label 'Test: Run pytest (slow)' -ExitCode $_ec; exit $_ec",
+      "group": "test",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "showReuseMessage": false,
+        "close": false
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Test: Run Telnyx Sandbox",
+      "type": "shell",
+      "command": "docker compose exec -T -e TELNYX_SANDBOX=1 app pytest tests/integration/test_telnyx_sandbox.py -v --tb=short; $_ec = $LASTEXITCODE; pwsh -ExecutionPolicy Bypass -File scripts/notify.ps1 -Label 'Test: Run Telnyx Sandbox' -ExitCode $_ec; exit $_ec",
+      "group": "test",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "showReuseMessage": false,
+        "close": false
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Test: Run E2E (cross-browser)",
+      "type": "shell",
+      "command": "pwsh -ExecutionPolicy Bypass -File scripts/run-e2e.ps1 -CrossBrowser; $_ec = $LASTEXITCODE; pwsh -ExecutionPolicy Bypass -File scripts/notify.ps1 -Label 'Test: Run E2E (cross-browser)' -ExitCode $_ec; exit $_ec",
+      "group": "test",
+      "presentation": {
+        "reveal": "always",
+        "panel": "new",
+        "showReuseMessage": false,
+        "close": false
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Test: Run Load (Locust)",
+      "type": "shell",
+      "command": "pwsh -ExecutionPolicy Bypass -File scripts/run-load.ps1; $_ec = $LASTEXITCODE; pwsh -ExecutionPolicy Bypass -File scripts/notify.ps1 -Label 'Test: Run Load (Locust)' -ExitCode $_ec; exit $_ec",
+      "group": "test",
+      "presentation": {
+        "reveal": "always",
+        "panel": "new",
+        "showReuseMessage": false,
+        "close": false
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Test: Run Mutation (mutmut)",
+      "type": "shell",
+      "command": "pwsh -ExecutionPolicy Bypass -File scripts/run-mutation.ps1; $_ec = $LASTEXITCODE; pwsh -ExecutionPolicy Bypass -File scripts/notify.ps1 -Label 'Test: Run Mutation (mutmut)' -ExitCode $_ec; exit $_ec",
+      "group": "test",
+      "presentation": {
+        "reveal": "always",
+        "panel": "new",
+        "showReuseMessage": false,
+        "close": false
+      },
+      "problemMatcher": []
+    },
+    {
       "label": "Log: Extract Errors",
       "type": "shell",
       "command": "pwsh -ExecutionPolicy Bypass -File scripts/extract-log-errors.ps1; $_ec = $LASTEXITCODE; pwsh -ExecutionPolicy Bypass -File scripts/notify.ps1 -Label 'Log: Extract Errors' -ExitCode $_ec; exit $_ec",

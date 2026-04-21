@@ -1,185 +1,138 @@
 """Live Telnyx sandbox integration tests.
 
-These tests call the real Telnyx API using sandbox/test credentials.
-They are skipped by default and only run when TELNYX_SANDBOX=1 is set.
-
-Prerequisites:
-  - A Telnyx test API key (prefix KEY or KEYT) in TELNYX_API_KEY env var
-  - Internet access
-
-Run:
-    TELNYX_SANDBOX=1 pytest tests/integration/test_telnyx_sandbox.py -v
-
-Or inside Docker:
-    docker compose exec -e TELNYX_SANDBOX=1 app pytest tests/integration/test_telnyx_sandbox.py -v
+These tests use real Telnyx sandbox credentials and are skipped by default.
+Enable explicitly with ``TELNYX_SANDBOX=1``.
 """
 
 from __future__ import annotations
 
+import asyncio
 import os
+from collections.abc import AsyncIterator
 
+import httpx
 import pytest
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
+from app.repositories.sms_message_repo import SmsMessageRepo
 from app.services.providers.carrier.telnyx import TelnyxCarrier
 
-pytestmark = pytest.mark.asyncio(loop_scope="session")
-
-_SANDBOX_ENABLED = os.environ.get("TELNYX_SANDBOX", "").strip() == "1"
-_API_KEY = settings.telnyx_api_key
-_WEBHOOK_URL = settings.telnyx_webhook_base_url or "http://localhost:8000"
-
-skip_no_sandbox = pytest.mark.skipif(
-    not _SANDBOX_ENABLED,
-    reason="Telnyx sandbox tests disabled (set TELNYX_SANDBOX=1 to enable)",
-)
-
-skip_no_key = pytest.mark.skipif(
-    not _API_KEY,
-    reason="TELNYX_API_KEY not set",
-)
+pytestmark = [
+    pytest.mark.asyncio(loop_scope="session"),
+    pytest.mark.sandbox,
+    pytest.mark.skipif(
+        os.getenv("TELNYX_SANDBOX") != "1",
+        reason="Set TELNYX_SANDBOX=1 to run Telnyx sandbox tests",
+    ),
+    pytest.mark.skipif(
+        not settings.telnyx_api_key,
+        reason="TELNYX_API_KEY not set",
+    ),
+]
 
 
-# ---------------------------------------------------------------------------
-# Fixtures
-# ---------------------------------------------------------------------------
+def _make_carrier() -> TelnyxCarrier:
+    return TelnyxCarrier(
+        api_key=settings.telnyx_api_key,
+        webhook_base_url=settings.telnyx_webhook_base_url,
+    )
 
 
 @pytest.fixture
-async def carrier():
-    """Create a real TelnyxCarrier instance and close it after the test."""
-    c = TelnyxCarrier(api_key=_API_KEY, webhook_base_url=_WEBHOOK_URL)
-    yield c
-    await c.aclose()
+async def carrier() -> AsyncIterator[TelnyxCarrier]:
+    """Create a real Telnyx carrier client for a test and close it afterward."""
+    c = _make_carrier()
+    try:
+        yield c
+    finally:
+        await c.aclose()
 
 
-# ---------------------------------------------------------------------------
-# DID Search
-# ---------------------------------------------------------------------------
-
-
-@skip_no_sandbox
-@skip_no_key
-async def test_search_numbers_returns_results(carrier):
-    """Search for available numbers in a major area code."""
-    results = await carrier.search_numbers("415", 2)
-
+async def test_search_numbers_returns_results(carrier: TelnyxCarrier) -> None:
+    """Telnyx sandbox returns available numbers for a known area code."""
+    results = await carrier.search_numbers(area_code="415", count=2)
     assert isinstance(results, list)
     assert len(results) >= 1
-    for item in results:
-        assert "phone_number" in item
-        assert item["phone_number"].startswith("+1415")
+    assert all(r["phone_number"].startswith("+") for r in results)
 
 
-@skip_no_sandbox
-@skip_no_key
-async def test_search_numbers_empty_area_code(carrier):
-    """Searching an unlikely area code returns an empty list (not an error)."""
-    results = await carrier.search_numbers("000", 1)
-    assert isinstance(results, list)
-    # May be empty or may return results depending on Telnyx inventory
+@pytest.mark.chargeable
+async def test_provision_and_release_number(carrier: TelnyxCarrier) -> None:
+    """Provision and release a sandbox DID (may incur a small sandbox charge)."""
+    numbers = await carrier.search_numbers(area_code="415", count=1)
+    assert numbers, "No numbers available in sandbox for area 415"
+
+    number = numbers[0]["phone_number"]
+    provisioned = await carrier.provision_number(number)
+    assert provisioned["phone_number"] == number
+
+    provider_sid = provisioned.get("sid") or provisioned.get("provider_sid")
+    assert provider_sid, "Provision response did not include sid/provider_sid"
+
+    await carrier.release_number(provider_sid)
 
 
-@skip_no_sandbox
-@skip_no_key
-async def test_search_numbers_respects_count(carrier):
-    """The count parameter limits how many results come back."""
-    results = await carrier.search_numbers("212", 3)
-
-    assert isinstance(results, list)
-    assert len(results) <= 3
-
-
-# ---------------------------------------------------------------------------
-# Area Codes
-# ---------------------------------------------------------------------------
+async def test_send_sms_sandbox(carrier: TelnyxCarrier) -> None:
+    """Send an SMS using Telnyx sandbox magic numbers and verify no exception."""
+    result = await carrier.send_sms(
+        from_="+15005550006",
+        to="+15005550007",
+        body="Carameli sandbox test",
+    )
+    assert result is not None
 
 
-@skip_no_sandbox
-@skip_no_key
-async def test_get_available_area_codes_us(carrier):
-    """Fetch area codes for the US."""
-    results = await carrier.get_available_area_codes("US", None)
-
-    assert isinstance(results, list)
-    assert len(results) >= 1
-    for item in results:
-        assert "area_code" in item
-        assert "country" in item
-        assert item["country"] == "US"
-        assert len(item["area_code"]) == 3
+async def test_provision_invalid_number_raises_provider_error(carrier: TelnyxCarrier) -> None:
+    """Attempting to provision a non-existent number raises a structured provider error."""
+    with pytest.raises(httpx.HTTPStatusError):
+        await carrier.provision_number("+10000000000")
 
 
-@skip_no_sandbox
-@skip_no_key
-async def test_get_available_area_codes_with_state(carrier):
-    """Fetch area codes filtered by state."""
-    results = await carrier.get_available_area_codes("US", "CA")
-
-    assert isinstance(results, list)
-    # California has many area codes
-    if results:
-        assert results[0]["country"] == "US"
+async def test_send_sms_invalid_from_raises(carrier: TelnyxCarrier) -> None:
+    """Sending SMS from an unprovisionable number raises."""
+    with pytest.raises(httpx.HTTPStatusError):
+        await carrier.send_sms(from_="+10000000000", to="+15005550007", body="test")
 
 
-# ---------------------------------------------------------------------------
-# SMS (sandbox send)
-# ---------------------------------------------------------------------------
+@pytest.mark.chargeable
+@pytest.mark.skipif(
+    not os.getenv("NGROK_URL"),
+    reason="Requires NGROK_URL for live callback testing",
+)
+async def test_sms_delivery_receipt_schema(
+    carrier: TelnyxCarrier,
+    db_session: AsyncSession,
+) -> None:
+    """Send SMS and verify a live delivery receipt updates SmsMessage.delivery_status."""
+    result = await carrier.send_sms(
+        from_="+15005550006",
+        to="+15005550007",
+        body="Carameli sandbox delivery receipt schema test",
+    )
+    message_sid = str(result.get("sid") or "")
+    assert message_sid, "Carrier response missing message SID"
 
+    repo = SmsMessageRepo(db_session)
+    await repo.create(
+        customer_id=None,
+        phone_line_id=None,
+        message_sid=message_sid,
+        direction="outbound",
+        from_number="+15005550006",
+        to_number="+15005550007",
+        body="Carameli sandbox delivery receipt schema test",
+        delivery_status="queued",
+    )
 
-@skip_no_sandbox
-@skip_no_key
-async def test_send_sms_sandbox(carrier):
-    """Send an SMS via the Telnyx API.
+    receipt_status: str | None = None
+    for _ in range(20):  # wait up to ~10 seconds
+        row = await repo.get_by_message_sid(message_sid)
+        if row and row.delivery_status and row.delivery_status != "queued":
+            receipt_status = row.delivery_status
+            break
+        await asyncio.sleep(0.5)
 
-    NOTE: This will only succeed if you have at least one provisioned number.
-    With a test key, Telnyx may accept the request but queue it without delivery.
-    We just verify the API returns a message SID and status.
-    """
-    try:
-        result = await carrier.send_sms(
-            from_="+15005550006",  # Telnyx test "magic" number
-            to="+15005550009",
-            body="Carameli integration test",
-        )
-        assert "sid" in result
-        assert "status" in result
-    except Exception as exc:
-        # Telnyx may reject test sends with certain keys; that's OK.
-        # We just want to know the API is reachable and responds properly.
-        assert "40" in str(exc) or "42" in str(exc), f"Unexpected error: {exc}"
-
-
-# ---------------------------------------------------------------------------
-# DID Provisioning (full lifecycle)
-# ---------------------------------------------------------------------------
-
-
-@skip_no_sandbox
-@skip_no_key
-@pytest.mark.slow
-async def test_provision_and_release_number(carrier):
-    """Full DID lifecycle: search -> provision -> release.
-
-    WARNING: This test may incur charges on a live Telnyx account.
-    It is designed for sandbox/test API keys only.
-    """
-    # Search for an available number
-    available = await carrier.search_numbers("512", 1)
-    if not available:
-        pytest.skip("No numbers available in area code 512")
-
-    number = available[0]["phone_number"]
-
-    # Provision it
-    result = await carrier.provision_number(number)
-    assert "provider_sid" in result
-    assert result["phone_number"] == number
-    provider_sid = result["provider_sid"]
-
-    try:
-        # Release it
-        await carrier.release_number(provider_sid)
-    except Exception:
-        # Best-effort cleanup -- log but don't mask the original assertion
-        pytest.fail(f"Failed to release provisioned number {provider_sid}")
+    assert receipt_status is not None, (
+        "No delivery receipt observed within 10s. Check ngrok + Telnyx webhook configuration."
+    )

@@ -10,7 +10,8 @@
 #   .\scripts\run-e2e.ps1 -Headed    # watch in browser
 
 param(
-    [switch]$Headed
+    [switch]$Headed,
+    [switch]$CrossBrowser
 )
 
 $ErrorActionPreference = "Continue"
@@ -26,7 +27,7 @@ if (-not (Test-Path $venvPython)) {
     exit 1
 }
 
-$mode = if ($Headed) { "headed" } else { "headless" }
+$mode = if ($CrossBrowser) { "cross-browser" } elseif ($Headed) { "headed" } else { "headless" }
 
 Write-Host ""
 Write-Host "=== Carameli E2E Tests ===" -ForegroundColor Cyan
@@ -69,6 +70,23 @@ if (-not $viteReady -or -not $backendReady) {
 }
 
 # Run pytest with verbose + short tracebacks + no header/warnings for cleaner parsing
+if ($CrossBrowser) {
+    Write-Host "Running E2E tests..." -ForegroundColor Yellow
+    docker compose exec -T app pytest tests/e2e/ --browser=chromium --browser=firefox --browser=webkit -v --tb=short
+    $crossBrowserExit = $LASTEXITCODE
+    if ($crossBrowserExit -eq 0) {
+        Set-Content $artifact "" -Encoding utf8
+    }
+    else {
+        @(
+            "# e2e-cross-browser",
+            "# fix: inspect docker compose app logs and failing Playwright specs",
+            "docker compose exec -T app pytest tests/e2e/ --browser=chromium --browser=firefox --browser=webkit -v --tb=short"
+        ) | Set-Content $artifact -Encoding utf8
+    }
+    exit $crossBrowserExit
+}
+
 $e2eArgs = @("-m", "pytest", "tests/e2e/", "-v", "--tb=short", "--no-header", "-p", "no:warnings")
 if ($Headed) { $e2eArgs += "--headed" }
 

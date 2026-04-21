@@ -45,11 +45,22 @@ while ($activeLines.Count -gt 0 -and $activeLines[$activeLines.Count - 1].Trim()
     $activeLines.RemoveAt($activeLines.Count - 1)
 }
 
+# Normalize Done section spacing:
+# - remove blank lines captured from existing Done content
+# - we'll add exactly one blank line after the Done heading
+$normalizedDoneLines = [System.Collections.Generic.List[string]]::new()
+foreach ($l in $doneLines) {
+    if ($l.Trim() -ne '') {
+        $normalizedDoneLines.Add($l)
+    }
+}
+
 $output = [System.Collections.Generic.List[string]]::new()
 foreach ($l in $activeLines) { $output.Add($l) }
 $output.Add("")
 $output.Add($doneMarker)
-foreach ($l in $doneLines) { $output.Add($l) }
+$output.Add("")
+foreach ($l in $normalizedDoneLines) { $output.Add($l) }
 
 Set-Content -Path $file -Value $output
 Write-Host "Moved $moved checked item(s) to '$doneMarker'."

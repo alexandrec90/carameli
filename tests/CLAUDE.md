@@ -42,10 +42,44 @@ Use `AUTH_HEADERS` (a constant dict) for authenticated requests.
 
 | Command | Scope |
 | --- | --- |
-| `pytest` | Unit + integration (E2E excluded by default via `pytest.ini --ignore`) |
+| `pytest` | Unit + integration (E2E, load, quarantine excluded via `pytest.ini`) |
 | `pytest tests/unit/` | Unit only |
 | `pytest tests/integration/` | Contract fuzzing + multi-step flows |
+| `pytest -m slow` | Migration round-trip tests (excluded from default run) |
+| `TELNYX_SANDBOX=1 pytest tests/integration/test_telnyx_sandbox.py` | Live sandbox tests |
 | `pytest tests/e2e/` | Playwright (requires frontend on `:5173`) |
+
+## pytest Markers
+
+| Marker | When to apply | Excluded from default run |
+| --- | --- | --- |
+| `slow` | Migration round-trips, long Alembic operations | Yes |
+| `chargeable` | Tests that may incur provider charges | Yes |
+| `sandbox` | Requires live sandbox credentials (`TELNYX_SANDBOX=1`) | Yes |
+
+See `.claude/rules/testing.md` for the settings mutation pattern needed by sandbox/webhook tests.
+
+## ARQ Background Job Tests
+
+ARQ job functions (`retry_unposted_events`, `poll_agent_status`) are plain async functions
+that accept a `ctx: dict` argument. Test them directly — no ARQ infrastructure needed.
+
+```python
+from app.services.call_sync import retry_unposted_events
+from app.services.agent_status_sync import poll_agent_status
+
+# Pass a mock ctx dict; use AsyncMock for engine methods
+async def test_poll_no_engine_returns_cleanly():
+    await poll_agent_status({})  # ctx has no "engine" key — must not raise
+
+async def test_poll_happy_path(client, db_session):
+    mock_engine = MagicMock()
+    mock_engine.get_active_calls = AsyncMock(return_value=[])
+    mock_engine.get_registrations = AsyncMock(return_value=[])
+    await poll_agent_status({"engine": mock_engine})
+```
+
+Startup/shutdown hooks are also plain async functions — test them the same way.
 
 ## E2E (Playwright)
 

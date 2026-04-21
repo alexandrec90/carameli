@@ -55,3 +55,45 @@ outside of this fixture will make the suite order-dependent.
 All async tests and fixtures run on a shared session-scoped event loop
 (`asyncio_mode = auto`, `loop_scope = "session"` via `pytestmark`). Do not
 create new event loops inside tests. Do not use `asyncio.run()`.
+
+## pytest markers
+
+| Marker | Meaning | Excluded from |
+| --- | --- | --- |
+| `slow` | Migration round-trips and other long-running tests | Default run, PR gate |
+| `chargeable` | May incur real or sandbox provider charges | Default run, PR gate, nightly |
+| `sandbox` | Requires live sandbox credentials | Default run — needs `TELNYX_SANDBOX=1` |
+
+```python
+@pytest.mark.slow
+async def test_migration_round_trip(...): ...
+
+@pytest.mark.chargeable
+@pytest.mark.sandbox
+async def test_provision_and_release_number(...): ...
+```
+
+## Settings mutation in tests
+
+Tests that temporarily change `settings.*` must restore the original value
+unconditionally — mutated settings persist for the lifetime of the session-scoped
+event loop and will pollute subsequent tests.
+
+Preferred: `monkeypatch` (auto-restores after the test, works in async tests):
+
+```python
+async def test_something(monkeypatch):
+  monkeypatch.setattr(settings, "log_level", "DEBUG")
+    ...
+```
+
+When `monkeypatch` is unavailable (module-level code): use `try/finally`:
+
+```python
+orig = settings.log_level
+settings.log_level = "DEBUG"
+try:
+    ...
+finally:
+  settings.log_level = orig
+```

@@ -116,6 +116,24 @@ docker compose exec app pytest -v
 
 ---
 
+## CI Gates and Branch Protection
+
+The repository is wired for three CI tiers:
+
+- `PR Gate` (fast checks on `master` pull requests and pushes)
+- `Nightly` (full backend, frontend, and cross-browser coverage)
+- `Weekly Hardening` (migration/resilience/mutation and reliability summary)
+
+Configure a branch protection rule for `master` that requires these checks before merge:
+
+- `PR Gate / backend`
+- `PR Gate / frontend`
+
+For weekly reporting, create and pin an open GitHub issue titled `Weekly Test Reliability Report`.
+The weekly workflow auto-discovers that issue by title and posts the summary comment there.
+
+---
+
 ## Connecting Live Providers (Optional)
 
 Your `.env` already has provider placeholders. To test live calls and SMS:

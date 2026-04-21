@@ -421,6 +421,12 @@ if ($failed -and -not $skipReason) {
         $childErr = ($jobs["alembic-check"].ChildJobs | ForEach-Object { $_.Error } | ForEach-Object { "$_" }) -join "`n"
         if ($childErr) { $errs = @($childErr) }
     }
+    $hasLocator = ($errs | Where-Object { $_ -match "^[^:\s].+:\d+:\d+" }).Count -gt 0
+    if (-not $hasLocator) {
+        $summary = ($errs | Select-Object -Last 1)
+        if (-not $summary) { $summary = "alembic check failed" }
+        $errs = @("alembic/versions/env.py:1:1: [alembic-check] $summary") + $errs
+    }
     Add-Section "alembic-check" "alembic revision --autogenerate -m 'describe change'" $errs
 }
 if ($skipReason) { Write-Host "  [skip] alembic-check ($skipReason)" -ForegroundColor DarkGray }

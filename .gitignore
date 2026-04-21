@@ -58,6 +58,7 @@ htmlcov/
 # Logs
 *.log
 logs/
+reports/
 
 # OS / editor
 .DS_Store

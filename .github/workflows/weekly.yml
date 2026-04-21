@@ -1,0 +1,218 @@
+name: Weekly Hardening
+
+on:
+  schedule:
+    - cron: "0 3 * * 0"
+  workflow_dispatch:
+
+jobs:
+  migration-round-trip:
+    name: Migration round-trip + drift detection
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: carameli
+          POSTGRES_PASSWORD: carameli_local_dev
+          POSTGRES_DB: carameli
+        ports: ["5432:5432"]
+        options: --health-cmd="pg_isready -U carameli" --health-interval=5s --health-retries=10
+    env:
+      DATABASE_URL: postgresql+asyncpg://carameli:carameli_local_dev@localhost:5432/carameli
+      API_KEY_SECRET: weekly-test-key
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt -r requirements-dev.txt
+      - run: mkdir -p reports
+      - run: pytest tests/unit/test_migration_concerns.py -v -m slow --junit-xml=reports/junit-migration-weekly.xml
+      - name: Upload migration result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: weekly-migration-results
+          path: reports/junit-migration-weekly.xml
+
+  resilience:
+    name: Resilience and chaos
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: carameli
+          POSTGRES_PASSWORD: carameli_local_dev
+          POSTGRES_DB: carameli
+        ports: ["5432:5432"]
+        options: --health-cmd="pg_isready -U carameli" --health-interval=5s --health-retries=10
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+    env:
+      DATABASE_URL: postgresql+asyncpg://carameli:carameli_local_dev@localhost:5432/carameli
+      REDIS_URL: redis://localhost:6379
+      API_KEY_SECRET: weekly-test-key
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt -r requirements-dev.txt
+      - run: mkdir -p reports
+      - run: pytest tests/integration/test_resilience.py -v --junit-xml=reports/junit-resilience-weekly.xml
+      - name: Upload resilience result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: weekly-resilience-results
+          path: reports/junit-resilience-weekly.xml
+
+  mutation:
+    name: Mutation testing report
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt -r requirements-dev.txt mutmut
+      - run: mkdir -p reports
+      - name: Run mutation tests
+        run: mutmut run || true
+      - name: Export report
+        run: |
+          mutmut results > reports/mutation-report.txt
+          echo "Mutation score:" >> reports/mutation-report.txt
+          mutmut results | tail -5 >> reports/mutation-report.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mutation-report
+          path: reports/mutation-report.txt
+
+  weekly-reliability-report:
+    name: Weekly reliability summary
+    runs-on: ubuntu-latest
+    needs: [migration-round-trip, resilience, mutation]
+    if: always()
+    permissions:
+      contents: read
+      issues: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: weekly-migration-results
+          path: reports/migration
+      - uses: actions/download-artifact@v4
+        with:
+          name: weekly-resilience-results
+          path: reports/resilience
+      - uses: actions/download-artifact@v4
+        with:
+          name: mutation-report
+          path: reports/mutation
+      - name: Build weekly summary
+        run: |
+          python - <<'PY'
+          import glob
+          import os
+          import re
+          import xml.etree.ElementTree as ET
+
+          def parse_junit(path: str) -> tuple[int, int, int]:
+              if not os.path.exists(path):
+                  return (0, 0, 0)
+              root = ET.parse(path).getroot()
+              tests = int(root.attrib.get("tests", 0))
+              failures = int(root.attrib.get("failures", 0))
+              errors = int(root.attrib.get("errors", 0))
+              skipped = int(root.attrib.get("skipped", 0))
+              failed = failures + errors
+              passed = max(tests - failed - skipped, 0)
+              return passed, failed, skipped
+
+          passed = failed = skipped = 0
+          for path in [
+              "reports/migration/junit-migration-weekly.xml",
+              "reports/resilience/junit-resilience-weekly.xml",
+          ]:
+              p, f, s = parse_junit(path)
+              passed += p
+              failed += f
+              skipped += s
+
+          quarantine_tests = 0
+          for qfile in glob.glob("tests/quarantine/**/*.py", recursive=True):
+              if os.path.basename(qfile) == "__init__.py":
+                  continue
+              with open(qfile, "r", encoding="utf-8") as fh:
+                  text = fh.read()
+              quarantine_tests += len(
+                  re.findall(r"(?m)^\\s*(?:async\\s+)?def\\s+test_", text)
+              )
+
+          mutation_score = "N/A"
+          mutation_tail = "N/A"
+          mutation_report = "reports/mutation/mutation-report.txt"
+          if os.path.exists(mutation_report):
+              with open(mutation_report, "r", encoding="utf-8", errors="ignore") as fh:
+                  body = fh.read()
+              lines = [line for line in body.splitlines() if line.strip()]
+              if lines:
+                  mutation_tail = "\\n".join(lines[-5:])
+              score_match = re.search(r"(\\d+)%", body)
+              if score_match:
+                  mutation_score = f"{score_match.group(1)}%"
+
+          p95_baseline = "Not found"
+          baseline_doc = "docs/performance-baselines.md"
+          if os.path.exists(baseline_doc):
+              with open(baseline_doc, "r", encoding="utf-8", errors="ignore") as fh:
+                  for line in fh:
+                      if "p95" in line.lower():
+                          p95_baseline = line.strip()
+                          break
+
+          os.makedirs("reports", exist_ok=True)
+          with open("reports/weekly-summary.md", "w", encoding="utf-8") as out:
+              out.write("# Weekly Test Reliability Report\\n\\n")
+              out.write(f"- Total tests: {passed} passed / {failed} failed / {skipped} skipped\\n")
+              out.write(f"- Flake rate: {quarantine_tests} tests in `tests/quarantine/`\\n")
+              out.write(f"- Mutation score: {mutation_score}\\n")
+              out.write(f"- P95 latency baseline: {p95_baseline}\\n\\n")
+              out.write("## Mutation report tail\\n\\n")
+              out.write("```text\\n")
+              out.write(f"{mutation_tail}\\n")
+              out.write("```\\n")
+
+          print("Generated reports/weekly-summary.md")
+          PY
+      - name: Resolve pinned weekly report issue
+        run: |
+          ISSUE_NUMBER=$(gh issue list --state open --search "Weekly Test Reliability Report in:title" --limit 1 --json number --jq '.[0].number')
+          if [ -n "$ISSUE_NUMBER" ] && [ "$ISSUE_NUMBER" != "null" ]; then
+            echo "WEEKLY_RELIABILITY_ISSUE=$ISSUE_NUMBER" >> "$GITHUB_ENV"
+          fi
+      - name: Post summary to pinned issue
+        run: |
+          if [ -n "$WEEKLY_RELIABILITY_ISSUE" ]; then
+            gh issue comment "$WEEKLY_RELIABILITY_ISSUE" --body-file reports/weekly-summary.md
+          else
+            echo "Create and pin an open issue titled 'Weekly Test Reliability Report' to enable automated comments."
+          fi
+      - name: Upload weekly summary
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: weekly-reliability-summary
+          path: reports/weekly-summary.md

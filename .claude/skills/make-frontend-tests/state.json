@@ -1,4 +1,54 @@
 {
-  "last_run": null,
-  "modules": []
+  "last_run": "2026-04-20",
+  "modules": [
+    {
+      "module": "frontend/src/api/client.ts",
+      "test_file": "frontend/src/tests/api/client.test.ts",
+      "last_reviewed": "2026-04-20",
+      "git_hash": "UNCOMMITTED",
+      "gaps_found": 0
+    },
+    {
+      "module": "frontend/src/lib/logger.ts",
+      "test_file": "frontend/src/tests/lib/logger.test.ts",
+      "last_reviewed": "2026-04-20",
+      "git_hash": "UNCOMMITTED",
+      "gaps_found": 0
+    },
+    {
+      "module": "frontend/src/hooks/useAuth.ts",
+      "test_file": "frontend/src/tests/hooks/useAuth.test.ts",
+      "last_reviewed": "2026-04-20",
+      "git_hash": "UNCOMMITTED",
+      "gaps_found": 0
+    },
+    {
+      "module": "frontend/src/hooks/useDashboard.ts",
+      "test_file": "frontend/src/tests/hooks/useDashboard.test.ts",
+      "last_reviewed": "2026-04-20",
+      "git_hash": "UNCOMMITTED",
+      "gaps_found": 0
+    },
+    {
+      "module": "frontend/src/hooks/useExtensions.ts",
+      "test_file": "frontend/src/tests/hooks/useExtensions.test.ts",
+      "last_reviewed": "2026-04-20",
+      "git_hash": "UNCOMMITTED",
+      "gaps_found": 0
+    },
+    {
+      "module": "frontend/src/hooks/usePhoneLines.ts",
+      "test_file": "frontend/src/tests/hooks/usePhoneLines.test.ts",
+      "last_reviewed": "2026-04-20",
+      "git_hash": "UNCOMMITTED",
+      "gaps_found": 0
+    },
+    {
+      "module": "frontend/src/skins/registry.ts",
+      "test_file": "frontend/src/tests/skins/registry.test.ts",
+      "last_reviewed": "2026-04-20",
+      "git_hash": "UNCOMMITTED",
+      "gaps_found": 0
+    }
+  ]
 }

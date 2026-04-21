@@ -173,6 +173,15 @@ In **review** mode, stop here and print the full gap report. Do not write files.
 
 ## Step 5 — Write Tests
 
+**Vitest environment:** Tests must run under `happy-dom` (not `jsdom`). If `vitest.config.ts`
+or `vite.config.ts` does not already set `test.environment = 'happy-dom'`, add it. If
+`happy-dom` is not in `devDependencies`, add it — do not use `jsdom` as a substitute.
+
+**CI command:** The CI-safe single-run command is `npm run test:run`. The `npm run test`
+command opens watch mode and blocks in CI. Only use `npm run test:run` in scripts and task
+instructions. Verify both script names exist in `package.json`; add `"test:run": "vitest run"`
+if missing.
+
 For each gap identified, append or create tests following the patterns in
 [writing-conventions.md](writing-conventions.md). That file covers:
 
