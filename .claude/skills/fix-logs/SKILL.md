@@ -1,5 +1,6 @@
 ---
 name: fix-logs
+disable-model-invocation: true
 description: 'Fixes runtime errors from logs/log-errors.log (written by the Log: Extract Errors task).'
 argument-hint: '"backend" | "frontend" | "known-only" — optional scope filter'
 ---

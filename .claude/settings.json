@@ -3,7 +3,8 @@
     "MAX_THINKING_TOKENS": "63999",
     "CLAUDE_CODE_ALWAYS_ENABLE_EFFORT": "1",
     "CLAUDE_CODE_DISABLE_ADAPTIVE_THINKING": "1",
-    "CLAUDE_CODE_EFFORT_LEVEL": "max"
+    "CLAUDE_CODE_USE_POWERSHELL_TOOL": "1",
+    "CLAUDE_CODE_DISABLE_AUTO_MEMORY": "1"
   },
   "permissions": {
     "allow": [
@@ -20,26 +21,79 @@
       "NotebookEdit(*)",
       "TodoRead(*)",
       "TodoWrite(*)",
-      "WebSearch(*)"
+      "WebSearch(*)",
+      "Edit(/.claude/skills/audit-design-flaws/**)",
+      "Edit(/.claude/skills/state-tools/**)",
+      "Edit(/.claude/skills/make-tests/**)",
+      "Edit(/.claude/skills/make-frontend-tests/**)",
+      "Edit(/.claude/skills/refactor/**)",
+      "Bash(cp .claude/skills/audit-design-flaws/state.json /tmp/_state-audit.json)",
+      "Bash(cp .claude/skills/make-tests/state.json /tmp/_state-make-tests.json)",
+      "Bash(cp .claude/skills/make-frontend-tests/state.json /tmp/_state-make-frontend-tests.json)",
+      "Bash(cp .claude/skills/refactor/state.json /tmp/_state-refactor.json)",
+      "Edit(/.claude/skills/plan-handoff/**)",
+      "Edit(/.claude/skills/check-boundaries/**)",
+      "Edit(/.claude/skills/check-logging/**)"
     ],
     "defaultMode": "bypassPermissions",
     "additionalDirectories": [
-      "C:\\Users\\Administrator\\.claude"
+      "C:\\Users\\Administrator\\.claude",
+      "c:\\Users\\Administrator\\Desktop\\vs_code\\carameli\\.claude\\skills\\state-tools"
     ]
   },
+  "effortLevel": "medium",
+  "defaultModel": "sonnet",
   "hooks": {
-    "Stop": [
+    "PreToolUse": [
       {
-        "matcher": "",
+        "matcher": "Bash",
         "hooks": [
           {
             "type": "command",
-            "command": "python3 scripts/hooks/archive-session.py"
+            "command": "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/hooks/enforce-capped-bash.ps1"
+          }
+        ]
+      },
+      {
+        "matcher": ".*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/hooks/copilot-settings-pretool.ps1"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "pwsh -NoProfile -ExecutionPolicy Bypass -File .claude/skills/add-db-model/after-model-edit.ps1"
+          }
+        ]
+      },
+      {
+        "matcher": "Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "pwsh -NoProfile -ExecutionPolicy Bypass -File .claude/skills/add-db-model/after-model-edit.ps1"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/hooks/copilot-settings-stop.ps1"
           }
         ]
       }
     ]
   },
-  "effortLevel": "high",
-  "defaultModel": "opus"
+  "autoMemoryEnabled": false
 }

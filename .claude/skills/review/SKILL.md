@@ -1,5 +1,6 @@
 ---
 name: review
+disable-model-invocation: true
 description: 'Runs all structural invariant checks (boundaries, secrets, migrations, logging) and fixes any violations found. Use before committing or when performing a broad code review.'
 argument-hint: 'No arguments — always checks and fixes.'
 ---
@@ -18,7 +19,9 @@ Spawn one **Explore** agent with this prompt:
 > You are running detection-only passes for four structural checks on the Carameli project at
 > `c:/Users/Administrator/Desktop/vs_code/carameli`. **Do NOT modify any files.**
 >
-> Use the Grep tool for grep checks and Bash for docker commands. Run all checks.
+> Use the Grep tool for grep checks. Before spawning this Explore agent, run the
+> two suggested migration commands below once and paste their outputs in place of
+> the command lines. Do not rerun docker commands inside the Explore agent.
 >
 > ---
 >
@@ -51,7 +54,9 @@ Spawn one **Explore** agent with this prompt:
 > ### MIGRATIONS (3 checks)
 >
 > **M1 — Linear history**
-> Run: `docker compose -f c:/Users/Administrator/Desktop/vs_code/carameli\docker-compose.yml exec app alembic history --verbose 2>&1`
+> Pre-collected output (includes `__EXIT:<code>` marker):
+> Suggested command (run before spawning this agent):
+> `& { docker compose -f c:/Users/Administrator/Desktop/vs_code/carameli/docker-compose.yml exec -T app alembic history --verbose 2>&1; "__EXIT:$LASTEXITCODE" }`
 > Flag any line containing `(branchpoint)` or `(mergepoint)`.
 >
 > **M2 — Downgrade completeness**
@@ -59,7 +64,9 @@ Spawn one **Explore** agent with this prompt:
 > the function body is only `pass` or a comment — flag those as WARNING.
 >
 > **M3 — Model drift**
-> Run: `docker compose -f c:/Users/Administrator/Desktop/vs_code/carameli\docker-compose.yml exec app alembic check 2>&1`
+> Pre-collected output (includes `__EXIT:<code>` marker):
+> Suggested command (run before spawning this agent):
+> `& { docker compose -f c:/Users/Administrator/Desktop/vs_code/carameli/docker-compose.yml exec -T app alembic check 2>&1; "__EXIT:$LASTEXITCODE" }`
 > Non-zero exit = VIOLATION.
 >
 > ---

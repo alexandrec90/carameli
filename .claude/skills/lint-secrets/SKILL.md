@@ -1,5 +1,6 @@
 ---
 name: lint-secrets
+disable-model-invocation: true
 description: 'Grep-based credential hygiene checker. Detects credential fields in response schemas and raw env-var bypass of pydantic-settings. Use when reviewing new endpoints or schemas for accidental secret exposure.'
 argument-hint: 'Optional: "fix" to auto-fix any violations found'
 ---
@@ -27,31 +28,19 @@ No state file. No file-reading loop. Runs in seconds.
 
 ## Step 1 — Run the Checks
 
-Run both checks in parallel. Collect every match as a violation.
+Run the suggested harness command. Output should be grouped by check label.
 
-### Check 1 — Credential fields in response schemas
+Suggested command (run in terminal):
+`pwsh -NoProfile -ExecutionPolicy Bypass -File .claude/skills/lint-secrets/run-checks.ps1`
 
-```bash
-# Response schemas (classes ending in Response or Out) exposing raw secret fields
-grep -rn \
-  --include="*.py" \
-  -E "^\s+(api_key|password|secret|token)\s*:" \
-  app/schemas/
-```
+### Interpretation
 
-Request schemas may accept these fields (for create/auth routes). Only *response* schemas
-are checked — detect by class name ending in `Response`, `Out`, or `Read`.
-
-### Check 2 — Raw env var access for credentials
-
-```bash
-# os.environ / os.getenv calls for credential-named variables outside app/core/config.py
-grep -rn \
-  --include="*.py" \
-  -E 'os\.(environ\.get|getenv)\(["\x27](.*key.*|.*secret.*|.*password.*|.*token.*)["\x27]' \
-  app/ \
-  | grep -v "app/core/config.py"
-```
+- **Check 1 — Credential fields in response schemas.** Request schemas may
+  accept `api_key`/`password`/`secret`/`token` (for create/auth routes). Only
+  *response* schemas are violations — look for class names ending in
+  `Response`, `Out`, or `Read` among matches.
+- **Check 2 — Raw env var access.** Any `os.environ.get` / `os.getenv` call
+  for a credential-named variable outside `app/core/config.py` is a violation.
 
 ---
 
@@ -100,7 +89,8 @@ All secret hygiene checks passed. No violations found.
 - Move the `os.getenv(...)` call into `app/core/config.py` as a settings field.
 - Replace the call site with `settings.<field_name>`.
 
-After fixing, re-run both checks (Step 1) to confirm clean.
+After fixing, tell the user to re-invoke `/lint-secrets` to re-verify (the
+harness re-runs both checks using the same suggested command from Step 1).
 
 ---
 

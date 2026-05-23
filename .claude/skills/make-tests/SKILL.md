@@ -1,5 +1,6 @@
 ---
 name: make-tests
+disable-model-invocation: true
 description: 'Generates or audits pytest tests: unit, integration, property-based, webhook, concurrency, DB integrity, migration, config, security, snapshot, and benchmark. Use when adding backend modules, fixing bugs, or reviewing test coverage.'
 argument-hint: 'Optional: a file or module path to target (e.g., "app/api/vsapi/sms.py"), or "review" to audit existing tests for gaps only'
 ---
@@ -43,30 +44,14 @@ If the file does not exist, treat it as `{ "last_run": null, "modules": [] }`.
 
 ## Step 3 — Discover Source Modules
 
-Find all first-party Python source files **and** migration files
-(skip tests, `__pycache__`, venv):
+The harness preprocesses discovery: every first-party Python source module
+(including migrations) with its last-commit git hash. TSV columns:
+`lines<TAB>hash<TAB>path`. Note `app/core/config.py` (config validation tests)
+and migration files in `alembic/versions/` are included.
 
-```bash
-find app alembic/versions -name "*.py" \
-  -not -path "*/__pycache__/*" \
-  -not -name "conftest.py" \
-  | sort
-```
-
-Also discover infrastructure modules that need dedicated test categories:
-
-```bash
-# Config module (config validation tests)
-echo app/core/config.py
-
-# Migration files (migration roundtrip tests)
-find alembic/versions -name "*.py" -not -name "__*" | sort
-```
-
-For each module, get its current last-commit hash:
-
-```bash
-git log --format="%H" -1 -- <filepath>
+Suggested command (run in terminal):
+```powershell
+pwsh -NoProfile -ExecutionPolicy Bypass -File .claude/skills/state-tools/discover-files.ps1 -Roots app,alembic/versions -Includes *.py -ExcludeDirs __pycache__ -ExcludeNames conftest.py -WithGitHash
 ```
 
 Triage:
@@ -74,7 +59,7 @@ Triage:
 | Status | Condition | Action |
 | --- | --- | --- |
 | **SKIP** | In state.json, hash matches, gaps_found = 0 | Skip |
-| **SKIP** | No git commit yet (`git log -1 -- <file>` returns empty) and not explicitly targeted | Skip — file was just created this session; tests will be requested separately |
+| **SKIP** | Hash column shows `UNCOMMITTED` and not explicitly targeted | Skip — file was just created this session; tests will be requested separately |
 | **CHANGED** | In state.json but hash differs | Re-evaluate |
 | **NEW** | Not in state.json and has at least one commit | Full pass |
 
@@ -219,12 +204,25 @@ For each gap identified, append or create tests following the patterns in
 
 ## Step 6 — Update State
 
-After processing each module, update `.claude/skills/make-tests/state.json`:
+Write `.claude/skills/make-tests/state-updates.json` with processed module rows:
 
-- Set `last_reviewed` to today's date
-- Set `git_hash` to the current hash of the source module
-- Set `gaps_found` to the number of gaps discovered this run (0 if none)
-- Set `last_run` on the root object to today's date
+```json
+{
+  "last_run": "YYYY-MM-DD",
+  "modules": [
+    {
+      "module": "app/api/vsapi/sms.py",
+      "test_file": "tests/unit/test_sms.py",
+      "last_reviewed": "YYYY-MM-DD",
+      "git_hash": "<sha-or-UNCOMMITTED>",
+      "gaps_found": 0
+    }
+  ]
+}
+```
+
+The skill's `Stop` hook detects `state-updates.json`, runs `state-engine.py
+apply`, and removes the file. Do not run `apply` by hand.
 
 ---
 

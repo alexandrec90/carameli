@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import os
 from collections.abc import AsyncGenerator
 from unittest.mock import MagicMock
@@ -32,6 +33,23 @@ pytestmark = pytest.mark.asyncio(loop_scope="session")
 # Run: docker compose exec app pytest
 
 
+def _schema_fingerprint() -> str:
+    """SHA256 prefix of a stable representation of Base.metadata.
+
+    Changes whenever any table name, column name, or column type changes.
+    Used to decide whether the test DB schema still matches the current
+    models so we can skip the expensive DROP/CREATE/create_all path.
+    """
+    parts = [
+        (
+            table.name,
+            sorted((c.name, str(c.type)) for c in table.columns),
+        )
+        for table in sorted(Base.metadata.tables.values(), key=lambda t: t.name)
+    ]
+    return hashlib.sha256(repr(parts).encode()).hexdigest()[:16]
+
+
 @pytest_asyncio.fixture(scope="session")
 async def test_engine() -> AsyncGenerator[AsyncEngine, None]:
     engine = create_async_engine(
@@ -46,40 +64,78 @@ async def test_engine() -> AsyncGenerator[AsyncEngine, None]:
     #    two workers can both pass the "table doesn't exist" check and then
     #    both attempt CREATE TABLE, causing a pg_type_typname_nsp_index
     #    UniqueViolationError.  Solved by a transaction-level advisory lock
-    #    (released on commit) that serialises all create_all calls.
+    #    (released on commit) that serialises all setup.
     #
     # 2. Teardown race: if we drop tables at the end of each worker's
     #    session, a fast worker (gw0) finishing unit tests can drop the
     #    schema while a slow worker (gw1) is still running contract tests.
     #    Solved by doing ALL cleanup at the START of the next run instead
-    #    of at the end — only the primary worker drops + recreates the
-    #    schema in the setup phase, ensuring a fresh state at run start
-    #    without touching anything during teardown.
+    #    of at the end — only the primary worker resets state in the setup
+    #    phase, ensuring a clean state at run start without touching
+    #    anything during teardown.
+    #
+    # Session reset strategy: the primary worker fingerprints Base.metadata
+    # and compares it to a comment stored on the public schema by a previous
+    # run.  If they match, it TRUNCATEs all tables with RESTART IDENTITY
+    # CASCADE (~100ms, atomic, resets sequences).  If they differ (first
+    # run, or models changed), it falls back to DROP SCHEMA + CREATE SCHEMA
+    # + create_all (~1-3s) and stamps the new fingerprint.  Both paths
+    # guarantee every table is empty at session start — the defence against
+    # data leaking from a crashed previous run.
     #
     # Advisory lock key 7654321987 is also acquired by _contract_env so
     # that schemathesis tests serialise with this setup.
     worker_id = os.environ.get("PYTEST_XDIST_WORKER", "master")
     is_primary = worker_id in ("master", "gw0")
+    fingerprint = _schema_fingerprint()
+    expected_comment = f"fingerprint={fingerprint}"
 
     async with engine.begin() as conn:
         # Acquire lock first so non-primary workers block until the
-        # primary has finished dropping + creating.
+        # primary has finished resetting state.
         await conn.execute(text("SELECT pg_advisory_xact_lock(7654321987)"))
         if is_primary:
-            # Fresh schema at the beginning of each run so leftover data
-            # from a previous (possibly crashed) run cannot affect tests.
-            await conn.execute(text("DROP SCHEMA public CASCADE"))
-            await conn.execute(text("CREATE SCHEMA public"))
-        # create_all is a no-op for tables that already exist (primary
-        # created them above); for non-primary workers this is always a
-        # no-op.  Lock released when this transaction commits.
-        await conn.run_sync(Base.metadata.create_all)
+            existing_comment = (
+                await conn.execute(
+                    text(
+                        "SELECT obj_description('public'::regnamespace, 'pg_namespace')"
+                    )
+                )
+            ).scalar()
+
+            if existing_comment == expected_comment:
+                # Fast path: schema matches, just empty every table.
+                table_list = ", ".join(
+                    f'"{t.name}"'
+                    for t in sorted(
+                        Base.metadata.tables.values(), key=lambda t: t.name
+                    )
+                )
+                if table_list:
+                    await conn.execute(
+                        text(f"TRUNCATE TABLE {table_list} RESTART IDENTITY CASCADE")
+                    )
+            else:
+                # Slow path: first run, or schema drift -- full rebuild.
+                await conn.execute(text("DROP SCHEMA public CASCADE"))
+                await conn.execute(text("CREATE SCHEMA public"))
+                await conn.run_sync(Base.metadata.create_all)
+                # fingerprint is sha256 hex (16 chars, [0-9a-f]) -- safe to
+                # interpolate; COMMENT ON does not accept bind parameters.
+                await conn.execute(
+                    text(f"COMMENT ON SCHEMA public IS 'fingerprint={fingerprint}'")
+                )
+        else:
+            # Non-primary workers: ensure tables exist (no-op after primary's
+            # fast path, and also after primary's slow path via create_all).
+            # Lock released when this transaction commits.
+            await conn.run_sync(Base.metadata.create_all)
 
     try:
         yield engine
     finally:
         # No schema teardown here — the next run's primary worker will
-        # drop + recreate at startup (see above).  Dropping here would
+        # reset state at startup (see above).  Touching state here would
         # race with other workers that may still be executing tests.
         await engine.dispose()
 

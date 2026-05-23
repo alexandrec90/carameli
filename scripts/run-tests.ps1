@@ -19,31 +19,37 @@ if ($Fast) {
     # to drop -n/--dist during the dry-run collect.
     # If testmon selects more than half the suite, fall back to xdist for speed
     # but keep --testmon-noselect so the DB gets updated (breaks the stale-DB loop).
-    $collectCmd = "pytest --collect-only -q -o addopts='--ignore=tests/e2e' --testmon 2>/dev/null | tail -1"
-    $totalCmd   = "pytest --collect-only -q -o addopts='--ignore=tests/e2e' 2>/dev/null | tail -1"
+    # Combine both collects into one exec to pay Python/pytest startup only once.
+    # addopts matches pytest.ini so load/quarantine dirs are excluded from both counts.
+    $dualCollect = @'
+S=$(pytest --collect-only -q -o addopts='--ignore=tests/e2e --ignore=tests/load --ignore=tests/quarantine' --testmon 2>/dev/null | tail -1)
+T=$(pytest --collect-only -q -o addopts='--ignore=tests/e2e --ignore=tests/load --ignore=tests/quarantine'          2>/dev/null | tail -1)
+echo "SEL=${S}|TOT=${T}"
+'@
 
     Write-Host "  Checking testmon selection..." -ForegroundColor DarkGray
-    $selectedRaw = docker compose exec -T app bash -c "$collectCmd" 2>&1 | ForEach-Object { "$_" } | Select-Object -Last 1
-    $totalRaw    = docker compose exec -T app bash -c "$totalCmd" 2>&1 | ForEach-Object { "$_" } | Select-Object -Last 1
+    $dualRaw = docker compose exec -T app bash -c "$dualCollect" 2>&1 | ForEach-Object { "$_" } | Select-Object -Last 1
+    $selectedRaw = if ($dualRaw -match "SEL=([^|]*)") { $Matches[1].Trim() } else { "" }
+    $totalRaw    = if ($dualRaw -match "TOT=(.*)$")    { $Matches[1].Trim() } else { "" }
 
     $selected = if ($selectedRaw -match "(\d+)\s+(selected|test)") { [int]$Matches[1] } else { 999 }
     $total    = if ($totalRaw    -match "(\d+)\s+(selected|test)") { [int]$Matches[1] } else { 1 }
 
     if ($total -gt 0 -and $selected -gt [Math]::Ceiling($total / 2)) {
         Write-Host "  testmon selected $selected/$total tests -- falling back to xdist" -ForegroundColor Yellow
-        $pytestCmd = "pytest -v --tb=short --no-header --color=no -n auto --testmon-noselect"
+        $pytestCmd = "pytest -v --tb=short --no-header --color=no --durations=20 -n auto --dist=worksteal --testmon-noselect"
         $modeLabel = "full (xdist fallback -- testmon-noselect to update DB)"
     } elseif ($selected -eq 0) {
         Write-Host "  testmon: 0 tests to run (no changes detected)" -ForegroundColor Green
-        $pytestCmd = "pytest -v --tb=short --no-header --color=no -o addopts='--ignore=tests/e2e' --testmon"
+        $pytestCmd = "pytest -v --tb=short --no-header --color=no --durations=20 -o addopts='--ignore=tests/e2e --ignore=tests/load --ignore=tests/quarantine' --testmon"
         $modeLabel = "fast (changed-only, testmon -- 0 selected)"
     } else {
         Write-Host "  testmon: $selected/$total tests selected" -ForegroundColor Green
-        $pytestCmd = "pytest -v --tb=short --no-header --color=no -o addopts='--ignore=tests/e2e' --testmon"
+        $pytestCmd = "pytest -v --tb=short --no-header --color=no --durations=20 -o addopts='--ignore=tests/e2e --ignore=tests/load --ignore=tests/quarantine' --testmon"
         $modeLabel = "fast (changed-only, testmon)"
     }
 } else {
-    $pytestCmd = "pytest -v --tb=short --no-header --color=no -n auto"
+    $pytestCmd = "pytest -v --tb=short --no-header --color=no --durations=20 -n auto --dist=worksteal"
     $modeLabel = "full (parallel, xdist)"
 }
 

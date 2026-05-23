@@ -1,5 +1,6 @@
 ---
 name: fix-tests-auto
+disable-model-invocation: true
 description: 'Autonomous test-fix loop: runs pytest, reads failures, applies fixes, restarts app if needed, and repeats until green or stuck. Use when you want hands-off iteration instead of the manual fix-tests workflow. Parameterless.'
 argument-hint: '(no arguments)'
 ---
@@ -35,10 +36,15 @@ Cap at **4 iterations**. On each iteration:
 
 ### A — Run tests
 
-Run `pwsh -ExecutionPolicy Bypass -File scripts/run-tests.ps1` in the terminal with
-`isBackground=false` and a **timeout of 360000 ms** (6 minutes). This blocks in a single
-call until the script exits, writing `logs/test-failures.log` automatically. Do not poll
-with `get_terminal_output` — the blocking call handles it.
+Run the suggested command at the start of each iteration:
+
+Suggested command (run in terminal):
+```powershell
+pwsh -ExecutionPolicy Bypass -File scripts/run-tests.ps1
+```
+
+This command writes
+`logs/test-failures.log` automatically.
 
 ### B — Check result
 
@@ -79,9 +85,9 @@ For each failure:
 
 ### F — Restart if needed
 
-If any file under `app/` was changed in this iteration, run `docker compose restart app`
-in the terminal with `isBackground=false` and a **timeout of 60000 ms** before the next
-test run. If only `tests/` files changed, skip the restart.
+Restart is hook-driven and automatic. The `PreToolUse` hook script checks whether
+`app/` changed since the last restart and runs `scripts/docker-restart-app.ps1`
+only when needed before the next tool action.
 
 ### G — Loop
 

@@ -1,5 +1,6 @@
 ---
 name: fix-problems
+disable-model-invocation: true
 description: 'Fixes errors and warnings shown in the VS Code Problems panel (Pylance, TypeScript, ESLint, etc.) by reading live diagnostics and applying fixes in a single pass. Use when the Problems panel has entries to clear, or when asked to fix diagnostics or type errors.'
 argument-hint: 'optional file path or glob to scope which problems to fix'
 ---

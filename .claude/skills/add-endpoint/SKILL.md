@@ -1,5 +1,6 @@
 ---
 name: add-endpoint
+disable-model-invocation: true
 description: 'Adds a FastAPI route handler with Pydantic schemas, service wiring, and logging. Use when creating a new REST endpoint for the Carameli API.'
 argument-hint: 'Optional endpoint name or route path (e.g., "/PhoneLine/UpdateCallRecording")'
 ---

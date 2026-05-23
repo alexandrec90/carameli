@@ -1,5 +1,6 @@
 ---
 name: fix-lint
+disable-model-invocation: true
 description: 'Fixes lint errors from logs/lint-errors.log (written by the Lint: Everything task).'
 ---
 

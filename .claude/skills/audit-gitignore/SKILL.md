@@ -1,5 +1,6 @@
 ---
 name: audit-gitignore
+disable-model-invocation: true
 description: 'Reviews and updates .gitignore for sensitive or irrelevant files and removes newly ignored files from the repo. Use when adding new tools, build outputs, or secret files to the project.'
 argument-hint: 'Optional: scope (quick|deep), target paths, or ignore categories.'
 ---

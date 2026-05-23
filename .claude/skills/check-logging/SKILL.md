@@ -1,5 +1,6 @@
 ---
 name: check-logging
+disable-model-invocation: true
 description: 'Grep-based logging coverage checker. Detects silent exception swallowing, missing module-level loggers, and route handlers with no log calls. Use when auditing logging coverage or reviewing new code.'
 argument-hint: 'Optional: "fix" to auto-fix any violations found'
 ---
@@ -23,57 +24,22 @@ No state file. No file-reading loop. Runs in seconds.
 
 ## Step 1 — Run the Checks
 
-Run all three checks in parallel. For each, collect every match as a violation.
+Run the suggested harness command. Output should be grouped by check label.
 
-### Check 1 — Silent except blocks
+Suggested command (run in terminal):
+`pwsh -NoProfile -ExecutionPolicy Bypass -File .claude/skills/check-logging/run-checks.ps1`
 
-Two-step: find files with bare `except Exception` blocks, then confirm they contain no `logger.` call in the same file.
+### Interpretation
 
-```bash
-# Step A: files that catch Exception
-grep -rln \
-  --include="*.py" \
-  -E "except Exception" \
-  app/
-```
-
-```bash
-# Step B: from Step A results, find which files have NO logger call at all
-grep -rLn \
-  --include="*.py" \
-  "logger\." \
-  app/
-```
-
-Files appearing in Step A but NOT in Step B are violations — they catch Exception but never log.
-
-> Note: A file that has *some* logger calls may still silently swallow specific except blocks.
-> Flag any file where `except Exception` count > `logger.error\|logger.warning` count as a
-> potential gap and note it in the report without blocking on it.
-
-### Check 2 — Missing module-level logger
-
-```bash
-# Files in app/ that never declare a module logger
-grep -rL \
-  --include="*.py" \
-  "logger = logging.getLogger" \
-  app/
-```
-
-Exclude `__init__.py` files and `app/core/logging_config.py` (which defines the logger setup, not a user).
-
-### Check 3 — Route handlers with no logging
-
-```bash
-# Files in app/api/ with no logger calls at all
-grep -rL \
-  --include="*.py" \
-  "logger\." \
-  app/api/
-```
-
-Every route file should log at minimum one INFO entry per handler.
+- **Check 1 — Silent except blocks.** `VIOLATION` = file catches Exception but
+  has no logger call at all. `POTENTIAL` = except-Exception count exceeds
+  logger.error/warning count — still has a logger, but may silently swallow
+  specific blocks. Flag `POTENTIAL` without blocking on it.
+- **Check 2 — Missing module-level logger.** Every `.py` file in `app/`
+  (excluding `__init__.py` and `logging_config.py`) must declare
+  `logger = logging.getLogger(__name__)`.
+- **Check 3 — Silent route handlers.** Every route file in `app/api/` must
+  contain at least one `logger.` call.
 
 ---
 
@@ -145,8 +111,9 @@ For each violation, apply the minimal correct fix:
 - Example: `logger.info("GET phone line %s", line_id)`
 - Never log secret values (`api_key`, passwords, tokens).
 
-After fixing, re-run all three grep checks (Step 1) to confirm clean.
-Report a before/after summary of files changed.
+After fixing, report a before/after summary of files changed and tell the user
+to re-invoke `/check-logging` to re-verify (using the same suggested command
+from Step 1).
 
 ---
 

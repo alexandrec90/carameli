@@ -1,5 +1,6 @@
 ---
 name: check-migrations
+disable-model-invocation: true
 description: 'Audits Alembic migration health: linear history, no model drift, non-empty downgrade paths. Use after modifying SQLAlchemy models or before deploying to catch drift.'
 argument-hint: 'Optional: "fix" to scaffold missing downgrade bodies or stubs for drift'
 ---
@@ -23,13 +24,12 @@ Three targeted checks — cheap, no ORM introspection loop.
 
 ## Step 1 — Run the Checks
 
-Run all three checks in parallel inside the app container.
+Collect all three checks using the suggested commands below.
 
 ### Check 1 — Linear history
 
-```bash
-docker compose exec app alembic history --verbose 2>&1
-```
+Suggested command (run in terminal and capture output):
+`& { docker compose exec -T app alembic history --verbose 2>&1; "__EXIT:$LASTEXITCODE" }`
 
 Look for any line containing `(branchpoint)` or `(mergepoint)`. A branch point means
 two migration chains diverged; a merge point means they were manually rejoined.
@@ -40,9 +40,8 @@ the previous revision's `revision` with no gaps.
 
 ### Check 2 — Downgrade completeness
 
-```bash
-grep -rn "def downgrade" alembic/versions/*.py
-```
+Suggested command (run in terminal):
+`Get-ChildItem alembic/versions/*.py | ForEach-Object { Select-String -Path $_.FullName -Pattern '^\s*def\s+downgrade' } | ForEach-Object { "$($_.Path):$($_.LineNumber):$($_.Line.Trim())" }`
 
 For each migration file, read the `downgrade()` function body. Flag it if:
 
@@ -55,9 +54,8 @@ A missing downgrade is a **VIOLATION**.
 
 ### Check 3 — Model / migration drift
 
-```bash
-docker compose exec app alembic check 2>&1
-```
+Suggested command (run in terminal and capture output):
+`& { docker compose exec -T app alembic check 2>&1; "__EXIT:$LASTEXITCODE" }`
 
 Exit code 0 = no drift. Any other exit code means SQLAlchemy detected model changes
 not reflected in any migration. Capture and display the full output.

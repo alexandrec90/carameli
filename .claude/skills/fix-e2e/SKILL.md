@@ -1,5 +1,6 @@
 ---
 name: fix-e2e
+disable-model-invocation: true
 description: 'Fixes E2E test failures from logs/e2e-failures.log (written by the Test: Run E2E task).'
 ---
 
@@ -140,15 +141,15 @@ State clearly:
 - Which failures were fixed (test name, what changed, which files were edited).
 - Which were skipped and why.
 - **Restart reminders** (as applicable):
-  - Backend files changed (`app/`): tell the user to run `docker compose restart app`
+   - Backend files changed (`app/`): tell the user to run:
+
+      ```powershell
+      docker compose restart app
+
   - Frontend files changed (`frontend/src/`): note that Vite HMR should pick it up
     (manual restart only needed for config changes like `vite.config.ts`)
-- Tell the user to re-run the **Test: Run E2E (headless)** task and invoke `/fix-e2e`
-  again if failures remain.
-
 ---
 
-## Hard Rules
 
 1. Edit only files directly implicated by the collected failures — never pre-emptive cleanup.
 2. One failure = one minimal fix. Do not restructure surrounding code.

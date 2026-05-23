@@ -36,6 +36,26 @@ paths:
   characters. They cause parse errors when file encoding is misread.
 - **Use `pwsh`** (PowerShell 7), never `powershell` (Windows PowerShell 5.1).
 
+## PowerShell Script Tests
+
+- **Every new script under `scripts/` must ship with a Pester test** in
+  `scripts/tests/` in the same change.
+- Prefer **contract-style tests** over implementation-coupled tests:
+  assert exit codes, artifact contents, side effects, and no-op behavior rather
+  than internal variable values.
+- When a script depends on external tools (`docker`, `git`, `npm`, etc.), use a
+  fake CLI harness or temp workspace in the Pester test so the test remains
+  deterministic and does not require live infrastructure unless that is the
+  specific thing being tested.
+- For diagnostic scripts that write log artifacts, tests should cover both:
+  - **clean path** — artifact cleared / empty output / zero exit code
+  - **failure path** — actionable artifact shape, filtered noise, expected exit code
+- Add tests to the existing suite under `scripts/tests/` so they run via
+  `scripts/run-pester.ps1` and the VS Code task `Test: Run Pester (PowerShell)`.
+- If a script is intentionally too environment-specific to test end-to-end,
+  extract the parser / formatter / decision logic into testable units or cover a
+  stable contract path instead of leaving it untested.
+
 ## GitHub Secrets and Variables
 
 When a workflow references `${{ secrets.* }}` or `${{ vars.* }}`, use the `gh` CLI

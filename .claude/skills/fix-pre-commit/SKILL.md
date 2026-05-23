@@ -1,5 +1,6 @@
 ---
 name: fix-pre-commit
+disable-model-invocation: true
 description: 'Fixes pre-commit hook errors from logs/pre-commit-errors.log (written by the git pre-commit hook or the Pre-Commit: Run All Hooks task).'
 argument-hint: '(no arguments)'
 ---
@@ -78,7 +79,13 @@ For each error:
   env var lookup). If the finding is a false positive, add a `# nosec BXXX` comment with
   a brief justification.
 - **detect-secrets**: if the finding is a real secret, remove it and use an env var. If it
-  is a false positive, run `detect-secrets scan > .secrets.baseline` to update the baseline,
+  is a false positive, run:
+
+  ```powershell
+  detect-secrets scan > .secrets.baseline
+  ```
+
+  to update the baseline,
   or add an inline `# pragma: allowlist secret` comment with justification.
 - **dotenv-linter**: fix formatting/ordering issues in `.env` files.
 

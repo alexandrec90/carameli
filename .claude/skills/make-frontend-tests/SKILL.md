@@ -1,5 +1,6 @@
 ---
 name: make-frontend-tests
+disable-model-invocation: true
 description: 'Generates missing Vitest tests for frontend hooks, API client, skin system, views, pages, and shared components. Use when adding new frontend modules or reviewing test coverage gaps.'
 argument-hint: 'Optional: a file path to target (e.g., "frontend/src/hooks/useDashboard.ts"), or "review" to audit for gaps only'
 ---
@@ -44,15 +45,12 @@ If the file does not exist, treat it as `{ "last_run": null, "modules": [] }`.
 
 ## Step 3 — Discover Source Modules
 
-Find all first-party TypeScript source files (skip tests, node_modules, dist):
+The harness preprocesses discovery: every first-party TypeScript source file
+with its last-commit git hash. TSV columns: `lines<TAB>hash<TAB>path`.
 
-```bash
-find frontend/src -name "*.ts" -o -name "*.tsx" \
-  | grep -v node_modules \
-  | grep -v dist \
-  | grep -v ".test." \
-  | grep -v "__tests__" \
-  | sort
+Suggested command (run in terminal):
+```powershell
+pwsh -NoProfile -ExecutionPolicy Bypass -File .claude/skills/state-tools/discover-files.ps1 -Roots frontend/src -Includes *.ts,*.tsx -ExcludeDirs node_modules,dist,__tests__ -ExcludeNames *.test.ts,*.test.tsx,*.spec.ts,*.spec.tsx -WithGitHash
 ```
 
 Classify each file into a layer:
@@ -69,18 +67,12 @@ Classify each file into a layer:
 | **Shared components** | `frontend/src/components/*.tsx` | Standard React Testing Library render |
 | **App** | `frontend/src/App.tsx`, `main.tsx` | Router integration test |
 
-For each module, get its current last-commit hash:
-
-```bash
-git log --format="%H" -1 -- <filepath>
-```
-
 Triage (same rules as make-tests):
 
 | Status | Condition | Action |
 | --- | --- | --- |
 | **SKIP** | In state.json, hash matches, gaps_found = 0 | Skip |
-| **SKIP** | No git commit yet and not explicitly targeted | Skip |
+| **SKIP** | Hash column shows `UNCOMMITTED` and not explicitly targeted | Skip |
 | **CHANGED** | In state.json but hash differs | Re-evaluate |
 | **NEW** | Not in state.json and has at least one commit | Full pass |
 
@@ -200,12 +192,26 @@ For each gap identified, append or create tests following the patterns in
 
 ## Step 6 — Update State
 
-After processing each module, update `.claude/skills/make-frontend-tests/state.json`:
+Write `.claude/skills/make-frontend-tests/state-updates.json` with processed
+module rows:
 
-- Set `last_reviewed` to today's date
-- Set `git_hash` to the current hash of the source module
-- Set `gaps_found` to the number of gaps discovered this run (0 if none)
-- Set `last_run` on the root object to today's date
+```json
+{
+  "last_run": "YYYY-MM-DD",
+  "modules": [
+    {
+      "module": "frontend/src/hooks/useDashboard.ts",
+      "test_file": "frontend/src/tests/hooks/useDashboard.test.ts",
+      "last_reviewed": "YYYY-MM-DD",
+      "git_hash": "<sha-or-UNCOMMITTED>",
+      "gaps_found": 0
+    }
+  ]
+}
+```
+
+The skill's `Stop` hook detects `state-updates.json`, runs `state-engine.py
+apply`, and removes the file. Do not run `apply` by hand.
 
 ---
 

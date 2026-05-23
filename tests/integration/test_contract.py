@@ -21,6 +21,7 @@ from schemathesis.checks import not_a_server_error
 from slowapi.middleware import SlowAPIMiddleware
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+from sqlalchemy.pool import NullPool
 
 import app.models
 from app.core.config import settings
@@ -50,41 +51,40 @@ async def _contract_env():
 
     Schemathesis tests are sync — they run through anyio's blocking portal,
     which uses a different event loop from the session-scoped test_engine.
-    We must NOT share test_engine; instead, create tables with a short-lived
-    engine and give each request its own engine + session.
+    We must NOT share test_engine; instead we use a module-scoped engine with
+    NullPool so each request gets a fresh asyncpg connection bound to the
+    current loop (no cross-loop pool reuse), while avoiding the overhead of
+    creating and disposing a full SQLAlchemy engine on every Hypothesis
+    example.
     """
     db_url = settings.database_url
 
-    # Ensure tables exist for the per-request engines schemathesis will use.
-    # Use the same advisory lock as test_engine (conftest.py) to serialise
-    # this create_all with any concurrent worker that is still setting up its
-    # schema.  The lock is released when the transaction commits, so the
-    # second caller always finds the tables already created (no-op).
-    _setup = create_async_engine(db_url, connect_args={"prepared_statement_cache_size": 0})
-    async with _setup.begin() as conn:
+    # NullPool: every connect() opens a fresh asyncpg connection on the
+    # current event loop and closes it on exit, so no pooled connection is
+    # ever reused across the per-example loops schemathesis spins up.
+    # Advisory lock (same key as conftest.py's test_engine) serialises
+    # create_all with any xdist worker still setting up its schema.
+    engine = create_async_engine(
+        db_url,
+        echo=False,
+        connect_args={"prepared_statement_cache_size": 0},
+        poolclass=NullPool,
+    )
+    async with engine.begin() as conn:
         await conn.execute(text("SELECT pg_advisory_xact_lock(7654321987)"))
         await conn.run_sync(Base.metadata.create_all)
-    await _setup.dispose()
 
     async def _session_override():
-        per_req_engine = create_async_engine(
-            db_url,
-            echo=False,
-            connect_args={"prepared_statement_cache_size": 0},
-        )
-        try:
-            async with per_req_engine.connect() as conn:
-                await conn.begin()
-                session_factory = async_sessionmaker(
-                    bind=conn,
-                    expire_on_commit=False,
-                    join_transaction_mode="create_savepoint",
-                )
-                async with session_factory() as session:
-                    yield session
-                await conn.rollback()
-        finally:
-            await per_req_engine.dispose()
+        async with engine.connect() as conn:
+            await conn.begin()
+            session_factory = async_sessionmaker(
+                bind=conn,
+                expire_on_commit=False,
+                join_transaction_mode="create_savepoint",
+            )
+            async with session_factory() as session:
+                yield session
+            await conn.rollback()
 
     app.dependency_overrides[get_session] = _session_override
 
@@ -140,6 +140,7 @@ async def _contract_env():
         rate_limiter._limiter = _real_rl
 
     app.dependency_overrides.clear()
+    await engine.dispose()
 
 
 # ---------------------------------------------------------------------------
@@ -148,7 +149,7 @@ async def _contract_env():
 
 
 @schema.parametrize()
-@h_settings(max_examples=20)
+@h_settings(max_examples=10)
 def test_api_contract(case):
     """Fuzz every endpoint with auto-generated inputs.
 

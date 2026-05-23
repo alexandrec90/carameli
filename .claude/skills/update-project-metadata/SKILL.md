@@ -1,5 +1,6 @@
 ---
 name: update-project-metadata
+disable-model-invocation: true
 description: 'Audits and refreshes all Claude Code project metadata: root and subdirectory CLAUDE.md files, .claude/rules/, .claudeignore, and settings.local.json permissions. Use after tech stack changes, folder restructures, or new integrations.'
 argument-hint: 'No arguments needed — always scans and applies any required updates.'
 ---
@@ -13,11 +14,20 @@ reflect the current project structure, tech stack, and conventions.
 
 ## Step 1 — Gather Current State
 
-Read all of the following **in parallel**:
+The harness preloads all source-of-truth and metadata files:
+
+Suggested command (run in terminal):
+`pwsh -NoProfile -ExecutionPolicy Bypass -File .claude/skills/state-tools/project-snapshot.ps1 -Sections compose,requirements,requirements-dev,frontend-pkg,config-py,pytest,alembic-env,claude-md,frontend-claude-md,tests-claude-md,services-claude-md,rules-list,claudeignore,settings-local`
+
+The `rules-list` section above lists the rule file names. Read each
+`.claude/rules/<name>.md` individually (using the list as your manifest) to
+check glob accuracy and convention correctness — they are too varied to pre-inject.
+
+Reference — what to look for in each injected section:
 
 ### Source-of-truth files
 
-| File | What to extract |
+| Section | What to extract |
 | --- | --- |
 | `docker-compose.yml` | Service names, ports, volumes |
 | `requirements.txt` | Python runtime deps |
@@ -29,13 +39,13 @@ Read all of the following **in parallel**:
 
 ### Existing metadata files
 
-| File | Purpose |
+| Section | Purpose |
 | --- | --- |
 | `CLAUDE.md` | Root project context — tech stack, architecture, conventions |
 | `frontend/CLAUDE.md` | Frontend context for Claude |
 | `tests/CLAUDE.md` | Test conventions for Claude |
 | `app/services/CLAUDE.md` | Service layer context for Claude |
-| `.claude/rules/*.md` | All rule files (read every one) |
+| `rules-list` | Names of all `.claude/rules/*.md` files — read each individually |
 | `.claudeignore` | Context exclusions |
 | `.claude/settings.local.json` | Auto-allow permissions |
 

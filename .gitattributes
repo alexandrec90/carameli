@@ -1,0 +1,23 @@
+# Keep repository text files normalized to LF to avoid CRLF warning noise
+# during automated staging (for example, third-party Claude agent sessions).
+.gitattributes -text
+* text=auto eol=lf
+
+# Preserve native Windows line endings for command shell scripts.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Treat common binary assets as binary.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.pdf binary
+*.zip binary
+*.gz binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.eot binary

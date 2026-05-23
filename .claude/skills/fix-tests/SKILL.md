@@ -1,5 +1,6 @@
 ---
 name: fix-tests
+disable-model-invocation: true
 description: 'Fixes test failures from logs/test-failures.log (written by the Test: Run pytest task).'
 ---
 

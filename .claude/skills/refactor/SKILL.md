@@ -1,5 +1,6 @@
 ---
 name: refactor
+disable-model-invocation: true
 description: 'Refactors first-party source files using a state.json tracking workflow. Use when improving code quality, reducing complexity, or applying consistent style fixes across a set of files.'
 argument-hint: 'Optional focus path or file (e.g., "frontend/src/pages")'
 ---
@@ -21,36 +22,18 @@ touching that file at the time it was refactored.
 
 ## Step 2 — Discover Source Files
 
-Run once to get a line-count overview, sorted largest first:
+Run the discovery command below to gather the top 50 source files by line count, each with its last-commit git hash. TSV columns: `lines<TAB>hash<TAB>path`.
 
-```bash
-find . \
-  -not \( \
-    -path "*/node_modules/*" -o -path "*/.git/*" -o -path "*/venv/*" \
-    -o -path "*/.venv/*" -o -path "*/dist/*" -o -path "*/build/*" \
-    -o -path "*/__pycache__/*" -o -path "*/alembic/versions/*" \
-    -o -path "*/tests/*" -o -path "*/__tests__/*" -o -path "*/.claude/*" \
-    -o -path "*/coverage/*" -o -path "*/logs/*" -o -path "*/.pytest_cache/*" \
-  \) \
-  \( -name "*.py" -o -name "*.ts" -o -name "*.tsx" \) \
-  -not \( \
-    -name "*.d.ts" -o -name "*.config.ts" -o -name "*.config.js" \
-    -o -name "*.config.mjs" -o -name "conftest.py" \
-    -o -name "*.test.ts" -o -name "*.spec.ts" \
-    -o -name "test_*.py" -o -name "*_test.py" \
-  \) \
-  -exec wc -l {} + | sort -rn | head -50
+Suggested command (run in terminal):
+```powershell
+pwsh -NoProfile -ExecutionPolicy Bypass -File .claude/skills/state-tools/discover-files.ps1 -Roots app,frontend/src -Includes *.py,*.ts,*.tsx -ExcludeDirs node_modules,.git,venv,.venv,dist,build,__pycache__,alembic/versions,tests,__tests__,.claude,coverage,logs,.pytest_cache -ExcludeNames *.d.ts,*.config.ts,*.config.js,*.config.mjs,conftest.py,*.test.ts,*.spec.ts,test_*.py,*_test.py -Top 50 -WithGitHash
 ```
 
 ---
 
 ## Step 3 — Triage
 
-For each file, get its current last-commit hash:
-
-```bash
-git log --format="%H" -1 -- <filepath>
-```
+The git hashes from Step 2 are pre-computed. Triage each path against `state.json`:
 
 | Status | Condition | Action |
 | --- | --- | --- |
@@ -98,11 +81,21 @@ Fix any import error before moving on.
 
 ## Step 5 — Update State
 
-After each file, write its entry back to `.claude/skills/refactor/state.json`:
+Write `.claude/skills/refactor/state-updates.json` with touched files:
 
-```bash
-git log --format="%H" -1 -- <filepath>
+```json
+{
+  "files": {
+    "frontend/src/pages/DashboardPage.tsx": {
+      "git_hash": "<sha-or-UNCOMMITTED>",
+      "refactored_at": "YYYY-MM-DD"
+    }
+  }
+}
 ```
+
+The skill's `Stop` hook detects `state-updates.json`, runs `state-engine.py
+apply`, and removes the file. Do not run `apply` by hand.
 
 Use `"UNCOMMITTED"` for files edited this session but not yet committed. They
 will re-evaluate on the next run once committed.

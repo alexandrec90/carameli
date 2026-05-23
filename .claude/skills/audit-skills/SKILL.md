@@ -1,5 +1,6 @@
 ---
 name: audit-skills
+disable-model-invocation: true
 description: Audits Claude Skills for adherence to Anthropic's best practices and Carameli authoring conventions. Use when reviewing SKILL.md files, directory structures, or skill implementations to ensure they are concise, discoverable, and effective.
 argument-hint: 'Optional: skill name to audit (e.g., "add-endpoint"), or omit to audit all skills'
 ---

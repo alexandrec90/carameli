@@ -1,5 +1,6 @@
 ---
 name: audit-dockerignore
+disable-model-invocation: true
 description: 'Audits .dockerignore for missing patterns that bloat the Docker build context or leak secrets into images. Use after adding new directories, config files, or secret files to the project.'
 argument-hint: 'No arguments needed — always scans and applies any required updates.'
 ---

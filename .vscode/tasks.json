@@ -316,6 +316,45 @@
       "problemMatcher": []
     },
     {
+      "label": "Test: Run Hook Contracts (dry)",
+      "type": "process",
+      "command": "pwsh",
+      "args": [
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "scripts/test-hooks.ps1"
+      ],
+      "group": "test",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "showReuseMessage": false,
+        "close": false
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Test: Run Pester (PowerShell)",
+      "type": "process",
+      "command": "pwsh",
+      "args": [
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "scripts/run-pester.ps1",
+        "-InstallIfMissing"
+      ],
+      "group": "test",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "showReuseMessage": false,
+        "close": false
+      },
+      "problemMatcher": []
+    },
+    {
       "label": "Log: Extract Errors",
       "type": "shell",
       "command": "pwsh -ExecutionPolicy Bypass -File scripts/extract-log-errors.ps1; $_ec = $LASTEXITCODE; pwsh -ExecutionPolicy Bypass -File scripts/notify.ps1 -Label 'Log: Extract Errors' -ExitCode $_ec; exit $_ec",

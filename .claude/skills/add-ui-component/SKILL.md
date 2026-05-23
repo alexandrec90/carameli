@@ -1,5 +1,6 @@
 ---
 name: add-ui-component
+disable-model-invocation: true
 description: 'Builds a Carameli 3D UI component using React Three Fiber conventions. Use when adding a new interactive element (button, card, modal, nav) to the carameli skin canvas.'
 argument-hint: 'Component type or purpose (e.g., "stats card", "cta button")'
 ---

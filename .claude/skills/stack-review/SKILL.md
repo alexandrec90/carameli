@@ -1,5 +1,6 @@
 ---
 name: stack-review
+disable-model-invocation: true
 description: 'Audits the current tech stack and surfaces prioritized modernization recommendations. Use when evaluating dependencies, frameworks, or infrastructure for upgrades or replacements.'
 argument-hint: 'Optional: "dismiss <id>" to remove a recommendation, "implement <id>" to action one, or "implement-all" to batch-implement all pending items via parallel agents'
 ---
@@ -45,16 +46,22 @@ If an argument was passed:
 
 ## Step 3 — Audit Project Files
 
-Read all of the following (in parallel where possible):
+Run the suggested preload command before auditing:
 
-| File | What to look for |
+Suggested command (run in terminal):
+`pwsh -NoProfile -ExecutionPolicy Bypass -File .claude/skills/state-tools/project-snapshot.ps1 -Sections requirements,compose,claude-md,todo,frontend-pkg,alembic-count`
+
+Skip to Step 4 if Step 2 handled an argument (dismiss/implement — no audit needed).
+Otherwise use the preloaded data. Reference:
+
+| Section | What to look for |
 | --- | --- |
 | `requirements.txt` | Missing packages, known anti-patterns for async FastAPI |
 | `docker-compose.yml` | Missing services (Redis, PgBouncer, observability stack) |
 | `CLAUDE.md` | Current architecture — use as ground truth |
 | `todo.md` | Items already tracked — do not duplicate them as recommendations |
 | `frontend/package.json` | Outdated or missing frontend libraries |
-| `alembic/versions/` (file count) | Migration sprawl — flag if > 30 revisions with no squash |
+| `alembic-count` | Migration revision count — flag if > 30 with no squash |
 
 Cross-reference findings against the state file:
 

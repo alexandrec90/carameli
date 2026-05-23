@@ -1,5 +1,6 @@
 ---
 name: fix-all
+disable-model-invocation: true
 description: 'Runs fix-lint, fix-tests, and fix-e2e in sequence. Use when you want to fix all outstanding lint, test, and E2E failures in one pass.'
 ---
 

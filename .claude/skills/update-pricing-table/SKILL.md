@@ -1,5 +1,6 @@
 ---
 name: update-pricing-table
+disable-model-invocation: true
 description: 'Audits carrier integrations and infrastructure against charts/pricing/pricing table.md and updates any stale sections. Use after changing Telnyx plans, infrastructure tiers, S3 config, or the scaling model.'
 argument-hint: 'Optional: describe what changed (e.g., "added Twilio as second carrier", "added CDN layer"). If omitted, performs a full scan.'
 ---
@@ -14,17 +15,21 @@ missing, stale, or incorrectly reflect the current architecture.
 
 ## Step 1 — Read the Source Files
 
-Read all of the following **in parallel**:
+The harness preloads all source files:
 
-| File | What to look for |
-|------|-----------------|
-| `docker-compose.yml` | Every service block — these are the infrastructure components with a runtime cost |
-| `requirements.txt` | External SaaS packages: carrier SDKs (telnyx, twilio, vonage…), object-storage clients (boto3, aiobotocore…), any new billable integration |
+Suggested command (run in terminal):
+`pwsh -NoProfile -ExecutionPolicy Bypass -File .claude/skills/state-tools/project-snapshot.ps1 -Sections compose,requirements,config-py,provider-modules,claude-md,chart-tech-legend,chart-pricing`
+
+Reference — what to look for in each injected section:
+
+| Section | What to look for |
+|---------|-----------------|
+| `docker-compose.yml` | Every service block — infrastructure components with a runtime cost |
+| `requirements.txt` | External SaaS packages: carrier SDKs, object-storage clients, any new billable integration |
 | `app/core/config.py` | Env-var groups for external services — each group is a potential cost line |
-| `app/services/providers/carrier/` | Active carrier module(s) — determines which §1 pricing section to include |
-| `app/services/providers/engine/` | Active call engine module(s) — determines Jambonz vs. a hosted alternative |
+| `provider-modules` (listings of `carrier/` and `engine/`) | Active carrier/engine modules — determines which §1 pricing section to include |
 | `CLAUDE.md` | Tech stack table — authoritative ground truth for component names and roles |
-| `charts/tech stack/tech stack legend.md` | Current runtime component list — use to detect any component not yet reflected in the pricing table |
+| `charts/tech stack/tech stack legend.md` | Current runtime component list — detect any component not yet in the pricing table |
 | `charts/pricing/pricing table.md` | Current pricing table — the diff target |
 
 ---

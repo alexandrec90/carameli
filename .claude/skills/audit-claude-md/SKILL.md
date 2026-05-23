@@ -1,5 +1,6 @@
 ---
 name: audit-claude-md
+disable-model-invocation: true
 description: 'Audits CLAUDE.md files against Anthropic best practices for conciseness, structure, and content quality.'
 argument-hint: '(no arguments)'
 ---

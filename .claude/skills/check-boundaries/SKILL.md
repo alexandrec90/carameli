@@ -1,5 +1,6 @@
 ---
 name: check-boundaries
+disable-model-invocation: true
 description: 'Grep-based checker for provider leaks, layer violations, and blocking I/O in async handlers. Use when reviewing code changes or running a pre-commit structural audit.'
 argument-hint: 'Optional: "fix" to auto-fix any violations found'
 ---
@@ -23,46 +24,22 @@ No state file. No file-reading loop. Runs in seconds.
 
 ## Step 1 — Run the Checks
 
-Run all three checks in parallel. For each, collect every match as a violation.
+Run the suggested harness command. Output should be grouped by check; each
+match is `path:line:content`.
 
-### Check 1 — Provider boundary leak
+Suggested command (run in terminal):
+`pwsh -NoProfile -ExecutionPolicy Bypass -File .claude/skills/check-boundaries/run-checks.ps1`
 
-```bash
-# Find any import of telnyx or jambonz outside of app/services/providers/
-grep -rn \
-  --include="*.py" \
-  -E "^\s*(import telnyx|from telnyx|import jambonz|from jambonz)" \
-  app/ \
-  | grep -v "app/services/providers/"
-```
+### Interpretation
 
-A match here means production code is bypassing the `CarrierProvider` /
-`CallEngineProvider` abstraction and calling the SDK directly.
-
-### Check 2 — Layer boundary violation
-
-```bash
-# Find any route handler or webhook importing a repository directly
-grep -rn \
-  --include="*.py" \
-  -E "from app\.repositories\." \
-  app/api/
-```
-
-Route handlers must call services, not repositories. Services call repositories.
-
-### Check 3 — Blocking I/O in async modules
-
-```bash
-# Find blocking-I/O imports anywhere in app/ (these stall the event loop)
-grep -rn \
-  --include="*.py" \
-  -E "^\s*(import requests|from requests|import urllib\.request|import time$|from time import sleep|import subprocess|from subprocess)" \
-  app/
-```
-
-Any match is a potential event-loop block. Async code must use `httpx.AsyncClient`,
-`asyncio.sleep`, or `asyncio.create_subprocess_*`.
+- **Check 1 — Provider boundary leak.** A match means production code is
+  bypassing the `CarrierProvider` / `CallEngineProvider` abstraction and
+  calling the SDK directly.
+- **Check 2 — Layer boundary violation.** Route handlers must call services,
+  not repositories. Services call repositories.
+- **Check 3 — Blocking I/O in async modules.** Any match is a potential
+  event-loop block. Async code must use `httpx.AsyncClient`, `asyncio.sleep`,
+  or `asyncio.create_subprocess_*`.
 
 ---
 
@@ -132,8 +109,9 @@ For each violation, apply the minimal correct fix:
 - Replace `time.sleep(n)` with `await asyncio.sleep(n)`.
 - Replace `subprocess.run(...)` with `await asyncio.create_subprocess_exec(...)`.
 
-After fixing, re-run all three grep checks (Step 1) to confirm clean.
-Report a before/after summary of files changed.
+After fixing, report a before/after summary of files changed and tell the user
+to re-invoke `/check-boundaries` to re-verify (using the same suggested command
+from Step 1).
 
 ---
 

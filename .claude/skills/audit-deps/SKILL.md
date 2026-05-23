@@ -1,5 +1,6 @@
 ---
 name: audit-deps
+disable-model-invocation: true
 description: 'Audits requirements.txt and requirements-dev.txt for unused, missing, or misplaced Python dependencies. Use when adding or removing packages, or when imports do not match listed requirements.'
 argument-hint: 'No arguments needed — always scans and applies any required updates.'
 ---

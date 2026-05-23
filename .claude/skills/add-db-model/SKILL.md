@@ -1,5 +1,6 @@
 ---
 name: add-db-model
+disable-model-invocation: true
 description: 'Adds a SQLAlchemy model and Alembic migration with repository and schema guidance. Use when introducing a new table or adding/changing columns in an existing one.'
 argument-hint: 'Optional entity name or table (e.g., "call_event")'
 ---
@@ -44,7 +45,9 @@ from app.models.my_entity import MyEntity  # noqa: F401
 ## Step 2 — Generate the Migration
 
 Ask the user to run:
-`docker compose exec app alembic revision --autogenerate -m "add my_entities table"`
+```powershell
+docker compose exec app alembic revision --autogenerate -m "add my_entities table"
+```
 
 Open the generated file in `alembic/versions/` and verify:
 
@@ -56,10 +59,14 @@ Open the generated file in `alembic/versions/` and verify:
 ## Step 3 — Apply the Migration
 
 Ask the user to run:
-`docker compose exec app alembic upgrade head`
+```powershell
+docker compose exec app alembic upgrade head
+```
 
 To roll back one step during development:
-`docker compose exec app alembic downgrade -1`
+```powershell
+docker compose exec app alembic downgrade -1
+```
 
 ## Step 4 — Add Pydantic Schemas
 

@@ -1,5 +1,6 @@
 ---
 name: update-skills-chart
+disable-model-invocation: true
 description: 'Scans the Carameli skill catalog and updates charts/skills/skills chart.md if skills were added, removed, or changed. Use after creating, updating, or removing any skill file.'
 argument-hint: 'No arguments needed — always scans and applies any required updates.'
 ---
@@ -14,13 +15,14 @@ is out of date.
 
 ## Step 1 — Read the Source Files
 
-Read all of the following **in parallel**:
+The harness preloads all skill metadata and the current chart:
 
-| File / Location | What to look for |
-| --- | --- |
-| `.claude/skills/` directory listing | Every subdirectory name — each is a project skill |
-| Each `.claude/skills/<name>/SKILL.md` | Frontmatter `name`, `description`; step count; whether it reads, writes, greps, or spawns agents |
-| `charts/skills/skills chart.md` | Current chart rows — the diff target |
+Suggested command (run in terminal):
+`pwsh -NoProfile -ExecutionPolicy Bypass -File .claude/skills/state-tools/project-snapshot.ps1 -Sections skills-meta,chart-skills`
+
+`skills-meta` emits each skill's frontmatter (`name`, `description`, hooks),
+step count, and line count — enough to classify category, cost, and description
+without reading individual SKILL.md files. `chart-skills` is the current diff target.
 
 Also note the built-in / system skills visible in the system-reminder skill list
 that are **not** project-specific (e.g. `update-config`, `keybindings-help`,

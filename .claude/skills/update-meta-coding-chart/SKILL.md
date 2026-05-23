@@ -1,5 +1,6 @@
 ---
 name: update-meta-coding-chart
+disable-model-invocation: true
 description: 'Scans the Carameli codebase for meta-coding tools and updates charts/meta coding/ if needed. Use after adding linters, type checkers, test runners, security scanners, AI config, pre-commit hooks, VS Code tasks, or scripts.'
 argument-hint: 'No arguments needed — always scans and applies any required updates.'
 ---
@@ -19,23 +20,28 @@ job queue, carrier SDKs, etc.) — those belong in the tech stack chart.
 
 ## Step 1 — Read the Source Files
 
-Read all of the following **in parallel**:
+The harness preloads all source files:
 
-| File | What to look for |
+Suggested command (run in terminal):
+`pwsh -NoProfile -ExecutionPolicy Bypass -File .claude/skills/state-tools/project-snapshot.ps1 -Sections pre-commit,requirements-dev,frontend-pkg,tasks-json,scripts-list,ruff,mypy,pytest,frontend-eslint,frontend-stylelint,frontend-cspell,rules-list,skills-list,chart-meta-legend,chart-meta-mmd`
+
+Reference — what to look for in each injected section:
+
+| Section | What to look for |
 | --- | --- |
 | `.pre-commit-config.yaml` | Every hook `id` — each is an enforced meta tool |
 | `requirements-dev.txt` | Dev-only Python packages: test runners, linters, security scanners, property-based testing |
-| `frontend/package.json` → `devDependencies` | Frontend dev tools: ESLint plugins, type checker, Vitest, Stylelint, cspell, markdownlint, Vite plugins |
+| `frontend/package.json` | `devDependencies` — ESLint plugins, type checker, Vitest, Stylelint, cspell, markdownlint, Vite plugins |
 | `.vscode/tasks.json` | Every task `label` — maps to a developer workflow action |
-| `scripts/` directory listing | Every `.ps1` helper script name and its inline comment header |
+| `scripts/` listing | Every `.ps1` helper script name |
 | `ruff.toml` | Rule sets selected, line length, per-file overrides |
 | `mypy.ini` | Strict mode, plugins enabled, suppressed stub packages |
 | `pytest.ini` | asyncio mode, test paths |
 | `frontend/eslint.config.js` | ESLint plugins loaded, rules overridden |
 | `frontend/stylelint.config.cjs` | Base config, at-rule whitelist |
 | `frontend/cspell.config.yaml` | Custom word list, ignored paths |
-| `.claude/rules/` directory listing | Rule file names (each file = one enforced convention area) |
-| `.claude/skills/` directory listing | Skill names (each subdirectory = one structured workflow) |
+| `.claude/rules/` listing | Rule file names (each file = one enforced convention area) |
+| `.claude/skills/` listing | Skill directory names (each = one structured workflow) |
 | `charts/meta coding/meta coding legend.md` | Current legend rows — the diff target |
 | `charts/meta coding/meta coding chart.mmd` | Current Mermaid diagram — the diff target |
 

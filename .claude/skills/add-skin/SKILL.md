@@ -1,5 +1,6 @@
 ---
 name: add-skin
+disable-model-invocation: true
 description: 'Scaffolds a new frontend skin and registers it in the skin system. Use when creating a new visual theme or UI layout variant for the frontend.'
 argument-hint: 'Skin name (e.g., "candy-shop")'
 ---
@@ -204,7 +205,7 @@ export const skinLoaders: Record<SkinName, () => Promise<{ default: Skin }>> = {
 ```
 
 TypeScript will error at build time if the new skin's views don't satisfy `SkinViews`.
-Run `npm run build` (or `npm run typecheck`) inside `frontend/` to confirm.
+The `Stop` hook runs `npm run typecheck` automatically; fix any reported errors.
 
 ---
 
@@ -242,9 +243,7 @@ Edit `skins/README.md`. Add a row to the table:
 
 ## Step 6 — Verify the scaffold
 
-```bash
-cd frontend && npm run typecheck
-```
+Typecheck is executed automatically by the skill's `Stop` hook.
 
 Fix any TypeScript errors before implementing the actual UI. Common issues:
 
@@ -282,4 +281,4 @@ location.reload()
 - [ ] `registry.ts` — skin added to `skinLoaders`
 - [ ] `SkinSwitcher.tsx` — display label added to `SKIN_LABELS`
 - [ ] `skins/README.md` table updated
-- [ ] `npm run typecheck` passes with no errors
+- [ ] Automatic `Stop` hook typecheck passes with no errors

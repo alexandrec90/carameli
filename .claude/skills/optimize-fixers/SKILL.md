@@ -1,5 +1,6 @@
 ---
 name: optimize-fixers
+disable-model-invocation: true
 description: 'Analyzes agent session data to optimize fix-* skill configurations. Use after accumulating several fixer skill invocations to populate known-fixes tables and update where-to-look hints.'
 argument-hint: '"fix-tests" | "fix-e2e" | "all" -- scope to one skill or all fixers (default: all)'
 ---
@@ -132,9 +133,9 @@ Check `known-fixes.md` for rows where **Hits = 0** and **Added** is more than
 
 ### Save snapshot
 
-After all changes are applied, **copy** the current `logs/agent/skills-profile.json`
-to `logs/agent/skills-profile.optimized.json` using the Write tool. This marks the
-current profile state as "optimized" so the next run only processes new data.
+The `Stop` hook automatically copies `logs/agent/skills-profile.json` to
+`logs/agent/skills-profile.optimized.json` when the session ends — no manual
+action needed. Do not use the Write tool for this copy.
 
 ### Report
 
@@ -159,7 +160,7 @@ Summarize what was changed per skill:
    the data you need. Keep token usage minimal.
 5. Maximum 3 file reads per skill (SKILL.md + known-fixes.md + profile).
    All data-driven decisions come from the pre-computed profile.
-6. **Always save the snapshot** after applying changes. Skipping this causes
-   the next run to re-process stale data and duplicate work.
+6. **The snapshot is saved automatically** by the `Stop` hook. Do not use Write
+   to copy the profile — the hook handles it after the session ends.
 7. **Skip skills with zero new invocations** since the snapshot -- there is
    nothing new to act on.

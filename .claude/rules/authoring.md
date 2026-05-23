@@ -75,18 +75,66 @@ See `.claude/rules/security.md` as the canonical example.
 
 ## Skills (`.claude/skills/`)
 
-- Each skill lives in `.claude/skills/<name>/SKILL.md`.
+- Every skill frontmatter must include `disable-model-invocation: true`.
 - If the skill generates scripts, those scripts must follow the PowerShell
   conventions in `.claude/rules/tooling.md` (especially `-T` for `docker compose exec`
   and `[Environment]::Exit()`).
 
-### Description field requirements (critical for skill discovery)
+### Hook location (Copilot-compatible)
 
-The `description` field is how the agent decides which skill to invoke. It must include
-both **what** the skill does and **when** to use it:
+Copilot does not reliably execute skill frontmatter `hooks`. Define operational
+hooks in `.claude/settings.json` instead.
 
-- Include a "Use when…" clause with concrete triggers
-- Maximum 1024 characters
+- Use top-level `hooks` in settings for `PreToolUse`, `PostToolUse`, and `Stop`.
+- Keep command logic in shared scripts under `scripts/hooks/`.
+- For behavior that should stay skill-specific, route the settings hook to a
+  dispatcher script that no-ops unless the target skill artifact/condition is
+  present.
+
+Example:
+
+```json
+"hooks": {
+  "Stop": [
+    {
+      "hooks": [
+        {
+          "type": "command",
+          "command": "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/hooks/copilot-settings-stop.ps1"
+        }
+      ]
+    }
+  ]
+}
+```
+
+### Claude vs Copilot compatibility
+
+Copilot may ignore Claude-specific frontmatter attributes such as skill-level
+`hooks`.
+
+When behavior must work in **both** tools:
+
+1. Keep the automation logic in a shared script (single source of truth)
+2. Use `.claude/settings.json` hooks to invoke that script automatically
+3. Add a Copilot fallback in the skill steps (explicit finalization step or VS Code task)
+
+For critical workflows, do not rely on `hooks` as the only execution path.
+
+### Hook output byte caps (token control)
+
+When a hook or command placeholder emits command output that will be injected into
+model context, cap output bytes by default to reduce token usage.
+
+- Prefer a shared helper script in `scripts/hooks/` for capping and truncation markers
+  instead of ad-hoc per-skill snippets.
+- For PowerShell, prefer `Get-Content`/substring logic or a helper script over bash-only
+  utilities such as `head -c`.
+- Do not keep only the first chunk when diagnostics matter. Prefer head+tail windows (or
+  at minimum tail-on-error) so terminal errors near the end are preserved.
+- Preserve exit-code semantics. Truncation wrappers must not mask command failures.
+- Keep cap sizes explicit and small by default (for example, 4-8 KB), and raise only when
+  diagnostics require a larger window.
 
 ### SKILL.md size limit
 

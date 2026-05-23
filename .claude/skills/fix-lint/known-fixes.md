@@ -18,7 +18,7 @@ apply the documented fix directly instead of reasoning from scratch.
 | `Detected removed index` + `Detected removed foreign key` on agent_statuses | Model FK missing `ondelete="SET NULL"` and `index=True`, causing drift vs migration 005 | Add `ondelete="SET NULL"` to both `ForeignKey(...)` calls and `index=True` to `customer_id` in `app/models/agent_status.py` | 1 | 2026-04-02 | 2026-04-02 |
 | `# fix: alembic revision --autogenerate -m 'describe change'` | SQLAlchemy model changed without a matching Alembic migration; alembic check detected schema drift | Run `alembic revision --autogenerate -m 'describe change'` then review the generated file; check `app/models/` for recent column/table additions that lack a migration | 2 | 2026-04-20 | 2026-04-06 |
 | `declaration-block-single-line-max-declarations` | CSS rule block contains multiple declarations on one line (e.g. `.foo { a: 1; b: 2; }`) | Expand each property onto its own line | 1 | 2026-04-08 | 2026-04-08 |
-| `jsx-a11y/click-events-have-key-events` | Interactive `onClick` on a non-input element has no keyboard event listener | Add `onKeyDown={(e) => { if (e.key === 'Enter' \|\| e.key === ' ') handler() }}` alongside `onClick` | 1 | 2026-04-08 | 2026-04-08 |
+| `jsx-a11y/click-events-have-key-events` | Interactive `onClick` on a non-input element has no keyboard event listener | Add `onKeyDown={(e) => { if (e.key === 'Enter' \ | \ | e.key === ' ') handler() }}` alongside `onClick` | 1 | 1 | 1 | 1 | 1 | 1 | 2026-04-08 | 2026-04-08 |
 | `jsx-a11y/no-static-element-interactions` | Non-interactive element (`span`, `div`) has an event handler without a role | Add `role="button"` and `tabIndex={0}` to the element | 1 | 2026-04-08 | 2026-04-08 |
 | `react-hooks/exhaustive-deps` | Variable used inside `useEffect` body is missing from the dependency array | Add the missing variable(s) to the `useEffect` dependency array | 1 | 2026-04-08 | 2026-04-08 |
 | `PSUseApprovedVerbs` | PowerShell function uses an unapproved verb (e.g. `Ensure-`, `Verify-`) | Rename to use an approved PowerShell verb (`Initialize-`, `Test-`, `Set-`, etc.) and update all call sites | 1 | 2026-04-08 | 2026-04-08 |
@@ -33,3 +33,8 @@ apply the documented fix directly instead of reasoning from scratch.
 | MD024/no-duplicate-heading | Duplicate heading text in the same markdown file | Rename repeated headings with section-specific suffixes (e.g., `(B1)`, `(B2)`) | 1 | 2026-04-20 | 2026-04-20 |
 | Secret Keyword [not in baseline] | Example literals include `secret`-like values in tests/docs and trigger detect-secrets | Replace placeholder values with neutral key names; avoid `*-secret` literal strings in examples | 2 | 2026-04-20 | 2026-04-20 |
 | PSAvoidAssignmentToAutomaticVariable | PowerShell parameter name collides with automatic variable (`$Host`) | Rename parameter (e.g., `$TargetHost`) and update downstream references | 1 | 2026-04-20 | 2026-04-20 |
+
+
+
+
+

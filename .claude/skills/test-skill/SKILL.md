@@ -1,27 +1,51 @@
 ---
 name: test-skill
-description: 'Smoke-tests the gh copilot task pipeline by writing a timestamped sentinel file. Use when verifying that skill invocation, worktree isolation, and session status reporting all work end-to-end.'
+disable-model-invocation: true
+description: 'Validates Claude-style skill behavior by exercising frontmatter hooks and a ! command placeholder, then writing a timestamped sentinel file. Use when checking Copilot/Claude agent compatibility end-to-end.'
+description: 'Validates Claude-style skill behavior by exercising frontmatter hooks and a suggested verification command. Use when checking Copilot/Claude agent compatibility end-to-end.'
 argument-hint: '(no arguments)'
 ---
 
 # Skill: Test Skill
 
-Makes a small, observable change to the repository so that
-`gh copilot session status` shows a real git diff.
+This is a tiny compatibility smoke test for Claude-style skill features.
+
+- Frontmatter `hooks` should write `logs/agent/test-skill-hook.txt` with a UTC ISO timestamp.
+- The suggested verification command below is optional and helps confirm workspace diff state.
+
+## Provenance guardrail (critical)
+
+- The coding agent must **not** run equivalent script lines manually in a terminal.
+- The coding agent must **not** directly create, edit, or overwrite any of these files:
+  - `logs/agent/test-skill-hook.txt`
+- This file is a test artifact and must be produced only by frontmatter `hooks`.
+
+## Compatibility note (important)
+
+- Invoke this as an actual skill command (for example `/test-skill`).
+- If this file is only pasted/attached as plain prompt text, Claude/Copilot frontmatter hooks and suggested command text may be treated as plain text and not executed automatically.
+
+Suggested verification command (optional, run manually):
+```powershell
+gh pr diff
+```
 
 ---
 
-## Step 1 — Write the sentinel file
+## Step 1 — Verify freshness and shape
 
-Create or overwrite `logs/agent/test-skill-sentinel.txt` with these exact contents
-(replace `<ISO_TIMESTAMP>` with the current UTC date-time in ISO 8601 format):
+Confirm the hook artifact file was updated for **this invocation**:
 
-```
-test-skill ran at <ISO_TIMESTAMP>
-```
+- `logs/agent/test-skill-hook.txt`
 
-Use `create_file` if the file does not exist, or `replace_string_in_file` (replace the
-entire content) if it does.
+Requirements:
+
+- The line must match its expected prefix + UTC ISO 8601 timestamp (`...Z`).
+- Freshness gate: the extracted timestamp must be within the last **5 minutes**.
+
+If any timestamp is stale or missing, treat the run as failed and reply with:
+
+> FAIL: test-skill hook timestamp was not refreshed for this invocation; the frontmatter hook did not execute.
 
 ---
 
@@ -29,5 +53,12 @@ entire content) if it does.
 
 Reply with a single short message:
 
-> Sentinel written to `logs/agent/test-skill-sentinel.txt`.
-> Run `gh copilot session status` (or `git diff --stat`) to observe the change.
+> Test file written with UTC timestamp: `logs/agent/test-skill-hook.txt`.
+> Optionally run either of these commands to verify the change:
+>
+> ```powershell
+> gh copilot session status
+> git diff --stat
+> ```
+
+Only use the success message above if Step 1 passed the freshness gate.

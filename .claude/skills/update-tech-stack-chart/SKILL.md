@@ -1,5 +1,6 @@
 ---
 name: update-tech-stack-chart
+disable-model-invocation: true
 description: 'Scans the Carameli codebase for runtime tech components and updates charts/tech stack/ if needed. Use after adding, removing, or upgrading runtime dependencies or infrastructure components.'
 argument-hint: 'No arguments needed — always scans and applies any required updates.'
 ---
@@ -17,9 +18,14 @@ checkers, test runners, formatters, AI coding tools, CI/CD pipelines, etc.
 
 ## Step 1 — Read the Source Files
 
-Read all of the following **in parallel**:
+The harness preloads all source files:
 
-| File | What to look for |
+Suggested command (run in terminal):
+`pwsh -NoProfile -ExecutionPolicy Bypass -File .claude/skills/state-tools/project-snapshot.ps1 -Sections compose,requirements,frontend-pkg,claude-md,config-py,chart-tech-legend,chart-tech-mmd`
+
+Reference — what to look for in each injected section:
+
+| Section | What to look for |
 | --- | --- |
 | `docker-compose.yml` | Every service block (`services:`) — each is a runtime component |
 | `requirements.txt` | Runtime Python packages: web framework, ORM, async driver, job queue, Redis client, HTTP client, auth libs |
