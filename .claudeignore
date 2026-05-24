@@ -146,9 +146,6 @@ frontend/package-lock.json
 # Prometheus config (static infra, not app code)
 prometheus.yml
 
-# Skill state files (internal bookkeeping)
-.claude/skills/*/state.json
-
 # Markdown lint config
 .markdownlint.json
 
