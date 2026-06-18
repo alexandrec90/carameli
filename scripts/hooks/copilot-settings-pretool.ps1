@@ -7,6 +7,22 @@ $ErrorActionPreference = 'Continue'
 $isDryRun = $DryRun -or ($env:CARAMELI_HOOK_DRY_RUN -eq '1')
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
+$rawHookPayload = [Console]::In.ReadToEnd()
+
+# Enforce audit-design-flaws Step 2.5 batch caps before any other pre-tool behavior.
+if ($isDryRun) {
+    Write-Output '[DRY RUN] would enforce audit-design-flaws Step 2.5 batch caps'
+}
+else {
+    $enforceScript = Join-Path $repoRoot 'scripts/hooks/enforce-audit-batch-caps.ps1'
+    if (Test-Path -LiteralPath $enforceScript) {
+        $rawHookPayload | & pwsh -NoProfile -ExecutionPolicy Bypass -File $enforceScript
+        if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+        }
+    }
+}
+
 $fixTestsAutoMarker = Join-Path $repoRoot '.claude/skills/fix-tests-auto/.active'
 $testSkillMarker = Join-Path $repoRoot '.claude/skills/test-skill/.active'
 

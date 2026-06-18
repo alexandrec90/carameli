@@ -545,6 +545,24 @@
         "close": false
       },
       "problemMatcher": []
+    },
+    {
+      "label": "Agent: Sync CLAUDE -> AGENTS context",
+      "type": "process",
+      "command": "pwsh",
+      "args": [
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "scripts/sync-agents-context.ps1"
+      ],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "showReuseMessage": false,
+        "close": false
+      },
+      "problemMatcher": []
     }
   ],
   "inputs": [

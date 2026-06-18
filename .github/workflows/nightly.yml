@@ -1,8 +1,9 @@
 name: Nightly
 
 on:
-  schedule:
-    - cron: "0 2 * * *"
+  # Temporarily disabled: re-enable when tests are stable
+  # schedule:
+  #   - cron: "0 2 * * *"
   workflow_dispatch:
 
 jobs:

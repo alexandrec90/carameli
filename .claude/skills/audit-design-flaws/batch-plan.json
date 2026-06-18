@@ -1,0 +1,256 @@
+{
+  "version": 1,
+  "generatedAt": "2026-05-25T00:51:38.8295838Z",
+  "thresholds": {
+    "violations": 25,
+    "touchedFiles": 15,
+    "perBatchFiles": 10,
+    "highRiskPerBatch": 1
+  },
+  "totals": {
+    "violations": 76,
+    "touchedFiles": 55
+  },
+  "batches": [
+    {
+      "id": "low-1",
+      "group": "low-risk mechanical",
+      "checks": [
+        "E",
+        "F",
+        "G",
+        "I",
+        "L"
+      ],
+      "maxFiles": 10,
+      "files": [
+        "app/api/auth.py",
+        "frontend/src/hooks/useExtensions.ts",
+        "frontend/src/skins/barebone/views/Dashboard.tsx",
+        "frontend/src/skins/barebone/views/Extensions.tsx",
+        "frontend/src/skins/barebone/views/PhoneLines.tsx",
+        "frontend/src/skins/candy-shop/views/Dashboard.tsx",
+        "frontend/src/skins/candy-shop/views/Extensions.tsx",
+        "frontend/src/skins/candy-shop/views/PhoneLines.tsx",
+        "frontend/src/skins/carameli/views/Dashboard.tsx",
+        "frontend/src/skins/carameli/views/Extensions.tsx"
+      ],
+      "status": "pending"
+    },
+    {
+      "id": "low-2",
+      "group": "low-risk mechanical",
+      "checks": [
+        "E",
+        "F",
+        "G",
+        "I",
+        "L"
+      ],
+      "maxFiles": 10,
+      "files": [
+        "frontend/src/skins/carameli/views/PhoneLines.tsx",
+        "frontend/src/skins/carameli/views/Placeholder.tsx",
+        "frontend/src/skins/comic-book/views/Dashboard.tsx",
+        "frontend/src/skins/comic-book/views/Extensions.tsx",
+        "frontend/src/skins/comic-book/views/PhoneLines.tsx",
+        "tests/e2e/test_smoke.py",
+        "tests/integration/test_telnyx_sandbox.py",
+        "tests/unit/test_agent_status.py",
+        "tests/unit/test_auto_attendant.py",
+        "tests/unit/test_session.py"
+      ],
+      "status": "pending"
+    },
+    {
+      "id": "low-3",
+      "group": "low-risk mechanical",
+      "checks": [
+        "E",
+        "F",
+        "G",
+        "I",
+        "L"
+      ],
+      "maxFiles": 10,
+      "files": [
+        "tests/unit/test_sms_messages.py",
+        "tests/unit/test_webhooks.py"
+      ],
+      "status": "pending"
+    },
+    {
+      "id": "medium-1",
+      "group": "medium refactor",
+      "checks": [
+        "B",
+        "C",
+        "J",
+        "K"
+      ],
+      "maxFiles": 10,
+      "files": [
+        "app/main.py",
+        "app/repositories/agent_status_repo.py",
+        "app/repositories/call_event_repo.py",
+        "app/repositories/customer_repo.py",
+        "app/repositories/did_pointer_repo.py",
+        "app/repositories/extension_repo.py",
+        "app/repositories/phone_line_repo.py",
+        "app/repositories/sci_rule_repo.py",
+        "app/repositories/sms_message_repo.py",
+        "app/services/agent_status_sync.py"
+      ],
+      "status": "pending"
+    },
+    {
+      "id": "medium-2",
+      "group": "medium refactor",
+      "checks": [
+        "B",
+        "C",
+        "J",
+        "K"
+      ],
+      "maxFiles": 10,
+      "files": [
+        "app/services/call_event_service.py",
+        "app/services/callback_state.py",
+        "app/services/customer_service.py",
+        "app/services/extension_service.py",
+        "app/services/phone_line_service.py",
+        "app/services/pointer_service.py",
+        "app/services/providers/base.py",
+        "app/services/providers/carrier/telnyx.py",
+        "app/services/sci_service.py",
+        "app/services/sms_message_service.py"
+      ],
+      "status": "pending"
+    },
+    {
+      "id": "medium-3",
+      "group": "medium refactor",
+      "checks": [
+        "B",
+        "C",
+        "J",
+        "K"
+      ],
+      "maxFiles": 10,
+      "files": [
+        "frontend/src/api/client.ts",
+        "frontend/src/hooks/useExtensions.ts",
+        "frontend/src/hooks/usePhoneLines.ts",
+        "frontend/src/skins/candy-shop/Layout.tsx",
+        "frontend/src/skins/candy-shop/views/Dashboard.tsx",
+        "frontend/src/skins/candy-shop/views/Extensions.tsx",
+        "frontend/src/skins/candy-shop/views/PhoneLines.tsx",
+        "frontend/src/skins/candy-shop/views/Placeholder.tsx",
+        "frontend/src/tests/api/client.test.ts",
+        "frontend/src/tests/hooks/useDashboard.test.ts"
+      ],
+      "status": "pending"
+    },
+    {
+      "id": "medium-4",
+      "group": "medium refactor",
+      "checks": [
+        "B",
+        "C",
+        "J",
+        "K"
+      ],
+      "maxFiles": 10,
+      "files": [
+        "frontend/src/tests/hooks/useExtensions.test.ts",
+        "frontend/src/tests/hooks/usePhoneLines.test.ts"
+      ],
+      "status": "pending"
+    },
+    {
+      "id": "high-1",
+      "group": "high-risk structural",
+      "checks": [
+        "A",
+        "D",
+        "H"
+      ],
+      "maxFiles": 1,
+      "files": [
+        "app/api/webhooks/call_status.py"
+      ],
+      "status": "pending"
+    },
+    {
+      "id": "high-2",
+      "group": "high-risk structural",
+      "checks": [
+        "A",
+        "D",
+        "H"
+      ],
+      "maxFiles": 1,
+      "files": [
+        "app/schemas/pointer.py"
+      ],
+      "status": "pending"
+    },
+    {
+      "id": "high-3",
+      "group": "high-risk structural",
+      "checks": [
+        "A",
+        "D",
+        "H"
+      ],
+      "maxFiles": 1,
+      "files": [
+        "app/schemas/voicemail.py"
+      ],
+      "status": "pending"
+    },
+    {
+      "id": "high-4",
+      "group": "high-risk structural",
+      "checks": [
+        "A",
+        "D",
+        "H"
+      ],
+      "maxFiles": 1,
+      "files": [
+        "frontend/src/skins/candy-shop/Layout.tsx"
+      ],
+      "status": "pending"
+    },
+    {
+      "id": "high-5",
+      "group": "high-risk structural",
+      "checks": [
+        "A",
+        "D",
+        "H"
+      ],
+      "maxFiles": 1,
+      "files": [
+        "frontend/src/skins/comic-book/Layout.tsx"
+      ],
+      "status": "pending"
+    },
+    {
+      "id": "high-6",
+      "group": "high-risk structural",
+      "checks": [
+        "A",
+        "D",
+        "H"
+      ],
+      "maxFiles": 1,
+      "files": [
+        "frontend/src/skins/context.tsx"
+      ],
+      "status": "pending"
+    }
+  ],
+  "currentBatchId": "low-1"
+}

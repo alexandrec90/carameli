@@ -47,7 +47,7 @@ async def create_session(response: Response) -> SessionResponse:
         key=COOKIE_NAME,
         value=signed,
         httponly=True,
-        secure=False,  # TODO: set True in production behind HTTPS
+        secure=False,  # TODO(#cookie-secure-https): set True in production behind HTTPS
         samesite="lax",
         path="/",
         max_age=60 * 60 * 24 * 30,  # 30 days

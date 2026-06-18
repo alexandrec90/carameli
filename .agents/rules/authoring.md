@@ -1,0 +1,178 @@
+---
+description: Conventions for authoring .claude rules and skills files
+paths:
+  - CLAUDE.md
+  - "**/CLAUDE.md"
+  - .claude/rules/**/*.md
+  - .claude/skills/**/SKILL.md
+---
+
+# Rule: Rules & Skills Authoring
+
+## CLAUDE.md files
+
+- **No command instructions** — never document `npm run …`, `pwsh …`, or other CLI
+  invocations. Commands are discoverable from `package.json`, `tasks.json`, or script
+  files; repeating them wastes context window tokens and drifts out of sync.
+- **Only record non-obvious configuration** — things that can't be derived by reading
+  source files (e.g. proxy routes, port mappings, env var semantics, architectural
+  constraints). If Claude can find it in a config file in one read, leave it out.
+
+## Rules (`.claude/rules/`)
+
+Every rule file must include YAML frontmatter so Claude can scope when it applies:
+
+```yaml
+---
+description: One-line summary of what the rule covers
+paths:
+  - app/models/**/*.py
+  - alembic/**/*.py
+---
+```
+
+- `description` — brief, specific summary (used to decide relevance).
+- `paths` — glob patterns for files the rule applies to. Omit only if the rule is
+  truly global (rare).
+- Keep rules focused on a single domain — don't mix unrelated conventions in one file.
+
+### Skin rule files
+
+One rule file per skin, named `.claude/rules/skin-<name>.md`.
+
+- **Scope paths to the skin directory only** — never add global frontend paths:
+
+  ```yaml
+  paths:
+    - frontend/src/skins/<name>/**/*.ts
+    - frontend/src/skins/<name>/**/*.tsx
+  ```
+
+- **Visual properties as spec tables** — no JSX or CSS code blocks for
+  material/animation/layout values. Use markdown tables:
+
+  ```markdown
+  | Property | Value | Notes |
+  | --- | --- | --- |
+  | `roughness` | `0.05` | near-mirror gloss |
+  ```
+
+  Structural code (scene hierarchy trees, very short class-name examples) may remain as
+  code blocks where the structure itself conveys meaning.
+
+### Security / scoping rules
+
+Cross-cutting security rules (e.g. multi-tenant auth) belong in a scoped rule file, not
+in `CLAUDE.md`. Scope them tightly:
+
+```yaml
+paths:
+  - app/api/**/*.py
+```
+
+Then add a one-line pointer in `CLAUDE.md`'s guardrails cross-reference list.
+See `.claude/rules/security.md` as the canonical example.
+
+## Skills (`.claude/skills/`)
+
+- Every skill frontmatter must include `disable-model-invocation: true`.
+- If the skill generates scripts, those scripts must follow the PowerShell
+  conventions in `.claude/rules/tooling.md` (especially `-T` for `docker compose exec`
+  and `[Environment]::Exit()`).
+
+### Hook location (Copilot-compatible)
+
+Copilot does not reliably execute skill frontmatter `hooks`. Define operational
+hooks in `.claude/settings.json` instead.
+
+- Use top-level `hooks` in settings for `PreToolUse`, `PostToolUse`, and `Stop`.
+- Keep command logic in shared scripts under `scripts/hooks/`.
+- For behavior that should stay skill-specific, route the settings hook to a
+  dispatcher script that no-ops unless the target skill artifact/condition is
+  present.
+
+Example:
+
+```json
+"hooks": {
+  "Stop": [
+    {
+      "hooks": [
+        {
+          "type": "command",
+          "command": "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/hooks/copilot-settings-stop.ps1"
+        }
+      ]
+    }
+  ]
+}
+```
+
+### Claude vs Copilot compatibility
+
+Copilot may ignore Claude-specific frontmatter attributes such as skill-level
+`hooks`.
+
+When behavior must work in **both** tools:
+
+1. Keep the automation logic in a shared script (single source of truth)
+2. Use `.claude/settings.json` hooks to invoke that script automatically
+3. Add a Copilot fallback in the skill steps (explicit finalization step or VS Code task)
+
+For critical workflows, do not rely on `hooks` as the only execution path.
+
+### Hook output byte caps (token control)
+
+When a hook or command placeholder emits command output that will be injected into
+model context, cap output bytes by default to reduce token usage.
+
+- Prefer a shared helper script in `scripts/hooks/` for capping and truncation markers
+  instead of ad-hoc per-skill snippets.
+- For PowerShell, prefer `Get-Content`/substring logic or a helper script over bash-only
+  utilities such as `head -c`.
+- Do not keep only the first chunk when diagnostics matter. Prefer head+tail windows (or
+  at minimum tail-on-error) so terminal errors near the end are preserved.
+- Preserve exit-code semantics. Truncation wrappers must not mask command failures.
+- Keep cap sizes explicit and small by default (for example, 4-8 KB), and raise only when
+  diagnostics require a larger window.
+
+### SKILL.md size limit
+
+Keep `SKILL.md` under **500 lines**. If content exceeds this, apply progressive disclosure:
+
+1. Extract reference material into a sibling file (e.g. `writing-conventions.md`)
+2. Keep all references **one level deep** — `SKILL.md` → `reference.md` (never deeper)
+3. Add a table of contents to any reference file longer than 100 lines
+4. Use forward slashes in all file paths — never backslashes
+
+### Fixer skill conventions (`fix-*`)
+
+Skills that read a log artifact and fix the reported issues must follow these patterns
+to prevent investigation spirals (where the model reads dozens of files without ever
+making an edit):
+
+#### 1. Known-fixes table (mandatory)
+
+Every `fix-*` skill must have a sibling `known-fixes.md` file with this table format:
+
+```markdown
+| Error pattern (substring) | Root cause | Fix | Hits | Last used | Added |
+```
+
+- Patterns are plain substrings, not regex
+- The skill updates **Hits** and **Last used** on every match
+- Rows with **Hits = 0** older than 90 days from **Added** are pruned
+- New rows are added only for patterns likely to recur
+
+#### 2. Known-fix matching must be Step 1 — before any investigation
+
+The skill must read the log artifact and `known-fixes.md` **in parallel** as its first
+action. For every error that matches a known-fix pattern, the fix is applied immediately
+as a one-shot — no additional file reads, no re-derivation. This is a **mandatory
+short-circuit**, not a suggestion. Add it as a hard rule.
+
+#### 3. Addressed marker
+
+After applying fixes, append `--- ADDRESSED` to the log artifact. On the next
+invocation, if the marker is present, tell the user to re-run the diagnostic task and
+stop. The diagnostic task overwrites the file, naturally clearing the marker.

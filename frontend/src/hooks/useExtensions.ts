@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api/client'
-
-const CUSTOMER_ID = 1
+import { DEMO_VS_CUSTOMER_ID } from '../lib/constants'
+import { logger } from '../lib/logger'
 
 export interface AvailableExt {
   available: string[]
@@ -27,9 +27,11 @@ export function useExtensions(): UseExtensionsResult {
 
   useEffect(() => {
     api.extensions
-      .getAvailable(CUSTOMER_ID, 100, 199)
+      .getAvailable(DEMO_VS_CUSTOMER_ID, 100, 199)
       .then(setAvailable)
-      .catch(() => { })
+      .catch((error) => {
+        logger.error('Failed to load available extensions', { error })
+      })
   }, [])
 
   async function addExtension() {
@@ -39,12 +41,12 @@ export function useExtensions(): UseExtensionsResult {
     setSuccess('')
     try {
       const ext = await api.extensions.add({
-        vs_customer_id: CUSTOMER_ID,
+        vs_customer_id: DEMO_VS_CUSTOMER_ID,
         extension_number: extNumber.trim(),
       })
       setSuccess(`Extension ${ext.extension_number} created. SIP: ${ext.sip_username}`)
       setExtNumber('')
-      const upd = await api.extensions.getAvailable(CUSTOMER_ID, 100, 199)
+      const upd = await api.extensions.getAvailable(DEMO_VS_CUSTOMER_ID, 100, 199)
       setAvailable(upd)
     } catch (e) {
       setError(String(e))

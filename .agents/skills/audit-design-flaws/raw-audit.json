@@ -1,0 +1,435 @@
+{
+  "generatedAt": "2026-05-24T18:15:31.342263+00:00",
+  "violations": {
+    "A": [
+      {
+        "file": "app/api/webhooks/call_status.py",
+        "lines": 306,
+        "limit": 300
+      },
+      {
+        "file": "frontend/src/skins/candy-shop/Layout.tsx",
+        "lines": 260,
+        "limit": 250
+      },
+      {
+        "file": "frontend/src/skins/comic-book/Layout.tsx",
+        "lines": 1036,
+        "limit": 250
+      }
+    ],
+    "B": [
+      {
+        "type": "duplicate_constant",
+        "name": "CUSTOMER_ID",
+        "value": "1",
+        "occurrences": [
+          {
+            "file": "frontend/src/hooks/useExtensions.ts",
+            "line": 3
+          },
+          {
+            "file": "frontend/src/hooks/usePhoneLines.ts",
+            "line": 3
+          }
+        ]
+      },
+      {
+        "type": "hardcoded_url",
+        "file": "app/main.py",
+        "line": 89,
+        "match": "http://localhost"
+      },
+      {
+        "type": "hardcoded_url",
+        "file": "app/main.py",
+        "line": 91,
+        "match": "http://localhost"
+      },
+      {
+        "type": "hardcoded_url",
+        "file": "app/services/providers/carrier/telnyx.py",
+        "line": 9,
+        "match": "https://api.telnyx.com"
+      },
+      {
+        "type": "hardcoded_url",
+        "file": "frontend/src/skins/candy-shop/Layout.tsx",
+        "line": 31,
+        "match": "http://www.w3.org"
+      },
+      {
+        "type": "hardcoded_url",
+        "file": "frontend/src/skins/candy-shop/views/Dashboard.tsx",
+        "line": 10,
+        "match": "http://www.w3.org"
+      },
+      {
+        "type": "hardcoded_url",
+        "file": "frontend/src/skins/candy-shop/views/Extensions.tsx",
+        "line": 8,
+        "match": "http://www.w3.org"
+      },
+      {
+        "type": "hardcoded_url",
+        "file": "frontend/src/skins/candy-shop/views/PhoneLines.tsx",
+        "line": 8,
+        "match": "http://www.w3.org"
+      },
+      {
+        "type": "hardcoded_url",
+        "file": "frontend/src/skins/candy-shop/views/Placeholder.tsx",
+        "line": 24,
+        "match": "http://www.w3.org"
+      }
+    ],
+    "C": [
+      {
+        "file": "frontend/src/api/client.ts",
+        "styles": [
+          "customerId",
+          "customer_id",
+          "vs_customer_id"
+        ]
+      },
+      {
+        "file": "frontend/src/tests/api/client.test.ts",
+        "styles": [
+          "customer_id",
+          "vs_customer_id"
+        ]
+      },
+      {
+        "file": "frontend/src/tests/hooks/useDashboard.test.ts",
+        "styles": [
+          "customer_id",
+          "vs_customer_id"
+        ]
+      },
+      {
+        "file": "frontend/src/tests/hooks/useExtensions.test.ts",
+        "styles": [
+          "customer_id",
+          "vs_customer_id"
+        ]
+      },
+      {
+        "file": "frontend/src/tests/hooks/usePhoneLines.test.ts",
+        "styles": [
+          "customer_id",
+          "vs_customer_id"
+        ]
+      }
+    ],
+    "D": [
+      {
+        "helper": "normalize_phone_number",
+        "files": [
+          "app/schemas/pointer.py",
+          "app/schemas/voicemail.py"
+        ]
+      }
+    ],
+    "E": [
+      {
+        "file": "app/api/auth.py",
+        "line": 50,
+        "text": "secure=False,  # TODO: set True in production behind HTTPS"
+      }
+    ],
+    "F": [],
+    "G": [
+      {
+        "type": "ts_swallow_chain",
+        "file": "frontend/src/hooks/useExtensions.ts",
+        "line": 32
+      }
+    ],
+    "H": [
+      {
+        "file": "frontend/src/skins/comic-book/Layout.tsx",
+        "useEffectCount": 5
+      },
+      {
+        "file": "frontend/src/skins/context.tsx",
+        "useEffectCount": 4
+      }
+    ],
+    "I": [
+      {
+        "type": "skip_or_xfail",
+        "file": "tests/e2e/test_smoke.py",
+        "line": 118,
+        "match": "@pytest.mark.skip"
+      },
+      {
+        "type": "skip_or_xfail",
+        "file": "tests/e2e/test_smoke.py",
+        "line": 130,
+        "match": "@pytest.mark.skip"
+      },
+      {
+        "type": "skip_or_xfail",
+        "file": "tests/e2e/test_smoke.py",
+        "line": 147,
+        "match": "@pytest.mark.skip"
+      },
+      {
+        "type": "skip_or_xfail",
+        "file": "tests/integration/test_telnyx_sandbox.py",
+        "line": 99,
+        "match": "@pytest.mark.skip"
+      },
+      {
+        "type": "loose_assertion",
+        "file": "tests/unit/test_agent_status.py",
+        "line": 165,
+        "match": "assert rows[0].call_sid is None"
+      },
+      {
+        "type": "loose_assertion",
+        "file": "tests/unit/test_agent_status.py",
+        "line": 289,
+        "match": "assert rows[0].call_sid is None"
+      },
+      {
+        "type": "loose_assertion",
+        "file": "tests/unit/test_auto_attendant.py",
+        "line": 98,
+        "match": "assert body[\"auto_attendant_max_digits\"] is None"
+      },
+      {
+        "type": "loose_assertion",
+        "file": "tests/unit/test_session.py",
+        "line": 18,
+        "match": "assert verify_signed_token(tampered) is None"
+      },
+      {
+        "type": "loose_assertion",
+        "file": "tests/unit/test_session.py",
+        "line": 22,
+        "match": "assert verify_signed_token(\"nodot\") is None"
+      },
+      {
+        "type": "loose_assertion",
+        "file": "tests/unit/test_session.py",
+        "line": 26,
+        "match": "assert verify_signed_token(\"\") is None"
+      },
+      {
+        "type": "loose_assertion",
+        "file": "tests/unit/test_sms_messages.py",
+        "line": 115,
+        "match": "assert result.scalar_one_or_none() is None"
+      },
+      {
+        "type": "loose_assertion",
+        "file": "tests/unit/test_sms_messages.py",
+        "line": 155,
+        "match": "assert row.error_code is None"
+      },
+      {
+        "type": "skip_or_xfail",
+        "file": "tests/unit/test_webhooks.py",
+        "line": 201,
+        "match": "@pytest.mark.skip"
+      },
+      {
+        "type": "skip_or_xfail",
+        "file": "tests/unit/test_webhooks.py",
+        "line": 220,
+        "match": "@pytest.mark.skip"
+      },
+      {
+        "type": "skip_or_xfail",
+        "file": "tests/unit/test_webhooks.py",
+        "line": 238,
+        "match": "@pytest.mark.skip"
+      },
+      {
+        "type": "skip_or_xfail",
+        "file": "tests/unit/test_webhooks.py",
+        "line": 257,
+        "match": "@pytest.mark.skip"
+      },
+      {
+        "type": "skip_or_xfail",
+        "file": "tests/unit/test_webhooks.py",
+        "line": 269,
+        "match": "@pytest.mark.skip"
+      }
+    ],
+    "J": [],
+    "K": [
+      {
+        "type": "backend_no_test",
+        "file": "app/repositories/agent_status_repo.py"
+      },
+      {
+        "type": "backend_no_test",
+        "file": "app/repositories/call_event_repo.py"
+      },
+      {
+        "type": "backend_no_test",
+        "file": "app/repositories/customer_repo.py"
+      },
+      {
+        "type": "backend_no_test",
+        "file": "app/repositories/did_pointer_repo.py"
+      },
+      {
+        "type": "backend_no_test",
+        "file": "app/repositories/extension_repo.py"
+      },
+      {
+        "type": "backend_no_test",
+        "file": "app/repositories/phone_line_repo.py"
+      },
+      {
+        "type": "backend_no_test",
+        "file": "app/repositories/sci_rule_repo.py"
+      },
+      {
+        "type": "backend_no_test",
+        "file": "app/repositories/sms_message_repo.py"
+      },
+      {
+        "type": "backend_no_test",
+        "file": "app/services/agent_status_sync.py"
+      },
+      {
+        "type": "backend_no_test",
+        "file": "app/services/call_event_service.py"
+      },
+      {
+        "type": "backend_no_test",
+        "file": "app/services/callback_state.py"
+      },
+      {
+        "type": "backend_no_test",
+        "file": "app/services/customer_service.py"
+      },
+      {
+        "type": "backend_no_test",
+        "file": "app/services/extension_service.py"
+      },
+      {
+        "type": "backend_no_test",
+        "file": "app/services/phone_line_service.py"
+      },
+      {
+        "type": "backend_no_test",
+        "file": "app/services/pointer_service.py"
+      },
+      {
+        "type": "backend_no_test",
+        "file": "app/services/providers/base.py"
+      },
+      {
+        "type": "backend_no_test",
+        "file": "app/services/sci_service.py"
+      },
+      {
+        "type": "backend_no_test",
+        "file": "app/services/sms_message_service.py"
+      }
+    ],
+    "L": [
+      {
+        "type": "ts_deep_relative",
+        "file": "frontend/src/skins/barebone/views/Dashboard.tsx",
+        "line": 1
+      },
+      {
+        "type": "ts_deep_relative",
+        "file": "frontend/src/skins/barebone/views/Extensions.tsx",
+        "line": 1
+      },
+      {
+        "type": "ts_deep_relative",
+        "file": "frontend/src/skins/barebone/views/PhoneLines.tsx",
+        "line": 1
+      },
+      {
+        "type": "ts_deep_relative",
+        "file": "frontend/src/skins/candy-shop/views/Dashboard.tsx",
+        "line": 2
+      },
+      {
+        "type": "ts_deep_relative",
+        "file": "frontend/src/skins/candy-shop/views/Extensions.tsx",
+        "line": 2
+      },
+      {
+        "type": "ts_deep_relative",
+        "file": "frontend/src/skins/candy-shop/views/PhoneLines.tsx",
+        "line": 2
+      },
+      {
+        "type": "ts_deep_relative",
+        "file": "frontend/src/skins/carameli/views/Dashboard.tsx",
+        "line": 2
+      },
+      {
+        "type": "ts_deep_relative",
+        "file": "frontend/src/skins/carameli/views/Dashboard.tsx",
+        "line": 3
+      },
+      {
+        "type": "ts_deep_relative",
+        "file": "frontend/src/skins/carameli/views/Dashboard.tsx",
+        "line": 4
+      },
+      {
+        "type": "ts_deep_relative",
+        "file": "frontend/src/skins/carameli/views/Extensions.tsx",
+        "line": 2
+      },
+      {
+        "type": "ts_deep_relative",
+        "file": "frontend/src/skins/carameli/views/Extensions.tsx",
+        "line": 3
+      },
+      {
+        "type": "ts_deep_relative",
+        "file": "frontend/src/skins/carameli/views/Extensions.tsx",
+        "line": 4
+      },
+      {
+        "type": "ts_deep_relative",
+        "file": "frontend/src/skins/carameli/views/PhoneLines.tsx",
+        "line": 3
+      },
+      {
+        "type": "ts_deep_relative",
+        "file": "frontend/src/skins/carameli/views/PhoneLines.tsx",
+        "line": 4
+      },
+      {
+        "type": "ts_deep_relative",
+        "file": "frontend/src/skins/carameli/views/PhoneLines.tsx",
+        "line": 5
+      },
+      {
+        "type": "ts_deep_relative",
+        "file": "frontend/src/skins/carameli/views/Placeholder.tsx",
+        "line": 2
+      },
+      {
+        "type": "ts_deep_relative",
+        "file": "frontend/src/skins/comic-book/views/Dashboard.tsx",
+        "line": 1
+      },
+      {
+        "type": "ts_deep_relative",
+        "file": "frontend/src/skins/comic-book/views/Extensions.tsx",
+        "line": 1
+      },
+      {
+        "type": "ts_deep_relative",
+        "file": "frontend/src/skins/comic-book/views/PhoneLines.tsx",
+        "line": 1
+      }
+    ]
+  }
+}

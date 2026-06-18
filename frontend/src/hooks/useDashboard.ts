@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api, type Customer, type PhoneLine } from '../api/client'
-
-const DEMO_CUSTOMER_ID = 1
+import { DEMO_VS_CUSTOMER_ID } from '../lib/constants'
 
 export interface UseDashboardResult {
   customer: Customer | null
@@ -30,11 +29,11 @@ export function useDashboard(): UseDashboardResult {
         const authRes = await fetch('/auth/me', { credentials: 'include' })
         if (authRes.ok) {
           try {
-            const c = await api.customers.get(DEMO_CUSTOMER_ID)
+            const c = await api.customers.get(DEMO_VS_CUSTOMER_ID)
             setCustomer(c)
-            const lines = await api.customers.getPhoneLines(DEMO_CUSTOMER_ID)
+            const lines = await api.customers.getPhoneLines(DEMO_VS_CUSTOMER_ID)
             setPhoneLines(lines)
-            const cnt = await api.phoneLines.getCount(DEMO_CUSTOMER_ID)
+            const cnt = await api.phoneLines.getCount(DEMO_VS_CUSTOMER_ID)
             setLineCount(cnt.count)
           } catch {
             // Customer not seeded yet — that's fine for first run
@@ -52,10 +51,10 @@ export function useDashboard(): UseDashboardResult {
   async function seedDemoCustomer() {
     try {
       await api.customers.create({
-        vs_customer_id: DEMO_CUSTOMER_ID,
+        vs_customer_id: DEMO_VS_CUSTOMER_ID,
         api_key: 'demo-customer-key',
       })
-      const c = await api.customers.get(DEMO_CUSTOMER_ID)
+      const c = await api.customers.get(DEMO_VS_CUSTOMER_ID)
       setCustomer(c)
     } catch (e) {
       alert(String(e))

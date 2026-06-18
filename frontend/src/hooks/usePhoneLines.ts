@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api, type PhoneLine } from '../api/client'
-
-const CUSTOMER_ID = 1
+import { DEMO_VS_CUSTOMER_ID } from '../lib/constants'
 
 export interface UsePhoneLinesResult {
   lines: PhoneLine[]
@@ -23,7 +22,7 @@ export function usePhoneLines(): UsePhoneLinesResult {
 
   async function load() {
     try {
-      const data = await api.customers.getPhoneLines(CUSTOMER_ID)
+      const data = await api.customers.getPhoneLines(DEMO_VS_CUSTOMER_ID)
       setLines(data)
     } catch {
       setLines([])
@@ -39,7 +38,7 @@ export function usePhoneLines(): UsePhoneLinesResult {
     setAdding(true)
     setError('')
     try {
-      await api.phoneLines.add({ vs_customer_id: CUSTOMER_ID, area_code: areaCode.trim() })
+      await api.phoneLines.add({ vs_customer_id: DEMO_VS_CUSTOMER_ID, area_code: areaCode.trim() })
       setAreaCode('')
       await load()
     } catch (e) {
@@ -52,7 +51,7 @@ export function usePhoneLines(): UsePhoneLinesResult {
   async function deactivate(phone_number: string) {
     if (!confirm(`Deactivate ${phone_number}? This releases it from the active carrier.`)) return
     try {
-      await api.phoneLines.deactivate({ vs_customer_id: CUSTOMER_ID, phone_number })
+      await api.phoneLines.deactivate({ vs_customer_id: DEMO_VS_CUSTOMER_ID, phone_number })
       await load()
     } catch (e) {
       alert(String(e))

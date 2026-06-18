@@ -97,9 +97,7 @@ async def test_engine() -> AsyncGenerator[AsyncEngine, None]:
         if is_primary:
             existing_comment = (
                 await conn.execute(
-                    text(
-                        "SELECT obj_description('public'::regnamespace, 'pg_namespace')"
-                    )
+                    text("SELECT obj_description('public'::regnamespace, 'pg_namespace')")
                 )
             ).scalar()
 
@@ -107,9 +105,7 @@ async def test_engine() -> AsyncGenerator[AsyncEngine, None]:
                 # Fast path: schema matches, just empty every table.
                 table_list = ", ".join(
                     f'"{t.name}"'
-                    for t in sorted(
-                        Base.metadata.tables.values(), key=lambda t: t.name
-                    )
+                    for t in sorted(Base.metadata.tables.values(), key=lambda t: t.name)
                 )
                 if table_list:
                     await conn.execute(
@@ -122,9 +118,7 @@ async def test_engine() -> AsyncGenerator[AsyncEngine, None]:
                 await conn.run_sync(Base.metadata.create_all)
                 # fingerprint is sha256 hex (16 chars, [0-9a-f]) -- safe to
                 # interpolate; COMMENT ON does not accept bind parameters.
-                await conn.execute(
-                    text(f"COMMENT ON SCHEMA public IS 'fingerprint={fingerprint}'")
-                )
+                await conn.execute(text(f"COMMENT ON SCHEMA public IS 'fingerprint={fingerprint}'"))
         else:
             # Non-primary workers: ensure tables exist (no-op after primary's
             # fast path, and also after primary's slow path via create_all).

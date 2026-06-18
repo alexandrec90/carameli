@@ -21,6 +21,7 @@ from app.api.vsapi import vsapi_router
 from app.api.webhooks.call_status import jambonz_router
 from app.api.webhooks.sms_inbound import router as sms_inbound_router
 from app.core.config import settings
+from app.core.constants import DEFAULT_FRONTEND_ORIGIN
 from app.core.database import engine
 from app.core.limiter import limiter
 from app.core.logging_config import configure_logging
@@ -86,9 +87,10 @@ _cors_origins = settings.cors_origins
 if "*" in _cors_origins:
     logger.warning(
         "CORS_ORIGINS contains '*' which is invalid with allow_credentials=True; "
-        "falling back to ['http://localhost:5173']"
+        "falling back to ['%s']",
+        DEFAULT_FRONTEND_ORIGIN,
     )
-    _cors_origins = ["http://localhost:5173"]
+    _cors_origins = [DEFAULT_FRONTEND_ORIGIN]
 
 app.add_middleware(
     CORSMiddleware,

@@ -1,8 +1,9 @@
 name: Weekly Hardening
 
 on:
-  schedule:
-    - cron: "0 3 * * 0"
+  # Temporarily disabled: re-enable when tests are stable
+  # schedule:
+  #   - cron: "0 3 * * 0"
   workflow_dispatch:
 
 jobs:

@@ -4,9 +4,11 @@ import logging
 
 import httpx
 
+from app.core.constants import TELNYX_API_BASE_URL
+
 logger = logging.getLogger(__name__)
 
-_BASE_URL = "https://api.telnyx.com/v2"
+_BASE_URL = TELNYX_API_BASE_URL
 
 # NANP toll-free area-code prefixes (FCC-designated, fixed set).
 _TOLL_FREE_PREFIXES: frozenset[str] = frozenset({"800", "833", "844", "855", "866", "877", "888"})
