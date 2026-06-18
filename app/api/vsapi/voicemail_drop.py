@@ -67,7 +67,7 @@ async def voicemail_drop(
 
     logger.info(
         "Voicemail drop initiated call_sid=%s status=%s",
-        result["call_sid"],
+        result["call_id"],
         result["status"],
     )
-    return VoicemailDropResponse(call_sid=result["call_sid"], status=result["status"])
+    return VoicemailDropResponse(call_sid=result["call_id"], status=result["status"])

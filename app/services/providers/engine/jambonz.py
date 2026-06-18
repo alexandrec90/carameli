@@ -40,7 +40,7 @@ class JambonzEngine:
         await self._client.aclose()
 
     async def initiate_call(self, from_: str, to: str, webhook_url: str, **opts) -> dict:
-        payload = {
+        payload: dict[str, Any] = {
             "from": from_,
             "to": {"type": "phone", "number": to},
             "call_hook": {"url": webhook_url, "method": "POST"},
@@ -49,6 +49,11 @@ class JambonzEngine:
                 "method": "POST",
             },
         }
+        # Opaque application data echoed back on the call_hook (e.g. the agent SIP
+        # URI to bridge to on answer). Jambonz returns it untouched in the webhook.
+        tag = opts.get("tag")
+        if tag is not None:
+            payload["tag"] = tag
         resp = await self._client.post(self._calls_url(), json=payload)
         if resp.is_error:
             logger.error(

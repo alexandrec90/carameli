@@ -250,6 +250,62 @@ async def jambonz_incoming_call_webhook(
 
 
 @jambonz_router.post(
+    "/outbound-answered",
+    responses={
+        400: {"description": "Bad request (non-JSON body)"},
+        403: {"description": "Forbidden (invalid signature)"},
+    },
+    openapi_extra={
+        "requestBody": {
+            "required": True,
+            "content": {"application/json": {"schema": {"type": "object"}}},
+        }
+    },
+)
+async def jambonz_outbound_answered_webhook(
+    request: Request,
+) -> Response:
+    """Bridge an answered outbound call to the agent SIP URI carried in the call tag."""
+    raw_body = await request.body()
+    signature = request.headers.get("X-Jambonz-Signature", "")
+    _validate_jambonz_signature(raw_body, signature)
+
+    try:
+        data: dict[str, Any] = await request.json()
+    except Exception:
+        logger.warning("Jambonz outbound-answered webhook received non-JSON body")
+        return Response(status_code=400)
+
+    if not isinstance(data, dict):
+        logger.warning(
+            "Jambonz outbound-answered webhook received non-dict payload type: %s",
+            type(data).__name__,
+        )
+        return Response(status_code=400)
+
+    call_sid: str = data.get("call_sid", "") or ""
+    from_number: str = data.get("from", "") or ""
+    tag = data.get("tag")
+    agent_sip_uri = tag.get("agent_sip_uri") if isinstance(tag, dict) else None
+    logger.info("Jambonz outbound-answered webhook: call_sid=%s from=%s", call_sid, from_number)
+
+    if not agent_sip_uri:
+        logger.warning("outbound-answered: missing agent_sip_uri call_sid=%s", call_sid)
+        return JSONResponse([])
+
+    logger.info("Bridging outbound call_sid=%s to agent=%s", call_sid, agent_sip_uri)
+    return JSONResponse(
+        [
+            {
+                "verb": "dial",
+                "callerId": from_number,
+                "target": [{"type": "sip", "sipUri": agent_sip_uri}],
+            }
+        ]
+    )
+
+
+@jambonz_router.post(
     "/callback-answered",
     responses={
         400: {"description": "Bad request (non-JSON body)"},
