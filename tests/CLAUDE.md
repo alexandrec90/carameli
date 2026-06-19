@@ -40,14 +40,18 @@ Use `AUTH_HEADERS` (a constant dict) for authenticated requests.
 
 ## Running Tests
 
-| Command | Scope |
-| --- | --- |
-| `pytest` | Unit + integration (E2E, load, quarantine excluded via `pytest.ini`) |
-| `pytest tests/unit/` | Unit only |
-| `pytest tests/integration/` | Contract fuzzing + multi-step flows |
-| `pytest -m slow` | Migration round-trip tests (excluded from default run) |
-| `TELNYX_SANDBOX=1 pytest tests/integration/test_telnyx_sandbox.py` | Live sandbox tests |
-| `pytest tests/e2e/` | Playwright (requires frontend on `:5173`) |
+**The coding agent must not run the test suite.** The suite requires a live PostgreSQL
+instance and locked dependency versions (managed by the host's pwsh update script).
+Neither is available in the ephemeral cloud container used by the Claude Code web/mobile
+session. Running tests from a fresh venv produces misleading failures from version skew,
+not from the code.
+
+The suite is executed by the maintainer locally (via Docker) or by CI. The agent's
+verification bar is static analysis only: `ruff check`, `mypy`, `python -m py_compile`,
+and importing the app to confirm routes register. Say "static checks pass; suite to be
+run by CI" — never claim tests pass.
+
+For reference, the maintainer runs pytest inside the Docker container.
 
 ## pytest Markers
 
