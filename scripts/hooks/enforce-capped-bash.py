@@ -15,7 +15,6 @@ ALLOWED_PATTERNS = [
     r'scripts/hooks/invoke-capped\.py',
     r'scripts/hooks/invoke-capped\.ps1',
     r'\|\s*head\s*-c\s*\d+',
-    r'Set-Content\s+.+\|\s*Out-Null',
 ]
 
 BLOCK_MESSAGE = (

@@ -266,6 +266,7 @@ async def jambonz_outbound_answered_webhook(
     request: Request,
 ) -> Response:
     """Bridge an answered outbound call to the agent SIP URI carried in the call tag."""
+    # auth: signature validation
     raw_body = await request.body()
     signature = request.headers.get("X-Jambonz-Signature", "")
     _validate_jambonz_signature(raw_body, signature)

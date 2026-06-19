@@ -4,6 +4,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
+from app.core.config import settings
 from tests.conftest import AUTH_HEADERS
 
 pytestmark = pytest.mark.asyncio(loop_scope="session")
@@ -194,3 +195,25 @@ async def test_outbound_answered_invalid_json_returns_400(client) -> None:
         headers={"Content-Type": "application/json"},
     )
     assert resp.status_code == 400
+
+
+async def test_outbound_answered_bad_signature_returns_403(client, monkeypatch) -> None:
+    """A wrong X-Jambonz-Signature is rejected before the body is processed."""
+    monkeypatch.setattr(settings, "jambonz_webhook_secret", "webhook-key")
+    resp = await client.post(
+        _OUTBOUND_ANSWERED,
+        content=b'{"call_sid":"CS-out-badsig","from":"%s"}' % _DID.encode(),
+        headers={"Content-Type": "application/json", "X-Jambonz-Signature": "bad"},
+    )
+    assert resp.status_code == 403
+
+
+async def test_outbound_answered_missing_signature_header_returns_403(client, monkeypatch) -> None:
+    """A missing X-Jambonz-Signature when a secret is configured is rejected."""
+    monkeypatch.setattr(settings, "jambonz_webhook_secret", "webhook-key")
+    resp = await client.post(
+        _OUTBOUND_ANSWERED,
+        content=b'{"call_sid":"CS-out-nosig","from":"%s"}' % _DID.encode(),
+        headers={"Content-Type": "application/json"},
+    )
+    assert resp.status_code == 403
