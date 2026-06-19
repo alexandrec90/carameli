@@ -36,9 +36,23 @@ paths:
   characters. They cause parse errors when file encoding is misread.
 - **Use `pwsh`** (PowerShell 7), never `powershell` (Windows PowerShell 5.1).
 
+## Hook Scripts (Python)
+
+Hook scripts under `scripts/hooks/` are written in Python for universal compatibility
+(local Windows, web, and mobile sessions — no `pwsh` required).
+
+- **Expose pure importable functions** guarded by `if __name__ == '__main__'` so pytest
+  can test the logic without spawning a subprocess.
+- **stdlib only** — no third-party packages. Hooks run before the virtualenv is activated.
+- **Write pytest tests** in `scripts/hooks/tests/` using the `load_module()` helper in
+  `conftest.py` (handles hyphenated filenames via `importlib.util`).
+- `scripts/hooks/tests/` is **excluded from the app test suite** automatically because
+  `pytest.ini` sets `testpaths = tests`.
+- Every new Python hook must ship with tests in the same change.
+
 ## PowerShell Script Tests
 
-- **Every new script under `scripts/` must ship with a Pester test** in
+- **Every new `.ps1` script under `scripts/` must ship with a Pester test** in
   `scripts/tests/` in the same change.
 - Prefer **contract-style tests** over implementation-coupled tests:
   assert exit codes, artifact contents, side effects, and no-op behavior rather
