@@ -27,8 +27,11 @@ No state file. No file-reading loop. Runs in seconds.
 Run the suggested harness command. Output should be grouped by check; each
 match is `path:line:content`.
 
-Suggested command (run in terminal):
-`pwsh -NoProfile -ExecutionPolicy Bypass -File .claude/skills/check-boundaries/run-checks.ps1`
+Run three Grep passes directly:
+
+- **Check 1 — Provider boundary:** grep `^\s*(import telnyx|from telnyx|import jambonz|from jambonz)` across `app/**/*.py`, excluding files under `app/services/providers/`
+- **Check 2 — Layer boundary:** grep `from app\.repositories\.` across `app/api/**/*.py`
+- **Check 3 — Blocking I/O:** grep `^\s*(import requests|from requests|import urllib\.request|import time$|from time import sleep|import subprocess|from subprocess)` across `app/**/*.py`
 
 ### Interpretation
 

@@ -22,12 +22,11 @@ touching that file at the time it was refactored.
 
 ## Step 2 — Discover Source Files
 
-Run the discovery command below to gather the top 50 source files by line count, each with its last-commit git hash. TSV columns: `lines<TAB>hash<TAB>path`.
+Use the Glob tool to discover the top 50 source files by size. Search these patterns:
+- `app/**/*.py` (exclude `__pycache__`, `alembic/versions`, `tests`, `conftest.py`)
+- `frontend/src/**/*.{ts,tsx}` (exclude `node_modules`, `dist`, `__tests__`, `*.test.ts`, `*.spec.ts`, `*.d.ts`, `*.config.*`)
 
-Suggested command (run in terminal):
-```powershell
-pwsh -NoProfile -ExecutionPolicy Bypass -File .claude/skills/state-tools/discover-files.ps1 -Roots app,frontend/src -Includes *.py,*.ts,*.tsx -ExcludeDirs node_modules,.git,venv,.venv,dist,build,__pycache__,alembic/versions,tests,__tests__,.claude,coverage,logs,.pytest_cache -ExcludeNames *.d.ts,*.config.ts,*.config.js,*.config.mjs,conftest.py,*.test.ts,*.spec.ts,test_*.py,*_test.py -Top 50 -WithGitHash
-```
+For each file, get its last-commit git hash: `git log -1 --format=%H -- <path>`.
 
 ---
 
@@ -81,7 +80,7 @@ Fix any import error before moving on.
 
 ## Step 5 — Update State
 
-Write `.claude/skills/refactor/state-updates.json` with touched files:
+Read `.claude/skills/refactor/state.json`, merge in the touched files, and write it back directly:
 
 ```json
 {
@@ -94,11 +93,7 @@ Write `.claude/skills/refactor/state-updates.json` with touched files:
 }
 ```
 
-The skill's `Stop` hook detects `state-updates.json`, runs `state-engine.py
-apply`, and removes the file. Do not run `apply` by hand.
-
-Use `"UNCOMMITTED"` for files edited this session but not yet committed. They
-will re-evaluate on the next run once committed.
+Use `"UNCOMMITTED"` for files edited this session but not yet committed.
 
 ---
 

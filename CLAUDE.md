@@ -105,3 +105,6 @@ Every code change must include tests in the same commit.
 - Integration tests use Telnyx sandbox + local Jambonz (no real charges)
 - Use the `make-tests` skill to identify coverage gaps after significant changes
 - DB isolation rules (savepoint fixture, no raw sessions, no teardown cleanup) — `.claude/rules/testing.md`
+
+**The coding agent must not run the test suite** — see `tests/CLAUDE.md` for the full
+boundary. Verify with `ruff`, `mypy`, `py_compile`, and app-import only.

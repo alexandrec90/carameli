@@ -6,6 +6,9 @@ description: 'Fixes PowerShell Pester failures from logs/pester-failures.log (wr
 
 # Skill: Fix Pester Failures
 
+> **Local session only.** This skill reads log artifacts written by PS1 scripts
+> on the host machine. It cannot run in web or mobile sessions.
+
 Fix actionable PowerShell test failures collected in `logs/pester-failures.log`.
 
 ---

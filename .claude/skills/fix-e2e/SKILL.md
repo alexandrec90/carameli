@@ -6,6 +6,9 @@ description: 'Fixes E2E test failures from logs/e2e-failures.log (written by the
 
 # Skill: Fix E2E Failures
 
+> **Local session only.** This skill reads log artifacts written by PS1 scripts
+> on the host machine. It cannot run in web or mobile sessions.
+
 Fix Playwright E2E failures collected in `logs/e2e-failures.log`.
 
 ---

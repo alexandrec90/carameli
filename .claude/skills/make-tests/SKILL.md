@@ -44,15 +44,11 @@ If the file does not exist, treat it as `{ "last_run": null, "modules": [] }`.
 
 ## Step 3 — Discover Source Modules
 
-The harness preprocesses discovery: every first-party Python source module
-(including migrations) with its last-commit git hash. TSV columns:
-`lines<TAB>hash<TAB>path`. Note `app/core/config.py` (config validation tests)
-and migration files in `alembic/versions/` are included.
+Use the Glob tool to find all first-party Python source modules:
+- Pattern `app/**/*.py` (exclude `__pycache__`, `conftest.py`)
+- Pattern `alembic/versions/*.py`
 
-Suggested command (run in terminal):
-```powershell
-pwsh -NoProfile -ExecutionPolicy Bypass -File .claude/skills/state-tools/discover-files.ps1 -Roots app,alembic/versions -Includes *.py -ExcludeDirs __pycache__ -ExcludeNames conftest.py -WithGitHash
-```
+For each file, get its last-commit git hash via `git log -1 --format=%H -- <path>`.
 
 Triage:
 
@@ -184,27 +180,19 @@ In **review** mode, stop here and print the full gap report. Do not write files.
 
 ## Step 5 — Write Tests
 
-For each gap identified, append or create tests following the patterns in
-[writing-conventions.md](writing-conventions.md). That file covers:
+For each gap identified, append or create tests following the patterns in:
 
-- Fixture and async conventions
-- Mock boundary rules (CarrierProvider / CallEngineProvider only, never SDK internals)
-- Adversarial webhook tests (bad signature, missing header, replayed timestamp, malformed payload)
-- Property-based tests (hypothesis) for wide-domain inputs
-- Concurrency / race-condition tests (`asyncio.gather`)
-- DB integrity tests (FK constraints, unique constraints — use real DB, no mocks)
-- Migration roundtrip tests (upgrade → downgrade → upgrade)
-- Config validation tests (`monkeypatch` env vars)
-- Security / tenant isolation tests (cross-customer access, missing auth header)
-- OpenAPI snapshot tests (golden-file comparison)
-- Performance benchmark tests (`pytest-benchmark`, hot-path endpoints only)
-- Naming conventions and what NOT to do
+- `tests/CLAUDE.md` — day-to-day patterns: fixtures, mocking, webhook adversarial cases,
+  concurrency, DB integrity, security/isolation, file naming, what NOT to do
+- [writing-conventions.md](writing-conventions.md) — specialized patterns: property-based
+  (hypothesis), migration roundtrip, config validation, OpenAPI snapshot, performance benchmarks
 
 ---
 
 ## Step 6 — Update State
 
-Write `.claude/skills/make-tests/state-updates.json` with processed module rows:
+Read `.claude/skills/make-tests/state.json`. Merge in all processed module rows,
+then write the result back to `state.json` directly:
 
 ```json
 {
@@ -221,8 +209,8 @@ Write `.claude/skills/make-tests/state-updates.json` with processed module rows:
 }
 ```
 
-The skill's `Stop` hook detects `state-updates.json`, runs `state-engine.py
-apply`, and removes the file. Do not run `apply` by hand.
+Do not write a separate `state-updates.json` — update `state.json` in place.
+The Stop hook is a Windows-only convenience; do not depend on it.
 
 ---
 

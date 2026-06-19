@@ -7,6 +7,9 @@ argument-hint: '(no arguments)'
 
 # Skill: Autonomous Test-Fix Loop
 
+> **Local session only.** This skill reads log artifacts written by PS1 scripts
+> on the host machine. It cannot run in web or mobile sessions.
+
 Runs the full fix-tests cycle autonomously without user interaction between iterations.
 
 ---

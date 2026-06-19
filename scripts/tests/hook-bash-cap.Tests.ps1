@@ -40,6 +40,6 @@ Describe 'Bash cap hook scripts' {
     It 'invoke-capped truncates oversized output with marker' {
         $out = & pwsh -NoProfile -ExecutionPolicy Bypass -File $script:ctx.InvokeScript -Command '$x = "a" * 12000; Write-Output $x' -MaxBytes 2000 -HeadBytes 1000
         $LASTEXITCODE | Should -Be 0
-        ($out -join "`n") | Should -Match '\[truncated bytes=' 
+        ($out -join "`n") | Should -Match '\[truncated bytes='
     }
 }

@@ -7,6 +7,9 @@ argument-hint: '(no arguments)'
 
 # Skill: Fix Docker Errors
 
+> **Local session only.** This skill reads log artifacts written by PS1 scripts
+> on the host machine. It cannot run in web or mobile sessions.
+
 Fix Docker failures collected in `logs/docker/` artifact files.
 
 ---

@@ -17,8 +17,15 @@ missing, stale, or incorrectly reflect the current architecture.
 
 The harness preloads all source files:
 
-Suggested command (run in terminal):
-`pwsh -NoProfile -ExecutionPolicy Bypass -File .claude/skills/state-tools/project-snapshot.ps1 -Sections compose,requirements,config-py,provider-modules,claude-md,chart-tech-legend,chart-pricing`
+Read the following files using the Read tool (in parallel where independent):
+
+- `docker-compose.yml`
+- `requirements.txt`
+- `app/core/config.py`
+- Use Glob to discover: `app/services/providers/**/*.py` — list filenames (reveals active carrier and engine modules)
+- `CLAUDE.md`
+- Use Glob to discover: `charts/tech stack/*legend*` — read the file found (current runtime component list)
+- Use Glob to discover: `charts/pricing/*` — read the pricing table file found (the diff target)
 
 Reference — what to look for in each injected section:
 

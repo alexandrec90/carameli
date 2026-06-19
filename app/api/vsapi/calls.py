@@ -3,16 +3,103 @@ from __future__ import annotations
 import logging
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Path
+from fastapi import APIRouter, Depends, HTTPException, Path, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.auth import AuthContext, get_auth_context
+from app.core.auth import AuthContext, enforce_customer_scope, get_auth_context
+from app.core.config import settings
 from app.core.database import get_session
 from app.schemas.call_event import CallRecordingResponse
-from app.services import call_event_service, customer_service
+from app.schemas.outbound_call import OutboundCallRequest, OutboundCallResponse
+from app.services import (
+    call_event_service,
+    customer_service,
+    extension_service,
+    phone_line_service,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/VsCall", tags=["calls"])
+
+
+@router.post(
+    "/Initiate",
+    response_model=OutboundCallResponse,
+    status_code=200,
+    responses={
+        404: {"description": "Customer, phone line, or extension not found"},
+        502: {"description": "Call engine error"},
+    },
+)
+async def initiate_outbound_call(
+    body: OutboundCallRequest,
+    request: Request,
+    session: Annotated[AsyncSession, Depends(get_session)],
+    auth: Annotated[AuthContext, Depends(get_auth_context)],
+) -> OutboundCallResponse:
+    """Originate an outbound call from a customer DID and bridge to an agent extension on answer."""
+    enforce_customer_scope(auth, body.vs_customer_id)
+    logger.info(
+        "VsCall/Initiate vs_customer_id=%s from=%s destination=%s extension=%s",
+        body.vs_customer_id,
+        body.from_number,
+        body.destination_number,
+        body.extension,
+    )
+    customer = await customer_service.get_by_vs_id(session, body.vs_customer_id)
+    if not customer:
+        logger.warning("Customer not found vs_customer_id=%s", body.vs_customer_id)
+        raise HTTPException(status_code=404, detail="Customer not found")
+
+    line = await phone_line_service.get_by_number(session, customer.id, body.from_number)
+    if not line:
+        logger.warning(
+            "Phone line not found vs_customer_id=%s from=%s",
+            body.vs_customer_id,
+            body.from_number,
+        )
+        raise HTTPException(status_code=404, detail="Phone line not found")
+
+    ext = await extension_service.get_by_number(session, customer.id, body.extension)
+    if not ext:
+        logger.warning(
+            "Extension not found vs_customer_id=%s extension=%s",
+            body.vs_customer_id,
+            body.extension,
+        )
+        raise HTTPException(status_code=404, detail="Extension not found")
+
+    if ext.sip_domain_sid:
+        agent_sip_uri = f"sip:{ext.sip_username}@{ext.sip_domain_sid}"
+    else:
+        agent_sip_uri = ext.sip_username
+
+    webhook_url = f"{settings.jambonz_webhook_base_url}/webhooks/jambonz/outbound-answered"
+
+    engine = request.app.state.engine
+    try:
+        result = await engine.initiate_call(
+            from_=body.from_number,
+            to=body.destination_number,
+            webhook_url=webhook_url,
+            tag={"agent_sip_uri": agent_sip_uri},
+        )
+    except Exception as exc:
+        logger.error(
+            "Call engine error initiating outbound call vs_customer_id=%s destination=%s: %s",
+            body.vs_customer_id,
+            body.destination_number,
+            exc,
+        )
+        raise HTTPException(status_code=502, detail="Call engine error") from None
+
+    logger.info(
+        "Outbound call initiated call_sid=%s vs_customer_id=%s destination=%s",
+        result.get("call_id"),
+        body.vs_customer_id,
+        body.destination_number,
+    )
+    return OutboundCallResponse(call_sid=result["call_id"], status=result["status"])
 
 
 @router.get(

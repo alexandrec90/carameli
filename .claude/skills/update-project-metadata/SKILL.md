@@ -16,8 +16,22 @@ reflect the current project structure, tech stack, and conventions.
 
 The harness preloads all source-of-truth and metadata files:
 
-Suggested command (run in terminal):
-`pwsh -NoProfile -ExecutionPolicy Bypass -File .claude/skills/state-tools/project-snapshot.ps1 -Sections compose,requirements,requirements-dev,frontend-pkg,config-py,pytest,alembic-env,claude-md,frontend-claude-md,tests-claude-md,services-claude-md,rules-list,claudeignore,settings-local`
+Read the following files using the Read tool (in parallel where independent):
+
+- `docker-compose.yml`
+- `requirements.txt`
+- `requirements-dev.txt`
+- `frontend/package.json`
+- `app/core/config.py`
+- `pytest.ini`
+- `alembic/env.py`
+- `CLAUDE.md`
+- `frontend/CLAUDE.md`
+- `tests/CLAUDE.md`
+- `app/services/CLAUDE.md`
+- Use Glob to discover: `.claude/rules/*.md` — list filenames as the rules manifest
+- `.claudeignore`
+- `.claude/settings.local.json`
 
 The `rules-list` section above lists the rule file names. Read each
 `.claude/rules/<name>.md` individually (using the list as your manifest) to

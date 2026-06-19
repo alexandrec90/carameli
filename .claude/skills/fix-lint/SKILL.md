@@ -6,6 +6,9 @@ description: 'Fixes lint errors from logs/lint-errors.log (written by the Lint: 
 
 # Skill: Fix Lint Errors
 
+> **Local session only.** This skill reads log artifacts written by PS1 scripts
+> on the host machine. It cannot run in web or mobile sessions.
+
 Fix actionable lint errors collected in `logs/lint-errors.log`.
 
 ---

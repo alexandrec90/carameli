@@ -36,7 +36,7 @@ async def test_voicemail_drop_happy_path(client) -> None:
     from app.main import app
 
     app.state.engine.initiate_voicemail_drop = AsyncMock(
-        return_value={"call_sid": "CAvm8200", "status": "queued"}
+        return_value={"call_id": "CAvm8200", "status": "queued"}
     )
 
     resp = await client.post(_DROP_URL, json=_VALID_PAYLOAD, headers=AUTH_HEADERS)

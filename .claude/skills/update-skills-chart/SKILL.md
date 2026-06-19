@@ -17,12 +17,14 @@ is out of date.
 
 The harness preloads all skill metadata and the current chart:
 
-Suggested command (run in terminal):
-`pwsh -NoProfile -ExecutionPolicy Bypass -File .claude/skills/state-tools/project-snapshot.ps1 -Sections skills-meta,chart-skills`
+Read the following files using the Read tool (in parallel where independent):
 
-`skills-meta` emits each skill's frontmatter (`name`, `description`, hooks),
+- Use Glob to discover: `.claude/skills/*/SKILL.md` — read the frontmatter (`name`, `description`) from each to build the skills metadata
+- Use Glob to discover: `charts/skills/*` — read the skills chart file found (the diff target)
+
+For the skills metadata, read each discovered `SKILL.md` file and extract the frontmatter (`name`, `description`, hooks),
 step count, and line count — enough to classify category, cost, and description
-without reading individual SKILL.md files. `chart-skills` is the current diff target.
+without reading individual SKILL.md files fully. The chart file found is the current diff target.
 
 Also note the built-in / system skills visible in the system-reminder skill list
 that are **not** project-specific (e.g. `update-config`, `keybindings-help`,

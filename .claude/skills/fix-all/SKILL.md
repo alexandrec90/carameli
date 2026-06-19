@@ -6,6 +6,9 @@ description: 'Runs fix-lint, fix-tests, and fix-e2e in sequence. Use when you wa
 
 # Skill: Fix All
 
+> **Local session only.** This skill reads log artifacts written by PS1 scripts
+> on the host machine. It cannot run in web or mobile sessions.
+
 Delegates to the three canonical fixers in order: lint, tests, E2E.
 
 ---
