@@ -7,6 +7,9 @@ argument-hint: '(no arguments)'
 
 # Skill: Fix Pre-Commit Errors
 
+> **Local session only.** This skill reads log artifacts written by PS1 scripts
+> on the host machine. It cannot run in web or mobile sessions.
+
 Fix hook errors collected in `logs/pre-commit-errors.log`.
 
 ---

@@ -108,6 +108,35 @@ Example:
 }
 ```
 
+### Mobile / remote session compatibility
+
+Skills run in all session types: local VS Code, web browser, and mobile app.
+Hooks and PowerShell scripts only execute in local sessions where the Claude Code
+desktop app or CLI is running. Classify each skill as one of:
+
+| Class | Works on mobile? | Pattern |
+|---|---|---|
+| **Cross-environment** | Yes | Uses only Glob, Grep, Read, Write, Edit, Bash, Agent tools |
+| **Local-only** | No | Depends on log artifacts written by PS1 scripts that run on the host |
+
+**Cross-environment skills must:**
+
+- **Discovery:** use the Glob tool, not `discover-files.ps1`
+- **Grep checks:** use the Grep tool directly with the patterns from the PS1, not `run-checks.ps1`
+- **Config snapshot:** use the Read tool on the listed files, not `project-snapshot.ps1`
+- **State finalization:** write `state.json` directly — never write `state-updates.json` and wait for a Stop hook
+
+**Local-only skills** (`fix-lint`, `fix-tests`, `fix-tests-auto`, `fix-pre-commit`,
+`fix-e2e`, `fix-logs`, `fix-pester`, `fix-docker`) must say so at the top of the SKILL.md:
+
+```markdown
+> **Local session only.** This skill reads a log artifact written by a PS1 script
+> on the host machine. It cannot run in web or mobile sessions.
+```
+
+Hooks remain a Windows-local performance shortcut; they must never be the only path
+for any step a cross-environment skill needs to complete.
+
 ### Claude vs Copilot compatibility
 
 Copilot may ignore Claude-specific frontmatter attributes such as skill-level

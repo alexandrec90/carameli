@@ -6,6 +6,9 @@ description: 'Fixes test failures from logs/test-failures.log (written by the Te
 
 # Skill: Fix Test Failures
 
+> **Local session only.** This skill reads log artifacts written by PS1 scripts
+> on the host machine. It cannot run in web or mobile sessions.
+
 Fix failing tests collected in `logs/test-failures.log`.
 
 ---

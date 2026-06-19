@@ -7,6 +7,9 @@ argument-hint: 'optional file path or glob to scope which problems to fix'
 
 # Skill: Fix Problems Panel
 
+> **Local session only.** This skill reads log artifacts written by PS1 scripts
+> on the host machine. It cannot run in web or mobile sessions.
+
 Fix diagnostics surfaced in the VS Code Problems panel in a **single pass**. After fixes
 are applied, the user must accept changes (Keep) before the Problems panel refreshes —
 so re-checking happens in a follow-up invocation if needed, not in the same run.

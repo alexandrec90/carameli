@@ -30,8 +30,10 @@ No state file. No file-reading loop. Runs in seconds.
 
 Run the suggested harness command. Output should be grouped by check label.
 
-Suggested command (run in terminal):
-`pwsh -NoProfile -ExecutionPolicy Bypass -File .claude/skills/lint-secrets/run-checks.ps1`
+Run two Grep passes directly:
+
+- **Check 1 — Credential fields in response schemas:** grep `^\s+(api_key|password|secret|token)\s*:` across `app/schemas/**/*.py` (content mode). Flag only classes whose name ends in `Response`, `Out`, or `Read` — request schemas may legitimately accept these fields.
+- **Check 2 — Raw env var access:** grep `os\.(environ\.get|getenv)\(["'].*?(key|secret|password|token).*?["']` across `app/**/*.py` excluding `app/core/config.py` (content mode).
 
 ### Interpretation
 

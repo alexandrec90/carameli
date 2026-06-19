@@ -45,13 +45,12 @@ If the file does not exist, treat it as `{ "last_run": null, "modules": [] }`.
 
 ## Step 3 — Discover Source Modules
 
-The harness preprocesses discovery: every first-party TypeScript source file
-with its last-commit git hash. TSV columns: `lines<TAB>hash<TAB>path`.
+Use the Glob tool to discover first-party TypeScript source files:
 
-Suggested command (run in terminal):
-```powershell
-pwsh -NoProfile -ExecutionPolicy Bypass -File .claude/skills/state-tools/discover-files.ps1 -Roots frontend/src -Includes *.ts,*.tsx -ExcludeDirs node_modules,dist,__tests__ -ExcludeNames *.test.ts,*.test.tsx,*.spec.ts,*.spec.tsx -WithGitHash
-```
+- Pattern: `frontend/src/**/*.{ts,tsx}`
+- Exclude: `node_modules`, `dist`, `__tests__`, `*.test.ts`, `*.test.tsx`, `*.spec.ts`, `*.spec.tsx`, `*.d.ts`, `*.config.*`
+
+For each file, get its last-commit git hash: `git log -1 --format=%H -- <path>`.
 
 Classify each file into a layer:
 
@@ -192,8 +191,8 @@ For each gap identified, append or create tests following the patterns in
 
 ## Step 6 — Update State
 
-Write `.claude/skills/make-frontend-tests/state-updates.json` with processed
-module rows:
+Read `.claude/skills/make-frontend-tests/state.json`, merge in the processed
+module rows, and write it back directly:
 
 ```json
 {
@@ -210,8 +209,7 @@ module rows:
 }
 ```
 
-The skill's `Stop` hook detects `state-updates.json`, runs `state-engine.py
-apply`, and removes the file. Do not run `apply` by hand.
+Use `"UNCOMMITTED"` for files edited this session but not yet committed.
 
 ---
 
