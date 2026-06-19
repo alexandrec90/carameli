@@ -74,6 +74,10 @@ exception handler in `app/main.py` writes all unhandled 500s to the log — do n
 
 ## Tooling
 
+> **Local session only.** Everything in this section needs a local Docker Desktop daemon.
+> Web and mobile sessions have no Docker — do not attempt `docker` / `docker compose` there.
+> Make the code change and defer container/stack verification to a local session or CI.
+
 See `.claude/rules/tooling.md`. Running `docker` / `docker compose` directly is fine — the
 CLI shares Docker Desktop's daemon, so it operates on the same containers without conflict.
 Be deliberate with destructive lifecycle ops on a running stack: `down -v` wipes DB volumes
@@ -108,6 +112,12 @@ Every code change must include tests in the same commit.
 - Integration tests use Telnyx sandbox + local Jambonz (no real charges)
 - Use the `make-tests` skill to identify coverage gaps after significant changes
 - DB isolation rules (savepoint fixture, no raw sessions, no teardown cleanup) — `.claude/rules/testing.md`
+
+> **Local session only for execution.** Writing tests works anywhere, but *running*
+> `pytest` (needs the local Postgres/Docker stack), `ruff`, `mypy`, and `py_compile`
+> requires a local toolchain that web/mobile sessions don't have. In those sessions,
+> still write the required tests in the same change — just leave execution to a local
+> session or CI.
 
 Run **targeted** tests to verify a change — the specific files or module you touched
 (e.g. `pytest tests/unit/test_<module>.py`), with the local Postgres container up. Do
