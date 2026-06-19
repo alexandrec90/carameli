@@ -316,14 +316,14 @@
       "problemMatcher": []
     },
     {
-      "label": "Test: Run Hook Contracts (dry)",
+      "label": "Test: Run Hook Tests (pytest)",
       "type": "process",
-      "command": "pwsh",
+      "command": "python",
       "args": [
-        "-ExecutionPolicy",
-        "Bypass",
-        "-File",
-        "scripts/test-hooks.ps1"
+        "-m",
+        "pytest",
+        "scripts/hooks/tests",
+        "-q"
       ],
       "group": "test",
       "presentation": {

@@ -100,7 +100,7 @@ Example:
       "hooks": [
         {
           "type": "command",
-          "command": "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/hooks/copilot-settings-stop.ps1"
+          "command": "python3 scripts/hooks/stop.py"
         }
       ]
     }

@@ -40,16 +40,22 @@ Use `AUTH_HEADERS` (a constant dict) for authenticated requests.
 
 ## Running Tests
 
-**The coding agent must not run the test suite.** The suite requires a live PostgreSQL
-instance and locked dependency versions (managed by the host's pwsh update script).
-Neither is available in the ephemeral cloud container used by the Claude Code web/mobile
-session. Running tests from a fresh venv produces misleading failures from version skew,
-not from the code.
+Run **targeted** tests to verify a change — only the files or module you touched. This
+needs the local PostgreSQL container running (the test pool connects to a live DB).
 
-The suite is executed by the maintainer locally (via Docker) or by CI. The agent's
-verification bar is static analysis only: `ruff check`, `mypy`, `python -m py_compile`,
-and importing the app to confirm routes register. Say "static checks pass; suite to be
-run by CI" — never claim tests pass.
+| Command | Scope |
+| --- | --- |
+| `pytest tests/unit/test_<module>.py` | The module you changed (preferred) |
+| `pytest tests/unit/` | Unit only |
+| `pytest tests/integration/` | Contract fuzzing + multi-step flows |
+| `pytest -m slow` | Migration round-trip tests (excluded from default run) |
+| `pytest tests/e2e/` | Playwright (requires frontend on `:5173`) |
+
+Do **not** run the entire suite on every change — it's slow, and a fresh-venv full run
+can produce misleading version-skew failures rather than real code failures. Full-suite
+runs are owned by the maintainer (via Docker) and CI. In web/mobile sessions there is no
+live DB, so fall back to static analysis only there. Always also pass `ruff check`,
+`mypy`, and `python -m py_compile`.
 
 ## pytest Markers
 

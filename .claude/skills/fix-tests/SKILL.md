@@ -141,8 +141,10 @@ State clearly:
 
 1. Edit only files directly implicated by the collected failures — never pre-emptive cleanup.
 2. One failure = one minimal fix. Do not restructure surrounding code.
-3. **Never run tests yourself.** Do not invoke `pytest`, `docker compose exec`, or any test
-   runner command. All test execution is done by the user via the VS Code task.
+3. **Diagnose from `logs/test-failures.log`, not by running the full suite.** After applying a
+   fix you may run a single targeted check — `docker compose exec -T app pytest <path::to::the_test>`
+   for just the test you fixed — to confirm it goes green. Do not run the whole suite or dump raw
+   output; the full **Test: Run pytest** task remains the user's to re-run.
 4. Skip the log file if already stamped `--- ADDRESSED` — tell the user to re-run tests first.
 5. Only stamp the log after applying at least one code fix.
 6. **Known fixes are mandatory short-circuits.** If a known-fix pattern matches, apply it

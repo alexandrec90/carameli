@@ -4,13 +4,14 @@ Two scripts, two subcommands, no per-skill configs. State-driven skills follow t
 
 1. (audit only) Generate a scan plan with `state-engine.py plan`
 2. Generate a per-skill artifact (`scan-results.json` or `state-updates.json`)
-3. Skill's `Stop` hook fires `finalize-state.ps1`, which calls `state-engine.py
+3. The session `Stop` hook fires `finalize-state.py`, which calls `state-engine.py
    apply` and removes the artifact
 
 ## Files
 
 - `state-engine.py` — `plan` (audit) + `apply` (all schemas) subcommands
-- `finalize-state.ps1` — `Stop`-hook wrapper: gates on artifact existence,
+- `finalize-state.py` — `Stop`-hook wrapper (in `scripts/hooks/`): gates on
+  artifact existence,
   calls `apply`, cleans up artifacts on success
 - `README.md`
 
@@ -45,13 +46,11 @@ The skill agent only invokes `plan` (audit only); `apply` runs through the hook.
 python .claude/skills/state-tools/state-engine.py plan --skill audit-design-flaws
 ```
 
-The hook (in each skill's frontmatter) calls `finalize-state.ps1`, which is the
-only place `apply` is invoked:
+The session `Stop` hook (`scripts/hooks/stop.py`) calls `finalize-state.py`, which
+is the only place `apply` is invoked:
 
-```powershell
-pwsh -NoProfile -ExecutionPolicy Bypass `
-  -File .claude/skills/state-tools/finalize-state.ps1 `
-  -Skill <skill-name> -Schema <audit|modules|files>
+```bash
+python3 scripts/hooks/finalize-state.py --skill <skill-name> --schema <audit|modules|files>
 ```
 
 Common flags on `state-engine.py` (both subcommands): `--repo-root`, `--skill`,
@@ -60,17 +59,14 @@ overrides (`--scan-plan`, `--results-file`, `--updates-file`).
 
 ## Hook flow
 
-Each state-driven skill declares a `Stop` hook in its frontmatter:
+The session `Stop` hook in `.claude/settings.json` runs `scripts/hooks/stop.py`,
+which finalizes every state-driven skill:
 
-```yaml
-hooks:
-  Stop:
-    - hooks:
-        - type: command
-          command: "pwsh -NoProfile -ExecutionPolicy Bypass -File .claude/skills/state-tools/finalize-state.ps1 -Skill <name> -Schema <schema>"
+```bash
+python3 scripts/hooks/finalize-state.py --skill <name> --schema <schema>
 ```
 
-`finalize-state.ps1` is idempotent and gated on artifact existence:
+`finalize-state.py` is idempotent and gated on artifact existence:
 
 1. If `<artifact>.json` doesn't exist → exit 0 (no-op, fires harmlessly on
    every Stop while the skill is active).

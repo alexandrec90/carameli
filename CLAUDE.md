@@ -74,8 +74,11 @@ exception handler in `app/main.py` writes all unhandled 500s to the log — do n
 
 ## Tooling
 
-See `.claude/rules/tooling.md`. Never run `docker` or `docker compose` commands directly — provide
-them for the user to run instead.
+See `.claude/rules/tooling.md`. Running `docker` / `docker compose` directly is fine — the
+CLI shares Docker Desktop's daemon, so it operates on the same containers without conflict.
+Be deliberate with destructive lifecycle ops on a running stack: `down -v` wipes DB volumes
+and `restart` / `up --build` can drop the user's session — confirm before those. Use `-T`
+with `docker compose exec` (see tooling.md).
 
 ## Guardrails
 
@@ -106,5 +109,8 @@ Every code change must include tests in the same commit.
 - Use the `make-tests` skill to identify coverage gaps after significant changes
 - DB isolation rules (savepoint fixture, no raw sessions, no teardown cleanup) — `.claude/rules/testing.md`
 
-**The coding agent must not run the test suite** — see `tests/CLAUDE.md` for the full
-boundary. Verify with `ruff`, `mypy`, `py_compile`, and app-import only.
+Run **targeted** tests to verify a change — the specific files or module you touched
+(e.g. `pytest tests/unit/test_<module>.py`), with the local Postgres container up. Do
+**not** run the whole suite on every change: it's slow and a fresh-venv full run can
+surface misleading version-skew failures — leave full runs to CI. Also verify with
+`ruff`, `mypy`, and `py_compile`. See `tests/CLAUDE.md`.

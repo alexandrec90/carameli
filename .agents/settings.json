@@ -43,48 +43,5 @@
   },
   "effortLevel": "medium",
   "defaultModel": "sonnet",
-  "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/hooks/enforce-capped-bash.ps1"
-          }
-        ]
-      },
-      {
-        "matcher": ".*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/hooks/copilot-settings-pretool.ps1"
-          }
-        ]
-      }
-    ],
-    "PostToolUse": [
-      {
-        "matcher": "^(Edit|Write|MultiEdit|apply_patch|create_file)$",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "pwsh -NoProfile -ExecutionPolicy Bypass -File .claude/skills/add-db-model/after-model-edit.ps1"
-          }
-        ]
-      }
-    ],
-    "Stop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/hooks/copilot-settings-stop.ps1"
-          }
-        ]
-      }
-    ]
-  },
   "autoMemoryEnabled": false
 }

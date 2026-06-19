@@ -41,8 +41,8 @@
       "c:\\Users\\Administrator\\Desktop\\vs_code\\carameli\\.claude\\skills\\state-tools"
     ]
   },
-  "effortLevel": "medium",
-  "defaultModel": "sonnet",
+  "effortLevel": "high",
+  "defaultModel": "opus",
   "hooks": {
     "PreToolUse": [
       {
@@ -59,7 +59,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/hooks/copilot-settings-pretool.ps1"
+            "command": "python3 scripts/hooks/pretool.py"
           }
         ]
       }
@@ -81,14 +81,6 @@
           {
             "type": "command",
             "command": "python3 scripts/hooks/stop.py"
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/hooks/copilot-settings-stop.ps1"
           }
         ]
       }

@@ -114,8 +114,9 @@ Check `bash_spiral_count` and `avg_bash` in the delta.
 - If `bash_spiral_count > 0`: the skill ran ≥5 consecutive Bash calls in at least one
   session. Check whether SKILL.md has a hard rule explicitly prohibiting self-initiated
   command execution (e.g. running tests, docker commands, or the test runner).
-  If absent or weak, add or strengthen it: **"Never run `<tool>` yourself — all
-  execution is done by the user via the VS Code task."**
+  If absent or weak, add or strengthen the **scoped** rule: diagnose from the log
+  artifact, and after a fix run at most a single targeted verification of the thing
+  just fixed — never re-run the full task or dump raw output into context.
 - If `avg_bash > 3`: the skill is using Bash heavily on average. Check whether those
   calls could be replaced with Read/Grep/Glob. If the SKILL.md encourages Bash-based
   investigation (e.g. "check logs by running…"), rewrite those instructions to use

@@ -120,7 +120,9 @@ State clearly:
 - Which were skipped and why.
 - Next step: re-run **Lint: Everything** if fixes were applied.
 
-Never run additional diagnostics after edits — instruct the user to rerun the task.
+Diagnose from `logs/lint-errors.log`. After a fix you may re-run the single linter on the file you
+changed (e.g. `ruff check <file>`, `mypy <file>`) to confirm it clears — don't re-run the full
+**Lint: Everything** task; that stays the user's to run.
 
 ---
 
@@ -137,7 +139,8 @@ Never run additional diagnostics after edits — instruct the user to rerun the 
 
 1. Edit only files directly implicated by the collected errors — never pre-emptive cleanup.
 2. One error = one minimal fix. Do not restructure surrounding code.
-3. Never run additional diagnostics after edits — instruct user to rerun the task.
+3. After a fix, run at most the single linter on the file you changed to verify — never re-run the
+   full **Lint: Everything** task or dump raw output.
 4. Skip the log file if already stamped `--- ADDRESSED` — tell the user to re-run linting first.
 5. Only stamp the log after applying at least one code fix.
 6. **Known fixes are mandatory short-circuits.** If a known-fix pattern matches, apply it

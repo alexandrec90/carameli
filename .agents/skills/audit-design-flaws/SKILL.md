@@ -47,8 +47,8 @@ In parallel:
   `known-flaws.md` only.
 - Always use `.claude/skills/state-tools/state-engine.py plan` to
   compare file signatures against `state.json`. Do not hand-derive diffs.
-- Cache writes are automatic: the skill's `Stop` hook runs
-  `state-tools/finalize-state.ps1`, which calls `state-engine.py apply` and
+- Cache writes are automatic: the session `Stop` hook runs
+  `scripts/hooks/finalize-state.py`, which calls `state-engine.py apply` and
   cleans up `scan-plan.json` / `scan-results.json`. Do not run `apply` by hand
   or hand-edit cache rows.
 - `state.json` stores per-check metadata and per-file fingerprints, for example:
@@ -316,7 +316,7 @@ both sides can import from directly.
   2. **Medium refactor**: B, C, J, K
   3. **High-risk structural**: A, D, H (one module at a time)
 - Per batch cap: max 10 files or one structural extraction.
-- Enforcement is automatic via `scripts/hooks/enforce-audit-batch-caps.ps1` on
+- Enforcement is automatic via `scripts/hooks/enforce-audit-batch-caps.py` on
   `PreToolUse` for edit/write tools.
 - When caps are required, the hook creates:
   - `.claude/skills/audit-design-flaws/batch-plan.json` (all capped batches)
@@ -462,6 +462,6 @@ what is now enforced. Format:
    at run end.
 10. No same-run rechecks: verdicts come from the first pass; fixed entries are
   recorded as fixed immediately.
-11. Cache updates are hook-driven via the skill's `Stop` hook +
-    `finalize-state.ps1`; never hand-edit per-file cache records or invoke
+11. Cache updates are hook-driven via the session `Stop` hook +
+    `finalize-state.py`; never hand-edit per-file cache records or invoke
     `apply` manually.

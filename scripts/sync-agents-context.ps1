@@ -30,16 +30,32 @@ $agentsDir = Join-Path $Root '.agents'
 
 if (Test-Path $claudeDir) {
     # robocopy: /MIR mirrors (copies new/changed, removes orphans)
+    # /XF settings.json: settings.json is NOT a blind mirror -- it carries a
+    #   hooks block in .claude that must never reach .agents (Codex hooks live
+    #   only in .codex/hooks.json). It is regenerated below with hooks stripped.
     # /NJH /NJS /NP suppress header/summary/progress noise
     # Exit codes 0-7 are success for robocopy
-    $rc = robocopy $claudeDir $agentsDir /MIR /NJH /NJS /NP /NFL /NDL 2>&1
+    $rc = robocopy $claudeDir $agentsDir /MIR /XF settings.json /NJH /NJS /NP /NFL /NDL 2>&1
     $ec = $LASTEXITCODE
     if ($ec -le 7) {
-        Write-Host "  mirrored .claude/ -> .agents/"
+        Write-Host "  mirrored .claude/ -> .agents/ (settings.json excluded)"
         $copied++
     } else {
         Write-Error "robocopy failed (exit $ec): $rc"
         exit 1
+    }
+
+    # Regenerate .agents/settings.json from .claude/settings.json with the hooks
+    # block stripped, so env/permissions stay in sync but hooks never propagate.
+    $claudeSettings = Join-Path $claudeDir 'settings.json'
+    $agentsSettings = Join-Path $agentsDir 'settings.json'
+    if (Test-Path $claudeSettings) {
+        python (Join-Path $PSScriptRoot 'sync-agents-settings.py') $claudeSettings $agentsSettings
+        if ($LASTEXITCODE -ne 0) {
+            Write-Error "sync-agents-settings.py failed (exit $LASTEXITCODE)"
+            exit 1
+        }
+        Write-Host "  regenerated .agents/settings.json (hooks stripped)"
     }
 } else {
     Write-Host "  skipped  .claude/ (not found)"

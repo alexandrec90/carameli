@@ -156,8 +156,10 @@ State clearly:
 
 1. Edit only files directly implicated by the collected failures — never pre-emptive cleanup.
 2. One failure = one minimal fix. Do not restructure surrounding code.
-3. **Never run E2E tests yourself.** Do not invoke `pytest`, `playwright`, or any test
-   runner command. All test execution is done by the user via the VS Code task.
+3. **Diagnose from the log, not by running the full E2E suite.** After a fix you may run the
+   single spec you fixed (e.g. `pytest tests/e2e/<spec>.py -k <test>`) to confirm it, provided the
+   stack and frontend (`:5173`) are up. Do not run the whole suite or dump raw output; the full
+   E2E task remains the user's to re-run.
 4. Skip the log file if already stamped `--- ADDRESSED` — tell the user to re-run E2E first.
 5. Only stamp the log after applying at least one code fix.
 6. E2E failures are usually app bugs, not test bugs — prefer fixing application code over

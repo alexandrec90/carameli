@@ -82,6 +82,32 @@ Describe 'sync-agents-context.ps1' {
         }
     }
 
+    Context 'settings.json hooks are not mirrored to .agents/' {
+
+        BeforeEach {
+            Set-Content -Path (Join-Path $workDir 'CLAUDE.md') -Value '# Root'
+            $claudeDir = Join-Path $workDir '.claude'
+            New-Item -ItemType Directory -Path $claudeDir -Force | Out-Null
+            $settings = @{
+                env     = @{ EXAMPLE = '1' }
+                hooks   = @{ Stop = @(@{ hooks = @(@{ type = 'command'; command = 'x' }) }) }
+            } | ConvertTo-Json -Depth 10
+            Set-Content -Path (Join-Path $claudeDir 'settings.json') -Value $settings
+        }
+
+        It 'regenerates .agents/settings.json without a hooks block but keeps env' {
+            & $script:scriptPath -Root $workDir
+            $LASTEXITCODE | Should -Be 0
+
+            $agentsSettings = Join-Path $workDir '.agents' 'settings.json'
+            Test-Path $agentsSettings | Should -Be $true
+
+            $parsed = Get-Content $agentsSettings -Raw | ConvertFrom-Json
+            $parsed.PSObject.Properties.Name | Should -Not -Contain 'hooks'
+            $parsed.env.EXAMPLE | Should -Be '1'
+        }
+    }
+
     Context 'exit codes' {
 
         It 'exits 0 on a clean run' {
