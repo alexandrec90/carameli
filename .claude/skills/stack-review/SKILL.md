@@ -48,8 +48,14 @@ If an argument was passed:
 
 Run the suggested preload command before auditing:
 
-Suggested command (run in terminal):
-`pwsh -NoProfile -ExecutionPolicy Bypass -File .claude/skills/state-tools/project-snapshot.ps1 -Sections requirements,compose,claude-md,todo,frontend-pkg,alembic-count`
+Read the following files using the Read tool (in parallel where independent):
+
+- `requirements.txt`
+- `docker-compose.yml`
+- `CLAUDE.md`
+- `todo.md`
+- `frontend/package.json`
+- Use Glob to discover: `alembic/versions/*.py` — count the results to get the migration revision count
 
 Skip to Step 4 if Step 2 handled an argument (dismiss/implement — no audit needed).
 Otherwise use the preloaded data. Reference:
