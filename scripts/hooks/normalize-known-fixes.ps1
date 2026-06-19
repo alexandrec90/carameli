@@ -7,7 +7,7 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-function Split-MarkdownCells {
+function Split-MarkdownCell {
     param(
         [Parameter(Mandatory = $true)]
         [string]$Row
@@ -51,7 +51,7 @@ function Split-MarkdownCells {
     return ,$cells
 }
 
-function Parse-IntSafe {
+function ConvertTo-IntSafe {
     param(
         [Parameter(Mandatory = $true)]
         [string]$Value
@@ -65,7 +65,7 @@ function Parse-IntSafe {
     return $null
 }
 
-function Parse-DateSafe {
+function ConvertTo-DateSafe {
     param(
         [Parameter(Mandatory = $true)]
         [string]$Value
@@ -92,7 +92,7 @@ function Parse-DateSafe {
     return $null
 }
 
-function Normalize-KnownFixesFile {
+function Update-KnownFixesFile {
     param(
         [Parameter(Mandatory = $true)]
         [string]$FilePath,
@@ -166,7 +166,7 @@ function Normalize-KnownFixesFile {
             continue
         }
 
-        $cells = Split-MarkdownCells -Row $line
+        $cells = Split-MarkdownCell -Row $line
         $normalizedCells = [System.Collections.Generic.List[string]]::new()
         foreach ($c in $cells) {
             $normalizedCells.Add($c.Trim())
@@ -191,8 +191,8 @@ function Normalize-KnownFixesFile {
             $normalizedCells.Add($addedCell.Trim())
         }
 
-        $hits = Parse-IntSafe -Value $normalizedCells[3]
-        $addedDate = Parse-DateSafe -Value $normalizedCells[5]
+        $hits = ConvertTo-IntSafe -Value $normalizedCells[3]
+        $addedDate = ConvertTo-DateSafe -Value $normalizedCells[5]
         if ($null -ne $hits -and $hits -eq 0 -and $null -ne $addedDate) {
             $ageDays = ($today - $addedDate).Days
             if ($ageDays -gt $StaleDays) {
@@ -256,7 +256,7 @@ if (-not $knownFixFiles) {
 }
 
 $results = foreach ($file in $knownFixFiles) {
-    Normalize-KnownFixesFile -FilePath $file -StaleDays $StaleDays -DryRun:$DryRun
+    Update-KnownFixesFile -FilePath $file -StaleDays $StaleDays -DryRun:$DryRun
 }
 
 $changedCount = @($results | Where-Object { $_.Changed }).Count

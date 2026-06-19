@@ -69,7 +69,7 @@ describe('api.customers.get', () => {
     const body = {
       id: 'cust-1',
       vs_customer_id: 1,
-      api_key: 'demo-key',
+      api_key: 'demo-key', // pragma: allowlist secret
       active: true,
       created_at: '2026-01-01T00:00:00Z',
     }
@@ -306,7 +306,7 @@ describe('api.extensions.add', () => {
     const payload: AddExtensionBody = {
       vs_customer_id: 1,
       extension_number: '101',
-      password: 'strong-pass',
+      password: 'strong-pass', // pragma: allowlist secret
     }
     const body = {
       id: 'ext-1',

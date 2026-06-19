@@ -82,7 +82,7 @@ function ConvertTo-RepoRelativePath {
     return $normalized.TrimStart('./')
 }
 
-function Add-ViolationFiles {
+function Add-ViolationFile {
     param(
         [Parameter(Mandatory = $true)]
         [object]$Violation,
@@ -169,7 +169,7 @@ function Get-FilesFromToolPayload {
     return @($files)
 }
 
-function Split-IntoChunks {
+function Split-IntoChunk {
     param(
         [Parameter(Mandatory = $true)]
         [string[]]$Items,
@@ -227,7 +227,7 @@ foreach ($check in $checks) {
     if ($items -is [System.Collections.IEnumerable]) {
         foreach ($item in $items) {
             $totalViolations += 1
-            Add-ViolationFiles -Violation $item -Set $allTouched -RepoRootPath $RepoRoot
+            Add-ViolationFile -Violation $item -Set $allTouched -RepoRootPath $RepoRoot
         }
     }
 }
@@ -254,7 +254,7 @@ if (-not (Test-Path -LiteralPath $batchPlanPath)) {
             $items = $violations.PSObject.Properties[$checkId].Value
             if ($items -is [System.Collections.IEnumerable]) {
                 foreach ($item in $items) {
-                    Add-ViolationFiles -Violation $item -Set $groupFiles -RepoRootPath $RepoRoot
+                    Add-ViolationFile -Violation $item -Set $groupFiles -RepoRootPath $RepoRoot
                 }
             }
         }
@@ -265,7 +265,7 @@ if (-not (Test-Path -LiteralPath $batchPlanPath)) {
         }
 
         $chunkSize = if ($groupName -eq 'high') { 1 } else { $PerBatchFileCap }
-        $chunks = Split-IntoChunks -Items $groupFileList -ChunkSize $chunkSize
+        $chunks = Split-IntoChunk -Items $groupFileList -ChunkSize $chunkSize
         $idx = 1
         foreach ($chunk in $chunks) {
             $batches += [ordered]@{

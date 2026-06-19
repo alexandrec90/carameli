@@ -19,6 +19,7 @@ Steps:
   5. Test the happy path, the 404 path, and any 409/400 paths.
 """
 
+# ruff: noqa: S101
 from __future__ import annotations
 
 from unittest.mock import AsyncMock

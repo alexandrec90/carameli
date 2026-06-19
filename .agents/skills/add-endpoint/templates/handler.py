@@ -78,8 +78,8 @@ async def create_my_entity(
 
 @router.get("/Get/{customerId}/{entityId}", response_model=MyEntityResponse)
 async def get_my_entity(
-    customerId: int,
-    entityId: str,
+    customerId: int,  # noqa: N803
+    entityId: str,  # noqa: N803
     session: Annotated[AsyncSession, Depends(get_session)],
     auth: Annotated[AuthContext, Depends(get_auth_context)],
 ) -> MyEntityResponse:

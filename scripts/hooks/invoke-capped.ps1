@@ -4,7 +4,7 @@ param(
     [string]$Command,
     [int]$MaxBytes = 4000,
     [int]$HeadBytes = 2000,
-    [switch]$TailOnTruncate = $true
+    [switch]$HeadOnly
 )
 
 $ErrorActionPreference = 'Stop'
@@ -41,7 +41,7 @@ try {
         exit $exitCode
     }
 
-    if (-not $TailOnTruncate) {
+    if ($HeadOnly) {
         $headOnly = [System.Text.Encoding]::UTF8.GetString($bytes, 0, $MaxBytes)
         Write-Output ($headOnly + "`n[truncated bytes=$($bytes.Length - $MaxBytes)]")
         exit $exitCode

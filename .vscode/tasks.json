@@ -443,37 +443,15 @@
       "problemMatcher": []
     },
     {
-      "label": "Test: Run CI Locally",
-      "type": "shell",
-      "command": "pwsh -ExecutionPolicy Bypass -File scripts/run-ci.ps1; $_ec = $LASTEXITCODE; pwsh -ExecutionPolicy Bypass -File scripts/notify.ps1 -Label 'Test: Run CI Locally' -ExitCode $_ec; exit $_ec",
-      "group": "test",
-      "presentation": {
-        "reveal": "always",
-        "panel": "new",
-        "showReuseMessage": false,
-        "close": false
-      },
-      "problemMatcher": []
-    },
-    {
-      "label": "Test: Run CI Locally (skip E2E)",
-      "type": "shell",
-      "command": "pwsh -ExecutionPolicy Bypass -File scripts/run-ci.ps1 -SkipE2E; $_ec = $LASTEXITCODE; pwsh -ExecutionPolicy Bypass -File scripts/notify.ps1 -Label 'Test: Run CI Locally (skip E2E)' -ExitCode $_ec; exit $_ec",
-      "group": "test",
-      "presentation": {
-        "reveal": "always",
-        "panel": "new",
-        "showReuseMessage": false,
-        "close": false
-      },
-      "problemMatcher": []
-    },
-    {
-      "label": "Test: Lint + pytest + E2E",
+      "label": "Test: All Checks",
       "dependsOn": [
         "Lint: Everything",
         "Test: Run pytest",
-        "Test: Run E2E (headless)"
+        "Test: Run Frontend",
+        "Test: Run E2E (headless)",
+        "Test: Run Pester (PowerShell)",
+        "Test: Run Hook Contracts (dry)",
+        "Test: Run Telnyx Sandbox"
       ],
       "dependsOrder": "parallel",
       "group": "test",
@@ -486,9 +464,9 @@
       "problemMatcher": []
     },
     {
-      "label": "CI: Check + Fix Known Issues",
+      "label": "Test: All Checks + Auto-Fix (agent)",
       "type": "shell",
-      "command": "pwsh -ExecutionPolicy Bypass -File scripts/check-and-fix-known.ps1; $_ec = $LASTEXITCODE; pwsh -ExecutionPolicy Bypass -File scripts/notify.ps1 -Label 'CI: Check + Fix Known Issues' -ExitCode $_ec; exit $_ec",
+      "command": "pwsh -ExecutionPolicy Bypass -File scripts/check-and-fix-known.ps1; $_ec = $LASTEXITCODE; pwsh -ExecutionPolicy Bypass -File scripts/notify.ps1 -Label 'Test: All Checks + Auto-Fix (agent)' -ExitCode $_ec; exit $_ec",
       "group": "test",
       "presentation": {
         "reveal": "always",

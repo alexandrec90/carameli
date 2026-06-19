@@ -7,7 +7,7 @@
 Describe 'sync-agents-context.ps1' {
 
     BeforeAll {
-        $script     = Join-Path $PSScriptRoot '..' 'sync-agents-context.ps1'
+        $script:scriptPath = Join-Path $PSScriptRoot '..' 'sync-agents-context.ps1'
         $workDir    = Join-Path $TestDrive 'workspace'
         New-Item -ItemType Directory -Path $workDir | Out-Null
     }
@@ -24,7 +24,7 @@ Describe 'sync-agents-context.ps1' {
         }
 
         It 'copies root CLAUDE.md to AGENTS.md' {
-            & $script -Root $workDir
+            & $script:scriptPath -Root $workDir
             $LASTEXITCODE | Should -Be 0
             $dest = Join-Path $workDir 'AGENTS.md'
             Test-Path $dest | Should -Be $true
@@ -32,7 +32,7 @@ Describe 'sync-agents-context.ps1' {
         }
 
         It 'copies subdir CLAUDE.md to AGENTS.md beside it' {
-            & $script -Root $workDir
+            & $script:scriptPath -Root $workDir
             $LASTEXITCODE | Should -Be 0
             $dest = Join-Path $workDir 'frontend' 'AGENTS.md'
             Test-Path $dest | Should -Be $true
@@ -41,7 +41,7 @@ Describe 'sync-agents-context.ps1' {
 
         It 'overwrites a stale AGENTS.md with the current CLAUDE.md content' {
             Set-Content -Path (Join-Path $workDir 'AGENTS.md') -Value '# Stale'
-            & $script -Root $workDir
+            & $script:scriptPath -Root $workDir
             $LASTEXITCODE | Should -Be 0
             Get-Content (Join-Path $workDir 'AGENTS.md') | Should -Be '# Root'
         }
@@ -57,7 +57,7 @@ Describe 'sync-agents-context.ps1' {
         }
 
         It 'creates .agents/ mirroring .claude/' {
-            & $script -Root $workDir
+            & $script:scriptPath -Root $workDir
             $LASTEXITCODE | Should -Be 0
             $dest = Join-Path $workDir '.agents' 'rules.md'
             Test-Path $dest | Should -Be $true
@@ -70,14 +70,14 @@ Describe 'sync-agents-context.ps1' {
             New-Item -ItemType Directory -Path $agentsDir -Force | Out-Null
             Set-Content -Path (Join-Path $agentsDir 'orphan.md') -Value 'gone'
 
-            & $script -Root $workDir
+            & $script:scriptPath -Root $workDir
             $LASTEXITCODE | Should -Be 0
             Test-Path (Join-Path $agentsDir 'orphan.md') | Should -Be $false
         }
 
         It 'succeeds and skips mirror when .claude/ does not exist' {
             Remove-Item -Recurse -Force (Join-Path $workDir '.claude') -ErrorAction SilentlyContinue
-            { & $script -Root $workDir } | Should -Not -Throw
+            { & $script:scriptPath -Root $workDir } | Should -Not -Throw
             $LASTEXITCODE | Should -Be 0
         }
     }
@@ -86,7 +86,7 @@ Describe 'sync-agents-context.ps1' {
 
         It 'exits 0 on a clean run' {
             Set-Content -Path (Join-Path $workDir 'CLAUDE.md') -Value '# Root'
-            & $script -Root $workDir
+            & $script:scriptPath -Root $workDir
             $LASTEXITCODE | Should -Be 0
         }
     }

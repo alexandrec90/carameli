@@ -27,7 +27,7 @@ import { useDashboard } from '../../hooks/useDashboard'
 const demoCustomer: Customer = {
   id: 'cust-1',
   vs_customer_id: 1,
-  api_key: 'demo-key',
+  api_key: 'demo-key', // pragma: allowlist secret
   active: true,
   created_at: '2026-01-01T00:00:00Z',
 }

@@ -1,23 +1,33 @@
 # Runs lint, pytest, and E2E checks in sequence.
 # For each check type, if failures are detected:
-#   1. Call copilot haiku with <skill> known-only  -- fast pass for recognized patterns.
-#   2. If unknown errors remain in the log, call copilot sonnet with <skill> -- full pass.
+#   1. Call the agent (cheap model) with <skill> known-only  -- fast pass for recognized patterns.
+#   2. If unknown errors remain in the log, call the agent (full model) with <skill> -- full pass.
 #   3. Re-run the check.
 #   4. Repeat up to MAX_RETRIES times, then give up and move on.
 #
 # Usage:
-#   .\scripts\check-and-fix-known.ps1
+#   .\scripts\check-and-fix-known.ps1                  # defaults to claude
+#   .\scripts\check-and-fix-known.ps1 -AgentCli copilot
+#   .\scripts\check-and-fix-known.ps1 -AgentCli codex
+param(
+    [ValidateSet("claude", "copilot", "codex")]
+    [string]$AgentCli = "claude"
+)
 
 $ErrorActionPreference = "Continue"
 
 $MAX_RETRIES = 3
-$MODEL_CHEAP = "claude-haiku-4.5"    # fast model for known-pattern pass
-$MODEL_FULL = "claude-sonnet-4.6"   # full model for unknown errors
+# Model IDs differ slightly per CLI (claude uses dashes, copilot uses dots).
+$MODEL_CHEAP, $MODEL_FULL = switch ($AgentCli) {
+    "copilot" { "claude-haiku-4.5",        "claude-sonnet-4.6" }
+    default   { "claude-haiku-4-5-20251001", "claude-sonnet-4-6" }
+}
 $branchCreated = $false
 
 # Structured run log -- written to logs/agent/ for optimize-fixers analysis.
 $script:runLog = [ordered]@{
     run_at      = (Get-Date -Format 'yyyy-MM-ddTHH:mm:ss')
+    agent_cli   = $AgentCli
     models      = [ordered]@{ cheap = $MODEL_CHEAP; full = $MODEL_FULL }
     max_retries = $MAX_RETRIES
     checks      = [System.Collections.Generic.List[object]]::new()
@@ -38,6 +48,18 @@ function Initialize-SandboxBranch {
         Write-Host "Sandbox branch: $branch" -ForegroundColor DarkGray
     }
     $script:branchCreated = $true
+}
+
+# Invokes the configured coding agent CLI with the given skill prompt and model.
+# Skills are slash commands for claude (/fix-lint), plain names for copilot/codex.
+function Invoke-Agent {
+    param([string]$Prompt, [string]$Model)
+    switch ($script:AgentCli) {
+        "claude"  { claude  -p "/$Prompt" --model $Model --dangerously-skip-permissions }
+        "copilot" { copilot -p $Prompt    --model $Model --yolo }
+        "codex"   { codex   -p $Prompt    --model $Model }
+        default   { Write-Error "Unknown agent CLI: '$($script:AgentCli)'. Supported: claude, copilot, codex"; exit 1 }
+    }
 }
 
 # Returns $true when the log exists, is non-empty, and has NOT been stamped
@@ -110,14 +132,14 @@ function Invoke-CheckAndFix {
 
         # Step 1: cheap model handles known patterns -- fast pass
         Write-Host "  [$MODEL_CHEAP] $FixSkill known-only ..." -ForegroundColor DarkGray
-        copilot -p "$FixSkill known-only" --model $MODEL_CHEAP --yolo
+        Invoke-Agent -Prompt "$FixSkill known-only" -Model $MODEL_CHEAP
 
         # Step 2: if unknown errors remain, escalate to full model
         if (Test-LogHasUnaddressedError -LogPath $LogPath) {
             $attemptLog.had_unaddressed_before_full = $true
             $attemptLog.full_invoked = $true
             Write-Host "  [$MODEL_FULL] Unknown errors remain -- running $FixSkill (full) ..." -ForegroundColor DarkGray
-            copilot -p "$FixSkill" --model $MODEL_FULL --yolo
+            Invoke-Agent -Prompt "$FixSkill" -Model $MODEL_FULL
         }
         else {
             Write-Host "  [$MODEL_CHEAP] All errors matched known fixes -- full model not needed." -ForegroundColor DarkGray
@@ -162,7 +184,7 @@ function Invoke-CheckAndFix {
                 if ($healthContent -match "Unhealthy|Exited|exited|Restarting|FAIL") {
                     Write-Host "  Docker health issues detected -- running fix-docker ..." -ForegroundColor Yellow
                     $attemptLog.docker_fix_triggered = $true
-                    copilot -p "fix-docker" --model $MODEL_FULL --yolo
+                    Invoke-Agent -Prompt "fix-docker" -Model $MODEL_FULL
                 }
             }
 
