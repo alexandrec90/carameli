@@ -104,7 +104,10 @@ When adding a pip package, add it to `requirements.txt` (runtime) or `requiremen
 
 ## Testing
 
-Every code change must include tests in the same commit.
+Every code change must include tests in the same commit. Every endpoint and every
+testable unit of logic must have test coverage — gaps are not acceptable. If you
+add or touch something that has no test, write the test in the same commit even if
+the logic itself didn't change.
 
 - New endpoint/service: cover happy path, error cases, and edge cases
 - Bug fix: write a regression test first
