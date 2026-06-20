@@ -451,3 +451,115 @@ async def test_add_phone_line_country_code_lowercased_accepted(client) -> None:
     )
     assert resp.status_code == 201
     app.state.carrier.search_numbers.assert_awaited_once_with("523", 1, country_code="US")
+
+
+# ---------------------------------------------------------------------------
+# PUT /SetAutoAttendant
+# ---------------------------------------------------------------------------
+
+
+async def _provision_line(client, vs_id: int, phone_number: str, area_code: str) -> None:
+    await _create_customer(client, vs_id)
+    from app.main import app
+
+    app.state.carrier.search_numbers = AsyncMock(return_value=[{"phone_number": phone_number}])
+    app.state.carrier.provision_number = AsyncMock(
+        return_value={"sid": f"PNaa{vs_id}", "phone_number": phone_number}
+    )
+    resp = await client.post(
+        f"{_LINE_BASE}/Add",
+        json={"vs_customer_id": vs_id, "area_code": area_code},
+        headers=AUTH_HEADERS,
+    )
+    assert resp.status_code == 201
+
+
+async def test_set_auto_attendant_enable(client) -> None:
+    await _provision_line(client, 5200, "+15205550100", "520")
+    resp = await client.put(
+        f"{_LINE_BASE}/SetAutoAttendant",
+        json={
+            "vs_customer_id": 5200,
+            "phone_number": "+15205550100",
+            "enabled": True,
+            "max_digits": 1,
+        },
+        headers=AUTH_HEADERS,
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["auto_attendant_enabled"] is True
+    assert data["auto_attendant_max_digits"] == 1
+
+
+async def test_set_auto_attendant_disable(client) -> None:
+    await _provision_line(client, 5201, "+15215550100", "521")
+    # First enable it
+    await client.put(
+        f"{_LINE_BASE}/SetAutoAttendant",
+        json={
+            "vs_customer_id": 5201,
+            "phone_number": "+15215550100",
+            "enabled": True,
+            "max_digits": 3,
+        },
+        headers=AUTH_HEADERS,
+    )
+    # Then disable — max_digits not required when disabling
+    resp = await client.put(
+        f"{_LINE_BASE}/SetAutoAttendant",
+        json={
+            "vs_customer_id": 5201,
+            "phone_number": "+15215550100",
+            "enabled": False,
+        },
+        headers=AUTH_HEADERS,
+    )
+    assert resp.status_code == 200
+    assert resp.json()["auto_attendant_enabled"] is False
+
+
+async def test_set_auto_attendant_enabled_without_max_digits_returns_400(client) -> None:
+    await _provision_line(client, 5202, "+15225550200", "522")
+    resp = await client.put(
+        f"{_LINE_BASE}/SetAutoAttendant",
+        json={
+            "vs_customer_id": 5202,
+            "phone_number": "+15225550200",
+            "enabled": True,
+        },
+        headers=AUTH_HEADERS,
+    )
+    assert resp.status_code == 400
+    assert resp.json()["detail"] == "max_digits is required when enabled=true"
+
+
+async def test_set_auto_attendant_unknown_customer_returns_404(client) -> None:
+    resp = await client.put(
+        f"{_LINE_BASE}/SetAutoAttendant",
+        json={
+            "vs_customer_id": 99980,
+            "phone_number": "+10000000000",
+            "enabled": True,
+            "max_digits": 1,
+        },
+        headers=AUTH_HEADERS,
+    )
+    assert resp.status_code == 404
+    assert resp.json()["detail"] == "Customer not found"
+
+
+async def test_set_auto_attendant_unknown_line_returns_404(client) -> None:
+    await _create_customer(client, 5203)
+    resp = await client.put(
+        f"{_LINE_BASE}/SetAutoAttendant",
+        json={
+            "vs_customer_id": 5203,
+            "phone_number": "+10000000099",
+            "enabled": True,
+            "max_digits": 2,
+        },
+        headers=AUTH_HEADERS,
+    )
+    assert resp.status_code == 404
+    assert resp.json()["detail"] == "Phone line not found"
