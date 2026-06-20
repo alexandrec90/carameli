@@ -1,0 +1,25 @@
+# Example task — read-only, so it's safe to run repeatedly and proves the pipeline
+# end to end without editing files.
+#
+# The voip-providers rule states business logic imports only from
+# services/providers/base.py, never from a concrete provider. With the rule loaded
+# the agent should answer correctly in very few tool calls; the baseline provider
+# has to grep the tree to find out (more tool calls, sometimes wrong).
+#
+# This is the shape every task takes: a prompt + asserts on correctness AND on the
+# behavioral metrics the provider returns. Destructive fixer tasks follow the same
+# shape but the prompt invokes a /fix-* skill and an assert runs the target test
+# in the worktree.
+
+- vars:
+    prompt: >-
+      In this codebase, business logic such as call_control.py and did_manager.py
+      must import VoIP providers from exactly one module. Which module file is it?
+      Answer with just the file path, nothing else.
+  assert:
+    - type: icontains
+      value: base.py
+    # Correctness alone isn't the point — the instructions should also make the
+    # agent reach the answer cheaply. Compare this number across the two providers.
+    - type: javascript
+      value: '(context.providerResponse?.metadata?.toolCalls ?? 99) <= 4'

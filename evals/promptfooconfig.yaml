@@ -1,0 +1,43 @@
+# Carameli — instruction-file effectiveness evals.
+#
+# Two providers run the SAME tasks: one with the repo's instruction files, one
+# with CLAUDE.md + .claude/ stripped out of the worktree. Comparing their columns
+# (correctness, tool calls, failed calls, tokens, cost) is the with/without
+# baseline — it shows whether the instructions actually change agent behavior.
+#
+# Run:   npm run eval
+# View:  npm run eval:view
+#
+# NOTE: each test spawns a real Claude Code agent in a throwaway git worktree, so
+# runs are slow and consume Claude credits. Keep the task suite small and focused.
+# The worktree is taken from committed HEAD — commit instruction edits before
+# evaluating, or uncommitted changes won't be measured.
+
+description: Carameli instruction-file effectiveness
+
+# Each task supplies its instruction as a `prompt` var; pass it straight through to
+# the agent provider.
+prompts:
+  - '{{prompt}}'
+
+providers:
+  - id: file://providers/claude-skill-provider.cjs
+    label: with-instructions
+    config:
+      baseRef: HEAD
+  - id: file://providers/claude-skill-provider.cjs
+    label: baseline-no-instructions
+    config:
+      baseRef: HEAD
+      stripInstructions: true
+
+# Behavioral guardrails applied to every task, on top of each task's own asserts.
+# Metrics come back on the provider response; access them defensively because the
+# baseline provider may legitimately spiral.
+defaultTest:
+  assert:
+    - type: javascript
+      value: '(context.providerResponse?.metadata?.failedToolCalls ?? 0) <= 2'
+
+tests:
+  - tasks/*/test.yaml

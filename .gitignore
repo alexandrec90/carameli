@@ -112,5 +112,10 @@ VanillaLand/
 
 todo.md
 
+# promptfoo eval cache / outputs
+.promptfoo/
+evals/output/
+evals/.last-run.json
+
 # Claude Code local settings (personal permissions / preferences)
 .claude/settings.local.json

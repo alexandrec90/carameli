@@ -10,7 +10,11 @@
   "devDependencies": {
     "@playwright/test": "^1.58.2",
     "@types/node": "^25.5.0",
+    "promptfoo": "^0.121.17",
     "sharp": "^0.34.0"
   },
-  "scripts": {}
+  "scripts": {
+    "eval": "promptfoo eval -c evals/promptfooconfig.yaml",
+    "eval:view": "promptfoo view"
+  }
 }

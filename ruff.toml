@@ -1,6 +1,9 @@
 target-version = "py312"
 line-length = 100
 
+# Eval fixtures are intentionally broken test data — never lint them.
+extend-exclude = ["evals/fixtures"]
+
 [lint]
 select = ["E", "F", "I", "UP", "B", "ASYNC", "S", "SIM", "T20", "N", "RUF"]
 

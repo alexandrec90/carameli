@@ -1,0 +1,29 @@
+# Destructive-task template: evaluates the /fix-tests skill end to end.
+#
+# Flow (all inside a throwaway worktree — the real repo is never touched):
+#   1. setup.cjs seeds logs/test-failures.log describing a failing test
+#   2. the agent runs /fix-tests, which should repair the committed broken fixture
+#   3. verify.cjs runs the repaired code and reports pass/fail as metadata
+#
+# Run with both providers (with-instructions vs baseline) to see whether the
+# fix-tests skill + known-fixes short-circuit actually help: compare verifyPassed,
+# readsBeforeFirstEdit (spiral), failedToolCalls, and tokens across the columns.
+#
+# NOTE: the worktree is checked out from committed HEAD, so the fixture and this
+# task must be committed before `npm run eval` — uncommitted files won't be present.
+
+- vars:
+    prompt: /fix-tests
+    setup: tasks/fix-tests-logic-bug/setup.cjs
+    verify: tasks/fix-tests-logic-bug/verify.cjs
+  assert:
+    # Correctness: the bug is actually fixed.
+    - type: javascript
+      value: context.providerResponse?.metadata?.verifyPassed === true
+    # The agent acted rather than just reporting.
+    - type: javascript
+      value: context.providerResponse?.metadata?.madeAnEdit === true
+    # Spiral guard — should reach the fix without reading half the repo. Tune the
+    # threshold once you have a baseline number from a real run.
+    - type: javascript
+      value: '(context.providerResponse?.metadata?.readsBeforeFirstEdit ?? 99) <= 6'
