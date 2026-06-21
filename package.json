@@ -14,7 +14,12 @@
     "sharp": "^0.34.0"
   },
   "scripts": {
-    "eval": "promptfoo eval -c evals/promptfooconfig.yaml",
-    "eval:view": "promptfoo view"
+    "eval": "promptfoo eval -c evals/promptfooconfig.yaml -o evals/output/latest.json",
+    "eval:view": "promptfoo view",
+    "eval:summary": "node evals/summarize.cjs",
+    "eval:coverage": "node evals/ablate.cjs --coverage",
+    "eval:ablate": "node evals/ablate.cjs",
+    "eval:rewrite": "node evals/rewrite.cjs",
+    "eval:section": "node evals/section-ablate.cjs"
   }
 }

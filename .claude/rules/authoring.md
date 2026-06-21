@@ -9,6 +9,35 @@ paths:
 
 # Rule: Rules & Skills Authoring
 
+## Eval coverage is mandatory for instruction files
+
+Instruction files are tested like code. The `evals/` promptfoo harness measures whether
+a `CLAUDE.md`, a `.claude/rules/*` file, or a `.claude/skills/*` skill actually changes
+agent behavior (with-instructions vs a leave-one-out ablation). **Treat a new or
+substantially changed instruction file the same way you treat new code: it ships with a
+test in the same change.**
+
+- **New skill, or new/rewritten rule:** add an eval task under
+  `evals/tasks/<name>/test.yaml` whose `metadata.targets` names the file, and whose
+  prompt + asserts only pass when that file's guidance is in effect. This is the
+  instruction-file analogue of the unit/integration-test mandate in the root `CLAUDE.md`.
+- **Pick a discriminating prompt.** The task must measurably fail (or behave worse) when
+  the file is ablated — otherwise it proves nothing. Verify with
+  `npm run eval:ablate -- <path>`: the with-instructions arm should beat the ablated one.
+- **`/skill` tasks need a `baselinePrompt`** (the skill's plain-English equivalent) so the
+  ablated/baseline arm is a fair "skill vs unguided agent" comparison, not an unresolved
+  command. Weight the correctness assert above the efficiency asserts (see any existing
+  `test.yaml`).
+- **Fixer skills** (`fix-*`) follow the destructive-task template: a committed broken
+  fixture under `evals/fixtures/`, a `setup.cjs` that seeds the skill's log artifact, and
+  a `verify.cjs` that confirms the repair. Copy an existing `evals/tasks/fix-*/` as the
+  starting point.
+- **Run `npm run eval:coverage`** to confirm the file is no longer a gap.
+- **Genuinely untestable by the harness?** A few skills can't be evaluated headless — they
+  read live editor diagnostics (`fix-problems`) or drive a live runner/stack
+  (`fix-tests-auto`, aggregates like `fix-all`). Document the exclusion and the reason in
+  `evals/README.md` rather than shipping a flaky test.
+
 ## CLAUDE.md files
 
 - **No command instructions** — never document `npm run …`, `pwsh …`, or other CLI

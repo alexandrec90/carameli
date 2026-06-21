@@ -11,15 +11,27 @@
 # shape but the prompt invokes a /fix-* skill and an assert runs the target test
 # in the worktree.
 
-- vars:
+- metadata:
+    # Instruction files this task is meant to exercise. `npm run eval:ablate <file>`
+    # leaves one of these out and re-measures; `npm run eval:coverage` uses them to
+    # find instruction files that no task tests yet.
+    targets:
+      - .claude/rules/voip-providers.md
+  vars:
     prompt: >-
       In this codebase, business logic such as call_control.py and did_manager.py
       must import VoIP providers from exactly one module. Which module file is it?
       Answer with just the file path, nothing else.
+  # Weighted: getting the right module dominates; the tool-call ceiling is a
+  # secondary signal that shows up in the delta rather than hard-failing a correct
+  # answer. Pass = weighted score >= 0.7.
+  threshold: 0.7
   assert:
     - type: icontains
       value: base.py
+      weight: 3
     # Correctness alone isn't the point — the instructions should also make the
     # agent reach the answer cheaply. Compare this number across the two providers.
     - type: javascript
       value: '(context.providerResponse?.metadata?.toolCalls ?? 99) <= 4'
+      weight: 1

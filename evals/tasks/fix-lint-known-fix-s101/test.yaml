@@ -1,0 +1,26 @@
+# Second fix-lint scenario: an S101 error that MATCHES a known-fixes.md row, so it
+# exercises the skill's known-fix short-circuit (the unused-import task tests the
+# diagnose-from-scratch path). This is the task to pair with section-ablation of the
+# "Known-fix matching" section — see section-ablate.cjs.
+
+- metadata:
+    targets:
+      - .claude/skills/fix-lint
+  vars:
+    prompt: /fix-lint
+    baselinePrompt: >-
+      Lint errors are recorded in logs/lint-errors.log. Read that log, open the
+      implicated file, and resolve the reported lint violation with the smallest edit.
+    setup: tasks/fix-lint-known-fix-s101/setup.cjs
+    verify: tasks/fix-lint-known-fix-s101/verify.cjs
+  threshold: 0.7
+  assert:
+    - type: javascript
+      value: context.providerResponse?.metadata?.verifyPassed === true
+      weight: 3
+    - type: javascript
+      value: context.providerResponse?.metadata?.madeAnEdit === true
+      weight: 1
+    - type: javascript
+      value: '(context.providerResponse?.metadata?.readsBeforeFirstEdit ?? 99) <= 6'
+      weight: 1

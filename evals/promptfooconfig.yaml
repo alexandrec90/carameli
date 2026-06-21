@@ -31,6 +31,25 @@ providers:
       baseRef: HEAD
       stripInstructions: true
 
+  # ---- Leave-one-out ablation (worked example) ------------------------------
+  # To measure what ONE instruction file is worth, run the suite with just that
+  # file removed and compare against `with-instructions`. The provider below
+  # ablates the voip-providers rule — uncomment it and run `npm run eval` to see
+  # the import-boundary task's tool-call count climb when the rule is gone.
+  #
+  # Leaving it commented keeps the default run cheap (extra providers multiply
+  # every task's cost). For routine per-file ablation use the on-demand driver
+  # instead, which scopes the run to only the tasks that target the file:
+  #   npm run eval:ablate -- .claude/rules/voip-providers.md
+  #   npm run eval:coverage          # which files have a test yet (free)
+  #
+  # - id: file://providers/claude-skill-provider.cjs
+  #   label: ablate-voip-providers
+  #   config:
+  #     baseRef: HEAD
+  #     stripPaths:
+  #       - .claude/rules/voip-providers.md
+
 # Behavioral guardrails applied to every task, on top of each task's own asserts.
 # Metrics come back on the provider response; access them defensively because the
 # baseline provider may legitimately spiral.

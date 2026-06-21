@@ -1,0 +1,26 @@
+# Evaluates the /fix-docker skill end to end. setup.cjs seeds logs/docker/build.log
+# with a config failure naming a committed compose fixture that has a typo'd env key;
+# the skill should correct the key; verify.cjs confirms. The fix is a markdown-free
+# config edit, so no Docker daemon is needed to grade it.
+
+- metadata:
+    targets:
+      - .claude/skills/fix-docker
+  vars:
+    prompt: /fix-docker
+    baselinePrompt: >-
+      A Docker stack failure is captured under logs/docker/. Read those artifacts,
+      open the file named in the error, and fix the configuration with a minimal edit.
+    setup: tasks/fix-docker-env-typo/setup.cjs
+    verify: tasks/fix-docker-env-typo/verify.cjs
+  threshold: 0.7
+  assert:
+    - type: javascript
+      value: context.providerResponse?.metadata?.verifyPassed === true
+      weight: 3
+    - type: javascript
+      value: context.providerResponse?.metadata?.madeAnEdit === true
+      weight: 1
+    - type: javascript
+      value: '(context.providerResponse?.metadata?.readsBeforeFirstEdit ?? 99) <= 6'
+      weight: 1

@@ -12,18 +12,39 @@
 # NOTE: the worktree is checked out from committed HEAD, so the fixture and this
 # task must be committed before `npm run eval` — uncommitted files won't be present.
 
-- vars:
+- metadata:
+    # Instruction files this task exercises (see eval:ablate / eval:coverage).
+    # Ablating the skill dir makes the /fix-tests arm fall back to baselinePrompt,
+    # so ablation measures "skill vs unguided agent".
+    targets:
+      - .claude/skills/fix-tests
+  vars:
     prompt: /fix-tests
+    # The stripped baseline has no /fix-tests skill, so a bare "/fix-tests" would
+    # just error ("Unknown skill") — that measures nothing. Hand the baseline the
+    # skill's plain-English job instead, so the comparison is "skill scaffolding vs
+    # an unguided agent on the same problem". The with-instructions arm ignores this
+    # and runs the real /fix-tests.
+    baselinePrompt: >-
+      The test suite is failing. The failure is recorded in logs/test-failures.log.
+      Read that log, find the bug in the implicated source file, and fix it.
     setup: tasks/fix-tests-logic-bug/setup.cjs
     verify: tasks/fix-tests-logic-bug/verify.cjs
+  # Weighted so correctness dominates: a run that actually repairs the bug passes
+  # even if it was a little inefficient. Efficiency asserts still count — they pull
+  # the score down and show up in the with-vs-baseline delta — but they no longer
+  # flip a correct fix to a hard FAIL on their own. Pass = weighted score >= 0.7.
+  threshold: 0.7
   assert:
-    # Correctness: the bug is actually fixed.
+    # Correctness: the bug is actually fixed. This is the point of the task.
     - type: javascript
       value: context.providerResponse?.metadata?.verifyPassed === true
+      weight: 3
     # The agent acted rather than just reporting.
     - type: javascript
       value: context.providerResponse?.metadata?.madeAnEdit === true
-    # Spiral guard — should reach the fix without reading half the repo. Tune the
-    # threshold once you have a baseline number from a real run.
+      weight: 1
+    # Spiral guard — should reach the fix without reading half the repo.
     - type: javascript
       value: '(context.providerResponse?.metadata?.readsBeforeFirstEdit ?? 99) <= 6'
+      weight: 1

@@ -1,0 +1,9 @@
+# Fixture for the fix-docker eval task. The app service declares a typo'd env key
+# (DATABSE_URL) so the container can't find DATABASE_URL. The fix corrects the key.
+# This is a standalone fixture, not part of the real stack (root docker-compose.yml).
+# Leave it broken; it is the test data.
+services:
+  app:
+    image: carameli/app
+    environment:
+      DATABSE_URL: postgres://db:5432/carameli

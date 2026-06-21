@@ -1,0 +1,25 @@
+# Evaluates the /fix-logs skill end to end. setup.cjs seeds logs/log-errors.log
+# (pipe format) describing a KeyError in a committed fixture; the skill should make
+# the function default the missing key; verify.cjs runs it to confirm.
+
+- metadata:
+    targets:
+      - .claude/skills/fix-logs
+  vars:
+    prompt: /fix-logs
+    baselinePrompt: >-
+      A runtime error is recorded in logs/log-errors.log. Read that log, open the
+      implicated source file, and fix the bug with the smallest reasonable edit.
+    setup: tasks/fix-logs-runtime-error/setup.cjs
+    verify: tasks/fix-logs-runtime-error/verify.cjs
+  threshold: 0.7
+  assert:
+    - type: javascript
+      value: context.providerResponse?.metadata?.verifyPassed === true
+      weight: 3
+    - type: javascript
+      value: context.providerResponse?.metadata?.madeAnEdit === true
+      weight: 1
+    - type: javascript
+      value: '(context.providerResponse?.metadata?.readsBeforeFirstEdit ?? 99) <= 6'
+      weight: 1

@@ -112,9 +112,10 @@ VanillaLand/
 
 todo.md
 
-# promptfoo eval cache / outputs
+# promptfoo eval cache / outputs (keep the dir, ignore the generated artifacts)
 .promptfoo/
-evals/output/
+evals/output/*
+!evals/output/.gitkeep
 evals/.last-run.json
 
 # Claude Code local settings (personal permissions / preferences)

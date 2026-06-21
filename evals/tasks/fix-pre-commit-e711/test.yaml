@@ -1,0 +1,25 @@
+# Evaluates the /fix-pre-commit skill end to end. setup.cjs seeds
+# logs/pre-commit-errors.log with a failed ruff hook pointing at a committed fixture
+# carrying an E711; the skill should fix the comparison; verify.cjs confirms.
+
+- metadata:
+    targets:
+      - .claude/skills/fix-pre-commit
+  vars:
+    prompt: /fix-pre-commit
+    baselinePrompt: >-
+      Pre-commit hook errors are recorded in logs/pre-commit-errors.log. Read that
+      log, open the implicated file, and fix the reported violation with a minimal edit.
+    setup: tasks/fix-pre-commit-e711/setup.cjs
+    verify: tasks/fix-pre-commit-e711/verify.cjs
+  threshold: 0.7
+  assert:
+    - type: javascript
+      value: context.providerResponse?.metadata?.verifyPassed === true
+      weight: 3
+    - type: javascript
+      value: context.providerResponse?.metadata?.madeAnEdit === true
+      weight: 1
+    - type: javascript
+      value: '(context.providerResponse?.metadata?.readsBeforeFirstEdit ?? 99) <= 6'
+      weight: 1

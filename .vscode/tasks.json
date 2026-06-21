@@ -541,6 +541,31 @@
         "close": false
       },
       "problemMatcher": []
+    },
+    {
+      "label": "Eval: Instruction Files (promptfoo)",
+      "type": "shell",
+      "command": "npm run eval; $_ec = $LASTEXITCODE; npm run eval:summary; pwsh -ExecutionPolicy Bypass -File scripts/notify.ps1 -Label 'Eval: Instruction Files (promptfoo)' -ExitCode $_ec; exit $_ec",
+      "group": "test",
+      "presentation": {
+        "reveal": "always",
+        "panel": "new",
+        "showReuseMessage": false,
+        "close": false
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Eval: View Results (promptfoo)",
+      "type": "shell",
+      "command": "npm run eval:view",
+      "presentation": {
+        "reveal": "always",
+        "panel": "new",
+        "showReuseMessage": false,
+        "close": false
+      },
+      "problemMatcher": []
     }
   ],
   "inputs": [
