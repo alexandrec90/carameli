@@ -1,0 +1,20 @@
+# Read-only coverage for app/services/CLAUDE.md. "Which is the ONLY service that
+# breaks the thin-wrapper pattern" is stated in that file; deriving it from code means
+# reading every service, so the file should win on tool calls (and often correctness).
+
+- metadata:
+    targets:
+      - app/services/CLAUDE.md
+  vars:
+    prompt: >-
+      In the services layer, which single service module is the only one that breaks
+      the thin-wrapper pattern, running as a scheduled (ARQ cron) background job?
+      Answer with just the file name, nothing else.
+  threshold: 0.7
+  assert:
+    - type: icontains
+      value: call_sync
+      weight: 3
+    - type: javascript
+      value: '(context.providerResponse?.metadata?.toolCalls ?? 99) <= 6'
+      weight: 1
