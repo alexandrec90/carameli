@@ -42,6 +42,8 @@ jobs:
       - run: pip install -r requirements.txt -r requirements-dev.txt
       - name: Prepare reports directory
         run: mkdir -p reports
+      - name: Apply migrations
+        run: alembic upgrade head
       - name: Run backend unit tests
         run: pytest tests/unit/ -x -q --tb=short --junit-xml=reports/junit-unit.xml
       - name: Run critical integration tests

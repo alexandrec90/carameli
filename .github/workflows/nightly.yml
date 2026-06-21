@@ -36,6 +36,8 @@ jobs:
       - run: pip install -r requirements.txt -r requirements-dev.txt
       - name: Prepare reports directory
         run: mkdir -p reports
+      - name: Apply migrations
+        run: alembic upgrade head
       - name: Full unit suite
         run: pytest tests/unit/ -q --tb=short --junit-xml=reports/junit-unit-nightly.xml
       - name: Full integration suite

@@ -102,7 +102,11 @@ always has something to work with.
   the agent in the next run.
 - On **fail**: overwrite the artifact entirely -- never append to previous runs.
 - Artifact paths are fixed contracts consumed by skills:
-  - `logs/lint-errors.log` (lint-all.ps1)
-  - `logs/test-failures.log` (run-tests.ps1)
+  - `logs/lint-errors.log` — written by `scripts/lint-all.ps1` (local) or `scripts/ci-digest.py` (CI)
+  - `logs/test-failures.log` — written by `scripts/run-tests.ps1` (local) or `scripts/ci-digest.py` (CI)
   - `logs/pre-commit-errors.log` (pre-commit.ps1)
   - `logs/docker/health.log`, `logs/docker/config.log`, `logs/docker/app-logs.log` (docker-status.ps1)
+- `scripts/ci-digest.py` is the CI equivalent of the two PS1 scripts above. It reads
+  raw tool output from `reports/<tool>.txt` + `reports/<tool>.exit` (written by
+  `.github/workflows/on-demand.yml`) and applies identical filtering, producing the
+  same artifact format so `fix-lint` and `fix-tests` work unchanged in both environments.

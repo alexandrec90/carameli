@@ -65,6 +65,8 @@ jobs:
           cache: pip
       - run: pip install -r requirements.txt -r requirements-dev.txt
       - run: mkdir -p reports
+      - name: Apply migrations
+        run: alembic upgrade head
       - run: pytest tests/integration/test_resilience.py -v --junit-xml=reports/junit-resilience-weekly.xml
       - name: Upload resilience result
         if: always()

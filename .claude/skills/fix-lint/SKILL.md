@@ -6,8 +6,9 @@ description: 'Fixes lint errors from logs/lint-errors.log (written by the Lint: 
 
 # Skill: Fix Lint Errors
 
-> **Local session only.** This skill reads log artifacts written by PS1 scripts
-> on the host machine. It cannot run in web or mobile sessions.
+> **Cross-environment.** Reads `logs/lint-errors.log`, which is produced by either
+> the local **Lint: Everything** VS Code task (desktop) or the **On-Demand Lint + Test**
+> GitHub Actions workflow (mobile). Open the PR created by that workflow, then run this skill.
 
 Fix actionable lint errors collected in `logs/lint-errors.log`.
 

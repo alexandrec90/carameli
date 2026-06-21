@@ -6,8 +6,9 @@ description: 'Fixes test failures from logs/test-failures.log (written by the Te
 
 # Skill: Fix Test Failures
 
-> **Local session only.** This skill reads log artifacts written by PS1 scripts
-> on the host machine. It cannot run in web or mobile sessions.
+> **Cross-environment.** Reads `logs/test-failures.log`, which is produced by either
+> the local **Test: Run pytest** VS Code task (desktop) or the **On-Demand Lint + Test**
+> GitHub Actions workflow (mobile). Open the PR created by that workflow, then run this skill.
 
 Fix failing tests collected in `logs/test-failures.log`.
 
