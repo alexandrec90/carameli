@@ -10,7 +10,19 @@ description: 'Fixes lint errors from logs/lint-errors.log (written by the Lint: 
 > the local **Lint: Everything** VS Code task (desktop) or the **On-Demand Lint + Test**
 > GitHub Actions workflow (mobile). Open the PR created by that workflow, then run this skill.
 
-Fix actionable lint errors collected in `logs/lint-errors.log`.
+Fix actionable lint errors collected in `logs/lint-errors.log`. Lint fixes are plain
+source edits — identical in every environment.
+
+**Drive it to green — don't hand a half-fixed state back to a human.** Fix everything in
+the log, then regenerate it and keep going until it's empty:
+
+- **Desktop:** re-run the **Lint: Everything** task (it overwrites the log) and loop on
+  what's left.
+- **CI:** push your fixes; the workflow re-runs, regenerates the log, and the loop
+  re-enters on the refreshed version.
+
+This is a verify-and-loop *between* passes, not per edit — while fixing a batch, diagnose
+from the log and use targeted single-file rechecks (below), not full re-runs.
 
 ---
 
@@ -21,18 +33,17 @@ Read these two files **in parallel** (single tool call):
 - `logs/lint-errors.log`
 - `.claude/skills/fix-lint/known-fixes.md`
 
-If the log file does not exist or is empty, tell the user to run the **Lint: Everything**
-task first, then stop.
+An empty log means lint is green — you're done; stop. If the log doesn't exist at all,
+diagnostics haven't run yet: generate it (desktop: run the **Lint: Everything** task; CI:
+the workflow produces it) and proceed once it's present.
 
 ### Addressed check
 
-If the last line of `logs/lint-errors.log` is `--- ADDRESSED`, the errors have already
-been fixed. Tell the user:
-
-> These lint errors were already addressed. Re-run the **Lint: Everything** task and
-> invoke `/fix-lint` again if new errors appear.
-
-Then **stop**.
+If the last line of `logs/lint-errors.log` is `--- ADDRESSED`, this log was already fixed
+and is stale. Don't re-fix it — regenerate it first: re-run the **Lint: Everything** task
+(desktop) or push and let the workflow re-run (CI). Then continue on the fresh log if it
+still has errors, or stop if it's empty. **Do not apply fixes against an `--- ADDRESSED`
+log.**
 
 ### Log quality gate
 
@@ -46,11 +57,14 @@ Before investing in fixes, scan the log for these signals of incomplete diagnost
 If **any** quality problem is found:
 
 1. Identify which linter(s) are affected.
-2. Update `scripts/lint-all.ps1` to broaden the filter for those linters (switch to
-   `--output-format=full`, `-f parsable`, or widen the `Where-Object` regex for that section).
-3. Tell the user: what was wrong, what was changed, and ask them to re-run the
-   **Lint: Everything** task.
-4. **Stop** — do not attempt fixes on a low-quality log.
+2. Broaden the filter for those linters in the script named on the log's `# source:`
+   header line (switch to `--output-format=full`, `-f parsable`, or widen the keep-regex
+   for that section). `ci-digest.py` and `lint-all.ps1` share filter logic — if you change
+   one, change the other to match.
+3. Note what was wrong and what you changed, then regenerate the log with the improved
+   filter (desktop: re-run **Lint: Everything**; CI: push) and restart from Step 1 on the
+   higher-quality output.
+4. Do not attempt fixes on the current low-quality log — fix the filter first.
 
 ### Known-fix matching (mandatory — do this BEFORE any other file reads)
 
@@ -118,12 +132,13 @@ Delete rows where **Hits = 0** and **Added** is more than 90 days ago.
 State clearly:
 
 - Which errors were fixed (file, line, what changed).
-- Which were skipped and why.
-- Next step: re-run **Lint: Everything** if fixes were applied.
+- Which were skipped and why (only genuine stop conditions — a known refactor or missing context).
 
-Diagnose from `logs/lint-errors.log`. After a fix you may re-run the single linter on the file you
-changed (e.g. `ruff check <file>`, `mypy <file>`) to confirm it clears — don't re-run the full
-**Lint: Everything** task; that stays the user's to run.
+Then close the loop yourself: regenerate the log (desktop: re-run **Lint: Everything**;
+CI: push) and repeat from Step 1 until it's empty. While fixing a batch, diagnose from
+`logs/lint-errors.log` and use targeted single-file rechecks (e.g. `ruff check <file>`,
+`mypy <file>`) to confirm individual fixes — the full re-run is the once-per-pass verify,
+not a per-edit habit.
 
 ---
 
@@ -140,11 +155,14 @@ changed (e.g. `ruff check <file>`, `mypy <file>`) to confirm it clears — don't
 
 1. Edit only files directly implicated by the collected errors — never pre-emptive cleanup.
 2. One error = one minimal fix. Do not restructure surrounding code.
-3. After a fix, run at most the single linter on the file you changed to verify — never re-run the
-   full **Lint: Everything** task or dump raw output.
-4. Skip the log file if already stamped `--- ADDRESSED` — tell the user to re-run linting first.
+3. While fixing a batch, verify with targeted single-file rechecks — don't brute-force the
+   full lint suite after every edit. Re-run the full diagnostic once per pass to confirm and
+   loop, not per fix.
+4. If the log is stamped `--- ADDRESSED`, it's stale — regenerate it before fixing (don't fix
+   against a stale log).
 5. Only stamp the log after applying at least one code fix.
 6. **Known fixes are mandatory short-circuits.** If a known-fix pattern matches, apply it
    immediately. Do not investigate, do not read additional files, do not re-derive the fix.
 7. **Log quality gate is mandatory.** If any section has no self-locating error lines, update
-   `scripts/lint-all.ps1` and stop — never attempt fixes on a low-quality log.
+   the producing filter (named on the log's `# source:` header) and stop — never attempt
+   fixes on a low-quality log.

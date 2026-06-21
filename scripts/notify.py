@@ -15,7 +15,7 @@ def notify(title: str, message: str) -> None:
     try:
         from win11toast import toast
         toast(title, message)
-    except Exception:
+    except Exception:  # noqa: S110 - a toast must never break the wrapped task
         pass
 
 

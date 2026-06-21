@@ -1,5 +1,4 @@
 """Tests for scripts/notify.py and scripts/notify-wrap.py."""
-import subprocess
 import sys
 from unittest.mock import MagicMock, patch
 
@@ -50,7 +49,7 @@ def test_notify_swallows_toast_exceptions(monkeypatch):
 def _run_wrap(argv: list[str], *, elapsed: float = 1.0) -> int:
     """Invoke wrap_mod.main() with the given sys.argv and a fixed elapsed time."""
     with (
-        patch.object(sys, "argv", ["notify-wrap.py"] + argv),
+        patch.object(sys, "argv", ["notify-wrap.py", *argv]),
         patch("subprocess.run", return_value=MagicMock(returncode=0)) as mock_run,
         patch("time.monotonic", side_effect=[0.0, elapsed]),
         patch.object(wrap_mod, "notify") as mock_notify,
@@ -90,7 +89,7 @@ def test_wrap_notifies_passed_on_zero_exit():
     ):
         wrap_mod.main()
     mock_notify.assert_called_once()
-    title, message = mock_notify.call_args.args
+    _title, message = mock_notify.call_args.args
     assert "passed" in message.lower()
     assert "9s" in message
 
@@ -118,6 +117,29 @@ def test_wrap_elapsed_minutes_format():
         wrap_mod.main()
     _, message = mock_notify.call_args.args
     assert "1m" in message and "15s" in message
+
+
+def test_wrap_falls_back_to_shell_for_batch_launchers():
+    # First subprocess.run raises FileNotFoundError (npm.cmd not resolvable),
+    # the wrapper must retry with shell=True.
+    calls = []
+
+    def fake_run(cmd, **kwargs):
+        calls.append(kwargs)
+        if len(calls) == 1:
+            raise FileNotFoundError("npm")
+        return MagicMock(returncode=0)
+
+    with (
+        patch.object(sys, "argv", ["notify-wrap.py", "Frontend", "--", "npm", "run", "test"]),
+        patch("subprocess.run", side_effect=fake_run),
+        patch("time.monotonic", side_effect=[0.0, 1.0]),
+        patch.object(wrap_mod, "notify"),
+    ):
+        code = wrap_mod.main()
+    assert code == 0
+    assert len(calls) == 2
+    assert calls[1].get("shell") is True
 
 
 def test_wrap_title_from_multiple_words():

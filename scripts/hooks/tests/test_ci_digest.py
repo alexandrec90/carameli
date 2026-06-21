@@ -145,11 +145,9 @@ def test_filter_raw_fallback_when_no_e_lines():
 
 
 def test_filter_caps_block_at_max():
-    many_e_lines = ["E   line %d" % n for n in range(30)]
+    many_e_lines = [f"E   line {n}" for n in range(30)]
     raw = (
-        ["=== FAILURES ===", "___ test_big ___"]
-        + many_e_lines
-        + ["=== short test summary info ===", "FAILED tests/unit/test_big.py::test_big", "=== 1 failed ==="]
+        ["=== FAILURES ===", "___ test_big ___", *many_e_lines, "=== short test summary info ===", "FAILED tests/unit/test_big.py::test_big", "=== 1 failed ==="]
     )
     result = ci.filter_pytest_output(raw)
     assert any("truncated" in l for l in result)
@@ -194,6 +192,7 @@ def test_digest_lint_failure_writes_section(tmp_path, monkeypatch):
     result = ci.digest_lint()
     assert result
     content = (tmp_path / "lint-errors.log").read_text()
+    assert content.startswith(ci.SOURCE_HEADER)  # provenance stamp on non-empty artifact
     assert "# ruff" in content
     assert "app/main.py" in content
 
@@ -251,5 +250,60 @@ def test_digest_tests_failure_writes_artifact(tmp_path, monkeypatch):
     result = ci.digest_tests()
     assert result
     content = (tmp_path / "test-failures.log").read_text()
+    assert "# pytest" in content
     assert "AssertionError" in content
     assert "1 failed" in content
+
+
+def test_digest_tests_folds_frontend_failures(tmp_path, monkeypatch):
+    monkeypatch.setattr(ci, "REPORTS", tmp_path)
+    monkeypatch.setattr(ci, "LOGS", tmp_path)
+    (tmp_path / "pytest.txt").write_text("1 passed in 0.1s\n")
+    (tmp_path / "pytest.exit").write_text("0")
+    (tmp_path / "frontend-tests.txt").write_text(
+        "> vitest run\n\nFAIL src/foo.test.ts > renders\nAssertionError: expected 1 to be 2\n"
+    )
+    (tmp_path / "frontend-tests.exit").write_text("1")
+    result = ci.digest_tests()
+    assert result
+    content = (tmp_path / "test-failures.log").read_text()
+    assert "# frontend-tests" in content
+    assert "FAIL src/foo.test.ts" in content
+    # npm boilerplate denoised away
+    assert "> vitest run" not in content
+
+
+def test_digest_tests_folds_hook_test_failures(tmp_path, monkeypatch):
+    monkeypatch.setattr(ci, "REPORTS", tmp_path)
+    monkeypatch.setattr(ci, "LOGS", tmp_path)
+    (tmp_path / "pytest.txt").write_text("")
+    (tmp_path / "pytest.exit").write_text("0")
+    raw = "\n".join([
+        "=== FAILURES ===",
+        "___ test_hook ___",
+        "    scripts/hooks/foo.py:3: in run",
+        "E   ValueError: boom",
+        "=== short test summary info ===",
+        "FAILED scripts/hooks/tests/test_foo.py::test_hook",
+        "=== 1 failed in 0.1s ===",
+    ])
+    (tmp_path / "hook-tests.txt").write_text(raw)
+    (tmp_path / "hook-tests.exit").write_text("1")
+    result = ci.digest_tests()
+    assert result
+    content = (tmp_path / "test-failures.log").read_text()
+    assert "# hook-tests" in content
+    assert "ValueError: boom" in content
+
+
+def test_digest_tests_skips_env_error_source(tmp_path, monkeypatch):
+    monkeypatch.setattr(ci, "REPORTS", tmp_path)
+    monkeypatch.setattr(ci, "LOGS", tmp_path)
+    (tmp_path / "pytest.txt").write_text("")
+    (tmp_path / "pytest.exit").write_text("0")
+    # frontend runner missing entirely — not a code failure
+    (tmp_path / "frontend-tests.txt").write_text("npm error could not be found\n")
+    (tmp_path / "frontend-tests.exit").write_text("127")
+    result = ci.digest_tests()
+    assert not result
+    assert (tmp_path / "test-failures.log").read_text() == ""

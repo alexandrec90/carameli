@@ -3,8 +3,9 @@
   "tasks": [
     {
       "label": "Start: Full Stack (Docker Compose)",
-      "type": "shell",
-      "command": "pwsh -ExecutionPolicy Bypass -File scripts/docker-up.ps1 -Build; $_ec = $LASTEXITCODE; pwsh -ExecutionPolicy Bypass -File scripts/notify.ps1 -Label 'Start: Full Stack' -ExitCode $_ec; exit $_ec",
+      "type": "process",
+      "command": "python",
+      "args": ["scripts/notify-wrap.py", "Start: Full Stack", "--", "pwsh", "-ExecutionPolicy", "Bypass", "-File", "scripts/docker-up.ps1", "-Build"],
       "group": {
         "kind": "build",
         "isDefault": true
@@ -19,8 +20,9 @@
     },
     {
       "label": "Install: Frontend Dependencies",
-      "type": "shell",
-      "command": "npm install; $_ec = $LASTEXITCODE; pwsh -ExecutionPolicy Bypass -File ../scripts/notify.ps1 -Label 'Install: Frontend Dependencies' -ExitCode $_ec; exit $_ec",
+      "type": "process",
+      "command": "python",
+      "args": ["../scripts/notify-wrap.py", "Install: Frontend Dependencies", "--", "npm", "install"],
       "options": {
         "cwd": "${workspaceFolder}/frontend"
       },
@@ -34,8 +36,9 @@
     },
     {
       "label": "Install: Dev Dependencies (venv)",
-      "type": "shell",
-      "command": ".venv\\Scripts\\python.exe -m pip install -r requirements-dev.txt; $_ec = $LASTEXITCODE; pwsh -ExecutionPolicy Bypass -File scripts/notify.ps1 -Label 'Install: Dev Dependencies (venv)' -ExitCode $_ec; exit $_ec",
+      "type": "process",
+      "command": "python",
+      "args": ["scripts/notify-wrap.py", "Install: Dev Dependencies (venv)", "--", ".venv\\Scripts\\python.exe", "-m", "pip", "install", "-r", "requirements-dev.txt"],
       "presentation": {
         "reveal": "always",
         "panel": "shared",
@@ -112,8 +115,9 @@
     },
     {
       "label": "Stop: Docker Stack",
-      "type": "shell",
-      "command": "pwsh -ExecutionPolicy Bypass -File scripts/docker-down.ps1; $_ec = $LASTEXITCODE; pwsh -ExecutionPolicy Bypass -File scripts/notify.ps1 -Label 'Stop: Docker Stack' -ExitCode $_ec; exit $_ec",
+      "type": "process",
+      "command": "python",
+      "args": ["scripts/notify-wrap.py", "Stop: Docker Stack", "--", "pwsh", "-ExecutionPolicy", "Bypass", "-File", "scripts/docker-down.ps1"],
       "presentation": {
         "reveal": "always",
         "panel": "shared",
@@ -124,8 +128,9 @@
     },
     {
       "label": "Restart: App Container",
-      "type": "shell",
-      "command": "pwsh -ExecutionPolicy Bypass -File scripts/docker-restart-app.ps1; $_ec = $LASTEXITCODE; pwsh -ExecutionPolicy Bypass -File scripts/notify.ps1 -Label 'Restart: App Container' -ExitCode $_ec; exit $_ec",
+      "type": "process",
+      "command": "python",
+      "args": ["scripts/notify-wrap.py", "Restart: App Container", "--", "pwsh", "-ExecutionPolicy", "Bypass", "-File", "scripts/docker-restart-app.ps1"],
       "presentation": {
         "reveal": "always",
         "panel": "shared",
@@ -136,8 +141,9 @@
     },
     {
       "label": "Docker: Rebuild App",
-      "type": "shell",
-      "command": "pwsh -ExecutionPolicy Bypass -Command 'docker compose build app'; $_ec = $LASTEXITCODE; pwsh -ExecutionPolicy Bypass -File scripts/notify.ps1 -Label 'Docker: Rebuild App' -ExitCode $_ec; exit $_ec",
+      "type": "process",
+      "command": "python",
+      "args": ["scripts/notify-wrap.py", "Docker: Rebuild App", "--", "docker", "compose", "build", "app"],
       "presentation": {
         "reveal": "always",
         "panel": "shared",
@@ -148,8 +154,9 @@
     },
     {
       "label": "Docker: Stack Status",
-      "type": "shell",
-      "command": "pwsh -ExecutionPolicy Bypass -File scripts/docker-status.ps1; $_ec = $LASTEXITCODE; pwsh -ExecutionPolicy Bypass -File scripts/notify.ps1 -Label 'Docker: Stack Status' -ExitCode $_ec; exit $_ec",
+      "type": "process",
+      "command": "python",
+      "args": ["scripts/notify-wrap.py", "Docker: Stack Status", "--", "pwsh", "-ExecutionPolicy", "Bypass", "-File", "scripts/docker-status.ps1"],
       "presentation": {
         "reveal": "always",
         "panel": "shared",
@@ -160,8 +167,9 @@
     },
     {
       "label": "DB: Apply Migrations",
-      "type": "shell",
-      "command": "pwsh -ExecutionPolicy Bypass -File scripts/docker-migrate.ps1; $_ec = $LASTEXITCODE; pwsh -ExecutionPolicy Bypass -File scripts/notify.ps1 -Label 'DB: Apply Migrations' -ExitCode $_ec; exit $_ec",
+      "type": "process",
+      "command": "python",
+      "args": ["scripts/notify-wrap.py", "DB: Apply Migrations", "--", "pwsh", "-ExecutionPolicy", "Bypass", "-File", "scripts/docker-migrate.ps1"],
       "presentation": {
         "reveal": "always",
         "panel": "shared",
@@ -172,8 +180,9 @@
     },
     {
       "label": "Docker: Prune + Compact VHDX",
-      "type": "shell",
-      "command": "pwsh -ExecutionPolicy Bypass -File scripts/docker-prune.ps1; $_ec = $LASTEXITCODE; pwsh -ExecutionPolicy Bypass -File scripts/notify.ps1 -Label 'Docker: Prune + Compact VHDX' -ExitCode $_ec; exit $_ec",
+      "type": "process",
+      "command": "python",
+      "args": ["scripts/notify-wrap.py", "Docker: Prune + Compact VHDX", "--", "pwsh", "-ExecutionPolicy", "Bypass", "-File", "scripts/docker-prune.ps1"],
       "presentation": {
         "reveal": "always",
         "panel": "shared",
@@ -184,8 +193,9 @@
     },
     {
       "label": "Test: Run pytest",
-      "type": "shell",
-      "command": "pwsh -ExecutionPolicy Bypass -File scripts/run-tests.ps1; $_ec = $LASTEXITCODE; pwsh -ExecutionPolicy Bypass -File scripts/notify.ps1 -Label 'Test: Run pytest' -ExitCode $_ec; exit $_ec",
+      "type": "process",
+      "command": "python",
+      "args": ["scripts/notify-wrap.py", "Test: Run pytest", "--", "pwsh", "-ExecutionPolicy", "Bypass", "-File", "scripts/run-tests.ps1"],
       "group": "test",
       "presentation": {
         "reveal": "always",
@@ -197,8 +207,9 @@
     },
     {
       "label": "Test: Run pytest (fast, changed only)",
-      "type": "shell",
-      "command": "pwsh -ExecutionPolicy Bypass -File scripts/run-tests.ps1 -Fast; $_ec = $LASTEXITCODE; pwsh -ExecutionPolicy Bypass -File scripts/notify.ps1 -Label 'Test: Run pytest (fast)' -ExitCode $_ec; exit $_ec",
+      "type": "process",
+      "command": "python",
+      "args": ["scripts/notify-wrap.py", "Test: Run pytest (fast)", "--", "pwsh", "-ExecutionPolicy", "Bypass", "-File", "scripts/run-tests.ps1", "-Fast"],
       "group": "test",
       "presentation": {
         "reveal": "always",
@@ -210,8 +221,9 @@
     },
     {
       "label": "Test: Run Frontend",
-      "type": "shell",
-      "command": "npm run test; $_ec = $LASTEXITCODE; pwsh -ExecutionPolicy Bypass -File ../scripts/notify.ps1 -Label 'Test: Run Frontend' -ExitCode $_ec; exit $_ec",
+      "type": "process",
+      "command": "python",
+      "args": ["../scripts/notify-wrap.py", "Test: Run Frontend", "--", "npm", "run", "test"],
       "group": "test",
       "options": {
         "cwd": "${workspaceFolder}/frontend"
@@ -226,8 +238,9 @@
     },
     {
       "label": "Test: Run E2E (headless)",
-      "type": "shell",
-      "command": "pwsh -ExecutionPolicy Bypass -File scripts/run-e2e.ps1; $_ec = $LASTEXITCODE; pwsh -ExecutionPolicy Bypass -File scripts/notify.ps1 -Label 'Test: Run E2E (headless)' -ExitCode $_ec; exit $_ec",
+      "type": "process",
+      "command": "python",
+      "args": ["scripts/notify-wrap.py", "Test: Run E2E (headless)", "--", "pwsh", "-ExecutionPolicy", "Bypass", "-File", "scripts/run-e2e.ps1"],
       "group": "test",
       "presentation": {
         "reveal": "always",
@@ -239,8 +252,9 @@
     },
     {
       "label": "Test: Run E2E (headed)",
-      "type": "shell",
-      "command": "pwsh -ExecutionPolicy Bypass -File scripts/run-e2e.ps1 -Headed; $_ec = $LASTEXITCODE; pwsh -ExecutionPolicy Bypass -File scripts/notify.ps1 -Label 'Test: Run E2E (headed)' -ExitCode $_ec; exit $_ec",
+      "type": "process",
+      "command": "python",
+      "args": ["scripts/notify-wrap.py", "Test: Run E2E (headed)", "--", "pwsh", "-ExecutionPolicy", "Bypass", "-File", "scripts/run-e2e.ps1", "-Headed"],
       "group": "test",
       "presentation": {
         "reveal": "always",
@@ -252,8 +266,9 @@
     },
     {
       "label": "Test: Run pytest (slow)",
-      "type": "shell",
-      "command": "docker compose exec -T app pytest -m slow -v --tb=short; $_ec = $LASTEXITCODE; pwsh -ExecutionPolicy Bypass -File scripts/notify.ps1 -Label 'Test: Run pytest (slow)' -ExitCode $_ec; exit $_ec",
+      "type": "process",
+      "command": "python",
+      "args": ["scripts/notify-wrap.py", "Test: Run pytest (slow)", "--", "docker", "compose", "exec", "-T", "app", "pytest", "-m", "slow", "-v", "--tb=short"],
       "group": "test",
       "presentation": {
         "reveal": "always",
@@ -265,8 +280,9 @@
     },
     {
       "label": "Test: Run Telnyx Sandbox",
-      "type": "shell",
-      "command": "docker compose exec -T -e TELNYX_SANDBOX=1 app pytest tests/integration/test_telnyx_sandbox.py -v --tb=short; $_ec = $LASTEXITCODE; pwsh -ExecutionPolicy Bypass -File scripts/notify.ps1 -Label 'Test: Run Telnyx Sandbox' -ExitCode $_ec; exit $_ec",
+      "type": "process",
+      "command": "python",
+      "args": ["scripts/notify-wrap.py", "Test: Run Telnyx Sandbox", "--", "docker", "compose", "exec", "-T", "-e", "TELNYX_SANDBOX=1", "app", "pytest", "tests/integration/test_telnyx_sandbox.py", "-v", "--tb=short"],
       "group": "test",
       "presentation": {
         "reveal": "always",
@@ -278,8 +294,9 @@
     },
     {
       "label": "Test: Run E2E (cross-browser)",
-      "type": "shell",
-      "command": "pwsh -ExecutionPolicy Bypass -File scripts/run-e2e.ps1 -CrossBrowser; $_ec = $LASTEXITCODE; pwsh -ExecutionPolicy Bypass -File scripts/notify.ps1 -Label 'Test: Run E2E (cross-browser)' -ExitCode $_ec; exit $_ec",
+      "type": "process",
+      "command": "python",
+      "args": ["scripts/notify-wrap.py", "Test: Run E2E (cross-browser)", "--", "pwsh", "-ExecutionPolicy", "Bypass", "-File", "scripts/run-e2e.ps1", "-CrossBrowser"],
       "group": "test",
       "presentation": {
         "reveal": "always",
@@ -291,8 +308,9 @@
     },
     {
       "label": "Test: Run Load (Locust)",
-      "type": "shell",
-      "command": "pwsh -ExecutionPolicy Bypass -File scripts/run-load.ps1; $_ec = $LASTEXITCODE; pwsh -ExecutionPolicy Bypass -File scripts/notify.ps1 -Label 'Test: Run Load (Locust)' -ExitCode $_ec; exit $_ec",
+      "type": "process",
+      "command": "python",
+      "args": ["scripts/notify-wrap.py", "Test: Run Load (Locust)", "--", "pwsh", "-ExecutionPolicy", "Bypass", "-File", "scripts/run-load.ps1"],
       "group": "test",
       "presentation": {
         "reveal": "always",
@@ -304,8 +322,9 @@
     },
     {
       "label": "Test: Run Mutation (mutmut)",
-      "type": "shell",
-      "command": "pwsh -ExecutionPolicy Bypass -File scripts/run-mutation.ps1; $_ec = $LASTEXITCODE; pwsh -ExecutionPolicy Bypass -File scripts/notify.ps1 -Label 'Test: Run Mutation (mutmut)' -ExitCode $_ec; exit $_ec",
+      "type": "process",
+      "command": "python",
+      "args": ["scripts/notify-wrap.py", "Test: Run Mutation (mutmut)", "--", "pwsh", "-ExecutionPolicy", "Bypass", "-File", "scripts/run-mutation.ps1"],
       "group": "test",
       "presentation": {
         "reveal": "always",
@@ -319,12 +338,7 @@
       "label": "Test: Run Hook Tests (pytest)",
       "type": "process",
       "command": "python",
-      "args": [
-        "-m",
-        "pytest",
-        "scripts/hooks/tests",
-        "-q"
-      ],
+      "args": ["scripts/notify-wrap.py", "Test: Run Hook Tests", "--", "python", "-m", "pytest", "scripts/hooks/tests", "-q"],
       "group": "test",
       "presentation": {
         "reveal": "always",
@@ -337,14 +351,8 @@
     {
       "label": "Test: Run Pester (PowerShell)",
       "type": "process",
-      "command": "pwsh",
-      "args": [
-        "-ExecutionPolicy",
-        "Bypass",
-        "-File",
-        "scripts/run-pester.ps1",
-        "-InstallIfMissing"
-      ],
+      "command": "python",
+      "args": ["scripts/notify-wrap.py", "Test: Run Pester", "--", "pwsh", "-ExecutionPolicy", "Bypass", "-File", "scripts/run-pester.ps1", "-InstallIfMissing"],
       "group": "test",
       "presentation": {
         "reveal": "always",
@@ -356,8 +364,9 @@
     },
     {
       "label": "Log: Extract Errors",
-      "type": "shell",
-      "command": "pwsh -ExecutionPolicy Bypass -File scripts/extract-log-errors.ps1; $_ec = $LASTEXITCODE; pwsh -ExecutionPolicy Bypass -File scripts/notify.ps1 -Label 'Log: Extract Errors' -ExitCode $_ec; exit $_ec",
+      "type": "process",
+      "command": "python",
+      "args": ["scripts/notify-wrap.py", "Log: Extract Errors", "--", "pwsh", "-ExecutionPolicy", "Bypass", "-File", "scripts/extract-log-errors.ps1"],
       "presentation": {
         "reveal": "always",
         "panel": "shared",
@@ -368,8 +377,9 @@
     },
     {
       "label": "Lint: Everything",
-      "type": "shell",
-      "command": "pwsh -ExecutionPolicy Bypass -File scripts/lint-all.ps1; $_ec = $LASTEXITCODE; pwsh -ExecutionPolicy Bypass -File scripts/notify.ps1 -Label 'Lint: Everything' -ExitCode $_ec; exit $_ec",
+      "type": "process",
+      "command": "python",
+      "args": ["scripts/notify-wrap.py", "Lint: Everything", "--", "pwsh", "-ExecutionPolicy", "Bypass", "-File", "scripts/lint-all.ps1"],
       "group": {
         "kind": "build",
         "isDefault": true
@@ -384,8 +394,9 @@
     },
     {
       "label": "Pre-Commit: Install + Patch Hook",
-      "type": "shell",
-      "command": "pwsh -ExecutionPolicy Bypass -File scripts/install-pre-commit.ps1; $_ec = $LASTEXITCODE; pwsh -ExecutionPolicy Bypass -File scripts/notify.ps1 -Label 'Pre-Commit: Install + Patch Hook' -ExitCode $_ec; exit $_ec",
+      "type": "process",
+      "command": "python",
+      "args": ["scripts/notify-wrap.py", "Pre-Commit: Install + Patch Hook", "--", "pwsh", "-ExecutionPolicy", "Bypass", "-File", "scripts/install-pre-commit.ps1"],
       "presentation": {
         "reveal": "always",
         "panel": "shared",
@@ -396,8 +407,9 @@
     },
     {
       "label": "Pre-Commit: Run All Hooks",
-      "type": "shell",
-      "command": "pwsh -ExecutionPolicy Bypass -File scripts/pre-commit.ps1; $_ec = $LASTEXITCODE; pwsh -ExecutionPolicy Bypass -File scripts/notify.ps1 -Label 'Pre-Commit: Run All Hooks' -ExitCode $_ec; exit $_ec",
+      "type": "process",
+      "command": "python",
+      "args": ["scripts/notify-wrap.py", "Pre-Commit: Run All Hooks", "--", "pwsh", "-ExecutionPolicy", "Bypass", "-File", "scripts/pre-commit.ps1"],
       "presentation": {
         "reveal": "always",
         "panel": "shared",
@@ -408,8 +420,9 @@
     },
     {
       "label": "Git: Untrack Ignored Files",
-      "type": "shell",
-      "command": "pwsh -ExecutionPolicy Bypass -Command 'git ls-files -i -c --exclude-standard | ForEach-Object { git rm --cached $_ }'; $_ec = $LASTEXITCODE; pwsh -ExecutionPolicy Bypass -File scripts/notify.ps1 -Label 'Git: Untrack Ignored Files' -ExitCode $_ec; exit $_ec",
+      "type": "process",
+      "command": "python",
+      "args": ["scripts/notify-wrap.py", "Git: Untrack Ignored Files", "--", "pwsh", "-ExecutionPolicy", "Bypass", "-Command", "git ls-files -i -c --exclude-standard | ForEach-Object { git rm --cached $_ }"],
       "presentation": {
         "reveal": "always",
         "panel": "shared",
@@ -420,8 +433,9 @@
     },
     {
       "label": "Docker: Fix Stalled Desktop",
-      "type": "shell",
-      "command": "pwsh -ExecutionPolicy Bypass -File scripts/docker-fix.ps1; $_ec = $LASTEXITCODE; pwsh -ExecutionPolicy Bypass -File scripts/notify.ps1 -Label 'Docker: Fix Stalled Desktop' -ExitCode $_ec; exit $_ec",
+      "type": "process",
+      "command": "python",
+      "args": ["scripts/notify-wrap.py", "Docker: Fix Stalled Desktop", "--", "pwsh", "-ExecutionPolicy", "Bypass", "-File", "scripts/docker-fix.ps1"],
       "presentation": {
         "reveal": "always",
         "panel": "shared",
@@ -432,8 +446,9 @@
     },
     {
       "label": "Docker: Restart Engine",
-      "type": "shell",
-      "command": "pwsh -ExecutionPolicy Bypass -File scripts/docker-restart-engine.ps1; $_ec = $LASTEXITCODE; pwsh -ExecutionPolicy Bypass -File scripts/notify.ps1 -Label 'Docker: Restart Engine' -ExitCode $_ec; exit $_ec",
+      "type": "process",
+      "command": "python",
+      "args": ["scripts/notify-wrap.py", "Docker: Restart Engine", "--", "pwsh", "-ExecutionPolicy", "Bypass", "-File", "scripts/docker-restart-engine.ps1"],
       "presentation": {
         "reveal": "always",
         "panel": "new",
@@ -450,7 +465,7 @@
         "Test: Run Frontend",
         "Test: Run E2E (headless)",
         "Test: Run Pester (PowerShell)",
-        "Test: Run Hook Contracts (dry)",
+        "Test: Run Hook Tests (pytest)",
         "Test: Run Telnyx Sandbox"
       ],
       "dependsOrder": "parallel",
@@ -465,8 +480,9 @@
     },
     {
       "label": "Test: All Checks + Auto-Fix (agent)",
-      "type": "shell",
-      "command": "pwsh -ExecutionPolicy Bypass -File scripts/check-and-fix-known.ps1; $_ec = $LASTEXITCODE; pwsh -ExecutionPolicy Bypass -File scripts/notify.ps1 -Label 'Test: All Checks + Auto-Fix (agent)' -ExitCode $_ec; exit $_ec",
+      "type": "process",
+      "command": "python",
+      "args": ["scripts/notify-wrap.py", "Test: All Checks + Auto-Fix (agent)", "--", "pwsh", "-ExecutionPolicy", "Bypass", "-File", "scripts/check-and-fix-known.ps1"],
       "group": "test",
       "presentation": {
         "reveal": "always",
@@ -497,13 +513,8 @@
     {
       "label": "Images: Compress Comic Book (PNG/JPG -> WebP)",
       "type": "process",
-      "command": "pwsh",
-      "args": [
-        "-ExecutionPolicy",
-        "Bypass",
-        "-File",
-        "scripts/compress-comic-book-images.ps1"
-      ],
+      "command": "python",
+      "args": ["scripts/notify-wrap.py", "Images: Compress Comic Book", "--", "pwsh", "-ExecutionPolicy", "Bypass", "-File", "scripts/compress-comic-book-images.ps1"],
       "presentation": {
         "reveal": "always",
         "panel": "shared",
@@ -514,8 +525,9 @@
     },
     {
       "label": "Agent: Archive Copilot Session",
-      "type": "shell",
-      "command": "python scripts/hooks/archive-session-copilot.py '${input:sessionDescription}'; $_ec = $LASTEXITCODE; pwsh -ExecutionPolicy Bypass -File scripts/notify.ps1 -Label 'Agent: Archive Copilot Session' -ExitCode $_ec; exit $_ec",
+      "type": "process",
+      "command": "python",
+      "args": ["scripts/notify-wrap.py", "Agent: Archive Copilot Session", "--", "python", "scripts/hooks/archive-session-copilot.py", "${input:sessionDescription}"],
       "presentation": {
         "reveal": "always",
         "panel": "shared",
@@ -544,8 +556,9 @@
     },
     {
       "label": "Eval: Instruction Files (promptfoo)",
-      "type": "shell",
-      "command": "npm run eval; $_ec = $LASTEXITCODE; npm run eval:summary; pwsh -ExecutionPolicy Bypass -File scripts/notify.ps1 -Label 'Eval: Instruction Files (promptfoo)' -ExitCode $_ec; exit $_ec",
+      "type": "process",
+      "command": "python",
+      "args": ["scripts/notify-wrap.py", "Eval: Instruction Files (promptfoo)", "--", "pwsh", "-ExecutionPolicy", "Bypass", "-Command", "npm run eval; $e = $LASTEXITCODE; npm run eval:summary; exit $e"],
       "group": "test",
       "presentation": {
         "reveal": "always",

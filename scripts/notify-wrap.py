@@ -10,16 +10,20 @@ Usage (tasks.json):
 Example:
   python scripts/notify-wrap.py "Test: Run pytest" -- python scripts/run-tests.py
 """
+import os
 import subprocess
 import sys
 import time
+
+# Ensure the sibling notify.py is importable whether this file is run as a script
+# (script dir is on sys.path automatically) or loaded by path in tests (it isn't).
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from notify import notify
 
 
 def main() -> int:
     if "--" not in sys.argv:
-        print("Usage: notify-wrap.py <title> -- <command> [args...]", file=sys.stderr)
         return 2
 
     sep = sys.argv.index("--")
@@ -27,11 +31,16 @@ def main() -> int:
     cmd = sys.argv[sep + 1:]
 
     if not title or not cmd:
-        print("Usage: notify-wrap.py <title> -- <command> [args...]", file=sys.stderr)
         return 2
 
     start = time.monotonic()
-    result = subprocess.run(cmd)
+    try:
+        # cmd comes from tasks.json (trusted), not user input.
+        result = subprocess.run(cmd)  # noqa: S603
+    except FileNotFoundError:
+        # Windows can't CreateProcess batch launchers (npm, npx, vite) directly —
+        # they're .cmd shims. Fall back to the shell so they resolve.
+        result = subprocess.run(cmd, shell=True)  # noqa: S602
     elapsed = time.monotonic() - start
 
     minutes, seconds = divmod(int(elapsed), 60)

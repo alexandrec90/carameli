@@ -19,6 +19,10 @@ REPORTS = Path("reports")
 LOGS = Path("logs")
 MAX_PER_BLOCK = 25
 
+# Provenance header stamped on non-empty artifacts so the fix-lint / fix-tests skills can
+# name the script to edit if a filter swallowed actionable lines, without guessing the env.
+SOURCE_HEADER = "# source: scripts/ci-digest.py (CI)"
+
 _MISSING_TOOL = [
     "ModuleNotFoundError", "command not found", "not recognized",
     "is not installed", "Cannot find", "could not be found",
@@ -160,7 +164,7 @@ def digest_lint() -> bool:
             errs = [l for l in lines if l.strip()]
             if not any(re.match(r"^[^:\s].+:\d+:\d+", l) for l in errs):
                 summary = errs[-1] if errs else "alembic check failed"
-                errs = [f"alembic/versions/env.py:1:1: [alembic-check] {summary}"] + errs
+                errs = [f"alembic/versions/env.py:1:1: [alembic-check] {summary}", *errs]
             _section(
                 sections,
                 "alembic-check",
@@ -169,7 +173,7 @@ def digest_lint() -> bool:
             )
 
     artifact = LOGS / "lint-errors.log"
-    artifact.write_text("\n".join(sections) if any_failed else "", encoding="utf-8")
+    artifact.write_text("\n".join([SOURCE_HEADER, "", *sections]) if any_failed else "", encoding="utf-8")
     return any_failed
 
 
@@ -193,9 +197,9 @@ def filter_pytest_output(lines: list[str]) -> list[str]:
             is_raw_fallback = True
         if len(source) > MAX_PER_BLOCK:
             kept = len(source)
-            source = source[:MAX_PER_BLOCK] + [f"  ... ({kept} lines total, truncated)"]
+            source = [*source[:MAX_PER_BLOCK], f"  ... ({kept} lines total, truncated)"]
         if is_raw_fallback:
-            source = source + ["  [raw fallback: no E-lines in filtered output]"]
+            source = [*source, "  [raw fallback: no E-lines in filtered output]"]
         filtered.extend(source)
         filtered.append("")
         block_lines = []
@@ -254,11 +258,7 @@ def filter_pytest_output(lines: list[str]) -> list[str]:
                 pass  # test fixture noise
             else:
                 raw_block_lines.append(l)
-                if re.match(r"^E\s+", l):
-                    block_lines.append(l)
-                elif re.search(r"(tests/|app/).*\.py:\d+", l):
-                    block_lines.append(l)
-                elif re.match(r"^(WARNING|ERROR|CRITICAL)\s+", l):
+                if re.match(r"^E\s+", l) or re.search(r"(tests/|app/).*\.py:\d+", l) or re.match(r"^(WARNING|ERROR|CRITICAL)\s+", l):
                     block_lines.append(l)
                 elif re.match(r"^\s*[|+]", l):
                     if re.match(r"^\s*\|\s*$", l):
@@ -280,15 +280,40 @@ def filter_pytest_output(lines: list[str]) -> list[str]:
     return filtered
 
 
+# Each test source: (report name, section header, parser, fix hint). pytest-format
+# runners reuse filter_pytest_output; other runners (vitest) get generic denoising.
+_TEST_SOURCES = [
+    ("pytest", "pytest", filter_pytest_output, "pytest tests/unit/ <path::to::failing_test>"),
+    ("hook-tests", "hook-tests", filter_pytest_output, "pytest scripts/hooks/tests"),
+    ("frontend-tests", "frontend-tests", _denoise, "npm --prefix frontend run test:run"),
+]
+
+
 def digest_tests() -> bool:
     LOGS.mkdir(exist_ok=True)
-    lines, code = read_report("pytest")
+    sections: list[str] = []
+    any_failed = False
+
+    for name, header, parser, fix_hint in _TEST_SOURCES:
+        lines, code = read_report(name)
+        if code == 0:
+            continue
+        skip = get_skip_reason(lines)
+        if skip:
+            print(f"  [skip] {name} ({skip})")
+            continue
+        any_failed = True
+        body = parser(lines)
+        sections.append(f"# {header}")
+        sections.append(f"# fix: {fix_hint}")
+        sections.extend(body if body else [
+            "(exit code indicated failure but no parseable lines -- re-run the runner manually)"
+        ])
+        sections.append("")
+
     artifact = LOGS / "test-failures.log"
-    if code == 0:
-        artifact.write_text("", encoding="utf-8")
-        return False
-    artifact.write_text("\n".join(filter_pytest_output(lines)), encoding="utf-8")
-    return True
+    artifact.write_text("\n".join([SOURCE_HEADER, "", *sections]) if any_failed else "", encoding="utf-8")
+    return any_failed
 
 
 if __name__ == "__main__":

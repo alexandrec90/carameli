@@ -7,6 +7,11 @@ on:
         description: "Branch to run against and base the fix PR on"
         required: false
         default: "master"
+  # Re-run the loop automatically when an agent pushes fixes to a fix branch.
+  # The bot's own auto-fix commits carry "[skip ci]" so they do not retrigger.
+  push:
+    branches:
+      - "fix/auto-**"
 
 permissions:
   contents: write
@@ -39,9 +44,11 @@ jobs:
       SESSION_SECRET: ci-session-secret
 
     steps:
+      # On workflow_dispatch: check out the chosen base branch.
+      # On push to a fix/auto-** branch: check out that same branch (default ref).
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.inputs.base_branch }}
+          ref: ${{ github.event.inputs.base_branch || github.ref }}
           fetch-depth: 0
 
       - uses: actions/setup-python@v5
@@ -204,6 +211,18 @@ jobs:
             > reports/pytest.txt 2>&1
           echo $? > reports/pytest.exit
 
+      - name: frontend tests (vitest)
+        run: |
+          set +e
+          npm --prefix frontend run test:run > reports/frontend-tests.txt 2>&1
+          echo $? > reports/frontend-tests.exit
+
+      - name: hook tests
+        run: |
+          set +e
+          python -m pytest scripts/hooks/tests -q --color=no > reports/hook-tests.txt 2>&1
+          echo $? > reports/hook-tests.exit
+
       # -----------------------------------------------------------------------
       # Digest — produce logs/lint-errors.log + logs/test-failures.log
       # -----------------------------------------------------------------------
@@ -211,9 +230,11 @@ jobs:
       - name: Build fix artifacts
         id: digest
         run: |
-          set +e
-          python scripts/ci-digest.py
-          if [ $? -ne 0 ]; then
+          # Don't let the digest's own exit code decide pass/fail — a crash and a
+          # real failure both exit non-zero. The artifact contents are the source of
+          # truth: non-empty log == actionable failures remain.
+          python scripts/ci-digest.py || echo "::warning::ci-digest.py exited non-zero"
+          if [ -s logs/lint-errors.log ] || [ -s logs/test-failures.log ]; then
             echo "failures=true" >> "$GITHUB_OUTPUT"
           else
             echo "failures=false" >> "$GITHUB_OUTPUT"
@@ -253,29 +274,44 @@ jobs:
       # logs/ is gitignored, so force-add the artifact files.
       # -----------------------------------------------------------------------
 
+      # On a rerun (push to an existing fix/auto-** branch) commit the refreshed
+      # artifacts + any new auto-fixes back to the SAME branch — no new branch, no
+      # new PR. On the initial workflow_dispatch run, cut a fresh fix branch.
+      # Runs on any rerun too, so a now-clean branch gets its stale logs cleared
+      # (the git diff guard below no-ops when there is genuinely nothing to commit).
       - name: Commit fix branch
-        if: steps.digest.outputs.failures == 'true' || steps.autofixes.outputs.has_changes == 'true'
+        if: steps.digest.outputs.failures == 'true' || steps.autofixes.outputs.has_changes == 'true' || startsWith(github.ref_name, 'fix/auto-')
         id: fix_branch
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          BRANCH="fix/auto-$(date +%Y-%m-%d-%H%M)"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git checkout -b "$BRANCH"
+
+          if [[ "${{ github.ref_name }}" == fix/auto-* ]]; then
+            BRANCH="${{ github.ref_name }}"   # rerun: stay on the existing branch
+            NEW_BRANCH=false
+          else
+            BRANCH="fix/auto-$(date +%Y-%m-%d-%H%M)"
+            git checkout -b "$BRANCH"
+            NEW_BRANCH=true
+          fi
+
           git add -u
           git add -f logs/lint-errors.log logs/test-failures.log
           if ! git diff --cached --quiet; then
             git commit -m "ci: auto-fix + fix artifacts $(date +%Y-%m-%dT%H:%M:%SZ) [skip ci]"
-            git push origin "$BRANCH"
+            git push origin "HEAD:$BRANCH"
             echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
-            echo "created=true" >> "$GITHUB_OUTPUT"
+            echo "new_branch=$NEW_BRANCH" >> "$GITHUB_OUTPUT"
+            echo "committed=true" >> "$GITHUB_OUTPUT"
           else
-            echo "created=false" >> "$GITHUB_OUTPUT"
+            echo "committed=false" >> "$GITHUB_OUTPUT"
           fi
 
+      # Only the initial run opens a PR. Reruns update the existing one in place.
       - name: Create fix PR
-        if: steps.fix_branch.outputs.created == 'true'
+        if: steps.fix_branch.outputs.committed == 'true' && steps.fix_branch.outputs.new_branch == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -300,7 +336,9 @@ jobs:
           1. Open this PR in Claude Code
           2. Run \`/fix-lint\` if \`logs/lint-errors.log\` is non-empty
           3. Run \`/fix-tests\` if \`logs/test-failures.log\` is non-empty
-          4. Push fixes to this branch — CI will rerun automatically
+          4. Push fixes to this branch — CI re-runs automatically (fresh container,
+             \`alembic upgrade head\` before tests) and refreshes the logs in place.
+             Repeat until both logs are empty.
 
           **Artifacts committed to branch \`$BRANCH\`:**
           - \`logs/lint-errors.log\` — actionable lint failures (empty = all clear)
@@ -310,4 +348,4 @@ jobs:
           EOF
           )" \
             --head "$BRANCH" \
-            --base "${{ github.event.inputs.base_branch }}"
+            --base "${{ github.event.inputs.base_branch || 'master' }}"

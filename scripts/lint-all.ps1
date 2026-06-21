@@ -513,7 +513,8 @@ $jobs.Values | Remove-Job -Force
 # --- Write artifact and exit ---
 Write-Host ""
 if ($anyFailed) {
-    $sections | Set-Content $artifact -Encoding utf8
+    # Provenance header: lets fix-lint name the script to edit if the filter swallowed lines.
+    @("# source: scripts/lint-all.ps1 (local desktop)", "") + $sections | Set-Content $artifact -Encoding utf8
     Write-Host "Errors written to: $artifact" -ForegroundColor Red
     Write-Host ""
     Write-Host "  ==========================================" -ForegroundColor Red
