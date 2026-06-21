@@ -31,6 +31,11 @@ compatibility (local Windows desktop, GitHub Actions, web, and mobile sessions).
 - Use `"type": "process"` tasks in `tasks.json` so VS Code monitors the process
   directly. This ensures the task spinner stops and the exit-code icon appears reliably.
 - Set `"close": false` in `presentation` so the terminal stays open for review.
+- **Wrap with `notify-wrap.py` for Windows toast notifications** — never call
+  `notify.py` from inside a script. Notifications are a task-layer concern only:
+  ```jsonc
+  { "command": "python", "args": ["scripts/notify-wrap.py", "Task Name", "--", "python", "scripts/your-script.py"] }
+  ```
 
 ### Docker subprocess calls
 
