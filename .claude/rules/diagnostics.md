@@ -81,8 +81,9 @@ The `# fix:` hint gives the agent a starting point. Use the actual CLI command
 
 ## 6. Performance: parallel by default
 
-- Launch independent linters / checks as parallel background jobs (`Start-Job`), not
-  sequentially. The lint suite runs 13+ tools; sequential execution is unacceptable.
+- Launch independent linters / checks as parallel background jobs (threads or
+  subprocesses), not sequentially. The lint suite runs 13+ tools; sequential execution
+  is unacceptable.
 - Tools that mutate the same files (e.g. `ruff check --fix` then `ruff format`) must
   run sequentially within their job to avoid race conditions, but the combined job
   runs in parallel with all other tools.

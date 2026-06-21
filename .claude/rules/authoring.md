@@ -105,9 +105,8 @@ See `.claude/rules/security.md` as the canonical example.
 ## Skills (`.claude/skills/`)
 
 - Every skill frontmatter must include `disable-model-invocation: true`.
-- If the skill generates scripts, those scripts must follow the PowerShell
-  conventions in `.claude/rules/tooling.md` (especially `-T` for `docker compose exec`
-  and `[Environment]::Exit()`).
+- If the skill generates scripts, those scripts must follow the conventions
+  in `.claude/rules/tooling.md` (especially `-T` for `docker compose exec`).
 
 ### Hook location (Copilot-compatible)
 
