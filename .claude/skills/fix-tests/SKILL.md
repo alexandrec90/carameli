@@ -21,7 +21,9 @@ differs by environment, and only after you change a file under `app/`:
   `alembic upgrade head` before tests, so any code or migration change takes effect on the
   next push. There's nothing to restart.
 
-Don't try to guess your environment up front — if there's no Docker daemon, you're in CI.
+Don't over-think this up front: if there's no Docker daemon, you're not running locally —
+there's nothing for you to restart, so just fix the code (the next push or runner handles
+making it live; see Step 3).
 
 ---
 
@@ -138,15 +140,20 @@ State clearly:
 - Which failures were fixed (file, test name, what changed).
 - Which were skipped and why (only genuine stop conditions).
 
-Then close the loop yourself: make `app/` changes live (locally `docker compose restart
-app`; in CI the next push handles it — see the intro), regenerate the log, and repeat from
-Step 1 until it's empty. Don't stop at a half-fixed state and wait for a human.
+Your deliverable is the **fix plus the `--- ADDRESSED` stamp** — that needs no test runner
+and completes in any environment (including a headless eval that only seeds the log).
 
-> Regenerating locally runs the suite, which streams every test line. Don't pipe that into
-> context — discard the run's stdout and read the capped `logs/test-failures.log` instead
+**If a runner is reachable, close the loop yourself:** make `app/` changes live (locally
+`docker compose restart app`; in CI the next push handles it — see the intro), regenerate
+the log, and repeat from Step 1 until it's empty. Don't stop at a half-fixed state and wait
+for a human. **If no runner is reachable** (no Docker and not a CI workflow branch — e.g. a
+sandbox), you can't regenerate: finish the fix, stamp `--- ADDRESSED`, report, and stop.
+Whatever runs the suite next produces the fresh log.
+
+> When you do regenerate locally, the suite streams every test line — don't pipe that into
+> context; discard the run's stdout and read the capped `logs/test-failures.log` instead
 > (background a slow run so the turn isn't blocked). Waiting on pytest costs latency, not
-> tokens; ingesting its raw output is what costs tokens. In CI you skip this entirely — the
-> runner executes the suite and you just read the artifact.
+> tokens; ingesting its raw output is what costs tokens. In CI you skip this entirely.
 
 ---
 

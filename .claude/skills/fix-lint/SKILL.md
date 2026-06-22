@@ -134,11 +134,15 @@ State clearly:
 - Which errors were fixed (file, line, what changed).
 - Which were skipped and why (only genuine stop conditions — a known refactor or missing context).
 
-Then close the loop yourself: regenerate the log (desktop: re-run **Lint: Everything**;
-CI: push) and repeat from Step 1 until it's empty. While fixing a batch, diagnose from
-`logs/lint-errors.log` and use targeted single-file rechecks (e.g. `ruff check <file>`,
-`mypy <file>`) to confirm individual fixes — the full re-run is the once-per-pass verify,
-not a per-edit habit.
+Your deliverable is the **fix plus the `--- ADDRESSED` stamp** — that needs no linter run
+and completes in any environment (including a headless eval that only seeds the log).
+
+**If you can run linters, close the loop yourself:** regenerate the log (desktop: re-run
+**Lint: Everything**; CI: push) and repeat from Step 1 until it's empty. While fixing a
+batch, diagnose from `logs/lint-errors.log` and use targeted single-file rechecks (e.g.
+`ruff check <file>`, `mypy <file>`) to confirm individual fixes — the full re-run is the
+once-per-pass verify, not a per-edit habit. **If you can't run linters** (sandbox / no
+toolchain), finish the fixes, stamp `--- ADDRESSED`, report, and stop.
 
 ---
 
