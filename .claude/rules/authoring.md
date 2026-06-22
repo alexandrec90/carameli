@@ -105,9 +105,8 @@ See `.claude/rules/security.md` as the canonical example.
 ## Skills (`.claude/skills/`)
 
 - Every skill frontmatter must include `disable-model-invocation: true`.
-- If the skill generates scripts, those scripts must follow the PowerShell
-  conventions in `.claude/rules/tooling.md` (especially `-T` for `docker compose exec`
-  and `[Environment]::Exit()`).
+- If the skill generates scripts, those scripts must follow the conventions
+  in `.claude/rules/tooling.md` (especially `-T` for `docker compose exec`).
 
 ### Hook location (Copilot-compatible)
 
@@ -155,7 +154,7 @@ desktop app or CLI is running. Classify each skill as one of:
 - **Config snapshot:** use the Read tool on the listed files, not `project-snapshot.ps1`
 - **State finalization:** write `state.json` directly — never write `state-updates.json` and wait for a Stop hook
 
-**Local-only skills** (`fix-lint`, `fix-tests`, `fix-tests-auto`, `fix-pre-commit`,
+**Local-only skills** (`fix-tests-auto`, `fix-pre-commit`,
 `fix-e2e`, `fix-logs`, `fix-pester`, `fix-docker`) must say so at the top of the SKILL.md:
 
 ```markdown

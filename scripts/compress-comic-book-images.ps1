@@ -10,5 +10,6 @@ try {
     Pop-Location
 }
 
-pwsh -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "notify.ps1") -Label "Images: Compress Comic Book" -ExitCode $ec
+# Notifications are a task-layer concern — the VS Code task wraps this script with
+# scripts/notify-wrap.py. Do not emit a toast from inside the script.
 exit $ec

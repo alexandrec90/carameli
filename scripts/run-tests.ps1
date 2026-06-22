@@ -279,7 +279,8 @@ for ($i = $lines.Count - 1; $i -ge 0; $i--) {
     }
 }
 
-$filtered | Set-Content $artifact
+# Provenance header: lets fix-tests name the script to edit if the filter swallowed lines.
+@("# source: scripts/run-tests.ps1 (local desktop)", "") + $filtered | Set-Content $artifact
 
 Write-Host ""
 Write-Host "Errors written to: $artifact" -ForegroundColor Red

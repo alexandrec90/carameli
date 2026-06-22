@@ -6,10 +6,24 @@ description: 'Fixes test failures from logs/test-failures.log (written by the Te
 
 # Skill: Fix Test Failures
 
-> **Local session only.** This skill reads log artifacts written by PS1 scripts
-> on the host machine. It cannot run in web or mobile sessions.
+> **Cross-environment.** Reads `logs/test-failures.log`, which is produced by either
+> the local **Test: Run pytest** VS Code task (desktop) or the **On-Demand Lint + Test**
+> GitHub Actions workflow (mobile). Open the PR created by that workflow, then run this skill.
 
 Fix failing tests collected in `logs/test-failures.log`.
+
+The fix steps are the same everywhere — read the log, edit the implicated code. One thing
+differs by environment, and only after you change a file under `app/`:
+
+- **Running locally:** the app runs from a container, so the change isn't live until
+  `docker compose restart app`. Test-only edits need no restart.
+- **In CI** (working a `fix/auto-*` PR branch): each run rebuilds from scratch and runs
+  `alembic upgrade head` before tests, so any code or migration change takes effect on the
+  next push. There's nothing to restart.
+
+Don't over-think this up front: if there's no Docker daemon, you're not running locally —
+there's nothing for you to restart, so just fix the code (the next push or runner handles
+making it live; see Step 3).
 
 ---
 
@@ -24,19 +38,17 @@ Read these two files **in parallel** (single tool call):
 - `logs/test-failures.log`
 - `.claude/skills/fix-tests/known-fixes.md`
 
-If the log file does not exist or is empty, tell the user to run the **Test: Run pytest**
-task first, then stop.
+An empty log means tests are green — you're done; stop. If the log doesn't exist at all,
+diagnostics haven't run yet: generate it (desktop: run the **Test: Run pytest** task; CI:
+the workflow produces it) and proceed once it's present.
 
 ### Addressed check
 
-If the last line of `logs/test-failures.log` is `--- ADDRESSED`, the failures have
-already been fixed. Tell the user:
-
-> These failures were already addressed. Re-run the **Test: Run pytest** task
-> (after `docker compose restart app` if `app/` files were changed) and invoke
-> `/fix-tests` again if new failures appear.
-
-Then **stop**.
+If the last line of `logs/test-failures.log` is `--- ADDRESSED`, this log was already
+fixed and is stale. Don't re-fix it — regenerate it first (restart the app if you changed
+`app/` code locally, then re-run **Test: Run pytest**; in CI, push and let the workflow
+re-run). Continue on the fresh log if failures remain, or stop if it's empty. **Do not
+apply fixes against an `--- ADDRESSED` log.**
 
 ### Log quality gate
 
@@ -51,12 +63,14 @@ Before investing in fixes, scan the log for these signals of incomplete diagnost
 If **any** quality problem is found:
 
 1. Identify which test(s) are affected and which output pattern was lost.
-2. Update `scripts/run-tests.ps1` to relax the relevant filter in `Invoke-FlushBlock`
-   (e.g., widen the line-keep conditions, raise `$maxPerBlock`, or preserve the
-   missing frame pattern).
-3. Tell the user: what was wrong, what was changed, and ask them to re-run the
-   **Test: Run pytest** task.
-4. **Stop** — do not attempt fixes on a low-quality log.
+2. Relax the relevant filter in the script named on the log's `# source:` header — widen
+   the line-keep conditions, raise the per-block cap, or preserve the missing frame pattern.
+   `run-tests.ps1` (`Invoke-FlushBlock`) and `ci-digest.py` (`filter_pytest_output`) share
+   this logic — if you change one, change the other to match.
+3. Note what was wrong and what you changed, then regenerate the log with the improved
+   filter (desktop: re-run **Test: Run pytest**; CI: push) and restart from Step 1 on the
+   higher-quality output.
+4. Do not attempt fixes on the current low-quality log — fix the filter first.
 
 ### Known-fix matching (mandatory — do this BEFORE any other file reads)
 
@@ -124,16 +138,22 @@ than 90 days ago.
 State clearly:
 
 - Which failures were fixed (file, test name, what changed).
-- Which were skipped and why.
-- **Restart reminder:** If any source files under `app/` were changed, tell the user:
+- Which were skipped and why (only genuine stop conditions).
 
-  ```sh
-  docker compose restart app
-  ```
+Your deliverable is the **fix plus the `--- ADDRESSED` stamp** — that needs no test runner
+and completes in any environment (including a headless eval that only seeds the log).
 
-  If only test files were changed, no restart is needed.
-- Tell the user to re-run the **Test: Run pytest** task and invoke `/fix-tests` again
-  if failures remain.
+**If a runner is reachable, close the loop yourself:** make `app/` changes live (locally
+`docker compose restart app`; in CI the next push handles it — see the intro), regenerate
+the log, and repeat from Step 1 until it's empty. Don't stop at a half-fixed state and wait
+for a human. **If no runner is reachable** (no Docker and not a CI workflow branch — e.g. a
+sandbox), you can't regenerate: finish the fix, stamp `--- ADDRESSED`, report, and stop.
+Whatever runs the suite next produces the fresh log.
+
+> When you do regenerate locally, the suite streams every test line — don't pipe that into
+> context; discard the run's stdout and read the capped `logs/test-failures.log` instead
+> (background a slow run so the turn isn't blocked). Waiting on pytest costs latency, not
+> tokens; ingesting its raw output is what costs tokens. In CI you skip this entirely.
 
 ---
 
@@ -141,14 +161,17 @@ State clearly:
 
 1. Edit only files directly implicated by the collected failures — never pre-emptive cleanup.
 2. One failure = one minimal fix. Do not restructure surrounding code.
-3. **Diagnose from `logs/test-failures.log`, not by running the full suite.** After applying a
-   fix you may run a single targeted check — `docker compose exec -T app pytest <path::to::the_test>`
-   for just the test you fixed — to confirm it goes green. Do not run the whole suite or dump raw
-   output; the full **Test: Run pytest** task remains the user's to re-run.
-4. Skip the log file if already stamped `--- ADDRESSED` — tell the user to re-run tests first.
+3. **Rerun selectively — never the whole suite to verify a fix.** You already have the failed
+   node IDs from the log; after a fix, rerun exactly those
+   (`docker compose exec -T app pytest tests/...::test_a tests/...::test_b`). To gate a pass
+   against regressions, use the changed-only run (the **Fast** task / `run-tests.ps1 -Fast`,
+   i.e. testmon) — it reruns just the tests your edits touched, including any previously-passing
+   one your fix breaks. Reserve a cold full suite for when the testmon graph looks stale.
+4. If the log is stamped `--- ADDRESSED`, it's stale — regenerate it before fixing (don't fix
+   against a stale log).
 5. Only stamp the log after applying at least one code fix.
 6. **Known fixes are mandatory short-circuits.** If a known-fix pattern matches, apply it
    immediately. Do not investigate, do not read additional files, do not re-derive the fix.
 7. **Log quality gate is mandatory.** If any failure block has no traceback (no `E` lines,
-   no `app/`/`tests/` frames), update `scripts/run-tests.ps1` and stop — never attempt fixes
-   on a log where the root cause is invisible.
+   no `app/`/`tests/` frames), update the producing filter (named on the log's `# source:`
+   header) and stop — never attempt fixes on a log where the root cause is invisible.
