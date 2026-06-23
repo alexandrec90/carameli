@@ -74,8 +74,15 @@ exception handler in `app/main.py` writes all unhandled 500s to the log — do n
 
 ## Tooling
 
-See `.claude/rules/tooling.md`. Never run `docker` or `docker compose` commands directly — provide
-them for the user to run instead.
+> **Local session only.** Everything in this section needs a local Docker Desktop daemon.
+> Web and mobile sessions have no Docker — do not attempt `docker` / `docker compose` there.
+> Make the code change and defer container/stack verification to a local session or CI.
+
+See `.claude/rules/tooling.md`. Running `docker` / `docker compose` directly is fine — the
+CLI shares Docker Desktop's daemon, so it operates on the same containers without conflict.
+Be deliberate with destructive lifecycle ops on a running stack: `down -v` wipes DB volumes
+and `restart` / `up --build` can drop the user's session — confirm before those. Use `-T`
+with `docker compose exec` (see tooling.md).
 
 ## Guardrails
 
@@ -97,7 +104,10 @@ When adding a pip package, add it to `requirements.txt` (runtime) or `requiremen
 
 ## Testing
 
-Every code change must include tests in the same commit.
+Every code change must include tests in the same commit. Every endpoint and every
+testable unit of logic must have test coverage — gaps are not acceptable. If you
+add or touch something that has no test, write the test in the same commit even if
+the logic itself didn't change.
 
 - New endpoint/service: cover happy path, error cases, and edge cases
 - Bug fix: write a regression test first
@@ -105,3 +115,15 @@ Every code change must include tests in the same commit.
 - Integration tests use Telnyx sandbox + local Jambonz (no real charges)
 - Use the `make-tests` skill to identify coverage gaps after significant changes
 - DB isolation rules (savepoint fixture, no raw sessions, no teardown cleanup) — `.claude/rules/testing.md`
+
+> **Local session only for execution.** Writing tests works anywhere, but *running*
+> `pytest` (needs the local Postgres/Docker stack), `ruff`, `mypy`, and `py_compile`
+> requires a local toolchain that web/mobile sessions don't have. In those sessions,
+> still write the required tests in the same change — just leave execution to a local
+> session or CI.
+
+Run **targeted** tests to verify a change — the specific files or module you touched
+(e.g. `pytest tests/unit/test_<module>.py`), with the local Postgres container up. Do
+**not** run the whole suite on every change: it's slow and a fresh-venv full run can
+surface misleading version-skew failures — leave full runs to CI. Also verify with
+`ruff`, `mypy`, and `py_compile`. See `tests/CLAUDE.md`.

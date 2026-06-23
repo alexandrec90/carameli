@@ -7,6 +7,9 @@ argument-hint: '(no arguments)'
 
 # Skill: Fix Docker Errors
 
+> **Local session only.** This skill reads log artifacts written by PS1 scripts
+> on the host machine. It cannot run in web or mobile sessions.
+
 Fix Docker failures collected in `logs/docker/` artifact files.
 
 ---
@@ -106,8 +109,10 @@ is cleared automatically when the producing task overwrites the file.)
 If an artifact contains **only transient failures** (no code fix applied), do **not**
 stamp it — transient errors should be re-evaluated on the next run.
 
-**Important:** Never run `docker` or `docker compose` commands directly — provide
-commands for the user to run instead.
+**Important:** Diagnose from the `logs/docker/` artifacts, not raw `docker` output. After applying
+a fix you may run the targeted apply command (the single-service `--no-build`/`--build` form below)
+and `Docker: Stack Status` to confirm the container comes up healthy. Avoid destructive ops
+(`down -v`, full-stack restarts) — confirm with the user before those.
 
 ---
 
@@ -144,7 +149,8 @@ After applying, tell the user to:
 2. Invoke `/fix-docker` again if any `logs/docker/` files still contain failures
    (including the freshly written `build.log` or `restart.log`).
 
-Never run Docker commands directly from the agent — provide the commands for the user to run.
+You may run the targeted single-service apply command yourself to verify the fix. Avoid destructive
+or full-stack commands (`down -v`, full restarts) — provide those for the user to run.
 
 ---
 
@@ -164,7 +170,8 @@ State clearly:
 ## Hard Rules
 
 1. Edit only files directly implicated by the collected errors — never pre-emptive cleanup.
-2. Never run `docker` or `docker compose` commands — provide them for the user to run.
+2. Run only targeted apply/verify commands (single-service `up`/`build`, `Docker: Stack Status`).
+   Avoid destructive ops (`down -v`, full-stack restart) — provide those for the user to run.
 3. One error = one minimal fix. Do not restructure surrounding code.
 4. Never modify secrets or credentials in `.env` — report what is missing and let the user fill it in.
 5. Skip artifacts already stamped `--- ADDRESSED` — they were fixed in a prior run.

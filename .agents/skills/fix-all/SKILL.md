@@ -1,61 +1,104 @@
 ---
 name: fix-all
 disable-model-invocation: true
-description: 'Runs fix-lint, fix-tests, and fix-e2e in sequence. Use when you want to fix all outstanding lint, test, and E2E failures in one pass.'
+description: 'Coding-agent-driven loop: runs pytest then lint, delegates fixes to the per-check fixer skills, restarts the app so fixes take effect, and re-runs each check until green or a retry cap. Use to fix all outstanding failures in one supervised pass.'
 ---
 
 # Skill: Fix All
 
-Delegates to the three canonical fixers in order: lint, tests, E2E.
+> **Local session only.** This skill runs the check scripts (which need the Docker
+> stack) and restarts containers between attempts. It cannot run in web or mobile
+> sessions — see the Preflight for what to do there instead.
+
+You — the coding agent in this session — **own this loop directly.** There is no
+background script spawning another agent: you run each check with the shell, delegate
+fixing to the per-check fixer skills with the Skill tool, make the fix live, and re-run.
+The user watches it happen.
+
+The fixers apply their **known-fixes short-circuit first** (cheap, no investigation) and
+only reason from scratch on unmatched failures — that replaces the old cheap→full model
+escalation, which only existed because a script picked the model per call.
 
 ---
 
-## Step 1 — Determine which logs have failures
+## Preflight — the stack must be live (do this first)
 
-Read all three log files **in parallel** (single tool call):
+This loop runs the check scripts and restarts containers, so it needs a running Docker
+stack. **Before running any check or editing any file:**
 
-- `logs/lint-errors.log`
-- `logs/test-failures.log`
-- `logs/e2e-failures.log`
+1. Confirm the stack is up — `docker compose ps` (or `scripts/docker-status.ps1`, which
+   writes `logs/docker/health.log`). The `app` and `db` containers must be running.
+2. **Stack down** (Docker is running but the containers aren't) → **stop immediately.** Do
+   not run a check or edit anything. Tell the user to start it (the **Start: Full Stack**
+   task), then re-invoke.
+3. **No Docker at all** (web / mobile / CI session — no daemon, no PS1 host) → this live
+   loop can't run here, so **don't attempt it.** The mobile/CI flow is different: run the
+   per-check fixers `/fix-tests`, `/fix-lint` against the logs CI produced
+   (open the On-Demand workflow's PR), then push and let the workflow re-run. `fix-all`'s
+   value is the *local* live re-run loop; on mobile that role belongs to CI, not this skill.
 
-For each file: it is **active** if it exists, is non-empty, and its last line is not
-`--- ADDRESSED`. Skip files that are missing, empty, or already addressed.
+## Branch safety
 
-If **no** log is active, tell the user all checks are clean and stop.
-
----
-
-## Step 2 — Run fixers for active logs
-
-For each active log, invoke the corresponding skill:
-
-| Active log | Skill to invoke |
-|---|---|
-| `logs/lint-errors.log` | `/fix-lint` |
-| `logs/test-failures.log` | `/fix-tests` |
-| `logs/e2e-failures.log` | `/fix-e2e` |
-
-Run them **sequentially** — lint first, tests second, E2E third. Each skill may edit
-source files; later skills must see the results of earlier edits.
-
-Invoke each skill using the Skill tool exactly as if the user had typed the slash command.
+If the working branch is the default branch (`master`), create an `auto-fix/<timestamp>`
+branch before any edits, so the auto-fix pass is isolated. On a feature branch, stay on it.
 
 ---
 
-## Step 3 — Report
+## The loop
 
-After all active fixers complete, summarize:
+Run the two checks **in order** — pytest, then lint. Tests do the substantive code edits;
+lint runs last so its auto-fixers (`ruff --fix`, `ruff format`, `eslint --fix`, …) format
+whatever the test fixes just changed — no separate re-lint pass needed. For each check:
 
-- Which fixers ran and their outcome (all matched / partial / none matched).
-- Which files were changed.
-- Any unmatched failures still remaining in trimmed logs.
-- Next step for the user: re-run the **CI: Check + Fix Known Issues** task to verify.
+| Check | Run (writes its log) | Log artifact | Fixer |
+|---|---|---|---|
+| pytest | `scripts/run-tests.ps1` (**Test: Run pytest**) | `logs/test-failures.log` | `/fix-tests` |
+| Lint | `scripts/lint-all.ps1` (**Lint: Everything**) | `logs/lint-errors.log` | `/fix-lint` |
+
+For each check, up to **3 attempts**:
+
+1. **Run the check.** Don't ingest its streamed stdout — discard it and read the capped
+   log artifact instead (a green run leaves the log empty). For pytest, run the **full**
+   suite on the first attempt only; on every re-run use `-Fast` (the **Test: Run pytest
+   (fast, changed only)** task — testmon reruns just the tests your edits touched, and
+   falls back to the full xdist run on its own if testmon selects more than half the suite).
+2. **Passed?** (exit 0 / empty log) → move to the next check.
+3. **Failed?** Invoke the matching fixer with the Skill tool, exactly as if the user typed
+   the slash command. The fixer handles its own log + known-fixes short-circuit.
+4. **Make the fix live** (pytest only — lint needs no restart):
+   - `app/` files changed → restart the app container (`scripts/docker-restart-app.ps1`).
+   - `requirements.txt` changed → `docker compose build app`, then restart.
+   - A new `alembic/versions/*.py` migration appeared → apply it (`scripts/docker-migrate.ps1`).
+   - Then check stack health (`scripts/docker-status.ps1`); if `logs/docker/health.log`
+     shows Unhealthy/Exited/Restarting, invoke `/fix-docker` before re-running.
+5. **Re-run** (back to step 1). After 3 failed attempts, stop on this check, note it, and
+   move to the next — never loop forever.
+
+---
+
+## Report
+
+After both checks, summarize:
+
+- Per check: passed clean / passed after N attempts / still failing after 3.
+- Which files changed, and any container ops triggered (restart / rebuild / migrate / fix-docker).
+- Any unmatched failures still in the trimmed logs.
+- Whether you're on an `auto-fix/*` branch the user needs to review and merge.
 
 ---
 
 ## Hard Rules
 
-1. Never skip a fixer for an active log — all three must run if their log is active.
-2. Run sequentially, not in parallel — edits from one fixer may affect what another finds.
-3. Do not read individual log files beyond Step 1 — each sub-skill handles its own log.
-4. Do not apply any fixes directly — all fixing is delegated to the sub-skills.
+1. **Preflight first.** Never run a check or edit a file unless the Docker stack is live.
+   No Docker (mobile/web/CI) → don't run the loop; use the CI path in the Preflight.
+2. **Never spawn a coding-agent CLI** (`claude`/`copilot`/`codex`). You are the agent —
+   delegate fixes with the Skill tool, run checks with the shell. Nothing in this loop
+   shells out to another agent.
+3. **Run sequentially** — pytest, then lint. Edits from the test pass feed the lint pass.
+4. **Restart the app after `app/` edits** before re-running pytest. A stale container
+   produces false failures.
+5. **Cap at 3 attempts per check**, then move on. Report the holdout; don't spin.
+6. **Delegate all fixing** to the sub-skills — this skill orchestrates, it doesn't edit
+   source directly.
+7. **Don't pipe streamed check output into context** — read the capped `logs/*.log`
+   artifact each check produces.

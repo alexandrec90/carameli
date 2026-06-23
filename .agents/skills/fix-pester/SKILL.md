@@ -6,6 +6,9 @@ description: 'Fixes PowerShell Pester failures from logs/pester-failures.log (wr
 
 # Skill: Fix Pester Failures
 
+> **Local session only.** This skill reads log artifacts written by PS1 scripts
+> on the host machine. It cannot run in web or mobile sessions.
+
 Fix actionable PowerShell test failures collected in `logs/pester-failures.log`.
 
 ---
@@ -114,7 +117,9 @@ State clearly:
 - Which failures were skipped and why
 - Next step: re-run **Test: Run Pester (PowerShell)**
 
-Never run Pester yourself after edits — instruct the user to re-run the task.
+Diagnose from `logs/pester-failures.log`. After a fix you may run just the affected test file
+(`Invoke-Pester -Path <file>`) to confirm it passes — don't re-run the full **Test: Run Pester
+(PowerShell)** task; that stays the user's to run.
 
 ---
 
@@ -127,4 +132,5 @@ Never run Pester yourself after edits — instruct the user to re-run the task.
 5. Skip already-addressed artifacts stamped `--- ADDRESSED`.
 6. Only stamp the log after applying at least one code fix.
 7. If the artifact is not self-locating, fix `scripts/run-pester.ps1` first and stop.
-8. Never run additional diagnostics yourself after edits — tell the user to rerun the task.
+8. After a fix, run at most the single affected test file to verify — never re-run the full
+   Pester task or dump raw output.

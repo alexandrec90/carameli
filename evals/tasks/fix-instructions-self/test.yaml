@@ -1,0 +1,56 @@
+# Meta-task: evaluates the /fix-instructions skill end to end — the markdown
+# optimizer that acts on eval results. Previously a documented gap in README.md
+# ("testing it is meta and not yet wired"); this scaffolds it.
+#
+# Flow (all inside a throwaway worktree — the real repo is never touched):
+#   1. setup.cjs seeds evals/output/latest.json with a fabricated prior eval run:
+#      - an actionable task where the WITH-INSTRUCTIONS arm underperformed on a
+#        rule it should enforce (category 3a — "strengthen the weakest link"), and
+#      - a degenerate-baseline task (toolCalls: 0, failed) that the skill must
+#        REFUSE to act on (category 3d).
+#   2. the agent runs /fix-instructions, which should edit the implicated rule
+#      markdown and stamp state.json with the seeded evalId.
+#   3. verify.cjs confirms it made an instruction edit AND stamped the run.
+#
+# NOTE: this task could not be run-verified when it was scaffolded (an agent eval
+# costs credits + needs the claude CLI). Run `npm run eval:ablate -- \
+# .claude/skills/fix-instructions` locally or in CI to confirm the with-instructions
+# arm beats the baselinePrompt before trusting the numbers.
+#
+# Held-out caveat: per fix-instructions Hard Rule 8, the optimizer must not edit the
+# files that govern its own loop. This task therefore seeds an actionable row that
+# targets an UNRELATED rule (.claude/rules/naming.md), never the harness or this skill.
+
+- metadata:
+    # Ablating the skill dir makes the /fix-instructions arm fall back to the
+    # baselinePrompt, so ablation measures "skill scaffolding vs unguided agent".
+    targets:
+      - .claude/skills/fix-instructions
+  vars:
+    prompt: /fix-instructions
+    baselinePrompt: >-
+      A prior eval run is recorded in evals/output/latest.json. For each task,
+      compare the with-instructions arm against the baseline arm. Where the
+      with-instructions arm clearly underperformed on a behavior a named instruction
+      file should enforce, make the smallest markdown edit to that file to fix it.
+      Ignore any task whose baseline did no real work (toolCalls 0 and failed) — that
+      comparison is invalid. Then record the run's evalId in
+      .claude/skills/fix-instructions/state.json as lastAddressedEvalId.
+    setup: tasks/fix-instructions-self/setup.cjs
+    verify: tasks/fix-instructions-self/verify.cjs
+  # Correctness dominates: a run that edits the implicated markdown and stamps the
+  # run passes even if a little inefficient. Pass = weighted score >= 0.7.
+  threshold: 0.7
+  assert:
+    # Correctness: an instruction edit was made AND the run was stamped (verify.cjs).
+    - type: javascript
+      value: context.providerResponse?.metadata?.verifyPassed === true
+      weight: 3
+    # The agent acted rather than just reporting.
+    - type: javascript
+      value: context.providerResponse?.metadata?.madeAnEdit === true
+      weight: 1
+    # Spiral guard — the delta is in the seeded JSON; it shouldn't read half the repo.
+    - type: javascript
+      value: '(context.providerResponse?.metadata?.readsBeforeFirstEdit ?? 99) <= 8'
+      weight: 1

@@ -15,7 +15,6 @@ Steps:
   3. Add test cases for any custom query methods in your repo.
 """
 
-# ruff: noqa: S101
 from __future__ import annotations
 
 import pytest

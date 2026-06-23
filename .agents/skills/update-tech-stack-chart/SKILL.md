@@ -20,8 +20,15 @@ checkers, test runners, formatters, AI coding tools, CI/CD pipelines, etc.
 
 The harness preloads all source files:
 
-Suggested command (run in terminal):
-`pwsh -NoProfile -ExecutionPolicy Bypass -File .claude/skills/state-tools/project-snapshot.ps1 -Sections compose,requirements,frontend-pkg,claude-md,config-py,chart-tech-legend,chart-tech-mmd`
+Read the following files using the Read tool (in parallel where independent):
+
+- `docker-compose.yml`
+- `requirements.txt`
+- `frontend/package.json`
+- `CLAUDE.md`
+- `app/core/config.py`
+- Use Glob to discover: `charts/tech stack/*legend*` — read the file found (current legend diff target)
+- Use Glob to discover: `charts/tech stack/*.mmd` — read the file found (current Mermaid diagram diff target)
 
 Reference — what to look for in each injected section:
 

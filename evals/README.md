@@ -21,7 +21,8 @@ compares correctness, tool-call count, failed calls, tokens, and cost.
 ## Run
 
 ```sh
-npm run eval         # run the suite, write evals/output/latest.json
+npm run eval         # run the suite once, write evals/output/latest.json
+npm run eval:stable  # run with --repeat 3 — variance-checked numbers for decisions
 npm run eval:summary # print the with-vs-baseline delta from the last run (free)
 npm run eval:view    # open the web UI to diff with-instructions vs baseline
 npm run eval:coverage          # which instruction files have a test yet (free, no agent runs)
@@ -33,6 +34,18 @@ npm run eval:section -- <file> "<heading>"      # what is ONE section of a SKILL
 Every comparison reports the three optimization axes side by side — **accuracy**
 (`verifyPassed` / score, the pass gate), **tokens**, **latency**, and **cost** — so you
 can pick the variant that stays correct while minimizing the rest.
+
+### Variance: a single run is a point estimate
+
+Agent runs are stochastic, so one `npm run eval` row can swing on noise. `eval:summary`
+guards against acting on jitter:
+
+- A **single** run prints each verdict tagged `provisional`.
+- `eval:stable` runs each task `--repeat 3`; the summary then reports **median [min-max]**
+  per metric and, when the two arms' tool-call ranges **overlap**, marks the task
+  `INCONCLUSIVE` — the delta is within run-to-run noise at that sample size.
+- `/fix-instructions` must not edit instructions off an `INCONCLUSIVE` or `provisional`
+  row (its Hard Rule 9). Make decisions — especially deletions — off `eval:stable`.
 
 The **Eval: Instruction Files (promptfoo)** VS Code task runs `eval` then prints the
 summary automatically.
@@ -114,7 +127,15 @@ skill's log (`setup.cjs`), points it at a committed broken fixture under
 | `fix-problems` | Reads **live** VS Code diagnostics via `get_errors` — there's no log artifact to seed in a throwaway worktree. |
 | `fix-tests-auto` | An autonomous loop that **runs** pytest against a live Docker stack each iteration — not deterministic headless. Its underlying fix logic is covered by `fix-tests`. |
 | `fix-all` | Aggregate dispatcher — no behavior of its own to measure. |
-| `fix-instructions` | The markdown optimizer that acts on *these* results; testing it is meta and not yet wired. |
+
+`fix-instructions` — the markdown optimizer that acts on *these* results — **is** wired,
+via the `fix-instructions-self` task: `setup.cjs` seeds a fabricated prior run (one
+actionable 3a task + one degenerate-baseline 3d task), and `verify.cjs` checks the skill
+made an instruction edit and stamped the run. It was scaffolded without a run-verify pass
+(an agent eval costs credits), so confirm it locally with
+`npm run eval:ablate -- .claude/skills/fix-instructions` before trusting its numbers. Per
+the skill's Hard Rule 8, the seeded actionable row targets an unrelated rule, never the
+harness or the skill itself (held-out / no self-optimization).
 
 When adding a fixer skill, add its task too (see `.claude/rules/authoring.md`). If it's
 genuinely untestable headless, add a row here with the reason instead of a flaky test.
