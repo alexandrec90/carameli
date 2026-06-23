@@ -25,11 +25,17 @@ providers:
     label: with-instructions
     config:
       baseRef: HEAD
+      extraArgs:
+        - "--model"
+        - "claude-haiku-4-5"
   - id: file://providers/claude-skill-provider.cjs
     label: baseline-no-instructions
     config:
       baseRef: HEAD
       stripInstructions: true
+      extraArgs:
+        - "--model"
+        - "claude-haiku-4-5"
 
   # ---- Leave-one-out ablation (worked example) ------------------------------
   # To measure what ONE instruction file is worth, run the suite with just that

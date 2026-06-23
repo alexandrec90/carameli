@@ -15,6 +15,7 @@
   },
   "scripts": {
     "eval": "promptfoo eval -c evals/promptfooconfig.yaml -o evals/output/latest.json",
+    "eval:stable": "promptfoo eval -c evals/promptfooconfig.yaml -o evals/output/latest.json --repeat 3",
     "eval:view": "promptfoo view",
     "eval:summary": "node evals/summarize.cjs",
     "eval:coverage": "node evals/ablate.cjs --coverage",

@@ -9,11 +9,37 @@ paths:
 
 # Rule: Rules & Skills Authoring
 
+## Eval coverage is mandatory for instruction files
+
+Instruction files are tested like code. The `evals/` promptfoo harness measures whether
+a `CLAUDE.md`, a `.claude/rules/*` file, or a `.claude/skills/*` skill actually changes
+agent behavior (with-instructions vs a leave-one-out ablation). **Treat a new or
+substantially changed instruction file the same way you treat new code: it ships with a
+test in the same change.**
+
+- **New skill, or new/rewritten rule:** add an eval task under
+  `evals/tasks/<name>/test.yaml` whose `metadata.targets` names the file, and whose
+  prompt + asserts only pass when that file's guidance is in effect. This is the
+  instruction-file analogue of the unit/integration-test mandate in the root `CLAUDE.md`.
+- **Pick a discriminating prompt.** The task must measurably fail (or behave worse) when
+  the file is ablated — otherwise it proves nothing. Verify with
+  `npm run eval:ablate -- <path>`: the with-instructions arm should beat the ablated one.
+- **`/skill` tasks need a `baselinePrompt`** (the skill's plain-English equivalent) so the
+  ablated/baseline arm is a fair "skill vs unguided agent" comparison, not an unresolved
+  command. Weight the correctness assert above the efficiency asserts (see any existing
+  `test.yaml`).
+- **Fixer skills** (`fix-*`) follow the destructive-task template: a committed broken
+  fixture under `evals/fixtures/`, a `setup.cjs` that seeds the skill's log artifact, and
+  a `verify.cjs` that confirms the repair. Copy an existing `evals/tasks/fix-*/` as the
+  starting point.
+- **Run `npm run eval:coverage`** to confirm the file is no longer a gap.
+- **Genuinely untestable by the harness?** A few skills can't be evaluated headless — they
+  read live editor diagnostics (`fix-problems`) or drive a live runner/stack
+  (`fix-tests-auto`, aggregates like `fix-all`). Document the exclusion and the reason in
+  `evals/README.md` rather than shipping a flaky test.
+
 ## CLAUDE.md files
 
-- **No command instructions** — never document `npm run …`, `pwsh …`, or other CLI
-  invocations. Commands are discoverable from `package.json`, `tasks.json`, or script
-  files; repeating them wastes context window tokens and drifts out of sync.
 - **Only record non-obvious configuration** — things that can't be derived by reading
   source files (e.g. proxy routes, port mappings, env var semantics, architectural
   constraints). If Claude can find it in a config file in one read, leave it out.
@@ -76,50 +102,39 @@ See `.claude/rules/security.md` as the canonical example.
 ## Skills (`.claude/skills/`)
 
 - Every skill frontmatter must include `disable-model-invocation: true`.
-- If the skill generates scripts, those scripts must follow the PowerShell
-  conventions in `.claude/rules/tooling.md` (especially `-T` for `docker compose exec`
-  and `[Environment]::Exit()`).
+- If the skill generates scripts, those scripts must follow the conventions
+  in `.claude/rules/tooling.md` (especially `-T` for `docker compose exec`).
 
-### Hook location (Copilot-compatible)
 
-Copilot does not reliably execute skill frontmatter `hooks`. Define operational
-hooks in `.claude/settings.json` instead.
+### Mobile / remote session compatibility
 
-- Use top-level `hooks` in settings for `PreToolUse`, `PostToolUse`, and `Stop`.
-- Keep command logic in shared scripts under `scripts/hooks/`.
-- For behavior that should stay skill-specific, route the settings hook to a
-  dispatcher script that no-ops unless the target skill artifact/condition is
-  present.
+Skills run in all session types: local VS Code, web browser, and mobile app.
+Hooks and PowerShell scripts only execute in local sessions where the Claude Code
+desktop app or CLI is running. Classify each skill as one of:
 
-Example:
+| Class | Works on mobile? | Pattern |
+|---|---|---|
+| **Cross-environment** | Yes | Uses only Glob, Grep, Read, Write, Edit, Bash, Agent tools |
+| **Local-only** | No | Depends on log artifacts written by PS1 scripts that run on the host |
 
-```json
-"hooks": {
-  "Stop": [
-    {
-      "hooks": [
-        {
-          "type": "command",
-          "command": "python3 scripts/hooks/stop.py"
-        }
-      ]
-    }
-  ]
-}
+**Cross-environment skills must:**
+
+- **Discovery:** use the Glob tool, not `discover-files.ps1`
+- **Grep checks:** use the Grep tool directly with the patterns from the PS1, not `run-checks.ps1`
+- **Config snapshot:** use the Read tool on the listed files, not `project-snapshot.ps1`
+- **State finalization:** write `state.json` directly — never write `state-updates.json` and wait for a Stop hook
+
+**Local-only skills** (`fix-tests-auto`, `fix-pre-commit`,
+`fix-e2e`, `fix-logs`, `fix-pester`, `fix-docker`) must say so at the top of the SKILL.md:
+
+```markdown
+> **Local session only.** This skill reads a log artifact written by a PS1 script
+> on the host machine. It cannot run in web or mobile sessions.
 ```
 
-### Claude vs Copilot compatibility
+Hooks remain a Windows-local performance shortcut; they must never be the only path
+for any step a cross-environment skill needs to complete.
 
-Copilot may ignore Claude-specific frontmatter attributes such as skill-level
-`hooks`.
-
-When behavior must work in **both** tools:
-
-1. Keep the automation logic in a shared script (single source of truth)
-2. Use `.claude/settings.json` hooks to invoke that script automatically
-3. Add a Copilot fallback in the skill steps (explicit finalization step or VS Code task)
-
-For critical workflows, do not rely on `hooks` as the only execution path.
 
 ### Hook output byte caps (token control)
 

@@ -479,20 +479,6 @@
       "problemMatcher": []
     },
     {
-      "label": "Test: All Checks + Auto-Fix (agent)",
-      "type": "process",
-      "command": "python",
-      "args": ["scripts/notify-wrap.py", "Test: All Checks + Auto-Fix (agent)", "--", "pwsh", "-ExecutionPolicy", "Bypass", "-File", "scripts/check-and-fix-known.ps1"],
-      "group": "test",
-      "presentation": {
-        "reveal": "always",
-        "panel": "new",
-        "showReuseMessage": false,
-        "close": false
-      },
-      "problemMatcher": []
-    },
-    {
       "label": "Todo: Archive Done Items",
       "type": "process",
       "command": "pwsh",
@@ -575,6 +561,34 @@
       "presentation": {
         "reveal": "always",
         "panel": "new",
+        "showReuseMessage": false,
+        "close": false
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Eval: Instruction Files — Stable (promptfoo, repeat 3)",
+      "type": "process",
+      "command": "python",
+      "args": ["scripts/notify-wrap.py", "Eval: Instruction Files (stable)", "--", "pwsh", "-ExecutionPolicy", "Bypass", "-Command", "npm run eval:stable; $e = $LASTEXITCODE; npm run eval:summary; exit $e"],
+      "group": "test",
+      "presentation": {
+        "reveal": "always",
+        "panel": "new",
+        "showReuseMessage": false,
+        "close": false
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Lint: Instruction Files",
+      "type": "process",
+      "command": "python",
+      "args": ["scripts/notify-wrap.py", "Lint: Instruction Files", "--", "python", "scripts/lint-instructions.py"],
+      "group": "test",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
         "showReuseMessage": false,
         "close": false
       },

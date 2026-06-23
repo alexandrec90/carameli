@@ -1,4 +1,4 @@
-# Runs all linters in parallel (ruff, ruff-format, eslint, tsc, stylelint, markdownlint, mypy, pip-audit, vulture, detect-secrets, dotenv-linter, alembic-check, yamllint, actionlint, psscriptanalyzer).
+# Runs all linters in parallel (ruff, ruff-format, eslint, tsc, stylelint, markdownlint, mypy, pip-audit, vulture, detect-secrets, dotenv-linter, alembic-check, yamllint, actionlint, psscriptanalyzer, lint-instructions).
 # On failure: writes actionable error details to logs/lint-errors.log for AI-agent consumption.
 # On pass: clears the artifact. Terminal exits when done.
 $ErrorActionPreference = "Continue"
@@ -20,7 +20,7 @@ $anyFailed = $false
 Write-Host ""
 Write-Host "=== Carameli Lint Suite ===" -ForegroundColor Cyan
 Write-Host "Artifact : $((Resolve-Path $artifact -ErrorAction SilentlyContinue) ?? (Join-Path $PWD $artifact))" -ForegroundColor DarkGray
-Write-Host "Linters  : ruff, ruff-format, eslint, tsc, stylelint, markdownlint, mypy, pip-audit, vulture, detect-secrets, dotenv-linter, alembic-check, yamllint, actionlint, psscriptanalyzer" -ForegroundColor DarkGray
+Write-Host "Linters  : ruff, ruff-format, eslint, tsc, stylelint, markdownlint, mypy, pip-audit, vulture, detect-secrets, dotenv-linter, alembic-check, yamllint, actionlint, psscriptanalyzer, lint-instructions" -ForegroundColor DarkGray
 Write-Host "Mode     : parallel" -ForegroundColor DarkGray
 Write-Host ""
 
@@ -245,6 +245,14 @@ $jobs["actionlint"] = Start-Job -WorkingDirectory $wd -ScriptBlock {
     else {
         [PSCustomObject]@{ ExitCode = 0; Lines = @() }
     }
+}
+
+$jobs["lint-instructions"] = Start-Job -WorkingDirectory $wd -ScriptBlock {
+    [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+    # Deterministic checks for CLAUDE.md / .claude/rules / .claude/skills (frontmatter
+    # schema, dead links, size caps, fixer structure). Stdlib-only Python, no venv needed.
+    $out = python scripts/lint-instructions.py 2>&1
+    [PSCustomObject]@{ ExitCode = $LASTEXITCODE; Lines = @($out | ForEach-Object { "$_" }) }
 }
 
 $jobs["psscriptanalyzer"] = Start-Job -WorkingDirectory $wd -ScriptBlock {
@@ -494,6 +502,19 @@ if ($failed -and -not $skipReason) {
 }
 if ($skipReason) { Write-Host "  [skip] actionlint ($skipReason)" -ForegroundColor DarkGray }
 else { Write-LintResult "actionlint" $failed }
+
+# lint-instructions
+$r = Receive-Job $jobs["lint-instructions"]
+$failed = $r.ExitCode -ne 0
+$skipReason = if ($failed) { Get-SkipReason $r.Lines } else { $null }
+if ($failed -and -not $skipReason) {
+    $anyFailed = $true
+    $errs = @($r.Lines | Where-Object { $_ -match ":\d+: \[" })
+    if (-not $errs) { $errs = @($r.Lines | Where-Object { $_.Trim() -ne "" }) }
+    Add-Section "lint-instructions" "python scripts/lint-instructions.py" $errs
+}
+if ($skipReason) { Write-Host "  [skip] lint-instructions ($skipReason)" -ForegroundColor DarkGray }
+else { Write-LintResult "lint-instructions" $failed }
 
 # psscriptanalyzer
 $r = Receive-Job $jobs["psscriptanalyzer"]

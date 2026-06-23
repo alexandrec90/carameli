@@ -7,6 +7,9 @@ argument-hint: '"backend" | "frontend" | "known-only" — optional scope filter'
 
 # Skill: Fix Log Errors
 
+> **Local session only.** This skill reads log artifacts written by PS1 scripts
+> on the host machine. It cannot run in web or mobile sessions.
+
 Fix code bugs surfaced in `logs/log-errors.log` (runtime ERROR/WARNING entries).
 
 ---

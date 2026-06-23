@@ -1,60 +1,46 @@
 ---
-description: VS Code task scripts and PowerShell conventions for Windows
+description: Script and tooling conventions for VS Code tasks, CI, and hooks
 paths:
+  - scripts/**/*.py
   - scripts/**/*.ps1
   - .vscode/tasks.json
+  - .github/workflows/*.yml
 ---
 
 # Rule: Tooling Conventions
 
-## Task Scripts (VS Code)
+## Scripts
 
-- **Always use PowerShell (`.ps1`) for VS Code task scripts** — not Bash or `.sh` files.
-- The host OS is Windows 11. `.sh` scripts require Git Bash and are not reliably portable.
-- Use `"type": "process"` tasks in `tasks.json` so VS Code monitors the pwsh
-  process directly (not wrapped in a bash shell). This ensures the task spinner
-  stops and the exit-code icon (green checkmark / red X) appears reliably.
+All new scripts under `scripts/` are written in Python for cross-environment
+compatibility (local Windows desktop, GitHub Actions, web, and mobile sessions).
 
+- **Expose pure importable functions** guarded by `if __name__ == '__main__'` so pytest
+  can test the logic without spawning a subprocess.
+- **Write pytest tests** in `scripts/hooks/tests/` using the `load_module()` helper in
+  `conftest.py` (handles non-standard filenames via `importlib.util`).
+- Every new script must ship with tests in the same change.
+
+### Hook scripts (`scripts/hooks/`)
+
+- **stdlib only** — no third-party packages. Hooks run before the virtualenv is activated.
+- `scripts/hooks/tests/` is excluded from the app test suite automatically because
+  `pytest.ini` sets `testpaths = tests`.
+
+### VS Code tasks
+
+- Use `"type": "process"` tasks in `tasks.json` so VS Code monitors the process
+  directly. This ensures the task spinner stops and the exit-code icon appears reliably.
+- Set `"close": false` in `presentation` so the terminal stays open for review.
+- **Wrap with `notify-wrap.py` for Windows toast notifications** — never call
+  `notify.py` from inside a script. Notifications are a task-layer concern only:
   ```jsonc
-  { "type": "process", "command": "pwsh", "args": ["-ExecutionPolicy", "Bypass", "-File", "scripts/your-script.ps1"] }
+  { "command": "python", "args": ["scripts/notify-wrap.py", "Task Name", "--", "python", "scripts/your-script.py"] }
   ```
 
-- Set `"close": false` in `presentation` so the terminal stays open for review
-  after the task finishes.
-- Store all task helper scripts under `scripts/` in the workspace root.
+### Docker subprocess calls
 
-## PowerShell Scripting (Windows Pitfalls)
-
-- **`docker compose exec` must use `-T`** in scripts — without it, a pseudo-TTY is
-  allocated and the ConPTY handle can outlive the command, keeping `pwsh.exe` alive
-  after the script finishes. VS Code will show the task as still running.
-- **Use `exit N` instead of `[Environment]::Exit(N)`** at the end of scripts —
-  `[Environment]::Exit()` hard-kills the .NET runtime and bypasses PowerShell's
-  normal shutdown, which can prevent VS Code from detecting the process exit.
-  `exit` does a clean teardown that `"type": "process"` tasks reliably detect.
-- **ASCII only in `.ps1` files** — no em-dashes, curly quotes, or other non-ASCII
-  characters. They cause parse errors when file encoding is misread.
-- **Use `pwsh`** (PowerShell 7), never `powershell` (Windows PowerShell 5.1).
-
-## PowerShell Script Tests
-
-- **Every new script under `scripts/` must ship with a Pester test** in
-  `scripts/tests/` in the same change.
-- Prefer **contract-style tests** over implementation-coupled tests:
-  assert exit codes, artifact contents, side effects, and no-op behavior rather
-  than internal variable values.
-- When a script depends on external tools (`docker`, `git`, `npm`, etc.), use a
-  fake CLI harness or temp workspace in the Pester test so the test remains
-  deterministic and does not require live infrastructure unless that is the
-  specific thing being tested.
-- For diagnostic scripts that write log artifacts, tests should cover both:
-  - **clean path** — artifact cleared / empty output / zero exit code
-  - **failure path** — actionable artifact shape, filtered noise, expected exit code
-- Add tests to the existing suite under `scripts/tests/` so they run via
-  `scripts/run-pester.ps1` and the VS Code task `Test: Run Pester (PowerShell)`.
-- If a script is intentionally too environment-specific to test end-to-end,
-  extract the parser / formatter / decision logic into testable units or cover a
-  stable contract path instead of leaving it untested.
+- **`docker compose exec` must use `-T`** — without it a pseudo-TTY is allocated and
+  the subprocess handle can outlive the command, leaving the calling process hung.
 
 ## GitHub Secrets and Variables
 

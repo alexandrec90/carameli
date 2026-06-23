@@ -27,8 +27,12 @@ No state file. No file-reading loop. Runs in seconds.
 
 Run the suggested harness command. Output should be grouped by check label.
 
-Suggested command (run in terminal):
-`pwsh -NoProfile -ExecutionPolicy Bypass -File .claude/skills/check-logging/run-checks.ps1`
+Run four Grep passes directly:
+
+- **Check 1 — Silent except:** grep `except Exception` across `app/**/*.py` (files_with_matches). Then grep `logger\.` across the same set. Any file in the first set but absent from the second is a `VIOLATION`. Any file where the count of `except Exception` lines exceeds the count of `logger\.(error|warning)` lines is a `POTENTIAL`.
+- **Check 2 — Missing logger:** grep `logger = logging\.getLogger` across `app/**/*.py` (files_with_matches). Any `.py` file in `app/` that is not `__init__.py` or `app/core/logging_config.py` and does not appear in that set is a `VIOLATION`.
+- **Check 3 — Silent route handlers:** grep `logger\.` across `app/api/**/*.py` (files_with_matches). Any non-`__init__.py` file in `app/api/` absent from that set is a `VIOLATION`.
+- **Check 4 — Silent frontend catch:** grep `catch\s*(\([^)]*\))?\s*\{\s*\}|\.catch\(\s*(\(\)|_)\s*=>\s*\{?\s*\}?\s*\)` across `frontend/src/**/*.{ts,tsx}` (files_with_matches). For each match, check whether the same file contains `logger\.error\(` — if not, it is a `VIOLATION`.
 
 ### Interpretation
 

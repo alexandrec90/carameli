@@ -22,8 +22,23 @@ job queue, carrier SDKs, etc.) — those belong in the tech stack chart.
 
 The harness preloads all source files:
 
-Suggested command (run in terminal):
-`pwsh -NoProfile -ExecutionPolicy Bypass -File .claude/skills/state-tools/project-snapshot.ps1 -Sections pre-commit,requirements-dev,frontend-pkg,tasks-json,scripts-list,ruff,mypy,pytest,frontend-eslint,frontend-stylelint,frontend-cspell,rules-list,skills-list,chart-meta-legend,chart-meta-mmd`
+Read the following files using the Read tool (in parallel where independent):
+
+- `.pre-commit-config.yaml`
+- `requirements-dev.txt`
+- `frontend/package.json`
+- `.vscode/tasks.json`
+- Use Glob to discover: `scripts/*.ps1` — list filenames
+- `ruff.toml`
+- `mypy.ini`
+- `pytest.ini`
+- Use Glob to discover: `frontend/eslint*` — read the file found (e.g. `frontend/eslint.config.js`)
+- Use Glob to discover: `frontend/stylelint*` — read the file found (e.g. `frontend/stylelint.config.cjs`)
+- Use Glob to discover: `frontend/cspell*` — read the file found (e.g. `frontend/cspell.config.yaml`)
+- Use Glob to discover: `.claude/rules/*.md` — list filenames
+- Use Glob to discover: `.claude/skills/*/SKILL.md` — list skill names
+- Use Glob to discover: `charts/meta coding/*legend*` — read the file found (current legend diff target)
+- Use Glob to discover: `charts/meta coding/*.mmd` — read the file found (current Mermaid diagram diff target)
 
 Reference — what to look for in each injected section:
 

@@ -40,9 +40,6 @@ test in the same change.**
 
 ## CLAUDE.md files
 
-- **No command instructions** — never document `npm run …`, `pwsh …`, or other CLI
-  invocations. Commands are discoverable from `package.json`, `tasks.json`, or script
-  files; repeating them wastes context window tokens and drifts out of sync.
 - **Only record non-obvious configuration** — things that can't be derived by reading
   source files (e.g. proxy routes, port mappings, env var semantics, architectural
   constraints). If Claude can find it in a config file in one read, leave it out.
@@ -108,33 +105,6 @@ See `.claude/rules/security.md` as the canonical example.
 - If the skill generates scripts, those scripts must follow the conventions
   in `.claude/rules/tooling.md` (especially `-T` for `docker compose exec`).
 
-### Hook location (Copilot-compatible)
-
-Copilot does not reliably execute skill frontmatter `hooks`. Define operational
-hooks in `.claude/settings.json` instead.
-
-- Use top-level `hooks` in settings for `PreToolUse`, `PostToolUse`, and `Stop`.
-- Keep command logic in shared scripts under `scripts/hooks/`.
-- For behavior that should stay skill-specific, route the settings hook to a
-  dispatcher script that no-ops unless the target skill artifact/condition is
-  present.
-
-Example:
-
-```json
-"hooks": {
-  "Stop": [
-    {
-      "hooks": [
-        {
-          "type": "command",
-          "command": "python3 scripts/hooks/stop.py"
-        }
-      ]
-    }
-  ]
-}
-```
 
 ### Mobile / remote session compatibility
 
@@ -165,18 +135,6 @@ desktop app or CLI is running. Classify each skill as one of:
 Hooks remain a Windows-local performance shortcut; they must never be the only path
 for any step a cross-environment skill needs to complete.
 
-### Claude vs Copilot compatibility
-
-Copilot may ignore Claude-specific frontmatter attributes such as skill-level
-`hooks`.
-
-When behavior must work in **both** tools:
-
-1. Keep the automation logic in a shared script (single source of truth)
-2. Use `.claude/settings.json` hooks to invoke that script automatically
-3. Add a Copilot fallback in the skill steps (explicit finalization step or VS Code task)
-
-For critical workflows, do not rely on `hooks` as the only execution path.
 
 ### Hook output byte caps (token control)
 
