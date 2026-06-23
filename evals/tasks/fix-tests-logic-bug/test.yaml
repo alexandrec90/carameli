@@ -18,6 +18,8 @@
     # so ablation measures "skill vs unguided agent".
     targets:
       - .claude/skills/fix-tests
+  # Multi-step logic bug: needs Sonnet-tier reasoning to reliably identify and fix.
+  providers: [with-instructions-capable, baseline-capable]
   vars:
     prompt: /fix-tests
     # The stripped baseline has no /fix-tests skill, so a bare "/fix-tests" would

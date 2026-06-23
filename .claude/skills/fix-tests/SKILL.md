@@ -38,17 +38,14 @@ Read these two files **in parallel** (single tool call):
 - `logs/test-failures.log`
 - `.claude/skills/fix-tests/known-fixes.md`
 
-An empty log means tests are green — you're done; stop. If the log doesn't exist at all,
-diagnostics haven't run yet: generate it (desktop: run the **Test: Run pytest** task; CI:
-the workflow produces it) and proceed once it's present.
+**Decide what to do based on what you just read — do not run any test command before checking:**
 
-### Addressed check
-
-If the last line of `logs/test-failures.log` is `--- ADDRESSED`, this log was already
-fixed and is stale. Don't re-fix it — regenerate it first (restart the app if you changed
-`app/` code locally, then re-run **Test: Run pytest**; in CI, push and let the workflow
-re-run). Continue on the fresh log if failures remain, or stop if it's empty. **Do not
-apply fixes against an `--- ADDRESSED` log.**
+| Log state | Action |
+|---|---|
+| Non-empty, last line is NOT `--- ADDRESSED` | **Fresh** — proceed to known-fix matching below. **Do not re-run any test command.** |
+| Empty | Tests are green — stop. |
+| Last line is `--- ADDRESSED` | **Stale** — regenerate it (desktop: restart app if `app/` changed, then re-run **Test: Run pytest**; CI: push and let the workflow re-run). Stop this turn; restart on the fresh log. |
+| File doesn't exist | Not yet generated — generate it (desktop: run **Test: Run pytest**; CI: the workflow produces it). Stop this turn; restart on the fresh log once present. |
 
 ### Log quality gate
 

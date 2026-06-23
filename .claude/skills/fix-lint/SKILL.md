@@ -33,17 +33,14 @@ Read these two files **in parallel** (single tool call):
 - `logs/lint-errors.log`
 - `.claude/skills/fix-lint/known-fixes.md`
 
-An empty log means lint is green — you're done; stop. If the log doesn't exist at all,
-diagnostics haven't run yet: generate it (desktop: run the **Lint: Everything** task; CI:
-the workflow produces it) and proceed once it's present.
+**Decide what to do based on what you just read — do not run any linter before checking:**
 
-### Addressed check
-
-If the last line of `logs/lint-errors.log` is `--- ADDRESSED`, this log was already fixed
-and is stale. Don't re-fix it — regenerate it first: re-run the **Lint: Everything** task
-(desktop) or push and let the workflow re-run (CI). Then continue on the fresh log if it
-still has errors, or stop if it's empty. **Do not apply fixes against an `--- ADDRESSED`
-log.**
+| Log state | Action |
+|---|---|
+| Non-empty, last line is NOT `--- ADDRESSED` | **Fresh** — proceed to known-fix matching below. **Do not re-run any linter.** |
+| Empty | Lint is green — stop. |
+| Last line is `--- ADDRESSED` | **Stale** — regenerate it (desktop: re-run **Lint: Everything**; CI: push and let the workflow re-run). Stop this turn; restart on the fresh log. |
+| File doesn't exist | Not yet generated — generate it (desktop: run **Lint: Everything**; CI: the workflow produces it). Stop this turn; restart on the fresh log once present. |
 
 ### Log quality gate
 

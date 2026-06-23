@@ -15,23 +15,54 @@
 
 description: Carameli instruction-file effectiveness
 
+# ---- Model tiers -----------------------------------------------------------
+# Two tiers; change the model strings here to switch globally.
+#
+#   cheap    — read-only and simple single-edit fix tasks. Currently Haiku.
+#   capable  — complex bug-fix / refactor tasks that need multi-step reasoning.
+#              Currently Sonnet. Tasks opt in by adding:
+#                providers: [with-instructions-capable, baseline-capable]
+#              to their test.yaml.
+#
+x-models:
+  cheap-args: &cheap-args
+    - '--model'
+    - 'claude-haiku-4-5-20251001'
+  capable-args: &capable-args
+    - '--model'
+    - 'claude-sonnet-4-6'
+
 # Each task supplies its instruction as a `prompt` var; pass it straight through to
 # the agent provider.
 prompts:
   - '{{prompt}}'
 
 providers:
+  # Default (cheap) tier — used by all tasks unless overridden.
   - id: file://providers/claude-skill-provider.cjs
     label: with-instructions
     config:
       baseRef: HEAD
-      extraArgs: ['--model', 'claude-haiku-4-5-20251001']
+      extraArgs: *cheap-args
   - id: file://providers/claude-skill-provider.cjs
     label: baseline-no-instructions
     config:
       baseRef: HEAD
       stripInstructions: true
-      extraArgs: ['--model', 'claude-haiku-4-5-20251001']
+      extraArgs: *cheap-args
+
+  # Capable tier — opt in per task via `providers: [with-instructions-capable, baseline-capable]`.
+  - id: file://providers/claude-skill-provider.cjs
+    label: with-instructions-capable
+    config:
+      baseRef: HEAD
+      extraArgs: *capable-args
+  - id: file://providers/claude-skill-provider.cjs
+    label: baseline-capable
+    config:
+      baseRef: HEAD
+      stripInstructions: true
+      extraArgs: *capable-args
 
   # ---- Leave-one-out ablation (worked example) ------------------------------
   # To measure what ONE instruction file is worth, run the suite with just that
