@@ -5,6 +5,8 @@
 - metadata:
     targets:
       - .claude/skills/fix-logs
+  # Runtime error diagnosis: needs Sonnet-tier reasoning to trace root cause.
+  providers: [with-instructions-capable, baseline-capable]
   vars:
     prompt: /fix-logs
     baselinePrompt: >-
