@@ -28,6 +28,12 @@ test in the same change.**
   ablated/baseline arm is a fair "skill vs unguided agent" comparison, not an unresolved
   command. Weight the correctness assert above the efficiency asserts (see any existing
   `test.yaml`).
+- **Every task MUST declare `providers:`.** promptfoo runs a test against *all* top-level
+  providers unless the test overrides them, so a task with no `providers:` line silently
+  also runs on the Sonnet arms — doubling its cost for nothing. Simple read-only /
+  single-edit tasks use `providers: [with-instructions, baseline-no-instructions]` (Haiku);
+  only genuinely multi-step reasoning tasks opt into Sonnet with
+  `providers: [with-instructions-capable, baseline-capable]`.
 - **Fixer skills** (`fix-*`) follow the destructive-task template: a committed broken
   fixture under `evals/fixtures/`, a `setup.cjs` that seeds the skill's log artifact, and
   a `verify.cjs` that confirms the repair. Copy an existing `evals/tasks/fix-*/` as the

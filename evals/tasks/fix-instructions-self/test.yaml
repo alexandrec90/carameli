@@ -26,6 +26,7 @@
     # baselinePrompt, so ablation measures "skill scaffolding vs unguided agent".
     targets:
       - .claude/skills/fix-instructions
+  providers: [with-instructions, baseline-no-instructions]
   vars:
     prompt: /fix-instructions
     baselinePrompt: >-

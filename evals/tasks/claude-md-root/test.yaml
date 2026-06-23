@@ -5,6 +5,7 @@
 - metadata:
     targets:
       - CLAUDE.md
+  providers: [with-instructions, baseline-no-instructions]
   vars:
     prompt: >-
       In this project's VanillaLand-to-Carameli mapping, which Carameli database table

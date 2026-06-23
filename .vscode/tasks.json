@@ -545,6 +545,11 @@
       "type": "process",
       "command": "python",
       "args": ["scripts/notify-wrap.py", "Eval: Instruction Files (promptfoo)", "--", "pwsh", "-ExecutionPolicy", "Bypass", "-Command", "npm run eval; $e = $LASTEXITCODE; npm run eval:summary; exit $e"],
+      "options": {
+        "env": {
+          "EVAL_MAX_USD": "8"
+        }
+      },
       "group": "test",
       "presentation": {
         "reveal": "always",
@@ -558,6 +563,25 @@
       "label": "Eval: View Results (promptfoo)",
       "type": "shell",
       "command": "npm run eval:view",
+      "presentation": {
+        "reveal": "always",
+        "panel": "new",
+        "showReuseMessage": false,
+        "close": false
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Eval: Instruction Files — Quick (sample of 3)",
+      "type": "process",
+      "command": "python",
+      "args": ["scripts/notify-wrap.py", "Eval: Instruction Files (quick)", "--", "pwsh", "-ExecutionPolicy", "Bypass", "-Command", "npm run eval:quick"],
+      "options": {
+        "env": {
+          "EVAL_MAX_USD": "5"
+        }
+      },
+      "group": "test",
       "presentation": {
         "reveal": "always",
         "panel": "new",

@@ -24,13 +24,25 @@ description: Carameli instruction-file effectiveness
 #                providers: [with-instructions-capable, baseline-capable]
 #              to their test.yaml.
 #
+# `--max-turns` is a spend backstop: it bounds a single agent's loop so a spiral
+# can't burn the whole budget inside the wall-clock timeout. The cap is tier-split:
+# cheap tasks are simple read-only / single-edit work that healthily finishes in
+# <=7 turns, so 20 is plenty and catches a cheap-tier spiral early; capable tasks
+# are multi-step fixers observed up to ~30 turns, so they keep 40 to avoid cutting
+# legitimate work (a too-tight cap manufactures false failures). See
+# evals/providers/claude-skill-provider.cjs for the other layers (per-task budget
+# assertion + EVAL_MAX_USD cumulative cap + default-effort neutralization).
 x-models:
   cheap-args: &cheap-args
     - '--model'
     - 'claude-haiku-4-5-20251001'
+    - '--max-turns'
+    - '20'
   capable-args: &capable-args
     - '--model'
     - 'claude-sonnet-4-6'
+    - '--max-turns'
+    - '40'
 
 # Each task supplies its instruction as a `prompt` var; pass it straight through to
 # the agent provider.
@@ -90,6 +102,16 @@ defaultTest:
   assert:
     - type: javascript
       value: '(context.providerResponse?.metadata?.failedToolCalls ?? 0) <= 2'
+    # Cost is a first-class pass/fail axis: a run that blows its per-task token/cost
+    # budget FAILS, even when the output is correct — optimizing instructions means
+    # optimizing spend too. weight 3 matches the correctness assert in every task, so
+    # an over-budget run reliably drops below threshold without being able to MASK a
+    # wrong answer (verified against the 3-weight correctness convention all tasks
+    # use). The provider computes overBudget from a per-tier default that
+    # `vars.costBudgetUsd` / EVAL_TASK_MAX_USD can override.
+    - type: javascript
+      value: 'context.providerResponse?.metadata?.overBudget !== true'
+      weight: 3
 
 tests:
   - tasks/*/test.yaml

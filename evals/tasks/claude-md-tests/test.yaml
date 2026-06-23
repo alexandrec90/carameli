@@ -5,6 +5,7 @@
 - metadata:
     targets:
       - tests/CLAUDE.md
+  providers: [with-instructions, baseline-no-instructions]
   vars:
     prompt: >-
       In this project's tests, the global `client` fixture removes one middleware

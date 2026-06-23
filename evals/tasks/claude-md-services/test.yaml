@@ -5,6 +5,7 @@
 - metadata:
     targets:
       - app/services/CLAUDE.md
+  providers: [with-instructions, baseline-no-instructions]
   vars:
     prompt: >-
       In the services layer, which single service module is the only one that breaks

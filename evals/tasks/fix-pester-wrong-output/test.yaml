@@ -5,6 +5,7 @@
 - metadata:
     targets:
       - .claude/skills/fix-pester
+  providers: [with-instructions, baseline-no-instructions]
   vars:
     prompt: /fix-pester
     baselinePrompt: >-

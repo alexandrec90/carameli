@@ -17,6 +17,9 @@
     # find instruction files that no task tests yet.
     targets:
       - .claude/rules/voip-providers.md
+  # Cheap (Haiku) tier only. Without this, the task runs against ALL top-level
+  # providers — including the Sonnet arms — silently doubling its cost.
+  providers: [with-instructions, baseline-no-instructions]
   vars:
     prompt: >-
       In this codebase, business logic such as call_control.py and did_manager.py

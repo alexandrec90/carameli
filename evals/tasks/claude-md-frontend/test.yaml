@@ -5,6 +5,7 @@
 - metadata:
     targets:
       - frontend/CLAUDE.md
+  providers: [with-instructions, baseline-no-instructions]
   vars:
     prompt: >-
       In the frontend, shared literal constants must all live in exactly one file,

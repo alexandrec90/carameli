@@ -18,12 +18,69 @@ compares correctness, tool-call count, failed calls, tokens, and cost.
 - Requires the `claude` CLI on PATH and a clean-ish git tree (worktrees check out
   committed `HEAD` — commit instruction edits before evaluating).
 
+### Spend guardrails
+
+Because every task burns real credits, three layers cap how much a run can spend —
+`eval:stable --repeat 3` once drained a whole budget, so cost is now treated as a
+first-class pass/fail axis, not just a reported column:
+
+0. **Default effort** — interactive-session knobs (`effortLevel`,
+   `MAX_THINKING_TOKENS`, `CLAUDE_CODE_ALWAYS_ENABLE_EFFORT`, `CLAUDE_EFFORT`) force a
+   64k-token thinking budget every turn (a major subscription-quota sink) and 400 on
+   models without effort support (Haiku). The provider removes them from **both**
+   vectors: the worktree's `.claude/settings.json` (so it isn't a hidden variable
+   between arms) **and** the spawned agent's environment (so they can't be inherited
+   from the launching shell — e.g. an interactive Claude Code session — and reach the
+   agent regardless of the worktree). Every arm runs at the model's default effort.
+1. **Per-agent turn cap** — `--max-turns 40` (in `promptfooconfig.yaml`) bounds a
+   single agent's loop so a spiral can't burn the budget inside the wall-clock
+   timeout. 40 clears the healthy ceiling (~30 turns on the hardest tasks).
+2. **Per-task budget = FAIL** — the provider compares each run's cost to a per-tier
+   ceiling (Haiku `$0.40`, Sonnet `$1.00`) and surfaces `metadata.overBudget`. A
+   `defaultTest` assertion (weight 3, equal to the correctness assert) **fails any
+   over-budget run even if its output was correct**. Override per task with
+   `vars.costBudgetUsd`, or globally with `EVAL_TASK_MAX_USD`.
+3. **Cumulative run cap** — once a run's total spend crosses `EVAL_MAX_USD`
+   (default `$20`), the provider short-circuits remaining tasks *before* spawning
+   another agent, so a runaway suite can't drain everything. Raise it to allow a
+   bigger run: `EVAL_MAX_USD=40 npm run eval:stable`.
+
+Cheapest way to keep spend down day-to-day: prefer `npm run eval:quick` (a small seeded
+task sample) for a smoke/cost check, `npm run eval` (single pass, full suite) for the real
+comparison, and scope to one file with `eval:ablate` when iterating. Reserve `eval:stable`
+(3×) for decisions that need variance.
+
+> **Why a sample and not a one-arm filter?** promptfoo validates each task's declared
+> `providers:` against the active provider set, so `--filter-providers` throws once tasks
+> name a provider you've filtered out. To run a cheap subset, filter *tasks*
+> (`--filter-sample`, `--filter-first-n`, `--filter-range`) and let each run both arms.
+
+**Provider scoping is per-task, not global.** Every task must declare which providers it
+runs against, because promptfoo runs a test against ALL top-level providers unless the test
+overrides it — a task with no `providers:` line silently runs on the Sonnet arms too,
+doubling its cost. Cheap (Haiku) tasks declare `providers: [with-instructions,
+baseline-no-instructions]`; multi-step tasks that need Sonnet declare
+`providers: [with-instructions-capable, baseline-capable]`. The `--max-turns` cap is
+tier-split to match (cheap 20, capable 40).
+
+**Spend log.** The provider appends one JSON line per run to `logs/eval-spend.log`
+(gitignored), flushed as each task completes — plus a line when the cumulative cap
+short-circuits a run. Unlike `evals/output/latest.json` (written only when promptfoo
+finishes), this survives a run that's killed mid-way, so you can always see where the
+money went. Tail it in another terminal to watch spend live:
+
+```sh
+tail -f logs/eval-spend.log    # each line: {time, provider, model, costUsd, cumulativeUsd, overBudget, task}
+```
+
 ## Run
 
 ```sh
 npm run eval         # run the suite once, write evals/output/latest.json
+npm run eval:quick   # a small seeded sample of tasks (both arms) — cheapest "does it run / what's the cost" smoke check
 npm run eval:stable  # run with --repeat 3 — variance-checked numbers for decisions
 npm run eval:summary # print the with-vs-baseline delta from the last run (free)
+npm run eval:test    # unit-test the provider's spend guardrails (free, no agent runs)
 npm run eval:view    # open the web UI to diff with-instructions vs baseline
 npm run eval:coverage          # which instruction files have a test yet (free, no agent runs)
 npm run eval:ablate -- <path>  # leave-one-out: what is ONE file worth? (slow, costs $)
@@ -100,6 +157,10 @@ Returned on the provider response; assert on them via
 | `readsBeforeFirstEdit` | investigation-spiral signal (high = thrashing before acting) |
 | `madeAnEdit` | whether the agent edited any file |
 | `numTurns` | agent turns to completion |
+| `costUsd` | this run's `total_cost_usd` |
+| `costBudgetUsd` | the per-task ceiling applied to this run |
+| `overBudget` | run cost exceeded its budget — asserted on in `defaultTest`, fails the task |
+| `cumulativeCostUsd` | running total across the whole eval (drives the `EVAL_MAX_USD` cap) |
 
 `tokenUsage` and `cost` are first-class and auto-aggregate in the results table.
 

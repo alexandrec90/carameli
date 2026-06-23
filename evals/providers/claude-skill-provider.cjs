@@ -64,6 +64,101 @@ const EVALS_DIR = path.resolve(__dirname, '..');
 const READ_TOOLS = new Set(['Read', 'Grep', 'Glob']);
 const EDIT_TOOLS = new Set(['Edit', 'Write', 'NotebookEdit']);
 
+// --- Spend guardrails -------------------------------------------------------
+// Each task spawns a real Claude Code agent, so an unbounded run can drain a
+// whole token budget — which is exactly what `eval:stable --repeat 3` did. Three
+// layers cap spend:
+//   1. `--max-turns` (set in promptfooconfig) bounds a single agent's loop.
+//   2. A per-task USD ceiling: the run's cost is compared to a budget and the
+//      result surfaced as `metadata.overBudget`; a defaultTest assertion fails any
+//      over-budget run, so cost is a first-class pass/fail axis, not just a column.
+//   3. A cumulative run ceiling (EVAL_MAX_USD) enforced here: once the whole run
+//      crosses it, remaining calls short-circuit before spawning another agent.
+
+// Default per-task ceilings by model tier. Healthy runs observed: Haiku tasks
+// peak ~$0.26, Sonnet tasks ~$0.55 — these sit ~1.5-1.8x above that, so a clear
+// blowout fails while normal runs pass. Override per task with
+// `vars.costBudgetUsd`, or globally with EVAL_TASK_MAX_USD.
+const TIER_BUDGET_USD = { cheap: 0.4, capable: 1.0 };
+
+// Default whole-run ceiling. A single full pass costs ~$7; `--repeat 3` ~$20.
+// $20 lets a normal pass finish but trips on a runaway. Override with EVAL_MAX_USD.
+const DEFAULT_RUN_BUDGET_USD = 20;
+
+// A positive numeric env var, or undefined when unset/invalid.
+function positiveEnv(name) {
+  const v = Number(process.env[name]);
+  return Number.isFinite(v) && v > 0 ? v : undefined;
+}
+
+// `--model X` in the provider's extraArgs → 'X' (or '' when unset).
+function modelFromArgs(extraArgs) {
+  const i = (extraArgs || []).indexOf('--model');
+  return i >= 0 ? String(extraArgs[i + 1] || '') : '';
+}
+
+// Tier from the model string: cheap (Haiku) vs capable (Sonnet / anything else).
+function tierForModel(model) {
+  return /haiku/i.test(model || '') ? 'cheap' : 'capable';
+}
+
+// Per-task USD ceiling: explicit task var > EVAL_TASK_MAX_USD > model-tier default.
+function taskBudgetUsd({ vars, model } = {}) {
+  const fromVar = Number(vars?.costBudgetUsd);
+  if (Number.isFinite(fromVar) && fromVar > 0) return fromVar;
+  return positiveEnv('EVAL_TASK_MAX_USD') ?? TIER_BUDGET_USD[tierForModel(model)];
+}
+
+// Whole-run ceiling: EVAL_MAX_USD > built-in default.
+function runBudgetUsd() {
+  return positiveEnv('EVAL_MAX_USD') ?? DEFAULT_RUN_BUDGET_USD;
+}
+
+// { budgetUsd, overBudget } for one run. A non-positive/NaN cost is never over.
+function evaluateCost({ cost, vars, model } = {}) {
+  const budgetUsd = taskBudgetUsd({ vars, model });
+  const n = Number(cost);
+  return { budgetUsd, overBudget: Number.isFinite(n) && n > budgetUsd };
+}
+
+// Cumulative spend across the run. promptfoo require()s this module once, so the
+// counter persists across every task/arm in a single `promptfoo eval`.
+let cumulativeCostUsd = 0;
+function recordCost(usd) {
+  const n = Number(usd);
+  if (Number.isFinite(n) && n > 0) cumulativeCostUsd += n;
+  return cumulativeCostUsd;
+}
+function getCumulativeCost() { return cumulativeCostUsd; }
+function resetCumulativeCost() { cumulativeCostUsd = 0; } // test hook
+
+// Append-per-run spend log. The JSON artifact (evals/output/latest.json) is only
+// written when promptfoo finishes, so a run killed mid-way leaves no trace — this
+// flushes one line as each run completes (and on a budget short-circuit), so you
+// can always reconstruct where the money went. logs/ is gitignored.
+const SPEND_LOG = path.join(REPO_ROOT, 'logs', 'eval-spend.log');
+
+// Normalize a completed run into a compact log record. Pure → unit-tested.
+function spendRecord({ time, provider, model, costUsd, budgetUsd, overBudget, cumulativeCostUsd: cum, prompt }) {
+  return {
+    time,
+    provider,
+    model,
+    costUsd: Number(costUsd) || 0,
+    budgetUsd,
+    overBudget: !!overBudget,
+    cumulativeUsd: Math.round((Number(cum) || 0) * 1e4) / 1e4,
+    task: String(prompt ?? '').replace(/\s+/g, ' ').trim().slice(0, 60),
+  };
+}
+
+function appendSpendLog(record) {
+  try {
+    fs.mkdirSync(path.dirname(SPEND_LOG), { recursive: true });
+    fs.appendFileSync(SPEND_LOG, `${JSON.stringify(record)}\n`);
+  } catch { /* logging must never break a run */ }
+}
+
 function git(args, cwd = REPO_ROOT) {
   return execFileSync('git', args, { cwd, encoding: 'utf8' }).trim();
 }
@@ -97,6 +192,52 @@ function rmPaths(worktree, relPaths) {
     const full = path.join(worktree, rel.split('/').join(path.sep));
     fs.rmSync(full, { recursive: true, force: true });
   }
+}
+
+// The repo's .claude/settings.json carries interactive-session model knobs —
+// effortLevel + a 64k MAX_THINKING_TOKENS budget + always-enable-effort — that are
+// wrong for headless evals: they 400 on models with no effort support (Haiku), burn
+// a huge thinking-token budget every turn (the real subscription-quota sink), and
+// exist only in the with-instructions arm, so they CONFOUND the comparison with
+// effort rather than instruction content. Strip them in the worktree so every arm
+// runs at the model's default effort. Returns true if it changed the file.
+const EFFORT_ENV_KEYS = [
+  'MAX_THINKING_TOKENS',
+  'CLAUDE_CODE_ALWAYS_ENABLE_EFFORT',
+  'CLAUDE_CODE_DISABLE_ADAPTIVE_THINKING',
+];
+function neutralizeModelEffort(worktree) {
+  const p = path.join(worktree, '.claude', 'settings.json');
+  if (!fs.existsSync(p)) return false;
+  let doc;
+  try { doc = JSON.parse(fs.readFileSync(p, 'utf8')); } catch { return false; }
+  let changed = false;
+  if (doc && typeof doc === 'object' && 'effortLevel' in doc) {
+    delete doc.effortLevel;
+    changed = true;
+  }
+  if (doc && doc.env && typeof doc.env === 'object') {
+    for (const k of EFFORT_ENV_KEYS) {
+      if (k in doc.env) { delete doc.env[k]; changed = true; }
+    }
+  }
+  if (changed) fs.writeFileSync(p, `${JSON.stringify(doc, null, 2)}\n`);
+  return changed;
+}
+
+// The worktree file is only half the problem: effort/thinking are ALSO forced by
+// inherited env vars (CLAUDE_CODE_ALWAYS_ENABLE_EFFORT, MAX_THINKING_TOKENS,
+// CLAUDE_EFFORT, …) whenever the eval is launched from a shell that has them set —
+// e.g. an interactive Claude Code session. Those reach the spawned agent regardless
+// of the worktree, and 400 on models without effort support (Haiku). Strip every
+// effort/thinking var from the child's env so it runs at the model's default.
+function effortFreeEnv(env = process.env) {
+  const out = {};
+  for (const [k, v] of Object.entries(env)) {
+    if (/EFFORT|THINKING/i.test(k)) continue;
+    out[k] = v;
+  }
+  return out;
 }
 
 // A /skill prompt only resolves if its skill dir is present. When the arm under
@@ -163,6 +304,7 @@ function parseTranscript(lines) {
   let result = '';
   let usage = { input_tokens: 0, output_tokens: 0 };
   let cost = 0;
+  let isError = false;
 
   for (const line of lines) {
     let ev;
@@ -185,9 +327,19 @@ function parseTranscript(lines) {
       usage = ev.usage ?? usage;
       cost = ev.total_cost_usd ?? 0;
       m.numTurns = ev.num_turns ?? 0;
+      // The agent itself failed (e.g. an API 400) rather than just answering wrong.
+      // Surface it so a misconfigured model doesn't masquerade as a bad instruction
+      // file — the result text is the error payload in that case.
+      if (ev.is_error === true || /^(API Error|Error:)/.test(String(result))) isError = true;
     }
   }
-  return { metrics: m, result, usage, cost };
+  return { metrics: m, result, usage, cost, isError };
+}
+
+// A run with no result event at all (process died before finishing) is also a
+// failure, not a clean answer.
+function looksLikeAgentError(result, isError) {
+  return isError || /^(API Error|Error:)/.test(String(result || ''));
 }
 
 class ClaudeSkillProvider {
@@ -199,6 +351,22 @@ class ClaudeSkillProvider {
   id() { return this.providerId; }
 
   async callApi(prompt, context) {
+    // Cumulative run-budget kill switch: once the whole run has spent past the
+    // ceiling, stop spawning agents. Returns an error so remaining tests fail fast
+    // and cheap instead of draining the budget. Checked before any worktree work.
+    const runCap = runBudgetUsd();
+    if (getCumulativeCost() >= runCap) {
+      appendSpendLog({
+        time: new Date().toISOString(),
+        event: 'skipped: run budget reached',
+        cumulativeUsd: Math.round(getCumulativeCost() * 1e4) / 1e4,
+        capUsd: runCap,
+      });
+      return {
+        error: `eval run budget reached: spent $${getCumulativeCost().toFixed(4)} >= $${runCap} (EVAL_MAX_USD). Skipped without spawning an agent; raise EVAL_MAX_USD to continue.`,
+      };
+    }
+
     const baseRef = this.config.baseRef || 'HEAD';
     const timeoutMs = this.config.timeoutMs || 180000;
     const setupRel = context?.vars?.setup;
@@ -221,6 +389,10 @@ class ClaudeSkillProvider {
       else if (stripPaths.length) rmPaths(worktree, stripPaths);
       if (this.config.replacePaths) applyReplacements(worktree, this.config.replacePaths);
       if (Array.isArray(this.config.stripSections)) applySectionStrips(worktree, this.config.stripSections);
+      // Always run at the model's default effort so Haiku doesn't 400 on the effort
+      // param and the thinking-token budget can't balloon the run (and so effort
+      // isn't a hidden variable between arms). No-op on the stripped baseline.
+      neutralizeModelEffort(worktree);
       if (setupRel) runHook(setupRel, worktree); // seed broken state for fixer tasks
 
       const args = [
@@ -234,7 +406,7 @@ class ClaudeSkillProvider {
       const stdout = await new Promise((resolve, reject) => {
         // shell:true so the `claude` (.cmd on Windows) shim resolves; args are
         // static and the prompt goes over stdin, so there is no injection risk.
-        const child = spawn('claude', args, { cwd: worktree, shell: true });
+        const child = spawn('claude', args, { cwd: worktree, shell: true, env: effortFreeEnv() });
         let out = '';
         let err = '';
         const timer = setTimeout(() => { child.kill('SIGKILL'); reject(new Error(`timeout after ${timeoutMs}ms`)); }, timeoutMs);
@@ -250,7 +422,44 @@ class ClaudeSkillProvider {
         child.stdin.end();
       });
 
-      const { metrics, result, usage, cost } = parseTranscript(stdout.split('\n'));
+      const { metrics, result, usage, cost, isError } = parseTranscript(stdout.split('\n'));
+
+      // An agent-level failure (API 400, dead process) is an ERROR, not a $0 "fail":
+      // returning it as output would let a misconfigured model look like a useless
+      // instruction file. Surface it loudly and log it.
+      if (looksLikeAgentError(result, isError)) {
+        appendSpendLog({
+          time: new Date().toISOString(),
+          event: 'agent error',
+          provider: this.providerId,
+          model: modelFromArgs(this.config.extraArgs),
+          detail: String(result).replace(/\s+/g, ' ').trim().slice(0, 200),
+        });
+        return { error: `agent run failed: ${String(result).replace(/\s+/g, ' ').trim().slice(0, 300)}` };
+      }
+
+      // Spend bookkeeping: add this run to the cumulative total and decide whether
+      // it blew its per-task budget. `overBudget` is asserted on in defaultTest, so
+      // an over-budget run fails the task even if the output was correct — cost is a
+      // first-class optimization axis here, not just a reported column.
+      recordCost(cost);
+      const model = modelFromArgs(this.config.extraArgs);
+      const { budgetUsd, overBudget } = evaluateCost({ cost, vars: context?.vars, model });
+      metrics.costUsd = cost;
+      metrics.costBudgetUsd = budgetUsd;
+      metrics.overBudget = overBudget;
+      metrics.cumulativeCostUsd = getCumulativeCost();
+
+      appendSpendLog(spendRecord({
+        time: new Date().toISOString(),
+        provider: this.providerId,
+        model,
+        costUsd: cost,
+        budgetUsd,
+        overBudget,
+        cumulativeCostUsd: getCumulativeCost(),
+        prompt: effectivePrompt,
+      }));
 
       // Verify the repaired worktree BEFORE teardown — the worktree is gone by
       // the time promptfoo runs its assertions, so correctness must be captured
@@ -281,3 +490,19 @@ module.exports = ClaudeSkillProvider;
 module.exports.stripSection = stripSection;
 module.exports.applyReplacements = applyReplacements;
 module.exports.applySectionStrips = applySectionStrips;
+module.exports.neutralizeModelEffort = neutralizeModelEffort;
+module.exports.effortFreeEnv = effortFreeEnv;
+module.exports.looksLikeAgentError = looksLikeAgentError;
+module.exports.EFFORT_ENV_KEYS = EFFORT_ENV_KEYS;
+// Spend-guardrail helpers (pure — testable without spawning an agent).
+module.exports.modelFromArgs = modelFromArgs;
+module.exports.tierForModel = tierForModel;
+module.exports.taskBudgetUsd = taskBudgetUsd;
+module.exports.runBudgetUsd = runBudgetUsd;
+module.exports.evaluateCost = evaluateCost;
+module.exports.recordCost = recordCost;
+module.exports.getCumulativeCost = getCumulativeCost;
+module.exports.resetCumulativeCost = resetCumulativeCost;
+module.exports.spendRecord = spendRecord;
+module.exports.TIER_BUDGET_USD = TIER_BUDGET_USD;
+module.exports.DEFAULT_RUN_BUDGET_USD = DEFAULT_RUN_BUDGET_USD;
