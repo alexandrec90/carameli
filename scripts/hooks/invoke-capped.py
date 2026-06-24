@@ -28,7 +28,9 @@ def cap_output(data: bytes, max_bytes: int, head_bytes: int) -> bytes:
 
 def run_capped(command: str, max_bytes: int, head_bytes: int) -> tuple[int, bytes]:
     """Run `command` in a shell and return (exit_code, capped combined output)."""
-    result = subprocess.run(command, shell=True, capture_output=True)
+    # shell=True is the whole point: this wrapper caps the output of an arbitrary
+    # shell command. The command is agent-supplied tooling, not external input.
+    result = subprocess.run(command, shell=True, capture_output=True)  # noqa: S602
     combined = result.stdout + result.stderr
     return result.returncode, cap_output(combined, max_bytes, head_bytes)
 

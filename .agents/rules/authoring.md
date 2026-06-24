@@ -9,6 +9,18 @@ paths:
 
 # Rule: Rules & Skills Authoring
 
+## Source of truth: `.claude/` over `.agents/`
+
+`CLAUDE.md` and everything under `.claude/` are the **single source of truth**. The
+`AGENTS.md` files and the `.agents/` tree are **generated mirrors** — a sync step copies
+`CLAUDE.md` → `AGENTS.md` and `.claude/` → `.agents/` for harnesses that read those paths.
+
+- **Only ever edit `.claude/` and `CLAUDE.md`.** Never hand-edit `.agents/**` or any
+  `AGENTS.md` — those changes are overwritten on the next sync.
+- **Treat the duplication as expected, not a defect.** Audits, reviews, and dedup passes
+  should ignore `.agents/**` and `AGENTS.md` as mirror copies of `.claude/**` and `CLAUDE.md` —
+  don't flag them as redundant or try to reconcile the two trees.
+
 ## Eval coverage is mandatory for instruction files
 
 Instruction files are tested like code. The `evals/` promptfoo harness measures whether
@@ -28,6 +40,12 @@ test in the same change.**
   ablated/baseline arm is a fair "skill vs unguided agent" comparison, not an unresolved
   command. Weight the correctness assert above the efficiency asserts (see any existing
   `test.yaml`).
+- **Every task MUST declare `providers:`.** promptfoo runs a test against *all* top-level
+  providers unless the test overrides them, so a task with no `providers:` line silently
+  also runs on the Sonnet arms — doubling its cost for nothing. Simple read-only /
+  single-edit tasks use `providers: [with-instructions, baseline-no-instructions]` (Haiku);
+  only genuinely multi-step reasoning tasks opt into Sonnet with
+  `providers: [with-instructions-capable, baseline-capable]`.
 - **Fixer skills** (`fix-*`) follow the destructive-task template: a committed broken
   fixture under `evals/fixtures/`, a `setup.cjs` that seeds the skill's log artifact, and
   a `verify.cjs` that confirms the repair. Copy an existing `evals/tasks/fix-*/` as the
@@ -109,27 +127,27 @@ See `.claude/rules/security.md` as the canonical example.
 ### Mobile / remote session compatibility
 
 Skills run in all session types: local VS Code, web browser, and mobile app.
-Hooks and PowerShell scripts only execute in local sessions where the Claude Code
+Hooks and host scripts only execute in local sessions where the Claude Code
 desktop app or CLI is running. Classify each skill as one of:
 
 | Class | Works on mobile? | Pattern |
 |---|---|---|
 | **Cross-environment** | Yes | Uses only Glob, Grep, Read, Write, Edit, Bash, Agent tools |
-| **Local-only** | No | Depends on log artifacts written by PS1 scripts that run on the host |
+| **Local-only** | No | Depends on the local stack (Docker / running services / git hooks) |
 
 **Cross-environment skills must:**
 
-- **Discovery:** use the Glob tool, not `discover-files.ps1`
-- **Grep checks:** use the Grep tool directly with the patterns from the PS1, not `run-checks.ps1`
-- **Config snapshot:** use the Read tool on the listed files, not `project-snapshot.ps1`
+- **Discovery:** use the Glob tool
+- **Grep checks:** use the Grep tool directly
+- **Config snapshot:** use the Read tool on the listed files
 - **State finalization:** write `state.json` directly — never write `state-updates.json` and wait for a Stop hook
 
 **Local-only skills** (`fix-tests-auto`, `fix-pre-commit`,
-`fix-e2e`, `fix-logs`, `fix-pester`, `fix-docker`) must say so at the top of the SKILL.md:
+`fix-e2e`, `fix-logs`, `fix-docker`) must say so at the top of the SKILL.md:
 
 ```markdown
-> **Local session only.** This skill reads a log artifact written by a PS1 script
-> on the host machine. It cannot run in web or mobile sessions.
+> **Local session only.** This skill depends on the local stack (Docker / running
+> services / git hooks). It cannot run in web or mobile sessions.
 ```
 
 Hooks remain a Windows-local performance shortcut; they must never be the only path
@@ -143,8 +161,6 @@ model context, cap output bytes by default to reduce token usage.
 
 - Prefer a shared helper script in `scripts/hooks/` for capping and truncation markers
   instead of ad-hoc per-skill snippets.
-- For PowerShell, prefer `Get-Content`/substring logic or a helper script over bash-only
-  utilities such as `head -c`.
 - Do not keep only the first chunk when diagnostics matter. Prefer head+tail windows (or
   at minimum tail-on-error) so terminal errors near the end are preserved.
 - Preserve exit-code semantics. Truncation wrappers must not mask command failures.

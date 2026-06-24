@@ -2,7 +2,7 @@
 
 These tests verify that Telnyx and Jambonz can reach Carameli's webhook
 endpoints through an ngrok tunnel. They are skipped unless NGROK_URL is set
-(the start-ngrok.ps1 script sets this automatically in .env).
+(the start-ngrok.py script sets this automatically in .env).
 
 Prerequisites:
   - ngrok running with a tunnel to localhost:8000

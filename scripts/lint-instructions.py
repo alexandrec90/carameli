@@ -140,10 +140,9 @@ def check_size(rel: str, text: str) -> list[Finding]:
     if rel == 'CLAUDE.md' or rel.endswith('/CLAUDE.md'):
         if n > CLAUDE_MAX_LINES:
             return [Finding(rel, n, 'size', f'CLAUDE.md is {n} lines (cap {CLAUDE_MAX_LINES})')]
-    elif rel.endswith('/SKILL.md'):
-        if n > SKILL_MAX_LINES:
-            return [Finding(rel, n, 'size',
-                           f'SKILL.md is {n} lines (cap {SKILL_MAX_LINES}); use progressive disclosure')]
+    elif rel.endswith('/SKILL.md') and n > SKILL_MAX_LINES:
+        return [Finding(rel, n, 'size',
+                       f'SKILL.md is {n} lines (cap {SKILL_MAX_LINES}); use progressive disclosure')]
     return []
 
 

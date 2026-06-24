@@ -1,8 +1,6 @@
 """Unit tests for the after-model-edit PostToolUse hook decision logic."""
-import json
 
 import pytest
-
 from conftest import load_module
 
 hook = load_module('.claude/skills/add-db-model/after-model-edit.py')

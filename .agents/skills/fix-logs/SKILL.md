@@ -1,14 +1,14 @@
 ---
 name: fix-logs
 disable-model-invocation: true
-description: 'Fixes runtime errors from logs/log-errors.log (written by the Log: Extract Errors task).'
+description: 'Fixes runtime errors collected in logs/log-errors.log.'
 argument-hint: '"backend" | "frontend" | "known-only" — optional scope filter'
 ---
 
 # Skill: Fix Log Errors
 
-> **Local session only.** This skill reads log artifacts written by PS1 scripts
-> on the host machine. It cannot run in web or mobile sessions.
+> **Local session only.** This skill depends on the local runtime log produced by a
+> running stack. It cannot run in web or mobile sessions.
 
 Fix code bugs surfaced in `logs/log-errors.log` (runtime ERROR/WARNING entries).
 
@@ -21,18 +21,14 @@ Read these two files **in parallel** (single tool call):
 - `logs/log-errors.log`
 - `.claude/skills/fix-logs/known-fixes.md`
 
-If the log file does not exist or is empty, tell the user to run the **Log: Extract
-Errors** task first, then stop.
+If the log file does not exist or is empty, regenerate it by running the log extractor
+yourself. If there's no local runtime log to extract from (no running stack), say so and stop.
 
 ### Addressed check
 
 If the last line of `logs/log-errors.log` is `--- ADDRESSED`, the errors have already
-been fixed. Tell the user:
-
-> These log errors were already addressed. Re-run the **Log: Extract Errors** task
-> and invoke `/fix-logs` again if new errors appear.
-
-Then **stop**.
+been fixed. Regenerate the log (re-run the extractor) and re-enter on the fresh output; if
+it's still stamped, there are no new errors — report that and **stop**.
 
 ### Log quality gate
 
@@ -47,9 +43,8 @@ Before investing in fixes, scan the log for these signals of incomplete diagnost
 If **any** quality problem is found:
 
 1. Identify which pattern is broken.
-2. Update `scripts/extract-log-errors.ps1` to fix the level filter or format parser.
-3. Tell the user: what was wrong, what was changed, and ask them to re-run the
-   **Log: Extract Errors** task.
+2. Update the producing log extractor to fix the level filter or format parser.
+3. Note what was wrong and what you changed, then regenerate the log (re-run the extractor).
 4. **Stop** — do not attempt fixes on a low-quality log.
 
 ### Known-fix matching (mandatory — do this BEFORE any other file reads)
@@ -160,12 +155,12 @@ State clearly:
 2. Never force-fix transient external failures (provider 5xx, DB timeouts).
 3. Never modify source files in response to config issues — report them instead.
 4. One error = one minimal fix. Do not restructure surrounding code.
-5. Skip the log file if already stamped `--- ADDRESSED` — tell the user to re-run extraction first.
+5. Skip the log file if already stamped `--- ADDRESSED` — regenerate it (re-run extraction) first.
 6. Only stamp the log after applying at least one code fix.
 7. **Known fixes are mandatory short-circuits.** If a known-fix pattern matches, apply it
    immediately. Do not investigate, do not read additional files, do not re-derive the fix.
 8. **Log quality gate is mandatory.** Lines without a `module.path:lineno` field cannot be
-   fixed — update `scripts/extract-log-errors.ps1` and stop.
+   fixed — update the producing log extractor and stop.
 9. **known-only mode: never investigate.** When `known-only` is set, do not proceed past
     Step 1. Rewrite the log with only the unmatched errors, then stop. The expensive model
     reads the trimmed log as-is.

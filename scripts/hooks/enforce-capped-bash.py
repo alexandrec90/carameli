@@ -13,7 +13,6 @@ DEFAULT_MAX_BYTES = 4000
 
 ALLOWED_PATTERNS = [
     r'scripts/hooks/invoke-capped\.py',
-    r'scripts/hooks/invoke-capped\.ps1',
     r'\|\s*head\s*-c\s*\d+',
 ]
 

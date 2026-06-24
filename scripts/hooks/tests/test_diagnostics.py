@@ -3,7 +3,6 @@ import textwrap
 
 import diagnostics as diag
 
-
 # ---------------------------------------------------------------------------
 # get_skip_reason
 # ---------------------------------------------------------------------------
@@ -162,7 +161,7 @@ def test_digest_lint_pass_returns_empty():
 
 def test_digest_lint_failure_writes_section():
     results = {"ruff-check": (["app/main.py:1:1: F401 unused import os"], 1)}
-    any_failed, text, skips = diag.digest_lint(results, "scripts/lint-all.py (local)")
+    any_failed, text, _ = diag.digest_lint(results, "scripts/lint-all.py (local)")
     assert any_failed
     assert text.startswith(diag.source_header("scripts/lint-all.py (local)"))
     assert "# ruff-check" in text

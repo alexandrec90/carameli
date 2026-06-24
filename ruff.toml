@@ -10,13 +10,17 @@ select = ["E", "F", "I", "UP", "B", "ASYNC", "S", "SIM", "T20", "N", "RUF"]
 [lint.per-file-ignores]
 "alembic/versions/*.py" = ["E501"]
 "tests/**/*.py" = ["E501", "S101", "S105"]
-".claude/skills/**/*.py" = ["S101", "N803", "B904"]
+".claude/skills/**/*.py" = ["S101", "N803", "B904", "S603", "S607"]
 "app/api/**/*.py" = ["N803"]
 "app/core/config.py" = ["S105"]
 # CLI / diagnostic tooling: terminal output (T201), terse single-char loop vars
 # (E741), and long regex/format lines (E501) are idiomatic here. Keep T201 ignored
 # so the on-demand workflow's `ruff --fix` pass does not strip the diagnostic prints.
-"scripts/**/*.py" = ["T201", "E741", "E501"]
+# These scripts orchestrate trusted first-party tools (docker, git, npm, pre-commit,
+# wsl) via subprocess and poll localhost APIs, so the bandit subprocess/url-open
+# warnings (S603 untrusted input, S607 partial path, S310 urlopen) are expected
+# false positives here.
+"scripts/**/*.py" = ["T201", "E741", "E501", "S603", "S607", "S310"]
 # Hook-script tests follow the same relaxed rules as the main test suite.
 "scripts/hooks/tests/**/*.py" = ["E501", "S101", "S105"]
 

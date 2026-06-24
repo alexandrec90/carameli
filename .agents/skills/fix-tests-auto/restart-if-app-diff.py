@@ -4,14 +4,13 @@
 Hashes the current `git diff` of `app/` and, when it differs from the last
 recorded hash, restarts the Docker app container so fixes take effect. The
 restart is a desktop/Docker-only concern: it shells to the existing
-`scripts/docker-restart-app.ps1` only when `pwsh` is available, and no-ops
-otherwise (e.g. mobile sessions, which never set the fix-tests-auto marker).
+`scripts/docker-restart-app.py`. On mobile sessions the fix-tests-auto marker is
+never set, so this never runs there.
 
 Pure `app_diff_hash` is unit-tested via
 `scripts/hooks/tests/test_restart_if_app_diff.py`.
 """
 import hashlib
-import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -43,13 +42,9 @@ def get_app_diff(repo_root: Path) -> str | None:
 
 
 def restart_app(repo_root: Path) -> int:
-    """Restart the Docker app container via the existing pwsh task. No-op without pwsh."""
-    pwsh = shutil.which('pwsh')
-    if not pwsh:
-        return 0
+    """Restart the Docker app container via the existing python task."""
     result = subprocess.run(
-        [pwsh, '-NoProfile', '-ExecutionPolicy', 'Bypass',
-         '-File', 'scripts/docker-restart-app.ps1'],
+        [sys.executable, 'scripts/docker-restart-app.py'],
         cwd=repo_root, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
     )
     return result.returncode

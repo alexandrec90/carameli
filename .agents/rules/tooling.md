@@ -2,7 +2,6 @@
 description: Script and tooling conventions for VS Code tasks, CI, and hooks
 paths:
   - scripts/**/*.py
-  - scripts/**/*.ps1
   - .vscode/tasks.json
   - .github/workflows/*.yml
 ---

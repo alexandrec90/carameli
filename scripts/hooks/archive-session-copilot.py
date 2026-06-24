@@ -24,8 +24,8 @@ WORKSPACE_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "
 
 def run_git(*args):
     try:
-        result = subprocess.run(  # noqa: S603
-            ["git", *args],  # noqa: S607
+        result = subprocess.run(
+            ["git", *args],
             capture_output=True,
             text=True,
             cwd=WORKSPACE_ROOT,

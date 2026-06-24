@@ -1,14 +1,14 @@
 ---
 name: fix-pre-commit
 disable-model-invocation: true
-description: 'Fixes pre-commit hook errors from logs/pre-commit-errors.log (written by the git pre-commit hook or the Pre-Commit: Run All Hooks task).'
+description: 'Fixes pre-commit hook errors collected in logs/pre-commit-errors.log.'
 argument-hint: '(no arguments)'
 ---
 
 # Skill: Fix Pre-Commit Errors
 
-> **Local session only.** This skill reads log artifacts written by PS1 scripts
-> on the host machine. It cannot run in web or mobile sessions.
+> **Local session only.** This skill depends on the local git hooks / pre-commit run.
+> It cannot run in web or mobile sessions.
 
 Fix hook errors collected in `logs/pre-commit-errors.log`.
 
@@ -17,8 +17,8 @@ Fix hook errors collected in `logs/pre-commit-errors.log`.
 ## Step 1 — Collect Errors
 
 Read `logs/pre-commit-errors.log` with the Read tool. If the file does not exist or is empty,
-tell the user to either attempt a commit (the git hook writes the artifact automatically) or
-run the `Pre-Commit: Run All Hooks` task first, then stop.
+regenerate it by running the pre-commit hooks yourself (attempting a commit also writes the
+artifact via the git hook). If you can't run them in this environment, say so and stop.
 
 The file contains the output of failed pre-commit hooks. Each failed hook is identified by a
 line ending in `Failed` (e.g. `ruff......Failed`). The actionable error output follows
@@ -56,10 +56,9 @@ After parsing, check the triage list for these signals of incomplete diagnostics
 If **any** quality problem is found:
 
 1. Identify which hook(s) are affected.
-2. Update `scripts/pre-commit.ps1` to fix the capture or classification logic (e.g.,
+2. Update the producing pre-commit runner to fix the capture or classification logic (e.g.,
    redirect hook stderr, filter out `Fixing ...` lines, ensure error output is flushed).
-3. Tell the user: what was wrong, what was changed, and ask them to re-run the
-   **Pre-Commit: Run All Hooks** task.
+3. Note what was wrong and what you changed, then regenerate the log (re-run the hooks).
 4. **Stop** — do not attempt fixes on a low-quality log.
 
 ---
@@ -84,7 +83,7 @@ For each error:
 - **detect-secrets**: if the finding is a real secret, remove it and use an env var. If it
   is a false positive, run:
 
-  ```powershell
+  ```sh
   detect-secrets scan > .secrets.baseline
   ```
 
@@ -102,13 +101,12 @@ For each error:
 
 ## Step 3 — Verify
 
-Tell the user to re-run the `Pre-Commit: Run All Hooks` task or attempt a commit, then
-invoke `/fix-pre-commit` again to catch any newly surfaced errors. Repeat until
-`logs/pre-commit-errors.log` is empty.
+Regenerate the log (re-run the hooks, or attempt a commit) and re-enter to catch any newly
+surfaced errors. Repeat until `logs/pre-commit-errors.log` is empty.
 
 Diagnose from `logs/pre-commit-errors.log`. After a fix you may run the single hook you addressed
-(`pre-commit run <hook-id> --files <file>`) to confirm it passes — don't re-run the full
-`Pre-Commit: Run All Hooks` task; that remains the user's to run.
+(`pre-commit run <hook-id> --files <file>`) to confirm it passes — reserve a full re-run for the
+once-per-pass regenerate-and-loop.
 
 ---
 
@@ -118,15 +116,15 @@ State clearly:
 
 - Which errors were fixed (hook, file, line, what changed).
 - Which were skipped and why.
-- Next step: re-run `Pre-Commit: Run All Hooks` if fixes were applied.
+- Next step: regenerate the log (re-run the hooks) if fixes were applied.
 
 ---
 
 ## Hard Rules
 
 1. Edit only files directly implicated by the collected errors — never pre-emptive cleanup.
-2. After a fix, run at most the single hook you addressed to verify — never re-run the full
-   `Pre-Commit: Run All Hooks` task or dump raw output.
+2. After a fix, run at most the single hook you addressed to verify — don't re-run the full
+   hook suite per edit or dump raw output.
 3. One error = one minimal fix. Do not restructure surrounding code.
 4. **Log quality gate is mandatory.** If any `Failed` hook has no captured error lines,
-   update `scripts/pre-commit.ps1` and stop — never attempt fixes when root cause is invisible.
+   update the producing pre-commit runner and stop — never attempt fixes when root cause is invisible.

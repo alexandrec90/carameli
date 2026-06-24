@@ -1,14 +1,14 @@
 ---
 name: fix-lint
 disable-model-invocation: true
-description: 'Fixes lint errors from logs/lint-errors.log (written by the Lint: Everything task).'
+description: 'Fixes lint errors collected in logs/lint-errors.log.'
 ---
 
 # Skill: Fix Lint Errors
 
-> **Cross-environment.** Reads `logs/lint-errors.log`, which is produced by either
-> the local **Lint: Everything** VS Code task (desktop) or the **On-Demand Lint + Test**
-> GitHub Actions workflow (mobile). Open the PR created by that workflow, then run this skill.
+> **Cross-environment.** Reads `logs/lint-errors.log`, produced whenever the lint suite
+> runs — locally during a check run, or in CI by the On-Demand Lint + Test workflow (open
+> the PR it creates, then run this skill). Fixing works the same either way.
 
 Fix actionable lint errors collected in `logs/lint-errors.log`. Lint fixes are plain
 source edits — identical in every environment.
@@ -16,8 +16,7 @@ source edits — identical in every environment.
 **Drive it to green — don't hand a half-fixed state back to a human.** Fix everything in
 the log, then regenerate it and keep going until it's empty:
 
-- **Desktop:** re-run the **Lint: Everything** task (it overwrites the log) and loop on
-  what's left.
+- **Locally:** re-run the lint suite yourself (it overwrites the log) and loop on what's left.
 - **CI:** push your fixes; the workflow re-runs, regenerates the log, and the loop
   re-enters on the refreshed version.
 
@@ -33,17 +32,14 @@ Read these two files **in parallel** (single tool call):
 - `logs/lint-errors.log`
 - `.claude/skills/fix-lint/known-fixes.md`
 
-An empty log means lint is green — you're done; stop. If the log doesn't exist at all,
-diagnostics haven't run yet: generate it (desktop: run the **Lint: Everything** task; CI:
-the workflow produces it) and proceed once it's present.
+**Decide what to do based on what you just read — do not run any linter before checking:**
 
-### Addressed check
-
-If the last line of `logs/lint-errors.log` is `--- ADDRESSED`, this log was already fixed
-and is stale. Don't re-fix it — regenerate it first: re-run the **Lint: Everything** task
-(desktop) or push and let the workflow re-run (CI). Then continue on the fresh log if it
-still has errors, or stop if it's empty. **Do not apply fixes against an `--- ADDRESSED`
-log.**
+| Log state | Action |
+|---|---|
+| Non-empty, last line is NOT `--- ADDRESSED` | **Fresh** — proceed to known-fix matching below. **Do not re-run any linter.** |
+| Empty | Lint is green — stop. |
+| Last line is `--- ADDRESSED` | **Stale** — regenerate it (locally: re-run the lint suite yourself; CI: push and let the workflow re-run). Stop this turn; restart on the fresh log. |
+| File doesn't exist | Not yet generated — generate it (locally: run the lint suite yourself; CI: the workflow produces it). Stop this turn; restart on the fresh log once present. |
 
 ### Log quality gate
 
@@ -57,12 +53,13 @@ Before investing in fixes, scan the log for these signals of incomplete diagnost
 If **any** quality problem is found:
 
 1. Identify which linter(s) are affected.
-2. Broaden the filter for those linters in the script named on the log's `# source:`
-   header line (switch to `--output-format=full`, `-f parsable`, or widen the keep-regex
-   for that section). `ci-digest.py` and `lint-all.ps1` share filter logic — if you change
-   one, change the other to match.
+2. Broaden the filter in `scripts/diagnostics.py` (the `LINT_SECTIONS` keep-functions), or
+   widen the tool's own output in the runner named on the log's `# source:` header (switch to
+   `--output-format=full`, `-f parsable`). The `diagnostics.py` filter is shared by the local
+   task and CI, so one change covers both. Update `scripts/hooks/tests/test_diagnostics.py`
+   in the same edit.
 3. Note what was wrong and what you changed, then regenerate the log with the improved
-   filter (desktop: re-run **Lint: Everything**; CI: push) and restart from Step 1 on the
+   filter (locally: re-run the lint suite; CI: push) and restart from Step 1 on the
    higher-quality output.
 4. Do not attempt fixes on the current low-quality log — fix the filter first.
 
@@ -137,8 +134,8 @@ State clearly:
 Your deliverable is the **fix plus the `--- ADDRESSED` stamp** — that needs no linter run
 and completes in any environment (including a headless eval that only seeds the log).
 
-**If you can run linters, close the loop yourself:** regenerate the log (desktop: re-run
-**Lint: Everything**; CI: push) and repeat from Step 1 until it's empty. While fixing a
+**If you can run linters, close the loop yourself:** regenerate the log (locally: re-run
+the lint suite; CI: push) and repeat from Step 1 until it's empty. While fixing a
 batch, diagnose from `logs/lint-errors.log` and use targeted single-file rechecks (e.g.
 `ruff check <file>`, `mypy <file>`) to confirm individual fixes — the full re-run is the
 once-per-pass verify, not a per-edit habit. **If you can't run linters** (sandbox / no

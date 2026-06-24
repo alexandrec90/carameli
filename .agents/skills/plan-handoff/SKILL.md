@@ -20,12 +20,8 @@ If no argument is given, ask the user what to plan, then stop.
 
 ## Step 1 — Parse input and gather context
 
-Strip a leading `/` from the first token if present. Run
-the following command to list skill directories:
-
-```powershell
-Get-ChildItem .claude/skills -Directory -Name
-```
+Strip a leading `/` from the first token if present. List the skill directories with the
+Glob tool (`.claude/skills/*/SKILL.md` → take the directory names).
 
 **Skill mode** (first token matches a skill dir): read these in a single
 parallel call:
@@ -52,7 +48,7 @@ changes — read existing patterns, locate insertion points, identify dependenci
 
 In both modes, you **may** use:
 
-- `Read`, `Glob`, `Grep`, `Bash`/`PowerShell` (read-only commands only)
+- `Read`, `Glob`, `Grep`, `Bash` (read-only commands only)
 
 You **may not** use:
 

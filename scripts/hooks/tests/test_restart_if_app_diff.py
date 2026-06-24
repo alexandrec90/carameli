@@ -20,6 +20,16 @@ def test_hash_changes_with_content():
     assert hook.app_diff_hash('app/a.py') != hook.app_diff_hash('app/b.py')
 
 
-def test_restart_app_noop_without_pwsh(tmp_path, monkeypatch):
-    monkeypatch.setattr(hook.shutil, 'which', lambda _: None)
+def test_restart_app_invokes_python_script(tmp_path, monkeypatch):
+    calls = {}
+
+    class _Result:
+        returncode = 0
+
+    def fake_run(argv, **kwargs):
+        calls['argv'] = argv
+        return _Result()
+
+    monkeypatch.setattr(hook.subprocess, 'run', fake_run)
     assert hook.restart_app(tmp_path) == 0
+    assert calls['argv'] == [hook.sys.executable, 'scripts/docker-restart-app.py']

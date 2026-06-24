@@ -36,7 +36,7 @@ def main() -> int:
     start = time.monotonic()
     try:
         # cmd comes from tasks.json (trusted), not user input.
-        result = subprocess.run(cmd)  # noqa: S603
+        result = subprocess.run(cmd)
     except FileNotFoundError:
         # Windows can't CreateProcess batch launchers (npm, npx, vite) directly —
         # they're .cmd shims. Fall back to the shell so they resolve.

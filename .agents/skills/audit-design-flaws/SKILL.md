@@ -82,11 +82,10 @@ In parallel:
 
 ## Step 1.5 — Build incremental scan targets via script
 
-Run the planner command below before continuing:
+Run the planner command below before continuing — it writes `scan-plan.json`:
 
-Suggested command (run in terminal):
-```powershell
-& { python .claude/skills/state-tools/state-engine.py plan --skill audit-design-flaws; if ($LASTEXITCODE -eq 0) { "scan-plan.json written" } else { "state-engine plan FAILED: exit $LASTEXITCODE" } }
+```sh
+python .claude/skills/state-tools/state-engine.py plan --skill audit-design-flaws
 ```
 
 Then use `.claude/skills/audit-design-flaws/scan-plan.json` as the source of truth:

@@ -7,8 +7,8 @@ argument-hint: '(no arguments)'
 
 # Skill: Fix Docker Errors
 
-> **Local session only.** This skill reads log artifacts written by PS1 scripts
-> on the host machine. It cannot run in web or mobile sessions.
+> **Local session only.** This skill depends on the local Docker stack and its diagnostics.
+> It cannot run in web or mobile sessions.
 
 Fix Docker failures collected in `logs/docker/` artifact files.
 
@@ -18,19 +18,19 @@ Fix Docker failures collected in `logs/docker/` artifact files.
 
 Read all non-empty files in `logs/docker/` with the Read tool:
 
-| Artifact | Written by | Contains |
+| Artifact | Produced by | Contains |
 |---|---|---|
-| `logs/docker/health.log` | Docker: Stack Status | Container status, sick-container logs, healthcheck details |
-| `logs/docker/config.log` | Docker: Stack Status | Compose config validation, Docker resource usage |
-| `logs/docker/app-logs.log` | Docker: Stack Status | Recent app container log lines (always collected) |
-| `logs/docker/build.log` | Start: Full Stack | Build output, startup failures |
-| `logs/docker/migrate.log` | DB: Apply Migrations | Alembic migration output |
-| `logs/docker/restart.log` | Restart: App Container | Restart failures |
-| `logs/docker/down.log` | Stop: Docker Stack | Shutdown failures |
-| `logs/docker/prune.log` | Docker: Prune + Compact | Prune/compact failures |
+| `logs/docker/health.log` | the stack status check | Container status, sick-container logs, healthcheck details |
+| `logs/docker/config.log` | the stack status check | Compose config validation, Docker resource usage |
+| `logs/docker/app-logs.log` | the stack status check | Recent app container log lines (always collected) |
+| `logs/docker/build.log` | stack startup / build | Build output, startup failures |
+| `logs/docker/migrate.log` | applying migrations | Alembic migration output |
+| `logs/docker/restart.log` | restarting the app | Restart failures |
+| `logs/docker/down.log` | stopping the stack | Shutdown failures |
+| `logs/docker/prune.log` | prune / compact | Prune/compact failures |
 
-If the `logs/docker/` directory does not exist or all files are empty, tell the user to run
-the `Docker: Stack Status` task first, then stop.
+If the `logs/docker/` directory does not exist or all files are empty, regenerate them by
+running the stack status check yourself. If Docker is unreachable, say so and stop.
 
 ### Addressed-artifact check
 
@@ -39,8 +39,8 @@ to that file (see Step 2). On subsequent runs, **skip** any artifact whose last 
 `--- ADDRESSED` — those errors have already been fixed and the file has not been
 refreshed by a task since.
 
-Task scripts overwrite the entire file on each run, so the marker is naturally cleared
-whenever the user re-runs the producing task (e.g., `Docker: Stack Status`).
+The producing check overwrites the entire file on each run, so the marker is naturally cleared
+whenever the stack status check is re-run.
 
 ### Log quality gate
 
@@ -55,12 +55,11 @@ incomplete diagnostics:
 
 If **any** quality problem is found:
 
-- **Docker unreachable** (`Cannot connect`, `is the docker daemon running`): tell the user
-  to start Docker Desktop and re-run **Docker: Stack Status**, then **stop**.
-- **Empty capture when Docker is reachable**: update `scripts/docker-status.ps1` to fix the
+- **Docker unreachable** (`Cannot connect`, `is the docker daemon running`): this needs Docker
+  Desktop running — say so and **stop**.
+- **Empty capture when Docker is reachable**: update the producing status check to fix the
   capture logic (e.g., ensure `docker compose ps` output is written, ensure app logs are
-  collected for unhealthy containers), then ask the user to re-run **Docker: Stack Status**
-  and **stop**.
+  collected for unhealthy containers), then regenerate the diagnostics and **stop**.
 
 ### Triage table
 
@@ -91,7 +90,7 @@ Skip **addressed** artifacts (last line is `--- ADDRESSED`). For each remaining 
    or `docker-compose.yml` as needed.
 4. For **build failures**: open the implicated source file and apply the smallest fix.
 5. For **migration failures**: check `alembic/versions/` and models for drift.
-6. For **resource issues**: suggest running the `Docker: Prune + Compact VHDX` task.
+6. For **resource issues**: suggest a prune + VHDX-compaction pass to reclaim space.
 7. For **transient failures**: note them and skip — these resolve on retry.
 
 **Stop conditions:**
@@ -111,41 +110,38 @@ stamp it — transient errors should be re-evaluated on the next run.
 
 **Important:** Diagnose from the `logs/docker/` artifacts, not raw `docker` output. After applying
 a fix you may run the targeted apply command (the single-service `--no-build`/`--build` form below)
-and `Docker: Stack Status` to confirm the container comes up healthy. Avoid destructive ops
+and re-run the stack status check to confirm the container comes up healthy. Avoid destructive ops
 (`down -v`, full-stack restarts) — confirm with the user before those.
 
 ---
 
 ## Step 3 — Verify
 
-Provide the user with the **fastest** command to apply the fix, then tell them to run
-`Docker: Stack Status` afterwards.
+Apply the **fastest** targeted command, capturing its output to the matching `logs/docker/`
+artifact, then re-run the stack status check afterwards.
 
 ### Choosing the right apply command
 
-All apply commands are run as a single PowerShell pipeline that tees output to the matching
-`logs/docker/` artifact file. This gives the user live terminal feedback **and** leaves a
-machine-readable record for the next `/fix-docker` pass — without triggering a slow full
-rebuild.
+Run the smallest targeted command and redirect its output to the matching `logs/docker/`
+artifact file — that leaves a machine-readable record for the next `/fix-docker` pass without
+triggering a slow full rebuild.
 
-| What changed | Fastest apply command (with error capture) |
+| What changed | Fastest apply command |
 |---|---|
-| Only `docker-compose.yml` env/config for **one** service | `docker compose up -d --no-build <service> 2>&1 \| Tee-Object -FilePath logs/docker/restart.log` |
-| `docker-compose.yml` env/config for **multiple** services | `docker compose up -d --no-build 2>&1 \| Tee-Object -FilePath logs/docker/restart.log` |
-| App source (`app/`) or `requirements*.txt` / `Dockerfile` | `docker compose up -d --build app 2>&1 \| Tee-Object -FilePath logs/docker/build.log` |
-| Alembic migration only | Run the `DB: Apply Migrations` task (output already goes to `logs/docker/migrate.log`) |
-| `docker-compose.yml` structural change (new service, volume, network) | `docker compose up -d --no-build 2>&1 \| Tee-Object -FilePath logs/docker/restart.log` |
+| Only `docker-compose.yml` env/config for **one** service | `docker compose up -d --no-build <service>` → `logs/docker/restart.log` |
+| `docker-compose.yml` env/config for **multiple** services | `docker compose up -d --no-build` → `logs/docker/restart.log` |
+| App source (`app/`) or `requirements*.txt` / `Dockerfile` | `docker compose up -d --build app` → `logs/docker/build.log` |
+| Alembic migration only | `docker compose exec -T app alembic upgrade head` → `logs/docker/migrate.log` |
+| `docker-compose.yml` structural change (new service, volume, network) | `docker compose up -d --no-build` → `logs/docker/restart.log` |
 
-Always prefer the single-service form (`--no-build <service>`) when only one container is
-affected — it skips image pulls and build steps entirely and is the quickest path.
+Redirect each command's combined output (`2>&1`) to the listed artifact, **overwriting** it
+so any `--- ADDRESSED` stamp from a prior pass is cleared automatically. Always prefer the
+single-service form (`--no-build <service>`) when only one container is affected — it skips
+image pulls and build steps entirely and is the quickest path.
 
-The `Tee-Object` pipeline **overwrites** the target file on each run (PowerShell default),
-so any `--- ADDRESSED` stamp from a prior pass is cleared automatically — exactly the same
-behaviour as the task scripts that produce the other artifacts.
+After applying:
 
-After applying, tell the user to:
-
-1. Run `Docker: Stack Status` to refresh the health/config/app-logs diagnostics.
+1. Re-run the stack status check to refresh the health/config/app-logs diagnostics.
 2. Invoke `/fix-docker` again if any `logs/docker/` files still contain failures
    (including the freshly written `build.log` or `restart.log`).
 
@@ -163,19 +159,19 @@ State clearly:
 - Which errors were fixed (file, what changed).
 - Which were skipped (transient / needs credentials / needs user action).
 - Which artifacts were stamped `--- ADDRESSED`.
-- Next step: which task(s) to re-run.
+- Next step: which diagnostics to regenerate.
 
 ---
 
 ## Hard Rules
 
 1. Edit only files directly implicated by the collected errors — never pre-emptive cleanup.
-2. Run only targeted apply/verify commands (single-service `up`/`build`, `Docker: Stack Status`).
+2. Run only targeted apply/verify commands (single-service `up`/`build`, the stack status check).
    Avoid destructive ops (`down -v`, full-stack restart) — provide those for the user to run.
 3. One error = one minimal fix. Do not restructure surrounding code.
 4. Never modify secrets or credentials in `.env` — report what is missing and let the user fill it in.
 5. Skip artifacts already stamped `--- ADDRESSED` — they were fixed in a prior run.
 6. Only stamp an artifact after applying at least one code fix from it (not for transient-only files).
 7. **Log quality gate is mandatory.** Docker-unreachable errors are infra, not code — stop
-   immediately and tell the user to start Docker Desktop. For empty captures when Docker is
-   reachable, fix `scripts/docker-status.ps1` and stop.
+   immediately and say Docker Desktop needs to be running. For empty captures when Docker is
+   reachable, fix the producing status check and stop.

@@ -7,8 +7,8 @@ argument-hint: '(no arguments)'
 
 # Skill: Autonomous Test-Fix Loop
 
-> **Local session only.** This skill reads log artifacts written by PS1 scripts
-> on the host machine. It cannot run in web or mobile sessions.
+> **Local session only.** This skill depends on the local Docker stack and restarts
+> containers between iterations. It cannot run in web or mobile sessions.
 
 Runs the full fix-tests cycle autonomously without user interaction between iterations.
 
@@ -16,8 +16,8 @@ Runs the full fix-tests cycle autonomously without user interaction between iter
 
 ## Prerequisites
 
-The Docker stack must already be running. If it is not, stop and tell the user to run
-the **Start: Full Stack (Docker Compose)** task first.
+The Docker stack must be running. If it isn't, bring it up (`docker compose up -d`) before
+starting — or, if there's no Docker daemon in this environment, stop and say so.
 
 ---
 
@@ -39,15 +39,8 @@ Cap at **4 iterations**. On each iteration:
 
 ### A — Run tests
 
-Run the suggested command at the start of each iteration:
-
-Suggested command (run in terminal):
-```powershell
-pwsh -ExecutionPolicy Bypass -File scripts/run-tests.ps1
-```
-
-This command writes
-`logs/test-failures.log` automatically.
+At the start of each iteration, run the test suite. It writes `logs/test-failures.log`
+automatically — discard the streamed stdout and read that capped log instead.
 
 ### B — Check result
 
@@ -89,8 +82,8 @@ For each failure:
 ### F — Restart if needed
 
 Restart is hook-driven and automatic. The `PreToolUse` hook script checks whether
-`app/` changed since the last restart and runs `scripts/docker-restart-app.ps1`
-only when needed before the next tool action.
+`app/` changed since the last restart and restarts the app container only when needed
+before the next tool action.
 
 ### G — Loop
 

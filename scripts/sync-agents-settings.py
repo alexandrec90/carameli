@@ -5,7 +5,7 @@ Codex reads both `.agents/settings.json` and `.codex/hooks.json`, so hooks live
 in `.codex/hooks.json` only (single source). The `.claude` -> `.agents` mirror
 must never carry a `hooks` block into `.agents/settings.json`, or Codex would
 fire every hook twice. This keeps env/permissions/model in sync while stripping
-hooks. Invoked by `scripts/sync-agents-context.ps1` after the directory mirror.
+hooks. Invoked by `scripts/sync-agents-context.py` after the directory mirror.
 
 `strip_hooks` is pure and unit-tested
 (`scripts/hooks/tests/test_sync_agents_settings.py`).

@@ -48,7 +48,7 @@ Evaluate and refine Claude Skills against the checklists below. After scoring, o
 
 ## 5. Project Conventions
 
-- [ ] **Script Compliance**: If the skill generates scripts, do they follow PowerShell conventions from `.claude/rules/tooling.md`?
+- [ ] **Script Compliance**: If the skill generates scripts, do they follow the conventions in `.claude/rules/tooling.md`?
 - [ ] **Time-Sensitivity**: No mentions of specific dates or "current" years that will expire.
 - [ ] **Terminology**: Is the language consistent (e.g., always "endpoint," never switching to "route")?
 

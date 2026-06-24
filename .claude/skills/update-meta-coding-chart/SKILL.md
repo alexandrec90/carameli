@@ -28,7 +28,7 @@ Read the following files using the Read tool (in parallel where independent):
 - `requirements-dev.txt`
 - `frontend/package.json`
 - `.vscode/tasks.json`
-- Use Glob to discover: `scripts/*.py` and `scripts/*.ps1` — list filenames
+- Use Glob to discover: `scripts/*.py` — list filenames
 - `ruff.toml`
 - `mypy.ini`
 - `pytest.ini`
@@ -48,7 +48,7 @@ Reference — what to look for in each injected section:
 | `requirements-dev.txt` | Dev-only Python packages: test runners, linters, security scanners, property-based testing |
 | `frontend/package.json` | `devDependencies` — ESLint plugins, type checker, Vitest, Stylelint, cspell, markdownlint, Vite plugins |
 | `.vscode/tasks.json` | Every task `label` — maps to a developer workflow action |
-| `scripts/` listing | Every helper script name (`.py` / `.ps1`) |
+| `scripts/` listing | Every helper script name (`.py`) |
 | `ruff.toml` | Rule sets selected, line length, per-file overrides |
 | `mypy.ini` | Strict mode, plugins enabled, suppressed stub packages |
 | `pytest.ini` | asyncio mode, test paths |

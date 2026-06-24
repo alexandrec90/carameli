@@ -39,7 +39,9 @@ def _ensure_venv_on_path() -> None:
 
 def run(cmd: str) -> tuple[list[str], int]:
     """Run a shell command from the repo root, merging stdout+stderr in order."""
-    p = subprocess.run(
+    # shell=True is intentional: cmd is a trusted first-party tool invocation
+    # (ruff/mypy/eslint/...), not external input.
+    p = subprocess.run(  # noqa: S602
         cmd, shell=True, cwd=REPO_ROOT,
         stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
         text=True, encoding="utf-8", errors="replace",

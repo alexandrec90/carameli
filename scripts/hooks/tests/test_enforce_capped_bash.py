@@ -2,7 +2,6 @@
 import json
 
 import pytest
-
 from conftest import load_module
 
 hook = load_module('scripts/hooks/enforce-capped-bash.py')
@@ -44,10 +43,17 @@ def test_capped_with_head_c_allows():
     assert code == 0
 
 
-def test_capped_with_ps1_wrapper_allows():
-    cmd = 'pwsh -File scripts/hooks/invoke-capped.ps1 -Command "ls"'
+def test_py_wrapper_allows():
+    cmd = 'python3 scripts/hooks/invoke-capped.py --command "ls"'
     code, _ = hook.decide(payload('Bash', cmd))
     assert code == 0
+
+
+def test_removed_ps1_wrapper_no_longer_allowed():
+    # invoke-capped.ps1 was deleted; the .ps1 form must now be blocked.
+    cmd = 'pwsh -File scripts/hooks/invoke-capped.ps1 -Command "ls"'
+    code, _ = hook.decide(payload('Bash', cmd))
+    assert code == 42
 
 
 # --- decide: block paths ---

@@ -5,7 +5,7 @@
       "label": "Start: Full Stack (Docker Compose)",
       "type": "process",
       "command": "python",
-      "args": ["scripts/notify-wrap.py", "Start: Full Stack", "--", "pwsh", "-ExecutionPolicy", "Bypass", "-File", "scripts/docker-up.ps1", "-Build"],
+      "args": ["scripts/notify-wrap.py", "Start: Full Stack", "--", "python", "scripts/docker-up.py", "--build"],
       "group": {
         "kind": "build",
         "isDefault": true
@@ -104,7 +104,7 @@
     {
       "label": "Start: ngrok + Patch .env + Restart App",
       "type": "shell",
-      "command": "pwsh -ExecutionPolicy Bypass -File scripts/start-ngrok.ps1",
+      "command": "python scripts/start-ngrok.py",
       "presentation": {
         "reveal": "always",
         "panel": "shared",
@@ -117,7 +117,7 @@
       "label": "Stop: Docker Stack",
       "type": "process",
       "command": "python",
-      "args": ["scripts/notify-wrap.py", "Stop: Docker Stack", "--", "pwsh", "-ExecutionPolicy", "Bypass", "-File", "scripts/docker-down.ps1"],
+      "args": ["scripts/notify-wrap.py", "Stop: Docker Stack", "--", "python", "scripts/docker-down.py"],
       "presentation": {
         "reveal": "always",
         "panel": "shared",
@@ -130,7 +130,7 @@
       "label": "Restart: App Container",
       "type": "process",
       "command": "python",
-      "args": ["scripts/notify-wrap.py", "Restart: App Container", "--", "pwsh", "-ExecutionPolicy", "Bypass", "-File", "scripts/docker-restart-app.ps1"],
+      "args": ["scripts/notify-wrap.py", "Restart: App Container", "--", "python", "scripts/docker-restart-app.py"],
       "presentation": {
         "reveal": "always",
         "panel": "shared",
@@ -156,7 +156,7 @@
       "label": "Docker: Stack Status",
       "type": "process",
       "command": "python",
-      "args": ["scripts/notify-wrap.py", "Docker: Stack Status", "--", "pwsh", "-ExecutionPolicy", "Bypass", "-File", "scripts/docker-status.ps1"],
+      "args": ["scripts/notify-wrap.py", "Docker: Stack Status", "--", "python", "scripts/docker-status.py"],
       "presentation": {
         "reveal": "always",
         "panel": "shared",
@@ -169,7 +169,7 @@
       "label": "DB: Apply Migrations",
       "type": "process",
       "command": "python",
-      "args": ["scripts/notify-wrap.py", "DB: Apply Migrations", "--", "pwsh", "-ExecutionPolicy", "Bypass", "-File", "scripts/docker-migrate.ps1"],
+      "args": ["scripts/notify-wrap.py", "DB: Apply Migrations", "--", "python", "scripts/docker-migrate.py"],
       "presentation": {
         "reveal": "always",
         "panel": "shared",
@@ -182,7 +182,7 @@
       "label": "Docker: Prune + Compact VHDX",
       "type": "process",
       "command": "python",
-      "args": ["scripts/notify-wrap.py", "Docker: Prune + Compact VHDX", "--", "pwsh", "-ExecutionPolicy", "Bypass", "-File", "scripts/docker-prune.ps1"],
+      "args": ["scripts/notify-wrap.py", "Docker: Prune + Compact VHDX", "--", "python", "scripts/docker-prune.py"],
       "presentation": {
         "reveal": "always",
         "panel": "shared",
@@ -240,7 +240,7 @@
       "label": "Test: Run E2E (headless)",
       "type": "process",
       "command": "python",
-      "args": ["scripts/notify-wrap.py", "Test: Run E2E (headless)", "--", "pwsh", "-ExecutionPolicy", "Bypass", "-File", "scripts/run-e2e.ps1"],
+      "args": ["scripts/notify-wrap.py", "Test: Run E2E (headless)", "--", "python", "scripts/run-e2e.py"],
       "group": "test",
       "presentation": {
         "reveal": "always",
@@ -254,7 +254,7 @@
       "label": "Test: Run E2E (headed)",
       "type": "process",
       "command": "python",
-      "args": ["scripts/notify-wrap.py", "Test: Run E2E (headed)", "--", "pwsh", "-ExecutionPolicy", "Bypass", "-File", "scripts/run-e2e.ps1", "-Headed"],
+      "args": ["scripts/notify-wrap.py", "Test: Run E2E (headed)", "--", "python", "scripts/run-e2e.py", "--headed"],
       "group": "test",
       "presentation": {
         "reveal": "always",
@@ -296,7 +296,7 @@
       "label": "Test: Run E2E (cross-browser)",
       "type": "process",
       "command": "python",
-      "args": ["scripts/notify-wrap.py", "Test: Run E2E (cross-browser)", "--", "pwsh", "-ExecutionPolicy", "Bypass", "-File", "scripts/run-e2e.ps1", "-CrossBrowser"],
+      "args": ["scripts/notify-wrap.py", "Test: Run E2E (cross-browser)", "--", "python", "scripts/run-e2e.py", "--cross-browser"],
       "group": "test",
       "presentation": {
         "reveal": "always",
@@ -310,7 +310,7 @@
       "label": "Test: Run Load (Locust)",
       "type": "process",
       "command": "python",
-      "args": ["scripts/notify-wrap.py", "Test: Run Load (Locust)", "--", "pwsh", "-ExecutionPolicy", "Bypass", "-File", "scripts/run-load.ps1"],
+      "args": ["scripts/notify-wrap.py", "Test: Run Load (Locust)", "--", "python", "scripts/run-load.py"],
       "group": "test",
       "presentation": {
         "reveal": "always",
@@ -324,7 +324,7 @@
       "label": "Test: Run Mutation (mutmut)",
       "type": "process",
       "command": "python",
-      "args": ["scripts/notify-wrap.py", "Test: Run Mutation (mutmut)", "--", "pwsh", "-ExecutionPolicy", "Bypass", "-File", "scripts/run-mutation.ps1"],
+      "args": ["scripts/notify-wrap.py", "Test: Run Mutation (mutmut)", "--", "python", "scripts/run-mutation.py"],
       "group": "test",
       "presentation": {
         "reveal": "always",
@@ -352,7 +352,7 @@
       "label": "Log: Extract Errors",
       "type": "process",
       "command": "python",
-      "args": ["scripts/notify-wrap.py", "Log: Extract Errors", "--", "pwsh", "-ExecutionPolicy", "Bypass", "-File", "scripts/extract-log-errors.ps1"],
+      "args": ["scripts/notify-wrap.py", "Log: Extract Errors", "--", "python", "scripts/extract-log-errors.py"],
       "presentation": {
         "reveal": "always",
         "panel": "shared",
@@ -382,7 +382,7 @@
       "label": "Pre-Commit: Install + Patch Hook",
       "type": "process",
       "command": "python",
-      "args": ["scripts/notify-wrap.py", "Pre-Commit: Install + Patch Hook", "--", "pwsh", "-ExecutionPolicy", "Bypass", "-File", "scripts/install-pre-commit.ps1"],
+      "args": ["scripts/notify-wrap.py", "Pre-Commit: Install + Patch Hook", "--", "python", "scripts/install-pre-commit.py"],
       "presentation": {
         "reveal": "always",
         "panel": "shared",
@@ -395,7 +395,7 @@
       "label": "Pre-Commit: Run All Hooks",
       "type": "process",
       "command": "python",
-      "args": ["scripts/notify-wrap.py", "Pre-Commit: Run All Hooks", "--", "pwsh", "-ExecutionPolicy", "Bypass", "-File", "scripts/pre-commit.ps1"],
+      "args": ["scripts/notify-wrap.py", "Pre-Commit: Run All Hooks", "--", "python", "scripts/pre-commit.py"],
       "presentation": {
         "reveal": "always",
         "panel": "shared",
@@ -421,7 +421,7 @@
       "label": "Docker: Fix Stalled Desktop",
       "type": "process",
       "command": "python",
-      "args": ["scripts/notify-wrap.py", "Docker: Fix Stalled Desktop", "--", "pwsh", "-ExecutionPolicy", "Bypass", "-File", "scripts/docker-fix.ps1"],
+      "args": ["scripts/notify-wrap.py", "Docker: Fix Stalled Desktop", "--", "python", "scripts/docker-fix.py"],
       "presentation": {
         "reveal": "always",
         "panel": "shared",
@@ -434,7 +434,7 @@
       "label": "Docker: Restart Engine",
       "type": "process",
       "command": "python",
-      "args": ["scripts/notify-wrap.py", "Docker: Restart Engine", "--", "pwsh", "-ExecutionPolicy", "Bypass", "-File", "scripts/docker-restart-engine.ps1"],
+      "args": ["scripts/notify-wrap.py", "Docker: Restart Engine", "--", "python", "scripts/docker-restart-engine.py"],
       "presentation": {
         "reveal": "always",
         "panel": "new",
@@ -466,12 +466,9 @@
     {
       "label": "Todo: Archive Done Items",
       "type": "process",
-      "command": "pwsh",
+      "command": "python",
       "args": [
-        "-ExecutionPolicy",
-        "Bypass",
-        "-File",
-        "scripts/archive-done-todos.ps1"
+        "scripts/archive-done-todos.py"
       ],
       "presentation": {
         "reveal": "always",
@@ -485,7 +482,7 @@
       "label": "Images: Compress Comic Book (PNG/JPG -> WebP)",
       "type": "process",
       "command": "python",
-      "args": ["scripts/notify-wrap.py", "Images: Compress Comic Book", "--", "pwsh", "-ExecutionPolicy", "Bypass", "-File", "scripts/compress-comic-book-images.ps1"],
+      "args": ["scripts/notify-wrap.py", "Images: Compress Comic Book", "--", "python", "scripts/compress-comic-book-images.py"],
       "presentation": {
         "reveal": "always",
         "panel": "shared",
@@ -510,12 +507,9 @@
     {
       "label": "Agent: Sync CLAUDE -> AGENTS context",
       "type": "process",
-      "command": "pwsh",
+      "command": "python",
       "args": [
-        "-ExecutionPolicy",
-        "Bypass",
-        "-File",
-        "scripts/sync-agents-context.ps1"
+        "scripts/sync-agents-context.py"
       ],
       "presentation": {
         "reveal": "always",

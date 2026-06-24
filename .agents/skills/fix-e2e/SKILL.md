@@ -1,13 +1,13 @@
 ---
 name: fix-e2e
 disable-model-invocation: true
-description: 'Fixes E2E test failures from logs/e2e-failures.log (written by the Test: Run E2E task).'
+description: 'Fixes E2E test failures collected in logs/e2e-failures.log.'
 ---
 
 # Skill: Fix E2E Failures
 
-> **Local session only.** This skill reads log artifacts written by PS1 scripts
-> on the host machine. It cannot run in web or mobile sessions.
+> **Local session only.** This skill depends on the local stack and a browser runner.
+> It cannot run in web or mobile sessions.
 
 Fix Playwright E2E failures collected in `logs/e2e-failures.log`.
 
@@ -20,18 +20,14 @@ Read these two files **in parallel** (single tool call):
 - `logs/e2e-failures.log`
 - `.claude/skills/fix-e2e/known-fixes.md`
 
-If the log file does not exist or is empty, tell the user to run the **Test: Run E2E
-(headless)** task first, then stop.
+If the log file does not exist or is empty, regenerate it by running the headless E2E suite
+yourself. If the stack/frontend isn't up to run it, say so and stop.
 
 ### Addressed check
 
 If the last line of `logs/e2e-failures.log` is `--- ADDRESSED`, the failures have
-already been fixed. Tell the user:
-
-> These E2E failures were already addressed. Re-run the **Test: Run E2E (headless)**
-> task and invoke `/fix-e2e` again if new failures appear.
-
-Then **stop**.
+already been fixed. Regenerate the log (re-run the headless E2E suite) and re-enter on the
+fresh output; if it's still stamped, there are no new failures — report that and **stop**.
 
 ### Log quality gate
 
@@ -46,10 +42,10 @@ Before investing in fixes, scan the log for these signals of incomplete diagnost
 If **any** quality problem is found:
 
 1. Identify which test(s) are affected and which output pattern is missing.
-2. Update `scripts/run-e2e.ps1` to preserve the missing content (e.g., always emit a
+2. Update the producing E2E runner to preserve the missing content (e.g., always emit a
    `# fix:` hint, widen the block-capture logic to include assertion output).
-3. Tell the user: what was wrong, what was changed, and ask them to re-run the
-   **Test: Run E2E (headless)** task.
+3. Note what was wrong and what you changed, then regenerate the log (re-run the headless
+   E2E suite).
 4. **Stop** — do not attempt fixes on a low-quality log.
 
 ### Known-fix matching (mandatory — do this BEFORE any other file reads)
@@ -144,23 +140,22 @@ State clearly:
 - Which failures were fixed (test name, what changed, which files were edited).
 - Which were skipped and why.
 - **Restart reminders** (as applicable):
-   - Backend files changed (`app/`): tell the user to run:
+  - Backend files changed (`app/`): restart the app container so the change is live —
+    `docker compose restart app`.
+  - Frontend files changed (`frontend/src/`): Vite HMR should pick it up (manual restart
+    only needed for config changes like `vite.config.ts`).
 
-      ```powershell
-      docker compose restart app
-
-  - Frontend files changed (`frontend/src/`): note that Vite HMR should pick it up
-    (manual restart only needed for config changes like `vite.config.ts`)
 ---
 
+## Hard Rules
 
 1. Edit only files directly implicated by the collected failures — never pre-emptive cleanup.
 2. One failure = one minimal fix. Do not restructure surrounding code.
 3. **Diagnose from the log, not by running the full E2E suite.** After a fix you may run the
    single spec you fixed (e.g. `pytest tests/e2e/<spec>.py -k <test>`) to confirm it, provided the
-   stack and frontend (`:5173`) are up. Do not run the whole suite or dump raw output; the full
-   E2E task remains the user's to re-run.
-4. Skip the log file if already stamped `--- ADDRESSED` — tell the user to re-run E2E first.
+   stack and frontend (`:5173`) are up. Do not run the whole suite or dump raw output; reserve a
+   full re-run for the once-per-pass regenerate-and-loop.
+4. Skip the log file if already stamped `--- ADDRESSED` — regenerate it (re-run E2E) first.
 5. Only stamp the log after applying at least one code fix.
 6. E2E failures are usually app bugs, not test bugs — prefer fixing application code over
    modifying tests. Only edit test files if the test itself is genuinely wrong.
@@ -169,4 +164,4 @@ State clearly:
 8. **Do not read runtime logs (`carameli.log`) unless the fix hint says `5xx` and the route
    handler alone doesn't explain it.** Runtime logs are a last resort, not a first step.
 9. **Log quality gate is mandatory.** If any failure block has no error/traceback lines,
-    update `scripts/run-e2e.ps1` and stop — never attempt fixes when root cause is invisible.
+    update the producing E2E runner and stop — never attempt fixes when root cause is invisible.
