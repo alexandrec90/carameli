@@ -77,163 +77,37 @@ jobs:
         run: alembic upgrade head
 
       - name: Create working directories
-        run: mkdir -p reports logs
+        run: mkdir -p logs
 
       # -----------------------------------------------------------------------
-      # Auto-fix passes (ruff --fix, eslint --fix, stylelint --fix)
-      # Source file changes from these are committed to the fix branch.
+      # Lint + test via the shared Python runners (CI=true selects the CI paths).
+      # lint-all.py auto-fixes in place (ruff/eslint/stylelint/markdownlint) and
+      # writes logs/lint-errors.log; run-tests.py runs pytest + hook + frontend
+      # tests and writes logs/test-failures.log. Both filter through
+      # scripts/diagnostics.py -- the same module the local VS Code tasks use, so
+      # the artifacts are byte-identical across environments.
+      # continue-on-error so a non-zero "failures found" exit doesn't end the job;
+      # the artifact contents are the source of truth (see Detect step below).
       # -----------------------------------------------------------------------
 
-      - name: ruff auto-fix
-        run: |
-          ruff check . --fix --unsafe-fixes --quiet 2>&1 || true
-          ruff format . --quiet 2>&1 || true
-
-      - name: eslint auto-fix
-        run: npm --prefix frontend run lint:eslint -- --fix 2>&1 || true
+      - name: Lint (auto-fix + report)
+        env:
+          CI: "true"
+        run: python scripts/lint-all.py
         continue-on-error: true
 
-      - name: stylelint auto-fix
-        run: npm --prefix frontend run lint:css -- --fix 2>&1 || true
+      - name: Test
+        env:
+          CI: "true"
+        run: python scripts/run-tests.py
         continue-on-error: true
 
-      - name: markdownlint auto-fix
-        run: |
-          npm --prefix frontend exec --yes -- \
-            markdownlint "**/*.md" \
-            --ignore "**/node_modules/**" --ignore "**/.git/**" --ignore "**/.venv/**" \
-            -c ".markdownlint.json" --fix 2>&1 || true
-        continue-on-error: true
-
-      # -----------------------------------------------------------------------
-      # Check passes — capture output + exit codes for ci-digest.py
-      # Each step uses set +e so the script continues regardless of tool exit.
-      # -----------------------------------------------------------------------
-
-      - name: ruff check
-        run: |
-          set +e
-          ruff check . --output-format=full > reports/ruff-check.txt 2>&1
-          echo $? > reports/ruff-check.exit
-
-      - name: ruff format check
-        run: |
-          set +e
-          ruff format --check . > reports/ruff-format.txt 2>&1
-          echo $? > reports/ruff-format.exit
-
-      - name: mypy
-        run: |
-          set +e
-          mypy app/ > reports/mypy.txt 2>&1
-          echo $? > reports/mypy.exit
-
-      - name: eslint check
-        run: |
-          set +e
-          npm --prefix frontend run lint:eslint > reports/eslint.txt 2>&1
-          echo $? > reports/eslint.exit
-
-      - name: tsc
-        run: |
-          set +e
-          npm --prefix frontend run lint:types > reports/tsc.txt 2>&1
-          echo $? > reports/tsc.exit
-
-      - name: stylelint check
-        run: |
-          set +e
-          npm --prefix frontend run lint:css > reports/stylelint.txt 2>&1
-          echo $? > reports/stylelint.exit
-
-      - name: markdownlint check
-        run: |
-          set +e
-          npm --prefix frontend exec --yes -- \
-            markdownlint "**/*.md" \
-            --ignore "**/node_modules/**" --ignore "**/.git/**" --ignore "**/.venv/**" \
-            -c ".markdownlint.json" > reports/markdownlint.txt 2>&1
-          echo $? > reports/markdownlint.exit
-
-      - name: pip-audit
-        run: |
-          set +e
-          pip-audit --ignore-vuln CVE-2026-4539 > reports/pip-audit.txt 2>&1
-          echo $? > reports/pip-audit.exit
-
-      - name: vulture
-        run: |
-          set +e
-          vulture app/ --min-confidence 80 --ignore-names "cls,ctx,opts" > reports/vulture.txt 2>&1
-          echo $? > reports/vulture.exit
-
-      - name: yamllint
-        run: |
-          set +e
-          targets=""
-          for f in .pre-commit-config.yaml .github/workflows docker-compose.yml prometheus.yml; do
-            [ -e "$f" ] && targets="$targets $f"
-          done
-          if [ -n "$targets" ]; then
-            yamllint --strict -f parsable $targets > reports/yamllint.txt 2>&1
-            echo $? > reports/yamllint.exit
-          else
-            echo "" > reports/yamllint.txt
-            echo 0 > reports/yamllint.exit
-          fi
-
-      - name: actionlint
-        run: |
-          set +e
-          if command -v actionlint > /dev/null 2>&1; then
-            actionlint > reports/actionlint.txt 2>&1
-            echo $? > reports/actionlint.exit
-          else
-            echo "" > reports/actionlint.txt
-            echo 0 > reports/actionlint.exit
-          fi
-
-      - name: alembic check
-        run: |
-          set +e
-          alembic check > reports/alembic-check.txt 2>&1
-          echo $? > reports/alembic-check.exit
-
-      # -----------------------------------------------------------------------
-      # Tests
-      # -----------------------------------------------------------------------
-
-      - name: pytest
-        run: |
-          set +e
-          pytest tests/unit/ tests/integration/test_full_flows.py tests/integration/test_contract.py \
-            -v --tb=short --no-header --color=no \
-            > reports/pytest.txt 2>&1
-          echo $? > reports/pytest.exit
-
-      - name: frontend tests (vitest)
-        run: |
-          set +e
-          npm --prefix frontend run test:run > reports/frontend-tests.txt 2>&1
-          echo $? > reports/frontend-tests.exit
-
-      - name: hook tests
-        run: |
-          set +e
-          python -m pytest scripts/hooks/tests -q --color=no > reports/hook-tests.txt 2>&1
-          echo $? > reports/hook-tests.exit
-
-      # -----------------------------------------------------------------------
-      # Digest — produce logs/lint-errors.log + logs/test-failures.log
-      # -----------------------------------------------------------------------
-
-      - name: Build fix artifacts
+      - name: Detect remaining failures
         id: digest
         run: |
-          # Don't let the digest's own exit code decide pass/fail — a crash and a
-          # real failure both exit non-zero. The artifact contents are the source of
-          # truth: non-empty log == actionable failures remain.
-          python scripts/ci-digest.py || echo "::warning::ci-digest.py exited non-zero"
+          # A non-empty log means actionable failures remain. The runners' own
+          # exit codes are swallowed above so a crash and a real failure can't be
+          # conflated -- the committed artifact is the contract the skills read.
           if [ -s logs/lint-errors.log ] || [ -s logs/test-failures.log ]; then
             echo "failures=true" >> "$GITHUB_OUTPUT"
           else
@@ -252,15 +126,8 @@ jobs:
           fi
 
       # -----------------------------------------------------------------------
-      # Upload raw reports as artifacts (always, for debugging)
+      # Upload the filtered fix artifacts (always, for debugging)
       # -----------------------------------------------------------------------
-
-      - name: Upload raw reports
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: ci-reports
-          path: reports/
 
       - name: Upload fix artifacts
         if: always()
@@ -344,7 +211,7 @@ jobs:
           - \`logs/lint-errors.log\` — actionable lint failures (empty = all clear)
           - \`logs/test-failures.log\` — actionable test failures (empty = all clear)
 
-          Raw tool outputs are available as GitHub Actions artifacts on this run.
+          The same filtered logs are attached to this run as the \`fix-artifacts\` workflow artifact.
           EOF
           )" \
             --head "$BRANCH" \

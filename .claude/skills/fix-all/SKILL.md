@@ -26,12 +26,10 @@ escalation, which only existed because a script picked the model per call.
 This loop runs the check scripts and restarts containers, so it needs a running Docker
 stack. **Before running any check or editing any file:**
 
-1. Confirm the stack is up — `docker compose ps` (or `scripts/docker-status.ps1`, which
-   writes `logs/docker/health.log`). The `app` and `db` containers must be running.
+1. Confirm the stack is up — `docker compose ps`. The `app` and `db` containers must be running.
 2. **Stack down** (Docker is running but the containers aren't) → **stop immediately.** Do
-   not run a check or edit anything. Tell the user to start it (the **Start: Full Stack**
-   task), then re-invoke.
-3. **No Docker at all** (web / mobile / CI session — no daemon, no PS1 host) → this live
+   not run a check or edit anything. Bring the stack up (`docker compose up -d`), then re-invoke.
+3. **No Docker at all** (web / mobile / CI session — no daemon) → this live
    loop can't run here, so **don't attempt it.** The mobile/CI flow is different: run the
    per-check fixers `/fix-tests`, `/fix-lint` against the logs CI produced
    (open the On-Demand workflow's PR), then push and let the workflow re-run. `fix-all`'s
@@ -52,25 +50,26 @@ whatever the test fixes just changed — no separate re-lint pass needed. For ea
 
 | Check | Run (writes its log) | Log artifact | Fixer |
 |---|---|---|---|
-| pytest | `scripts/run-tests.ps1` (**Test: Run pytest**) | `logs/test-failures.log` | `/fix-tests` |
-| Lint | `scripts/lint-all.ps1` (**Lint: Everything**) | `logs/lint-errors.log` | `/fix-lint` |
+| pytest | run the test suite | `logs/test-failures.log` | `/fix-tests` |
+| Lint | run the lint suite | `logs/lint-errors.log` | `/fix-lint` |
 
 For each check, up to **3 attempts**:
 
 1. **Run the check.** Don't ingest its streamed stdout — discard it and read the capped
    log artifact instead (a green run leaves the log empty). For pytest, run the **full**
-   suite on the first attempt only; on every re-run use `-Fast` (the **Test: Run pytest
-   (fast, changed only)** task — testmon reruns just the tests your edits touched, and
-   falls back to the full xdist run on its own if testmon selects more than half the suite).
+   suite on the first attempt only; on every re-run use the **changed-only (testmon)** run —
+   it reruns just the tests your edits touched, and falls back to the full xdist run on its
+   own if testmon selects more than half the suite.
 2. **Passed?** (exit 0 / empty log) → move to the next check.
 3. **Failed?** Invoke the matching fixer with the Skill tool, exactly as if the user typed
    the slash command. The fixer handles its own log + known-fixes short-circuit.
 4. **Make the fix live** (pytest only — lint needs no restart):
-   - `app/` files changed → restart the app container (`scripts/docker-restart-app.ps1`).
+   - `app/` files changed → restart the app container (`docker compose restart app`).
    - `requirements.txt` changed → `docker compose build app`, then restart.
-   - A new `alembic/versions/*.py` migration appeared → apply it (`scripts/docker-migrate.ps1`).
-   - Then check stack health (`scripts/docker-status.ps1`); if `logs/docker/health.log`
-     shows Unhealthy/Exited/Restarting, invoke `/fix-docker` before re-running.
+   - A new `alembic/versions/*.py` migration appeared → apply it
+     (`docker compose exec -T app alembic upgrade head`).
+   - Then check stack health (`docker compose ps`); if a container shows
+     Unhealthy/Exited/Restarting, invoke `/fix-docker` before re-running.
 5. **Re-run** (back to step 1). After 3 failed attempts, stop on this check, note it, and
    move to the next — never loop forever.
 

@@ -28,7 +28,7 @@ Read the following files using the Read tool (in parallel where independent):
 - `requirements-dev.txt`
 - `frontend/package.json`
 - `.vscode/tasks.json`
-- Use Glob to discover: `scripts/*.ps1` — list filenames
+- Use Glob to discover: `scripts/*.py` and `scripts/*.ps1` — list filenames
 - `ruff.toml`
 - `mypy.ini`
 - `pytest.ini`
@@ -48,7 +48,7 @@ Reference — what to look for in each injected section:
 | `requirements-dev.txt` | Dev-only Python packages: test runners, linters, security scanners, property-based testing |
 | `frontend/package.json` | `devDependencies` — ESLint plugins, type checker, Vitest, Stylelint, cspell, markdownlint, Vite plugins |
 | `.vscode/tasks.json` | Every task `label` — maps to a developer workflow action |
-| `scripts/` listing | Every `.ps1` helper script name |
+| `scripts/` listing | Every helper script name (`.py` / `.ps1`) |
 | `ruff.toml` | Rule sets selected, line length, per-file overrides |
 | `mypy.ini` | Strict mode, plugins enabled, suppressed stub packages |
 | `pytest.ini` | asyncio mode, test paths |
@@ -87,7 +87,7 @@ Include a tool **only if** it satisfies at least one of:
 - Has a dedicated `.vscode/tasks.json` entry that invokes it
 - Has its own config file in the workspace root or `frontend/` (e.g. `ruff.toml`,
   `mypy.ini`, `pytest.ini`, `.markdownlint.json`)
-- Is a `.ps1` script under `scripts/` that wraps a quality or security tool
+- Is a helper script under `scripts/` that wraps a quality or security tool
 - Is a file or directory under `.claude/rules/` or `.claude/skills/`
 
 ### Exclusion list — never include

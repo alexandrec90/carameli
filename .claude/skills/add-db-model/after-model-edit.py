@@ -18,7 +18,7 @@ MARKER = Path(__file__).parent / '.migration-needed'
 REMINDER_TEXT = (
     '\n'
     'MIGRATION NEEDED: app/models/ files have uncommitted changes.\n'
-    'Once all model edits are complete, tell the user to run:\n'
+    'Once all model edits are complete, generate the migration:\n'
     '  docker compose exec -T app alembic revision --autogenerate -m "<description>"\n'
     'Then open the new file in alembic/versions/ and verify columns, FK behaviour,\n'
     'indexes, and gen_random_uuid() defaults before applying with: alembic upgrade head\n'

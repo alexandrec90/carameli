@@ -75,7 +75,7 @@ For each metadata target, check whether the current codebase has diverged:
    and `docker-compose.yml`. Flag rows that name a tech no longer in use or miss a
    new runtime dependency.
 2. Compare the **Local Development** commands against `docker-compose.yml` service
-   names and `scripts/*.ps1`. Flag stale commands.
+   names and the helper scripts in `scripts/`. Flag stale commands.
 3. Compare the **VanillaLand Reference** mapping table against the actual files in
    `app/services/providers/`, `app/api/`, and `app/models/`. Flag new Carameli
    modules that have no VanillaLand mapping row (or stale rows pointing to removed code).
@@ -115,7 +115,7 @@ covering rule and exhibit a consistent convention worth documenting.
 ### 2e — `settings.local.json` permissions
 
 1. List the current `allow` entries.
-2. Check for commonly used commands in `scripts/*.ps1`, `package.json` scripts,
+2. Check for commonly used commands in the `scripts/` helpers, `package.json` scripts,
    and `Makefile` (if any) that are not yet auto-allowed.
 3. Check for stale entries that reference tools no longer in use.
 

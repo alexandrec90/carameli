@@ -175,7 +175,7 @@ Returned on the provider response; assert on them via
 
 Every fixer skill that diagnoses from a **seedable log artifact** has an end-to-end
 task built from the `fix-tests-logic-bug` template: `fix-tests`, `fix-lint`,
-`fix-logs`, `fix-pester`, `fix-e2e`, `fix-pre-commit`, `fix-docker`. Each seeds the
+`fix-logs`, `fix-e2e`, `fix-pre-commit`, `fix-docker`. Each seeds the
 skill's log (`setup.cjs`), points it at a committed broken fixture under
 `evals/fixtures/`, and checks the repair (`verify.cjs`) — by content, or for
 `fix-logs` by running the repaired code. The shared helpers live in

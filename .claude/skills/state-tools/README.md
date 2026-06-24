@@ -41,7 +41,7 @@ or `--updates-file` if a skill needs something custom.
 
 The skill agent only invokes `plan` (audit only); `apply` runs through the hook.
 
-```powershell
+```sh
 # Build incremental scan plan (audit schema only — agent runs this)
 python .claude/skills/state-tools/state-engine.py plan --skill audit-design-flaws
 ```

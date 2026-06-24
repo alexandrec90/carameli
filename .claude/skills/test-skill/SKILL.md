@@ -26,7 +26,7 @@ This is a tiny compatibility smoke test for Claude-style skill features.
 - If this file is only pasted/attached as plain prompt text, Claude/Copilot frontmatter hooks and suggested command text may be treated as plain text and not executed automatically.
 
 Suggested verification command (optional, run manually):
-```powershell
+```sh
 gh pr diff
 ```
 
@@ -56,7 +56,7 @@ Reply with a single short message:
 > Test file written with UTC timestamp: `logs/agent/test-skill-hook.txt`.
 > Optionally run either of these commands to verify the change:
 >
-> ```powershell
+> ```sh
 > gh copilot session status
 > git diff --stat
 > ```

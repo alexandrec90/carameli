@@ -2,7 +2,7 @@ fail_fast: true
 
 repos:
   # All hooks use language: system so they share the venv/local binaries
-  # with lint-all.ps1 — no version drift between the two scripts.
+  # with scripts/lint-all.py — no version drift between the two.
   - repo: local
     hooks:
       - id: detect-secrets

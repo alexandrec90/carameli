@@ -1,14 +1,14 @@
 ---
 description: Design rules for diagnostic scripts that produce log artifacts for AI-agent consumption
 paths:
-  - scripts/**/*.ps1
+  - scripts/**/*.py
 ---
 
 # Rule: Diagnostic Script Design
 
-Scripts in `scripts/` produce log artifacts in `logs/` that are consumed by coding-agent
-skills (`fix-lint`, `fix-tests`, `fix-pre-commit`, `fix-docker`). Every design decision
-in these scripts must prioritize: **Can an AI agent read this log and fix the problem
+Diagnostic scripts in `scripts/` produce log artifacts in `logs/` that are consumed by
+coding-agent skills (`fix-lint`, `fix-tests`, `fix-pre-commit`, `fix-docker`). Every design
+decision in these scripts must prioritize: **Can an AI agent read this log and fix the problem
 without asking questions?**
 
 ## 1. Every error line must be self-contained
@@ -103,11 +103,18 @@ always has something to work with.
   the agent in the next run.
 - On **fail**: overwrite the artifact entirely -- never append to previous runs.
 - Artifact paths are fixed contracts consumed by skills:
-  - `logs/lint-errors.log` — written by `scripts/lint-all.ps1` (local) or `scripts/ci-digest.py` (CI)
-  - `logs/test-failures.log` — written by `scripts/run-tests.ps1` (local) or `scripts/ci-digest.py` (CI)
-  - `logs/pre-commit-errors.log` (pre-commit.ps1)
-  - `logs/docker/health.log`, `logs/docker/config.log`, `logs/docker/app-logs.log` (docker-status.ps1)
-- `scripts/ci-digest.py` is the CI equivalent of the two PS1 scripts above. It reads
-  raw tool output from `reports/<tool>.txt` + `reports/<tool>.exit` (written by
-  `.github/workflows/on-demand.yml`) and applies identical filtering, producing the
-  same artifact format so `fix-lint` and `fix-tests` work unchanged in both environments.
+  - `logs/lint-errors.log` — consumed by `fix-lint`
+  - `logs/test-failures.log` — consumed by `fix-tests`
+  - `logs/pre-commit-errors.log` — consumed by `fix-pre-commit`
+  - `logs/docker/health.log`, `logs/docker/config.log`, `logs/docker/app-logs.log` — consumed by `fix-docker`
+- Each artifact carries a `# source:` header naming the runner that produced it
+  (e.g. `scripts/lint-all.py`, `scripts/run-tests.py`), so a consuming skill can locate the
+  producer — it is never hard-coded into a skill.
+- The lint and test runners (`scripts/lint-all.py`, `scripts/run-tests.py`) produce these
+  artifacts in **every** environment: the VS Code tasks and `.github/workflows/on-demand.yml`
+  both invoke the same Python entrypoints (CI sets `CI=true` to pick the CI execution path).
+  All filtering lives in one shared module, `scripts/diagnostics.py` — there is no separate
+  local/CI filter to keep in sync. Change the filter once in `diagnostics.py` and both follow.
+- `scripts/diagnostics.py` is pure (no subprocess, no file writes) and unit-tested in
+  `scripts/hooks/tests/test_diagnostics.py`; the runners hand it in-memory tool output and
+  write whatever it returns.

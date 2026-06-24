@@ -1,7 +1,7 @@
 ---
 name: fix-lint
 disable-model-invocation: true
-description: 'Fixes lint errors from logs/lint-errors.log (written by the Lint: Everything task).'
+description: 'Fixes lint errors collected in logs/lint-errors.log.'
 ---
 
 # Skill: Fix Lint Errors
@@ -15,8 +15,8 @@ A/B testing via `npm run eval:rewrite`. Not loaded as a skill (skills load from
 ## Step 1 — Read log + known fixes (parallel, first action)
 
 Read `logs/lint-errors.log` and `.claude/skills/fix-lint/known-fixes.md` in a single
-parallel call. If the log is missing/empty, tell the user to run **Lint: Everything**
-and stop. If its last line is `--- ADDRESSED`, tell them to re-run lint first and stop.
+parallel call. If the log is missing/empty, regenerate it (re-run the lint suite; CI: push)
+and stop. If its last line is `--- ADDRESSED`, regenerate it first and stop.
 
 **Known-fix short-circuit (mandatory):** for each error, if any `known-fixes.md`
 pattern substring matches the rule code or message, apply that fix immediately — no
@@ -30,7 +30,7 @@ cleanup. Preserve existing `logger.*` calls. If a fix needs a DB schema change, 
 and use `/add-db-model`.
 
 If an error has no `file:line` (not self-locating), the log is low quality: fix the
-relevant filter in `scripts/lint-all.ps1` and stop instead of guessing.
+producing lint filter (named on the log's `# source:` header) and stop instead of guessing.
 
 After applying at least one fix, append `--- ADDRESSED` to `logs/lint-errors.log`. Add
 a `known-fixes.md` row for any new pattern likely to recur; prune zero-hit rows older

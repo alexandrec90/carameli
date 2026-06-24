@@ -44,9 +44,9 @@ from app.models.my_entity import MyEntity  # noqa: F401
 
 ## Step 2 — Generate the Migration
 
-Ask the user to run:
-```powershell
-docker compose exec app alembic revision --autogenerate -m "add my_entities table"
+Generate the migration:
+```sh
+docker compose exec -T app alembic revision --autogenerate -m "add my_entities table"
 ```
 
 Open the generated file in `alembic/versions/` and verify:
@@ -58,14 +58,14 @@ Open the generated file in `alembic/versions/` and verify:
 
 ## Step 3 — Apply the Migration
 
-Ask the user to run:
-```powershell
-docker compose exec app alembic upgrade head
+Apply the migration:
+```sh
+docker compose exec -T app alembic upgrade head
 ```
 
 To roll back one step during development:
-```powershell
-docker compose exec app alembic downgrade -1
+```sh
+docker compose exec -T app alembic downgrade -1
 ```
 
 ## Step 4 — Add Pydantic Schemas

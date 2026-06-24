@@ -195,7 +195,7 @@
       "label": "Test: Run pytest",
       "type": "process",
       "command": "python",
-      "args": ["scripts/notify-wrap.py", "Test: Run pytest", "--", "pwsh", "-ExecutionPolicy", "Bypass", "-File", "scripts/run-tests.ps1"],
+      "args": ["scripts/notify-wrap.py", "Test: Run pytest", "--", "python", "scripts/run-tests.py"],
       "group": "test",
       "presentation": {
         "reveal": "always",
@@ -209,7 +209,7 @@
       "label": "Test: Run pytest (fast, changed only)",
       "type": "process",
       "command": "python",
-      "args": ["scripts/notify-wrap.py", "Test: Run pytest (fast)", "--", "pwsh", "-ExecutionPolicy", "Bypass", "-File", "scripts/run-tests.ps1", "-Fast"],
+      "args": ["scripts/notify-wrap.py", "Test: Run pytest (fast)", "--", "python", "scripts/run-tests.py", "--fast"],
       "group": "test",
       "presentation": {
         "reveal": "always",
@@ -349,20 +349,6 @@
       "problemMatcher": []
     },
     {
-      "label": "Test: Run Pester (PowerShell)",
-      "type": "process",
-      "command": "python",
-      "args": ["scripts/notify-wrap.py", "Test: Run Pester", "--", "pwsh", "-ExecutionPolicy", "Bypass", "-File", "scripts/run-pester.ps1", "-InstallIfMissing"],
-      "group": "test",
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared",
-        "showReuseMessage": false,
-        "close": false
-      },
-      "problemMatcher": []
-    },
-    {
       "label": "Log: Extract Errors",
       "type": "process",
       "command": "python",
@@ -379,7 +365,7 @@
       "label": "Lint: Everything",
       "type": "process",
       "command": "python",
-      "args": ["scripts/notify-wrap.py", "Lint: Everything", "--", "pwsh", "-ExecutionPolicy", "Bypass", "-File", "scripts/lint-all.ps1"],
+      "args": ["scripts/notify-wrap.py", "Lint: Everything", "--", "python", "scripts/lint-all.py"],
       "group": {
         "kind": "build",
         "isDefault": true
@@ -464,7 +450,6 @@
         "Test: Run pytest",
         "Test: Run Frontend",
         "Test: Run E2E (headless)",
-        "Test: Run Pester (PowerShell)",
         "Test: Run Hook Tests (pytest)",
         "Test: Run Telnyx Sandbox"
       ],

@@ -1,14 +1,14 @@
 ---
 name: fix-tests
 disable-model-invocation: true
-description: 'Fixes test failures from logs/test-failures.log (written by the Test: Run pytest task).'
+description: 'Fixes test failures collected in logs/test-failures.log.'
 ---
 
 # Skill: Fix Test Failures
 
-> **Cross-environment.** Reads `logs/test-failures.log`, which is produced by either
-> the local **Test: Run pytest** VS Code task (desktop) or the **On-Demand Lint + Test**
-> GitHub Actions workflow (mobile). Open the PR created by that workflow, then run this skill.
+> **Cross-environment.** Reads `logs/test-failures.log`, produced whenever the test suite
+> runs — locally during a check run, or in CI by the On-Demand Lint + Test workflow (open
+> the PR it creates, then run this skill). Fixing works the same either way.
 
 Fix failing tests collected in `logs/test-failures.log`.
 
@@ -44,8 +44,8 @@ Read these two files **in parallel** (single tool call):
 |---|---|
 | Non-empty, last line is NOT `--- ADDRESSED` | **Fresh** — proceed to known-fix matching below. **Do not re-run any test command.** |
 | Empty | Tests are green — stop. |
-| Last line is `--- ADDRESSED` | **Stale** — regenerate it (desktop: restart app if `app/` changed, then re-run **Test: Run pytest**; CI: push and let the workflow re-run). Stop this turn; restart on the fresh log. |
-| File doesn't exist | Not yet generated — generate it (desktop: run **Test: Run pytest**; CI: the workflow produces it). Stop this turn; restart on the fresh log once present. |
+| Last line is `--- ADDRESSED` | **Stale** — regenerate it (locally: restart the app if `app/` changed, then re-run the suite yourself; CI: push and let the workflow re-run). Stop this turn; restart on the fresh log. |
+| File doesn't exist | Not yet generated — generate it (locally: run the suite yourself; CI: the workflow produces it). Stop this turn; restart on the fresh log once present. |
 
 ### Log quality gate
 
@@ -60,12 +60,13 @@ Before investing in fixes, scan the log for these signals of incomplete diagnost
 If **any** quality problem is found:
 
 1. Identify which test(s) are affected and which output pattern was lost.
-2. Relax the relevant filter in the script named on the log's `# source:` header — widen
-   the line-keep conditions, raise the per-block cap, or preserve the missing frame pattern.
-   `run-tests.ps1` (`Invoke-FlushBlock`) and `ci-digest.py` (`filter_pytest_output`) share
-   this logic — if you change one, change the other to match.
+2. Relax the filter in `scripts/diagnostics.py` (`filter_pytest_output`) — widen the
+   line-keep conditions, raise the per-block cap, or preserve the missing frame pattern.
+   That one module is shared by the local task and CI (the `# source:` header names the
+   runner that called it), so a single change covers every environment. Update its tests
+   in `scripts/hooks/tests/test_diagnostics.py` in the same edit.
 3. Note what was wrong and what you changed, then regenerate the log with the improved
-   filter (desktop: re-run **Test: Run pytest**; CI: push) and restart from Step 1 on the
+   filter (locally: re-run the suite; CI: push) and restart from Step 1 on the
    higher-quality output.
 4. Do not attempt fixes on the current low-quality log — fix the filter first.
 
@@ -161,9 +162,9 @@ Whatever runs the suite next produces the fresh log.
 3. **Rerun selectively — never the whole suite to verify a fix.** You already have the failed
    node IDs from the log; after a fix, rerun exactly those
    (`docker compose exec -T app pytest tests/...::test_a tests/...::test_b`). To gate a pass
-   against regressions, use the changed-only run (the **Fast** task / `run-tests.ps1 -Fast`,
-   i.e. testmon) — it reruns just the tests your edits touched, including any previously-passing
-   one your fix breaks. Reserve a cold full suite for when the testmon graph looks stale.
+   against regressions, use the changed-only (testmon) run — it reruns just the tests your
+   edits touched, including any previously-passing one your fix breaks. Reserve a cold full
+   suite for when the testmon graph looks stale.
 4. If the log is stamped `--- ADDRESSED`, it's stale — regenerate it before fixing (don't fix
    against a stale log).
 5. Only stamp the log after applying at least one code fix.
