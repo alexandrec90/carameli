@@ -550,7 +550,6 @@
           "EVAL_MAX_USD": "8"
         }
       },
-      "group": "test",
       "presentation": {
         "reveal": "always",
         "panel": "new",
@@ -581,7 +580,6 @@
           "EVAL_MAX_USD": "5"
         }
       },
-      "group": "test",
       "presentation": {
         "reveal": "always",
         "panel": "new",

@@ -1,11 +1,4 @@
 {
-  "env": {
-    "MAX_THINKING_TOKENS": "63999",
-    "CLAUDE_CODE_ALWAYS_ENABLE_EFFORT": "1",
-    "CLAUDE_CODE_DISABLE_ADAPTIVE_THINKING": "1",
-    "CLAUDE_CODE_USE_POWERSHELL_TOOL": "1",
-    "CLAUDE_CODE_DISABLE_AUTO_MEMORY": "1"
-  },
   "permissions": {
     "allow": [
       "Bash(*)",
@@ -42,7 +35,7 @@
     ]
   },
   "effortLevel": "high",
-  "defaultModel": "opus",
+  "defaultModel": "sonnet",
   "hooks": {
     "PreToolUse": [
       {
@@ -85,6 +78,5 @@
         ]
       }
     ]
-  },
-  "autoMemoryEnabled": false
+  }
 }
