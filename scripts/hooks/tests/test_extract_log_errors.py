@@ -1,4 +1,5 @@
 """Tests for scripts/extract-log-errors.py pure parsing/filtering."""
+
 from conftest import load_module
 
 mod = load_module("scripts/extract-log-errors.py")

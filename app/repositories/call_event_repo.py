@@ -92,6 +92,27 @@ class CallEventRepo:
         except (TypeError, ValueError):
             return None
 
+    async def list_for_customer(
+        self,
+        customer_id: uuid.UUID,
+        start: datetime | None = None,
+        end: datetime | None = None,
+        limit: int = 100,
+    ) -> list[CallEvent]:
+        """Return a customer's call events, newest first, with an optional date range.
+
+        The date range filters on ``started_at`` (the call start). Rows with a null
+        ``started_at`` are excluded once any bound is supplied.
+        """
+        stmt = select(CallEvent).where(CallEvent.customer_id == customer_id)
+        if start is not None:
+            stmt = stmt.where(CallEvent.started_at >= start)
+        if end is not None:
+            stmt = stmt.where(CallEvent.started_at <= end)
+        stmt = stmt.order_by(CallEvent.created_at.desc()).limit(limit)
+        result = await self.session.execute(stmt)
+        return list(result.scalars().all())
+
     async def get_by_call_sid(self, call_sid: str) -> CallEvent | None:
         result = await self.session.execute(select(CallEvent).where(CallEvent.call_sid == call_sid))
         return result.scalar_one_or_none()

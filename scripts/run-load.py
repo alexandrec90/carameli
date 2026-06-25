@@ -3,6 +3,7 @@
 
 Usage: python scripts/run-load.py [--users N] [--spawn-rate R] [--run-time T] [--host URL]
 """
+
 import argparse
 import subprocess
 import sys
@@ -14,14 +15,21 @@ def build_argv(users: int, spawn_rate: str, run_time: str, host: str) -> list[st
     """Build the locust argv (reports go under reports/)."""
     return [
         str(venv_exe("locust")),
-        "-f", "tests/load/locustfile.py",
+        "-f",
+        "tests/load/locustfile.py",
         "--headless",
-        "-u", str(users),
-        "-r", spawn_rate,
-        "--run-time", run_time,
-        "--host", host,
-        "--html", "reports/load-report.html",
-        "--csv", "reports/load",
+        "-u",
+        str(users),
+        "-r",
+        spawn_rate,
+        "--run-time",
+        run_time,
+        "--host",
+        host,
+        "--html",
+        "reports/load-report.html",
+        "--csv",
+        "reports/load",
     ]
 
 

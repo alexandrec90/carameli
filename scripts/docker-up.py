@@ -8,6 +8,7 @@ clears it. Uses `docker ps --filter` for health polling instead of
 Flags:
   --build   Force a rebuild (after changing requirements*.txt or the Dockerfile)
 """
+
 import re
 import sys
 
@@ -28,8 +29,12 @@ _FAILURE_RE = re.compile(r"unhealthy|Exited|exited|Dead|dead|Created|created", r
 
 def _fail(message: str, body=None) -> int:
     print(f"  {message}")
-    dc.write_artifact(ARTIFACT, dc.format_artifact("Failed task: Start: Full Stack",
-                                                   body if body is not None else [message]))
+    dc.write_artifact(
+        ARTIFACT,
+        dc.format_artifact(
+            "Failed task: Start: Full Stack", body if body is not None else [message]
+        ),
+    )
     print(f"\nErrors written to: {dc.DOCKER_LOG_DIR / ARTIFACT}")
     return 1
 
@@ -52,16 +57,22 @@ def main() -> int:
     # --- Step 1: Pull pre-built registry images (skip locally-built images) ---
     _, _, timed_out = _run_step(
         f"Pulling registry images (timeout {PULL_TIMEOUT}s -- first run may be slow)...",
-        ["docker", "compose", "pull", "--ignore-buildable"], PULL_TIMEOUT)
+        ["docker", "compose", "pull", "--ignore-buildable"],
+        PULL_TIMEOUT,
+    )
     if timed_out:
-        return _fail(f"[TIMEOUT] docker compose pull timed out after {PULL_TIMEOUT}s -- "
-                     "Docker daemon may be stuck or network is very slow.")
+        return _fail(
+            f"[TIMEOUT] docker compose pull timed out after {PULL_TIMEOUT}s -- "
+            "Docker daemon may be stuck or network is very slow."
+        )
 
     # --- Step 2: Build local app image (only with --build) ---
     if build:
         output, code, timed_out = _run_step(
             f"Building app image (timeout {BUILD_TIMEOUT}s)...",
-            ["docker", "compose", "build"], BUILD_TIMEOUT)
+            ["docker", "compose", "build"],
+            BUILD_TIMEOUT,
+        )
         if timed_out:
             return _fail(f"[TIMEOUT] docker compose build timed out after {BUILD_TIMEOUT}s.")
         if code != 0:
@@ -70,7 +81,9 @@ def main() -> int:
     # --- Step 3: Start services ---
     output, code, timed_out = _run_step(
         f"Starting services (timeout {UP_TIMEOUT}s)...",
-        ["docker", "compose", "up", "-d"], UP_TIMEOUT)
+        ["docker", "compose", "up", "-d"],
+        UP_TIMEOUT,
+    )
     if timed_out:
         return _fail(f"[TIMEOUT] docker compose up -d timed out after {UP_TIMEOUT}s.")
     if code != 0:
@@ -101,7 +114,9 @@ def main() -> int:
     # --- Final status check ---
     lines, _, ps_timed_out = dc.docker_ps("{{.Names}}|{{.Status}}")
     if ps_timed_out:
-        return _fail("[TIMEOUT] docker ps timed out during final check -- Docker daemon may be stuck.")
+        return _fail(
+            "[TIMEOUT] docker ps timed out during final check -- Docker daemon may be stuck."
+        )
     entries = dc.parse_status_entries(lines, project)
     failures = dc.sick_services(entries, _FAILURE_RE)
 
@@ -111,8 +126,7 @@ def main() -> int:
         return 0
 
     print(f"\n  [FAIL] Services not running: {', '.join(failures)}")
-    body = [f"Failed services: {', '.join(failures)}", "",
-            "=== docker ps (project containers) ==="]
+    body = [f"Failed services: {', '.join(failures)}", "", "=== docker ps (project containers) ==="]
     ps_table, _, _ = dc.docker_ps("table {{.Names}}\t{{.Status}}\t{{.Ports}}")
     body += [*ps_table, ""]
     for svc in failures:

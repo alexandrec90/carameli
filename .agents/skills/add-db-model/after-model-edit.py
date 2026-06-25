@@ -4,24 +4,25 @@
 Pure decision helpers (`parse_hook_input`, `should_check_git`, `filter_changed`)
 are unit-tested via pytest (`scripts/hooks/tests/test_after_model_edit.py`).
 """
+
 import json
 import re
 import subprocess
 import sys
 from pathlib import Path
 
-ALLOWED_TOOLS = {'Edit', 'Write', 'MultiEdit', 'apply_patch', 'create_file'}
-MODEL_PATH_RE = re.compile(r'app[/\\]+models[/\\]+[^/\\]+\.py')
-REPO_ROOT = (Path(__file__).parent / '../../..').resolve()
-MARKER = Path(__file__).parent / '.migration-needed'
+ALLOWED_TOOLS = {"Edit", "Write", "MultiEdit", "apply_patch", "create_file"}
+MODEL_PATH_RE = re.compile(r"app[/\\]+models[/\\]+[^/\\]+\.py")
+REPO_ROOT = (Path(__file__).parent / "../../..").resolve()
+MARKER = Path(__file__).parent / ".migration-needed"
 
 REMINDER_TEXT = (
-    '\n'
-    'MIGRATION NEEDED: app/models/ files have uncommitted changes.\n'
-    'Once all model edits are complete, generate the migration:\n'
+    "\n"
+    "MIGRATION NEEDED: app/models/ files have uncommitted changes.\n"
+    "Once all model edits are complete, generate the migration:\n"
     '  docker compose exec -T app alembic revision --autogenerate -m "<description>"\n'
-    'Then open the new file in alembic/versions/ and verify columns, FK behaviour,\n'
-    'indexes, and gen_random_uuid() defaults before applying with: alembic upgrade head\n'
+    "Then open the new file in alembic/versions/ and verify columns, FK behaviour,\n"
+    "indexes, and gen_random_uuid() defaults before applying with: alembic upgrade head\n"
 )
 
 
@@ -44,25 +45,27 @@ def should_check_git(hook_input) -> bool:
     if not hook_input:
         return True
 
-    tool_name = hook_input.get('tool_name') or hook_input.get('toolName', '')
+    tool_name = hook_input.get("tool_name") or hook_input.get("toolName", "")
     if tool_name and tool_name not in ALLOWED_TOOLS:
         return False
 
-    tool_input = hook_input.get('tool_input') or hook_input.get('toolInput') or {}
+    tool_input = hook_input.get("tool_input") or hook_input.get("toolInput") or {}
     return bool(MODEL_PATH_RE.search(json.dumps(tool_input)))
 
 
 def filter_changed(porcelain_output: str) -> list[str]:
     """Keep only meaningful model-change lines from `git status --porcelain`."""
-    return [ln for ln in porcelain_output.splitlines() if ln and '__init__.py' not in ln]
+    return [ln for ln in porcelain_output.splitlines() if ln and "__init__.py" not in ln]
 
 
 def get_changed(repo_root: Path):
     """Return filtered changed-model lines, or None on git failure."""
     try:
         result = subprocess.run(
-            ['git', 'status', '--porcelain', '--', 'app/models/*.py'],
-            cwd=repo_root, capture_output=True, text=True
+            ["git", "status", "--porcelain", "--", "app/models/*.py"],
+            cwd=repo_root,
+            capture_output=True,
+            text=True,
         )
     except OSError:
         return None
@@ -85,10 +88,9 @@ def main() -> int:
     if MARKER.exists():
         return 0
 
-    MARKER.write_text('pending')
-    print(REMINDER_TEXT)
+    MARKER.write_text("pending")
     return 0
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(main())

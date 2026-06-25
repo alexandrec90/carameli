@@ -6,6 +6,7 @@ If every failing hook only auto-reformatted files, the changes are staged and th
 failed hooks re-run before reporting. The pure parsing/classification/rendering
 helpers are unit-tested in `scripts/hooks/tests/test_pre_commit_runner.py`.
 """
+
 import os
 import re
 import subprocess
@@ -18,7 +19,8 @@ CONFIG = REPO_ROOT / ".pre-commit-config.yaml"
 
 _RESULT_RE = re.compile(r"^(.+?)\.{3,}.*(Passed|Failed|Skipped)")
 _MISCONFIG_RE = re.compile(
-    r"unrecognized subcommand|unknown option|not found|command not found|No such file")
+    r"unrecognized subcommand|unknown option|not found|command not found|No such file"
+)
 
 
 def parse_hook_blocks(lines: list[str]) -> dict[str, list[str]]:
@@ -65,8 +67,9 @@ def build_name_to_id(config_text: str) -> dict[str, str]:
     return mapping
 
 
-def render_artifact(hooks: dict[str, list[str]], tags: dict[str, str],
-                    auto_fixed_files: list[str]) -> str:
+def render_artifact(
+    hooks: dict[str, list[str]], tags: dict[str, str], auto_fixed_files: list[str]
+) -> str:
     """Render the structured per-hook artifact body."""
     out: list[str] = []
     for hook_id, body in hooks.items():
@@ -81,9 +84,12 @@ def render_artifact(hooks: dict[str, list[str]], tags: dict[str, str],
                 out += [f"  {bl}" for bl in body]
             out += ["", "Action: stage the modified files and re-commit."]
         elif tag == "misconfigured":
-            out += ["The hook itself errored (not a source-code issue).",
-                    f"Fix target: .pre-commit-config.yaml (entry for `{hook_id}`)", "",
-                    "Hook output:"]
+            out += [
+                "The hook itself errored (not a source-code issue).",
+                f"Fix target: .pre-commit-config.yaml (entry for `{hook_id}`)",
+                "",
+                "Hook output:",
+            ]
             out += [f"  {bl}" for bl in body]
         else:
             out += body
@@ -99,8 +105,14 @@ def _activate_venv() -> None:
 
 
 def _git_dirty_files() -> list[str]:
-    p = subprocess.run(["git", "diff", "--name-only"], cwd=REPO_ROOT,
-                       stdout=subprocess.PIPE, text=True, encoding="utf-8", errors="replace")
+    p = subprocess.run(
+        ["git", "diff", "--name-only"],
+        cwd=REPO_ROOT,
+        stdout=subprocess.PIPE,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
     return [f for f in (p.stdout or "").splitlines() if f.strip()]
 
 
@@ -127,10 +139,20 @@ def _changed_since(before: dict[str, float]) -> list[str]:
 
 
 def _run_pre_commit(extra_args=None) -> tuple[list[str], int]:
-    cmd = ["pre-commit", "run", "--all-files"] if not extra_args else \
-          ["pre-commit", "run", *extra_args, "--all-files"]
-    p = subprocess.run(cmd, cwd=REPO_ROOT, stdout=subprocess.PIPE,
-                       stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace")
+    cmd = (
+        ["pre-commit", "run", "--all-files"]
+        if not extra_args
+        else ["pre-commit", "run", *extra_args, "--all-files"]
+    )
+    p = subprocess.run(
+        cmd,
+        cwd=REPO_ROOT,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
     return (p.stdout or "").splitlines(), p.returncode
 
 
@@ -173,8 +195,12 @@ def main() -> int:
         name_to_id = build_name_to_id(CONFIG.read_text(encoding="utf-8")) if CONFIG.exists() else {}
         print(f"  Auto-fixed files detected -- staging and re-running: {', '.join(hooks)}...")
         for f in auto_fixed_files:
-            subprocess.run(["git", "add", "--", f], cwd=REPO_ROOT,
-                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            subprocess.run(
+                ["git", "add", "--", f],
+                cwd=REPO_ROOT,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
         retry_lines: list[str] = []
         retry_ok = True
         for name in hooks:

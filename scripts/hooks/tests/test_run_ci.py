@@ -1,4 +1,5 @@
 """Tests for scripts/run-ci.py stage definitions and reachability check."""
+
 from conftest import load_module
 
 mod = load_module("scripts/run-ci.py")
@@ -17,5 +18,6 @@ def test_e2e_stage_targets_smoke():
 def test_frontend_reachable_false_on_oserror(monkeypatch):
     def boom(*a, **k):
         raise OSError("refused")
+
     monkeypatch.setattr(mod.urllib.request, "urlopen", boom)
     assert mod.frontend_reachable("http://localhost:1") is False

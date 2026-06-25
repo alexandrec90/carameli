@@ -13,6 +13,7 @@ CLAUDE.md / .claude/ are the source of truth; run this after editing them.
 The pure tree helpers are unit-tested in
 `scripts/hooks/tests/test_sync_agents_context.py`.
 """
+
 import shutil
 import subprocess
 import sys
@@ -49,8 +50,9 @@ def mirror_tree(src: Path, dest: Path, exclude_names=frozenset()) -> None:
     Files named in `exclude_names` are neither copied nor deleted (caller owns them).
     """
     dest.mkdir(parents=True, exist_ok=True)
-    src_rel = {p.relative_to(src) for p in src.rglob("*") if p.is_file()
-               and p.name not in exclude_names}
+    src_rel = {
+        p.relative_to(src) for p in src.rglob("*") if p.is_file() and p.name not in exclude_names
+    }
 
     # Copy new/changed files.
     for rel in src_rel:
@@ -60,13 +62,17 @@ def mirror_tree(src: Path, dest: Path, exclude_names=frozenset()) -> None:
 
     # Delete orphan files (present in dest, absent in src).
     for path in list(dest.rglob("*")):
-        if (path.is_file() and path.name not in exclude_names
-                and path.relative_to(dest) not in src_rel):
+        if (
+            path.is_file()
+            and path.name not in exclude_names
+            and path.relative_to(dest) not in src_rel
+        ):
             path.unlink()
 
     # Remove now-empty directories (deepest first).
-    for path in sorted((p for p in dest.rglob("*") if p.is_dir()),
-                       key=lambda p: len(p.parts), reverse=True):
+    for path in sorted(
+        (p for p in dest.rglob("*") if p.is_dir()), key=lambda p: len(p.parts), reverse=True
+    ):
         if not any(path.iterdir()):
             path.rmdir()
 
@@ -87,8 +93,12 @@ def main() -> int:
     claude_settings = claude_dir / "settings.json"
     if claude_settings.exists():
         result = subprocess.run(
-            [sys.executable, str(REPO_ROOT / "scripts" / "sync-agents-settings.py"),
-             str(claude_settings), str(agents_dir / "settings.json")],
+            [
+                sys.executable,
+                str(REPO_ROOT / "scripts" / "sync-agents-settings.py"),
+                str(claude_settings),
+                str(agents_dir / "settings.json"),
+            ],
             cwd=REPO_ROOT,
         )
         if result.returncode != 0:

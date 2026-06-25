@@ -1,4 +1,5 @@
 """Tests for scripts/run-e2e.py pure parsing/classification helpers."""
+
 from conftest import load_module
 
 mod = load_module("scripts/run-e2e.py")
@@ -14,6 +15,18 @@ def test_get_fix_hint_5xx():
 
 def test_get_fix_hint_default():
     assert "underlying application code" in mod.get_fix_hint("totally unrelated text")
+
+
+def test_get_unreachable_preflight_urls_empty_when_all_reachable():
+    assert mod.get_unreachable_preflight_urls(lambda _url, _timeout: True) == []
+
+
+def test_get_unreachable_preflight_urls_lists_failed_endpoints():
+    def fake_check(url: str, _timeout: int) -> bool:
+        return url == mod.BACKEND_HEALTH
+
+    unreachable = mod.get_unreachable_preflight_urls(fake_check)
+    assert unreachable == [f"frontend dev server ({mod.VITE_URL})"]
 
 
 def test_count_results():

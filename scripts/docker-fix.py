@@ -5,6 +5,7 @@ More aggressive than docker-restart-engine.py: kills vmmem, force-terminates WSL
 with a timeout, resets cached state, and polls until the engine responds.
 On failure writes output to logs/docker/fix.log; on success clears it. Windows-only.
 """
+
 import shutil
 import sys
 import time
@@ -24,7 +25,12 @@ from docker_win import (
 )
 
 ARTIFACT = "fix.log"
-DOCKER_PROCESSES = ["Docker Desktop", "com.docker.backend", "com.docker.service", "com.docker.proxy"]
+DOCKER_PROCESSES = [
+    "Docker Desktop",
+    "com.docker.backend",
+    "com.docker.service",
+    "com.docker.proxy",
+]
 POLL_TIMEOUT = 90
 POLL_INTERVAL = 5
 
@@ -108,7 +114,9 @@ def main() -> int:
 
     if not errors:
         errors += [f"=== Engine did not respond within {POLL_TIMEOUT}s ===", ""]
-    dc.write_artifact(ARTIFACT, dc.format_artifact("Failed task: Docker: Fix Stalled Desktop", errors))
+    dc.write_artifact(
+        ARTIFACT, dc.format_artifact("Failed task: Docker: Fix Stalled Desktop", errors)
+    )
     print(dc.banner("ENGINE STILL NOT RESPONDING"))
     print("  Last resort: reboot the machine.\n")
     return 1

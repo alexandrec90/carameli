@@ -1,4 +1,5 @@
 """Tests for scripts/archive-done-todos.py pure archive_todos."""
+
 import pytest
 from conftest import load_module
 

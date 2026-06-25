@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import uuid
+from datetime import datetime
 from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -10,6 +11,16 @@ from app.models.call_event import CallEvent
 from app.repositories.call_event_repo import CallEventRepo
 
 logger = logging.getLogger(__name__)
+
+
+async def list_for_customer(
+    session: AsyncSession,
+    customer_id: uuid.UUID,
+    start: datetime | None = None,
+    end: datetime | None = None,
+    limit: int = 100,
+) -> list[CallEvent]:
+    return await CallEventRepo(session).list_for_customer(customer_id, start, end, limit)
 
 
 async def get_by_call_sid(session: AsyncSession, call_sid: str) -> CallEvent | None:

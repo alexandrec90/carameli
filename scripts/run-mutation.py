@@ -4,6 +4,7 @@
 Exits 0 even if mutants survive -- surviving mutants are informational, not a hard
 failure, until the score target (>80%) is met.
 """
+
 import subprocess
 import sys
 
@@ -16,13 +17,19 @@ def main() -> int:
 
     run = subprocess.run([mutmut, "run"], cwd=REPO_ROOT)
     if run.returncode != 0:
-        print("mutmut run returned a non-zero status "
-              "(expected while mutation score target is still in progress).")
+        print(
+            "mutmut run returned a non-zero status "
+            "(expected while mutation score target is still in progress)."
+        )
 
     results = subprocess.run(
-        [mutmut, "results"], cwd=REPO_ROOT,
-        stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
-        encoding="utf-8", errors="replace",
+        [mutmut, "results"],
+        cwd=REPO_ROOT,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
     )
     output = results.stdout or ""
     print(output, end="")

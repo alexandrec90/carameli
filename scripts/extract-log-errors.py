@@ -5,6 +5,7 @@ message, filters to the most recent window, and writes logs/log-errors.log.
 Log files are never modified. The pure parsing/filtering functions are unit-tested
 in `scripts/hooks/tests/test_extract_log_errors.py`.
 """
+
 import re
 import sys
 from datetime import datetime, timedelta

@@ -3,6 +3,7 @@
 
 On failure writes output to logs/docker/down.log; on success clears it.
 """
+
 import sys
 
 import docker_common as dc
@@ -26,10 +27,13 @@ def main() -> int:
         return 0
 
     print(f"  [FAIL] docker compose down exited with code {code}")
-    dc.write_artifact(ARTIFACT, dc.format_artifact(
-        "Failed task: Stop: Docker Stack",
-        ["=== docker compose down ===", *output],
-    ))
+    dc.write_artifact(
+        ARTIFACT,
+        dc.format_artifact(
+            "Failed task: Stop: Docker Stack",
+            ["=== docker compose down ===", *output],
+        ),
+    )
     print(f"\nErrors written to: {dc.DOCKER_LOG_DIR / ARTIFACT}")
     print(dc.banner("STOP FAILED"))
     return code

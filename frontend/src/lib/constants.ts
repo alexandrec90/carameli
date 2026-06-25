@@ -1,0 +1,1 @@
+export const DEMO_VS_CUSTOMER_ID = 1

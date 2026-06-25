@@ -4,10 +4,11 @@ import Dashboard from './views/Dashboard'
 import PhoneLines from './views/PhoneLines'
 import Extensions from './views/Extensions'
 import Placeholder from './views/Placeholder'
+import DataPage from './views/DataPage'
 
 const skin: Skin = {
   Layout,
-  views: { Dashboard, PhoneLines, Extensions, Placeholder },
+  views: { Dashboard, PhoneLines, Extensions, Placeholder, DataPage },
 }
 
 export default skin

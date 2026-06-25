@@ -1,15 +1,20 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Path, Request
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth import AuthContext, enforce_customer_scope, get_auth_context
 from app.core.config import settings
 from app.core.database import get_session
-from app.schemas.call_event import CallRecordingResponse
+from app.schemas.call_event import (
+    CallEventListResponse,
+    CallEventResponse,
+    CallRecordingResponse,
+)
 from app.schemas.outbound_call import OutboundCallRequest, OutboundCallResponse
 from app.services import (
     call_event_service,
@@ -100,6 +105,39 @@ async def initiate_outbound_call(
         body.destination_number,
     )
     return OutboundCallResponse(call_sid=result["call_id"], status=result["status"])
+
+
+@router.get(
+    "/List/{customerId}",
+    response_model=CallEventListResponse,
+    responses={404: {"description": "Customer not found"}},
+)
+async def list_call_events(
+    customerId: Annotated[int, Path(ge=1, le=2147483647)],
+    session: Annotated[AsyncSession, Depends(get_session)],
+    auth: Annotated[AuthContext, Depends(get_auth_context)],
+    start: Annotated[datetime | None, Query()] = None,
+    end: Annotated[datetime | None, Query()] = None,
+    limit: Annotated[int, Query(ge=1, le=500)] = 100,
+) -> CallEventListResponse:
+    """List a customer's call events, newest first, with an optional started_at date range."""
+    enforce_customer_scope(auth, customerId)
+    logger.info(
+        "Listing call events vs_customer_id=%s start=%s end=%s limit=%s",
+        customerId,
+        start,
+        end,
+        limit,
+    )
+    customer = await customer_service.get_by_vs_id(session, customerId)
+    if not customer:
+        logger.warning("Customer not found vs_customer_id=%s", customerId)
+        raise HTTPException(status_code=404, detail="Customer not found")
+    events = await call_event_service.list_for_customer(session, customer.id, start, end, limit)
+    return CallEventListResponse(
+        events=[CallEventResponse.model_validate(e) for e in events],
+        vs_customer_id=customerId,
+    )
 
 
 @router.get(

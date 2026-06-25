@@ -1,7 +1,7 @@
 ---
 name: audit-design-flaws
 disable-model-invocation: true
-description: 'Grep-based audit for systematic AI-generated design flaws (file bloat, hardcoded constants, naming inconsistency, ghost code, type erasure, state-sync useEffects, helper proliferation). Use periodically on a vibe-coded codebase to detect and prevent architectural decay. Source of truth: docs/Systematic AI-Generated Design Flaws.md.'
+description: 'Grep-based audit for systematic AI-generated design flaws (file bloat, hardcoded constants, naming inconsistency, ghost code, type erasure, state-sync useEffects, helper proliferation). Use periodically on a vibe-coded codebase to detect and prevent architectural decay. Source of truth: sibling design-flaws-catalog.md.'
 argument-hint: '(no arguments)'
 ---
 
@@ -10,7 +10,7 @@ argument-hint: '(no arguments)'
 Detect the recurring anti-patterns LLMs accumulate over long sessions.
 Each check is a one-shot grep — no file-reading loops, no investigation spirals.
 
-> **Source of truth:** `docs/Systematic AI-Generated Design Flaws.md`. Re-read it
+> **Source of truth:** `.claude/skills/audit-design-flaws/design-flaws-catalog.md`. Re-read it
 > first to pick up new entries the user added.
 
 ---
@@ -29,7 +29,7 @@ This skill accepts no arguments and always runs in a single flow:
 
 In parallel:
 
-1. Read `docs/Systematic AI-Generated Design Flaws.md` (catalog of flaws to check).
+1. Read `.claude/skills/audit-design-flaws/design-flaws-catalog.md` (catalog of flaws to check).
 2. Read `.claude/skills/audit-design-flaws/known-flaws.md` (per-flaw `Hits` /
    `Last seen` table — lets us spot recurring offenders).
 3. Read `.claude/skills/audit-design-flaws/state.json` (incremental scan cache;
@@ -431,7 +431,7 @@ guardrail for a check that didn't fire — keep the rule files lean.
 ### Update the catalog
 
 Append the newly enforced guardrail as a "Mitigation" column in
-`docs/Systematic AI-Generated Design Flaws.md` so the source of truth tracks
+`.claude/skills/audit-design-flaws/design-flaws-catalog.md` so the source of truth tracks
 what is now enforced. Format:
 
 ```markdown

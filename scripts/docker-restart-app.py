@@ -4,6 +4,7 @@
 On failure writes output to logs/docker/restart.log; on success clears it.
 Uses `docker ps --filter` for status to avoid Compose v2 hangs.
 """
+
 import sys
 
 import docker_common as dc
@@ -27,8 +28,9 @@ def app_broken(status_lines) -> bool:
 
 
 def _app_status() -> list[str]:
-    status, _, _ = dc.docker_ps("{{.Status}}", all_containers=False,
-                                extra_filters=[dc.service_filter("app")])
+    status, _, _ = dc.docker_ps(
+        "{{.Status}}", all_containers=False, extra_filters=[dc.service_filter("app")]
+    )
     return status
 
 
@@ -40,14 +42,19 @@ def main() -> int:
 
     if not app_present(_app_status()):
         status = _app_status()
-        msg = (f"service 'app' is not running (status: {' '.join(status)}). "
-               "Run the 'Start: Full Stack' task first.")
+        msg = (
+            f"service 'app' is not running (status: {' '.join(status)}). "
+            "Run the 'Start: Full Stack' task first."
+        )
         print(f"  [FAIL] {msg}")
         ps_table, _, _ = dc.docker_ps("table {{.Names}}\t{{.Status}}")
-        dc.write_artifact(ARTIFACT, dc.format_artifact(
-            "Failed task: Restart: App Container",
-            [msg, "", "=== docker ps (project containers) ===", *ps_table],
-        ))
+        dc.write_artifact(
+            ARTIFACT,
+            dc.format_artifact(
+                "Failed task: Restart: App Container",
+                [msg, "", "=== docker ps (project containers) ===", *ps_table],
+            ),
+        )
         print(f"\nErrors written to: {dc.DOCKER_LOG_DIR / ARTIFACT}")
         return 1
 
@@ -58,10 +65,13 @@ def main() -> int:
 
     if code != 0:
         print(f"  [FAIL] docker compose restart app exited with code {code}")
-        dc.write_artifact(ARTIFACT, dc.format_artifact(
-            "Failed task: Restart: App Container",
-            ["=== docker compose restart app ===", *output],
-        ))
+        dc.write_artifact(
+            ARTIFACT,
+            dc.format_artifact(
+                "Failed task: Restart: App Container",
+                ["=== docker compose restart app ===", *output],
+            ),
+        )
         print(f"\nErrors written to: {dc.DOCKER_LOG_DIR / ARTIFACT}")
         return code
 
@@ -73,12 +83,21 @@ def main() -> int:
         print(f"  [FAIL] app is {' '.join(status)} after restart")
         ps_table, _, _ = dc.docker_ps("table {{.Names}}\t{{.Status}}")
         logs = dc.docker_logs(f"{project}-app-1", tail=40)
-        dc.write_artifact(ARTIFACT, dc.format_artifact(
-            "Failed task: Restart: App Container",
-            [f"App status after restart: {' '.join(status)}", "",
-             "=== docker ps (project containers) ===", *ps_table, "",
-             "=== logs: app (last 40 lines) ===", *logs],
-        ))
+        dc.write_artifact(
+            ARTIFACT,
+            dc.format_artifact(
+                "Failed task: Restart: App Container",
+                [
+                    f"App status after restart: {' '.join(status)}",
+                    "",
+                    "=== docker ps (project containers) ===",
+                    *ps_table,
+                    "",
+                    "=== logs: app (last 40 lines) ===",
+                    *logs,
+                ],
+            ),
+        )
         print(f"\nErrors written to: {dc.DOCKER_LOG_DIR / ARTIFACT}")
         print(dc.banner("RESTART FAILED"))
         return 1

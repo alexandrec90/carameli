@@ -1,4 +1,5 @@
 """Tests for scripts/run-load.py argv construction."""
+
 from conftest import load_module
 
 mod = load_module("scripts/run-load.py")

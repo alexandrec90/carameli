@@ -5,6 +5,7 @@ Steps: kill processes -> wsl --shutdown -> restart service -> relaunch -> poll.
 Requires elevation (Admin) for the service stop/start; without it, falls back to
 process-kill + relaunch only. Windows-only by nature (drives Docker Desktop).
 """
+
 import sys
 
 import docker_common as dc

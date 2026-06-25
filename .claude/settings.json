@@ -43,7 +43,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 scripts/hooks/enforce-capped-bash.py"
+            "command": "python3 \"${CLAUDE_PROJECT_DIR:-.}/scripts/hooks/enforce-capped-bash.py\""
           }
         ]
       },
@@ -52,7 +52,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 scripts/hooks/pretool.py"
+            "command": "python3 \"${CLAUDE_PROJECT_DIR:-.}/scripts/hooks/pretool.py\""
           }
         ]
       }
@@ -63,7 +63,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 .claude/skills/add-db-model/after-model-edit.py"
+            "command": "python3 \"${CLAUDE_PROJECT_DIR:-.}/.claude/skills/add-db-model/after-model-edit.py\""
           }
         ]
       }
@@ -73,7 +73,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 scripts/hooks/stop.py"
+            "command": "python3 \"${CLAUDE_PROJECT_DIR:-.}/scripts/hooks/stop.py\""
           }
         ]
       }

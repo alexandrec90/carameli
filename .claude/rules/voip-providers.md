@@ -18,8 +18,6 @@ Carameli uses a two-layer provider abstraction so the carrier (who owns the
 phone numbers / SIP trunk) and the call engine (what controls the call) can be
 swapped independently via environment variables.
 
-See `docs/voip-migration-plan.md` for the full migration rationale and phased plan.
-
 ## Provider Layers
 
 | Layer | Env var | Active impl |

@@ -4,6 +4,7 @@
 Notifications are a task-layer concern -- the VS Code task wraps this with
 scripts/notify-wrap.py. Do not emit a toast from inside the script.
 """
+
 import subprocess
 import sys
 from pathlib import Path

@@ -10,6 +10,7 @@ Usage (tasks.json):
 Example:
   python scripts/notify-wrap.py "Test: Run pytest" -- python scripts/run-tests.py
 """
+
 import os
 import subprocess
 import sys
@@ -28,7 +29,7 @@ def main() -> int:
 
     sep = sys.argv.index("--")
     title = " ".join(sys.argv[1:sep])
-    cmd = sys.argv[sep + 1:]
+    cmd = sys.argv[sep + 1 :]
 
     if not title or not cmd:
         return 2

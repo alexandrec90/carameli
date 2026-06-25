@@ -1,4 +1,5 @@
 """Tests for scripts/script_common.py venv path resolution."""
+
 from conftest import load_module
 
 sc = load_module("scripts/script_common.py")

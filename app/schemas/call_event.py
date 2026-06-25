@@ -26,6 +26,11 @@ class CallEventResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class CallEventListResponse(BaseModel):
+    events: list[CallEventResponse]
+    vs_customer_id: int
+
+
 class CallRecordingResponse(BaseModel):
     call_sid: str
     recording_url: str

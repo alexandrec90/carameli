@@ -1,4 +1,5 @@
 """Tests for scripts/docker_common.py pure helpers."""
+
 import re
 
 from conftest import load_module

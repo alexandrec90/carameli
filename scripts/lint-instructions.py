@@ -21,6 +21,7 @@ Pure functions are exposed for pytest (`scripts/hooks/tests/test_lint_instructio
 the __main__ guard walks the repo, prints findings as `path:line: [check] message`, and
 exits 1 if any are found.
 """
+
 from __future__ import annotations
 
 import re
@@ -36,17 +37,17 @@ SKILL_MAX_LINES = 500
 # Fixer skills with no seedable log artifact, so the known-fixes short-circuit does
 # not apply (documented in evals/README.md): an aggregate dispatcher, a live-diagnostics
 # reader, and an autonomous runner-driven loop.
-FIXER_EXEMPT = {'fix-all', 'fix-problems', 'fix-tests-auto'}
+FIXER_EXEMPT = {"fix-all", "fix-problems", "fix-tests-auto"}
 
 # Directories never walked for instruction files.
-SKIP_DIRS = {'node_modules', '.git', '.venv', 'dist', 'build', '__pycache__'}
+SKIP_DIRS = {"node_modules", ".git", ".venv", "dist", "build", "__pycache__"}
 
-LINK_RE = re.compile(r'\[[^\]]*\]\(([^)]+)\)')
-FM_KEY_RE = re.compile(r'^([A-Za-z_][\w-]*):\s*(.*)$')
+LINK_RE = re.compile(r"\[[^\]]*\]\(([^)]+)\)")
+FM_KEY_RE = re.compile(r"^([A-Za-z_][\w-]*):\s*(.*)$")
 
 
 class Finding(NamedTuple):
-    path: str   # repo-relative, forward slashes
+    path: str  # repo-relative, forward slashes
     line: int
     check: str
     message: str
@@ -63,32 +64,32 @@ def parse_frontmatter(text: str) -> dict | None:
     the small, flat frontmatter these files use — not a general YAML parser.
     """
     lines = text.splitlines()
-    if not lines or lines[0].strip() != '---':
+    if not lines or lines[0].strip() != "---":
         return None
     fm: dict = {}
     last_key: str | None = None
     for line in lines[1:]:
-        if line.strip() == '---':
+        if line.strip() == "---":
             break
-        if not line.strip() or line.lstrip().startswith('#'):
+        if not line.strip() or line.lstrip().startswith("#"):
             continue
         stripped = line.strip()
-        if stripped.startswith('- ') and last_key is not None:
+        if stripped.startswith("- ") and last_key is not None:
             fm.setdefault(last_key, [])
             if isinstance(fm[last_key], list):
-                fm[last_key].append(stripped[2:].strip().strip('\'"'))
+                fm[last_key].append(stripped[2:].strip().strip("'\""))
             continue
-        if not line.startswith((' ', '\t')):
+        if not line.startswith((" ", "\t")):
             m = FM_KEY_RE.match(line)
             if m:
-                key, val = m.group(1), m.group(2).strip().strip('\'"')
+                key, val = m.group(1), m.group(2).strip().strip("'\"")
                 last_key = key
                 fm[key] = val if val else []
     return fm
 
 
 def _truthy(val) -> bool:
-    return isinstance(val, str) and val.lower() in ('true', 'yes', '1')
+    return isinstance(val, str) and val.lower() in ("true", "yes", "1")
 
 
 def _nonempty_str(val) -> bool:
@@ -105,44 +106,57 @@ def _nonempty_list(val) -> bool:
 def check_frontmatter(rel: str, text: str) -> list[Finding]:
     """Schema for rule and skill frontmatter. CLAUDE.md needs none."""
     out: list[Finding] = []
-    rel = rel.replace('\\', '/')
-    is_rule = '/.claude/rules/' in f'/{rel}' or rel.startswith('.claude/rules/')
-    is_skill = rel.endswith('/SKILL.md') and '.claude/skills/' in rel
+    rel = rel.replace("\\", "/")
+    is_rule = "/.claude/rules/" in f"/{rel}" or rel.startswith(".claude/rules/")
+    is_skill = rel.endswith("/SKILL.md") and ".claude/skills/" in rel
 
     if not (is_rule or is_skill):
         return out
 
     fm = parse_frontmatter(text)
     if fm is None:
-        out.append(Finding(rel, 1, 'frontmatter', 'missing YAML frontmatter block (--- ... ---)'))
+        out.append(Finding(rel, 1, "frontmatter", "missing YAML frontmatter block (--- ... ---)"))
         return out
 
     if is_rule:
-        if not _nonempty_str(fm.get('description')):
-            out.append(Finding(rel, 1, 'frontmatter', "rule missing non-empty 'description'"))
-        if not _nonempty_list(fm.get('paths')):
-            out.append(Finding(rel, 1, 'frontmatter',
-                               "rule missing non-empty 'paths' (omit only for a truly global rule)"))
+        if not _nonempty_str(fm.get("description")):
+            out.append(Finding(rel, 1, "frontmatter", "rule missing non-empty 'description'"))
+        if not _nonempty_list(fm.get("paths")):
+            out.append(
+                Finding(
+                    rel,
+                    1,
+                    "frontmatter",
+                    "rule missing non-empty 'paths' (omit only for a truly global rule)",
+                )
+            )
     if is_skill:
-        if not _nonempty_str(fm.get('name')):
-            out.append(Finding(rel, 1, 'frontmatter', "skill missing non-empty 'name'"))
-        if not _nonempty_str(fm.get('description')):
-            out.append(Finding(rel, 1, 'frontmatter', "skill missing non-empty 'description'"))
-        if not _truthy(fm.get('disable-model-invocation')):
-            out.append(Finding(rel, 1, 'frontmatter',
-                               "skill must set 'disable-model-invocation: true'"))
+        if not _nonempty_str(fm.get("name")):
+            out.append(Finding(rel, 1, "frontmatter", "skill missing non-empty 'name'"))
+        if not _nonempty_str(fm.get("description")):
+            out.append(Finding(rel, 1, "frontmatter", "skill missing non-empty 'description'"))
+        if not _truthy(fm.get("disable-model-invocation")):
+            out.append(
+                Finding(rel, 1, "frontmatter", "skill must set 'disable-model-invocation: true'")
+            )
     return out
 
 
 def check_size(rel: str, text: str) -> list[Finding]:
-    rel = rel.replace('\\', '/')
+    rel = rel.replace("\\", "/")
     n = len(text.splitlines())
-    if rel == 'CLAUDE.md' or rel.endswith('/CLAUDE.md'):
+    if rel == "CLAUDE.md" or rel.endswith("/CLAUDE.md"):
         if n > CLAUDE_MAX_LINES:
-            return [Finding(rel, n, 'size', f'CLAUDE.md is {n} lines (cap {CLAUDE_MAX_LINES})')]
-    elif rel.endswith('/SKILL.md') and n > SKILL_MAX_LINES:
-        return [Finding(rel, n, 'size',
-                       f'SKILL.md is {n} lines (cap {SKILL_MAX_LINES}); use progressive disclosure')]
+            return [Finding(rel, n, "size", f"CLAUDE.md is {n} lines (cap {CLAUDE_MAX_LINES})")]
+    elif rel.endswith("/SKILL.md") and n > SKILL_MAX_LINES:
+        return [
+            Finding(
+                rel,
+                n,
+                "size",
+                f"SKILL.md is {n} lines (cap {SKILL_MAX_LINES}); use progressive disclosure",
+            )
+        ]
     return []
 
 
@@ -151,21 +165,24 @@ def check_links(file_path: Path, text: str, repo_root: Path) -> list[Finding]:
     rel = file_path.relative_to(repo_root).as_posix()
     out: list[Finding] = []
     for m in LINK_RE.finditer(text):
-        target = m.group(1).strip().split()[0] if m.group(1).strip() else ''
-        if (not target or target.startswith(('#', 'http://', 'https://', 'mailto:', '<'))
-                or '://' in target):
+        target = m.group(1).strip().split()[0] if m.group(1).strip() else ""
+        if (
+            not target
+            or target.startswith(("#", "http://", "https://", "mailto:", "<"))
+            or "://" in target
+        ):
             continue
-        target = target.split('#', 1)[0]  # drop #anchor / #L42
+        target = target.split("#", 1)[0]  # drop #anchor / #L42
         if not target:
             continue
         # Only treat path-shaped targets as file links — skip regexes/globs/code that
         # happen to sit inside `](...)` (e.g. `](.*key.*|.*secret.*)`).
-        if not re.fullmatch(r'[\w./~-]+', target):
+        if not re.fullmatch(r"[\w./~-]+", target):
             continue
         candidates = [(file_path.parent / target), (repo_root / target)]
         if not any(c.exists() for c in candidates):
-            line = text[:m.start()].count('\n') + 1
-            out.append(Finding(rel, line, 'dead-link', f'link target not found: {target}'))
+            line = text[: m.start()].count("\n") + 1
+            out.append(Finding(rel, line, "dead-link", f"link target not found: {target}"))
     return out
 
 
@@ -177,30 +194,42 @@ def check_skill_structure(skill_dir: Path, text: str, repo_root: Path) -> list[F
     plan-handoff and the exempt fixers legitimately *reference* other skills'
     known-fixes.md without owning one.
     """
-    rel = (skill_dir / 'SKILL.md').relative_to(repo_root).as_posix()
+    rel = (skill_dir / "SKILL.md").relative_to(repo_root).as_posix()
     out: list[Finding] = []
     name = skill_dir.name
 
     fm = parse_frontmatter(text) or {}
-    if _nonempty_str(fm.get('name')) and fm['name'] != name:
-        out.append(Finding(rel, 1, 'structure',
-                           f"frontmatter name '{fm['name']}' != directory '{name}'"))
+    if _nonempty_str(fm.get("name")) and fm["name"] != name:
+        out.append(
+            Finding(rel, 1, "structure", f"frontmatter name '{fm['name']}' != directory '{name}'")
+        )
 
-    if name.startswith('fix-') and name not in FIXER_EXEMPT and not (skill_dir / 'known-fixes.md').exists():
-        out.append(Finding(rel, 1, 'structure',
-                           'fixer skill has no sibling known-fixes.md (authoring.md mandates one); '
-                           'add it, or add the skill to FIXER_EXEMPT if it has no seedable log'))
+    if (
+        name.startswith("fix-")
+        and name not in FIXER_EXEMPT
+        and not (skill_dir / "known-fixes.md").exists()
+    ):
+        out.append(
+            Finding(
+                rel,
+                1,
+                "structure",
+                "fixer skill has no sibling known-fixes.md (authoring.md mandates one); "
+                "add it, or add the skill to FIXER_EXEMPT if it has no seedable log",
+            )
+        )
     return out
 
 
 def check_known_fixes_table(rel: str, text: str) -> list[Finding]:
     """A known-fixes.md must be a well-formed markdown table (header + separator row)."""
-    rel = rel.replace('\\', '/')
-    has_sep = any(re.match(r'^\s*\|?[\s:|-]*-{3,}[\s:|-]*\|', ln) or
-                  re.match(r'^\s*\|[\s:-]+\|', ln)
-                  for ln in text.splitlines())
+    rel = rel.replace("\\", "/")
+    has_sep = any(
+        re.match(r"^\s*\|?[\s:|-]*-{3,}[\s:|-]*\|", ln) or re.match(r"^\s*\|[\s:-]+\|", ln)
+        for ln in text.splitlines()
+    )
     if not has_sep:
-        return [Finding(rel, 1, 'structure', 'known-fixes.md has no markdown table separator row')]
+        return [Finding(rel, 1, "structure", "known-fixes.md has no markdown table separator row")]
     return []
 
 
@@ -208,12 +237,16 @@ def check_known_fixes_table(rel: str, text: str) -> list[Finding]:
 
 
 def lint_file(file_path: Path, repo_root: Path) -> list[Finding]:
-    text = file_path.read_text(encoding='utf-8', errors='replace')
+    text = file_path.read_text(encoding="utf-8", errors="replace")
     rel = file_path.relative_to(repo_root).as_posix()
-    out = check_frontmatter(rel, text) + check_size(rel, text) + check_links(file_path, text, repo_root)
-    if file_path.name == 'SKILL.md':
+    out = (
+        check_frontmatter(rel, text)
+        + check_size(rel, text)
+        + check_links(file_path, text, repo_root)
+    )
+    if file_path.name == "SKILL.md":
         out += check_skill_structure(file_path.parent, text, repo_root)
-    if file_path.name == 'known-fixes.md':
+    if file_path.name == "known-fixes.md":
         out += check_known_fixes_table(rel, text)
     return out
 
@@ -223,23 +256,23 @@ def instruction_files(repo_root: Path) -> list[Path]:
     found: list[Path] = []
 
     def walk_claude(base: Path):
-        for p in base.rglob('CLAUDE.md'):
+        for p in base.rglob("CLAUDE.md"):
             if not any(part in SKIP_DIRS for part in p.parts):
                 found.append(p)
 
     walk_claude(repo_root)
-    rules = repo_root / '.claude' / 'rules'
+    rules = repo_root / ".claude" / "rules"
     if rules.is_dir():
-        found += sorted(rules.glob('*.md'))
-    skills = repo_root / '.claude' / 'skills'
+        found += sorted(rules.glob("*.md"))
+    skills = repo_root / ".claude" / "skills"
     if skills.is_dir():
         for d in sorted(skills.iterdir()):
             if not d.is_dir():
                 continue
-            if (d / 'SKILL.md').exists():
-                found.append(d / 'SKILL.md')
-            if (d / 'known-fixes.md').exists():
-                found.append(d / 'known-fixes.md')
+            if (d / "SKILL.md").exists():
+                found.append(d / "SKILL.md")
+            if (d / "known-fixes.md").exists():
+                found.append(d / "known-fixes.md")
     # de-dup, stable order
     seen, uniq = set(), []
     for p in found:
@@ -260,13 +293,13 @@ def main(argv: list[str]) -> int:
     root = REPO_ROOT
     findings = lint_repo(root)
     if not findings:
-        print('lint-instructions: OK — all instruction files pass.')
+        print("lint-instructions: OK — all instruction files pass.")
         return 0
-    print(f'lint-instructions: {len(findings)} issue(s):\n')
+    print(f"lint-instructions: {len(findings)} issue(s):\n")
     for f in findings:
-        print(f'{f.path}:{f.line}: [{f.check}] {f.message}')
+        print(f"{f.path}:{f.line}: [{f.check}] {f.message}")
     return 1
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(main(sys.argv[1:]))

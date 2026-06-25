@@ -5,6 +5,7 @@ to logs/pre-commit-errors.log and activate the venv. Safe to re-run any time.
 The pure `patch_hook_content` function is unit-tested in
 `scripts/hooks/tests/test_install_pre_commit.py`.
 """
+
 import subprocess
 import sys
 from pathlib import Path
@@ -12,8 +13,10 @@ from pathlib import Path
 from script_common import venv_exe
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-HOOK_FILES = [REPO_ROOT / ".git" / "hooks" / "pre-commit",
-              REPO_ROOT / ".git" / "hooks" / "pre-push"]
+HOOK_FILES = [
+    REPO_ROOT / ".git" / "hooks" / "pre-commit",
+    REPO_ROOT / ".git" / "hooks" / "pre-push",
+]
 
 OLD_TAIL = """if [ -x "$INSTALL_PYTHON" ]; then
     exec "$INSTALL_PYTHON" -mpre_commit "${ARGS[@]}"
@@ -115,8 +118,16 @@ def patch_hook_content(content: str) -> tuple[str | None, str]:
 
 def _install() -> int:
     return subprocess.run(
-        [str(venv_exe("python")), "-m", "pre_commit", "install",
-         "--hook-type", "pre-commit", "--hook-type", "pre-push"],
+        [
+            str(venv_exe("python")),
+            "-m",
+            "pre_commit",
+            "install",
+            "--hook-type",
+            "pre-commit",
+            "--hook-type",
+            "pre-push",
+        ],
         cwd=REPO_ROOT,
     ).returncode
 
@@ -147,11 +158,15 @@ def main() -> int:
             continue
         if status == "patched":
             hook_file.write_text(new_content, encoding="utf-8", newline="")
-            print(f"  [pass] {hook_file.name} patched "
-                  "(venv activation + errors -> logs/pre-commit-errors.log)")
+            print(
+                f"  [pass] {hook_file.name} patched "
+                "(venv activation + errors -> logs/pre-commit-errors.log)"
+            )
         else:
-            print(f"  [WARN] {hook_file.name} structure not recognized -- manual patch may be needed",
-                  file=sys.stderr)
+            print(
+                f"  [WARN] {hook_file.name} structure not recognized -- manual patch may be needed",
+                file=sys.stderr,
+            )
             return 1
 
     print("\n  PRE-COMMIT HOOK INSTALLED + PATCHED")

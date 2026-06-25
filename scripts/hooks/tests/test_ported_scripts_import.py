@@ -4,6 +4,7 @@ These scripts are orchestration-heavy (subprocess sequencing) with little pure
 logic; importing each one verifies it parses, that its module-level imports
 resolve, and that side effects stay behind `if __name__ == '__main__'`.
 """
+
 import pytest
 from conftest import load_module
 

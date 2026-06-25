@@ -11,6 +11,7 @@ wrappers (`run`, `run_with_timeout`) are the only impure surface.
 Artifacts land in `logs/docker/*.log` and are consumed by the `fix-docker`
 skill (see `.claude/rules/diagnostics.md`).
 """
+
 import re
 import subprocess
 import time
@@ -109,9 +110,14 @@ def run_with_timeout(argv, timeout: int) -> tuple[list[str], int, bool]:
     """
     try:
         p = subprocess.run(
-            argv, cwd=REPO_ROOT,
-            stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-            text=True, encoding="utf-8", errors="replace", timeout=timeout,
+            argv,
+            cwd=REPO_ROOT,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=timeout,
         )
     except subprocess.TimeoutExpired:
         return [], 1, True
@@ -126,8 +132,9 @@ def run(argv) -> tuple[list[str], int]:
     return lines, code
 
 
-def docker_ps(fmt: str, *, all_containers: bool = True, extra_filters=None,
-              timeout: int = 15) -> tuple[list[str], int, bool]:
+def docker_ps(
+    fmt: str, *, all_containers: bool = True, extra_filters=None, timeout: int = 15
+) -> tuple[list[str], int, bool]:
     """`docker ps [-a] --filter <project> [--filter ...] --format <fmt>`."""
     argv = ["docker", "ps"]
     if all_containers:
@@ -145,8 +152,10 @@ def docker_logs(container: str, tail: int = 40, timeout: int = 10) -> list[str]:
         ["docker", "logs", container, "--tail", str(tail)], timeout=timeout
     )
     if timed_out:
-        return [f"[TIMEOUT] docker logs {container} --tail {tail} timed out after {timeout}s "
-                "(container log stream may be stuck)"]
+        return [
+            f"[TIMEOUT] docker logs {container} --tail {tail} timed out after {timeout}s "
+            "(container log stream may be stuck)"
+        ]
     return lines
 
 

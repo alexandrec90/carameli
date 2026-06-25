@@ -15,19 +15,31 @@ in-memory `results` dict (`{tool: (output_lines, exit_code)}`) and hand it to
 `digest_lint` / `digest_tests`, which return `(any_failed, artifact_text, skips)`.
 The caller writes the artifact and prints the skip notes.
 """
+
 import re
 
 MAX_PER_BLOCK = 25
 
 _MISSING_TOOL = [
-    "ModuleNotFoundError", "command not found", "not recognized",
-    "is not installed", "Cannot find", "could not be found",
+    "ModuleNotFoundError",
+    "command not found",
+    "not recognized",
+    "is not installed",
+    "Cannot find",
+    "could not be found",
 ]
 _ENV_ERROR = [
-    "ConnectionRefusedError", "InvalidPasswordError", "OperationalError",
-    "authentication failed", "could not connect", "connection refused",
-    "timeout expired", "Cannot connect to the Docker daemon",
-    "No such container", "No such service", "is not running",
+    "ConnectionRefusedError",
+    "InvalidPasswordError",
+    "OperationalError",
+    "authentication failed",
+    "could not connect",
+    "connection refused",
+    "timeout expired",
+    "Cannot connect to the Docker daemon",
+    "No such container",
+    "No such service",
+    "is not running",
     "error during connect",
 ]
 
@@ -58,9 +70,12 @@ def get_skip_reason(lines: list[str]) -> str | None:
 def denoise(lines: list[str]) -> list[str]:
     """Drop npm script echoes, npm warnings/errors, and blank lines."""
     return [
-        l for l in lines
-        if l.strip() and not l.startswith("> ")
-        and not l.startswith("npm warn") and not l.startswith("npm error")
+        l
+        for l in lines
+        if l.strip()
+        and not l.startswith("> ")
+        and not l.startswith("npm warn")
+        and not l.startswith("npm error")
     ]
 
 
@@ -68,10 +83,13 @@ def _section(sections: list[str], name: str, fix_hint: str, errs: list[str]) -> 
     sections.append(f"# {name}")
     if fix_hint:
         sections.append(f"# fix: {fix_hint}")
-    sections.extend(errs if errs else [
-        "(exit code indicated failure but no parseable error lines"
-        " -- re-run the tool manually)"
-    ])
+    sections.extend(
+        errs
+        if errs
+        else [
+            "(exit code indicated failure but no parseable error lines -- re-run the tool manually)"
+        ]
+    )
     sections.append("")
 
 
@@ -79,6 +97,7 @@ def _section(sections: list[str], name: str, fix_hint: str, errs: list[str]) -> 
 # Lint section filters. Each keeps only the actionable, self-locating lines for
 # one tool; if filtering strips everything, the caller falls back to denoise().
 # ---------------------------------------------------------------------------
+
 
 def _keep_ruff_check(l: str) -> bool:
     return bool(l.strip()) and not re.match(r"^Found \d+ error", l)
@@ -145,8 +164,16 @@ LINT_SECTIONS = [
     ("eslint", "npm --prefix frontend run lint:eslint -- --fix", _keep_eslint),
     ("tsc", "npm --prefix frontend run lint:types", _keep_tsc),
     ("stylelint", "npm --prefix frontend run lint:css -- --fix", _keep_stylelint),
-    ("markdownlint", 'npm --prefix frontend exec -- markdownlint "**/*.md" --fix', _keep_markdownlint),
-    ("pip-audit", "pip install --upgrade <package>  # update vulnerable dependencies", _keep_pip_audit),
+    (
+        "markdownlint",
+        'npm --prefix frontend exec -- markdownlint "**/*.md" --fix',
+        _keep_markdownlint,
+    ),
+    (
+        "pip-audit",
+        "pip install --upgrade <package>  # update vulnerable dependencies",
+        _keep_pip_audit,
+    ),
     ("vulture", "# remove unused code at the reported locations", _keep_vulture),
     ("detect-secrets", "detect-secrets scan --update .secrets.baseline", _keep_detect_secrets),
     ("dotenv-linter", "# fix ordering / quoting in the reported .env file", _keep_dotenv),
@@ -192,8 +219,10 @@ def digest_lint(results: dict[str, tuple[list[str], int]], source_label: str):
                 summary = errs[-1] if errs else "alembic check failed"
                 errs = [f"alembic/versions/env.py:1:1: [alembic-check] {summary}", *errs]
             _section(
-                sections, "alembic-check",
-                "alembic revision --autogenerate -m 'describe change'", errs,
+                sections,
+                "alembic-check",
+                "alembic revision --autogenerate -m 'describe change'",
+                errs,
             )
 
     text = "\n".join([source_header(source_label), "", *sections]) if any_failed else ""
@@ -207,6 +236,7 @@ def digest_lint(results: dict[str, tuple[list[str], int]], source_label: str):
 # Each block is capped; if filtering removes everything actionable it falls back
 # to the raw block so the agent always has something to work with.
 # ---------------------------------------------------------------------------
+
 
 def filter_pytest_output(lines: list[str]) -> list[str]:
     filtered: list[str] = []
@@ -222,7 +252,9 @@ def filter_pytest_output(lines: list[str]) -> list[str]:
             return
         source = list(block_lines)
         is_raw_fallback = False
-        if not any(re.match(r"^E\s+", l) for l in source) and len(raw_block_lines) > len(block_lines):
+        if not any(re.match(r"^E\s+", l) for l in source) and len(raw_block_lines) > len(
+            block_lines
+        ):
             source = list(raw_block_lines)
             is_raw_fallback = True
         if len(source) > MAX_PER_BLOCK:
@@ -264,7 +296,9 @@ def filter_pytest_output(lines: list[str]) -> list[str]:
             continue
 
         if not in_block:
-            if re.match(r"^(FAILED |ERROR |=)", l) and not re.match(r"^\s*=+\s+\d+\s+(failed|passed|error)", l):
+            if re.match(r"^(FAILED |ERROR |=)", l) and not re.match(
+                r"^\s*=+\s+\d+\s+(failed|passed|error)", l
+            ):
                 filtered.append(l)
         else:
             if re.match(r"^-+ Captured log call", l):
@@ -288,7 +322,11 @@ def filter_pytest_output(lines: list[str]) -> list[str]:
                 pass  # test fixture noise
             else:
                 raw_block_lines.append(l)
-                if re.match(r"^E\s+", l) or re.search(r"(tests/|app/).*\.py:\d+", l) or re.match(r"^(WARNING|ERROR|CRITICAL)\s+", l):
+                if (
+                    re.match(r"^E\s+", l)
+                    or re.search(r"(tests/|app/).*\.py:\d+", l)
+                    or re.match(r"^(WARNING|ERROR|CRITICAL)\s+", l)
+                ):
                     block_lines.append(l)
                 elif re.match(r"^\s*[|+]", l):
                     if re.match(r"^\s*\|\s*$", l):
@@ -316,6 +354,12 @@ TEST_SECTIONS = [
     ("pytest", "pytest", filter_pytest_output, "pytest tests/unit/ <path::to::failing_test>"),
     ("hook-tests", "hook-tests", filter_pytest_output, "pytest scripts/hooks/tests"),
     ("frontend-tests", "frontend-tests", denoise, "npm --prefix frontend run test:run"),
+    (
+        "telnyx-sandbox",
+        "telnyx-sandbox",
+        filter_pytest_output,
+        "TELNYX_SANDBOX=1 pytest tests/integration/test_telnyx_sandbox.py -v --tb=short",
+    ),
 ]
 
 
@@ -341,10 +385,141 @@ def digest_tests(results: dict[str, tuple[list[str], int]], source_label: str):
         body = parser(lines)
         sections.append(f"# {header}")
         sections.append(f"# fix: {fix_hint}")
-        sections.extend(body if body else [
-            "(exit code indicated failure but no parseable lines -- re-run the runner manually)"
-        ])
+        sections.extend(
+            body
+            if body
+            else [
+                "(exit code indicated failure but no parseable lines -- re-run the runner manually)"
+            ]
+        )
         sections.append("")
 
     text = "\n".join([source_header(source_label), "", *sections]) if any_failed else ""
     return any_failed, text, skips
+
+
+# ---------------------------------------------------------------------------
+# E2E helpers -- still emit the dedicated `logs/e2e-failures.log` contract used
+# by the /fix-e2e skill, but the filtering logic lives here so runner scripts do
+# not drift independently.
+# ---------------------------------------------------------------------------
+
+
+def get_e2e_fix_hint(blob: str) -> str:
+    """Infer a specific fix hint from an E2E failure block's error text."""
+    checks = [
+        (
+            r"CORS policy|Access-Control-Allow-Origin",
+            "CORS misconfiguration -- ensure Access-Control-Allow-Origin is not wildcard '*' "
+            "when credentials mode is 'include'",
+        ),
+        (
+            r"status[=\s]+5\d\d|Internal Server Error|502|503",
+            "backend endpoint returning 5xx -- check the route handler and server logs",
+        ),
+        (
+            r"status[=\s]+4\d\d|Not Found|Forbidden|Unauthorized",
+            "backend endpoint returning 4xx -- check auth, route registration, and request payload",
+        ),
+        (
+            r"Timeout|TimeoutError|waiting for selector|waiting for navigation",
+            "page element or navigation timed out -- check that the app renders the expected DOM",
+        ),
+        (
+            r"net::ERR_CONNECTION_REFUSED|ECONNREFUSED|net::ERR_EMPTY_RESPONSE|socket hang up",
+            "server not reachable -- ensure the backend and frontend dev servers are running "
+            "before running E2E tests",
+        ),
+        (
+            r"ElementNotFound|ElementHandle|locator\.",
+            "DOM element not found -- check selectors against the current page markup",
+        ),
+    ]
+    for pattern, hint in checks:
+        if re.search(pattern, blob):
+            return hint
+    return "read the test to understand intent, then fix the underlying application code"
+
+
+def _truncate_e2e_line(line: str, limit: int = 300) -> str:
+    return line[:297] + "..." if len(line) > limit else line
+
+
+def remove_e2e_diff_noise(block: list[str]) -> list[str]:
+    """Strip pytest diff noise, keeping file:line context + the first assertion."""
+    cleaned: list[str] = []
+    hit_assertion = False
+    for line in block:
+        if re.match(r"^\S.*:\d+:", line) or (
+            re.match(r"^\s{4}\S", line) and not line.startswith("E ")
+        ):
+            cleaned.append(line)
+            continue
+        if not hit_assertion and re.match(r"^E\s+(Assertion|assert|\+\s+where|.*Error:)", line):
+            cleaned.append(_truncate_e2e_line(line))
+            hit_assertion = True
+            continue
+        if hit_assertion and re.match(r"^E\s+\+\s+where", line):
+            cleaned.append(_truncate_e2e_line(line))
+            continue
+        if hit_assertion and re.match(r"^E\s", line):
+            continue
+        if line.startswith("E ") and not hit_assertion:
+            cleaned.append(_truncate_e2e_line(line))
+    return cleaned
+
+
+def build_e2e_artifact(lines: list[str], exit_code: int, fail_count: int) -> str:
+    """Build the structured E2E failure artifact. Empty string means clear it."""
+    if exit_code == 0:
+        return ""
+
+    block_header_re = re.compile(r"^_{3,}\s+(.+?)\s+_{3,}$")
+
+    if fail_count > 0:
+        sections: list[str] = []
+        current_test = ""
+        current_lines: list[str] = []
+        in_block = False
+
+        def flush() -> None:
+            if current_test and current_lines:
+                sections.append(f"# {current_test}")
+                sections.append(f"# fix: {get_e2e_fix_hint(chr(10).join(current_lines))}")
+                sections.extend(remove_e2e_diff_noise(current_lines))
+                sections.append("")
+
+        for line in lines:
+            header = block_header_re.match(line)
+            if header:
+                flush()
+                current_test = header.group(1)
+                current_lines = []
+                in_block = True
+                continue
+            if in_block and re.match(r"^={3,}\s+(short test summary|warnings summary)", line):
+                in_block = False
+                continue
+            if in_block and line.strip():
+                if re.match(r"^(FAILED|={3,}|\.venv|--\s+Docs:)", line):
+                    continue
+                current_lines.append(line)
+        flush()
+
+        summary = [line for line in lines if re.match(r"^FAILED\s+", line)]
+        if summary:
+            sections += ["# summary", *summary, ""]
+
+        if sections:
+            return "\n".join(sections) + "\n"
+
+    filtered = [
+        line
+        for line in denoise(lines)
+        if not re.match(r"^\.venv", line) and not re.match(r"^--\s+Docs:", line)
+    ]
+    head = [
+        "# e2e-collection-error",
+        "# fix: check that all test imports resolve and fixtures are available",
+    ]
+    return "\n".join(head + filtered) + "\n"

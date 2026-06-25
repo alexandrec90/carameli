@@ -6,6 +6,7 @@
 
 Usage: python3 scripts/hooks/invoke-capped.py --command "cmd" [--max-bytes 4000] [--head-bytes 2000]
 """
+
 import argparse
 import subprocess
 import sys
@@ -20,9 +21,9 @@ def cap_output(data: bytes, max_bytes: int, head_bytes: int) -> bytes:
     head_bytes = min(head_bytes, max_bytes)
     tail_bytes = max_bytes - head_bytes
     head = data[:head_bytes]
-    tail = data[max(0, len(data) - tail_bytes):] if tail_bytes > 0 else b''
+    tail = data[max(0, len(data) - tail_bytes) :] if tail_bytes > 0 else b""
     skipped = len(data) - max_bytes
-    marker = f'\n... [truncated bytes={skipped}] ...\n'.encode()
+    marker = f"\n... [truncated bytes={skipped}] ...\n".encode()
     return head + marker + tail
 
 
@@ -37,23 +38,23 @@ def run_capped(command: str, max_bytes: int, head_bytes: int) -> tuple[int, byte
 
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument('--command', required=True)
-    parser.add_argument('--max-bytes', type=int, default=4000)
-    parser.add_argument('--head-bytes', type=int, default=2000)
+    parser.add_argument("--command", required=True)
+    parser.add_argument("--max-bytes", type=int, default=4000)
+    parser.add_argument("--head-bytes", type=int, default=2000)
     args = parser.parse_args(argv)
 
     if args.max_bytes < MIN_MAX_BYTES:
-        print(f'--max-bytes must be >= {MIN_MAX_BYTES}', file=sys.stderr)
+        print(f"--max-bytes must be >= {MIN_MAX_BYTES}", file=sys.stderr)
         return 1
 
     exit_code, capped = run_capped(args.command, args.max_bytes, args.head_bytes)
 
     sys.stdout.buffer.write(capped)
-    if capped and not capped.endswith(b'\n'):
-        sys.stdout.buffer.write(b'\n')
+    if capped and not capped.endswith(b"\n"):
+        sys.stdout.buffer.write(b"\n")
 
     return exit_code
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(main())

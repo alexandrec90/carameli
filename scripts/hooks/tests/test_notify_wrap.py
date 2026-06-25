@@ -1,4 +1,5 @@
 """Tests for scripts/notify.py and scripts/notify-wrap.py."""
+
 import sys
 from unittest.mock import MagicMock, patch
 
@@ -11,6 +12,7 @@ wrap_mod = load_module("scripts/notify-wrap.py")
 # ---------------------------------------------------------------------------
 # notify.py
 # ---------------------------------------------------------------------------
+
 
 def test_notify_noops_on_non_windows(monkeypatch):
     monkeypatch.setattr(sys, "platform", "linux")
@@ -45,6 +47,7 @@ def test_notify_swallows_toast_exceptions(monkeypatch):
 # ---------------------------------------------------------------------------
 # notify-wrap.py
 # ---------------------------------------------------------------------------
+
 
 def _run_wrap(argv: list[str], *, elapsed: float = 1.0) -> int:
     """Invoke wrap_mod.main() with the given sys.argv and a fixed elapsed time."""
@@ -144,7 +147,9 @@ def test_wrap_falls_back_to_shell_for_batch_launchers():
 
 def test_wrap_title_from_multiple_words():
     with (
-        patch.object(sys, "argv", ["notify-wrap.py", "Test:", "Run", "pytest", "--", "python", "x.py"]),
+        patch.object(
+            sys, "argv", ["notify-wrap.py", "Test:", "Run", "pytest", "--", "python", "x.py"]
+        ),
         patch("subprocess.run", return_value=MagicMock(returncode=0)),
         patch("time.monotonic", side_effect=[0.0, 1.0]),
         patch.object(wrap_mod, "notify") as mock_notify,

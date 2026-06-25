@@ -1,4 +1,5 @@
 """Tests for scripts/pre-commit.py pure parsing/classification/rendering."""
+
 from conftest import load_module
 
 mod = load_module("scripts/pre-commit.py")
@@ -51,7 +52,9 @@ def test_render_artifact_error_verbatim():
 
 
 def test_render_artifact_auto_fixed_lists_files():
-    out = mod.render_artifact({"black": ["files were modified"]}, {"black": "auto-fixed"}, ["app/x.py"])
+    out = mod.render_artifact(
+        {"black": ["files were modified"]}, {"black": "auto-fixed"}, ["app/x.py"]
+    )
     assert "## black [auto-fixed]" in out
     assert "app/x.py" in out
     assert "stage the modified files" in out

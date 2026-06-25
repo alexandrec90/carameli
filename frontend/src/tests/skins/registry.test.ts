@@ -9,6 +9,7 @@ const mockSkin: Skin = {
     PhoneLines: () => null,
     Extensions: () => null,
     Placeholder: () => null,
+    DataPage: () => null,
   },
 }
 
@@ -46,6 +47,7 @@ describe('skin registry', () => {
         PhoneLines: expect.any(Function),
         Extensions: expect.any(Function),
         Placeholder: expect.any(Function),
+        DataPage: expect.any(Function),
       }),
     )
   })

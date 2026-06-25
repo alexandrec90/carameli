@@ -1,4 +1,5 @@
 """Tests for scripts/docker-up.py failure-classification regexes."""
+
 from conftest import load_module
 
 dc = load_module("scripts/docker_common.py")

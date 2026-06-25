@@ -1,4 +1,5 @@
 """Tests for scripts/start-ngrok.py pure helpers."""
+
 from conftest import load_module
 
 mod = load_module("scripts/start-ngrok.py")
@@ -22,10 +23,12 @@ def test_set_env_var_appends_when_missing():
 
 
 def test_extract_https_url_picks_https():
-    payload = {"tunnels": [
-        {"proto": "http", "public_url": "http://x"},
-        {"proto": "https", "public_url": "https://x"},
-    ]}
+    payload = {
+        "tunnels": [
+            {"proto": "http", "public_url": "http://x"},
+            {"proto": "https", "public_url": "https://x"},
+        ]
+    }
     assert mod.extract_https_url(payload) == "https://x"
 
 

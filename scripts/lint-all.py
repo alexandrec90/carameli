@@ -13,6 +13,7 @@ One entrypoint for every environment:
 Filtering / artifact format live in `scripts/diagnostics.py` (the single source
 of truth shared with `scripts/run-tests.py`), so local and CI never drift.
 """
+
 import os
 import re
 import subprocess
@@ -42,9 +43,14 @@ def run(cmd: str) -> tuple[list[str], int]:
     # shell=True is intentional: cmd is a trusted first-party tool invocation
     # (ruff/mypy/eslint/...), not external input.
     p = subprocess.run(  # noqa: S602
-        cmd, shell=True, cwd=REPO_ROOT,
-        stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-        text=True, encoding="utf-8", errors="replace",
+        cmd,
+        shell=True,
+        cwd=REPO_ROOT,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
     )
     return (p.stdout or "").splitlines(), p.returncode
 
@@ -53,6 +59,7 @@ def run(cmd: str) -> tuple[list[str], int]:
 # Per-tool runners. Each returns {report_name: (lines, exit_code)}. Tools that
 # auto-fix do so before the reporting pass so only unfixable issues are reported.
 # ---------------------------------------------------------------------------
+
 
 def t_ruff() -> dict:
     # Fix then format sequentially (format after fix) before the reporting pass.
@@ -77,11 +84,13 @@ def t_stylelint() -> dict:
 
 
 def t_markdownlint() -> dict:
-    return {"markdownlint": run(
-        'npm --prefix frontend exec --yes -- markdownlint "**/*.md" '
-        '--ignore "**/node_modules/**" --ignore "**/.git/**" --ignore "**/.venv/**" '
-        '-c ".markdownlint.json" --fix'
-    )}
+    return {
+        "markdownlint": run(
+            'npm --prefix frontend exec --yes -- markdownlint "**/*.md" '
+            '--ignore "**/node_modules/**" --ignore "**/.git/**" --ignore "**/.venv/**" '
+            '-c ".markdownlint.json" --fix'
+        )
+    }
 
 
 def t_mypy() -> dict:
@@ -117,7 +126,13 @@ def t_alembic_check() -> dict:
 
 def t_yamllint() -> dict:
     targets = [
-        t for t in (".pre-commit-config.yaml", ".github/workflows", "docker-compose.yml", "prometheus.yml")
+        t
+        for t in (
+            ".pre-commit-config.yaml",
+            ".github/workflows",
+            "docker-compose.yml",
+            "prometheus.yml",
+        )
         if (REPO_ROOT / t).exists()
     ]
     if not targets:
@@ -150,6 +165,7 @@ def t_detect_secrets() -> dict:
     baseline) -- real secrets surface in `git diff .secrets.baseline` for review.
     """
     import json
+
     exclude = '--exclude-files "\\.secrets\\.baseline"'
     baseline = REPO_ROOT / ".secrets.baseline"
 
@@ -175,14 +191,18 @@ def t_detect_secrets() -> dict:
 
     new_items: list[str] = []
     for file, secrets in (new_scan.get("results") or {}).items():
-        base_hashes = {s.get("hashed_secret") for s in (existing.get("results") or {}).get(file, [])}
+        base_hashes = {
+            s.get("hashed_secret") for s in (existing.get("results") or {}).get(file, [])
+        }
         for secret in secrets:
             if secret.get("hashed_secret") not in base_hashes:
                 new_items.append(f"{file}:{secret.get('line_number')}: {secret.get('type')}")
     if new_items:
         run(f'detect-secrets scan --update ".secrets.baseline" {exclude}')
-        print(f"  [auto-fix] detect-secrets: {len(new_items)} new finding(s) added to "
-              ".secrets.baseline -- review with: git diff .secrets.baseline")
+        print(
+            f"  [auto-fix] detect-secrets: {len(new_items)} new finding(s) added to "
+            ".secrets.baseline -- review with: git diff .secrets.baseline"
+        )
     return {"detect-secrets": ([], 0)}
 
 
@@ -190,13 +210,33 @@ def t_detect_secrets() -> dict:
 # either mutate a committed baseline (detect-secrets) or are enforced elsewhere
 # (dotenv-linter / lint-instructions run via pre-commit locally).
 LOCAL_TOOLS = [
-    t_ruff, t_eslint, t_tsc, t_stylelint, t_markdownlint, t_mypy, t_pip_audit,
-    t_vulture, t_detect_secrets, t_alembic_check, t_dotenv, t_yamllint,
-    t_actionlint, t_lint_instructions,
+    t_ruff,
+    t_eslint,
+    t_tsc,
+    t_stylelint,
+    t_markdownlint,
+    t_mypy,
+    t_pip_audit,
+    t_vulture,
+    t_detect_secrets,
+    t_alembic_check,
+    t_dotenv,
+    t_yamllint,
+    t_actionlint,
+    t_lint_instructions,
 ]
 CI_TOOLS = [
-    t_ruff, t_eslint, t_tsc, t_stylelint, t_markdownlint, t_mypy, t_pip_audit,
-    t_vulture, t_alembic_check, t_yamllint, t_actionlint,
+    t_ruff,
+    t_eslint,
+    t_tsc,
+    t_stylelint,
+    t_markdownlint,
+    t_mypy,
+    t_pip_audit,
+    t_vulture,
+    t_alembic_check,
+    t_yamllint,
+    t_actionlint,
 ]
 
 

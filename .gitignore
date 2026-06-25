@@ -67,6 +67,9 @@ Desktop.ini
 .idea/
 
 # Node / frontend
+# The Python-template `lib/` rule above (unanchored) otherwise swallows the
+# frontend source `lib/` dir — keep it tracked.
+!frontend/src/lib/
 node_modules/
 frontend/node_modules/
 frontend/.next/

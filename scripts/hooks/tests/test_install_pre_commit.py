@@ -1,4 +1,5 @@
 """Tests for scripts/install-pre-commit.py pure patch_hook_content."""
+
 from conftest import load_module
 
 mod = load_module("scripts/install-pre-commit.py")
@@ -6,12 +7,7 @@ mod = load_module("scripts/install-pre-commit.py")
 
 def _generated_hook() -> str:
     # A minimal stand-in for a freshly generated pre-commit hook ending.
-    return (
-        "#!/usr/bin/env bash\n"
-        "HERE=...\n"
-        "ARGS=(hook-impl ...)\n"
-        + mod.OLD_TAIL
-    )
+    return "#!/usr/bin/env bash\nHERE=...\nARGS=(hook-impl ...)\n" + mod.OLD_TAIL
 
 
 def test_patch_applies_to_generated_hook():

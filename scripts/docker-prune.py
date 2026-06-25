@@ -4,6 +4,7 @@
 On failure writes output to logs/docker/prune.log; on success clears it.
 The VHDX compaction step is Windows/WSL-specific.
 """
+
 import sys
 
 import docker_common as dc
@@ -67,7 +68,9 @@ def main() -> int:
         print(dc.banner("PRUNE COMPLETE"))
         return 0
 
-    dc.write_artifact(ARTIFACT, dc.format_artifact("Failed task: Docker: Prune + Compact VHDX", errors))
+    dc.write_artifact(
+        ARTIFACT, dc.format_artifact("Failed task: Docker: Prune + Compact VHDX", errors)
+    )
     print(f"Errors written to: {dc.DOCKER_LOG_DIR / ARTIFACT}")
     print(dc.banner("PRUNE HAD ERRORS"))
     return 1

@@ -4,6 +4,7 @@
 Pure helper `venv_exe` is unit-tested in
 `scripts/hooks/tests/test_script_common.py`.
 """
+
 import os
 from pathlib import Path
 

@@ -4,6 +4,7 @@
 The pure `set_env_var` and `extract_https_url` helpers are unit-tested in
 `scripts/hooks/tests/test_start_ngrok.py`.
 """
+
 import json
 import re
 import subprocess
@@ -50,18 +51,22 @@ def poll_tunnel_url(attempts: int = 20) -> str | None:
 
 def main() -> int:
     # Kill any existing ngrok process.
-    subprocess.run(["taskkill", "/f", "/im", "ngrok.exe"],
-                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    subprocess.run(
+        ["taskkill", "/f", "/im", "ngrok.exe"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+    )
     time.sleep(1)
 
     print("Starting ngrok...")
-    subprocess.Popen(["ngrok", "http", "8000"],
-                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    subprocess.Popen(
+        ["ngrok", "http", "8000"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+    )
 
     url = poll_tunnel_url()
     if not url:
-        print("Could not get ngrok URL after 20s. Is ngrok installed and authenticated?",
-              file=sys.stderr)
+        print(
+            "Could not get ngrok URL after 20s. Is ngrok installed and authenticated?",
+            file=sys.stderr,
+        )
         return 1
 
     print(f"Tunnel URL: {url}")
@@ -77,7 +82,9 @@ def main() -> int:
     print(f"\nDone. Webhook base URL: {url}")
     print("ngrok dashboard: http://localhost:4040")
     print("\nTo run webhook e2e tests:")
-    print(f"  docker compose exec -e NGROK_URL={url} app pytest tests/integration/test_webhook_e2e.py -v")
+    print(
+        f"  docker compose exec -e NGROK_URL={url} app pytest tests/integration/test_webhook_e2e.py -v"
+    )
     return 0
 
 

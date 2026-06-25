@@ -1,4 +1,5 @@
 """Tests for scripts/docker_win.py pure helpers."""
+
 from pathlib import Path
 
 from conftest import load_module

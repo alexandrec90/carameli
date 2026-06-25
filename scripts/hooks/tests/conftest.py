@@ -5,6 +5,7 @@ lives outside this tree), so tests load them by path. Each script guards its
 side effects behind `if __name__ == '__main__'`, so importing only binds the
 pure functions.
 """
+
 import importlib.util
 import sys
 from pathlib import Path
@@ -19,7 +20,7 @@ sys.path.insert(0, str(REPO_ROOT / "scripts"))
 def load_module(relpath: str):
     """Load a hook script (path relative to repo root) as a module object."""
     path = REPO_ROOT / relpath
-    mod_name = path.stem.replace('-', '_')
+    mod_name = path.stem.replace("-", "_")
     spec = importlib.util.spec_from_file_location(mod_name, path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)

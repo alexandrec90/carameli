@@ -1,4 +1,5 @@
 """Tests for scripts/diagnostics.py -- the shared lint/test digest library."""
+
 import textwrap
 
 import diagnostics as diag
@@ -6,6 +7,7 @@ import diagnostics as diag
 # ---------------------------------------------------------------------------
 # get_skip_reason
 # ---------------------------------------------------------------------------
+
 
 def test_get_skip_reason_missing_tool():
     assert diag.get_skip_reason(["command not found: ruff"]) == "not installed"
@@ -24,7 +26,9 @@ def test_get_skip_reason_empty():
 
 
 def test_source_header():
-    assert diag.source_header("scripts/lint-all.py (local)") == "# source: scripts/lint-all.py (local)"
+    assert (
+        diag.source_header("scripts/lint-all.py (local)") == "# source: scripts/lint-all.py (local)"
+    )
 
 
 def test_denoise_strips_npm_boilerplate():
@@ -35,6 +39,7 @@ def test_denoise_strips_npm_boilerplate():
 # ---------------------------------------------------------------------------
 # filter_pytest_output -- the pytest failure-block filter
 # ---------------------------------------------------------------------------
+
 
 def _raw(text: str) -> list[str]:
     return textwrap.dedent(text).strip().splitlines()
@@ -124,8 +129,12 @@ def test_filter_raw_fallback_when_no_e_lines():
 def test_filter_caps_block_at_max():
     many_e_lines = [f"E   line {n}" for n in range(30)]
     raw = [
-        "=== FAILURES ===", "___ test_big ___", *many_e_lines,
-        "=== short test summary info ===", "FAILED tests/unit/test_big.py::test_big", "=== 1 failed ===",
+        "=== FAILURES ===",
+        "___ test_big ___",
+        *many_e_lines,
+        "=== short test summary info ===",
+        "FAILED tests/unit/test_big.py::test_big",
+        "=== 1 failed ===",
     ]
     result = diag.filter_pytest_output(raw)
     assert any("truncated" in l for l in result)
@@ -151,6 +160,7 @@ def test_filter_empty_output():
 # ---------------------------------------------------------------------------
 # digest_lint -- builds the lint-errors.log text from in-memory results
 # ---------------------------------------------------------------------------
+
 
 def test_digest_lint_pass_returns_empty():
     any_failed, text, skips = diag.digest_lint({"ruff-check": ([], 0)}, "src")
@@ -193,6 +203,7 @@ def test_digest_lint_absent_tool_is_pass():
 # digest_tests -- builds the test-failures.log text from in-memory results
 # ---------------------------------------------------------------------------
 
+
 def test_digest_tests_pass_returns_empty():
     any_failed, text, _ = diag.digest_tests({"pytest": ([], 0)}, "src")
     assert not any_failed
@@ -217,9 +228,15 @@ def test_digest_tests_failure_writes_artifact():
 
 
 def test_digest_tests_folds_frontend_failures():
-    fe = ["> vitest run", "", "FAIL src/foo.test.ts > renders", "AssertionError: expected 1 to be 2"]
+    fe = [
+        "> vitest run",
+        "",
+        "FAIL src/foo.test.ts > renders",
+        "AssertionError: expected 1 to be 2",
+    ]
     any_failed, text, _ = diag.digest_tests(
-        {"pytest": ([], 0), "frontend-tests": (fe, 1)}, "src",
+        {"pytest": ([], 0), "frontend-tests": (fe, 1)},
+        "src",
     )
     assert any_failed
     assert "# frontend-tests" in text
@@ -243,9 +260,26 @@ def test_digest_tests_folds_hook_failures():
     assert "ValueError: boom" in text
 
 
+def test_digest_tests_folds_telnyx_sandbox_failures():
+    raw = [
+        "=== FAILURES ===",
+        "___ test_telnyx_sandbox ___",
+        "    tests/integration/test_telnyx_sandbox.py:44: in test_telnyx_sandbox",
+        "E   AssertionError: expected sandbox response",
+        "=== short test summary info ===",
+        "FAILED tests/integration/test_telnyx_sandbox.py::test_telnyx_sandbox",
+        "=== 1 failed in 0.2s ===",
+    ]
+    any_failed, text, _ = diag.digest_tests({"telnyx-sandbox": (raw, 1)}, "src")
+    assert any_failed
+    assert "# telnyx-sandbox" in text
+    assert "AssertionError: expected sandbox response" in text
+
+
 def test_digest_tests_skips_env_error_source():
     any_failed, text, skips = diag.digest_tests(
-        {"pytest": ([], 0), "frontend-tests": (["npm error could not be found"], 127)}, "src",
+        {"pytest": ([], 0), "frontend-tests": (["npm error could not be found"], 127)},
+        "src",
     )
     assert not any_failed
     assert text == ""

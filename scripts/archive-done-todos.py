@@ -4,6 +4,7 @@
 Operates on `todo.md` at the repo root. The pure `archive_todos` function is
 unit-tested in `scripts/hooks/tests/test_archive_done_todos.py`.
 """
+
 import re
 import sys
 from pathlib import Path

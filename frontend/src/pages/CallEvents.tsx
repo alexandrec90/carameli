@@ -1,11 +1,8 @@
+import { useCallEvents } from '../hooks/useCallEvents'
 import { useSkin } from '../skins/context'
 
 export default function CallEvents() {
+  const data = useCallEvents()
   const { views } = useSkin()
-  return (
-    <views.Placeholder
-      title="Call Events"
-      description="Real-time call tracking and status history"
-    />
-  )
+  return <views.DataPage {...data} />
 }

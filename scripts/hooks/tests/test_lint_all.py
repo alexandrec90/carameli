@@ -1,4 +1,5 @@
 """Tests for scripts/lint-all.py tool-set composition (local vs CI)."""
+
 from conftest import load_module
 
 la = load_module("scripts/lint-all.py")

@@ -1,4 +1,5 @@
 """Tests for scripts/sync-agents-context.py pure tree helpers."""
+
 from conftest import load_module
 
 mod = load_module("scripts/sync-agents-context.py")

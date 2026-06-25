@@ -8,6 +8,7 @@ Writes three artifacts consumed by the `fix-docker` skill:
 
 Uses `docker ps --filter` for status queries to avoid Compose v2 hangs.
 """
+
 import re
 import sys
 
@@ -38,7 +39,8 @@ def main() -> int:
 
     print("--- Compose Config Validation ---")
     cfg_out, cfg_code, cfg_timeout = dc.run_with_timeout(
-        ["docker", "compose", "config", "--quiet"], timeout=15)
+        ["docker", "compose", "config", "--quiet"], timeout=15
+    )
     if cfg_code == 0 and not cfg_timeout:
         print("  Compose file valid.")
         config_lines += ["=== Compose Config ===", "Valid.", ""]
@@ -65,8 +67,11 @@ def main() -> int:
     parse_lines, _, _ = dc.docker_ps("{{.Names}}|{{.Status}}")
 
     if table_code != 0:
-        msg = ("docker ps timed out -- Docker daemon may be stuck" if table_timeout
-               else "docker ps failed -- is Docker running?")
+        msg = (
+            "docker ps timed out -- Docker daemon may be stuck"
+            if table_timeout
+            else "docker ps failed -- is Docker running?"
+        )
         print(f"  [FAIL] {msg}")
         health_lines.append(msg)
         dc.write_artifact(HEALTH, "\n".join(health_lines) + "\n")
@@ -93,11 +98,13 @@ def main() -> int:
             health_lines += [f"=== Logs: {svc} (last 40 lines) ===", *logs, ""]
         health_lines.append("=== Healthcheck Details ===")
         for svc in sick:
-            ids, _, id_timeout = dc.docker_ps("{{.ID}}", all_containers=False,
-                                              extra_filters=[dc.service_filter(svc)])
+            ids, _, id_timeout = dc.docker_ps(
+                "{{.ID}}", all_containers=False, extra_filters=[dc.service_filter(svc)]
+            )
             if ids and not id_timeout:
                 hc, _, _ = dc.run_with_timeout(
-                    ["docker", "inspect", "--format", "{{json .State.Health}}", ids[0]], timeout=10)
+                    ["docker", "inspect", "--format", "{{json .State.Health}}", ids[0]], timeout=10
+                )
                 health_lines.append(f"{svc} : {' '.join(hc)}")
         health_lines.append("")
 
@@ -107,16 +114,21 @@ def main() -> int:
     # APP LOGS: Always collect recent app container output
     # ============================================================
     app_lines = ["App container logs", f"Timestamp: {dc.timestamp()}", ""]
-    app_status, _, app_timeout = dc.docker_ps("{{.Status}}", all_containers=False,
-                                              extra_filters=[dc.service_filter("app")])
+    app_status, _, app_timeout = dc.docker_ps(
+        "{{.Status}}", all_containers=False, extra_filters=[dc.service_filter("app")]
+    )
     blob = " ".join(app_status)
     if app_timeout or not re.search(r"Up|running|Restarting|Exited|exited", blob):
         print("--- App Logs ---\n  [SKIP] service 'app' has no container.")
         app_lines.append("service 'app' has no container.")
     else:
         logs = dc.docker_logs(f"{project}-app-1", tail=100)
-        app_lines += [f"App status: {blob}", "",
-                      f"=== docker logs {project}-app-1 --tail 100 ===", *logs]
+        app_lines += [
+            f"App status: {blob}",
+            "",
+            f"=== docker logs {project}-app-1 --tail 100 ===",
+            *logs,
+        ]
     dc.write_artifact(APP_LOGS, "\n".join(app_lines) + "\n")
 
     print(dc.banner("ISSUES FOUND" if has_errors else "ALL CLEAR"))

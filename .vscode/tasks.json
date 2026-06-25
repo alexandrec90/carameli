@@ -206,6 +206,20 @@
       "problemMatcher": []
     },
     {
+      "label": "Test: All Suites",
+      "type": "process",
+      "command": "python",
+      "args": ["scripts/notify-wrap.py", "Test: All Suites", "--", "python", "scripts/run-tests.py", "--all"],
+      "group": "test",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "showReuseMessage": false,
+        "close": false
+      },
+      "problemMatcher": []
+    },
+    {
       "label": "Test: Run pytest (fast, changed only)",
       "type": "process",
       "command": "python",
@@ -223,11 +237,8 @@
       "label": "Test: Run Frontend",
       "type": "process",
       "command": "python",
-      "args": ["../scripts/notify-wrap.py", "Test: Run Frontend", "--", "npm", "run", "test"],
+      "args": ["scripts/notify-wrap.py", "Test: Run Frontend", "--", "python", "scripts/run-tests.py", "--target", "frontend-tests"],
       "group": "test",
-      "options": {
-        "cwd": "${workspaceFolder}/frontend"
-      },
       "presentation": {
         "reveal": "always",
         "panel": "shared",
@@ -282,7 +293,7 @@
       "label": "Test: Run Telnyx Sandbox",
       "type": "process",
       "command": "python",
-      "args": ["scripts/notify-wrap.py", "Test: Run Telnyx Sandbox", "--", "docker", "compose", "exec", "-T", "-e", "TELNYX_SANDBOX=1", "app", "pytest", "tests/integration/test_telnyx_sandbox.py", "-v", "--tb=short"],
+      "args": ["scripts/notify-wrap.py", "Test: Run Telnyx Sandbox", "--", "python", "scripts/run-tests.py", "--target", "telnyx-sandbox"],
       "group": "test",
       "presentation": {
         "reveal": "always",
@@ -338,7 +349,7 @@
       "label": "Test: Run Hook Tests (pytest)",
       "type": "process",
       "command": "python",
-      "args": ["scripts/notify-wrap.py", "Test: Run Hook Tests", "--", "python", "-m", "pytest", "scripts/hooks/tests", "-q"],
+      "args": ["scripts/notify-wrap.py", "Test: Run Hook Tests", "--", "python", "scripts/run-tests.py", "--target", "hook-tests"],
       "group": "test",
       "presentation": {
         "reveal": "always",
@@ -447,11 +458,8 @@
       "label": "Test: All Checks",
       "dependsOn": [
         "Lint: Everything",
-        "Test: Run pytest",
-        "Test: Run Frontend",
-        "Test: Run E2E (headless)",
-        "Test: Run Hook Tests (pytest)",
-        "Test: Run Telnyx Sandbox"
+        "Test: All Suites",
+        "Test: Run E2E (headless)"
       ],
       "dependsOrder": "parallel",
       "group": "test",

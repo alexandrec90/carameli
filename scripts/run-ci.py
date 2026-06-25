@@ -6,6 +6,7 @@ pass) when --skip-e2e is given or the frontend dev server is unreachable.
 
 Usage: python scripts/run-ci.py [--skip-e2e]
 """
+
 import subprocess
 import sys
 import urllib.request
@@ -15,9 +16,18 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 FRONTEND_URL = "http://localhost:5173"
 
 _BACKEND_ARGV = [
-    "docker", "compose", "exec", "-T", "app", "pytest",
-    "tests/unit/", "tests/integration/test_full_flows.py", "tests/integration/test_contract.py",
-    "-x", "-q", "--tb=short",
+    "docker",
+    "compose",
+    "exec",
+    "-T",
+    "app",
+    "pytest",
+    "tests/unit/",
+    "tests/integration/test_full_flows.py",
+    "tests/integration/test_contract.py",
+    "-x",
+    "-q",
+    "--tb=short",
 ]
 _FRONTEND_ARGV = ["npm", "--prefix", "frontend", "run", "test:run"]
 _E2E_ARGV = ["pytest", "tests/e2e/test_smoke.py", "--browser=chromium", "-q"]

@@ -1,4 +1,5 @@
 """Tests for the small pure predicates in the docker-*.py runner scripts."""
+
 from conftest import load_module
 
 migrate = load_module("scripts/docker-migrate.py")

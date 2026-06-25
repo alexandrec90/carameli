@@ -62,6 +62,22 @@ export const api = {
         body: JSON.stringify(body),
       }),
   },
+
+  calls: {
+    list: (
+      customerId: number,
+      params: { start?: string; end?: string; limit?: number } = {}
+    ) => {
+      const q = new URLSearchParams()
+      if (params.start) q.set('start', params.start)
+      if (params.end) q.set('end', params.end)
+      if (params.limit) q.set('limit', String(params.limit))
+      const qs = q.toString()
+      return request<CallEventListResponse>(
+        `/vsapi/1.0.0/VsCall/List/${customerId}${qs ? `?${qs}` : ''}`
+      )
+    },
+  },
 }
 
 // Types
@@ -110,4 +126,24 @@ export interface AddExtensionBody {
   vs_customer_id: number
   extension_number: string
   password?: string
+}
+
+export interface CallEvent {
+  id: string
+  call_sid: string
+  direction: string
+  from_number: string | null
+  to_number: string | null
+  started_at: string | null
+  ended_at: string | null
+  duration_seconds: number | null
+  recording_url: string | null
+  status: string | null
+  posted: boolean
+  created_at: string
+}
+
+export interface CallEventListResponse {
+  events: CallEvent[]
+  vs_customer_id: number
 }

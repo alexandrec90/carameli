@@ -9,24 +9,25 @@ Order of operations:
 Marker selection is exposed as a pure function (`select_marker_scripts`) for unit
 testing; see `scripts/hooks/tests/test_pretool.py`.
 """
+
 import subprocess
 import sys
 from pathlib import Path
 
-REPO_ROOT = (Path(__file__).parent / '../..').resolve()
+REPO_ROOT = (Path(__file__).parent / "../..").resolve()
 
-ENFORCE_CAPS = REPO_ROOT / 'scripts/hooks/enforce-audit-batch-caps.py'
-TEST_SKILL_MARKER = REPO_ROOT / '.claude/skills/test-skill/.active'
-TEST_SKILL_SCRIPT = REPO_ROOT / '.claude/skills/test-skill/write-artifacts.py'
-FIX_TESTS_MARKER = REPO_ROOT / '.claude/skills/fix-tests-auto/.active'
-FIX_TESTS_SCRIPT = REPO_ROOT / '.claude/skills/fix-tests-auto/restart-if-app-diff.py'
+ENFORCE_CAPS = REPO_ROOT / "scripts/hooks/enforce-audit-batch-caps.py"
+TEST_SKILL_MARKER = REPO_ROOT / ".claude/skills/test-skill/.active"
+TEST_SKILL_SCRIPT = REPO_ROOT / ".claude/skills/test-skill/write-artifacts.py"
+FIX_TESTS_MARKER = REPO_ROOT / ".claude/skills/fix-tests-auto/.active"
+FIX_TESTS_SCRIPT = REPO_ROOT / ".claude/skills/fix-tests-auto/restart-if-app-diff.py"
 
 
 def select_marker_scripts(test_active: bool, fix_active: bool) -> list[list[str]]:
     """Return the argv lists for marker-gated steps, in execution order."""
     steps: list[list[str]] = []
     if test_active:
-        steps.append([str(TEST_SKILL_SCRIPT), '--mode', 'hook'])
+        steps.append([str(TEST_SKILL_SCRIPT), "--mode", "hook"])
     if fix_active:
         steps.append([str(FIX_TESTS_SCRIPT)])
     return steps
@@ -44,11 +45,13 @@ def main() -> int:
     steps = select_marker_scripts(TEST_SKILL_MARKER.exists(), FIX_TESTS_MARKER.exists())
     for argv in steps:
         subprocess.run(
-            [sys.executable, *argv], cwd=REPO_ROOT,
-            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            [sys.executable, *argv],
+            cwd=REPO_ROOT,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
         )
     return 0
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(main())
