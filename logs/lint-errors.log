@@ -1,0 +1,185 @@
+# source: scripts/lint-all.py (CI)
+
+# ruff-check
+# fix: ruff check . --fix --unsafe-fixes
+S607 Starting a process with a partial executable path
+  --> .agents/skills/add-db-model/after-model-edit.py:65:13
+   |
+63 |     try:
+64 |         result = subprocess.run(
+65 |             ["git", "status", "--porcelain", "--", "app/models/*.py"],
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+66 |             cwd=repo_root,
+67 |             capture_output=True,
+   |
+S101 Use of `assert` detected
+  --> .agents/skills/add-db-model/templates/test_repo.py:40:5
+   |
+38 |     }
+39 |     resp = await client.post(f"{_BASE}/Create", json=payload, headers=AUTH_HEADERS)
+40 |     assert resp.status_code == 201, resp.text
+   |     ^^^^^^
+41 |     return resp.json()
+   |
+S101 Use of `assert` detected
+  --> .agents/skills/add-db-model/templates/test_repo.py:52:5
+   |
+50 | async def test_create(client) -> None:
+51 |     data = await _create(client)
+52 |     assert "id" in data
+   |     ^^^^^^
+53 |     assert data["active"] is True
+   |
+S101 Use of `assert` detected
+  --> .agents/skills/add-db-model/templates/test_repo.py:53:5
+   |
+51 |     data = await _create(client)
+52 |     assert "id" in data
+53 |     assert data["active"] is True
+   |     ^^^^^^
+   |
+S101 Use of `assert` detected
+  --> .agents/skills/add-db-model/templates/test_repo.py:63:5
+   |
+61 |     # TODO: adjust path to match your GET endpoint
+62 |     resp = await client.get(f"{_BASE}/Get/{entity_id}", headers=AUTH_HEADERS)
+63 |     assert resp.status_code == 200
+   |     ^^^^^^
+64 |     assert resp.json()["id"] == entity_id
+   |
+S101 Use of `assert` detected
+  --> .agents/skills/add-db-model/templates/test_repo.py:64:5
+   |
+62 |     resp = await client.get(f"{_BASE}/Get/{entity_id}", headers=AUTH_HEADERS)
+63 |     assert resp.status_code == 200
+64 |     assert resp.json()["id"] == entity_id
+   |     ^^^^^^
+   |
+S101 Use of `assert` detected
+  --> .agents/skills/add-db-model/templates/test_repo.py:73:5
+   |
+71 |     fake_id = str(uuid.uuid4())
+72 |     resp = await client.get(f"{_BASE}/Get/{fake_id}", headers=AUTH_HEADERS)
+73 |     assert resp.status_code == 404
+   |     ^^^^^^
+   |
+S101 Use of `assert` detected
+  --> .agents/skills/add-db-model/templates/test_repo.py:84:5
+   |
+82 |     await client.post(f"{_BASE}/Create", json=payload, headers=AUTH_HEADERS)
+83 |     resp = await client.post(f"{_BASE}/Create", json=payload, headers=AUTH_HEADERS)
+84 |     assert resp.status_code == 409
+   |     ^^^^^^
+   |
+N803 Argument name `customerId` should be lowercase
+  --> .agents/skills/add-endpoint/templates/handler.py:81:5
+   |
+79 | @router.get("/Get/{customerId}/{entityId}", response_model=MyEntityResponse)
+80 | async def get_my_entity(
+81 |     customerId: int,
+   |     ^^^^^^^^^^^^^^^
+82 |     entityId: str,
+83 |     session: Annotated[AsyncSession, Depends(get_session)],
+   |
+N803 Argument name `entityId` should be lowercase
+  --> .agents/skills/add-endpoint/templates/handler.py:82:5
+   |
+80 | async def get_my_entity(
+81 |     customerId: int,
+82 |     entityId: str,
+   |     ^^^^^^^^^^^^^
+83 |     session: Annotated[AsyncSession, Depends(get_session)],
+84 |     auth: Annotated[AuthContext, Depends(get_auth_context)],
+   |
+S101 Use of `assert` detected
+  --> .agents/skills/add-endpoint/templates/test_unit.py:46:5
+   |
+44 |     }
+45 |     resp = await client.post(f"{_BASE}/Create", json=payload, headers=AUTH_HEADERS)
+46 |     assert resp.status_code == 201, resp.text
+   |     ^^^^^^
+47 |     return resp.json()
+   |
+S101 Use of `assert` detected
+  --> .agents/skills/add-endpoint/templates/test_unit.py:58:5
+   |
+56 | async def test_create(client) -> None:
+57 |     data = await _create(client)
+58 |     assert "id" in data
+   |     ^^^^^^
+59 |     assert data["active"] is True
+   |
+S101 Use of `assert` detected
+  --> .agents/skills/add-endpoint/templates/test_unit.py:59:5
+   |
+57 |     data = await _create(client)
+58 |     assert "id" in data
+59 |     assert data["active"] is True
+   |     ^^^^^^
+   |
+S101 Use of `assert` detected
+  --> .agents/skills/add-endpoint/templates/test_unit.py:65:5
+   |
+63 | async def test_create_requires_auth(client) -> None:
+64 |     resp = await client.post(f"{_BASE}/Create", json={})
+65 |     assert resp.status_code == 401
+   |     ^^^^^^
+   |
+S101 Use of `assert` detected
+  --> .agents/skills/add-endpoint/templates/test_unit.py:75:5
+   |
+73 |     # TODO: adjust path to match your GET endpoint signature
+74 |     resp = await client.get(f"{_BASE}/Get/9001/{fake_id}", headers=AUTH_HEADERS)
+75 |     assert resp.status_code == 404
+   |     ^^^^^^
+   |
+S101 Use of `assert` detected
+   --> .agents/skills/add-endpoint/templates/test_unit.py:102:5
+    |
+100 |     }
+101 |     resp = await client.post(f"{_BASE}/Create", json=payload, headers=AUTH_HEADERS)
+102 |     assert resp.status_code == 409
+    |     ^^^^^^
+    |
+RUF001 String contains ambiguous `❯` (HEAVY RIGHT-POINTING ANGLE QUOTATION MARK ORNAMENT). Did you mean `>` (GREATER-THAN SIGN)?
+   --> scripts/hooks/tests/test_diagnostics.py:100:21
+    |
+ 98 | def test_digest_tests_strips_ansi_from_frontend_section():
+ 99 |     # vitest output is colourised; the written artifact must be plain text.
+100 |     raw = ["\x1b[31m❯\x1b[39m src/foo.test.ts \x1b[31m(1 failed)\x1b[39m"]
+    |                     ^
+101 |     any_failed, text, _skips = diag.digest_tests({"frontend-tests": (raw, 1)}, "run-tests.py")
+102 |     assert any_failed
+    |
+RUF001 String contains ambiguous `❯` (HEAVY RIGHT-POINTING ANGLE QUOTATION MARK ORNAMENT). Did you mean `>` (GREATER-THAN SIGN)?
+   --> scripts/hooks/tests/test_diagnostics.py:104:13
+    |
+102 |     assert any_failed
+103 |     assert "\x1b[" not in text
+104 |     assert "❯ src/foo.test.ts (1 failed)" in text
+    |             ^
+    |
+
+# actionlint
+# fix: actionlint
+/bin/sh: 1: actionlint: not found
+
+# alembic-check
+# fix: alembic revision --autogenerate -m 'describe change'
+alembic/versions/env.py:1:1: [alembic-check] FAILED: New upgrade operations detected: [('remove_index', Index('ix_conferences_customer_id', Column('customer_id', UUID(), table=<conferences>, nullable=False))), ('remove_index', Index('ix_group_extensions_customer_id', Column('customer_id', UUID(), table=<group_extensions>, nullable=False))), ('remove_index', Index('ix_intercom_groups_customer_id', Column('customer_id', UUID(), table=<intercom_groups>, nullable=False))), ('remove_index', Index('ix_multicast_groups_customer_id', Column('customer_id', UUID(), table=<multicast_groups>, nullable=False))), ('remove_index', Index('ix_parking_lots_customer_id', Column('customer_id', UUID(), table=<parking_lots>, nullable=False))), ('remove_index', Index('ix_webhook_subscriptions_customer_id', Column('customer_id', UUID(), table=<webhook_subscriptions>, nullable=False)))]
+INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Will assume transactional DDL.
+INFO  [alembic.runtime.plugins] setting up autogenerate plugin alembic.autogenerate.schemas
+INFO  [alembic.runtime.plugins] setting up autogenerate plugin alembic.autogenerate.tables
+INFO  [alembic.runtime.plugins] setting up autogenerate plugin alembic.autogenerate.types
+INFO  [alembic.runtime.plugins] setting up autogenerate plugin alembic.autogenerate.constraints
+INFO  [alembic.runtime.plugins] setting up autogenerate plugin alembic.autogenerate.defaults
+INFO  [alembic.runtime.plugins] setting up autogenerate plugin alembic.autogenerate.comments
+INFO  [alembic.autogenerate.compare.constraints] Detected removed index 'ix_conferences_customer_id' on 'conferences'
+INFO  [alembic.autogenerate.compare.constraints] Detected removed index 'ix_group_extensions_customer_id' on 'group_extensions'
+INFO  [alembic.autogenerate.compare.constraints] Detected removed index 'ix_intercom_groups_customer_id' on 'intercom_groups'
+INFO  [alembic.autogenerate.compare.constraints] Detected removed index 'ix_multicast_groups_customer_id' on 'multicast_groups'
+INFO  [alembic.autogenerate.compare.constraints] Detected removed index 'ix_parking_lots_customer_id' on 'parking_lots'
+INFO  [alembic.autogenerate.compare.constraints] Detected removed index 'ix_webhook_subscriptions_customer_id' on 'webhook_subscriptions'
+ERROR [alembic.util.messaging] New upgrade operations detected: [('remove_index', Index('ix_conferences_customer_id', Column('customer_id', UUID(), table=<conferences>, nullable=False))), ('remove_index', Index('ix_group_extensions_customer_id', Column('customer_id', UUID(), table=<group_extensions>, nullable=False))), ('remove_index', Index('ix_intercom_groups_customer_id', Column('customer_id', UUID(), table=<intercom_groups>, nullable=False))), ('remove_index', Index('ix_multicast_groups_customer_id', Column('customer_id', UUID(), table=<multicast_groups>, nullable=False))), ('remove_index', Index('ix_parking_lots_customer_id', Column('customer_id', UUID(), table=<parking_lots>, nullable=False))), ('remove_index', Index('ix_webhook_subscriptions_customer_id', Column('customer_id', UUID(), table=<webhook_subscriptions>, nullable=False)))]
+FAILED: New upgrade operations detected: [('remove_index', Index('ix_conferences_customer_id', Column('customer_id', UUID(), table=<conferences>, nullable=False))), ('remove_index', Index('ix_group_extensions_customer_id', Column('customer_id', UUID(), table=<group_extensions>, nullable=False))), ('remove_index', Index('ix_intercom_groups_customer_id', Column('customer_id', UUID(), table=<intercom_groups>, nullable=False))), ('remove_index', Index('ix_multicast_groups_customer_id', Column('customer_id', UUID(), table=<multicast_groups>, nullable=False))), ('remove_index', Index('ix_parking_lots_customer_id', Column('customer_id', UUID(), table=<parking_lots>, nullable=False))), ('remove_index', Index('ix_webhook_subscriptions_customer_id', Column('customer_id', UUID(), table=<webhook_subscriptions>, nullable=False)))]

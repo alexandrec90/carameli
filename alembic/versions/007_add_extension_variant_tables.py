@@ -85,9 +85,7 @@ def upgrade() -> None:
             *_timestamp_columns(),
             sa.PrimaryKeyConstraint("id"),
         )
-        op.create_index(
-            "ix_group_extensions_customer_id", "group_extensions", ["customer_id"]
-        )
+        op.create_index("ix_group_extensions_customer_id", "group_extensions", ["customer_id"])
 
     if "intercom_groups" not in existing:
         op.create_table(

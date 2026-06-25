@@ -37,6 +37,7 @@ def strip_ansi_lines(lines: list[str]) -> list[str]:
     """Strip ANSI escapes from every line. Pure."""
     return [_ANSI_RE.sub("", l) for l in lines]
 
+
 _MISSING_TOOL = [
     "ModuleNotFoundError",
     "command not found",

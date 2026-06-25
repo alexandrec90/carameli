@@ -1,0 +1,120 @@
+# source: scripts/run-tests.py (CI)
+
+# pytest
+# fix: pytest tests/unit/ <path::to::failing_test>
+==================================== ERRORS ====================================
+_____________ ERROR at teardown of test_concurrent_phone_line_add ______________
+E   asyncpg.exceptions._base.InterfaceError: cannot perform operation: another operation is in progress
+E   sqlalchemy.dialects.postgresql.asyncpg.AsyncAdapt_asyncpg_dbapi.InterfaceError: <class 'asyncpg.exceptions._base.InterfaceError'>: cannot perform operation: another operation is in progress
+tests/conftest.py:139: in db_session
+E   sqlalchemy.exc.InterfaceError: (sqlalchemy.dialects.postgresql.asyncpg.InterfaceError) <class 'asyncpg.exceptions._base.InterfaceError'>: cannot perform operation: another operation is in progress
+E   (Background on this error at: https://sqlalche.me/e/20/rvf5)
+ERROR    app.main:main.py:73 Unhandled exception: POST http://test/vsapi/1.0.0/PhoneLine/Add
+
+=================================== FAILURES ===================================
+________ ERROR at teardown of test_concurrent_duplicate_customer_create ________
+E   asyncpg.exceptions._base.InterfaceError: cannot perform operation: another operation is in progress
+E   sqlalchemy.dialects.postgresql.asyncpg.AsyncAdapt_asyncpg_dbapi.InterfaceError: <class 'asyncpg.exceptions._base.InterfaceError'>: cannot perform operation: another operation is in progress
+tests/conftest.py:139: in db_session
+E   sqlalchemy.exc.InterfaceError: (sqlalchemy.dialects.postgresql.asyncpg.InterfaceError) <class 'asyncpg.exceptions._base.InterfaceError'>: cannot perform operation: another operation is in progress
+E   (Background on this error at: https://sqlalche.me/e/20/rvf5)
+ERROR    app.main:main.py:73 Unhandled exception: POST http://test/vsapi/1.0.0/PhoneLine/Add
+ERROR    app.main:main.py:73 Unhandled exception: POST http://test/vsapi/1.0.0/VsCustomer/Create
+
+________________________ test_concurrent_phone_line_add ________________________
+tests/unit/test_concurrency.py:69: in test_concurrent_phone_line_add
+app/api/vsapi/phone_lines.py:81: in add_phone_line
+app/services/phone_line_service.py:34: in create
+app/repositories/phone_line_repo.py:30: in create
+E   sqlalchemy.exc.IllegalStateChangeError: Method 'commit()' can't be called here; method '_prepare_impl()' is already in progress and this would cause an unexpected state change to <SessionTransactionState.CLOSED: 5> (Background on this error at: https://sqlalche.me/e/20/isce)
+ERROR    app.main:main.py:73 Unhandled exception: POST http://test/vsapi/1.0.0/PhoneLine/Add
+
+__________________ test_concurrent_duplicate_customer_create ___________________
+tests/unit/test_concurrency.py:89: in test_concurrent_duplicate_customer_create
+app/api/vsapi/customers.py:58: in create_customer
+app/services/customer_service.py:26: in create
+app/repositories/customer_repo.py:27: in create
+E   sqlalchemy.exc.InvalidRequestError: This session is provisioning a new connection; concurrent operations are not permitted (Background on this error at: https://sqlalche.me/e/20/isce)
+ERROR    app.main:main.py:73 Unhandled exception: POST http://test/vsapi/1.0.0/PhoneLine/Add
+ERROR    app.main:main.py:73 Unhandled exception: POST http://test/vsapi/1.0.0/VsCustomer/Create
+
+_________ test_unhandled_exception_returns_500_without_leaking_details _________
+tests/unit/test_health.py:68: in test_unhandled_exception_returns_500_without_leaking_details
+E   assert 404 == 500
+E    +  where 404 = <Response [404 Not Found]>.status_code
+WARNING  app.api.vsapi.customers:customers.py:84 Customer not found vs_customer_id=999
+
+_________________________ test_upgrade_on_clean_schema _________________________
+tests/unit/test_migration_concerns.py:271: in test_upgrade_on_clean_schema
+E   AssertionError: alembic upgrade head failed:
+E     STDOUT: 
+E     STDERR: Traceback (most recent call last):
+E       File "/opt/hostedtoolcache/Python/3.12.13/x64/bin/alembic", line 6, in <module>
+E         sys.exit(main())
+E                  ^^^^^^
+E       File "/opt/hostedtoolcache/Python/3.12.13/x64/lib/python3.12/site-packages/alembic/config.py", line 1047, in main
+E         CommandLine(prog=prog).main(argv=argv)
+E       File "/opt/hostedtoolcache/Python/3.12.13/x64/lib/python3.12/site-packages/alembic/config.py", line 1037, in main
+E         self.run_cmd(cfg, options)
+E       File "/opt/hostedtoolcache/Python/3.12.13/x64/lib/python3.12/site-packages/alembic/config.py", line 971, in run_cmd
+E         fn(
+E       File "/opt/hostedtoolcache/Python/3.12.13/x64/lib/python3.12/site-packages/alembic/command.py", line 490, in upgrade
+E         script.run_env()
+E       File "/opt/hostedtoolcache/Python/3.12.13/x64/lib/python3.12/site-packages/alembic/script/base.py", line 556, in run_env
+E         util.load_python_file(self.dir, "env.py")
+E       File "/opt/hostedtoolcache/Python/3.12.13/x64/lib/python3.12/site-packages/alembic/util/pyfiles.py", line 116, in load_python_file
+E         module = load_module_py(module_id, path)
+E                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       File "/opt/hostedtoolcache/Python/3.12.13/x64/lib/python3.12/site-packages/alembic/util/pyfiles.py", line 136, in load_module_py
+E         spec.loader.exec_module(module)  # type: ignore
+E         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       File "<frozen importlib._bootstrap_external>", line 999, in exec_module
+  ... (97 lines total, truncated)
+
+__________________________ test_migration_round_trip ___________________________
+tests/unit/test_migration_concerns.py:301: in test_migration_round_trip
+E   AssertionError: alembic upgrade head failed:
+E     STDOUT: 
+E     STDERR: Traceback (most recent call last):
+E       File "/opt/hostedtoolcache/Python/3.12.13/x64/bin/alembic", line 6, in <module>
+E         sys.exit(main())
+E                  ^^^^^^
+E       File "/opt/hostedtoolcache/Python/3.12.13/x64/lib/python3.12/site-packages/alembic/config.py", line 1047, in main
+E         CommandLine(prog=prog).main(argv=argv)
+E       File "/opt/hostedtoolcache/Python/3.12.13/x64/lib/python3.12/site-packages/alembic/config.py", line 1037, in main
+E         self.run_cmd(cfg, options)
+E       File "/opt/hostedtoolcache/Python/3.12.13/x64/lib/python3.12/site-packages/alembic/config.py", line 971, in run_cmd
+E         fn(
+E       File "/opt/hostedtoolcache/Python/3.12.13/x64/lib/python3.12/site-packages/alembic/command.py", line 490, in upgrade
+E         script.run_env()
+E       File "/opt/hostedtoolcache/Python/3.12.13/x64/lib/python3.12/site-packages/alembic/script/base.py", line 556, in run_env
+E         util.load_python_file(self.dir, "env.py")
+E       File "/opt/hostedtoolcache/Python/3.12.13/x64/lib/python3.12/site-packages/alembic/util/pyfiles.py", line 116, in load_python_file
+E         module = load_module_py(module_id, path)
+E                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       File "/opt/hostedtoolcache/Python/3.12.13/x64/lib/python3.12/site-packages/alembic/util/pyfiles.py", line 136, in load_module_py
+E         spec.loader.exec_module(module)  # type: ignore
+E         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       File "<frozen importlib._bootstrap_external>", line 999, in exec_module
+  ... (125 lines total, truncated)
+
+=========================== short test summary info ============================
+FAILED tests/unit/test_concurrency.py::test_concurrent_phone_line_add - sqlalchemy.exc.IllegalStateChangeError: Method 'commit()' can't be called here; method '_prepare_impl()' is already in progress and this would cause an unexpected state change to <SessionTransactionState.CLOSED: 5> (Background on this error at: https://sqlalche.me/e/20/isce)
+FAILED tests/unit/test_concurrency.py::test_concurrent_duplicate_customer_create - sqlalchemy.exc.InvalidRequestError: This session is provisioning a new connection; concurrent operations are not permitted (Background on this error at: https://sqlalche.me/e/20/isce)
+FAILED tests/unit/test_health.py::test_unhandled_exception_returns_500_without_leaking_details - assert 404 == 500
+FAILED tests/unit/test_migration_concerns.py::test_upgrade_on_clean_schema - AssertionError: alembic upgrade head failed:
+FAILED tests/unit/test_migration_concerns.py::test_migration_round_trip - AssertionError: alembic upgrade head failed:
+ERROR tests/unit/test_concurrency.py::test_concurrent_phone_line_add - sqlalchemy.exc.InterfaceError: (sqlalchemy.dialects.postgresql.asyncpg.InterfaceError) <class 'asyncpg.exceptions._base.InterfaceError'>: cannot perform operation: another operation is in progress
+ERROR tests/unit/test_concurrency.py::test_concurrent_duplicate_customer_create - sqlalchemy.exc.InterfaceError: (sqlalchemy.dialects.postgresql.asyncpg.InterfaceError) <class 'asyncpg.exceptions._base.InterfaceError'>: cannot perform operation: another operation is in progress
+======= 5 failed, 380 passed, 32 warnings, 2 errors in 97.64s (0:01:37) ========
+
+# hook-tests
+# fix: pytest scripts/hooks/tests
+=================================== FAILURES ===================================
+____________________________ test_expand_state_dirs ____________________________
+E       assert False
+E        +  where False = all(<generator object test_expand_state_dirs.<locals>.<genexpr> at 0x7f5c3caf7ae0>)
+scripts/hooks/tests/test_docker_win.py:27: AssertionError
+
+=========================== short test summary info ============================
+FAILED scripts/hooks/tests/test_docker_win.py::test_expand_state_dirs - assert False
