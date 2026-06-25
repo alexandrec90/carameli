@@ -30,7 +30,8 @@ Read all non-empty files in `logs/docker/` with the Read tool:
 | `logs/docker/prune.log` | prune / compact | Prune/compact failures |
 
 If the `logs/docker/` directory does not exist or all files are empty, regenerate them by
-running the stack status check yourself. If Docker is unreachable, say so and stop.
+running the stack status check — `python scripts/docker-status.py` (named on each artifact's
+`# source:` header) — yourself. If Docker is unreachable, say so and stop.
 
 ### Addressed-artifact check
 

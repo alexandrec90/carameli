@@ -1,7 +1,7 @@
 import React from 'react'
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'ghost'
+  variant?: 'primary' | 'ghost' | 'danger'
   size?: 'sm' | 'md'
   children: React.ReactNode
 }
@@ -25,6 +25,20 @@ export function Button({
         style={{
           background: 'rgba(255,159,28,0.08)',
           border: '1px solid rgba(255,244,224,0.1)',
+        }}
+        {...props}
+      >
+        {children}
+      </button>
+    )
+  }
+
+  if (variant === 'danger') {
+    return (
+      <button
+        className={`${base} ${sizeClass} btn-danger text-[#FFF4E0] ${className}`}
+        style={{
+          background: 'linear-gradient(to bottom right, #E8003D, #B00030)',
         }}
         {...props}
       >

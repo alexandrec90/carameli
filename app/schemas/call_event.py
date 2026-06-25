@@ -31,6 +31,23 @@ class CallEventListResponse(BaseModel):
     vs_customer_id: int
 
 
+class CallSummaryRow(BaseModel):
+    group_key: str
+    call_count: int
+    answered_count: int
+    total_duration_seconds: int
+    avg_duration_seconds: float
+    success_rate: float
+
+    model_config = {"from_attributes": True}
+
+
+class CallSummaryResponse(BaseModel):
+    summary: list[CallSummaryRow]
+    group_by: str
+    vs_customer_id: int
+
+
 class CallRecordingResponse(BaseModel):
     call_sid: str
     recording_url: str

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,6 +14,8 @@ from app.schemas.call_event import (
     CallEventListResponse,
     CallEventResponse,
     CallRecordingResponse,
+    CallSummaryResponse,
+    CallSummaryRow,
 )
 from app.schemas.outbound_call import OutboundCallRequest, OutboundCallResponse
 from app.services import (
@@ -136,6 +138,42 @@ async def list_call_events(
     events = await call_event_service.list_for_customer(session, customer.id, start, end, limit)
     return CallEventListResponse(
         events=[CallEventResponse.model_validate(e) for e in events],
+        vs_customer_id=customerId,
+    )
+
+
+@router.get(
+    "/Summary/{customerId}",
+    response_model=CallSummaryResponse,
+    responses={404: {"description": "Customer not found"}},
+)
+async def call_summary(
+    customerId: Annotated[int, Path(ge=1, le=2147483647)],
+    session: Annotated[AsyncSession, Depends(get_session)],
+    auth: Annotated[AuthContext, Depends(get_auth_context)],
+    group_by: Annotated[Literal["extension", "number"], Query()] = "extension",
+    start: Annotated[datetime | None, Query()] = None,
+    end: Annotated[datetime | None, Query()] = None,
+) -> CallSummaryResponse:
+    """Aggregate a customer's call events into CDR summary statistics by extension or number."""
+    enforce_customer_scope(auth, customerId)
+    logger.info(
+        "CDR summary vs_customer_id=%s group_by=%s start=%s end=%s",
+        customerId,
+        group_by,
+        start,
+        end,
+    )
+    customer = await customer_service.get_by_vs_id(session, customerId)
+    if not customer:
+        logger.warning("Customer not found vs_customer_id=%s", customerId)
+        raise HTTPException(status_code=404, detail="Customer not found")
+    rows = await call_event_service.summarize_for_customer(
+        session, customer.id, group_by, start, end
+    )
+    return CallSummaryResponse(
+        summary=[CallSummaryRow.model_validate(r) for r in rows],
+        group_by=group_by,
         vs_customer_id=customerId,
     )
 

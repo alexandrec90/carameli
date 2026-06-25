@@ -37,6 +37,32 @@ async def _seed_event(db_session, customer_id: uuid.UUID, call_sid: str) -> None
     )
 
 
+async def _seed_event_full(
+    db_session,
+    customer_id: uuid.UUID,
+    call_sid: str,
+    *,
+    status: str,
+    duration: str,
+    direction: str = "inbound",
+    extension: str = "101",
+    from_number: str = "+14155550000",
+    to_number: str = "+14155550001",
+) -> None:
+    await CallEventRepo(db_session).create_from_webhook(
+        customer_id=customer_id,
+        payload={
+            "CallSid": call_sid,
+            "CallStatus": status,
+            "From": from_number,
+            "To": to_number,
+            "CallDuration": duration,
+            "Direction": direction,
+            "Extension": extension,
+        },
+    )
+
+
 async def test_list_call_events_returns_customer_events(client, db_session) -> None:
     customer_id = await _create_customer(client, 6001)
     await _seed_event(db_session, customer_id, "CAlist6001a")
@@ -89,6 +115,111 @@ async def test_list_call_events_customer_not_found(client) -> None:
     resp = await client.get(f"{_CALL_BASE}/List/699999", headers=AUTH_HEADERS)
     assert resp.status_code == 404
     assert resp.json()["detail"] == "Customer not found"
+
+
+async def test_call_summary_groups_by_extension_with_metrics(client, db_session) -> None:
+    customer_id = await _create_customer(client, 6100)
+    # ext 101: two calls, one completed (60s), one failed (0s) -> 50% success, avg 30s
+    await _seed_event_full(
+        db_session, customer_id, "CAsum6100a", status="completed", duration="60", extension="101"
+    )
+    await _seed_event_full(
+        db_session, customer_id, "CAsum6100b", status="failed", duration="0", extension="101"
+    )
+    # ext 202: one completed call (120s)
+    await _seed_event_full(
+        db_session, customer_id, "CAsum6100c", status="completed", duration="120", extension="202"
+    )
+
+    resp = await client.get(f"{_CALL_BASE}/Summary/6100", headers=AUTH_HEADERS)
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["group_by"] == "extension"
+    assert body["vs_customer_id"] == 6100
+    by_key = {r["group_key"]: r for r in body["summary"]}
+    assert by_key["101"]["call_count"] == 2
+    assert by_key["101"]["answered_count"] == 1
+    assert by_key["101"]["total_duration_seconds"] == 60
+    assert by_key["101"]["avg_duration_seconds"] == 30.0
+    assert by_key["101"]["success_rate"] == 0.5
+    assert by_key["202"]["call_count"] == 1
+    assert by_key["202"]["success_rate"] == 1.0
+
+
+async def test_call_summary_groups_by_number_uses_customer_facing_did(client, db_session) -> None:
+    customer_id = await _create_customer(client, 6101)
+    # Inbound: customer DID is the To number.
+    await _seed_event_full(
+        db_session,
+        customer_id,
+        "CAsum6101a",
+        status="completed",
+        duration="30",
+        direction="inbound",
+        to_number="+14155551111",
+    )
+    # Outbound: customer DID is the From number.
+    await _seed_event_full(
+        db_session,
+        customer_id,
+        "CAsum6101b",
+        status="completed",
+        duration="30",
+        direction="outbound",
+        from_number="+14155552222",
+    )
+
+    resp = await client.get(
+        f"{_CALL_BASE}/Summary/6101", params={"group_by": "number"}, headers=AUTH_HEADERS
+    )
+    assert resp.status_code == 200
+    keys = {r["group_key"] for r in resp.json()["summary"]}
+    assert keys == {"+14155551111", "+14155552222"}
+
+
+async def test_call_summary_isolated_per_customer(client, db_session) -> None:
+    customer_a = await _create_customer(client, 6102)
+    await _create_customer(client, 6103)
+    await _seed_event_full(
+        db_session, customer_a, "CAsum6102a", status="completed", duration="30"
+    )
+
+    resp = await client.get(f"{_CALL_BASE}/Summary/6103", headers=AUTH_HEADERS)
+    assert resp.status_code == 200
+    assert resp.json()["summary"] == []
+
+
+async def test_call_summary_date_range_filters(client, db_session) -> None:
+    customer_id = await _create_customer(client, 6104)
+    await _seed_event_full(
+        db_session, customer_id, "CAsum6104a", status="completed", duration="30"
+    )
+
+    excluded = await client.get(
+        f"{_CALL_BASE}/Summary/6104", params={"end": "2000-01-01T00:00:00"}, headers=AUTH_HEADERS
+    )
+    assert excluded.status_code == 200
+    assert excluded.json()["summary"] == []
+
+    included = await client.get(
+        f"{_CALL_BASE}/Summary/6104", params={"start": "2000-01-01T00:00:00"}, headers=AUTH_HEADERS
+    )
+    assert included.status_code == 200
+    assert len(included.json()["summary"]) == 1
+
+
+async def test_call_summary_customer_not_found(client) -> None:
+    resp = await client.get(f"{_CALL_BASE}/Summary/699998", headers=AUTH_HEADERS)
+    assert resp.status_code == 404
+    assert resp.json()["detail"] == "Customer not found"
+
+
+async def test_call_summary_rejects_unknown_group_by(client) -> None:
+    await _create_customer(client, 6105)
+    resp = await client.get(
+        f"{_CALL_BASE}/Summary/6105", params={"group_by": "carrier"}, headers=AUTH_HEADERS
+    )
+    assert resp.status_code == 422
 
 
 async def test_get_recording_not_found(client) -> None:

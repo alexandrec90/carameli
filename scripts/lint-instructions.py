@@ -35,9 +35,9 @@ CLAUDE_MAX_LINES = 200
 SKILL_MAX_LINES = 500
 
 # Fixer skills with no seedable log artifact, so the known-fixes short-circuit does
-# not apply (documented in evals/README.md): an aggregate dispatcher, a live-diagnostics
-# reader, and an autonomous runner-driven loop.
-FIXER_EXEMPT = {"fix-all", "fix-problems", "fix-tests-auto"}
+# not apply (documented in evals/README.md): an aggregate dispatcher and a
+# live-diagnostics reader.
+FIXER_EXEMPT = {"fix-all", "fix-problems"}
 
 # Directories never walked for instruction files.
 SKIP_DIRS = {"node_modules", ".git", ".venv", "dist", "build", "__pycache__"}

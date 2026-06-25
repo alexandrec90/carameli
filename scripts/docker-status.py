@@ -18,6 +18,10 @@ HEALTH = "health.log"
 CONFIG = "config.log"
 APP_LOGS = "app-logs.log"
 
+# Provenance stamp on every artifact so the fix-docker skill can name the producing
+# script (per .claude/rules/diagnostics.md) instead of guessing how to regenerate it.
+SOURCE = "# source: scripts/docker-status.py"
+
 _SICK_RE = re.compile(r"unhealthy|Exited|exited|Restarting", re.IGNORECASE)
 
 
@@ -35,7 +39,7 @@ def main() -> int:
     # ============================================================
     # CONFIG: Compose file validation + Docker resource usage
     # ============================================================
-    config_lines = ["Docker Config Diagnostic", f"Timestamp: {dc.timestamp()}", ""]
+    config_lines = [SOURCE, "", "Docker Config Diagnostic", f"Timestamp: {dc.timestamp()}", ""]
 
     print("--- Compose Config Validation ---")
     cfg_out, cfg_code, cfg_timeout = dc.run_with_timeout(
@@ -60,7 +64,7 @@ def main() -> int:
     # ============================================================
     # HEALTH: Container status + sick container logs + healthchecks
     # ============================================================
-    health_lines = ["Docker Health Diagnostic", f"Timestamp: {dc.timestamp()}", ""]
+    health_lines = [SOURCE, "", "Docker Health Diagnostic", f"Timestamp: {dc.timestamp()}", ""]
 
     print("--- Container Status ---")
     table, table_code, table_timeout = dc.docker_ps("table {{.Names}}\t{{.Status}}\t{{.Ports}}")
@@ -113,7 +117,7 @@ def main() -> int:
     # ============================================================
     # APP LOGS: Always collect recent app container output
     # ============================================================
-    app_lines = ["App container logs", f"Timestamp: {dc.timestamp()}", ""]
+    app_lines = [SOURCE, "", "App container logs", f"Timestamp: {dc.timestamp()}", ""]
     app_status, _, app_timeout = dc.docker_ps(
         "{{.Status}}", all_containers=False, extra_filters=[dc.service_filter("app")]
     )

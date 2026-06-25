@@ -20,6 +20,12 @@ export const ROUTES: RouteItem[] = [
     { path: '/extensions', label: 'Extensions', element: lazy(() => import('./pages/Extensions')) },
     { path: '/sms', label: 'SMS', element: lazy(() => import('./pages/Sms')) },
     { path: '/calls', label: 'Call Events', element: lazy(() => import('./pages/CallEvents')) },
+    { path: '/reports', label: 'CDR Summary', element: lazy(() => import('./pages/CallReports')) },
+    { path: '/webhooks', label: 'Webhooks', element: lazy(() => import('./pages/Webhooks')) },
+    { path: '/subscription-logs', label: 'Subscription Logs', element: lazy(() => import('./pages/SubscriptionLogs')) },
+    { path: '/contacts', label: 'Contacts', element: lazy(() => import('./pages/Contacts')) },
+    { path: '/contact-groups', label: 'Contact Groups', element: lazy(() => import('./pages/ContactGroups')) },
+    { path: '/users', label: 'Users', element: lazy(() => import('./pages/Users')) },
     { path: '/settings', label: 'Settings', element: lazy(() => import('./pages/Settings')) },
 ]
 

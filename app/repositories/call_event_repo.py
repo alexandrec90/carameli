@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import logging
 import uuid
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from sqlalchemy import and_, select, update
+from sqlalchemy import Integer, and_, case, cast, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.call_event import CallEvent
@@ -13,6 +14,25 @@ from app.models.call_event import CallEvent
 logger = logging.getLogger(__name__)
 
 _TERMINAL_CALL_STATUSES = {"completed", "no-answer", "busy", "failed", "canceled"}
+
+# Grouping dimensions supported by the CDR summary report (cloudli spec sections 30-34).
+SUMMARY_GROUP_BY = ("extension", "number")
+
+
+@dataclass(frozen=True)
+class CallSummaryAggregate:
+    """A single grouped row of the CDR summary report.
+
+    ``group_key`` is the extension number or customer-facing DID; ``success_rate`` is
+    the answered/total ratio in the range [0, 1].
+    """
+
+    group_key: str
+    call_count: int
+    answered_count: int
+    total_duration_seconds: int
+    avg_duration_seconds: float
+    success_rate: float
 
 
 def _utcnow_naive() -> datetime:
@@ -112,6 +132,66 @@ class CallEventRepo:
         stmt = stmt.order_by(CallEvent.created_at.desc()).limit(limit)
         result = await self.session.execute(stmt)
         return list(result.scalars().all())
+
+    async def summarize_for_customer(
+        self,
+        customer_id: uuid.UUID,
+        group_by: str = "extension",
+        start: datetime | None = None,
+        end: datetime | None = None,
+    ) -> list[CallSummaryAggregate]:
+        """Aggregate a customer's call events into per-group CDR statistics.
+
+        ``group_by`` is ``"extension"`` (the dialled extension) or ``"number"`` (the
+        customer-facing DID — ``to_number`` on inbound calls, ``from_number`` on
+        outbound). The optional date range filters on ``started_at``. Rows are ordered
+        by call count, busiest first.
+        """
+        if group_by not in SUMMARY_GROUP_BY:
+            raise ValueError(f"Unsupported group_by: {group_by!r}")
+
+        if group_by == "number":
+            # Customer-facing DID: To on inbound, From on outbound.
+            group_col = case(
+                (CallEvent.direction == "inbound", CallEvent.to_number),
+                else_=CallEvent.from_number,
+            )
+            key = func.coalesce(group_col, "")
+        else:
+            key = func.coalesce(CallEvent.extension, "")
+        # Postgres FILTER clause: count only calls that reached a "completed" status.
+        answered = func.count().filter(func.lower(CallEvent.status) == "completed")
+        call_count = func.count()
+
+        stmt = select(
+            key.label("group_key"),
+            call_count.label("call_count"),
+            answered.label("answered_count"),
+            cast(func.coalesce(func.sum(CallEvent.duration_seconds), 0), Integer).label(
+                "total_duration_seconds"
+            ),
+            func.coalesce(func.avg(CallEvent.duration_seconds), 0).label("avg_duration_seconds"),
+        ).where(CallEvent.customer_id == customer_id)
+        if start is not None:
+            stmt = stmt.where(CallEvent.started_at >= start)
+        if end is not None:
+            stmt = stmt.where(CallEvent.started_at <= end)
+        stmt = stmt.group_by(key).order_by(call_count.desc())
+
+        result = await self.session.execute(stmt)
+        return [
+            CallSummaryAggregate(
+                group_key=row.group_key,
+                call_count=row.call_count,
+                answered_count=row.answered_count,
+                total_duration_seconds=int(row.total_duration_seconds),
+                avg_duration_seconds=round(float(row.avg_duration_seconds), 1),
+                success_rate=(
+                    round(row.answered_count / row.call_count, 4) if row.call_count else 0.0
+                ),
+            )
+            for row in result.all()
+        ]
 
     async def get_by_call_sid(self, call_sid: str) -> CallEvent | None:
         result = await self.session.execute(select(CallEvent).where(CallEvent.call_sid == call_sid))

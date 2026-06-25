@@ -5,14 +5,20 @@ from app.api.vsapi import (
     area_codes,
     callback,
     calls,
+    conferences,
     customers,
     extensions,
+    group_extensions,
+    intercom_groups,
+    multicast_groups,
+    parking_lots,
     phone_lines,
     pointers,
     recordings,
     sci,
     sms,
     voicemail_drop,
+    webhooks,
 )
 
 vsapi_router = APIRouter(prefix="/vsapi/1.0.0")
@@ -29,3 +35,9 @@ vsapi_router.include_router(area_codes.router)
 vsapi_router.include_router(calls.router)
 vsapi_router.include_router(callback.router)
 vsapi_router.include_router(recordings.router)
+vsapi_router.include_router(webhooks.router)
+vsapi_router.include_router(group_extensions.router)
+vsapi_router.include_router(intercom_groups.router)
+vsapi_router.include_router(multicast_groups.router)
+vsapi_router.include_router(conferences.router)
+vsapi_router.include_router(parking_lots.router)

@@ -20,6 +20,23 @@ import re
 
 MAX_PER_BLOCK = 25
 
+# Terminal colour / cursor escape sequences. pytest is invoked with --color=no,
+# but vitest (and any other tool that ignores a no-colour flag) emits SGR codes
+# that turn the artifact into unreadable `\x1b[31m...` noise an agent can't parse.
+# Strip them on ingest so every section -- and the summary-count regexes that key
+# off line starts -- sees plain text regardless of the producing tool.
+_ANSI_RE = re.compile(r"\x1b(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
+
+
+def strip_ansi(line: str) -> str:
+    """Remove ANSI escape sequences from a single line. Pure."""
+    return _ANSI_RE.sub("", line)
+
+
+def strip_ansi_lines(lines: list[str]) -> list[str]:
+    """Strip ANSI escapes from every line. Pure."""
+    return [_ANSI_RE.sub("", l) for l in lines]
+
 _MISSING_TOOL = [
     "ModuleNotFoundError",
     "command not found",
@@ -197,6 +214,7 @@ def digest_lint(results: dict[str, tuple[list[str], int]], source_label: str):
         lines, code = results.get(name, ([], 0))
         if code == 0:
             continue
+        lines = strip_ansi_lines(lines)
         skip = get_skip_reason(lines)
         if skip:
             skips.append((name, skip))
@@ -209,6 +227,7 @@ def digest_lint(results: dict[str, tuple[list[str], int]], source_label: str):
     # can find where to look (env.py:1:1 is a convention, not a literal line).
     lines, code = results.get("alembic-check", ([], 0))
     if code != 0:
+        lines = strip_ansi_lines(lines)
         skip = get_skip_reason(lines)
         if skip:
             skips.append(("alembic-check", skip))
@@ -236,6 +255,39 @@ def digest_lint(results: dict[str, tuple[list[str], int]], source_label: str):
 # Each block is capped; if filtering removes everything actionable it falls back
 # to the raw block so the agent always has something to work with.
 # ---------------------------------------------------------------------------
+
+
+# A pytest run ends with `===== 1 failed, 34 passed, 3 skipped in 4.56s =====`;
+# vitest with `  Tests  35 passed | 2 failed (37)`. Both are uniquely identifiable
+# and carry per-test counts, so the runners can show the same `Results:` line E2E
+# already shows. The lowercase words never match pytest's per-test `PASSED` lines.
+# `Tests` is mandatory-plural so it never matches vitest's separate
+# `Test Files  3 passed` line, which would double-count against `Tests  35 passed`.
+_PYTEST_SUMMARY_RE = re.compile(r"^=+ .*\bin\s+[\d.]+s.*=+\s*$")
+_VITEST_SUMMARY_RE = re.compile(r"^\s*Tests\s+.*\b(?:passed|failed)\b")
+_COUNT_RE = re.compile(r"(\d+)\s+(passed|failed|skipped|errors?)")
+
+
+def count_test_summary(lines: list[str]) -> tuple[int, int, int]:
+    """Sum (passed, failed, skipped) across any pytest/vitest summary lines.
+
+    Returns (0, 0, 0) when no summary line is present (e.g. a collection error),
+    so callers can suppress an all-zero `Results:` line. Errors count as failures.
+    Pure -- unit-tested in `test_diagnostics.py`.
+    """
+    passed = failed = skipped = 0
+    for line in strip_ansi_lines(lines):
+        if not (_PYTEST_SUMMARY_RE.match(line) or _VITEST_SUMMARY_RE.match(line)):
+            continue
+        for num, kind in _COUNT_RE.findall(line):
+            n = int(num)
+            if kind == "passed":
+                passed += n
+            elif kind == "skipped":
+                skipped += n
+            else:  # failed / error / errors
+                failed += n
+    return passed, failed, skipped
 
 
 def filter_pytest_output(lines: list[str]) -> list[str]:
@@ -377,6 +429,7 @@ def digest_tests(results: dict[str, tuple[list[str], int]], source_label: str):
         lines, code = results.get(name, ([], 0))
         if code == 0:
             continue
+        lines = strip_ansi_lines(lines)
         skip = get_skip_reason(lines)
         if skip:
             skips.append((name, skip))
@@ -474,6 +527,7 @@ def build_e2e_artifact(lines: list[str], exit_code: int, fail_count: int) -> str
     if exit_code == 0:
         return ""
 
+    lines = strip_ansi_lines(lines)
     block_header_re = re.compile(r"^_{3,}\s+(.+?)\s+_{3,}$")
 
     if fail_count > 0:

@@ -17,7 +17,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 import diagnostics
-from script_common import venv_exe
+import script_common
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 ARTIFACT = REPO_ROOT / "logs" / "e2e-failures.log"
@@ -25,6 +25,22 @@ VITE_URL = "http://localhost:5173"
 BACKEND_HEALTH = "http://127.0.0.1:8000/health"
 
 _RESULT_RE = re.compile(r"^(tests[\\/].+?::\S+)\s+(PASSED|FAILED|SKIPPED|ERROR|XFAIL|XPASS)")
+
+
+def stream_lines(stream, echo: Callable[[str], object] = print) -> list[str]:
+    """Echo each line of a text stream live and return all lines collected.
+
+    Lets the user watch per-test progress as pytest emits it, while still
+    capturing the full output for the post-run parsing / artifact pass. Reading
+    via ``readline`` (not ``for line in stream``) avoids the read-ahead buffering
+    that would otherwise defeat live streaming on a pipe.
+    """
+    collected: list[str] = []
+    for raw in iter(stream.readline, ""):
+        line = raw.rstrip("\r\n")
+        echo(line)
+        collected.append(line)
+    return collected
 
 
 def reachable(url: str, timeout: int = 5) -> bool:
@@ -96,23 +112,27 @@ def main(argv=None) -> int:
     headed = "--headed" in args or "-Headed" in args
     cross_browser = "--cross-browser" in args or "-CrossBrowser" in args
 
-    ARTIFACT.parent.mkdir(parents=True, exist_ok=True)
-    venv_python = venv_exe("python")
+    venv_python = script_common.venv_exe("python")
+    mode = "cross-browser" if cross_browser else ("headed" if headed else "headless")
+    script_common.print_suite_header(
+        "E2E Tests", ARTIFACT, [f"Runner   : Playwright (chromium, {mode})", ""]
+    )
+
     if not venv_python.exists():
         print("Venv not found at .venv/ -- create it first: python -m venv .venv", file=sys.stderr)
         return 1
 
-    mode = "cross-browser" if cross_browser else ("headed" if headed else "headless")
-    print("\n=== Carameli E2E Tests ===")
-    print(f"Artifact : {ARTIFACT}")
-    print(f"Runner   : Playwright (chromium, {mode})\n")
-
-    # Pre-flight: both servers must be reachable.
+    # Pre-flight: both servers must be reachable. Treated as a skip (environment,
+    # not a code failure) -- same classification as a mid-run server-down below.
     unreachable = get_unreachable_preflight_urls()
     if unreachable:
-        ARTIFACT.write_text("", encoding="utf-8")
-        print("  [environment] E2E skipped -- unreachable: " + "; ".join(unreachable) + ".")
-        return 0
+        return script_common.emit_report(
+            noun="E2E",
+            artifact_path=ARTIFACT,
+            statuses=[(script_common.SKIP, "e2e (environment: " + "; ".join(unreachable) + ")")],
+            artifact_text="",
+            failed=False,
+        )
 
     if cross_browser:
         cmd = [
@@ -130,18 +150,24 @@ def main(argv=None) -> int:
             "--tb=short",
         ]
         print("Running E2E tests...")
+        # Output streams live (uncaptured), so there are no per-test statuses to
+        # report; the shared banner still gives a consistent pass/fail close.
         code = subprocess.run(cmd, cwd=REPO_ROOT).returncode
-        if code == 0:
-            ARTIFACT.write_text("", encoding="utf-8")
-        else:
-            ARTIFACT.write_text(
-                "# e2e-cross-browser\n"
-                "# fix: inspect docker compose app logs and failing Playwright specs\n"
-                + " ".join(cmd)
-                + "\n",
-                encoding="utf-8",
-            )
-        return code
+        artifact_text = (
+            ""
+            if code == 0
+            else "# e2e-cross-browser\n"
+            "# fix: inspect docker compose app logs and failing Playwright specs\n"
+            + " ".join(cmd)
+            + "\n"
+        )
+        return script_common.emit_report(
+            noun="E2E",
+            artifact_path=ARTIFACT,
+            statuses=[],
+            artifact_text=artifact_text,
+            failed=code != 0,
+        )
 
     cmd = [
         str(venv_python),
@@ -158,7 +184,10 @@ def main(argv=None) -> int:
         cmd.append("--headed")
 
     print("Running E2E tests...")
-    proc = subprocess.run(
+    # Stream pytest's output line by line so the user sees per-test progress as
+    # it happens, while still accumulating every line for the parsing / artifact
+    # pass below. (subprocess.run with PIPE would block silently until exit.)
+    proc = subprocess.Popen(
         cmd,
         cwd=REPO_ROOT,
         stdout=subprocess.PIPE,
@@ -166,31 +195,48 @@ def main(argv=None) -> int:
         text=True,
         encoding="utf-8",
         errors="replace",
+        bufsize=1,
     )
-    lines = (proc.stdout or "").splitlines()
-    exit_code = proc.returncode
+    lines = stream_lines(proc.stdout) if proc.stdout is not None else []
+    exit_code = proc.wait()
 
     passed, failed, skipped = count_results(lines)
+    statuses: list[tuple[str, str]] = []
     for line in lines:
         m = _RESULT_RE.match(line)
         if m:
-            tag = {"PASSED": "pass", "FAILED": "FAIL", "ERROR": "FAIL"}.get(m.group(2), "skip")
-            print(f"  [{tag}] {m.group(1)}")
+            state = {
+                "PASSED": script_common.PASS,
+                "FAILED": script_common.FAIL,
+                "ERROR": script_common.FAIL,
+            }.get(m.group(2), script_common.SKIP)
+            statuses.append((state, m.group(1)))
 
+    # All failures were connection errors -> servers are down. Same skip
+    # classification as the pre-flight check, just detected after pytest ran.
     if is_server_down("\n".join(lines), failed):
-        ARTIFACT.write_text("", encoding="utf-8")
-        print("\n  [environment] E2E skipped -- frontend or backend dev server is not reachable.")
-        return exit_code
+        return script_common.emit_report(
+            noun="E2E",
+            artifact_path=ARTIFACT,
+            statuses=[
+                (
+                    script_common.SKIP,
+                    "e2e (environment: frontend or backend dev server not reachable)",
+                )
+            ],
+            artifact_text="",
+            failed=False,
+        )
 
-    ARTIFACT.write_text(build_artifact(lines, exit_code, failed), encoding="utf-8")
-
-    total = passed + failed + skipped
-    print(f"\nResults: {passed} passed, {failed} failed, {skipped} skipped ({total} total)")
-    if exit_code != 0:
-        print(f"Errors written to: {ARTIFACT}\n  E2E FAILED")
-    else:
-        print("  E2E PASSED")
-    return exit_code
+    return script_common.emit_report(
+        noun="E2E",
+        artifact_path=ARTIFACT,
+        statuses=statuses,
+        artifact_text=build_artifact(lines, exit_code, failed),
+        failed=exit_code != 0,
+        counts=(passed, failed, skipped),
+        unit="tests",
+    )
 
 
 if __name__ == "__main__":

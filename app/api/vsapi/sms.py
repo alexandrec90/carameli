@@ -1,16 +1,23 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Path, Request
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth import AuthContext, enforce_customer_scope, get_auth_context
 from app.core.config import settings
 from app.core.database import get_session
 from app.core.limiter import limiter
-from app.schemas.sms import SendSmsRequest, SmsEnableDisableResponse, SmsStatusResponse
+from app.schemas.sms import (
+    SendSmsRequest,
+    SmsEnableDisableResponse,
+    SmsMessageListResponse,
+    SmsMessageResponse,
+    SmsStatusResponse,
+)
 from app.services import customer_service, phone_line_service, sms_message_service
 
 logger = logging.getLogger(__name__)
@@ -148,3 +155,30 @@ async def send_sms(
     )
 
     return SmsStatusResponse(success=True, message_sid=message_sid)
+
+
+@router.get(
+    "/List/{customerId}",
+    response_model=SmsMessageListResponse,
+    responses={404: {"description": "Customer not found"}},
+)
+async def list_sms_messages(
+    customerId: Annotated[int, Path(ge=1, le=2147483647)],
+    session: Annotated[AsyncSession, Depends(get_session)],
+    auth: Annotated[AuthContext, Depends(get_auth_context)],
+    start: Annotated[datetime | None, Query()] = None,
+    end: Annotated[datetime | None, Query()] = None,
+    limit: Annotated[int, Query(ge=1, le=500)] = 100,
+) -> SmsMessageListResponse:
+    """List a customer's SMS messages, newest first, with an optional created_at date range."""
+    enforce_customer_scope(auth, customerId)
+    logger.info("Listing SMS messages vs_customer_id=%s start=%s end=%s", customerId, start, end)
+    customer = await customer_service.get_by_vs_id(session, customerId)
+    if not customer:
+        logger.warning("Customer not found vs_customer_id=%s", customerId)
+        raise HTTPException(status_code=404, detail="Customer not found")
+    messages = await sms_message_service.list_for_customer(session, customer.id, start, end, limit)
+    return SmsMessageListResponse(
+        messages=[SmsMessageResponse.model_validate(m) for m in messages],
+        vs_customer_id=customerId,
+    )

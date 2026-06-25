@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import uuid
+from datetime import datetime
 
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -47,6 +48,23 @@ class SmsMessageRepo:
             select(SmsMessage).where(SmsMessage.message_sid == message_sid)
         )
         return result.scalar_one_or_none()
+
+    async def list_for_customer(
+        self,
+        customer_id: uuid.UUID,
+        start: datetime | None = None,
+        end: datetime | None = None,
+        limit: int = 100,
+    ) -> list[SmsMessage]:
+        """Return a customer's SMS messages, newest first, with an optional created_at range."""
+        stmt = select(SmsMessage).where(SmsMessage.customer_id == customer_id)
+        if start is not None:
+            stmt = stmt.where(SmsMessage.created_at >= start)
+        if end is not None:
+            stmt = stmt.where(SmsMessage.created_at <= end)
+        stmt = stmt.order_by(SmsMessage.created_at.desc()).limit(limit)
+        result = await self.session.execute(stmt)
+        return list(result.scalars().all())
 
     async def update_delivery_status(
         self,

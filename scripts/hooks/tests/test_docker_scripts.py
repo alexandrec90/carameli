@@ -4,6 +4,14 @@ from conftest import load_module
 
 migrate = load_module("scripts/docker-migrate.py")
 restart = load_module("scripts/docker-restart-app.py")
+status = load_module("scripts/docker-status.py")
+
+
+def test_status_source_header():
+    # fix-docker locates the producer off this stamp (.claude/rules/diagnostics.md),
+    # so the prefix and script path are a contract, not cosmetic.
+    assert status.SOURCE == "# source: scripts/docker-status.py"
+    assert status.SOURCE.startswith("# source: ")
 
 
 def test_migrate_app_running():

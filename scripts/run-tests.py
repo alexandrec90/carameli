@@ -26,6 +26,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 import diagnostics
+import script_common
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 IS_CI = bool(os.environ.get("CI"))
@@ -257,42 +258,45 @@ def main() -> int:
 
     label = "scripts/run-tests.py (CI)" if IS_CI else "scripts/run-tests.py (local)"
 
-    print("\n=== Carameli Test Suite ===")
-    print(f"Artifact : {REPO_ROOT / 'logs' / 'test-failures.log'}")
+    artifact = REPO_ROOT / "logs" / "test-failures.log"
+    target_line = [f"Target   : {target}"] if target else []
+    script_common.print_suite_header("Test Suite", artifact, target_line)
 
     if target == "all":
-        print("Target   : all")
         results = run_all()
     elif target:
-        print(f"Target   : {target}")
         results = run_named_target(target)
     else:
         results = run_ci() if IS_CI else run_local(fast)
 
     any_failed, text, skips = diagnostics.digest_tests(results, label)
 
-    for name, (_, code) in results.items():
-        if code != 0 and not any(name == s for s, _ in skips):
-            print(f"  [FAIL] {name}")
-        elif code == 0:
-            print(f"  [pass] {name}")
-    for name, reason in skips:
-        print(f"  [skip] {name} ({reason})")
+    skipped = {s for s, _ in skips}
+    statuses = [
+        (script_common.FAIL if code != 0 else script_common.PASS, name)
+        for name, (_, code) in results.items()
+        if name not in skipped
+    ]
+    statuses += [(script_common.SKIP, f"{name} ({reason})") for name, reason in skips]
 
-    logs = REPO_ROOT / "logs"
-    logs.mkdir(exist_ok=True)
-    (logs / "test-failures.log").write_text(text, encoding="utf-8")
+    # Aggregate per-test counts from every target's captured pytest/vitest summary.
+    passed = tests_failed = tests_skipped = 0
+    for lines, _ in results.values():
+        tp, tf, ts = diagnostics.count_test_summary(lines)
+        passed += tp
+        tests_failed += tf
+        tests_skipped += ts
+    total = passed + tests_failed + tests_skipped
 
-    if any_failed:
-        print(f"\nErrors written to: {logs / 'test-failures.log'}")
-        print("\n  ==========================================")
-        print("             TESTS FAILED")
-        print("  ==========================================\n")
-        return 1
-    print("\n  ==========================================")
-    print("             TESTS PASSED")
-    print("  ==========================================\n")
-    return 0
+    return script_common.emit_report(
+        noun="TESTS",
+        artifact_path=artifact,
+        statuses=statuses,
+        artifact_text=text,
+        failed=any_failed,
+        counts=(passed, tests_failed, tests_skipped) if total else None,
+        unit="tests",
+    )
 
 
 if __name__ == "__main__":

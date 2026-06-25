@@ -8,7 +8,7 @@ from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.call_event import CallEvent
-from app.repositories.call_event_repo import CallEventRepo
+from app.repositories.call_event_repo import CallEventRepo, CallSummaryAggregate
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +21,16 @@ async def list_for_customer(
     limit: int = 100,
 ) -> list[CallEvent]:
     return await CallEventRepo(session).list_for_customer(customer_id, start, end, limit)
+
+
+async def summarize_for_customer(
+    session: AsyncSession,
+    customer_id: uuid.UUID,
+    group_by: str = "extension",
+    start: datetime | None = None,
+    end: datetime | None = None,
+) -> list[CallSummaryAggregate]:
+    return await CallEventRepo(session).summarize_for_customer(customer_id, group_by, start, end)
 
 
 async def get_by_call_sid(session: AsyncSession, call_sid: str) -> CallEvent | None:

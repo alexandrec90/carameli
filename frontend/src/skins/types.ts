@@ -13,7 +13,15 @@ export interface PlaceholderProps {
 // Functional-placeholder descriptor types live in lib/dataPage.ts so data hooks
 // can return them without importing from skins/. Re-exported here as part of the
 // skin contract.
-export type { DataColumn, DataFilter, DataAction, DataPageProps } from '../lib/dataPage'
+export type {
+  DataColumn,
+  DataFilter,
+  DataAction,
+  DataRowAction,
+  DataFormField,
+  DataForm,
+  DataPageProps,
+} from '../lib/dataPage'
 
 export interface SkinViews {
   Dashboard: React.ComponentType<UseDashboardResult>

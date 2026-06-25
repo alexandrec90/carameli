@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import logging
+import uuid
+from datetime import datetime
 
 from pydantic import BaseModel, Field
 
@@ -23,3 +25,22 @@ class SmsEnableDisableResponse(BaseModel):
     success: bool
     phone_number: str
     sms_enabled: bool
+
+
+class SmsMessageResponse(BaseModel):
+    id: uuid.UUID
+    direction: str
+    from_number: str
+    to_number: str
+    body: str
+    message_sid: str | None
+    delivery_status: str | None
+    error_code: str | None
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class SmsMessageListResponse(BaseModel):
+    messages: list[SmsMessageResponse]
+    vs_customer_id: int

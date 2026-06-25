@@ -186,7 +186,6 @@ skill's log (`setup.cjs`), points it at a committed broken fixture under
 | Skill | Why it can't be evaluated here |
 |---|---|
 | `fix-problems` | Reads **live** VS Code diagnostics via `get_errors` — there's no log artifact to seed in a throwaway worktree. |
-| `fix-tests-auto` | An autonomous loop that **runs** pytest against a live Docker stack each iteration — not deterministic headless. Its underlying fix logic is covered by `fix-tests`. |
 | `fix-all` | Aggregate dispatcher — no behavior of its own to measure. |
 
 `fix-instructions` — the markdown optimizer that acts on *these* results — **is** wired,

@@ -1,8 +1,28 @@
 """Tests for scripts/run-e2e.py pure parsing/classification helpers."""
 
+import io
+
 from conftest import load_module
 
 mod = load_module("scripts/run-e2e.py")
+
+
+def test_stream_lines_echoes_and_collects():
+    stream = io.StringIO("test_a PASSED\ntest_b FAILED\n")
+    echoed: list[str] = []
+    collected = mod.stream_lines(stream, echo=echoed.append)
+    assert collected == ["test_a PASSED", "test_b FAILED"]
+    assert echoed == ["test_a PASSED", "test_b FAILED"]
+
+
+def test_stream_lines_strips_trailing_newlines_only():
+    stream = io.StringIO("  spaced line  \r\n")
+    collected = mod.stream_lines(stream, echo=lambda _line: None)
+    assert collected == ["  spaced line  "]
+
+
+def test_stream_lines_empty_stream():
+    assert mod.stream_lines(io.StringIO(""), echo=lambda _line: None) == []
 
 
 def test_get_fix_hint_cors():

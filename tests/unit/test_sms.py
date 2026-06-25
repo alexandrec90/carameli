@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import uuid
 from unittest.mock import AsyncMock
 
 import pytest
 
+from app.repositories.sms_message_repo import SmsMessageRepo
 from tests.conftest import AUTH_HEADERS
 
 pytestmark = pytest.mark.asyncio(loop_scope="session")
@@ -255,3 +257,85 @@ async def test_sms_send_us_number_accepted(client) -> None:
     )
     assert resp.status_code == 200
     assert resp.json()["success"] is True
+
+
+# ---------------------------------------------------------------------------
+# List SMS messages (Plan A — mirrors VsCall/List)
+# ---------------------------------------------------------------------------
+
+
+async def _create_customer(client, vs_id: int) -> uuid.UUID:
+    resp = await client.post(
+        f"{_CUST_BASE}/Create",
+        json={"vs_customer_id": vs_id, "api_key": f"key-{vs_id}"},
+        headers=AUTH_HEADERS,
+    )
+    assert resp.status_code == 201
+    return uuid.UUID(resp.json()["id"])
+
+
+async def _seed_message(db_session, customer_id: uuid.UUID, message_sid: str) -> None:
+    await SmsMessageRepo(db_session).create(
+        customer_id=customer_id,
+        phone_line_id=None,
+        message_sid=message_sid,
+        direction="outbound",
+        from_number="+14155550000",
+        to_number="+14155550001",
+        body="hi",
+        delivery_status="delivered",
+    )
+
+
+async def test_list_sms_messages_returns_customer_messages(client, db_session) -> None:
+    customer_id = await _create_customer(client, 6101)
+    await _seed_message(db_session, customer_id, "SMlist6101a")
+    await _seed_message(db_session, customer_id, "SMlist6101b")
+
+    resp = await client.get(f"{_SMS_BASE}/List/6101", headers=AUTH_HEADERS)
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["vs_customer_id"] == 6101
+    assert {m["message_sid"] for m in body["messages"]} == {"SMlist6101a", "SMlist6101b"}
+
+
+async def test_list_sms_messages_empty(client) -> None:
+    await _create_customer(client, 6102)
+    resp = await client.get(f"{_SMS_BASE}/List/6102", headers=AUTH_HEADERS)
+    assert resp.status_code == 200
+    assert resp.json()["messages"] == []
+
+
+async def test_list_sms_messages_isolated_per_customer(client, db_session) -> None:
+    customer_a = await _create_customer(client, 6103)
+    await _create_customer(client, 6104)
+    await _seed_message(db_session, customer_a, "SMlist6103a")
+
+    resp = await client.get(f"{_SMS_BASE}/List/6104", headers=AUTH_HEADERS)
+    assert resp.status_code == 200
+    assert resp.json()["messages"] == []
+
+
+async def test_list_sms_messages_date_range_filters(client, db_session) -> None:
+    customer_id = await _create_customer(client, 6105)
+    await _seed_message(db_session, customer_id, "SMlist6105a")
+
+    # An end bound before the message's created_at excludes everything.
+    past = await client.get(
+        f"{_SMS_BASE}/List/6105", params={"end": "2000-01-01T00:00:00"}, headers=AUTH_HEADERS
+    )
+    assert past.status_code == 200
+    assert past.json()["messages"] == []
+
+    # A start bound far in the past includes the message.
+    included = await client.get(
+        f"{_SMS_BASE}/List/6105", params={"start": "2000-01-01T00:00:00"}, headers=AUTH_HEADERS
+    )
+    assert included.status_code == 200
+    assert {m["message_sid"] for m in included.json()["messages"]} == {"SMlist6105a"}
+
+
+async def test_list_sms_messages_customer_not_found(client) -> None:
+    resp = await client.get(f"{_SMS_BASE}/List/699999", headers=AUTH_HEADERS)
+    assert resp.status_code == 404
+    assert resp.json()["detail"] == "Customer not found"

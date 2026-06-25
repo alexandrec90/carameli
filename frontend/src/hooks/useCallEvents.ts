@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { api, type CallEvent } from '../api/client'
 import { DEMO_VS_CUSTOMER_ID } from '../lib/constants'
+import { formatDateTime, formatDuration } from '../lib/format'
 import { logger } from '../lib/logger'
 import type { DataColumn, DataPageProps } from '../lib/dataPage'
 
@@ -14,25 +15,13 @@ const COLUMNS: DataColumn[] = [
   { key: 'recording', label: 'Recording' },
 ]
 
-function fmtDateTime(iso: string | null): string {
-  if (!iso) return ''
-  return iso.replace('T', ' ').slice(0, 16)
-}
-
-function fmtDuration(sec: number | null): string {
-  if (sec == null) return ''
-  const m = Math.floor(sec / 60)
-  const s = sec % 60
-  return `${m}:${String(s).padStart(2, '0')}`
-}
-
 function toRow(e: CallEvent): Record<string, string> {
   return {
-    started_at: fmtDateTime(e.started_at),
+    started_at: formatDateTime(e.started_at),
     direction: e.direction ?? '',
     from_number: e.from_number ?? '',
     to_number: e.to_number ?? '',
-    duration: fmtDuration(e.duration_seconds),
+    duration: formatDuration(e.duration_seconds),
     status: e.status ?? '',
     recording: e.recording_url ? 'Yes' : '',
   }

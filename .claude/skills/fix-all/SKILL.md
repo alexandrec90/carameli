@@ -53,6 +53,12 @@ whatever the test fixes just changed — no separate re-lint pass needed. For ea
 | pytest | run the test suite | `logs/test-failures.log` | `/fix-tests` |
 | Lint | run the lint suite | `logs/lint-errors.log` | `/fix-lint` |
 
+> **Scope: pytest + lint only.** The pytest run here is the default pytest suite, which
+> overwrites `logs/test-failures.log` with just its own section. It does **not** cover the
+> `frontend-tests`, `hook-tests`, or `telnyx-sandbox` sections that the aggregate "Test: All
+> Suites" run (`run-tests.py --all`) produces. If you have a multi-section log to clear, run
+> `/fix-tests` directly (it regenerates with `--all`) instead of `/fix-all`.
+
 For each check, up to **3 attempts**:
 
 1. **Run the check.** Don't ingest its streamed stdout — discard it and read the capped

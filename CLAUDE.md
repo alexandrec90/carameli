@@ -127,13 +127,3 @@ Run **targeted** tests to verify a change — the specific files or module you t
 **not** run the whole suite on every change: it's slow and a fresh-venv full run can
 surface misleading version-skew failures — leave full runs to CI. Also verify with
 `ruff`, `mypy`, and `py_compile`. See `tests/CLAUDE.md`.
-
-## Session Scope
-
-**Push back when a single request is too large for one session.** If a task spans many
-files, a shared-contract change plus broad fan-out work, or many near-identical units
-(e.g. "build all N pages/endpoints"), say so explicitly and propose breaking it into
-plan handoffs for fresh sessions rather than attempting it all at once. Prefer: land the
-must-be-coherent foundation (shared contracts, one reference vertical) in the current
-session, then hand off the repetitive/parallelizable remainder as scoped plans. Do this
-proactively — don't wait to be asked, and don't silently overreach to satisfy a big ask.

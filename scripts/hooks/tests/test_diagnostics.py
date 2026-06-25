@@ -5,6 +5,44 @@ import textwrap
 import diagnostics as diag
 
 # ---------------------------------------------------------------------------
+# count_test_summary
+# ---------------------------------------------------------------------------
+
+
+def test_count_test_summary_pytest():
+    lines = [
+        "tests/unit/test_x.py::test_a PASSED",  # per-test line must NOT be counted
+        "==== 34 passed, 3 skipped, 1 failed in 4.56s ====",
+    ]
+    assert diag.count_test_summary(lines) == (34, 1, 3)
+
+
+def test_count_test_summary_vitest():
+    assert diag.count_test_summary(["  Tests  35 passed | 2 failed (37)"]) == (35, 2, 0)
+
+
+def test_count_test_summary_strips_ansi_from_vitest():
+    # vitest colourises its summary; the leading SGR codes must not stop the
+    # `^\s*Tests` match from finding the counts.
+    line = "\x1b[2m      Tests \x1b[22m \x1b[31m13 failed\x1b[39m | \x1b[32m31 passed\x1b[39m (44)"
+    assert diag.count_test_summary([line]) == (31, 13, 0)
+
+
+def test_count_test_summary_vitest_ignores_test_files_line():
+    # The "Test Files" line must not be counted alongside the "Tests" line.
+    lines = ["  Test Files  3 passed (3)", "       Tests  35 passed (35)"]
+    assert diag.count_test_summary(lines) == (35, 0, 0)
+
+
+def test_count_test_summary_counts_errors_as_failures():
+    assert diag.count_test_summary(["==== 2 errors in 0.10s ===="]) == (0, 2, 0)
+
+
+def test_count_test_summary_no_summary_line():
+    assert diag.count_test_summary(["ImportError: boom", "tests/x.py::t PASSED"]) == (0, 0, 0)
+
+
+# ---------------------------------------------------------------------------
 # get_skip_reason
 # ---------------------------------------------------------------------------
 
@@ -34,6 +72,36 @@ def test_source_header():
 def test_denoise_strips_npm_boilerplate():
     out = diag.denoise(["> vitest run", "npm warn deprecated", "", "FAIL src/foo.test.ts"])
     assert out == ["FAIL src/foo.test.ts"]
+
+
+# ---------------------------------------------------------------------------
+# strip_ansi -- terminal colour codes must never reach the artifact
+# ---------------------------------------------------------------------------
+
+
+def test_strip_ansi_removes_sgr_codes():
+    assert diag.strip_ansi("\x1b[31m\x1b[1mFAIL\x1b[22m\x1b[39m src/foo.test.ts") == (
+        "FAIL src/foo.test.ts"
+    )
+
+
+def test_strip_ansi_leaves_plain_text_untouched():
+    assert diag.strip_ansi("app/main.py:10:1: F401 unused import") == (
+        "app/main.py:10:1: F401 unused import"
+    )
+
+
+def test_strip_ansi_lines_maps_over_list():
+    assert diag.strip_ansi_lines(["\x1b[36mok\x1b[39m", "plain"]) == ["ok", "plain"]
+
+
+def test_digest_tests_strips_ansi_from_frontend_section():
+    # vitest output is colourised; the written artifact must be plain text.
+    raw = ["\x1b[31m❯\x1b[39m src/foo.test.ts \x1b[31m(1 failed)\x1b[39m"]
+    any_failed, text, skips = diag.digest_tests({"frontend-tests": (raw, 1)}, "run-tests.py")
+    assert any_failed
+    assert "\x1b[" not in text
+    assert "❯ src/foo.test.ts (1 failed)" in text
 
 
 # ---------------------------------------------------------------------------

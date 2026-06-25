@@ -143,7 +143,14 @@ and completes in any environment (including a headless eval that only seeds the 
 
 **If a runner is reachable, close the loop yourself:** make `app/` changes live (locally
 `docker compose restart app`; in CI the next push handles it — see the intro), regenerate
-the log, and repeat from Step 1 until it's empty. Don't stop at a half-fixed state and wait
+the log, and repeat from Step 1 until it's empty — capped at **4 iterations**, and stopping
+early if an iteration ends with the **same set of failures** it began with (no progress:
+report the stuck failures rather than spinning). If the cap is hit with failures still
+present, report what remains and tell the user to re-invoke `/fix-tests` after reviewing
+them. Regenerate at the **breadth of the log**:
+a pytest-only log → the selective/testmon pytest rerun above; a multi-section log (the
+aggregate "Test: All Suites" output) → `python scripts/run-tests.py --all`, so every section
+is reproduced rather than blanked. Don't stop at a half-fixed state and wait
 for a human. **If no runner is reachable** (no Docker and not a CI workflow branch — e.g. a
 sandbox), you can't regenerate: finish the fix, stamp `--- ADDRESSED`, report, and stop.
 Whatever runs the suite next produces the fresh log.
@@ -164,7 +171,11 @@ Whatever runs the suite next produces the fresh log.
    (`docker compose exec -T app pytest tests/...::test_a tests/...::test_b`). To gate a pass
    against regressions, use the changed-only (testmon) run — it reruns just the tests your
    edits touched, including any previously-passing one your fix breaks. Reserve a cold full
-   suite for when the testmon graph looks stale.
+   suite for when the testmon graph looks stale. These reruns cover **pytest only** — if the
+   log also has `frontend-tests`, `hook-tests`, or `telnyx-sandbox` sections, regenerate the
+   full artifact with `python scripts/run-tests.py --all` (the single writer for all four
+   targets). A pytest-only rerun overwrites the file with just its own section and silently
+   blanks the others, so the loop would report green while those sections were never re-run.
 4. If the log is stamped `--- ADDRESSED`, it's stale — regenerate it before fixing (don't fix
    against a stale log).
 5. Only stamp the log after applying at least one code fix.

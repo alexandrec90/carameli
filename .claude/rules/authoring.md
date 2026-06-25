@@ -52,8 +52,8 @@ test in the same change.**
   starting point.
 - **Run `npm run eval:coverage`** to confirm the file is no longer a gap.
 - **Genuinely untestable by the harness?** A few skills can't be evaluated headless — they
-  read live editor diagnostics (`fix-problems`) or drive a live runner/stack
-  (`fix-tests-auto`, aggregates like `fix-all`). Document the exclusion and the reason in
+  read live editor diagnostics (`fix-problems`) or are aggregate dispatchers with no
+  behavior of their own (`fix-all`). Document the exclusion and the reason in
   `evals/README.md` rather than shipping a flaky test.
 
 ## CLAUDE.md files
@@ -142,7 +142,7 @@ desktop app or CLI is running. Classify each skill as one of:
 - **Config snapshot:** use the Read tool on the listed files
 - **State finalization:** write `state.json` directly — never write `state-updates.json` and wait for a Stop hook
 
-**Local-only skills** (`fix-tests-auto`, `fix-pre-commit`,
+**Local-only skills** (`fix-pre-commit`,
 `fix-e2e`, `fix-logs`, `fix-docker`) must say so at the top of the SKILL.md:
 
 ```markdown

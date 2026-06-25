@@ -22,6 +22,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import diagnostics
+import script_common
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 IS_CI = bool(os.environ.get("CI"))
@@ -245,10 +246,16 @@ def main() -> int:
     tools = CI_TOOLS if IS_CI else LOCAL_TOOLS
     label = "scripts/lint-all.py (CI)" if IS_CI else "scripts/lint-all.py (local)"
 
-    print("\n=== Carameli Lint Suite ===")
-    print(f"Artifact : {REPO_ROOT / 'logs' / 'lint-errors.log'}")
-    print(f"Mode     : {'CI' if IS_CI else 'local'} (parallel)\n")
-    print("Running all linters in parallel...")
+    artifact = REPO_ROOT / "logs" / "lint-errors.log"
+    script_common.print_suite_header(
+        "Lint Suite",
+        artifact,
+        [
+            f"Mode     : {'CI' if IS_CI else 'local'} (parallel)",
+            "",
+            "Running all linters in parallel...",
+        ],
+    )
 
     results: dict[str, tuple[list[str], int]] = {}
     with ThreadPoolExecutor(max_workers=len(tools)) as ex:
@@ -257,26 +264,30 @@ def main() -> int:
 
     any_failed, text, skips = diagnostics.digest_lint(results, label)
 
-    for name, (_, code) in sorted(results.items()):
-        if code != 0 and not any(name == s for s, _ in skips):
-            print(f"  [FAIL] {name}")
-    for name, reason in skips:
-        print(f"  [skip] {name} ({reason})")
+    skipped = {s for s, _ in skips}
+    statuses = [
+        (script_common.FAIL, name)
+        for name, (_, code) in sorted(results.items())
+        if code != 0 and name not in skipped
+    ]
+    statuses += [(script_common.SKIP, f"{name} ({reason})") for name, reason in skips]
 
-    logs = REPO_ROOT / "logs"
-    logs.mkdir(exist_ok=True)
-    (logs / "lint-errors.log").write_text(text, encoding="utf-8")
+    # Lint's unit is the check, not a test: count passing vs failing vs skipped.
+    failed_checks = sum(
+        1 for name, (_, code) in results.items() if code != 0 and name not in skipped
+    )
+    passed_checks = sum(1 for _, (_, code) in results.items() if code == 0)
+    counts = (passed_checks, failed_checks, len(skips))
 
-    if any_failed:
-        print(f"\nErrors written to: {logs / 'lint-errors.log'}")
-        print("\n  ==========================================")
-        print("               LINT FAILED")
-        print("  ==========================================\n")
-        return 1
-    print("\n  ==========================================")
-    print("              LINT PASSED")
-    print("  ==========================================\n")
-    return 0
+    return script_common.emit_report(
+        noun="LINT",
+        artifact_path=artifact,
+        statuses=statuses,
+        artifact_text=text,
+        failed=any_failed,
+        counts=counts,
+        unit="checks",
+    )
 
 
 if __name__ == "__main__":

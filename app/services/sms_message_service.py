@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import uuid
+from datetime import datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -9,6 +10,16 @@ from app.models.sms_message import SmsMessage
 from app.repositories.sms_message_repo import SmsMessageRepo
 
 logger = logging.getLogger(__name__)
+
+
+async def list_for_customer(
+    session: AsyncSession,
+    customer_id: uuid.UUID,
+    start: datetime | None = None,
+    end: datetime | None = None,
+    limit: int = 100,
+) -> list[SmsMessage]:
+    return await SmsMessageRepo(session).list_for_customer(customer_id, start, end, limit)
 
 
 async def create_outbound(
