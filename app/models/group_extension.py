@@ -23,7 +23,7 @@ class GroupExtension(Base):
         UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()")
     )
     customer_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("customers.id"), nullable=False
+        UUID(as_uuid=True), ForeignKey("customers.id"), nullable=False, index=True
     )
     description: Mapped[str] = mapped_column(String(255), nullable=False, server_default="")
     number: Mapped[str] = mapped_column(String(20), nullable=False)

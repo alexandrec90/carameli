@@ -97,11 +97,11 @@ def test_strip_ansi_lines_maps_over_list():
 
 def test_digest_tests_strips_ansi_from_frontend_section():
     # vitest output is colourised; the written artifact must be plain text.
-    raw = ["\x1b[31m❯\x1b[39m src/foo.test.ts \x1b[31m(1 failed)\x1b[39m"]
+    raw = ["\x1b[31m❯\x1b[39m src/foo.test.ts \x1b[31m(1 failed)\x1b[39m"]  # noqa: RUF001
     any_failed, text, skips = diag.digest_tests({"frontend-tests": (raw, 1)}, "run-tests.py")
     assert any_failed
     assert "\x1b[" not in text
-    assert "❯ src/foo.test.ts (1 failed)" in text
+    assert "❯ src/foo.test.ts (1 failed)" in text  # noqa: RUF001
 
 
 # ---------------------------------------------------------------------------

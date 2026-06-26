@@ -22,9 +22,14 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
-    bind = op.get_bind()
-    inspector = sa.inspect(bind)
-    if "webhook_subscriptions" in inspector.get_table_names():
+    conn = op.get_bind()
+    already_exists = conn.execute(
+        sa.text(
+            "SELECT EXISTS (SELECT 1 FROM information_schema.tables "
+            "WHERE table_schema = 'public' AND table_name = 'webhook_subscriptions')"
+        )
+    ).scalar()
+    if already_exists:
         return
     op.create_table(
         "webhook_subscriptions",

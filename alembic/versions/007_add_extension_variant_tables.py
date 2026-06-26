@@ -65,9 +65,15 @@ _TABLES = (
 
 
 def upgrade() -> None:
-    bind = op.get_bind()
-    inspector = sa.inspect(bind)
-    existing = set(inspector.get_table_names())
+    conn = op.get_bind()
+    existing = {
+        row[0]
+        for row in conn.execute(
+            sa.text(
+                "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'"
+            )
+        ).fetchall()
+    }
 
     if "group_extensions" not in existing:
         op.create_table(

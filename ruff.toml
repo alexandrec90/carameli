@@ -11,6 +11,7 @@ select = ["E", "F", "I", "UP", "B", "ASYNC", "S", "SIM", "T20", "N", "RUF"]
 "alembic/versions/*.py" = ["E501"]
 "tests/**/*.py" = ["E501", "S101", "S105"]
 ".claude/skills/**/*.py" = ["S101", "N803", "B904", "S603", "S607"]
+".agents/skills/**/*.py" = ["S101", "N803", "B904", "S603", "S607"]
 "app/api/**/*.py" = ["N803"]
 "app/core/config.py" = ["S105"]
 # CLI / diagnostic tooling: terminal output (T201), terse single-char loop vars
