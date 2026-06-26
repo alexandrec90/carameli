@@ -180,9 +180,7 @@ async def test_call_summary_groups_by_number_uses_customer_facing_did(client, db
 async def test_call_summary_isolated_per_customer(client, db_session) -> None:
     customer_a = await _create_customer(client, 6102)
     await _create_customer(client, 6103)
-    await _seed_event_full(
-        db_session, customer_a, "CAsum6102a", status="completed", duration="30"
-    )
+    await _seed_event_full(db_session, customer_a, "CAsum6102a", status="completed", duration="30")
 
     resp = await client.get(f"{_CALL_BASE}/Summary/6103", headers=AUTH_HEADERS)
     assert resp.status_code == 200
@@ -191,9 +189,7 @@ async def test_call_summary_isolated_per_customer(client, db_session) -> None:
 
 async def test_call_summary_date_range_filters(client, db_session) -> None:
     customer_id = await _create_customer(client, 6104)
-    await _seed_event_full(
-        db_session, customer_id, "CAsum6104a", status="completed", duration="30"
-    )
+    await _seed_event_full(db_session, customer_id, "CAsum6104a", status="completed", duration="30")
 
     excluded = await client.get(
         f"{_CALL_BASE}/Summary/6104", params={"end": "2000-01-01T00:00:00"}, headers=AUTH_HEADERS
