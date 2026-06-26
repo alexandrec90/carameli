@@ -33,6 +33,16 @@ paths:
   Hard-deletes are only acceptable for `call_events` rows older than the
   retention window.
 
+- **`customer_id` FK columns must declare `index=True`** — every migration that
+  creates a customer-scoped table also runs `op.create_index("ix_<table>_customer_id", ...)`.
+  If the model column omits `index=True`, Alembic autogenerate sees the index in the DB
+  but not in the model and generates a spurious `drop_index` operation (schema drift).
+  This is the most common source of CI `alembic check` failures in this codebase.
+
+      customer_id: Mapped[uuid.UUID] = mapped_column(
+          UUID(as_uuid=True), ForeignKey("customers.id"), nullable=False, index=True
+      )
+
 ## Data Model Reference
 
 Core tables from the PRD:

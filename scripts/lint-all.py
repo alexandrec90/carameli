@@ -16,6 +16,7 @@ of truth shared with `scripts/run-tests.py`), so local and CI never drift.
 
 import os
 import re
+import shutil
 import subprocess
 import sys
 from concurrent.futures import ThreadPoolExecutor
@@ -144,6 +145,8 @@ def t_yamllint() -> dict:
 def t_actionlint() -> dict:
     wf = REPO_ROOT / ".github" / "workflows"
     if not wf.exists() or not list(wf.glob("*.yml")):
+        return {"actionlint": ([], 0)}
+    if not shutil.which("actionlint"):
         return {"actionlint": ([], 0)}
     return {"actionlint": run("actionlint")}
 

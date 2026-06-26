@@ -185,5 +185,38 @@ async def client(db_session: AsyncSession):
     app.dependency_overrides.clear()
 
 
+@pytest_asyncio.fixture
+async def concurrent_client(test_engine):
+    """HTTP client for concurrency tests; does NOT override get_session.
+
+    Each request creates its own real DB connection so asyncio.gather does not
+    contend on a single asyncpg connection.  Data written here persists until
+    the next run's TRUNCATE — tests using this fixture must use unique
+    vs_customer_ids (8000-range) to avoid collisions with other tests.
+    """
+    app.state.carrier = MagicMock()
+    app.state.engine = MagicMock()
+
+    _real_storage = rate_limiter._storage
+    _real_rl = rate_limiter._limiter
+    _mem_storage = storage_from_string("memory://")
+    rate_limiter._storage = _mem_storage
+    rate_limiter._limiter = LIMIT_STRATEGIES["fixed-window"](_mem_storage)
+
+    original_middleware = list(app.user_middleware)
+    app.user_middleware = [m for m in app.user_middleware if m.cls is not SlowAPIMiddleware]
+    app.middleware_stack = app.build_middleware_stack()
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        yield ac
+
+    app.user_middleware = original_middleware
+    app.middleware_stack = app.build_middleware_stack()
+    rate_limiter._storage = _real_storage
+    rate_limiter._limiter = _real_rl
+    app.dependency_overrides.clear()
+
+
 API_KEY = settings.api_key_secret
 AUTH_HEADERS = {"Authorization": f"Bearer {API_KEY}"}

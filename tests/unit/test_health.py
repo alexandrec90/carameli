@@ -62,7 +62,7 @@ async def test_unhandled_exception_returns_500_without_leaking_details(client) -
     from app.services import customer_service
     from tests.conftest import AUTH_HEADERS
 
-    with patch.object(customer_service, "get_by_id", AsyncMock(side_effect=RuntimeError("secret"))):
+    with patch.object(customer_service, "get_by_vs_id", AsyncMock(side_effect=RuntimeError("secret"))):
         resp = await client.get("/vsapi/1.0.0/VsCustomer/Get/999", headers=AUTH_HEADERS)
 
     assert resp.status_code == 500

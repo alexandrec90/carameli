@@ -43,11 +43,11 @@ async def test_concurrent_duplicate_webhook_creates_one_row(client, db_session) 
     assert len(rows) == 1
 
 
-async def test_concurrent_phone_line_add(client, db_session) -> None:
+async def test_concurrent_phone_line_add(concurrent_client) -> None:
     """Two concurrent phone-line-add requests for the same customer return two distinct lines."""
     from app.main import app
 
-    await client.post(
+    await concurrent_client.post(
         "/vsapi/1.0.0/VsCustomer/Create",
         json={"vs_customer_id": 8001, "api_key": "key-8001"},
         headers=AUTH_HEADERS,
@@ -67,12 +67,12 @@ async def test_concurrent_phone_line_add(client, db_session) -> None:
     )
 
     results = await asyncio.gather(
-        client.post(
+        concurrent_client.post(
             "/vsapi/1.0.0/PhoneLine/Add",
             json={"vs_customer_id": 8001, "area_code": "800"},
             headers=AUTH_HEADERS,
         ),
-        client.post(
+        concurrent_client.post(
             "/vsapi/1.0.0/PhoneLine/Add",
             json={"vs_customer_id": 8001, "area_code": "800"},
             headers=AUTH_HEADERS,
@@ -84,15 +84,15 @@ async def test_concurrent_phone_line_add(client, db_session) -> None:
     assert len(numbers) == 2  # two distinct numbers, no collision
 
 
-async def test_concurrent_duplicate_customer_create(client) -> None:
+async def test_concurrent_duplicate_customer_create(concurrent_client) -> None:
     """Concurrent creation of the same vs_customer_id yields one 201 and one conflict — no 500s."""
     results = await asyncio.gather(
-        client.post(
+        concurrent_client.post(
             "/vsapi/1.0.0/VsCustomer/Create",
             json={"vs_customer_id": 8002, "api_key": "key-8002a"},
             headers=AUTH_HEADERS,
         ),
-        client.post(
+        concurrent_client.post(
             "/vsapi/1.0.0/VsCustomer/Create",
             json={"vs_customer_id": 8002, "api_key": "key-8002b"},
             headers=AUTH_HEADERS,

@@ -10,6 +10,7 @@ unit-tested in `scripts/hooks/tests/test_docker_win.py`.
 
 import ctypes
 import os
+import re
 import subprocess
 from pathlib import Path
 
@@ -138,4 +139,8 @@ def optimize_vhd(path: Path) -> tuple[int, list[str]]:
 
 def expand_state_dirs(dirs=None) -> list[Path]:
     """Expand %APPDATA%/%LOCALAPPDATA% in the Docker cache dir list."""
-    return [Path(os.path.expandvars(d)) for d in (dirs or DOCKER_STATE_DIRS)]
+
+    def _expand(s: str) -> str:
+        return re.sub(r"%([^%]+)%", lambda m: os.environ.get(m.group(1), m.group(0)), s)
+
+    return [Path(_expand(d)) for d in (dirs or DOCKER_STATE_DIRS)]
