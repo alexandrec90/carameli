@@ -41,6 +41,10 @@ For each skill entry, compare the current profile against the snapshot:
 - **Changed files_read_freq**: files whose count increased or are new
 - **Changed known_fixes_checked**: compliance ratio may have shifted
 - **Bash behaviour**: `current.bash_spiral_count`, `current.avg_bash`, `current.max_consecutive_bash_ever` vs snapshot equivalents (treat missing snapshot fields as 0)
+- **Token cost**: `current.avg_tokens`, `current.total_output_tokens`, and the trend in
+  `current.tokens_history` vs the snapshot equivalents (treat missing snapshot fields as 0)
+- **Outcomes**: `current.fix_outcomes` (fixed/recurring/open/success_rate) and
+  `current.recurring_errors` vs the snapshot equivalents (treat missing as absent).
 
 If a skill has **zero new invocations** since the snapshot, skip it entirely --
 there is nothing new to optimize.
@@ -80,6 +84,12 @@ Check the profile field `known_fixes_checked` vs `invocations`.
   from the authoring conventions. If missing, add it.
 
 ### 3b. New known-fixes entries
+
+Before adding any row, check `fix_outcomes.success_rate` for this skill. If it is
+**< 0.5** with at least 3 resolved-or-open entries (`fixed + recurring + open >= 3`),
+the skill's fixes are not holding — do **not** add new known-fix rows (they would
+codify unreliable fixes). Instead handle the recurring errors under 3g and note the
+low success rate in the report.
 
 For each entry in the **delta** error patterns with a current count >= 2:
 
@@ -128,6 +138,50 @@ Check `bash_spiral_count` and `avg_bash` in the delta.
 Check `known-fixes.md` for rows where **Hits = 0** and **Added** is more than
 90 days before today. Delete those rows.
 
+### 3f. Token-cost regression
+
+The profile records per-invocation token cost: `avg_tokens` (mean total footprint),
+`total_output_tokens`, and `tokens_history` (last 50 per-run totals).
+
+**Interpret with care.** A segment's `input_tokens` / `cache_read_tokens` largely reflect
+the *ambient* session context the skill happened to run inside, not the skill itself — so
+never act on those alone. The controllable signals are **output tokens** (what the skill
+generated) and the **trend** of per-run totals across invocations (ambient noise averages
+out over the history).
+
+Act when, in the delta:
+
+- `avg_tokens` rose by **≥30%** vs the snapshot, **or**
+- `tokens_history` shows a clear upward trend across the new runs (each new run above the
+  mean of the snapshot history), **or**
+- mean output per run (`total_output_tokens / invocations`) rose by **≥30%**.
+
+A rising trend means the skill is pulling more into context or generating more than it used
+to — usually broad investigation or dumping raw command/test output. Check whether the
+skill's SKILL.md enforces context discipline:
+
+- diagnose from the log artifact instead of re-deriving by reading source broadly,
+- after a fix, run at most a single targeted verification — never re-run the full task or
+  paste raw output into context,
+- cap captured output to a head+tail window, per `.claude/rules/diagnostics.md`.
+
+If that guidance is absent or weak, add or strengthen a **scoped** rule saying so. If the
+cause is genuinely unclear from the profile, note it in the report with
+`(needs manual review)` — never fabricate a remedy.
+
+### 3g. Ineffective-fix escalation
+
+`recurring_errors` lists signatures that came back after being marked fixed — the
+existing guidance is not solving them. For each recurring signature:
+
+- If it matches an existing `known-fixes.md` row, the codified fix is wrong or
+  incomplete. Mark that row's **Fix** column with `(recurring — needs review)` and do
+  NOT silently overwrite it.
+- If it has no row, do NOT add a naive one. Note it in the report under "Escalate to
+  promptfoo" with the signature and the skill — this is the hand-off point to Plan 3/4.
+
+Never fabricate a corrected fix for a recurring error from the profile alone.
+
 ---
 
 ## Step 4 -- Save Snapshot & Report
@@ -146,6 +200,8 @@ Summarize what was changed per skill:
 - Where-to-look additions
 - Stale entries pruned
 - Compliance issues fixed
+- Token-cost rules added or strengthened (with the avg_tokens / output delta that triggered them)
+- Recurring errors escalated (signature, skill)
 - Skills skipped (no new data / insufficient data)
 
 ---

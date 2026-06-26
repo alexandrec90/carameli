@@ -1,0 +1,58 @@
+# Meta-task: evaluates the /optimize-fixers skill's token-cost check (step 3f) end
+# to end — the analyzer that turns per-skill token data from the Stop-hook profile
+# into context/output-discipline edits on fixer skills.
+#
+# Flow (all inside a throwaway worktree — the real repo is never touched):
+#   1. setup.cjs writes logs/agent/skills-profile.json (current) and
+#      skills-profile.optimized.json (snapshot) for a throwaway `fix-eval-fixture`
+#      skill whose token cost regressed (avg_tokens 3000 -> 14250). Every other
+#      lever (3a-3e) is neutralized, so 3f is the sole actionable finding. The
+#      fixture skill is created with a deliberate context/output-discipline gap.
+#   2. the agent runs /optimize-fixers, which should detect the cost regression and
+#      strengthen the fixture skill's SKILL.md (3f).
+#   3. verify.cjs confirms it edited the fixture SKILL.md to add discipline wording.
+#
+# NOTE: not run-verified when scaffolded (an agent eval costs credits + needs the
+# claude CLI). Run `npm run eval:ablate -- .claude/skills/optimize-fixers` locally or
+# in CI to confirm the with-instructions arm beats the baselinePrompt before trusting
+# the numbers.
+
+- metadata:
+    # Ablating the skill dir makes the /optimize-fixers arm fall back to the
+    # baselinePrompt, so ablation measures "skill scaffolding vs unguided agent".
+    targets:
+      - .claude/skills/optimize-fixers
+  providers: [with-instructions, baseline-no-instructions]
+  vars:
+    prompt: /optimize-fixers fix-eval-fixture
+    # The stripped baseline has no /optimize-fixers skill, so a bare command would
+    # error. Hand the baseline the skill's plain-English job so the comparison is
+    # "skill scaffolding vs an unguided agent on the same problem".
+    baselinePrompt: >-
+      logs/agent/skills-profile.json holds rolling per-skill agent stats and
+      logs/agent/skills-profile.optimized.json is the snapshot from the last run.
+      For the skill `fix-eval-fixture`, compare the two. Its per-invocation token
+      cost (avg_tokens) has risen sharply since the snapshot, which means it is
+      pulling too much into context or dumping raw output. Make the smallest edit to
+      .claude/skills/fix-eval-fixture/SKILL.md that adds context/output discipline
+      (diagnose from the log artifact, run a single targeted verification, do not
+      re-run the full suite or paste full output). Change nothing else.
+    setup: tasks/optimize-fixers-cost/setup.cjs
+    verify: tasks/optimize-fixers-cost/verify.cjs
+  # Correctness dominates: a run that makes the cost-discipline edit passes even if a
+  # little inefficient. Pass = weighted score >= 0.7.
+  threshold: 0.7
+  assert:
+    # Correctness: the fixture SKILL.md gained context/output discipline (verify.cjs).
+    - type: javascript
+      value: context.providerResponse?.metadata?.verifyPassed === true
+      weight: 3
+    # The agent acted rather than just reporting.
+    - type: javascript
+      value: context.providerResponse?.metadata?.madeAnEdit === true
+      weight: 1
+    # Spiral guard — all data is in the seeded profile; Hard Rule 5 caps reads at 3
+    # per skill (SKILL.md + known-fixes.md + profile), so it must not read broadly.
+    - type: javascript
+      value: '(context.providerResponse?.metadata?.readsBeforeFirstEdit ?? 99) <= 8'
+      weight: 1

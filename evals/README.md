@@ -187,6 +187,8 @@ skill's log (`setup.cjs`), points it at a committed broken fixture under
 |---|---|
 | `fix-problems` | Reads **live** VS Code diagnostics via `get_errors` — there's no log artifact to seed in a throwaway worktree. |
 | `fix-all` | Aggregate dispatcher — no behavior of its own to measure. |
+| `triage-fixers` | *(covered — see `evals/tasks/triage-fixers/`.)* |
+| `gen-fixer-eval` | **Generates eval tasks** from a real `error → fix commit → outcome` triple — its output *is* a new eval scaffold, and it needs the fix commit reachable in git history (not present in a throwaway worktree checked out from `HEAD`). Per `.claude/rules/authoring.md`, the safety net is unit tests on the underlying script, not a flaky agent eval: the pure scaffold/classification/diff logic in `scripts/gen-eval-fixture.py` is covered by `scripts/hooks/tests/test_gen_eval_fixture.py` (35+ cases — classification, multi-file/added/flake skips, diff parsing, discriminating-line selection, and a full `build_scaffold` whose generated `test.yaml` is asserted to load and carry `metadata.generated: true`). |
 
 `fix-instructions` — the markdown optimizer that acts on *these* results — **is** wired,
 via the `fix-instructions-self` task: `setup.cjs` seeds a fabricated prior run (one

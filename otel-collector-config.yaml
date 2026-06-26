@@ -1,0 +1,50 @@
+# OpenTelemetry Collector config for Claude Code agent telemetry.
+#
+# Claude Code (with CLAUDE_CODE_ENABLE_TELEMETRY=1) ships two signals over OTLP:
+#   - metrics: claude_code.token.usage, claude_code.cost.usage, session/commit/PR
+#     counts, code_edit_tool.decision, and tool-call counters
+#   - logs (events): per-event detail — user_prompt, tool_result, api_request,
+#     tool_decision — the richest source for "what tools did the agent call"
+#
+# Metrics are exposed for Prometheus to scrape (already in the monitoring profile);
+# events are written as JSONL under logs/telemetry/ for grep/jq review.
+# Runs only under the `monitoring` compose profile — see docker-compose.yml.
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  batch:
+    timeout: 5s
+
+exporters:
+  # Prometheus scrape target — http://otel-collector:8889/metrics
+  prometheus:
+    endpoint: 0.0.0.0:8889
+    resource_to_telemetry_conversion:
+      enabled: true
+  # Append-only event log for the fixer's tool calls / prompts / results.
+  file:
+    path: /telemetry/events.jsonl
+  # Mirror both signals to collector stdout (`docker compose logs otel-collector`).
+  debug:
+    verbosity: basic
+
+service:
+  pipelines:
+    metrics:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [prometheus, debug]
+    logs:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [file, debug]
+  telemetry:
+    logs:
+      level: info

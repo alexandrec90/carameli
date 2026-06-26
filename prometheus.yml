@@ -7,3 +7,8 @@ scrape_configs:
     static_configs:
       - targets: ["app:8000"]
     metrics_path: /metrics
+
+  # Claude Code agent telemetry, re-exposed by the OTel Collector.
+  - job_name: claude-code
+    static_configs:
+      - targets: ["otel-collector:8889"]

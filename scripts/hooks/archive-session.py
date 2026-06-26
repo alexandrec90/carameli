@@ -3,11 +3,16 @@
 Parses the session transcript, extracts per-skill tool call statistics
 and error context, and maintains a rolling aggregate (skills-profile.json)
 across sessions for fixer skill optimization.
+
+It also maintains an outcome ledger (error-ledger.json) that links each error a
+fixer skill saw to whether a later run showed it resolved -- the
+`error -> fix attempt -> did-it-stick` feedback the profile otherwise lacks.
 """
 
 import json
 import os
 import re
+import subprocess
 import sys
 from datetime import UTC, datetime
 
@@ -103,6 +108,31 @@ def extract_texts(entry):
     return []
 
 
+# Token usage fields carried by each assistant message in a Claude Code transcript.
+USAGE_FIELDS = (
+    "input_tokens",
+    "output_tokens",
+    "cache_creation_input_tokens",
+    "cache_read_input_tokens",
+)
+
+
+def extract_usage(entry):
+    """Return the four token counts for an assistant message (0 when absent).
+
+    Cache-read tokens are billed differently from fresh input, so they are kept
+    as a separate field rather than folded into `input_tokens`; `total` is the
+    full billed footprint across all four.
+    """
+    usage = entry.get("message", {}).get("usage") or {}
+    counts = {}
+    for field in USAGE_FIELDS:
+        value = usage.get(field, 0)
+        counts[field] = value if isinstance(value, int) else 0
+    counts["total"] = sum(counts[f] for f in USAGE_FIELDS)
+    return counts
+
+
 def find_skill_segments(entries):
     """Identify (skill_name, start_idx, end_idx) segments."""
     segments = []
@@ -144,7 +174,7 @@ def find_skill_segments(entries):
 
 def analyze_segment(entries, start, end, project_root=""):
     """Compute tool stats and error context for a single skill segment."""
-    tools = {}
+    tools: dict[str, int] = {}
     max_streak = 0
     streak = 0
     max_bash_streak = 0
@@ -155,6 +185,7 @@ def analyze_segment(entries, start, end, project_root=""):
     files_read = []
     files_edited = []
     checked_known_fixes = False
+    tokens = dict.fromkeys((*USAGE_FIELDS, "total"), 0)
 
     for entry in entries[start:end]:
         etype = entry.get("type", "")
@@ -163,6 +194,8 @@ def analyze_segment(entries, start, end, project_root=""):
             continue
 
         if etype == "assistant":
+            for field, value in extract_usage(entry).items():
+                tokens[field] += value
             for block in content:
                 if not isinstance(block, dict) or block.get("type") != "tool_use":
                     continue
@@ -234,23 +267,31 @@ def analyze_segment(entries, start, end, project_root=""):
         "files_edited": sorted(set(files_edited)),
         "error_snippets": error_snippets[:20],
         "checked_known_fixes": checked_known_fixes,
+        "input_tokens": tokens["input_tokens"],
+        "output_tokens": tokens["output_tokens"],
+        "cache_creation_tokens": tokens["cache_creation_input_tokens"],
+        "cache_read_tokens": tokens["cache_read_input_tokens"],
+        "total_tokens": tokens["total"],
     }
 
 
 def analyze_session(entries, project_root=""):
     """Return session-level stats and per-skill breakdowns."""
-    all_tools = {}
+    all_tools: dict[str, int] = {}
     max_streak = 0
     streak = 0
     max_bash_streak = 0
     bash_streak = 0
     user_prompts = []
     skills_invoked = []
+    tokens = dict.fromkeys((*USAGE_FIELDS, "total"), 0)
 
     for entry in entries:
         etype = entry.get("type", "")
 
         if etype == "assistant":
+            for field, value in extract_usage(entry).items():
+                tokens[field] += value
             content = entry.get("message", {}).get("content", [])
             if isinstance(content, list):
                 for block in content:
@@ -292,6 +333,11 @@ def analyze_session(entries, project_root=""):
         "read_to_write_ratio": round(total_reads / max(total_writes, 1), 1),
         "max_consecutive_reads": max_streak,
         "max_consecutive_bash": max_bash_streak,
+        "input_tokens": tokens["input_tokens"],
+        "output_tokens": tokens["output_tokens"],
+        "cache_creation_tokens": tokens["cache_creation_input_tokens"],
+        "cache_read_tokens": tokens["cache_read_input_tokens"],
+        "total_tokens": tokens["total"],
     }
 
     segments = find_skill_segments(entries)
@@ -309,7 +355,9 @@ def analyze_session(entries, project_root=""):
 # ---------------------------------------------------------------------------
 
 
-def update_profile(agent_dir, skill_details):
+def update_profile(agent_dir, skill_details, outcomes=None, recurring=None):
+    outcomes = outcomes or {}
+    recurring = recurring or {}
     profile_path = os.path.join(agent_dir, "skills-profile.json")
     try:
         with open(profile_path, encoding="utf-8") as f:
@@ -328,12 +376,18 @@ def update_profile(agent_dir, skill_details):
                 "total_reads_all": 0,
                 "total_writes_all": 0,
                 "total_bash_all": 0,
+                "total_tokens_all": 0,
+                "total_input_tokens": 0,
+                "total_output_tokens": 0,
+                "total_cache_creation_tokens": 0,
+                "total_cache_read_tokens": 0,
                 "max_consecutive_reads_ever": 0,
                 "max_consecutive_bash_ever": 0,
                 "spiral_count": 0,
                 "bash_spiral_count": 0,
                 "known_fixes_checked": 0,
                 "reads_history": [],
+                "tokens_history": [],
                 "error_patterns": {},
                 "files_read_freq": {},
                 "files_edited_freq": {},
@@ -345,6 +399,15 @@ def update_profile(agent_dir, skill_details):
         p["total_reads_all"] = p.get("total_reads_all", 0) + seg["total_reads"]
         p["total_writes_all"] = p.get("total_writes_all", 0) + seg["total_writes"]
         p["total_bash_all"] = p.get("total_bash_all", 0) + seg.get("total_bash", 0)
+        p["total_tokens_all"] = p.get("total_tokens_all", 0) + seg.get("total_tokens", 0)
+        p["total_input_tokens"] = p.get("total_input_tokens", 0) + seg.get("input_tokens", 0)
+        p["total_output_tokens"] = p.get("total_output_tokens", 0) + seg.get("output_tokens", 0)
+        p["total_cache_creation_tokens"] = p.get("total_cache_creation_tokens", 0) + seg.get(
+            "cache_creation_tokens", 0
+        )
+        p["total_cache_read_tokens"] = p.get("total_cache_read_tokens", 0) + seg.get(
+            "cache_read_tokens", 0
+        )
         p["max_consecutive_reads_ever"] = max(
             p.get("max_consecutive_reads_ever", 0),
             seg["max_consecutive_reads"],
@@ -365,6 +428,11 @@ def update_profile(agent_dir, skill_details):
         history = p.get("reads_history", [])
         history.append(seg["total_reads"])
         p["reads_history"] = history[-50:]
+
+        # Token history (last 50) — per-invocation total token footprint.
+        tok_history = p.get("tokens_history", [])
+        tok_history.append(seg.get("total_tokens", 0))
+        p["tokens_history"] = tok_history[-50:]
 
         # Error patterns (top 50 by count)
         err = p.get("error_patterns", {})
@@ -395,6 +463,7 @@ def update_profile(agent_dir, skill_details):
         p["avg_reads"] = round(p["total_reads_all"] / inv, 1)
         p["avg_writes"] = round(p["total_writes_all"] / inv, 1)
         p["avg_bash"] = round(p["total_bash_all"] / inv, 1)
+        p["avg_tokens"] = round(p["total_tokens_all"] / inv)
         p["avg_ratio"] = round(
             p["total_reads_all"] / max(p["total_writes_all"], 1),
             1,
@@ -404,10 +473,174 @@ def update_profile(agent_dir, skill_details):
         p90_idx = int(len(sorted_h) * 0.9)
         p["budget_recommendation"] = max(3, sorted_h[min(p90_idx, len(sorted_h) - 1)])
 
+        # Outcome rollup from the error ledger (absent for non-fixer skills).
+        if skill in outcomes:
+            p["fix_outcomes"] = outcomes[skill]
+        # Signatures whose fixes did not hold — surfaced so optimize-fixers can
+        # escalate them (check 3g) instead of codifying another guess. Omit when
+        # empty so non-fixer/clean skills carry no noise field.
+        if recurring.get(skill):
+            p["recurring_errors"] = recurring[skill]
+
         profile[skill] = p
 
     with open(profile_path, "w", encoding="utf-8") as f:
         json.dump(profile, f, indent=2)
+
+
+# ---------------------------------------------------------------------------
+# Outcome ledger: error -> fix attempt -> did-it-stick
+# ---------------------------------------------------------------------------
+
+
+def current_head(cwd):
+    """Best-effort short commit SHA at `cwd`; '' when git is unavailable."""
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"],
+            cwd=cwd or None,
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return ""
+    return result.stdout.strip() if result.returncode == 0 else ""
+
+
+def _ledger_key(skill, signature):
+    return f"{skill}::{signature}"
+
+
+def reconcile_outcomes(ledger, skill_details, head_sha, today):
+    """Fold this session's fixer segments into the outcome ledger and return it.
+
+    A fixer skill reads an error log (capturing the signatures it saw) and may edit
+    files (a fix attempt). Across sessions we infer outcomes by watching signatures
+    appear and disappear:
+
+      - first time a signature is seen        -> status "open"
+      - seen again after being marked fixed   -> status "recurring" (fix didn't hold)
+      - gone from a fresh read after >=1 fix  -> status "fixed"
+
+    Only `fix*` skills carry error logs, so non-fixer segments are ignored. Keying by
+    (skill, signature) keeps each fixer's errors separate. Pure: mutates and returns
+    the passed-in dict, no I/O.
+    """
+    observed: dict[str, set[str]] = {}  # skill -> signatures seen this session
+    attempted: dict[str, bool] = {}  # skill -> the skill edited files this session
+    for seg in skill_details:
+        skill = seg.get("skill", "")
+        if not skill.startswith("fix"):
+            continue
+        observed.setdefault(skill, set()).update(seg.get("error_snippets", []))
+        if seg.get("files_edited"):
+            attempted[skill] = True
+
+    for skill, signatures in observed.items():
+        attempted_now = attempted.get(skill, False)
+
+        # (a) Upsert every signature seen this session.
+        for sig in signatures:
+            key = _ledger_key(skill, sig)
+            entry = ledger.get(key)
+            if entry is None:
+                entry = {
+                    "skill": skill,
+                    "signature": sig,
+                    "first_seen": today,
+                    "last_seen": today,
+                    "attempts": 0,
+                    "status": "open",
+                    "last_commit": None,
+                }
+                ledger[key] = entry
+            if entry["status"] == "fixed":
+                # It came back -> the previous fix did not hold.
+                entry["status"] = "recurring"
+            entry["last_seen"] = today
+            if attempted_now:
+                entry["attempts"] += 1
+                entry["last_commit"] = head_sha or entry.get("last_commit")
+
+        # (b) Disappearance: an open/recurring signature absent from this fresh read,
+        #     with at least one prior attempt, counts as resolved.
+        for entry in ledger.values():
+            if entry["skill"] != skill:
+                continue
+            if entry["signature"] in signatures:
+                continue
+            if entry["attempts"] >= 1 and entry["status"] in ("open", "recurring"):
+                entry["status"] = "fixed"
+                entry["fixed_on"] = today
+
+    return ledger
+
+
+def outcome_counts(ledger):
+    """Per-skill {fixed, recurring, open, success_rate} rollup for the profile.
+
+    success_rate = fixed / (fixed + recurring + open), rounded to 2 dp; 0.0 when a
+    skill has no resolved-or-open entries yet.
+    """
+    counts: dict[str, dict[str, float]] = {}
+    for entry in ledger.values():
+        skill = entry.get("skill", "")
+        if not skill:
+            continue
+        c = counts.setdefault(skill, {"fixed": 0, "recurring": 0, "open": 0})
+        status = entry.get("status", "open")
+        if status in c:
+            c[status] += 1
+    for c in counts.values():
+        total = c["fixed"] + c["recurring"] + c["open"]
+        c["success_rate"] = round(c["fixed"] / total, 2) if total else 0.0
+    return counts
+
+
+def recurring_signatures(ledger, cap=10):
+    """Per-skill list of signatures whose status == 'recurring', newest first.
+
+    Surfaced into the profile so optimize-fixers can escalate fixes that did not
+    hold without a 4th file read (it only reads SKILL.md + known-fixes.md + the
+    profile). Capped at `cap` per skill, ordered by `last_seen` descending.
+    """
+    by_skill: dict[str, list] = {}
+    for entry in ledger.values():
+        if entry.get("status") != "recurring":
+            continue
+        skill = entry.get("skill", "")
+        if not skill:
+            continue
+        by_skill.setdefault(skill, []).append(entry)
+
+    result: dict[str, list[str]] = {}
+    for skill, entries in by_skill.items():
+        entries.sort(key=lambda e: e.get("last_seen", ""), reverse=True)
+        result[skill] = [e.get("signature", "") for e in entries[:cap]]
+    return result
+
+
+def update_outcome_ledger(agent_dir, skill_details, head_sha):
+    """Load, reconcile, and persist the outcome ledger.
+
+    Returns `(per-skill counts, per-skill recurring signatures)` so the caller can
+    fold both into the profile in a single write.
+    """
+    ledger_path = os.path.join(agent_dir, "error-ledger.json")
+    try:
+        with open(ledger_path, encoding="utf-8") as f:
+            ledger = json.load(f)
+    except (OSError, json.JSONDecodeError):
+        ledger = {}
+
+    today = datetime.now().strftime("%Y-%m-%d")
+    reconcile_outcomes(ledger, skill_details, head_sha, today)
+
+    with open(ledger_path, "w", encoding="utf-8") as f:
+        json.dump(ledger, f, indent=2)
+
+    return outcome_counts(ledger), recurring_signatures(ledger)
 
 
 # ---------------------------------------------------------------------------
@@ -461,7 +694,10 @@ def main():
         with open(summary_path, "w", encoding="utf-8") as f:
             json.dump(summary, f, indent=2)
 
-        update_profile(agent_dir, skill_details)
+        # Reconcile the error-outcome ledger first so the profile can carry the
+        # per-skill fix success counts in the same write.
+        outcomes, recurring = update_outcome_ledger(agent_dir, skill_details, current_head(cwd))
+        update_profile(agent_dir, skill_details, outcomes=outcomes, recurring=recurring)
 
     except Exception:
         import traceback

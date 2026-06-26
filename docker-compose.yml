@@ -289,6 +289,24 @@ services:
       retries: 10
       start_period: 15s
 
+  # OpenTelemetry Collector — receives Claude Code agent telemetry over OTLP
+  # (token cost, tool calls, events) and re-exposes metrics for Prometheus to
+  # scrape; events land in logs/telemetry/events.jsonl. Config in
+  # otel-collector-config.yaml. Host ports let Claude Code (running on the host)
+  # reach it at http://localhost:4318.
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.103.1
+    restart: unless-stopped
+    profiles: ["monitoring"]
+    command: ["--config=/etc/otelcol/config.yaml"]
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otelcol/config.yaml:ro
+      - ./logs/telemetry:/telemetry
+    ports:
+      - "4317:4317" # OTLP gRPC
+      - "4318:4318" # OTLP HTTP
+      - "8889:8889" # Prometheus scrape endpoint
+
   prometheus:
     image: prom/prometheus:v2.51.0
     restart: unless-stopped

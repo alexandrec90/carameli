@@ -56,3 +56,19 @@ def test_skin_changed_detects_porcelain_lines():
 def test_finalize_targets_cover_state_driven_skills():
     skills = {skill for skill, _ in hook.FINALIZE_TARGETS}
     assert skills == {"audit-design-flaws", "make-tests", "make-frontend-tests", "refactor"}
+
+
+def test_archive_targets_present_with_transcript():
+    payload = '{"transcript_path": "/x/session.jsonl", "cwd": "/repo"}'
+    assert hook.archive_targets_present(payload) is True
+
+
+def test_archive_targets_present_without_transcript():
+    assert hook.archive_targets_present('{"cwd": "/repo"}') is False
+    assert hook.archive_targets_present('{"transcript_path": ""}') is False
+
+
+def test_archive_targets_present_rejects_non_object_and_garbage():
+    assert hook.archive_targets_present("[1, 2, 3]") is False
+    assert hook.archive_targets_present("not json") is False
+    assert hook.archive_targets_present("") is False
