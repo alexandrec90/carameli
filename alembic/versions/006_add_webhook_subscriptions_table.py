@@ -26,7 +26,7 @@ def upgrade() -> None:
     already_exists = conn.execute(
         sa.text(
             "SELECT EXISTS (SELECT 1 FROM information_schema.tables "
-            "WHERE table_schema = 'public' AND table_name = 'webhook_subscriptions')"
+            "WHERE table_schema = current_schema() AND table_name = 'webhook_subscriptions')"
         )
     ).scalar()
     if already_exists:

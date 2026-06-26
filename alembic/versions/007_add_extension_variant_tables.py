@@ -70,7 +70,7 @@ def upgrade() -> None:
         row[0]
         for row in conn.execute(
             sa.text(
-                "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'"
+                "SELECT table_name FROM information_schema.tables WHERE table_schema = current_schema()"
             )
         ).fetchall()
     }

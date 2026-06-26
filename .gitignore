@@ -122,4 +122,4 @@ evals/output/*
 evals/.last-run.json
 
 # Claude Code local settings (personal permissions / preferences)
-.claude/settings.local.json
+.claude/settings.local.jsondocker-compose.override.yml

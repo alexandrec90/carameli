@@ -208,6 +208,24 @@ def test_filter_caps_block_at_max():
     assert any("truncated" in l for l in result)
 
 
+def test_filter_truncation_keeps_block_tail():
+    # A captured subprocess traceback carries the real error on its LAST line;
+    # truncation must preserve the tail, not just the head boilerplate.
+    e_lines = [f"E   frame {n}" for n in range(40)]
+    e_lines.append("E   sqlalchemy.exc.ProgrammingError: the real root cause")
+    raw = [
+        "=== FAILURES ===",
+        "___ test_big ___",
+        *e_lines,
+        "=== short test summary info ===",
+        "FAILED tests/unit/test_big.py::test_big",
+        "=== 1 failed ===",
+    ]
+    result = diag.filter_pytest_output(raw)
+    assert any("truncated" in l for l in result)
+    assert any("the real root cause" in l for l in result)
+
+
 def test_filter_appends_stats_line():
     raw = _raw("""
         === FAILURES ===

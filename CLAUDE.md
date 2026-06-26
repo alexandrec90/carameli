@@ -84,6 +84,15 @@ Be deliberate with destructive lifecycle ops on a running stack: `down -v` wipes
 and `restart` / `up --build` can drop the user's session — confirm before those. Use `-T`
 with `docker compose exec` (see tooling.md).
 
+## MCP Tools
+
+Configured MCP servers are documented in `README.md` (MCP Tools section). Installation
+gotchas for the VS Code extension are in `.claude/projects/*/memory/mcp-vscode-gotchas.md`.
+
+**Proactive suggestions:** If an MCP server would meaningfully help with the current task,
+suggest it — mention what it enables and the install steps. It's a hassle to set up here,
+so surfacing useful ones saves time.
+
 ## Guardrails
 
 This project is vibe-coded. **Every rule below is mandatory.**

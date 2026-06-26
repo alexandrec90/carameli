@@ -199,7 +199,23 @@ All API routes are prefixed with `/vsapi/1.0.0/`.
 
 ## MCP Tools
 
-No relevant MCP tools are currently configured. Tools that would help if added:
+| Server | Package | Scope | Status |
+| --- | --- | --- | --- |
+| `postgres` | `@modelcontextprotocol/server-postgres` | USER (`~/.claude.json`) | Configured |
+| `MCP_DOCKER` | `docker mcp gateway run` (Docker Desktop built-in) | USER (`~/.claude.json`) | Configured |
+| `github` | `ghcr.io/github/github-mcp-server` (Docker) | USER (`~/.claude.json`) | Configured |
+| `redis` | `@modelcontextprotocol/server-redis` | USER (`~/.claude.json`) | Configured — requires Redis port on localhost (see `docker-compose.override.yml`) |
 
-- **PostgreSQL MCP** — direct DB inspection without `docker compose exec`
-- **Docker MCP** — container management from Claude
+### Installation gotchas (VS Code extension + Windows)
+
+1. **Config file is `~/.claude.json`**, not `settings.json` — `mcpServers` is rejected by the settings schema.
+2. **USER scope only** — project-scoped entries (`projects.<path>.mcpServers`) silently fail in the VS Code extension due to drive-letter-case mismatches (`C:/` vs `c:/` as the path key).
+3. **`cmd.exe /c npx` wrapper required** — bare `npx` as `"command"` doesn't resolve in the extension's process environment on Windows.
+4. **Pre-install the npm package globally** — `npx -y <pkg>` downloads on first run and can exceed the 30s MCP timeout. Run `npm install -g <pkg>` once before reloading. (`@modelcontextprotocol/server-postgres` is deprecated but functional; install it anyway.)
+5. **Reload Window after editing** — the extension doesn't hot-reload `~/.claude.json`.
+6. **CLI "Connected" ≠ in-session** — `claude mcp list` shows Connected regardless of scope; reload and test a tool call to confirm.
+
+### Notes
+
+- `MCP_DOCKER` uses Docker Desktop's built-in MCP gateway (`docker mcp gateway run`) — no npm package needed. `docker` is a real binary so the `cmd.exe /c` wrapper is **not** required.
+- Both servers are local-session-only (require Docker Desktop running).

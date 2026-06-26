@@ -19,6 +19,11 @@ The caller writes the artifact and prints the skip notes.
 import re
 
 MAX_PER_BLOCK = 25
+# When a block is over the cap, keep this many lines from the END as well as the
+# head. A failure that embeds a captured subprocess traceback (e.g. an Alembic
+# CLI run asserted via its STDERR) carries the actual exception on the LAST lines;
+# a head-only truncation would drop the root cause and keep only boilerplate.
+TAIL_PER_BLOCK = 8
 
 # Terminal colour / cursor escape sequences. pytest is invoked with --color=no,
 # but vitest (and any other tool that ignores a no-colour flag) emits SGR codes
@@ -312,7 +317,9 @@ def filter_pytest_output(lines: list[str]) -> list[str]:
             is_raw_fallback = True
         if len(source) > MAX_PER_BLOCK:
             kept = len(source)
-            source = [*source[:MAX_PER_BLOCK], f"  ... ({kept} lines total, truncated)"]
+            head = source[: MAX_PER_BLOCK - TAIL_PER_BLOCK]
+            tail = source[-TAIL_PER_BLOCK:]
+            source = [*head, f"  ... ({kept} lines total, truncated)", *tail]
         if is_raw_fallback:
             source = [*source, "  [raw fallback: no E-lines in filtered output]"]
         filtered.extend(source)

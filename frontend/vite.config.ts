@@ -26,6 +26,12 @@ export default defineConfig(({ mode }) => {
     test: {
       environment: 'happy-dom',
       globals: true,
+      // Pin the API base to empty so URL assertions stay hermetic regardless of
+      // any ambient VITE_API_BASE_URL in the shell/CI. The app talks to the
+      // backend through the dev-server proxy (relative paths), so '' is correct.
+      env: {
+        VITE_API_BASE_URL: '',
+      },
     },
   }
 })

@@ -6,7 +6,7 @@ description: 'Fixes lint errors collected in logs/lint-errors.log.'
 
 # Skill: Fix Lint Errors
 
-> **Local session only.** Reads a log artifact written by a PS1 script on the host.
+> **Local session only.** Reads a log artifact written by a python script on the host.
 
 Candidate rewrite of `.claude/skills/fix-lint/SKILL.md` — a leaner version kept for
 A/B testing via `npm run eval:rewrite`. Not loaded as a skill (skills load from
