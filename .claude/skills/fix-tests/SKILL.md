@@ -15,15 +15,17 @@ Fix failing tests collected in `logs/test-failures.log`.
 The fix steps are the same everywhere — read the log, edit the implicated code. One thing
 differs by environment, and only after you change a file under `app/`:
 
-- **Running locally:** the app runs from a container, so the change isn't live until
-  `docker compose restart app`. Test-only edits need no restart.
-- **In CI** (working a `fix/auto-*` PR branch): each run rebuilds from scratch and runs
-  `alembic upgrade head` before tests, so any code or migration change takes effect on the
-  next push. There's nothing to restart.
+- **Docker is reachable** (check with `docker info`): run tests locally via
+  `docker compose exec -T app pytest ...`. `app/` changes need `docker compose restart app`
+  first; test-only edits need no restart. **This is always preferred — use it whenever
+  Docker is up, regardless of the branch name.**
+- **Docker is not reachable** (no daemon): you cannot run tests locally. If on a
+  `fix/auto-*` branch, the next push triggers CI which rebuilds and reruns. Otherwise
+  (sandbox / headless eval), stamp `--- ADDRESSED` and stop — whatever runs the suite
+  next produces the fresh log.
 
-Don't over-think this up front: if there's no Docker daemon, you're not running locally —
-there's nothing for you to restart, so just fix the code (the next push or runner handles
-making it live; see Step 3).
+Check Docker availability **once at the start of Step 3** with `docker info`. Do not
+infer environment from the branch name.
 
 ---
 
@@ -44,8 +46,8 @@ Read these two files **in parallel** (single tool call):
 |---|---|
 | Non-empty, last line is NOT `--- ADDRESSED` | **Fresh** — proceed to known-fix matching below. **Do not re-run any test command.** |
 | Empty | Tests are green — stop. |
-| Last line is `--- ADDRESSED` | **Stale** — regenerate it (locally: restart the app if `app/` changed, then re-run the suite yourself; CI: push and let the workflow re-run). Stop this turn; restart on the fresh log. |
-| File doesn't exist | Not yet generated — generate it (locally: run the suite yourself; CI: the workflow produces it). Stop this turn; restart on the fresh log once present. |
+| Last line is `--- ADDRESSED` | **Stale** — regenerate it. If Docker is up: restart the app if `app/` changed, then run the suite. If Docker is down: push (on a `fix/auto-*` branch) or ask the user to run the suite. Stop this turn; restart on the fresh log. |
+| File doesn't exist | Not yet generated — generate it. If Docker is up: run the suite. If Docker is down: push (on a `fix/auto-*` branch) or ask the user. Stop this turn; restart on the fresh log once present. |
 
 ### Log quality gate
 
@@ -141,24 +143,23 @@ State clearly:
 Your deliverable is the **fix plus the `--- ADDRESSED` stamp** — that needs no test runner
 and completes in any environment (including a headless eval that only seeds the log).
 
-**If a runner is reachable, close the loop yourself:** make `app/` changes live (locally
-`docker compose restart app`; in CI the next push handles it — see the intro), regenerate
-the log, and repeat from Step 1 until it's empty — capped at **4 iterations**, and stopping
-early if an iteration ends with the **same set of failures** it began with (no progress:
-report the stuck failures rather than spinning). If the cap is hit with failures still
-present, report what remains and tell the user to re-invoke `/fix-tests` after reviewing
-them. Regenerate at the **breadth of the log**:
+**If Docker is reachable, close the loop yourself:** make `app/` changes live
+(`docker compose restart app` for `app/` edits; test-only edits need no restart),
+regenerate the log, and repeat from Step 1 until it's empty — capped at **4 iterations**,
+and stopping early if an iteration ends with the **same set of failures** it began with
+(no progress: report the stuck failures rather than spinning). If the cap is hit with
+failures still present, report what remains and tell the user to re-invoke `/fix-tests`
+after reviewing them. Regenerate at the **breadth of the log**:
 a pytest-only log → the selective/testmon pytest rerun above; a multi-section log (the
 aggregate "Test: All Suites" output) → `python scripts/run-tests.py --all`, so every section
 is reproduced rather than blanked. Don't stop at a half-fixed state and wait
-for a human. **If no runner is reachable** (no Docker and not a CI workflow branch — e.g. a
-sandbox), you can't regenerate: finish the fix, stamp `--- ADDRESSED`, report, and stop.
-Whatever runs the suite next produces the fresh log.
+for a human. **If Docker is not reachable**, you can't regenerate locally: finish the fix,
+stamp `--- ADDRESSED`, report, and stop. Whatever runs the suite next produces the fresh log.
 
-> When you do regenerate locally, the suite streams every test line — don't pipe that into
+> When you regenerate locally, the suite streams every test line — don't pipe that into
 > context; discard the run's stdout and read the capped `logs/test-failures.log` instead
 > (background a slow run so the turn isn't blocked). Waiting on pytest costs latency, not
-> tokens; ingesting its raw output is what costs tokens. In CI you skip this entirely.
+> tokens; ingesting its raw output is what costs tokens.
 
 ---
 

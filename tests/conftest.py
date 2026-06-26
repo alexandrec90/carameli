@@ -173,7 +173,10 @@ async def client(db_session: AsyncSession):
     app.user_middleware = [m for m in app.user_middleware if m.cls is not SlowAPIMiddleware]
     app.middleware_stack = app.build_middleware_stack()
 
-    transport = ASGITransport(app=app)
+    # raise_app_exceptions=False: Starlette's ServerErrorMiddleware re-raises an
+    # unhandled exception after the `Exception` handler returns its 500 response,
+    # so without this the transport would propagate it instead of yielding the 500.
+    transport = ASGITransport(app=app, raise_app_exceptions=False)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac
 

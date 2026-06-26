@@ -26,10 +26,9 @@ _MIGRATION_SCHEMA = "migration_test_alembic"
 def _build_alembic_env(schema: str) -> dict[str, str]:
     from app.core.config import settings
 
-    base_url = settings.database_url
-    sep = "&" if "?" in base_url else "?"
     env = os.environ.copy()
-    env["DATABASE_URL"] = f"{base_url}{sep}server_settings[search_path]={schema}"
+    env["DATABASE_URL"] = settings.database_url
+    env["_ALEMBIC_SCHEMA"] = schema
     return env
 
 

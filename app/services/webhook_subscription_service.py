@@ -40,7 +40,5 @@ async def create(
     )
 
 
-async def deactivate(
-    session: AsyncSession, sub: WebhookSubscription
-) -> WebhookSubscription:
+async def deactivate(session: AsyncSession, sub: WebhookSubscription) -> WebhookSubscription:
     return await WebhookSubscriptionRepo(session).deactivate(sub)

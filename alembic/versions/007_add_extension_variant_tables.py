@@ -70,7 +70,7 @@ def upgrade() -> None:
         row[0]
         for row in conn.execute(
             sa.text(
-                "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'"
+                "SELECT table_name FROM information_schema.tables WHERE table_schema = current_schema()"
             )
         ).fetchall()
     }
@@ -91,9 +91,7 @@ def upgrade() -> None:
             *_timestamp_columns(),
             sa.PrimaryKeyConstraint("id"),
         )
-        op.create_index(
-            "ix_group_extensions_customer_id", "group_extensions", ["customer_id"]
-        )
+        op.create_index("ix_group_extensions_customer_id", "group_extensions", ["customer_id"])
 
     if "intercom_groups" not in existing:
         op.create_table(
