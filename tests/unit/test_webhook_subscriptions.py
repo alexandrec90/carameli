@@ -97,9 +97,7 @@ async def test_deactivate_webhook_subscription_success(client) -> None:
     await _create_customer(client, 7007)
     created = await _add_subscription(client, 7007)
 
-    resp = await client.put(
-        f"{_HOOK_BASE}/Deactivate/7007/{created['id']}", headers=AUTH_HEADERS
-    )
+    resp = await client.put(f"{_HOOK_BASE}/Deactivate/7007/{created['id']}", headers=AUTH_HEADERS)
     assert resp.status_code == 200
     assert resp.json()["active"] is False
 
@@ -110,8 +108,6 @@ async def test_deactivate_webhook_subscription_success(client) -> None:
 
 async def test_deactivate_webhook_subscription_not_found(client) -> None:
     await _create_customer(client, 7008)
-    resp = await client.put(
-        f"{_HOOK_BASE}/Deactivate/7008/{uuid.uuid4()}", headers=AUTH_HEADERS
-    )
+    resp = await client.put(f"{_HOOK_BASE}/Deactivate/7008/{uuid.uuid4()}", headers=AUTH_HEADERS)
     assert resp.status_code == 404
     assert resp.json()["detail"] == "Webhook subscription not found"

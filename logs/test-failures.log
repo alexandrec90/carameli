@@ -1,0 +1,70 @@
+# source: scripts/run-tests.py (CI)
+
+# pytest
+# fix: pytest tests/unit/ <path::to::failing_test>
+=================================== FAILURES ===================================
+_________ test_unhandled_exception_returns_500_without_leaking_details _________
+tests/unit/test_health.py:68: in test_unhandled_exception_returns_500_without_leaking_details
+app/api/vsapi/customers.py:82: in get_customer
+E   RuntimeError: secret
+ERROR    app.main:main.py:73 Unhandled exception: GET http://test/vsapi/1.0.0/VsCustomer/Get/999
+
+_________________________ test_upgrade_on_clean_schema _________________________
+tests/unit/test_migration_concerns.py:271: in test_upgrade_on_clean_schema
+E   AssertionError: alembic upgrade head failed:
+E     STDOUT: 
+E     STDERR: Traceback (most recent call last):
+E       File "/opt/hostedtoolcache/Python/3.12.13/x64/bin/alembic", line 6, in <module>
+E         sys.exit(main())
+E                  ^^^^^^
+E       File "/opt/hostedtoolcache/Python/3.12.13/x64/lib/python3.12/site-packages/alembic/config.py", line 1047, in main
+E         CommandLine(prog=prog).main(argv=argv)
+E       File "/opt/hostedtoolcache/Python/3.12.13/x64/lib/python3.12/site-packages/alembic/config.py", line 1037, in main
+E         self.run_cmd(cfg, options)
+E       File "/opt/hostedtoolcache/Python/3.12.13/x64/lib/python3.12/site-packages/alembic/config.py", line 971, in run_cmd
+E         fn(
+E       File "/opt/hostedtoolcache/Python/3.12.13/x64/lib/python3.12/site-packages/alembic/command.py", line 490, in upgrade
+E         script.run_env()
+E       File "/opt/hostedtoolcache/Python/3.12.13/x64/lib/python3.12/site-packages/alembic/script/base.py", line 556, in run_env
+E         util.load_python_file(self.dir, "env.py")
+E       File "/opt/hostedtoolcache/Python/3.12.13/x64/lib/python3.12/site-packages/alembic/util/pyfiles.py", line 116, in load_python_file
+E         module = load_module_py(module_id, path)
+E                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       File "/opt/hostedtoolcache/Python/3.12.13/x64/lib/python3.12/site-packages/alembic/util/pyfiles.py", line 136, in load_module_py
+E         spec.loader.exec_module(module)  # type: ignore
+E         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       File "<frozen importlib._bootstrap_external>", line 999, in exec_module
+  ... (97 lines total, truncated)
+
+__________________________ test_migration_round_trip ___________________________
+tests/unit/test_migration_concerns.py:301: in test_migration_round_trip
+E   AssertionError: alembic upgrade head failed:
+E     STDOUT: 
+E     STDERR: Traceback (most recent call last):
+E       File "/opt/hostedtoolcache/Python/3.12.13/x64/bin/alembic", line 6, in <module>
+E         sys.exit(main())
+E                  ^^^^^^
+E       File "/opt/hostedtoolcache/Python/3.12.13/x64/lib/python3.12/site-packages/alembic/config.py", line 1047, in main
+E         CommandLine(prog=prog).main(argv=argv)
+E       File "/opt/hostedtoolcache/Python/3.12.13/x64/lib/python3.12/site-packages/alembic/config.py", line 1037, in main
+E         self.run_cmd(cfg, options)
+E       File "/opt/hostedtoolcache/Python/3.12.13/x64/lib/python3.12/site-packages/alembic/config.py", line 971, in run_cmd
+E         fn(
+E       File "/opt/hostedtoolcache/Python/3.12.13/x64/lib/python3.12/site-packages/alembic/command.py", line 490, in upgrade
+E         script.run_env()
+E       File "/opt/hostedtoolcache/Python/3.12.13/x64/lib/python3.12/site-packages/alembic/script/base.py", line 556, in run_env
+E         util.load_python_file(self.dir, "env.py")
+E       File "/opt/hostedtoolcache/Python/3.12.13/x64/lib/python3.12/site-packages/alembic/util/pyfiles.py", line 116, in load_python_file
+E         module = load_module_py(module_id, path)
+E                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       File "/opt/hostedtoolcache/Python/3.12.13/x64/lib/python3.12/site-packages/alembic/util/pyfiles.py", line 136, in load_module_py
+E         spec.loader.exec_module(module)  # type: ignore
+E         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       File "<frozen importlib._bootstrap_external>", line 999, in exec_module
+  ... (123 lines total, truncated)
+
+=========================== short test summary info ============================
+FAILED tests/unit/test_health.py::test_unhandled_exception_returns_500_without_leaking_details - RuntimeError: secret
+FAILED tests/unit/test_migration_concerns.py::test_upgrade_on_clean_schema - AssertionError: alembic upgrade head failed:
+FAILED tests/unit/test_migration_concerns.py::test_migration_round_trip - AssertionError: alembic upgrade head failed:
+============ 3 failed, 382 passed, 28 warnings in 117.79s (0:01:57) ============

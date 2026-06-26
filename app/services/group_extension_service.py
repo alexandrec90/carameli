@@ -11,9 +11,7 @@ from app.repositories.group_extension_repo import GroupExtensionRepo
 logger = logging.getLogger(__name__)
 
 
-async def list_for_customer(
-    session: AsyncSession, customer_id: uuid.UUID
-) -> list[GroupExtension]:
+async def list_for_customer(session: AsyncSession, customer_id: uuid.UUID) -> list[GroupExtension]:
     return await GroupExtensionRepo(session).list_for_customer(customer_id)
 
 
