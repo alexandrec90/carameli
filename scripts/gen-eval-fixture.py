@@ -238,10 +238,16 @@ def select_source_file(
         return None, "fix commit touched no source files (logs/docs only)"
     if len(sources) > 1:
         paths = ", ".join(p for _, p in sources)
-        return None, f"fix touched multiple source files ({paths}); cannot auto-mint a single broken fixture"
+        return (
+            None,
+            f"fix touched multiple source files ({paths}); cannot auto-mint a single broken fixture",
+        )
     status, path = sources[0]
     if status == "A":
-        return None, f"source file {path} was added in the fix commit; no pre-fix (broken) state to derive"
+        return (
+            None,
+            f"source file {path} was added in the fix commit; no pre-fix (broken) state to derive",
+        )
     if status == "D":
         return None, f"source file {path} was deleted by the fix; cannot build a fix-by-edit task"
     return path, None
@@ -258,7 +264,9 @@ def _yaml_squote(s: str) -> str:
     return "'" + s.replace("'", "''") + "'"
 
 
-def render_seed_log(skill: str, signature: str, fixture_path: str, source_path: str, commit: str) -> str:
+def render_seed_log(
+    skill: str, signature: str, fixture_path: str, source_path: str, commit: str
+) -> str:
     """The log artifact content seeded before the agent runs. The source path is
     remapped to the fixture path so the agent edits the committed broken fixture,
     not the (unbroken) real source."""
@@ -288,7 +296,9 @@ def render_setup_cjs(skill: str, artifact: str, seed_log: str, commit: str) -> s
     )
 
 
-def render_verify_cjs(fixture_path: str, includes: list[str], excludes: list[str], commit: str) -> str:
+def render_verify_cjs(
+    fixture_path: str, includes: list[str], excludes: list[str], commit: str
+) -> str:
     inc = json.dumps(includes, ensure_ascii=False)
     exc = json.dumps(excludes, ensure_ascii=False)
     return (
@@ -403,9 +413,7 @@ def build_scaffold(
 
     diff = parse_unified_diff(diff_text)
     file_diff = diff.get(target, {"added": [], "removed": []})
-    hunk_count = sum(
-        1 for line in diff_text.splitlines() if line.startswith("@@")
-    )
+    hunk_count = sum(1 for line in diff_text.splitlines() if line.startswith("@@"))
     includes, excludes = discriminating_lines(file_diff["added"], file_diff["removed"])
     if not includes and not excludes:
         return Skip(
@@ -418,15 +426,11 @@ def build_scaffold(
     fixture_path = f"evals/fixtures/{task_name}/{basename}"
 
     seed_log = render_seed_log(skill, signature, fixture_path, target, commit)
-    providers = choose_providers(
-        len(file_diff["added"]) + len(file_diff["removed"]), hunk_count
-    )
+    providers = choose_providers(len(file_diff["added"]) + len(file_diff["removed"]), hunk_count)
 
     files = {
         fixture_path: pre_fix_contents[target],
-        f"evals/tasks/{task_name}/setup.cjs": render_setup_cjs(
-            skill, artifact, seed_log, commit
-        ),
+        f"evals/tasks/{task_name}/setup.cjs": render_setup_cjs(skill, artifact, seed_log, commit),
         f"evals/tasks/{task_name}/verify.cjs": render_verify_cjs(
             fixture_path, includes, excludes, commit
         ),
@@ -468,9 +472,7 @@ def commit_exists(commit: str, root: Path) -> bool:
     return result.returncode == 0
 
 
-def gather_git_inputs(
-    commit: str, root: Path
-) -> tuple[list[tuple[str, str]], str, dict[str, str]]:
+def gather_git_inputs(commit: str, root: Path) -> tuple[list[tuple[str, str]], str, dict[str, str]]:
     """Return (name_status, diff_text, pre_fix_contents) for the fix commit."""
     name_status = parse_name_status(_git(["show", "--name-status", "--format=", commit], root))
     diff_text = _git(["show", "--format=", "--unified=3", commit], root)
@@ -508,9 +510,7 @@ def validate_scaffold(paths: list[Path]) -> list[str]:
         if p.suffix == ".yaml" and yaml is not None:
             yaml.safe_load(p.read_text(encoding="utf-8"))
         elif p.suffix == ".cjs":
-            result = subprocess.run(
-                ["node", "--check", str(p)], capture_output=True, text=True
-            )
+            result = subprocess.run(["node", "--check", str(p)], capture_output=True, text=True)
             if result.returncode != 0:
                 if "not found" in result.stderr.lower() or result.returncode == 127:
                     warnings.append(f"node not available — skipped check of {p.name}")
