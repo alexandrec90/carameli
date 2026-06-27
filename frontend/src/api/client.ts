@@ -194,6 +194,135 @@ export const api = {
         method: 'PUT',
       }),
   },
+
+  agents: {
+    list: (customerId: number) =>
+      request<AgentListResponse>(`/vsapi/1.0.0/VsAgent/List/${customerId}`),
+    add: (body: AddAgentBody) =>
+      request<Agent>('/vsapi/1.0.0/VsAgent/Add', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
+    deactivate: (customerId: number, agentId: string) =>
+      request<Agent>(`/vsapi/1.0.0/VsAgent/Deactivate/${customerId}/${agentId}`, {
+        method: 'PUT',
+      }),
+  },
+
+  callQueues: {
+    list: (customerId: number) =>
+      request<CallQueueListResponse>(`/vsapi/1.0.0/VsCallQueue/List/${customerId}`),
+    add: (body: AddCallQueueBody) =>
+      request<CallQueue>('/vsapi/1.0.0/VsCallQueue/Add', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
+    deactivate: (customerId: number, queueId: string) =>
+      request<CallQueue>(`/vsapi/1.0.0/VsCallQueue/Deactivate/${customerId}/${queueId}`, {
+        method: 'PUT',
+      }),
+  },
+
+  agentSkills: {
+    list: (customerId: number) =>
+      request<AgentSkillListResponse>(`/vsapi/1.0.0/VsAgentSkill/List/${customerId}`),
+    add: (body: AddAgentSkillBody) =>
+      request<AgentSkill>('/vsapi/1.0.0/VsAgentSkill/Add', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
+    deactivate: (customerId: number, skillId: string) =>
+      request<AgentSkill>(`/vsapi/1.0.0/VsAgentSkill/Deactivate/${customerId}/${skillId}`, {
+        method: 'PUT',
+      }),
+  },
+
+  audioAssets: {
+    list: (customerId: number, kind?: string) => {
+      const qs = kind ? `?kind=${encodeURIComponent(kind)}` : ''
+      return request<AudioAssetListResponse>(`/vsapi/1.0.0/VsAudio/List/${customerId}${qs}`)
+    },
+    presignedUpload: (body: PresignedUploadBody) =>
+      request<PresignedUploadResponse>('/vsapi/1.0.0/VsAudio/PresignedUpload', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
+    confirmUpload: (body: ConfirmUploadBody) =>
+      request<AudioAsset>('/vsapi/1.0.0/VsAudio/ConfirmUpload', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
+    uploadToS3: async (uploadUrl: string, file: File): Promise<void> => {
+      const res = await fetch(uploadUrl, {
+        method: 'PUT',
+        body: file,
+        headers: { 'Content-Type': file.type || 'audio/mpeg' },
+      })
+      if (!res.ok) {
+        const text = await res.text()
+        logger.error('S3 upload failed', { status: res.status, body: text })
+        throw new Error(`${res.status} ${text}`)
+      }
+    },
+    deactivate: (customerId: number, assetId: string) =>
+      request<AudioAsset>(`/vsapi/1.0.0/VsAudio/Deactivate/${customerId}/${assetId}`, {
+        method: 'PUT',
+      }),
+  },
+
+  voicemailDropEvents: {
+    list: (customerId: number) =>
+      request<VoicemailDropEventListResponse>(`/vsapi/1.0.0/VsMailboxDrop/List/${customerId}`),
+  },
+
+  exemptionCodes: {
+    list: (customerId: number) =>
+      request<ExemptionCodeListResponse>(`/vsapi/1.0.0/VsExemptionCode/List/${customerId}`),
+    add: (body: AddExemptionCodeBody) =>
+      request<ExemptionCode>('/vsapi/1.0.0/VsExemptionCode/Add', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
+    deactivate: (customerId: number, exemptionId: string) =>
+      request<ExemptionCode>(
+        `/vsapi/1.0.0/VsExemptionCode/Deactivate/${customerId}/${exemptionId}`,
+        { method: 'PUT' }
+      ),
+  },
+
+  expansionModules: {
+    list: (customerId: number) =>
+      request<ExpansionModuleListResponse>(`/vsapi/1.0.0/VsExpansionModule/List/${customerId}`),
+    add: (body: AddExpansionModuleBody) =>
+      request<ExpansionModule>('/vsapi/1.0.0/VsExpansionModule/Add', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
+    deactivate: (customerId: number, moduleId: string) =>
+      request<ExpansionModule>(
+        `/vsapi/1.0.0/VsExpansionModule/Deactivate/${customerId}/${moduleId}`,
+        { method: 'PUT' }
+      ),
+  },
+
+  speedDials: {
+    list: (customerId: number) =>
+      request<SpeedDialListResponse>(`/vsapi/1.0.0/VsSpeedDial/List/${customerId}`),
+    add: (body: AddSpeedDialBody) =>
+      request<SpeedDial>('/vsapi/1.0.0/VsSpeedDial/Add', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
+    deactivate: (customerId: number, dialId: string) =>
+      request<SpeedDial>(`/vsapi/1.0.0/VsSpeedDial/Deactivate/${customerId}/${dialId}`, {
+        method: 'PUT',
+      }),
+  },
+
+  apiTokens: {
+    list: (customerId: number) =>
+      request<ApiTokenListResponse>(`/vsapi/1.0.0/VsToken/List/${customerId}`),
+  },
 }
 
 // Types
@@ -438,4 +567,196 @@ export interface AddParkingLotBody {
   description?: string
   extension: string
   ring_back_time_limit?: number
+}
+
+export interface Agent {
+  id: string
+  customer_id: string
+  extension_id: string | null
+  name: string
+  status: string
+  active: boolean
+  created_at: string
+}
+
+export interface AgentListResponse {
+  agents: Agent[]
+  vs_customer_id: number
+}
+
+export interface AddAgentBody {
+  vs_customer_id: number
+  name: string
+  extension_id?: string | null
+  status?: string
+}
+
+export interface CallQueue {
+  id: string
+  customer_id: string
+  name: string
+  strategy: string
+  active: boolean
+  created_at: string
+}
+
+export interface CallQueueListResponse {
+  call_queues: CallQueue[]
+  vs_customer_id: number
+}
+
+export interface AddCallQueueBody {
+  vs_customer_id: number
+  name: string
+  strategy?: string
+}
+
+export interface AgentSkill {
+  id: string
+  customer_id: string
+  agent_id: string
+  skill: string
+  level: number
+  active: boolean
+  created_at: string
+}
+
+export interface AgentSkillListResponse {
+  agent_skills: AgentSkill[]
+  vs_customer_id: number
+}
+
+export interface AddAgentSkillBody {
+  vs_customer_id: number
+  agent_id: string
+  skill: string
+  level?: number
+}
+
+export interface AudioAsset {
+  id: string
+  customer_id: string
+  kind: string
+  name: string
+  s3_key: string
+  playback_url: string | null
+  duration_seconds: number | null
+  active: boolean
+  created_at: string
+}
+
+export interface AudioAssetListResponse {
+  assets: AudioAsset[]
+  vs_customer_id: number
+}
+
+export interface PresignedUploadBody {
+  vs_customer_id: number
+  name: string
+  kind: string
+  content_type?: string
+}
+
+export interface PresignedUploadResponse {
+  upload_url: string
+  s3_key: string
+}
+
+export interface ConfirmUploadBody {
+  vs_customer_id: number
+  name: string
+  kind: string
+  s3_key: string
+  duration_seconds?: number | null
+}
+
+export interface VoicemailDropEvent {
+  id: string
+  customer_id: string
+  to_number: string
+  audio_asset_id: string | null
+  call_sid: string | null
+  status: string
+  created_at: string
+}
+
+export interface VoicemailDropEventListResponse {
+  events: VoicemailDropEvent[]
+  vs_customer_id: number
+}
+
+export interface ExemptionCode {
+  id: string
+  customer_id: string
+  description: string
+  code: string
+  call_restrictions: string
+  active: boolean
+  created_at: string
+}
+
+export interface ExemptionCodeListResponse {
+  exemption_codes: ExemptionCode[]
+  vs_customer_id: number
+}
+
+export interface AddExemptionCodeBody {
+  vs_customer_id: number
+  description: string
+  code: string
+  call_restrictions?: string
+}
+
+export interface ExpansionModule {
+  id: string
+  customer_id: string
+  description: string
+  brand: string
+  model: string
+  active: boolean
+  created_at: string
+}
+
+export interface ExpansionModuleListResponse {
+  expansion_modules: ExpansionModule[]
+  vs_customer_id: number
+}
+
+export interface AddExpansionModuleBody {
+  vs_customer_id: number
+  description: string
+  brand: string
+  model: string
+}
+
+export interface SpeedDial {
+  id: string
+  customer_id: string
+  code: string
+  phone_number: string
+  description: string
+  active: boolean
+  created_at: string
+}
+
+export interface SpeedDialListResponse {
+  speed_dials: SpeedDial[]
+  vs_customer_id: number
+}
+
+export interface AddSpeedDialBody {
+  vs_customer_id: number
+  code: string
+  phone_number: string
+  description?: string
+}
+
+export interface ApiTokenRow {
+  token_masked: string
+  enabled: boolean
+}
+
+export interface ApiTokenListResponse {
+  tokens: ApiTokenRow[]
+  vs_customer_id: number
 }

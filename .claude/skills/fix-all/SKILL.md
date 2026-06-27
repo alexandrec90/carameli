@@ -1,17 +1,20 @@
 ---
 name: fix-all
 disable-model-invocation: true
+argument-hint: 'Optional: "desktop" | "mobile" to skip env detection (else auto-detects via docker info)'
 description: 'Coding-agent-driven loop: runs pytest then lint, delegates fixes to the per-check fixer skills, and re-runs each check until green or a retry cap. Local sessions use a live Docker re-run loop; mobile/web sessions discover the latest On-Demand CI run, check out its fix branch, fix against the committed logs, and push to re-trigger CI.'
 ---
 
 # Skill: Fix All
 
-Two paths — check Docker first, then follow the matching one:
+Accepts an optional environment argument: `desktop` or `mobile`. When given, skip the Docker check and take the matching path directly. When omitted, run `docker info` to decide.
 
-- **Docker available** → [Local path](#local-path-docker-available): live re-run loop inside the running stack.
-- **No Docker** → [CI path](#ci-path-no-docker--mobileweb): discover the latest On-Demand PR, check out its branch, fix against its committed logs, push to re-trigger CI.
+Two paths — pick by the argument if given, else check Docker:
 
-Check Docker with `docker info`. Never infer the path from the branch name.
+- **`desktop` / Docker available** → [Local path](#local-path-docker-available): live re-run loop inside the running stack.
+- **`mobile` / no Docker** → [CI path](#ci-path-no-docker--mobileweb): discover the latest On-Demand PR, check out its branch, fix against its committed logs, push to re-trigger CI.
+
+Never infer the path from the branch name.
 
 ---
 
@@ -57,7 +60,8 @@ For each check, up to **3 attempts**:
    (a green run leaves the log empty). For pytest, run the **full** suite on the first
    attempt; on re-runs use the **changed-only (testmon)** run.
 2. **Passed?** (exit 0 / empty log) → move to the next check.
-3. **Failed?** Invoke the matching fixer with the Skill tool.
+3. **Failed?** Invoke the matching fixer with the Skill tool, forwarding the resolved
+   environment as its argument (`desktop` here) so it doesn't re-probe Docker.
 4. **Make the fix live** (pytest only — lint needs no restart):
    - `app/` files changed → `docker compose restart app`.
    - `requirements.txt` changed → `docker compose build app`, then restart.
@@ -118,8 +122,10 @@ The committed `logs/lint-errors.log` and `logs/test-failures.log` are now on dis
 
 ### Step 3 — Fix
 
-- If `logs/lint-errors.log` is non-empty → invoke `/fix-lint` with the Skill tool.
-- If `logs/test-failures.log` is non-empty → invoke `/fix-tests` with the Skill tool.
+Forward the resolved environment (`mobile` here) as the fixer's argument so it doesn't re-probe.
+
+- If `logs/lint-errors.log` is non-empty → invoke `/fix-lint mobile` with the Skill tool.
+- If `logs/test-failures.log` is non-empty → invoke `/fix-tests mobile` with the Skill tool.
 - If both are empty → CI is already green. Stop and report.
 
 ### Step 4 — Push and wait for re-run
@@ -163,7 +169,7 @@ After completing either path, summarize:
 
 ## Hard Rules
 
-1. **Check Docker first.** Use `docker info` — never infer the path from the branch name.
+1. **Honor the env argument; else check Docker first.** If `desktop`/`mobile` was passed, take that path. Otherwise use `docker info` — never infer the path from the branch name.
 2. **Local — stack must be live before any check or file edit.** If the stack is down, bring it up first.
 3. **Mobile — never skip to fixing without checking out the fix branch first.** The log
    artifacts live on that branch; fixing against stale or absent local logs produces wrong fixes.

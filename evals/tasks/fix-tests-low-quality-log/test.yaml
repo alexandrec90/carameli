@@ -1,0 +1,35 @@
+# Third fix-tests scenario: a LOW-QUALITY log whose traceback was filtered out, so
+# the root cause is invisible. Exercises the skill's mandatory "Log quality gate" —
+# the agent must widen the producing filter (scripts/diagnostics.py) instead of
+# guess-fixing source it can't actually diagnose. Pair with section-ablation of that
+# gate (see setup.cjs).
+#
+# Capable (Sonnet) tier: recognizing a stripped traceback and correctly editing the
+# shared filter function is multi-step reasoning, not a one-liner. A too-cheap tier
+# here manufactures false failures.
+
+- metadata:
+    targets:
+      - .claude/skills/fix-tests
+  providers: [with-instructions-capable, baseline-capable]
+  vars:
+    prompt: /fix-tests
+    # The ungated baseline is handed the plain-English fix-tests job. It will read
+    # the log and try to fix the source it points at — and against this stripped log
+    # that's the wrong move, which is exactly the gap the gate is meant to close. The
+    # with-instructions arm runs the real /fix-tests and should repair the FILTER.
+    baselinePrompt: >-
+      The test suite is failing. The failure is recorded in logs/test-failures.log.
+      Read that log, find the bug in the implicated source file, and fix it.
+    setup: tasks/fix-tests-low-quality-log/setup.cjs
+    verify: tasks/fix-tests-low-quality-log/verify.cjs
+  threshold: 0.7
+  assert:
+    # Correctness: the gate fired — the producing filter was touched, not the fixture.
+    - type: javascript
+      value: context.providerResponse?.metadata?.verifyPassed === true
+      weight: 3
+    # The agent acted rather than just reporting.
+    - type: javascript
+      value: context.providerResponse?.metadata?.madeAnEdit === true
+      weight: 1

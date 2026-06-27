@@ -8,6 +8,8 @@
 export interface DataColumn {
   key: string
   label: string
+  /** 'audio' renders an <audio> player instead of a text cell. Default: 'text'. */
+  kind?: 'text' | 'audio'
 }
 
 export interface DataFilter {
@@ -42,23 +44,26 @@ export interface DataRowAction {
 export interface DataFormField {
   key: string
   label: string
-  kind: 'text' | 'textarea' | 'checkbox'
+  kind: 'text' | 'textarea' | 'checkbox' | 'file'
   placeholder?: string
   required?: boolean
   /** Initial value when the form opens/resets (e.g. `'true'` for a default-on checkbox). */
   default?: string
+  /** Accepted MIME types for file inputs (e.g. 'audio/*'). */
+  accept?: string
 }
 
 /**
  * Optional create form for a DataPage. The renderer shows a button labelled
  * `newLabel` that toggles an inline form; submitting calls `onSubmit` with the
- * collected string values. The hook owns validation/feedback via the page `error`.
+ * collected string values and any selected File objects. The hook owns
+ * validation/feedback via the page `error`.
  */
 export interface DataForm {
   newLabel: string
   submitLabel: string
   fields: DataFormField[]
-  onSubmit: (values: Record<string, string>) => void | Promise<void>
+  onSubmit: (values: Record<string, string>, files?: Record<string, File | null>) => void | Promise<void>
 }
 
 export interface DataPageProps {

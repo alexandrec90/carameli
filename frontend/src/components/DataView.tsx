@@ -33,13 +33,21 @@ export function DataView({
   const [values, setValues] = useState<Record<string, string>>(() =>
     form ? blankFormValues(form) : {}
   )
+  const [files, setFiles] = useState<Record<string, File | null>>({})
+
+  const resetForm = useCallback(() => {
+    if (form) setValues(blankFormValues(form))
+    setFiles({})
+    setShowForm(false)
+  }, [form])
 
   const submit = useCallback(async () => {
     if (!form) return
-    await form.onSubmit(values)
-    setValues(blankFormValues(form))
+    await form.onSubmit(values, files)
+    if (form) setValues(blankFormValues(form))
+    setFiles({})
     setShowForm(false)
-  }, [form, values])
+  }, [form, values, files])
 
   return (
     <div className="space-y-8">
@@ -75,7 +83,7 @@ export function DataView({
                   key="new"
                   size="sm"
                   variant="primary"
-                  onClick={() => setShowForm((s) => !s)}
+                  onClick={() => { setShowForm((s) => !s); setFiles({}) }}
                 >
                   {form.newLabel}
                 </Button>
@@ -108,7 +116,21 @@ export function DataView({
               {form.fields.map((field) => (
                 <label key={field.key} className="flex flex-col gap-1">
                   <span className="text-helper text-xs">{field.label}</span>
-                  {field.kind === 'checkbox' ? (
+                  {field.kind === 'file' ? (
+                    <input
+                      type="file"
+                      accept={field.accept}
+                      required={field.required}
+                      onChange={(e) =>
+                        setFiles((f) => ({ ...f, [field.key]: e.target.files?.[0] ?? null }))
+                      }
+                      className="ui-input px-4 py-2.5 rounded-[16px] outline-none focus:ring-2 focus:ring-[#FF9F1C]/40"
+                      style={{
+                        background: 'rgba(255,159,28,0.08)',
+                        border: '1px solid rgba(255,244,224,0.1)',
+                      }}
+                    />
+                  ) : field.kind === 'checkbox' ? (
                     <input
                       type="checkbox"
                       checked={values[field.key] === 'true'}
@@ -144,7 +166,7 @@ export function DataView({
                   size="sm"
                   variant="ghost"
                   type="button"
-                  onClick={() => setShowForm(false)}
+                  onClick={resetForm}
                 >
                   Cancel
                 </Button>
@@ -179,7 +201,13 @@ export function DataView({
                   <tr key={i} className="border-t border-[rgba(255,244,224,0.08)]">
                     {columns.map((c) => (
                       <td key={c.key} className="text-body-soft py-2.5 pr-4">
-                        {row[c.key] ?? ''}
+                        {c.kind === 'audio' ? (
+                          row[c.key] ? (
+                            <audio controls src={row[c.key]} style={{ width: 200, height: 30 }} />
+                          ) : null
+                        ) : (
+                          row[c.key] ?? ''
+                        )}
                       </td>
                     ))}
                     {rowActions && rowActions.length > 0 && (

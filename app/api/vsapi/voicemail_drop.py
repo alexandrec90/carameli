@@ -11,7 +11,7 @@ from app.core.config import settings
 from app.core.database import get_session
 from app.core.limiter import limiter
 from app.schemas.voicemail import VoicemailDropRequest, VoicemailDropResponse
-from app.services import customer_service
+from app.services import customer_service, voicemail_drop_event_service
 
 logger = logging.getLogger(__name__)
 
@@ -70,4 +70,14 @@ async def voicemail_drop(
         result["call_id"],
         result["status"],
     )
+    try:
+        await voicemail_drop_event_service.create(
+            session,
+            customer_id=customer.id,
+            to_number=body.msg_drop_number,
+            status=result["status"],
+            call_sid=result["call_id"],
+        )
+    except Exception as exc:
+        logger.error("Failed to persist voicemail drop event: %s", exc)
     return VoicemailDropResponse(call_sid=result["call_id"], status=result["status"])

@@ -1,6 +1,7 @@
 ---
 name: fix-tests
 disable-model-invocation: true
+argument-hint: 'Optional: "desktop" | "mobile" to skip env detection (else auto-detects via docker info)'
 description: 'Fixes test failures collected in logs/test-failures.log.'
 ---
 
@@ -12,20 +13,21 @@ description: 'Fixes test failures collected in logs/test-failures.log.'
 
 Fix failing tests collected in `logs/test-failures.log`.
 
+Accepts an optional environment argument: `desktop` or `mobile`. When given, skip the `docker info` check — treat `desktop` as Docker reachable and `mobile` as Docker not reachable. When omitted, check with `docker info` once at the start of Step 3.
+
 The fix steps are the same everywhere — read the log, edit the implicated code. One thing
 differs by environment, and only after you change a file under `app/`:
 
-- **Docker is reachable** (check with `docker info`): run tests locally via
+- **`desktop` / Docker reachable**: run tests locally via
   `docker compose exec -T app pytest ...`. `app/` changes need `docker compose restart app`
   first; test-only edits need no restart. **This is always preferred — use it whenever
   Docker is up, regardless of the branch name.**
-- **Docker is not reachable** (no daemon): you cannot run tests locally. If on a
+- **`mobile` / Docker not reachable**: you cannot run tests locally. If on a
   `fix/auto-*` branch, the next push triggers CI which rebuilds and reruns. Otherwise
   (sandbox / headless eval), stamp `--- ADDRESSED` and stop — whatever runs the suite
   next produces the fresh log.
 
-Check Docker availability **once at the start of Step 3** with `docker info`. Do not
-infer environment from the branch name.
+When no argument is given, check Docker availability **once at the start of Step 3** with `docker info`. Do not infer environment from the branch name.
 
 ---
 

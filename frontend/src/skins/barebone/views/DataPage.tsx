@@ -42,11 +42,19 @@ export default function DataPage({
     const [values, setValues] = useState<Record<string, string>>(() =>
         form ? blankFormValues(form) : {}
     )
+    const [files, setFiles] = useState<Record<string, File | null>>({})
+
+    const resetForm = () => {
+        if (form) setValues(blankFormValues(form))
+        setFiles({})
+        setShowForm(false)
+    }
 
     const submit = async () => {
         if (!form) return
-        await form.onSubmit(values)
-        setValues(blankFormValues(form))
+        await form.onSubmit(values, files)
+        if (form) setValues(blankFormValues(form))
+        setFiles({})
         setShowForm(false)
     }
 
@@ -101,7 +109,15 @@ export default function DataPage({
                     {form.fields.map((field) => (
                         <label key={field.key} style={{ display: 'flex', flexDirection: 'column', gap: 2, fontSize: 12, color: '#666666' }}>
                             {field.label}
-                            {field.kind === 'checkbox' ? (
+                            {field.kind === 'file' ? (
+                                <input
+                                    type="file"
+                                    accept={field.accept}
+                                    required={field.required}
+                                    onChange={(e) => setFiles((f) => ({ ...f, [field.key]: e.target.files?.[0] ?? null }))}
+                                    style={inputStyle}
+                                />
+                            ) : field.kind === 'checkbox' ? (
                                 <input
                                     type="checkbox"
                                     checked={values[field.key] === 'true'}
@@ -122,7 +138,7 @@ export default function DataPage({
                     ))}
                     <div style={{ display: 'flex', gap: 8 }}>
                         <button type="submit" style={btnStyle(false)}>{form.submitLabel}</button>
-                        <button type="button" onClick={() => setShowForm(false)} style={btnStyle(false)}>Cancel</button>
+                        <button type="button" onClick={resetForm} style={btnStyle(false)}>Cancel</button>
                     </div>
                 </form>
             )}
@@ -162,7 +178,13 @@ export default function DataPage({
                             <tr key={i}>
                                 {columns.map((c) => (
                                     <td key={c.key} style={{ padding: '6px 8px', borderBottom: '1px solid #eeeeee' }}>
-                                        {row[c.key] ?? ''}
+                                        {c.kind === 'audio' ? (
+                                            row[c.key] ? (
+                                                <audio controls src={row[c.key]} style={{ width: 200, height: 30 }} />
+                                            ) : null
+                                        ) : (
+                                            row[c.key] ?? ''
+                                        )}
                                     </td>
                                 ))}
                                 {hasRowActions && (

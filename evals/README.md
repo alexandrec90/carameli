@@ -169,7 +169,15 @@ Returned on the provider response; assert on them via
 - **`provider-import-boundary`** — read-only. Safe to run repeatedly; proves the
   pipeline and demonstrates the with/without-instructions comparison.
 - **`fix-tests-logic-bug`** — the destructive-task template. Evaluates the
-  `/fix-tests` skill against a deliberately broken fixture, end to end.
+  `/fix-tests` skill against a deliberately broken fixture, end to end (the
+  diagnose-from-scratch path).
+- **`fix-tests-known-fix`** — a failure whose pattern is in `fix-tests/known-fixes.md`,
+  so it stresses the known-fix short-circuit. Pair with section-ablation of the
+  "Known-fix matching" section.
+- **`fix-tests-low-quality-log`** — a log whose traceback was filtered out, so it
+  stresses the mandatory "Log quality gate": the agent must widen the producing filter
+  (`scripts/diagnostics.py`) instead of guess-fixing source. Pair with section-ablation
+  of that gate.
 
 ### Fixer-skill coverage
 
@@ -330,6 +338,7 @@ npm run eval:section -- .claude/skills/fix-lint/SKILL.md "Known-fix matching"
 **A section only shows its value on a task that stresses it.** Ablating the
 "Known-fix matching" instruction does nothing on a task whose error matches no known
 fix — you'd see no delta and wrongly call it dead weight. The `fix-lint-known-fix-s101`
-task seeds an error that *is* in `known-fixes.md` precisely so that section has
-something to bite on. When you add a heavy section worth testing, add a task that
-triggers it.
+and `fix-tests-known-fix` tasks seed an error that *is* in `known-fixes.md` precisely so
+that section has something to bite on; `fix-tests-low-quality-log` does the same for the
+"Log quality gate" section (a stripped-traceback log). When you add a heavy section worth
+testing, add a task that triggers it.

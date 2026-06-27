@@ -1,6 +1,7 @@
 ---
 name: fix-lint
 disable-model-invocation: true
+argument-hint: 'Optional: "desktop" | "mobile" to skip env detection (else auto-detects toolchain availability)'
 description: 'Fixes lint errors collected in logs/lint-errors.log.'
 ---
 
@@ -13,11 +14,16 @@ description: 'Fixes lint errors collected in logs/lint-errors.log.'
 Fix actionable lint errors collected in `logs/lint-errors.log`. Lint fixes are plain
 source edits — identical in every environment.
 
+Accepts an optional environment argument: `desktop` or `mobile`. When given, skip the
+toolchain check — treat `desktop` as linters available locally and `mobile` as no
+toolchain. When omitted, check directly. Do not infer toolchain availability from the
+branch name.
+
 **Drive it to green — don't hand a half-fixed state back to a human.** Fix everything in
 the log, then regenerate it and keep going until it's empty. If the linter toolchain is
-available, re-run the lint suite yourself (it overwrites the log) and loop on what's left.
-If it isn't (sandbox / no toolchain), push on a `fix/auto-*` branch or ask the user.
-Do not infer toolchain availability from the branch name — check directly.
+available (`desktop`), re-run the lint suite yourself (it overwrites the log) and loop on
+what's left. If it isn't (`mobile` / sandbox / no toolchain), push on a `fix/auto-*`
+branch or ask the user.
 
 This is a verify-and-loop *between* passes, not per edit — while fixing a batch, diagnose
 from the log and use targeted single-file rechecks (below), not full re-runs.
