@@ -83,12 +83,14 @@ most-recent one. Prefer open over closed; a closed branch still carries the comm
 logs and accepts new pushes.
 
 **If no matching PR is found**, call `mcp__github__actions_list` with
-`method: list_workflow_runs`, `resource_id: on-demand.yml` to check the latest run:
+`method: list_workflow_runs`, `owner: alexandrec90`, `repo: carameli`,
+`resource_id: on-demand.yml` to check the latest run:
 
 | Latest run state | Action |
 |---|---|
-| `conclusion: success` and no fix branch (workflow ran clean — no failures) | CI is clean. Stop and report "no failures found on the latest On-Demand run." |
-| `status: in_progress` or `queued` | Tell the user the workflow is still running and to re-invoke `/fix-all` once it completes. |
+| `conclusion: success` and no fix branch | CI ran clean — no failures, no auto-fixes needed. Stop and report. |
+| `status: in_progress` or `queued` | The workflow is still running. Tell the user to re-invoke `/fix-all` once it completes. |
+| `conclusion: failure` or `conclusion: cancelled` | The workflow itself crashed (setup, migrations, etc.) — not a code failure. Report the run URL and tell the user to check the Actions log. |
 | No runs at all | Inform the user: trigger the **On-Demand Lint + Test** workflow from the GitHub Actions tab (workflow_dispatch), then re-invoke once it completes. |
 
 ### Step 2 — Check out the fix branch
