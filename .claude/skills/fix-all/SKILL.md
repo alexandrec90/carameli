@@ -76,16 +76,20 @@ same branch, and CI re-runs automatically.
 
 ### Step 1 — Discover the latest fix branch
 
-Use `mcp__github__list_pull_requests` (repo `alexandrec90/carameli`, state `open`) and
-find the most-recent PR whose head branch starts with `fix/auto-`. Its title matches
-`fix: on-demand lint+test YYYY-MM-DD`.
+Call `mcp__github__list_pull_requests` (repo `alexandrec90/carameli`, state `all`,
+sort `created`, direction `desc`) and scan the results for PRs whose title starts with
+`fix: on-demand lint+test` (the On-Demand workflow's PR title pattern). Take the
+most-recent one. Prefer open over closed; a closed branch still carries the committed
+logs and accepts new pushes.
 
-If no open PR exists, check for the most-recently closed one — its branch still carries
-the committed logs and accepts new pushes.
+**If no matching PR is found**, call `mcp__github__actions_list` with
+`method: list_workflow_runs`, `resource_id: on-demand.yml` to check the latest run:
 
-If no On-Demand PR exists at all, one hasn't been triggered yet. Inform the user: they
-need to trigger the **On-Demand Lint + Test** workflow from the GitHub Actions tab
-(workflow_dispatch), then re-invoke `/fix-all` once it completes.
+| Latest run state | Action |
+|---|---|
+| `conclusion: success` and no fix branch (workflow ran clean — no failures) | CI is clean. Stop and report "no failures found on the latest On-Demand run." |
+| `status: in_progress` or `queued` | Tell the user the workflow is still running and to re-invoke `/fix-all` once it completes. |
+| No runs at all | Inform the user: trigger the **On-Demand Lint + Test** workflow from the GitHub Actions tab (workflow_dispatch), then re-invoke once it completes. |
 
 ### Step 2 — Check out the fix branch
 
