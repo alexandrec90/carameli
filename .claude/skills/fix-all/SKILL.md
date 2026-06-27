@@ -71,27 +71,40 @@ For each check, up to **3 attempts**:
 
 The On-Demand Lint + Test workflow (`.github/workflows/on-demand.yml`) commits the
 filtered log artifacts (`logs/lint-errors.log`, `logs/test-failures.log`) to a
-`fix/auto-<timestamp>` branch and opens a PR. Fix against those logs, push back to the
-same branch, and CI re-runs automatically.
+`fix/auto-<timestamp>` branch and opens a PR. This path is a **self-contained loop**:
+trigger CI if needed, wait, fix, push, wait for the re-run, and repeat until green —
+up to 3 fix rounds without any human intervention.
 
-### Step 1 — Discover the latest fix branch
+### Step 1 — Discover or trigger CI
 
-Call `mcp__github__list_pull_requests` (repo `alexandrec90/carameli`, state `all`,
-sort `created`, direction `desc`) and scan the results for PRs whose title starts with
-`fix: on-demand lint+test` (the On-Demand workflow's PR title pattern). Take the
-most-recent one. Prefer open over closed; a closed branch still carries the committed
-logs and accepts new pushes.
+Call `mcp__github__list_pull_requests` (owner `alexandrec90`, repo `carameli`,
+state `all`, sort `created`, direction `desc`) and scan for the most-recent PR whose
+title starts with `fix: on-demand lint+test`. Prefer open over closed.
 
-**If no matching PR is found**, call `mcp__github__actions_list` with
-`method: list_workflow_runs`, `owner: alexandrec90`, `repo: carameli`,
-`resource_id: on-demand.yml` to check the latest run:
+**If a matching PR exists** → note the branch name and go to Step 2.
+
+**If no matching PR exists**, call `mcp__github__actions_list` (method
+`list_workflow_runs`, owner `alexandrec90`, repo `carameli`,
+resource_id `on-demand.yml`) to check the latest run:
 
 | Latest run state | Action |
 |---|---|
-| `conclusion: success` and no fix branch | CI ran clean — no failures, no auto-fixes needed. Stop and report. |
-| `status: in_progress` or `queued` | The workflow is still running. Tell the user to re-invoke `/fix-all` once it completes. |
-| `conclusion: failure` or `conclusion: cancelled` | The workflow itself crashed (setup, migrations, etc.) — not a code failure. Report the run URL and tell the user to check the Actions log. |
-| No runs at all | Inform the user: trigger the **On-Demand Lint + Test** workflow from the GitHub Actions tab (workflow_dispatch), then re-invoke once it completes. |
+| `status: in_progress` or `queued` | A run is already in progress — skip triggering and go straight to **Wait** below. |
+| `conclusion: success` and no fix branch | CI ran clean — no failures. Stop and report. |
+| `conclusion: failure` or `conclusion: cancelled` | The workflow itself crashed (setup, migrations, etc.). Report the run URL and tell the user to check the Actions log. Stop. |
+| No runs at all, or latest run was `success` with a fix branch (stale) | Trigger a fresh run. |
+
+**To trigger a fresh run**, call `mcp__github__actions_run_trigger` (owner
+`alexandrec90`, repo `carameli`, workflow_id `on-demand.yml`, ref `master`).
+
+**Wait for the run to complete**: after triggering (or if a run was already in
+progress), poll `mcp__github__actions_list` every 30 seconds (`Bash sleep 30` between
+calls) until the most-recent run's `status` is `completed`. Cap at 20 polls (~10 min).
+If the cap is hit, report the timeout and the in-progress run URL, then stop.
+Once `completed`:
+- `conclusion: success` + no fix branch created → clean, stop and report.
+- `conclusion: failure` / `cancelled` → report the run URL, stop.
+- A new `fix/auto-*` PR now exists → go to Step 2.
 
 ### Step 2 — Check out the fix branch
 
@@ -109,7 +122,7 @@ The committed `logs/lint-errors.log` and `logs/test-failures.log` are now on dis
 - If `logs/test-failures.log` is non-empty → invoke `/fix-tests` with the Skill tool.
 - If both are empty → CI is already green. Stop and report.
 
-### Step 4 — Push and re-trigger CI
+### Step 4 — Push and wait for re-run
 
 Commit all file edits and push to the same `fix/auto-*` branch:
 
@@ -117,13 +130,21 @@ Commit all file edits and push to the same `fix/auto-*` branch:
 git push -u origin <branch>
 ```
 
-The On-Demand workflow's `push` trigger on `fix/auto-**` branches fires CI
-automatically — it rebuilds, reruns both checks, and updates the PR's committed
-artifacts in place. No new PR is created; no manual workflow dispatch needed.
+Note the push timestamp. The On-Demand workflow's `push` trigger on `fix/auto-**`
+branches fires CI automatically — no manual dispatch needed.
 
-After pushing, report what was fixed and that CI is re-running. If the user wants to
-iterate, they can re-invoke `/fix-all` once the new CI run completes and its fresh logs
-are committed to the branch.
+**Wait for the re-run**: poll `mcp__github__actions_list` every 30 seconds until you
+see a run on the `fix/auto-*` branch with `event: push` and `status: completed` that
+started after your push timestamp. Cap at 20 polls (~10 min).
+
+Once completed:
+- `conclusion: success` → pull the updated logs (`git pull`). If both logs are empty,
+  the branch is green — stop and report. If logs are non-empty (CI found new failures),
+  go back to Step 3 for another round.
+- `conclusion: failure` / `cancelled` → report the run URL and stop.
+
+**Cap: 3 fix rounds total** (Steps 3→4 counted together). After 3 rounds with failures
+still present, stop and report what remains.
 
 ---
 
@@ -146,6 +167,7 @@ After completing either path, summarize:
 2. **Local — stack must be live before any check or file edit.** If the stack is down, bring it up first.
 3. **Mobile — never skip to fixing without checking out the fix branch first.** The log
    artifacts live on that branch; fixing against stale or absent local logs produces wrong fixes.
+   Trigger CI yourself if no fix branch exists — do not ask the user to do it.
 4. **Never spawn a coding-agent CLI** (`claude`/`copilot`/`codex`). You are the agent —
    delegate fixes with the Skill tool, run checks with the shell.
 5. **Run checks sequentially** — pytest, then lint. Edits from the test pass feed the lint pass.
