@@ -186,7 +186,9 @@ def test_render_setup_escapes_backticks():
 
 
 def test_render_verify_embeds_includes_excludes():
-    verify = mod.render_verify_cjs("evals/fixtures/x/calc.py", ["return qty * price"], ["return qty + price"], "abc1234")
+    verify = mod.render_verify_cjs(
+        "evals/fixtures/x/calc.py", ["return qty * price"], ["return qty + price"], "abc1234"
+    )
     assert '"return qty * price"' in verify
     assert '"return qty + price"' in verify
     assert "fixtureMatches(worktree, 'evals/fixtures/x/calc.py'" in verify

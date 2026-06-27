@@ -40,9 +40,11 @@ importable pure functions + `scripts/hooks/tests/`-style tests) driven by a thin
 diff-extraction and file-scaffolding are mechanical and deserve unit tests.
 
 Inputs (from `logs/agent/triage-report.md` + `error-ledger.json`):
+
 - the error signature, the owning `fix-*` skill, the `last_commit` SHA.
 
 Steps the script performs:
+
 1. `git show <last_commit>` → the fix diff and the file(s) it changed.
 2. Derive the **broken** state = the pre-fix version of those files (`git show <sha>^:path`).
 3. Scaffold `evals/tasks/<generated-name>/`:

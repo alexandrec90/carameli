@@ -1,0 +1,6 @@
+# source: scripts/lint-all.py (CI)
+
+# markdownlint
+# fix: npm --prefix frontend exec -- markdownlint "**/*.md" --fix
+plans/fixer-feedback-loop/plan-2-optimize-fixers-outcomes.md:45 error MD040/fenced-code-language Fenced code blocks should have a language specified [Context: "```"]
+plans/fixer-feedback-loop/README.md:12 error MD040/fenced-code-language Fenced code blocks should have a language specified [Context: "```"]

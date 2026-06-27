@@ -117,14 +117,30 @@ def test_update_outcome_ledger_persists_and_returns_counts(tmp_path):
 
 def test_recurring_signatures_lists_recurring_only_newest_first():
     ledger = {
-        "fix-tests::a": {"skill": "fix-tests", "signature": "a", "status": "recurring",
-                         "last_seen": "2026-06-26"},
-        "fix-tests::b": {"skill": "fix-tests", "signature": "b", "status": "recurring",
-                         "last_seen": "2026-06-28"},
-        "fix-tests::c": {"skill": "fix-tests", "signature": "c", "status": "fixed",
-                         "last_seen": "2026-06-29"},
-        "fix-lint::d": {"skill": "fix-lint", "signature": "d", "status": "recurring",
-                        "last_seen": "2026-06-27"},
+        "fix-tests::a": {
+            "skill": "fix-tests",
+            "signature": "a",
+            "status": "recurring",
+            "last_seen": "2026-06-26",
+        },
+        "fix-tests::b": {
+            "skill": "fix-tests",
+            "signature": "b",
+            "status": "recurring",
+            "last_seen": "2026-06-28",
+        },
+        "fix-tests::c": {
+            "skill": "fix-tests",
+            "signature": "c",
+            "status": "fixed",
+            "last_seen": "2026-06-29",
+        },
+        "fix-lint::d": {
+            "skill": "fix-lint",
+            "signature": "d",
+            "status": "recurring",
+            "last_seen": "2026-06-27",
+        },
     }
     result = arch.recurring_signatures(ledger)
     # Only recurring entries, newest last_seen first; fixed entry "c" excluded.

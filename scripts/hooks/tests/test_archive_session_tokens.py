@@ -39,7 +39,12 @@ def test_extract_usage_missing_or_malformed_is_zero():
 
 def test_analyze_segment_accumulates_tokens():
     entries = [
-        {"type": "user", "message": {"content": [{"type": "text", "text": "<command-name>fix-tests</command-name>"}]}},
+        {
+            "type": "user",
+            "message": {
+                "content": [{"type": "text", "text": "<command-name>fix-tests</command-name>"}]
+            },
+        },
         _assistant({"input_tokens": 1000, "output_tokens": 200, "cache_read_input_tokens": 300}),
         _assistant({"input_tokens": 500, "output_tokens": 100}),
     ]

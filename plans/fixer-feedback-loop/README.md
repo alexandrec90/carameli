@@ -42,6 +42,7 @@ Links every error a fixer saw to whether a later run resolved it. Keyed `"<skill
 ```
 
 State machine (see `reconcile_outcomes`):
+
 - new signature → `open`
 - seen again after `fixed` → `recurring` (the fix didn't hold / flaky)
 - gone from a fresh read after ≥1 attempt → `fixed`
