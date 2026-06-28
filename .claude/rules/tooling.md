@@ -36,6 +36,23 @@ compatibility (local Windows desktop, GitHub Actions, web, and mobile sessions).
   { "command": "python", "args": ["scripts/notify-wrap.py", "Task Name", "--", "python", "scripts/your-script.py"] }
   ```
 
+### Failure artifacts (fix from a file, not from the terminal)
+
+Any task or script whose failures a coding agent is expected to act on must persist the
+actionable failure to a **parseable artifact file** — never rely on streamed terminal
+output, which scrolls away and buries the signal in noise. Keep the terminal quiet (a
+short status line plus the artifact path); put everything needed to diagnose and fix in
+the file.
+
+- Follow the artifact format and lifecycle in `.claude/rules/diagnostics.md`
+  (self-locating error lines, strip noise, overwrite per run, `# source:` header).
+- Write the artifact on **failure too**, not just success — capture stdout/stderr to the
+  file rather than leaving the process on `stdio: 'inherit'` with nothing saved.
+- This is not limited to the lint/test diagnostic scripts. It applies to any long-running
+  task in `tasks.json`, including the promptfoo eval drivers
+  (`eval:ablate` / `eval:rewrite` / `eval:section`), which currently stream to the terminal
+  and leave no artifact when a run errors before promptfoo writes its output.
+
 ### Docker subprocess calls
 
 - **`docker compose exec` must use `-T`** — without it a pseudo-TTY is allocated and

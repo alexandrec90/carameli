@@ -590,6 +590,86 @@
       "problemMatcher": []
     },
     {
+      "label": "Eval: fix-tests — 4. Rewrite A/B (concise)",
+      "detail": "A/B the live fix-tests SKILL.md against evals/rewrites/fix-tests-concise across the 3 fix-tests tasks. Slow, costs credits.",
+      "type": "process",
+      "command": "python",
+      "args": ["scripts/notify-wrap.py", "Eval: fix-tests Rewrite A/B", "--", "pwsh", "-ExecutionPolicy", "Bypass", "-Command", "npm run eval:rewrite -- .claude/skills/fix-tests/SKILL.md evals/rewrites/fix-tests-concise/SKILL.md"],
+      "options": {
+        "env": {
+          "EVAL_MAX_USD": "6"
+        }
+      },
+      "group": "test",
+      "presentation": {
+        "reveal": "always",
+        "panel": "new",
+        "showReuseMessage": false,
+        "close": false
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Eval: fix-tests — 2. Section: Known-fix matching",
+      "detail": "Section-ablate the 'Known-fix matching' block. Signal lives on the fix-tests-known-fix row. Slow, costs credits.",
+      "type": "process",
+      "command": "python",
+      "args": ["scripts/notify-wrap.py", "Eval: fix-tests Section Known-fix", "--", "pwsh", "-ExecutionPolicy", "Bypass", "-Command", "npm run eval:section -- .claude/skills/fix-tests/SKILL.md 'Known-fix matching'"],
+      "options": {
+        "env": {
+          "EVAL_MAX_USD": "6"
+        }
+      },
+      "group": "test",
+      "presentation": {
+        "reveal": "always",
+        "panel": "new",
+        "showReuseMessage": false,
+        "close": false
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Eval: fix-tests — 3. Section: Log quality gate",
+      "detail": "Section-ablate the 'Log quality gate' block. Signal lives on the fix-tests-low-quality-log row. Slow, costs credits.",
+      "type": "process",
+      "command": "python",
+      "args": ["scripts/notify-wrap.py", "Eval: fix-tests Section Log-quality", "--", "pwsh", "-ExecutionPolicy", "Bypass", "-Command", "npm run eval:section -- .claude/skills/fix-tests/SKILL.md 'Log quality gate'"],
+      "options": {
+        "env": {
+          "EVAL_MAX_USD": "6"
+        }
+      },
+      "group": "test",
+      "presentation": {
+        "reveal": "always",
+        "panel": "new",
+        "showReuseMessage": false,
+        "close": false
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Eval: fix-tests — 1. Ablate (whole-skill floor)",
+      "detail": "Leave-one-out: does the fix-tests skill help at all vs an unguided agent? Validation floor, not optimization. Slow, costs credits.",
+      "type": "process",
+      "command": "python",
+      "args": ["scripts/notify-wrap.py", "Eval: fix-tests Ablate", "--", "pwsh", "-ExecutionPolicy", "Bypass", "-Command", "npm run eval:ablate -- .claude/skills/fix-tests"],
+      "options": {
+        "env": {
+          "EVAL_MAX_USD": "6"
+        }
+      },
+      "group": "test",
+      "presentation": {
+        "reveal": "always",
+        "panel": "new",
+        "showReuseMessage": false,
+        "close": false
+      },
+      "problemMatcher": []
+    },
+    {
       "label": "Lint: Instruction Files",
       "type": "process",
       "command": "python",

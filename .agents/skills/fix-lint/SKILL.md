@@ -1,6 +1,7 @@
 ---
 name: fix-lint
 disable-model-invocation: true
+argument-hint: 'Optional: "desktop" | "mobile" to skip env detection (else auto-detects toolchain availability)'
 description: 'Fixes lint errors collected in logs/lint-errors.log.'
 ---
 
@@ -13,12 +14,16 @@ description: 'Fixes lint errors collected in logs/lint-errors.log.'
 Fix actionable lint errors collected in `logs/lint-errors.log`. Lint fixes are plain
 source edits — identical in every environment.
 
-**Drive it to green — don't hand a half-fixed state back to a human.** Fix everything in
-the log, then regenerate it and keep going until it's empty:
+Accepts an optional environment argument: `desktop` or `mobile`. When given, skip the
+toolchain check — treat `desktop` as linters available locally and `mobile` as no
+toolchain. When omitted, check directly. Do not infer toolchain availability from the
+branch name.
 
-- **Locally:** re-run the lint suite yourself (it overwrites the log) and loop on what's left.
-- **CI:** push your fixes; the workflow re-runs, regenerates the log, and the loop
-  re-enters on the refreshed version.
+**Drive it to green — don't hand a half-fixed state back to a human.** Fix everything in
+the log, then regenerate it and keep going until it's empty. If the linter toolchain is
+available (`desktop`), re-run the lint suite yourself (it overwrites the log) and loop on
+what's left. If it isn't (`mobile` / sandbox / no toolchain), push on a `fix/auto-*`
+branch or ask the user.
 
 This is a verify-and-loop *between* passes, not per edit — while fixing a batch, diagnose
 from the log and use targeted single-file rechecks (below), not full re-runs.
@@ -38,8 +43,8 @@ Read these two files **in parallel** (single tool call):
 |---|---|
 | Non-empty, last line is NOT `--- ADDRESSED` | **Fresh** — proceed to known-fix matching below. **Do not re-run any linter.** |
 | Empty | Lint is green — stop. |
-| Last line is `--- ADDRESSED` | **Stale** — regenerate it (locally: re-run the lint suite yourself; CI: push and let the workflow re-run). Stop this turn; restart on the fresh log. |
-| File doesn't exist | Not yet generated — generate it (locally: run the lint suite yourself; CI: the workflow produces it). Stop this turn; restart on the fresh log once present. |
+| Last line is `--- ADDRESSED` | **Stale** — regenerate it. If linters are available locally: re-run the lint suite yourself. If not (no toolchain / sandbox): push on a `fix/auto-*` branch or ask the user. Stop this turn; restart on the fresh log. |
+| File doesn't exist | Not yet generated — generate it. If linters are available locally: run the lint suite yourself. If not: push on a `fix/auto-*` branch or ask the user. Stop this turn; restart on the fresh log once present. |
 
 ### Log quality gate
 
@@ -134,12 +139,13 @@ State clearly:
 Your deliverable is the **fix plus the `--- ADDRESSED` stamp** — that needs no linter run
 and completes in any environment (including a headless eval that only seeds the log).
 
-**If you can run linters, close the loop yourself:** regenerate the log (locally: re-run
-the lint suite; CI: push) and repeat from Step 1 until it's empty. While fixing a
-batch, diagnose from `logs/lint-errors.log` and use targeted single-file rechecks (e.g.
+**If linters are available locally, close the loop yourself:** re-run the lint suite to
+regenerate the log and repeat from Step 1 until it's empty. While fixing a batch,
+diagnose from `logs/lint-errors.log` and use targeted single-file rechecks (e.g.
 `ruff check <file>`, `mypy <file>`) to confirm individual fixes — the full re-run is the
-once-per-pass verify, not a per-edit habit. **If you can't run linters** (sandbox / no
-toolchain), finish the fixes, stamp `--- ADDRESSED`, report, and stop.
+once-per-pass verify, not a per-edit habit. **If linters are not available** (sandbox /
+no toolchain), finish the fixes, stamp `--- ADDRESSED`, report, and stop. Do not infer
+toolchain availability from the branch name — check directly.
 
 ---
 

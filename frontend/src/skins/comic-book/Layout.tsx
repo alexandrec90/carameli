@@ -1,6 +1,10 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import type { LayoutProps } from '../types'
+import { BUBBLE_TYPES } from './editor/bubbleTypes'
+import { PANEL_IMG_TRANSFORMS, PANEL_BUBBLE_TRANSFORMS } from './editor/layoutConfig'
+import { imgTransformStyle, bubbleStyle } from './editor/transforms'
+import { useEditorMode } from './editor/useEditorMode'
 import './comic-book.css'
 
 // ─── Ben-Day dot renderer ────────────────────────────────────────────────────
@@ -727,27 +731,17 @@ const PANEL_IMAGES: PanelImage[] = [
     { src: '/comic-book/mailman2.webp', alt: 'Post office', isLogo: false, path: '/' },           // 7
 ]
 
-// ─── Panel speech bubble manifest ───────────────────────────────────────────
-// Parallel to PANEL_IMAGES — one bubble config per panel.
-// Fonts: Bangers (action), Boogaloo (speech), Permanent Marker (thought),
-//        Fugaz One (onomatopoeia).
+// ─── Panel speech bubbles ───────────────────────────────────────────────────
+// Bubble content (type + text) and placement come from PANEL_BUBBLE_TRANSFORMS in
+// editor/layoutConfig.ts (the source of truth). The bubble's artwork + font are
+// resolved from its `type` via BUBBLE_TYPES (editor/bubbleTypes.ts).
 
-interface PanelBubble {
-    src: string
-    text: string
-    font: string
-}
-
-const PANEL_BUBBLES: PanelBubble[] = [
-    { src: '/comic-book/soft%20bubble.webp', text: "It's Carameli!", font: 'Boogaloo' },         // 0 logo
-    { src: '/comic-book/soft%20bubble.webp', text: 'Number please!', font: 'Boogaloo' },         // 1 switchboard
-    { src: '/comic-book/cloud%20bubble.webp', text: 'I wonder...', font: 'Permanent Marker' }, // 2 mailman1
-    { src: '/comic-book/lightning%20bubble.webp', text: 'FIXED!', font: 'Bangers' },          // 3 mechanic
-    { src: '/comic-book/soft%20bubble.webp', text: 'One moment please!', font: 'Boogaloo' },         // 4 receptionist
-    { src: '/comic-book/jagged%20bubble.webp', text: 'RING RING!', font: 'Fugaz One' },        // 5 rolodex
-    { src: '/comic-book/lightning%20bubble.webp', text: 'Ka-POW!', font: 'Bangers' },          // 6 rotary phone
-    { src: '/comic-book/cloud%20bubble.webp', text: 'Delivering dreams...', font: 'Permanent Marker' }, // 7 mailman2
-]
+// ─── Dev-only editor overlay (lazy) ────────────────────────────────────────────
+// Gated on import.meta.env.DEV at module scope: in a production build this static
+// `false` lets Rollup eliminate the branch and drop the overlay's chunk entirely.
+const EditorOverlay = import.meta.env.DEV
+    ? lazy(() => import('./editor/EditorOverlay'))
+    : null
 
 // ─── Layout ──────────────────────────────────────────────────────────────────
 
@@ -756,6 +750,11 @@ const PANEL_BUBBLES: PanelBubble[] = [
 export function Layout(_props: LayoutProps) {
     const navigate = useNavigate()
     const location = useLocation()
+    const editor = useEditorMode()
+
+    // Source transforms from the editor's working copy when active, else constants.
+    const imgT = editor.active ? editor.config.images : PANEL_IMG_TRANSFORMS
+    const bubbleT = editor.active ? editor.config.bubbles : PANEL_BUBBLE_TRANSFORMS
 
     const panelDotRefs = useRef<(HTMLCanvasElement | null)[]>([])
     const misregRefs = useRef<(HTMLCanvasElement | null)[]>([null, null, null, null])
@@ -896,7 +895,7 @@ export function Layout(_props: LayoutProps) {
     return (
         <>
             <div
-                className="cb-root"
+                className={`cb-root${editor.active ? ' cb-edit-active' : ''}`}
                 style={{ opacity: ready ? 1 : 0, transition: ready ? 'opacity 150ms ease-in' : 'none' }}
             >
                 {/* Layer 1 — Image panels (overflow: visible allows spill into gutters) */}
@@ -941,47 +940,77 @@ export function Layout(_props: LayoutProps) {
                                 className="cb-dots-panel-canvas"
                                 style={{ clipPath: dotClip }}
                             />
-                            {/* Panel image — clipped tightly to panel polygon */}
-                            <img
-                                src={info.src}
-                                alt={info.alt}
-                                className="cb-panel-img"
-                                loading="eager"
-                                draggable={false}
-                                style={{
-                                    position: 'absolute',
-                                    left: 0,
-                                    top: 0,
-                                    width: bounds.w,
-                                    height: bounds.h,
-                                    objectFit: 'cover',
-                                    objectPosition: info.isLogo ? 'center center' : 'center bottom',
-                                    clipPath: dotClip,
-                                    opacity: imgsVisible ? 1 : 0,
-                                }}
-                                onLoad={markSettled}
-                                onError={e => {
-                                    const t = e.currentTarget
-                                    console.warn('[comic-book] Failed to load panel image:', t.src)
-                                    t.style.display = 'none'
-                                    markSettled()
-                                }}
-                            />
-                            {/* Speech bubble — revealed on hover */}
-                            <div className="cb-panel-bubble" aria-hidden="true">
+                            {/* Image clip wrapper — clips the (zoomable/pannable) image to the
+                                panel polygon so overflow is hidden behind the panel edge, unless
+                                the image's `spill` flag lets it bleed into the gutter. */}
+                            <div
+                                className="cb-img-clip"
+                                style={
+                                    imgT[i].spill
+                                        ? { clipPath: 'none', overflow: 'visible' }
+                                        : { clipPath: dotClip, overflow: 'hidden' }
+                                }
+                            >
+                                {/* Panel image — framed via PANEL_IMG_TRANSFORMS */}
                                 <img
-                                    src={PANEL_BUBBLES[i].src}
-                                    alt=""
-                                    className="cb-panel-bubble-img"
+                                    src={info.src}
+                                    alt={info.alt}
+                                    className="cb-panel-img"
+                                    loading="eager"
                                     draggable={false}
+                                    style={{
+                                        position: 'absolute',
+                                        left: 0,
+                                        top: 0,
+                                        width: bounds.w,
+                                        height: bounds.h,
+                                        opacity: imgsVisible ? 1 : 0,
+                                        ...imgTransformStyle(imgT[i]),
+                                    }}
+                                    onLoad={markSettled}
+                                    onError={e => {
+                                        const t = e.currentTarget
+                                        console.warn('[comic-book] Failed to load panel image:', t.src)
+                                        t.style.display = 'none'
+                                        markSettled()
+                                    }}
                                 />
-                                <span
-                                    className="cb-panel-bubble-text"
-                                    style={{ fontFamily: `'${PANEL_BUBBLES[i].font}', cursive` }}
-                                >
-                                    {PANEL_BUBBLES[i].text}
-                                </span>
                             </div>
+                            {/* Speech bubble — content/type from PANEL_BUBBLE_TRANSFORMS, artwork +
+                                font resolved via BUBBLE_TYPES. Revealed on hover (always shown in
+                                edit mode). When spill is off, a clip wrapper hides any overflow
+                                behind the panel edge; when on, the bubble floats into the gutter. */}
+                            {(() => {
+                                const bubble = bubbleT[i]
+                                const def = BUBBLE_TYPES[bubble.type]
+                                const bubbleEl = (
+                                    <div
+                                        className="cb-panel-bubble"
+                                        aria-hidden="true"
+                                        style={bubbleStyle(bubble)}
+                                    >
+                                        <img
+                                            src={def.src}
+                                            alt=""
+                                            className="cb-panel-bubble-img"
+                                            draggable={false}
+                                        />
+                                        <span
+                                            className="cb-panel-bubble-text"
+                                            style={{ fontFamily: `'${def.font}', cursive` }}
+                                        >
+                                            {bubble.text}
+                                        </span>
+                                    </div>
+                                )
+                                return bubble.spill ? (
+                                    bubbleEl
+                                ) : (
+                                    <div className="cb-bubble-clip" style={{ clipPath: dotClip }}>
+                                        {bubbleEl}
+                                    </div>
+                                )
+                            })()}
                         </div>
                     )
                 })}
@@ -1017,6 +1046,13 @@ export function Layout(_props: LayoutProps) {
                 ))}
 
             </div>
+
+            {/* Dev-only editor overlay — never reached in a production build */}
+            {EditorOverlay && editor.active && (
+                <Suspense fallback={null}>
+                    <EditorOverlay api={editor} panelPolys={panelPolys} />
+                </Suspense>
+            )}
 
             {/* Loading indicator — outside cb-root so it's visible while the page is opacity:0 */}
             {showLoading && !ready && (

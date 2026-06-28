@@ -1,0 +1,231 @@
+/* Dev-only editor chrome for the comic-book skin.
+   Neutral styling — intentionally distinct from the comic palette so it reads
+   as tooling, not art. Exempt from the comic-book skin's no-radius / font rules. */
+
+.cb-ed-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 9000;
+  pointer-events: none;
+  font-family: ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
+}
+
+/* Full-layer backdrop that clears the selection on empty-space clicks. */
+.cb-ed-backdrop {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: default;
+  pointer-events: auto;
+}
+
+/* Transparent per-target hit areas. */
+.cb-ed-target {
+  position: absolute;
+  margin: 0;
+  padding: 0;
+  border: 1px dashed rgb(80 80 80 / 35%);
+  background: transparent;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.cb-ed-target:hover {
+  background: rgb(40 120 255 / 8%);
+  border-color: rgb(40 120 255 / 55%);
+}
+
+.cb-ed-target-bubble:hover {
+  background: rgb(255 140 0 / 10%);
+  border-color: rgb(255 140 0 / 60%);
+}
+
+/* Selection outline drawn over the active target. Draggable to move. */
+.cb-ed-outline {
+  position: absolute;
+  box-sizing: border-box;
+  border: 2px solid #2878ff;
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 70%);
+  pointer-events: auto;
+  cursor: move;
+  touch-action: none;
+}
+
+/* Drag handles on the selected target. */
+.cb-ed-handle {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  background: #2878ff;
+  border: 2px solid #fff;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 45%);
+  pointer-events: auto;
+  touch-action: none;
+}
+
+/* Bottom-right corner: resize (bubble) / zoom (image). */
+.cb-ed-handle-br {
+  right: -8px;
+  bottom: -8px;
+  cursor: nwse-resize;
+}
+
+/* Top-right corner: rotate (bubble only). */
+.cb-ed-handle-rot {
+  right: -8px;
+  top: -8px;
+  background: #ff8c00;
+  border-radius: 50%;
+  cursor: grab;
+}
+
+/* Toolbar pinned bottom-right. */
+.cb-ed-toolbar {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  width: 220px;
+  padding: 10px 12px;
+  background: rgb(24 24 28 / 94%);
+  color: #f0f0f0;
+  border: 1px solid #3a3a42;
+  border-radius: 6px;
+  box-shadow: 0 4px 16px rgb(0 0 0 / 40%);
+  pointer-events: auto;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.cb-ed-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: #8ab4ff;
+  margin-bottom: 6px;
+}
+
+.cb-ed-label {
+  font-weight: 700;
+  color: #fff;
+  margin-bottom: 6px;
+  overflow-wrap: anywhere;
+}
+
+.cb-ed-hint,
+.cb-ed-values {
+  color: #c8c8d0;
+  margin: 0 0 8px;
+}
+
+.cb-ed-values div {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.cb-ed-values dt {
+  color: #9a9aa6;
+}
+
+.cb-ed-values dd {
+  margin: 0;
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Labelled form rows (bubble type / text). */
+.cb-ed-field {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-bottom: 8px;
+}
+
+.cb-ed-field > span {
+  color: #9a9aa6;
+  font-size: 11px;
+}
+
+.cb-ed-select,
+.cb-ed-textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 4px 6px;
+  background: #1c1c22;
+  color: #f0f0f0;
+  border: 1px solid #4a4a54;
+  border-radius: 4px;
+  font: inherit;
+  font-size: 11px;
+}
+
+.cb-ed-textarea {
+  resize: vertical;
+  min-height: 32px;
+  line-height: 1.3;
+}
+
+/* Spill checkbox row. */
+.cb-ed-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+  color: #c8c8d0;
+  cursor: pointer;
+}
+
+.cb-ed-check input {
+  margin: 0;
+  cursor: pointer;
+}
+
+.cb-ed-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.cb-ed-btn {
+  flex: 1 1 auto;
+  padding: 4px 8px;
+  background: #2e2e36;
+  color: #f0f0f0;
+  border: 1px solid #4a4a54;
+  border-radius: 4px;
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+/* Compact secondary action (e.g. the .ts download fallback) — doesn't flex-grow. */
+.cb-ed-btn-icon {
+  flex: 0 0 auto;
+}
+
+/* Primary action (Save) — accent so it reads as the main control. */
+.cb-ed-btn-primary {
+  background: #2878ff;
+  border-color: #2878ff;
+  color: #fff;
+  font-weight: 700;
+}
+
+.cb-ed-btn-primary:hover {
+  background: #3a86ff;
+  border-color: #3a86ff;
+}
+
+.cb-ed-btn:hover {
+  background: #3a3a44;
+  border-color: #5a5a66;
+}
+
+.cb-ed-btn:active {
+  background: #262630;
+}

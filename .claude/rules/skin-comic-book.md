@@ -161,6 +161,31 @@ Layer drift directions at 50% (0% and 100% are `translate(0,0)`):
 
 Drawn on a static `<canvas>` that sits behind content panels. Lines are redrawn on `resize`. Use canvas `lineCap: 'square'`, `lineWidth: 5`, `strokeStyle: '#111111'`.
 
+## Per-Panel Image & Bubble Framing
+
+`editor/layoutConfig.ts` is the **source of truth** for per-panel image framing
+(`PANEL_IMG_TRANSFORMS`: scale / offsetX / offsetY / anchor) and speech-bubble
+placement (`PANEL_BUBBLE_TRANSFORMS`: top / right / width / rotate). The renderer in
+`Layout.tsx` reads from these arrays — there are **no magic framing numbers** in
+`Layout.tsx` or `comic-book.css` for images/bubbles. To retune them, use the editor
+rather than hand-editing scattered values.
+
+### Dev-only visual editor
+
+| Property | Value | Notes |
+| --- | --- | --- |
+| Enable | `?edit=1` in dev | Flag persists in `localStorage['comic-book:edit']` |
+| Gate | `import.meta.env.DEV && (?edit=1 \|\| flag)` | Never ships — `?edit=1` is inert in prod |
+| Adjust | drag / wheel / handles / arrows | Move, zoom/resize, rotate (bubble), nudge (⇧×10) |
+| Export | **Copy config** (or **.ts** download) | Paste output over the two `export const` blocks in `layoutConfig.ts` |
+| Reset all | clears working copy | Removes `localStorage['comic-book:editConfig']`, re-seeds from source |
+
+`EditorOverlay.tsx` is dynamically `import()`-ed behind the DEV gate so Rollup
+tree-shakes it (and `editor.css`) out of the production bundle. Only `layoutConfig.ts`
+(data) and `transforms.ts` (pure CSS/math) ship in prod. All editor math/serialization
+is pure and unit-tested in `frontend/src/tests/skins/`. See
+`frontend/src/skins/comic-book/editor/README.md` for the quick-start.
+
 ## Hard Rules Summary
 
 1. **Never use border-radius** on panels, buttons, or cards — flat ink-cut corners only

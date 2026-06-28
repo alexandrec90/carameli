@@ -50,13 +50,16 @@ C:\Users\Administrator\Desktop\vs_code\carameli\frontend\src\skins\barebone\view
 
 # markdownlint
 # fix: npm --prefix frontend exec -- markdownlint "**/*.md" --fix
+docs/plans/comic-book-editor/00-overview.md:40 error MD040/fenced-code-language Fenced code blocks should have a language specified [Context: "```"]
+docs/plans/comic-book-editor/00-overview.md:99 error MD040/fenced-code-language Fenced code blocks should have a language specified [Context: "```"]
+frontend/src/skins/comic-book/editor/README.md:47 error MD040/fenced-code-language Fenced code blocks should have a language specified [Context: "```"]
 plans/fixer-feedback-loop/plan-2-optimize-fixers-outcomes.md:45 error MD040/fenced-code-language Fenced code blocks should have a language specified [Context: "```"]
 plans/fixer-feedback-loop/README.md:12 error MD040/fenced-code-language Fenced code blocks should have a language specified [Context: "```"]
 
 # alembic-check
 # fix: alembic revision --autogenerate -m 'describe change'
-alembic/versions/env.py:1:1: [alembic-check] FAILED: Target database is not up to date.
+alembic/versions/env.py:1:1: [alembic-check] ERROR [alembic.util.messaging] Target database is not up to date.
 INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
 INFO  [alembic.runtime.migration] Will assume transactional DDL.
-ERROR [alembic.util.messaging] Target database is not up to date.
 FAILED: Target database is not up to date.
+ERROR [alembic.util.messaging] Target database is not up to date.

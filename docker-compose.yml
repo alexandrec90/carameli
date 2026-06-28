@@ -120,6 +120,9 @@ services:
     environment:
       - VITE_API_BASE_URL=http://localhost:8000
       - VITE_PROXY_TARGET=http://app:8000
+      # Windows bind mounts don't deliver inotify events to the container, so
+      # Vite's watcher needs polling for HMR to work. See frontend/vite.config.ts.
+      - CHOKIDAR_USEPOLLING=true
     healthcheck:
       test:
         [

@@ -84,6 +84,15 @@ Be deliberate with destructive lifecycle ops on a running stack: `down -v` wipes
 and `restart` / `up --build` can drop the user's session — confirm before those. Use `-T`
 with `docker compose exec` (see tooling.md).
 
+## MCP Tools
+
+Configured MCP servers are documented in `README.md` (MCP Tools section). Installation
+gotchas for the VS Code extension are in `.claude/projects/*/memory/mcp-vscode-gotchas.md`.
+
+**Proactive suggestions:** If an MCP server would meaningfully help with the current task,
+suggest it — mention what it enables and the install steps. It's a hassle to set up here,
+so surfacing useful ones saves time.
+
 ## Guardrails
 
 This project is vibe-coded. **Every rule below is mandatory.**
@@ -127,13 +136,3 @@ Run **targeted** tests to verify a change — the specific files or module you t
 **not** run the whole suite on every change: it's slow and a fresh-venv full run can
 surface misleading version-skew failures — leave full runs to CI. Also verify with
 `ruff`, `mypy`, and `py_compile`. See `tests/CLAUDE.md`.
-
-## Session Scope
-
-**Push back when a single request is too large for one session.** If a task spans many
-files, a shared-contract change plus broad fan-out work, or many near-identical units
-(e.g. "build all N pages/endpoints"), say so explicitly and propose breaking it into
-plan handoffs for fresh sessions rather than attempting it all at once. Prefer: land the
-must-be-coherent foundation (shared contracts, one reference vertical) in the current
-session, then hand off the repetitive/parallelizable remainder as scoped plans. Do this
-proactively — don't wait to be asked, and don't silently overreach to satisfy a big ask.
