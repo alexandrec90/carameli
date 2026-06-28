@@ -22,7 +22,8 @@ differs by environment, and only after you change a file under `app/`:
   `docker compose exec -T app pytest ...`. `app/` changes need `docker compose restart app`
   first; test-only edits need no restart. **This is always preferred — use it whenever
   Docker is up, regardless of the branch name.**
-- **`mobile` / Docker not reachable**: you cannot run tests locally. If on a
+- **`mobile` / Docker not reachable**: you cannot run tests locally — there is **no
+  verification loop**, so do not investigate-loop (see the one-pass guard in Step 2). If on a
   `fix/auto-*` branch, the next push triggers CI which rebuilds and reruns. Otherwise
   (sandbox / headless eval), stamp `--- ADDRESSED` and stop — whatever runs the suite
   next produces the fresh log.
@@ -96,6 +97,23 @@ For any failure not matched by a known fix, collect lines starting with `FAILED`
 ## Step 2 — Diagnose & Fix (unmatched failures only)
 
 Skip this step entirely if all failures were resolved by known fixes in Step 1.
+
+### Cloud/mobile (Docker not reachable): one pass, no spiral
+
+On a cloud/mobile session you **cannot run the suite to verify a fix** — there is no feedback
+loop, so iterative hypothesis-testing has nothing to converge against and will burn the whole
+token budget without fixing anything (this is the exact failure that motivated this guard).
+Hard limits when Docker is unreachable:
+
+- Known-fix short-circuits from Step 1 are your main tool — apply them as one-shots.
+- For an unmatched failure, read each implicated file **at most once**, then either apply a
+  single minimal fix you are confident in, or — if you can't be confident without running the
+  test — **stop investigating it.** Record it as needing a local session and move to the next.
+- **Never re-read a file you've already read** to keep theorizing, and never push one
+  speculative fix after another hoping CI turns green. One fix pass, stamp, push, done.
+- **Frontend/vitest failures are out of scope here.** CI splits them into
+  `logs/frontend-test-failures.log` (not the log you read), and they can't run on a cloud
+  session; if you ever see a `frontend-tests` section, report it for a local session — don't fix it.
 
 ### Applying fixes
 
@@ -187,3 +205,8 @@ stamp `--- ADDRESSED`, report, and stop. Whatever runs the suite next produces t
 7. **Log quality gate is mandatory.** If any failure block has no traceback (no `E` lines,
    no `app/`/`tests/` frames), update the producing filter (named on the log's `# source:`
    header) and stop — never attempt fixes on a log where the root cause is invisible.
+8. **Cloud/mobile = no verification loop, so no investigation spiral.** When Docker is
+   unreachable: known-fix one-shots, then at most one minimal confident fix per unmatched
+   failure (each implicated file read once); otherwise report it for a local session. Never
+   re-read files to keep theorizing, never chain speculative push→poll rounds, and never
+   attempt frontend/vitest failures — they can't run on a cloud session.

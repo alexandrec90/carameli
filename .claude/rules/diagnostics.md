@@ -104,7 +104,11 @@ always has something to work with.
 - On **fail**: overwrite the artifact entirely -- never append to previous runs.
 - Artifact paths are fixed contracts consumed by skills:
   - `logs/lint-errors.log` — consumed by `fix-lint`
-  - `logs/test-failures.log` — consumed by `fix-tests`
+  - `logs/test-failures.log` — consumed by `fix-tests` (backend pytest-format targets)
+  - `logs/frontend-test-failures.log` — vitest failures, **CI only** (`run-tests.py` splits
+    them out via `diagnostics.digest_tests(..., include=FRONTEND_TEST_TARGETS)`). Local-session
+    only: vitest can't run on a cloud/mobile session, so the mobile `fix-all` path skips it
+    rather than spiralling on a failure it can't verify.
   - `logs/pre-commit-errors.log` — consumed by `fix-pre-commit`
   - `logs/docker/health.log`, `logs/docker/config.log`, `logs/docker/app-logs.log` — consumed by `fix-docker`
 - Each artifact carries a `# source:` header naming the runner that produced it

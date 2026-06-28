@@ -422,18 +422,37 @@ TEST_SECTIONS = [
     ),
 ]
 
+# Frontend (vitest) tests need Node + a DOM shim (happy-dom) to run, so they can
+# only be verified where the frontend toolchain exists -- never on a cloud/mobile
+# Claude Code session. The CI runner splits them into their own artifact
+# (logs/frontend-test-failures.log) via `include=`, so the mobile fix-all path can
+# skip what it cannot verify instead of spiralling on it. Backend (pytest-format)
+# targets stay in logs/test-failures.log -- a mobile session verifies those
+# indirectly by pushing and letting CI rerun pytest.
+FRONTEND_TEST_TARGETS = frozenset({"frontend-tests"})
+BACKEND_TEST_TARGETS = frozenset(name for name, *_ in TEST_SECTIONS) - FRONTEND_TEST_TARGETS
 
-def digest_tests(results: dict[str, tuple[list[str], int]], source_label: str):
-    """Build `logs/test-failures.log` from in-memory per-source results.
+
+def digest_tests(
+    results: dict[str, tuple[list[str], int]],
+    source_label: str,
+    include: frozenset[str] | set[str] | None = None,
+):
+    """Build a test-failures artifact from in-memory per-source results.
 
     Returns `(any_failed, artifact_text, skips)`. A source absent from `results`
-    is treated as a clean pass.
+    is treated as a clean pass. When `include` is given, only those section names
+    are considered (the rest are ignored) -- this is how the CI runner writes
+    backend failures and frontend failures to separate artifacts from one results
+    dict. `include=None` (the default) folds every section into one artifact.
     """
     sections: list[str] = []
     skips: list[tuple[str, str]] = []
     any_failed = False
 
     for name, header, parser, fix_hint in TEST_SECTIONS:
+        if include is not None and name not in include:
+            continue
         lines, code = results.get(name, ([], 0))
         if code == 0:
             continue

@@ -108,7 +108,7 @@ jobs:
           # A non-empty log means actionable failures remain. The runners' own
           # exit codes are swallowed above so a crash and a real failure can't be
           # conflated -- the committed artifact is the contract the skills read.
-          if [ -s logs/lint-errors.log ] || [ -s logs/test-failures.log ]; then
+          if [ -s logs/lint-errors.log ] || [ -s logs/test-failures.log ] || [ -s logs/frontend-test-failures.log ]; then
             echo "failures=true" >> "$GITHUB_OUTPUT"
           else
             echo "failures=false" >> "$GITHUB_OUTPUT"
@@ -166,6 +166,12 @@ jobs:
 
           git add -u
           git add -f logs/lint-errors.log logs/test-failures.log
+          # Frontend (vitest) failures are split into their own artifact; commit it
+          # too when present so a local session can pick them up (the mobile fix-all
+          # path skips them, since vitest can't run on a cloud session).
+          if [ -f logs/frontend-test-failures.log ]; then
+            git add -f logs/frontend-test-failures.log
+          fi
           if ! git diff --cached --quiet; then
             git commit -m "ci: auto-fix + fix artifacts $(date +%Y-%m-%dT%H:%M:%SZ) [skip ci]"
             git push origin "HEAD:$BRANCH"
@@ -207,9 +213,14 @@ jobs:
              \`alembic upgrade head\` before tests) and refreshes the logs in place.
              Repeat until both logs are empty.
 
+          **Frontend (vitest) failures** land in \`logs/frontend-test-failures.log\` and
+          need a **local session** — vitest can't run on a cloud/mobile session, so
+          \`/fix-all mobile\` skips them rather than spinning on something it can't verify.
+
           **Artifacts committed to branch \`$BRANCH\`:**
           - \`logs/lint-errors.log\` — actionable lint failures (empty = all clear)
-          - \`logs/test-failures.log\` — actionable test failures (empty = all clear)
+          - \`logs/test-failures.log\` — actionable backend test failures (empty = all clear)
+          - \`logs/frontend-test-failures.log\` — vitest failures, local-session only (empty = all clear)
 
           The same filtered logs are attached to this run as the \`fix-artifacts\` workflow artifact.
           EOF
