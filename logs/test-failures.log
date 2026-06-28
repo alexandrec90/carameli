@@ -3,9 +3,9 @@
 # frontend-tests
 # fix: npm --prefix frontend run test:run
  RUN  v2.1.9 /home/runner/work/carameli/carameli/frontend
- ✓ src/tests/api/client.test.ts (18 tests) 18ms
- ✓ src/tests/useAudioAssets.test.ts (6 tests) 343ms
- ✓ src/tests/useWebhooks.test.ts (7 tests) 394ms
+ ✓ src/tests/api/client.test.ts (18 tests) 20ms
+ ✓ src/tests/useAudioAssets.test.ts (6 tests) 339ms
+ ✓ src/tests/useWebhooks.test.ts (7 tests) 390ms
  ✓ src/tests/skins/editorSerialize.test.ts (8 tests) 11ms
 stderr | src/tests/skins/editorMode.test.ts > hydrateConfig > falls back to seed on malformed JSON without throwing
 [WARN] Discarding malformed comic-book editor config {
@@ -16,13 +16,13 @@ stderr | src/tests/skins/editorMode.test.ts > hydrateConfig > falls back to seed
   key: 'comic-book:editConfig',
   err: `SyntaxError: Unexpected token 'o', "not json" is not valid JSON`
 }
- ✓ src/tests/skins/editorMode.test.ts (16 tests) 19ms
+ ✓ src/tests/skins/editorMode.test.ts (16 tests) 23ms
  ✓ src/tests/useCallSummary.test.ts (5 tests) 291ms
- ✓ src/tests/skins/editorTransformsMath.test.ts (18 tests) 7ms
- ✓ src/tests/useCallEvents.test.ts (4 tests) 232ms
- ✓ src/tests/useSms.test.ts (4 tests) 231ms
- ✓ src/tests/hooks/useExtensions.test.ts (4 tests) 179ms
- ✓ src/tests/skins/comicBookTransforms.test.ts (9 tests) 11ms
+ ✓ src/tests/skins/editorTransformsMath.test.ts (18 tests) 8ms
+ ✓ src/tests/useCallEvents.test.ts (4 tests) 229ms
+ ✓ src/tests/useSms.test.ts (4 tests) 227ms
+ ✓ src/tests/hooks/useExtensions.test.ts (4 tests) 177ms
+ ✓ src/tests/skins/comicBookTransforms.test.ts (9 tests) 16ms
 stderr | src/tests/useExemptionCodes.test.ts > useExemptionCodes > re-fetches after create
 An update to TestComponent inside a test was not wrapped in act(...).
 When testing, code that causes React state updates should be wrapped into act(...):
@@ -45,7 +45,7 @@ act(() => {
 });
 /* assert on the output */
 This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
- ✓ src/tests/useExemptionCodes.test.ts (4 tests) 230ms
+ ✓ src/tests/useExemptionCodes.test.ts (4 tests) 227ms
 stderr | src/tests/useSpeedDials.test.ts > useSpeedDials > re-fetches after create
 An update to TestComponent inside a test was not wrapped in act(...).
 When testing, code that causes React state updates should be wrapped into act(...):
@@ -68,7 +68,7 @@ act(() => {
 });
 /* assert on the output */
 This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
- ✓ src/tests/useSpeedDials.test.ts (4 tests) 231ms
+ ✓ src/tests/useSpeedDials.test.ts (4 tests) 228ms
 stderr | src/tests/useExpansionModules.test.ts > useExpansionModules > re-fetches after create
 An update to TestComponent inside a test was not wrapped in act(...).
 When testing, code that causes React state updates should be wrapped into act(...):
@@ -91,194 +91,21 @@ act(() => {
 });
 /* assert on the output */
 This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
- ✓ src/tests/useExpansionModules.test.ts (4 tests) 232ms
- ❯ src/tests/useVoicemailDropEvents.test.ts (4 tests | 1 failed) 230ms
-   × useVoicemailDropEvents > surfaces an error when the request fails 56ms
+ ✓ src/tests/useExpansionModules.test.ts (4 tests) 228ms
+ ❯ src/tests/useVoicemailDropEvents.test.ts (4 tests | 1 failed) 229ms
+   × useVoicemailDropEvents > surfaces an error when the request fails 57ms
      → 500 boom
  ✓ src/tests/hooks/useDashboard.test.ts (3 tests) 123ms
- ❯ src/tests/DataView.test.tsx (3 tests | 1 failed) 1070ms
-   × DataView contract extensions > toggles the create form, applies field defaults, and submits collected values 1031ms
-     → expected "spy" to be called with arguments: [ { …(2) } ]
-Received: 
-  1st spy call:
-  Array [
-    Object {
-      "enabled": "true",
-      "uri": "https://hooks.example.com/y",
-    },
-+   undefined,
-  ]
-Number of calls: 1
-Ignored nodes: comments, script, style
-<html>
-  <head />
-  <body>
-    <div>
-      <div
-        class="space-y-8"
-      >
-        <div>
-          <h1
-            class="page-title text-4xl font-extrabold"
-          >
-            Webhooks
-          </h1>
-        </div>
-        <div
-          class="rounded-[32px] p-6 glass-panel "
-        >
-          <div
-            class="flex gap-3 items-end flex-wrap"
-          >
-            <div
-              class="flex gap-2 ml-auto"
-            >
-              <button
-                class="inline-flex items-center gap-2 ui-button-label select-none cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed px-4 py-2 text-sm rounded-[16px] btn-primary text-[#1A0F00] "
-                style=""
-              >
-                New
-              </button>
-            </div>
-          </div>
-        </div>
-        <div
-          class="rounded-[32px] p-6 glass-panel "
-        >
-          <div
-            class="overflow-x-auto"
-          >
-            <table
-              class="w-full text-left text-sm"
-            >
-              <thead>
-                <tr>
-                  <th
-                    class="stat-label pb-3 pr-4 font-semibold"
-                  >
-                    URI
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr
-                  class="border-t border-[rgba(255,244,224,0.08)]"
-                >
-                  <td
-                    class="text-body-soft py-2.5 pr-4"
-                  >
-                    https://hooks.example.com/x
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    </div>
-  </body>
-</html>
- ❯ src/tests/useApiToken.test.ts (4 tests | 1 failed) 229ms
-   × useApiToken > surfaces an error when the request fails 57ms
+ ✓ src/tests/DataView.test.tsx (3 tests) 66ms
+ ❯ src/tests/useApiToken.test.ts (4 tests | 1 failed) 228ms
+   × useApiToken > surfaces an error when the request fails 56ms
      → 500 boom
- ✓ src/tests/usePlaceholderPage.test.ts (6 tests) 25ms
- ✓ src/tests/hooks/usePhoneLines.test.ts (3 tests) 125ms
- ✓ src/tests/skins/registry.test.ts (4 tests) 6ms
- ✓ src/tests/hooks/useAuth.test.ts (3 tests) 124ms
+ ✓ src/tests/usePlaceholderPage.test.ts (6 tests) 24ms
+ ✓ src/tests/hooks/usePhoneLines.test.ts (3 tests) 124ms
+ ✓ src/tests/skins/registry.test.ts (4 tests) 7ms
+ ✓ src/tests/hooks/useAuth.test.ts (3 tests) 121ms
  ✓ src/tests/smoke.test.ts (1 test) 2ms
-⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
- FAIL  src/tests/DataView.test.tsx > DataView contract extensions > toggles the create form, applies field defaults, and submits collected values
-AssertionError: expected "spy" to be called with arguments: [ { …(2) } ]
-Received: 
-  1st spy call:
-  Array [
-    Object {
-      "enabled": "true",
-      "uri": "https://hooks.example.com/y",
-    },
-+   undefined,
-  ]
-Number of calls: 1
-Ignored nodes: comments, script, style
-<html>
-  <head />
-  <body>
-    <div>
-      <div
-        class="space-y-8"
-      >
-        <div>
-          <h1
-            class="page-title text-4xl font-extrabold"
-          >
-            Webhooks
-          </h1>
-        </div>
-        <div
-          class="rounded-[32px] p-6 glass-panel "
-        >
-          <div
-            class="flex gap-3 items-end flex-wrap"
-          >
-            <div
-              class="flex gap-2 ml-auto"
-            >
-              <button
-                class="inline-flex items-center gap-2 ui-button-label select-none cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed px-4 py-2 text-sm rounded-[16px] btn-primary text-[#1A0F00] "
-                style=""
-              >
-                New
-              </button>
-            </div>
-          </div>
-        </div>
-        <div
-          class="rounded-[32px] p-6 glass-panel "
-        >
-          <div
-            class="overflow-x-auto"
-          >
-            <table
-              class="w-full text-left text-sm"
-            >
-              <thead>
-                <tr>
-                  <th
-                    class="stat-label pb-3 pr-4 font-semibold"
-                  >
-                    URI
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr
-                  class="border-t border-[rgba(255,244,224,0.08)]"
-                >
-                  <td
-                    class="text-body-soft py-2.5 pr-4"
-                  >
-                    https://hooks.example.com/x
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    </div>
-  </body>
-</html>
- ❯ src/tests/DataView.test.tsx:63:24
-     61| 
-     62|     await waitFor(() =>
-     63|       expect(onSubmit).toHaveBeenCalledWith({
-       |                        ^
-     64|         uri: 'https://hooks.example.com/y',
-     65|         enabled: 'true', // default applied without touching the check…
- ❯ runWithExpensiveErrorDiagnosticsDisabled node_modules/@testing-library/dom/dist/config.js:47:12
- ❯ checkCallback node_modules/@testing-library/dom/dist/wait-for.js:124:77
- ❯ Timeout.checkRealTimersCallback node_modules/@testing-library/dom/dist/wait-for.js:118:16
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
  FAIL  src/tests/useApiToken.test.ts > useApiToken > surfaces an error when the request fails
 Error: 500 boom
  ❯ src/tests/useApiToken.test.ts:45:32
@@ -288,7 +115,7 @@ Error: 500 boom
        |                                ^
      46|     const { result } = renderHook(() => useApiToken())
      47|     await waitFor(() => expect(result.current.loading).toBe(false))
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
  FAIL  src/tests/useVoicemailDropEvents.test.ts > useVoicemailDropEvents > surfaces an error when the request fails
 Error: 500 boom
  ❯ src/tests/useVoicemailDropEvents.test.ts:58:32
@@ -298,11 +125,10 @@ Error: 500 boom
        |                                ^
      59|     const { result } = renderHook(() =>
      60|       useVoicemailDropEvents('Mailbox Drop History', 'desc')
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
- Test Files  3 failed | 20 passed (23)
-      Tests  3 failed | 139 passed (142)
-   Start at  17:19:38
-   Duration  17.06s (transform 620ms, setup 0ms, collect 3.02s, tests 4.36s, environment 5.15s, prepare 1.72s)
-::error file=/home/runner/work/carameli/carameli/frontend/src/tests/DataView.test.tsx,title=src/tests/DataView.test.tsx > DataView contract extensions > toggles the create form%2C applies field defaults%2C and submits collected values,line=63,column=24::AssertionError: expected "spy" to be called with arguments: [ { …(2) } ]%0A%0AReceived: %0A%0A  1st spy call:%0A%0A  Array [%0A    Object {%0A      "enabled": "true",%0A      "uri": "https://hooks.example.com/y",%0A    },%0A+   undefined,%0A  ]%0A%0A%0ANumber of calls: 1%0A%0A%0AIgnored nodes: comments, script, style%0A<html>%0A  <head />%0A  <body>%0A    <div>%0A      <div%0A        class="space-y-8"%0A      >%0A        <div>%0A          <h1%0A            class="page-title text-4xl font-extrabold"%0A          >%0A            Webhooks%0A          </h1>%0A        </div>%0A        <div%0A          class="rounded-[32px] p-6 glass-panel "%0A        >%0A          <div%0A            class="flex gap-3 items-end flex-wrap"%0A          >%0A            <div%0A              class="flex gap-2 ml-auto"%0A            >%0A              <button%0A                class="inline-flex items-center gap-2 ui-button-label select-none cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed px-4 py-2 text-sm rounded-[16px] btn-primary text-[#1A0F00] "%0A                style=""%0A              >%0A                New%0A              </button>%0A            </div>%0A          </div>%0A        </div>%0A        <div%0A          class="rounded-[32px] p-6 glass-panel "%0A        >%0A          <div%0A            class="overflow-x-auto"%0A          >%0A            <table%0A              class="w-full text-left text-sm"%0A            >%0A              <thead>%0A                <tr>%0A                  <th%0A                    class="stat-label pb-3 pr-4 font-semibold"%0A                  >%0A                    URI%0A                  </th>%0A                </tr>%0A              </thead>%0A              <tbody>%0A                <tr%0A                  class="border-t border-[rgba(255,244,224,0.08)]"%0A                >%0A                  <td%0A                    class="text-body-soft py-2.5 pr-4"%0A                  >%0A                    https://hooks.example.com/x%0A                  </td>%0A                </tr>%0A              </tbody>%0A            </table>%0A          </div>%0A        </div>%0A      </div>%0A    </div>%0A  </body>%0A</html>%0A ❯ src/tests/DataView.test.tsx:63:24%0A ❯ runWithExpensiveErrorDiagnosticsDisabled node_modules/@testing-library/dom/dist/config.js:47:12%0A ❯ checkCallback node_modules/@testing-library/dom/dist/wait-for.js:124:77%0A ❯ Timeout.checkRealTimersCallback node_modules/@testing-library/dom/dist/wait-for.js:118:16%0A%0A
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+ Test Files  2 failed | 21 passed (23)
+      Tests  2 failed | 140 passed (142)
+   Start at  17:44:01
+   Duration  15.56s (transform 587ms, setup 0ms, collect 2.93s, tests 3.34s, environment 4.99s, prepare 1.68s)
 ::error file=/home/runner/work/carameli/carameli/frontend/src/tests/useApiToken.test.ts,title=src/tests/useApiToken.test.ts > useApiToken > surfaces an error when the request fails,line=45,column=32::Error: 500 boom%0A ❯ src/tests/useApiToken.test.ts:45:32%0A%0A
 ::error file=/home/runner/work/carameli/carameli/frontend/src/tests/useVoicemailDropEvents.test.ts,title=src/tests/useVoicemailDropEvents.test.ts > useVoicemailDropEvents > surfaces an error when the request fails,line=58,column=32::Error: 500 boom%0A ❯ src/tests/useVoicemailDropEvents.test.ts:58:32%0A%0A
