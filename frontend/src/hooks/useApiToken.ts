@@ -24,21 +24,20 @@ export function useApiToken(): DataPageProps {
   const [tokens, setTokens] = useState<ApiTokenRow[] | null>(null)
   const [error, setError] = useState('')
 
-  const load = useCallback(async () => {
+  const load = useCallback(() => {
     logger.info('Loading API tokens', { route: '/api-tokens' })
     setError('')
-    try {
-      const res = await api.apiTokens.list(DEMO_VS_CUSTOMER_ID)
-      setTokens(res.tokens)
-    } catch (e) {
-      logger.error('Failed to load API tokens', { error: String(e) })
-      setError('Failed to load API tokens')
-      setTokens([])
-    }
+    api.apiTokens.list(DEMO_VS_CUSTOMER_ID)
+      .then((res) => { setTokens(res.tokens) })
+      .catch((e: unknown) => {
+        logger.error('Failed to load API tokens', { error: String(e) })
+        setError('Failed to load API tokens')
+        setTokens([])
+      })
   }, [])
 
   useEffect(() => {
-    load().catch(() => undefined)
+    load()
   }, [load])
 
   const rows = useMemo(() => (tokens ?? []).map(toRow), [tokens])

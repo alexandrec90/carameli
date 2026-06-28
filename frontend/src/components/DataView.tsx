@@ -44,7 +44,11 @@ export function DataView({
   const submit = useCallback(async () => {
     if (!form) return
     const hasFiles = Object.values(files).some((f) => f !== null)
-    await form.onSubmit(values, hasFiles ? files : undefined)
+    if (hasFiles) {
+      await form.onSubmit(values, files)
+    } else {
+      await form.onSubmit(values)
+    }
     if (form) setValues(blankFormValues(form))
     setFiles({})
     setShowForm(false)

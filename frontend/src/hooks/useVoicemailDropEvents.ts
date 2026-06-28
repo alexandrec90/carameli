@@ -29,21 +29,20 @@ export function useVoicemailDropEvents(title: string, description: string): Data
   const [error, setError] = useState('')
   const [search, setSearch] = useState('')
 
-  const load = useCallback(async () => {
+  const load = useCallback(() => {
     logger.info('Loading voicemail drop events', { route: '/mailbox-drop' })
     setError('')
-    try {
-      const res = await api.voicemailDropEvents.list(DEMO_VS_CUSTOMER_ID)
-      setEvents(res.events)
-    } catch (e) {
-      logger.error('Failed to load voicemail drop events', { error: String(e) })
-      setError('Failed to load voicemail drop events')
-      setEvents([])
-    }
+    api.voicemailDropEvents.list(DEMO_VS_CUSTOMER_ID)
+      .then((res) => { setEvents(res.events) })
+      .catch((e: unknown) => {
+        logger.error('Failed to load voicemail drop events', { error: String(e) })
+        setError('Failed to load voicemail drop events')
+        setEvents([])
+      })
   }, [])
 
   useEffect(() => {
-    load().catch(() => undefined)
+    load()
   }, [load])
 
   const allRows = useMemo(() => (events ?? []).map(toRow), [events])
