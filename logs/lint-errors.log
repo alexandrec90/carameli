@@ -1,9 +1,9 @@
-# source: scripts/lint-all.py (local)
+# source: scripts/lint-all.py (CI)
 
 # ruff-check
 # fix: ruff check . --fix --unsafe-fixes
 RUF002 Docstring contains ambiguous `–` (EN DASH). Did you mean `-` (HYPHEN-MINUS)?
- --> alembic\versions\008_add_contact_centre_tables.py:7:74
+ --> alembic/versions/008_add_contact_centre_tables.py:7:74
   |
 5 | Create Date: 2026-06-27 00:00:00.000000
 6 |
@@ -12,7 +12,7 @@ RUF002 Docstring contains ambiguous `–` (EN DASH). Did you mean `-` (HYPHEN-MI
 8 | Call-routing integration deferred; these are pure config surfaces.
   |
 RUF002 Docstring contains ambiguous `–` (EN DASH). Did you mean `-` (HYPHEN-MINUS)?
- --> alembic\versions\009_add_media_tables.py:8:38
+ --> alembic/versions/009_add_media_tables.py:8:38
   |
 7 | Audio asset library for Music, On-Hold, Advertising, Prompts, Greetings,
 8 | and Broadcast audio (cloudli spec §18–22, §25, §29). Voicemail drop event
@@ -20,7 +20,7 @@ RUF002 Docstring contains ambiguous `–` (EN DASH). Did you mean `-` (HYPHEN-MI
 9 | history table so VsMessageDrop calls are persisted (spec §19).
   |
 RUF002 Docstring contains ambiguous `–` (EN DASH). Did you mean `-` (HYPHEN-MINUS)?
-  --> app\models\audio_asset.py:15:66
+  --> app/models/audio_asset.py:15:66
    |
 14 | class AudioAsset(Base):
 15 |     """A customer-owned audio file stored in S3 (cloudli spec §18–22, §25, §29)."""
@@ -31,35 +31,45 @@ RUF002 Docstring contains ambiguous `–` (EN DASH). Did you mean `-` (HYPHEN-MI
 
 # mypy
 # fix: mypy app/
-app\services\s3_service.py:37: error: Returning Any from function declared to return "str | None"  [no-any-return]
-app\services\s3_service.py:37: note: Error code "no-any-return" not covered by "type: ignore" comment
-app\services\s3_service.py:37: error: "object" has no attribute "generate_presigned_url"  [attr-defined]
-app\services\s3_service.py:37: note: Error code "attr-defined" not covered by "type: ignore" comment
-app\services\s3_service.py:53: error: Returning Any from function declared to return "str | None"  [no-any-return]
-app\services\s3_service.py:53: note: Error code "no-any-return" not covered by "type: ignore" comment
-app\services\s3_service.py:53: error: "object" has no attribute "generate_presigned_url"  [attr-defined]
-app\services\s3_service.py:53: note: Error code "attr-defined" not covered by "type: ignore" comment
+app/services/s3_service.py:37: error: Returning Any from function declared to return "str | None"  [no-any-return]
+app/services/s3_service.py:37: note: Error code "no-any-return" not covered by "type: ignore[union-attr]" comment
+app/services/s3_service.py:37: error: "object" has no attribute "generate_presigned_url"  [attr-defined]
+app/services/s3_service.py:37: note: Error code "attr-defined" not covered by "type: ignore[union-attr]" comment
+app/services/s3_service.py:53: error: Returning Any from function declared to return "str | None"  [no-any-return]
+app/services/s3_service.py:53: note: Error code "no-any-return" not covered by "type: ignore[union-attr]" comment
+app/services/s3_service.py:53: error: "object" has no attribute "generate_presigned_url"  [attr-defined]
+app/services/s3_service.py:53: note: Error code "attr-defined" not covered by "type: ignore[union-attr]" comment
+mypy.ini: note: unused section(s): [mypy-telnyx.*], [mypy-jambonz.*]
 
 # eslint
 # fix: npm --prefix frontend run lint:eslint -- --fix
 > eslint src --ext .js,.jsx,.ts,.tsx --format stylish --fix
-C:\Users\Administrator\Desktop\vs_code\carameli\frontend\src\components\DataView.tsx
+/home/runner/work/carameli/carameli/frontend/src/components/DataView.tsx
   206:29  error  Media elements such as <audio> and <video> must have a <track> for captions  jsx-a11y/media-has-caption
-C:\Users\Administrator\Desktop\vs_code\carameli\frontend\src\skins\barebone\views\DataPage.tsx
+/home/runner/work/carameli/carameli/frontend/src/skins/barebone/views/DataPage.tsx
   183:49  error  Media elements such as <audio> and <video> must have a <track> for captions  jsx-a11y/media-has-caption
+
+# stylelint
+# fix: npm --prefix frontend run lint:css -- --fix
+/home/runner/work/carameli/carameli/frontend/src/skins/comic-book/comic-book.css:304:1: Expected selector ".cb-edit-active .cb-panel-bubble" to come before selector ".cb-panel:hover .cb-panel-bubble", at line 296 (no-descending-specificity) [error]
 
 # markdownlint
 # fix: npm --prefix frontend exec -- markdownlint "**/*.md" --fix
-docs/plans/comic-book-editor/00-overview.md:40 error MD040/fenced-code-language Fenced code blocks should have a language specified [Context: "```"]
-docs/plans/comic-book-editor/00-overview.md:99 error MD040/fenced-code-language Fenced code blocks should have a language specified [Context: "```"]
-frontend/src/skins/comic-book/editor/README.md:47 error MD040/fenced-code-language Fenced code blocks should have a language specified [Context: "```"]
 plans/fixer-feedback-loop/plan-2-optimize-fixers-outcomes.md:45 error MD040/fenced-code-language Fenced code blocks should have a language specified [Context: "```"]
 plans/fixer-feedback-loop/README.md:12 error MD040/fenced-code-language Fenced code blocks should have a language specified [Context: "```"]
 
 # alembic-check
 # fix: alembic revision --autogenerate -m 'describe change'
-alembic/versions/env.py:1:1: [alembic-check] ERROR [alembic.util.messaging] Target database is not up to date.
+alembic/versions/env.py:1:1: [alembic-check] FAILED: New upgrade operations detected: [('remove_index', Index('uq_agents_extension_id_active', Column('extension_id', UUID(), table=<agents>), unique=True)), ('remove_index', Index('ix_audio_assets_kind', Column('kind', VARCHAR(length=32), table=<audio_assets>, nullable=False)))]
 INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
 INFO  [alembic.runtime.migration] Will assume transactional DDL.
-FAILED: Target database is not up to date.
-ERROR [alembic.util.messaging] Target database is not up to date.
+INFO  [alembic.runtime.plugins] setting up autogenerate plugin alembic.autogenerate.schemas
+INFO  [alembic.runtime.plugins] setting up autogenerate plugin alembic.autogenerate.tables
+INFO  [alembic.runtime.plugins] setting up autogenerate plugin alembic.autogenerate.types
+INFO  [alembic.runtime.plugins] setting up autogenerate plugin alembic.autogenerate.constraints
+INFO  [alembic.runtime.plugins] setting up autogenerate plugin alembic.autogenerate.defaults
+INFO  [alembic.runtime.plugins] setting up autogenerate plugin alembic.autogenerate.comments
+INFO  [alembic.autogenerate.compare.constraints] Detected removed index 'uq_agents_extension_id_active' on 'agents'
+INFO  [alembic.autogenerate.compare.constraints] Detected removed index 'ix_audio_assets_kind' on 'audio_assets'
+ERROR [alembic.util.messaging] New upgrade operations detected: [('remove_index', Index('uq_agents_extension_id_active', Column('extension_id', UUID(), table=<agents>), unique=True)), ('remove_index', Index('ix_audio_assets_kind', Column('kind', VARCHAR(length=32), table=<audio_assets>, nullable=False)))]
+FAILED: New upgrade operations detected: [('remove_index', Index('uq_agents_extension_id_active', Column('extension_id', UUID(), table=<agents>), unique=True)), ('remove_index', Index('ix_audio_assets_kind', Column('kind', VARCHAR(length=32), table=<audio_assets>, nullable=False)))]
