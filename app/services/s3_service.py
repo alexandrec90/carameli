@@ -34,7 +34,7 @@ def get_presigned_upload_url(s3_key: str, content_type: str, expires_in: int = 3
     if client is None or not settings.s3_bucket:
         return None
     try:
-        return client.generate_presigned_url(  # type: ignore[union-attr]
+        return client.generate_presigned_url(  # type: ignore[no-any-return, attr-defined]
             "put_object",
             Params={"Bucket": settings.s3_bucket, "Key": s3_key, "ContentType": content_type},
             ExpiresIn=expires_in,
@@ -50,7 +50,7 @@ def get_presigned_download_url(s3_key: str, expires_in: int = 3600) -> str | Non
     if client is None or not settings.s3_bucket:
         return None
     try:
-        return client.generate_presigned_url(  # type: ignore[union-attr]
+        return client.generate_presigned_url(  # type: ignore[no-any-return, attr-defined]
             "get_object",
             Params={"Bucket": settings.s3_bucket, "Key": s3_key},
             ExpiresIn=expires_in,

@@ -43,7 +43,7 @@ export function useVoicemailDropEvents(title: string, description: string): Data
   }, [])
 
   useEffect(() => {
-    void load()
+    load().catch(() => undefined)
   }, [load])
 
   const allRows = useMemo(() => (events ?? []).map(toRow), [events])

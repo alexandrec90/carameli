@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, ForeignKey, String, text
+from sqlalchemy import Boolean, ForeignKey, Index, String, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func
@@ -16,6 +16,14 @@ class Agent(Base):
     presence lives in agent_statuses (polled separately)."""
 
     __tablename__ = "agents"
+    __table_args__ = (
+        Index(
+            "uq_agents_extension_id_active",
+            "extension_id",
+            unique=True,
+            postgresql_where=text("active = true AND extension_id IS NOT NULL"),
+        ),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()")

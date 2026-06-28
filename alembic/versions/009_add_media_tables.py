@@ -5,7 +5,7 @@ Revises: 008
 Create Date: 2026-06-27 00:00:00.000000
 
 Audio asset library for Music, On-Hold, Advertising, Prompts, Greetings,
-and Broadcast audio (cloudli spec §18–22, §25, §29). Voicemail drop event
+and Broadcast audio (cloudli spec §18-22, §25, §29). Voicemail drop event
 history table so VsMessageDrop calls are persisted (spec §19).
 
 """

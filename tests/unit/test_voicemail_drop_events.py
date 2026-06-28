@@ -31,7 +31,7 @@ async def _initiate_drop(client, vs_id: int, to_number: str = "+15550001111") ->
         json={
             "vs_customer_id": vs_id,
             "msg_drop_number": to_number,
-            "extension": "100",
+            "extension": "+15550001234",
             "audio_url": "https://example.com/audio.mp3",
         },
         headers=AUTH_HEADERS,

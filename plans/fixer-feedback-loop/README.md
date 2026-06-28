@@ -9,7 +9,7 @@ first for the shared data contract, then the plan you're executing.
 
 ## Dependency order
 
-```
+```text
 Plan 1 (DONE) ──► Plan 2 (optimize-fixers consumes outcomes)
               └─► Plan 3 (triage report)  ──► Plan 4 (auto-generate promptfoo fixtures)
 ```

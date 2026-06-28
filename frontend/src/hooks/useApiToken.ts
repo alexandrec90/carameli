@@ -38,7 +38,7 @@ export function useApiToken(): DataPageProps {
   }, [])
 
   useEffect(() => {
-    void load()
+    load().catch(() => undefined)
   }, [load])
 
   const rows = useMemo(() => (tokens ?? []).map(toRow), [tokens])

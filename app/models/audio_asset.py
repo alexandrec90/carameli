@@ -12,7 +12,7 @@ from app.core.database import Base
 
 
 class AudioAsset(Base):
-    """A customer-owned audio file stored in S3 (cloudli spec §18–22, §25, §29)."""
+    """A customer-owned audio file stored in S3 (cloudli spec §18-22, §25, §29)."""
 
     __tablename__ = "audio_assets"
 
@@ -22,7 +22,7 @@ class AudioAsset(Base):
     customer_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("customers.id"), nullable=False, index=True
     )
-    kind: Mapped[str] = mapped_column(String(32), nullable=False)
+    kind: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     s3_key: Mapped[str] = mapped_column(String(512), nullable=False)
     duration_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)
