@@ -29,20 +29,21 @@ export function useVoicemailDropEvents(title: string, description: string): Data
   const [error, setError] = useState('')
   const [search, setSearch] = useState('')
 
-  const load = useCallback(() => {
+  const load = useCallback(async () => {
     logger.info('Loading voicemail drop events', { route: '/mailbox-drop' })
     setError('')
-    api.voicemailDropEvents.list(DEMO_VS_CUSTOMER_ID)
-      .then((res) => { setEvents(res.events) })
-      .catch((e: unknown) => {
-        logger.error('Failed to load voicemail drop events', { error: String(e) })
-        setError('Failed to load voicemail drop events')
-        setEvents([])
-      })
+    try {
+      const res = await api.voicemailDropEvents.list(DEMO_VS_CUSTOMER_ID)
+      setEvents(res.events)
+    } catch (e) {
+      logger.error('Failed to load voicemail drop events', { error: String(e) })
+      setError('Failed to load voicemail drop events')
+      setEvents([])
+    }
   }, [])
 
   useEffect(() => {
-    load()
+    void load()
   }, [load])
 
   const allRows = useMemo(() => (events ?? []).map(toRow), [events])
@@ -57,6 +58,21 @@ export function useVoicemailDropEvents(title: string, description: string): Data
     if (key === 'search') setSearch(value)
   }, [])
 
+  const exportCsv = useCallback(() => {
+    const header = COLUMNS.map((c) => c.label).join(',')
+    const body = rows
+      .map((r) => COLUMNS.map((c) => `"${(r[c.key] ?? '').replace(/"/g, '""')}"`).join(','))
+      .join('\n')
+    const blob = new Blob([`${header}\n${body}`], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'voicemail-drop-events.csv'
+    a.click()
+    URL.revokeObjectURL(url)
+    logger.info('Exported voicemail drop events CSV', { count: rows.length })
+  }, [rows])
+
   return {
     title,
     description,
@@ -68,6 +84,7 @@ export function useVoicemailDropEvents(title: string, description: string): Data
     rows,
     actions: [
       { key: 'refresh', label: 'Refresh', onClick: () => void load(), variant: 'primary' },
+      { key: 'export', label: 'Export CSV', onClick: exportCsv },
     ],
     emptyText: 'No voicemail drop history',
   }

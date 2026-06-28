@@ -24,23 +24,39 @@ export function useApiToken(): DataPageProps {
   const [tokens, setTokens] = useState<ApiTokenRow[] | null>(null)
   const [error, setError] = useState('')
 
-  const load = useCallback(() => {
+  const load = useCallback(async () => {
     logger.info('Loading API tokens', { route: '/api-tokens' })
     setError('')
-    api.apiTokens.list(DEMO_VS_CUSTOMER_ID)
-      .then((res) => { setTokens(res.tokens) })
-      .catch((e: unknown) => {
-        logger.error('Failed to load API tokens', { error: String(e) })
-        setError('Failed to load API tokens')
-        setTokens([])
-      })
+    try {
+      const res = await api.apiTokens.list(DEMO_VS_CUSTOMER_ID)
+      setTokens(res.tokens)
+    } catch (e) {
+      logger.error('Failed to load API tokens', { error: String(e) })
+      setError('Failed to load API tokens')
+      setTokens([])
+    }
   }, [])
 
   useEffect(() => {
-    load()
+    void load()
   }, [load])
 
   const rows = useMemo(() => (tokens ?? []).map(toRow), [tokens])
+
+  const exportCsv = useCallback(() => {
+    const header = COLUMNS.map((c) => c.label).join(',')
+    const body = rows
+      .map((r) => COLUMNS.map((c) => `"${(r[c.key] ?? '').replace(/"/g, '""')}"`).join(','))
+      .join('\n')
+    const blob = new Blob([`${header}\n${body}`], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'api-tokens.csv'
+    a.click()
+    URL.revokeObjectURL(url)
+    logger.info('Exported API tokens CSV', { count: rows.length })
+  }, [rows])
 
   return {
     title: 'API Token',
@@ -53,6 +69,7 @@ export function useApiToken(): DataPageProps {
     rows,
     actions: [
       { key: 'refresh', label: 'Refresh', onClick: () => void load(), variant: 'primary' },
+      { key: 'export', label: 'Export CSV', onClick: exportCsv },
     ],
     emptyText: 'No API token found',
   }
