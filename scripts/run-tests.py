@@ -11,6 +11,9 @@ One entrypoint for every environment:
     the aggregate VS Code task no longer fans out into racing writers.
   - **CI (GitHub Actions):** `python scripts/run-tests.py` with `CI=true` runs
     pytest + hook tests + frontend tests directly on the runner (no Docker stack).
+    Backend failures go to `logs/test-failures.log`; frontend (vitest) failures
+    are split into `logs/frontend-test-failures.log` so backend and frontend
+    failures can be triaged separately. All fixing happens locally.
 
 Filtering / artifact format live in `scripts/diagnostics.py` (shared with
 `scripts/lint-all.py`), so local and CI never drift.
@@ -269,7 +272,26 @@ def main() -> int:
     else:
         results = run_ci() if IS_CI else run_local(fast)
 
-    any_failed, text, skips = diagnostics.digest_tests(results, label)
+    if IS_CI:
+        # Split frontend (vitest) failures into their own artifact so backend and
+        # frontend failures are triaged separately. Both are fixed locally; the
+        # on-demand workflow gates on both logs and uploads them as run artifacts.
+        any_failed, text, skips = diagnostics.digest_tests(
+            results, label, include=diagnostics.BACKEND_TEST_TARGETS
+        )
+        fe_failed, fe_text, fe_skips = diagnostics.digest_tests(
+            results, label, include=diagnostics.FRONTEND_TEST_TARGETS
+        )
+        frontend_artifact = REPO_ROOT / "logs" / "frontend-test-failures.log"
+        frontend_artifact.parent.mkdir(parents=True, exist_ok=True)
+        frontend_artifact.write_text(fe_text, encoding="utf-8")
+        skips = skips + fe_skips
+        if fe_failed:
+            any_failed = True
+            print(f"\nFrontend (vitest) failures written to: {frontend_artifact}")
+            print("  (fix locally with /fix-tests)")
+    else:
+        any_failed, text, skips = diagnostics.digest_tests(results, label)
 
     skipped = {s for s, _ in skips}
     statuses = [

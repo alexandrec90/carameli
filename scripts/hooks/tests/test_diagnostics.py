@@ -412,6 +412,63 @@ def test_digest_tests_folds_frontend_failures():
     assert "> vitest run" not in text  # npm boilerplate denoised away
 
 
+def test_backend_and_frontend_targets_partition_sections():
+    # The two groups must cover every section exactly once -- no overlap, no gap,
+    # or the CI split would drop or duplicate a target.
+    all_names = {name for name, *_ in diag.TEST_SECTIONS}
+    assert {"frontend-tests"} == diag.FRONTEND_TEST_TARGETS
+    assert all_names == diag.BACKEND_TEST_TARGETS | diag.FRONTEND_TEST_TARGETS
+    assert not (diag.BACKEND_TEST_TARGETS & diag.FRONTEND_TEST_TARGETS)
+
+
+def test_digest_tests_include_backend_excludes_frontend():
+    # CI split: backend digest must carry pytest but never the frontend section,
+    # even when both failed in the same run.
+    pytest_raw = [
+        "=== FAILURES ===",
+        "___ test_foo ___",
+        "    app/services/foo.py:10: in bar",
+        "E   AssertionError: nope",
+        "=== 1 failed in 0.3s ===",
+    ]
+    fe = ["FAIL src/foo.test.ts > renders", "AssertionError: expected 1 to be 2"]
+    any_failed, text, _ = diag.digest_tests(
+        {"pytest": (pytest_raw, 1), "frontend-tests": (fe, 1)},
+        "src",
+        include=diag.BACKEND_TEST_TARGETS,
+    )
+    assert any_failed
+    assert "# pytest" in text
+    assert "# frontend-tests" not in text
+    assert "src/foo.test.ts" not in text
+
+
+def test_digest_tests_include_frontend_only():
+    fe = ["FAIL src/foo.test.ts > renders", "AssertionError: expected 1 to be 2"]
+    pytest_raw = ["=== FAILURES ===", "E   AssertionError: nope", "=== 1 failed in 0.3s ==="]
+    any_failed, text, _ = diag.digest_tests(
+        {"pytest": (pytest_raw, 1), "frontend-tests": (fe, 1)},
+        "src",
+        include=diag.FRONTEND_TEST_TARGETS,
+    )
+    assert any_failed
+    assert "# frontend-tests" in text
+    assert "# pytest" not in text
+
+
+def test_digest_tests_include_frontend_clean_when_only_backend_failed():
+    # Frontend passed, backend failed -> the frontend artifact must be empty so a
+    # clean frontend run never creates a stale fix-branch section.
+    pytest_raw = ["=== FAILURES ===", "E   AssertionError: nope", "=== 1 failed in 0.3s ==="]
+    fe_failed, fe_text, _ = diag.digest_tests(
+        {"pytest": (pytest_raw, 1), "frontend-tests": ([], 0)},
+        "src",
+        include=diag.FRONTEND_TEST_TARGETS,
+    )
+    assert not fe_failed
+    assert fe_text == ""
+
+
 def test_digest_tests_folds_hook_failures():
     raw = [
         "=== FAILURES ===",

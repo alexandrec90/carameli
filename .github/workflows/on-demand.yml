@@ -118,8 +118,10 @@ jobs:
           # A non-empty log means actionable failures remain. The runners' own
           # exit codes are swallowed above so a crash and a real failure can't be
           # conflated -- the artifact contents are the contract. Fail the job so
-          # the run shows red; fix locally, then push to re-run.
-          if [ -s logs/lint-errors.log ] || [ -s logs/test-failures.log ]; then
+          # the run shows red; fix locally, then push to re-run. Frontend (vitest)
+          # failures are split into their own artifact by run-tests.py in CI, so
+          # gate on that log too.
+          if [ -s logs/lint-errors.log ] || [ -s logs/test-failures.log ] || [ -s logs/frontend-test-failures.log ]; then
             echo "Actionable failures remain. Download the fix-artifacts bundle,"
             echo "then run /fix-lint or /fix-tests locally."
             exit 1
