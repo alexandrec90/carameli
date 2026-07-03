@@ -59,6 +59,8 @@ LOCK_NOTICE = (
 SHIM = """#!/bin/sh
 # Installed by scripts/hooks/deps-sync.py --install -- do not hand-edit.
 # Reinstalls local deps when a dependency manifest changed. See that script.
+# The installed hook outlives branch switches; skip on trees that predate the script.
+[ -f scripts/hooks/deps-sync.py ] || exit 0
 python scripts/hooks/deps-sync.py
 """
 
@@ -169,7 +171,9 @@ def main(argv: list[str]) -> int:
     with ThreadPoolExecutor(max_workers=max(1, len(installs))) as pool:
         for description, returncode in pool.map(run_install, installs):
             if returncode != 0:
-                print(f"[deps-sync] FAILED: {description} -- will retry on next run", file=sys.stderr)
+                print(
+                    f"[deps-sync] FAILED: {description} -- will retry on next run", file=sys.stderr
+                )
                 failures += 1
 
     if failures == 0:

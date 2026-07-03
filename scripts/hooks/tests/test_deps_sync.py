@@ -133,7 +133,10 @@ def test_install_hooks_writes_shims_and_respects_foreign_hooks(tmp_path, capsys)
     written = ds.install_hooks(tmp_path)
     assert sorted(p.name for p in written) == sorted(ds.HOOK_NAMES)
     for name in ds.HOOK_NAMES:
-        assert "deps-sync.py" in (tmp_path / name).read_text(encoding="utf-8")
+        shim = (tmp_path / name).read_text(encoding="utf-8")
+        assert "deps-sync.py" in shim
+        # Guard: checkouts of trees that predate the script must not error.
+        assert "[ -f scripts/hooks/deps-sync.py ] || exit 0" in shim
 
     # Re-install over our own shim is fine; a foreign hook is left untouched.
     (tmp_path / "post-merge").write_text("#!/bin/sh\nsomething-else\n", encoding="utf-8")
