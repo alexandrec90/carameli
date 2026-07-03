@@ -69,6 +69,20 @@ export function hydrateConfig(raw: string | null): EditorConfig {
   }
 }
 
+/**
+ * True when panel `index`'s image should render unclipped (a "full reveal") for
+ * framing: the editor is active and that image is the current selection. Layout uses
+ * this to drop the panel clip on the selected image so the whole picture stays visible
+ * while you drag/zoom it — the panel outline still marks where the crop lands.
+ */
+export function shouldRevealImg(
+  active: boolean,
+  selected: EditorModeApi['selected'],
+  index: number,
+): boolean {
+  return active && selected?.kind === 'img' && selected.index === index
+}
+
 /** Patch-merge a single image entry, returning a new config. */
 export function patchImg(
   config: EditorConfig,

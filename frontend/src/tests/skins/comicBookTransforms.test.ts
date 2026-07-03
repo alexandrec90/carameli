@@ -7,6 +7,9 @@ import {
 } from '../../skins/comic-book/editor/layoutConfig'
 import {
   imgTransformStyle,
+  fullImgStyle,
+  imgClipStyle,
+  anchorToFractions,
   bubbleStyle,
 } from '../../skins/comic-book/editor/transforms'
 
@@ -35,6 +38,85 @@ describe('imgTransformStyle', () => {
     })
     expect(style.transform).toBe('translate(0px, 0px) scale(1)')
     expect(style.objectPosition).toBe('center center')
+  })
+})
+
+describe('anchorToFractions', () => {
+  it('maps keyword pairs to [x, y] fractions', () => {
+    expect(anchorToFractions('center center')).toEqual([0.5, 0.5])
+    expect(anchorToFractions('center bottom')).toEqual([0.5, 1])
+    expect(anchorToFractions('left top')).toEqual([0, 0])
+    expect(anchorToFractions('right bottom')).toEqual([1, 1])
+  })
+
+  it('tolerates extra whitespace and missing keywords', () => {
+    expect(anchorToFractions('  right   ')).toEqual([1, 0.5])
+    expect(anchorToFractions('')).toEqual([0.5, 0.5])
+  })
+})
+
+describe('fullImgStyle', () => {
+  const t = (over: Partial<Parameters<typeof fullImgStyle>[2]> = {}) => ({
+    scale: 1,
+    offsetX: 0,
+    offsetY: 0,
+    anchor: 'center bottom',
+    spill: false,
+    ...over,
+  })
+
+  it('bottom-anchors a portrait image so the cover crop still shows the bottom', () => {
+    // 100×100 box, 100×200 source: cover scale 1, so the box shows the bottom 100px.
+    // The full 200px-tall image is revealed above the box (top: -100).
+    const s = fullImgStyle({ w: 100, h: 100 }, { w: 100, h: 200 }, t())
+    expect(s.left).toBe(0)
+    expect(s.top).toBe(-100)
+    expect(s.width).toBe(100)
+    expect(s.height).toBe(200)
+    expect(s.transform).toBe('scale(1)')
+    expect(s.objectFit).toBe('fill')
+    // Must opt out of a global `img { max-width: 100% }` reset, else the natural
+    // width collapses to the wrapper and the reveal geometry breaks.
+    expect(s.maxWidth).toBe('none')
+    expect(s.maxHeight).toBe('none')
+  })
+
+  it('center-anchors a wide image so it reveals symmetrically left/right', () => {
+    const s = fullImgStyle({ w: 100, h: 100 }, { w: 200, h: 100 }, t({ anchor: 'center center' }))
+    expect(s.left).toBe(-50)
+    expect(s.top).toBe(0)
+    expect(s.transform).toBe('scale(1)')
+  })
+
+  it('folds the transform zoom into the reveal scale and re-centres the pan', () => {
+    const s = fullImgStyle({ w: 100, h: 100 }, { w: 100, h: 200 }, t({ scale: 2 }))
+    expect(s.left).toBe(0)
+    expect(s.top).toBe(-150)
+    expect(s.transform).toBe('scale(2)')
+  })
+})
+
+describe('imgClipStyle', () => {
+  const CLIP = 'polygon(0px 0px, 10px 0px, 10px 10px, 0px 10px)'
+
+  it('clips to the panel polygon when spill is off and not revealed', () => {
+    expect(imgClipStyle(false, false, CLIP)).toEqual({
+      clipPath: CLIP,
+      overflow: 'hidden',
+    })
+  })
+
+  it('unclips and lifts above the frame lines (z-4 > svg z-3) when spill is on', () => {
+    expect(imgClipStyle(true, false, CLIP)).toEqual({
+      clipPath: 'none',
+      overflow: 'visible',
+      zIndex: 4,
+    })
+  })
+
+  it('unclips for the editor full-reveal selection regardless of spill', () => {
+    expect(imgClipStyle(false, true, CLIP).clipPath).toBe('none')
+    expect(imgClipStyle(true, true, CLIP).clipPath).toBe('none')
   })
 })
 

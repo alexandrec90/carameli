@@ -3,17 +3,30 @@
 `logs/lint-errors.log` for AI-agent consumption. On pass, clears the artifact.
 
 One entrypoint for every environment:
-  - **Local desktop / mobile-less sessions:** `python scripts/lint-all.py`
+  - **Local desktop:** `python scripts/lint-all.py`
     Runs host tools from the venv; `alembic check` runs inside the app container.
   - **CI (GitHub Actions):** `python scripts/lint-all.py` with `CI=true` set.
     Runs the same host tools directly (no Docker stack); `alembic check` runs
     against the service Postgres. Auto-fixes land in the working tree for the
     workflow to commit.
 
+Two scoping modes:
+  - **Full (default):** every tool runs over the whole tree.
+  - **Changed (`--changed`, or `--paths <files...>`):** lint only the working-tree
+    diff. File-scopable host tools (ruff / mypy / vulture) run on just the changed
+    files; the frontend tools (eslint / tsc / stylelint / markdownlint) and the
+    project-global tools (pip-audit / alembic / yamllint / actionlint / ...) run
+    their normal command only when a relevant file changed, else skip cleanly.
+    `/fix-all` uses this to relint after `/fix-tests` edits source, so a lint
+    violation introduced by a test fix is caught before CI.
+
 Filtering / artifact format live in `scripts/diagnostics.py` (the single source
-of truth shared with `scripts/run-tests.py`), so local and CI never drift.
+of truth shared with `scripts/run-tests.py`), so local and CI never drift — and
+both scoping modes hand the same `results` dict to `digest_lint`, so the artifact
+`/fix-lint` consumes is byte-identical regardless of scope.
 """
 
+import argparse
 import os
 import re
 import shutil
@@ -58,75 +71,234 @@ def run(cmd: str) -> tuple[list[str], int]:
 
 
 # ---------------------------------------------------------------------------
+# Changed-files scoping. `changed_files()` returns the repo-relative paths to
+# lint in --changed mode; the `_is_*` predicates classify a path so each tool can
+# decide whether it is relevant (and, for the host tools, which files to target).
+# All paths are repo-relative with forward slashes, as git emits them.
+# ---------------------------------------------------------------------------
+
+_FE_SCRIPT_EXT = (".ts", ".tsx", ".js", ".jsx")
+
+
+def changed_files(paths: list[str] | None = None) -> list[str]:
+    """Repo-relative paths to lint in --changed mode.
+
+    With explicit `paths`, use those; otherwise derive the set from git — tracked
+    edits vs HEAD plus untracked files. Either way, drop entries that no longer
+    exist on disk (deleted paths have nothing to lint) and de-duplicate.
+    """
+    if paths is not None:
+        cand = paths
+    else:
+        tracked, _ = run("git diff --name-only HEAD")
+        untracked, _ = run("git ls-files --others --exclude-standard")
+        cand = [*tracked, *untracked]
+    out: list[str] = []
+    for raw in cand:
+        f = raw.strip()
+        if f and f not in out and (REPO_ROOT / f).exists():
+            out.append(f)
+    return out
+
+
+def _sel(changed: list[str], pred) -> list[str]:
+    return [f for f in changed if pred(f)]
+
+
+def _q(files: list[str]) -> str:
+    """Shell-quote a file list for a `run()` command (shell=True)."""
+    return " ".join(f'"{f}"' for f in files)
+
+
+def _is_py(f: str) -> bool:
+    return f.endswith(".py")
+
+
+def _is_app_py(f: str) -> bool:
+    return f.endswith(".py") and f.startswith("app/")
+
+
+def _is_fe_script(f: str) -> bool:
+    return f.startswith("frontend/") and f.endswith(_FE_SCRIPT_EXT)
+
+
+def _is_fe_css(f: str) -> bool:
+    return f.startswith("frontend/") and f.endswith(".css")
+
+
+def _is_md(f: str) -> bool:
+    return f.endswith(".md")
+
+
+def _is_req(f: str) -> bool:
+    return f.startswith("requirements") and f.endswith((".txt", ".in"))
+
+
+def _is_env(f: str) -> bool:
+    return Path(f).name.startswith(".env")
+
+
+def _is_migration(f: str) -> bool:
+    return f.startswith("app/models/") or f.startswith("alembic/")
+
+
+def _is_yaml(f: str) -> bool:
+    return f.endswith((".yml", ".yaml"))
+
+
+def _is_workflow(f: str) -> bool:
+    return f.startswith(".github/workflows/")
+
+
+def _is_instruction(f: str) -> bool:
+    return f in ("CLAUDE.md", "AGENTS.md") or f.startswith((".claude/", ".agents/"))
+
+
+# ---------------------------------------------------------------------------
 # Per-tool runners. Each returns {report_name: (lines, exit_code)}. Tools that
 # auto-fix do so before the reporting pass so only unfixable issues are reported.
+#
+# Each accepts `changed`: None in full mode (lint the whole tree, the historical
+# behaviour), or the changed-file list in --changed mode. A tool with no relevant
+# change returns ([], 0) (a clean pass), which `digest_lint` omits entirely.
 # ---------------------------------------------------------------------------
 
 
-def t_ruff() -> dict:
+def t_ruff(changed: list[str] | None = None) -> dict:
     # Fix then format sequentially (format after fix) before the reporting pass.
-    run("ruff check . --fix --unsafe-fixes --quiet")
-    run("ruff format . --quiet")
+    if changed is None:
+        target = "."
+    else:
+        target = _q(_sel(changed, _is_py))
+        if not target:
+            return {"ruff-check": ([], 0), "ruff-format": ([], 0)}
+    run(f"ruff check {target} --fix --unsafe-fixes --quiet")
+    run(f"ruff format {target} --quiet")
     return {
-        "ruff-check": run("ruff check . --output-format=full"),
-        "ruff-format": run("ruff format --check ."),
+        "ruff-check": run(f"ruff check {target} --output-format=full"),
+        "ruff-format": run(f"ruff format --check {target}"),
     }
 
 
-def t_eslint() -> dict:
+def t_eslint(changed: list[str] | None = None) -> dict:
+    # eslint's npm script targets `src` wholesale; scope by gating on relevance
+    # rather than per-file (the lint of `src` is cheap relative to the diff math).
+    if changed is not None and not _sel(changed, _is_fe_script):
+        return {"eslint": ([], 0)}
     return {"eslint": run("npm --prefix frontend run lint:eslint -- --fix")}
 
 
-def t_tsc() -> dict:
+def t_tsc(changed: list[str] | None = None) -> dict:
+    # tsc cannot scope to single files (whole-project type-check), so gate on any
+    # frontend script change and otherwise run the normal project check.
+    if changed is not None and not _sel(changed, _is_fe_script):
+        return {"tsc": ([], 0)}
     return {"tsc": run("npm --prefix frontend run lint:types")}
 
 
-def t_stylelint() -> dict:
+def t_stylelint(changed: list[str] | None = None) -> dict:
+    if changed is not None and not _sel(changed, _is_fe_css):
+        return {"stylelint": ([], 0)}
     return {"stylelint": run("npm --prefix frontend run lint:css -- --fix")}
 
 
-def t_markdownlint() -> dict:
+def t_markdownlint(changed: list[str] | None = None) -> dict:
+    if changed is not None and not _sel(changed, _is_md):
+        return {"markdownlint": ([], 0)}
     return {
+        # Captured agent transcripts (e.g. "docs/failed fix-all transcript.md")
+        # are raw tool output, not prose -- they legitimately carry inline HTML
+        # and fenced code, generating hundreds of unfixable findings that bury
+        # real markdown errors. Exclude any *transcript*.md from the lint.
         "markdownlint": run(
             'npm --prefix frontend exec --yes -- markdownlint "**/*.md" '
             '--ignore "**/node_modules/**" --ignore "**/.git/**" --ignore "**/.venv/**" '
+            '--ignore "**/*transcript*.md" '
             '-c ".markdownlint.json" --fix'
         )
     }
 
 
-def t_mypy() -> dict:
-    return {"mypy": run("mypy app/")}
+def t_mypy(changed: list[str] | None = None) -> dict:
+    if changed is None:
+        return {"mypy": run("mypy app/")}
+    files = _sel(changed, _is_app_py)
+    if not files:
+        return {"mypy": ([], 0)}
+    return {"mypy": run(f"mypy {_q(files)}")}
 
 
-def t_vulture() -> dict:
-    return {"vulture": run('vulture app/ --min-confidence 80 --ignore-names "cls,ctx,opts"')}
+def t_vulture(changed: list[str] | None = None) -> dict:
+    opts = '--min-confidence 80 --ignore-names "cls,ctx,opts"'
+    if changed is None:
+        return {"vulture": run(f"vulture app/ {opts}")}
+    files = _sel(changed, _is_app_py)
+    if not files:
+        return {"vulture": ([], 0)}
+    return {"vulture": run(f"vulture {_q(files)} {opts}")}
 
 
-def t_pip_audit() -> dict:
-    ignore = "--ignore-vuln CVE-2026-4539"
-    # Keep pip itself current so it never appears in audit results.
-    run("python -m pip install --upgrade pip --quiet")
-    first, code = run(f"pip-audit {ignore}")
-    if code != 0:
-        pkgs: list[str] = []
-        for line in first:
-            m = re.match(r"^(\S+)\s+[\d.]+\s+\S+\s+[\d.]+\s*$", line)
-            if m and m.group(1) not in pkgs:
-                pkgs.append(m.group(1))
-        for pkg in pkgs:
-            run(f"python -m pip install --upgrade {pkg} --quiet")
-    return {"pip-audit": run(f"pip-audit {ignore}")}
+def t_pip_audit(changed: list[str] | None = None) -> dict:
+    # Report-only: never `pip install --upgrade` from here. Unconstrained upgrades
+    # (majors included) silently drift the local venv from requirements.txt and CI;
+    # vulnerable packages are fixed by a reviewed dependency bump that updates the
+    # manifest and passes the PR gate, not as a lint side effect.
+    if changed is not None and not _sel(changed, _is_req):
+        return {"pip-audit": ([], 0)}
+    return {"pip-audit": run("pip-audit --ignore-vuln CVE-2026-4539")}
 
 
-def t_alembic_check() -> dict:
-    # Locally the DB lives in the app container; in CI it's the service Postgres
-    # the runner can reach directly.
-    cmd = "alembic check" if IS_CI else "docker compose exec -T app alembic check"
-    return {"alembic-check": run(cmd)}
+def t_alembic_check(changed: list[str] | None = None) -> dict:
+    # Migration drift only depends on the models / migration tree.
+    if changed is not None and not _sel(changed, _is_migration):
+        return {"alembic-check": ([], 0)}
+    # In CI the service Postgres is fresh-migrated, so a direct check is valid.
+    if IS_CI:
+        return {"alembic-check": run("alembic check")}
+    # Locally the shared dev DB's schema is owned by the test suite (create_all +
+    # TRUNCATE, never alembic-stamped -- see tests/conftest.py), so checking against
+    # it reports DB-state noise ("Target database is not up to date") instead of
+    # code drift. Check against a fresh throwaway database instead: migrate from
+    # scratch, then compare models vs migrations.
+    return {"alembic-check": _alembic_check_fresh_db()}
 
 
-def t_yamllint() -> dict:
+def _alembic_check_fresh_db() -> tuple[list[str], int]:
+    """Run `alembic upgrade head` + `alembic check` against a throwaway database.
+
+    The throwaway DB isolates the drift check from local test-suite schema state.
+    Environment failures (stack down, DB unreachable) skip with a terminal note --
+    they are not code errors and must not reach the artifact.
+    """
+    lint_db = "carameli_lint_check"
+    # Derive the connection URL from the app container env (single source:
+    # docker-compose.yml) instead of duplicating credentials here. DIRECT_DATABASE_URL
+    # bypasses PgBouncer, which alembic needs anyway.
+    url_lines, rc = run("docker compose exec -T app printenv DIRECT_DATABASE_URL")
+    if rc != 0 or not url_lines or "://" not in url_lines[-1]:
+        print("  [skip] alembic-check: app container not reachable (stack down?)")
+        return ([], 0)
+    url = url_lines[-1].strip().rsplit("/", 1)[0] + f"/{lint_db}"
+    # User/dbname mirror the POSTGRES_* values in docker-compose.yml.
+    psql = "docker compose exec -T db psql -U carameli -d carameli -q -c"
+    run(f'{psql} "DROP DATABASE IF EXISTS {lint_db};"')
+    _, rc = run(f'{psql} "CREATE DATABASE {lint_db};"')
+    if rc != 0:
+        print("  [skip] alembic-check: could not create throwaway database")
+        return ([], 0)
+    try:
+        exec_app = f'docker compose exec -T -e DATABASE_URL="{url}" app'
+        out, rc = run(f"{exec_app} alembic upgrade head")
+        if rc != 0:
+            return (out, rc)  # broken migration chain -- actionable code error
+        return run(f"{exec_app} alembic check")
+    finally:
+        run(f'{psql} "DROP DATABASE IF EXISTS {lint_db};"')
+
+
+def t_yamllint(changed: list[str] | None = None) -> dict:
+    if changed is not None and not _sel(changed, _is_yaml):
+        return {"yamllint": ([], 0)}
     targets = [
         t
         for t in (
@@ -142,7 +314,9 @@ def t_yamllint() -> dict:
     return {"yamllint": run("yamllint --strict -f parsable " + " ".join(targets))}
 
 
-def t_actionlint() -> dict:
+def t_actionlint(changed: list[str] | None = None) -> dict:
+    if changed is not None and not _sel(changed, _is_workflow):
+        return {"actionlint": ([], 0)}
     wf = REPO_ROOT / ".github" / "workflows"
     if not wf.exists() or not list(wf.glob("*.yml")):
         return {"actionlint": ([], 0)}
@@ -151,24 +325,38 @@ def t_actionlint() -> dict:
     return {"actionlint": run("actionlint")}
 
 
-def t_lint_instructions() -> dict:
+def t_lint_instructions(changed: list[str] | None = None) -> dict:
+    if changed is not None and not _sel(changed, _is_instruction):
+        return {"lint-instructions": ([], 0)}
     return {"lint-instructions": run("python scripts/lint-instructions.py")}
 
 
-def t_dotenv() -> dict:
+def t_dotenv(changed: list[str] | None = None) -> dict:
+    if changed is not None and not _sel(changed, _is_env):
+        return {"dotenv-linter": ([], 0)}
     envs = [p.name for p in sorted(REPO_ROOT.glob(".env*")) if p.is_file()]
     if not envs:
         return {"dotenv-linter": ([], 0)}
     return {"dotenv-linter": run("dotenv-linter check " + " ".join(envs))}
 
 
-def t_detect_secrets() -> dict:
+def t_detect_secrets(changed: list[str] | None = None) -> dict:
     """Scan for secrets; auto-acknowledge new findings into the baseline.
 
-    detect-secrets never blocks the suite (it exits 0 after updating the
-    baseline) -- real secrets surface in `git diff .secrets.baseline` for review.
+    detect-secrets never blocks the suite -- real secrets surface in
+    `git diff .secrets.baseline` for review. New findings are detected by whether
+    `scan --baseline` actually changed the baseline's results (ignoring the
+    `generated_at` timestamp, which churns every run and is restored when it is the
+    only change), so a reported count always matches what `git diff` will show.
+    NB: the update flag is `--baseline`; `--update` does not exist in detect-secrets
+    1.5 -- the old call using it failed silently, which is why findings were
+    re-reported as "new" on every run without ever landing in the baseline.
     """
     import json
+
+    # The scan reads the whole tree; only worth it when a non-baseline file moved.
+    if changed is not None and not _sel(changed, lambda f: f != ".secrets.baseline"):
+        return {"detect-secrets": ([], 0)}
 
     exclude = '--exclude-files "\\.secrets\\.baseline"'
     baseline = REPO_ROOT / ".secrets.baseline"
@@ -178,34 +366,42 @@ def t_detect_secrets() -> dict:
         baseline.write_text("\n".join(out), encoding="utf-8")
         return {"detect-secrets": ([], 0)}
 
-    scan_lines, code = run(f"detect-secrets scan {exclude}")
-    scan_raw = "\n".join(scan_lines)
+    before = baseline.read_text(encoding="utf-8")
+    _, code = run(f'detect-secrets scan --baseline ".secrets.baseline" {exclude}')
     if code != 0:
-        return {"detect-secrets": ([f"detect-secrets: scan error: {scan_raw}"], 1)}
-    try:
-        new_scan = json.loads(scan_raw)
-    except ValueError:
-        return {"detect-secrets": (["detect-secrets: could not parse scan output"], 1)}
-    try:
-        existing = json.loads(baseline.read_text(encoding="utf-8"))
-    except ValueError:
-        out, _ = run(f"detect-secrets scan {exclude}")
-        baseline.write_text("\n".join(out), encoding="utf-8")
+        return {"detect-secrets": ([f"detect-secrets: baseline scan failed (exit {code})"], 1)}
+    after = baseline.read_text(encoding="utf-8")
+
+    def _normalize(text: str) -> str:
+        return re.sub(r'"generated_at":\s*"[^"]*"', '"generated_at": ""', text)
+
+    if _normalize(after) == _normalize(before):
+        if after != before:
+            # Timestamp-only churn: restore so the committed baseline stays clean.
+            baseline.write_text(before, encoding="utf-8")
         return {"detect-secrets": ([], 0)}
 
-    new_items: list[str] = []
-    for file, secrets in (new_scan.get("results") or {}).items():
-        base_hashes = {
-            s.get("hashed_secret") for s in (existing.get("results") or {}).get(file, [])
+    def _hashes(text: str) -> set[tuple[str, str]]:
+        try:
+            data = json.loads(text)
+        except ValueError:
+            return set()
+        return {
+            (file, s.get("hashed_secret", ""))
+            for file, secrets in (data.get("results") or {}).items()
+            for s in secrets
         }
-        for secret in secrets:
-            if secret.get("hashed_secret") not in base_hashes:
-                new_items.append(f"{file}:{secret.get('line_number')}: {secret.get('type')}")
-    if new_items:
-        run(f'detect-secrets scan --update ".secrets.baseline" {exclude}')
+
+    added = _hashes(after) - _hashes(before)
+    if added:
         print(
-            f"  [auto-fix] detect-secrets: {len(new_items)} new finding(s) added to "
+            f"  [auto-fix] detect-secrets: {len(added)} new finding(s) added to "
             ".secrets.baseline -- review with: git diff .secrets.baseline"
+        )
+    else:
+        print(
+            "  [auto-fix] detect-secrets: baseline entries updated (removed/relocated)"
+            " -- review with: git diff .secrets.baseline"
         )
     return {"detect-secrets": ([], 0)}
 
@@ -244,17 +440,48 @@ CI_TOOLS = [
 ]
 
 
-def main() -> int:
+def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    p = argparse.ArgumentParser(description=__doc__)
+    p.add_argument(
+        "--changed",
+        action="store_true",
+        help="Lint only the working-tree diff (vs HEAD, plus untracked), skipping "
+        "tools with no relevant change.",
+    )
+    p.add_argument(
+        "--paths",
+        nargs="*",
+        default=None,
+        metavar="FILE",
+        help="Explicit repo-relative paths to treat as the changed set (implies "
+        "--changed; overrides git detection).",
+    )
+    return p.parse_args(argv)
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = _parse_args(argv)
     _ensure_venv_on_path()
     tools = CI_TOOLS if IS_CI else LOCAL_TOOLS
-    label = "scripts/lint-all.py (CI)" if IS_CI else "scripts/lint-all.py (local)"
+
+    if args.paths is not None:
+        changed: list[str] | None = changed_files(args.paths)
+    elif args.changed:
+        changed = changed_files()
+    else:
+        changed = None
+
+    env = "CI" if IS_CI else "local"
+    scope = "full" if changed is None else f"changed ({len(changed)} file(s))"
+    label = f"scripts/lint-all.py ({env}{'' if changed is None else ', changed'})"
 
     artifact = REPO_ROOT / "logs" / "lint-errors.log"
     script_common.print_suite_header(
         "Lint Suite",
         artifact,
         [
-            f"Mode     : {'CI' if IS_CI else 'local'} (parallel)",
+            f"Mode     : {env} (parallel)",
+            f"Scope    : {scope}",
             "",
             "Running all linters in parallel...",
         ],
@@ -262,7 +489,7 @@ def main() -> int:
 
     results: dict[str, tuple[list[str], int]] = {}
     with ThreadPoolExecutor(max_workers=len(tools)) as ex:
-        for fut in [ex.submit(t) for t in tools]:
+        for fut in [ex.submit(t, changed) for t in tools]:
             results.update(fut.result())
 
     any_failed, text, skips = diagnostics.digest_lint(results, label)

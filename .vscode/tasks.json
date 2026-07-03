@@ -390,6 +390,21 @@
       "problemMatcher": []
     },
     {
+      "label": "Lint: Changed Files",
+      "detail": "Lint only the working-tree diff (vs HEAD, plus untracked), skipping tools with no relevant change. Same artifact as 'Lint: Everything'. This is what /fix-all runs after /fix-tests.",
+      "type": "process",
+      "command": "python",
+      "args": ["scripts/notify-wrap.py", "Lint: Changed Files", "--", "python", "scripts/lint-all.py", "--changed"],
+      "group": "build",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "showReuseMessage": false,
+        "close": false
+      },
+      "problemMatcher": []
+    },
+    {
       "label": "Pre-Commit: Install + Patch Hook",
       "type": "process",
       "command": "python",
@@ -407,6 +422,48 @@
       "type": "process",
       "command": "python",
       "args": ["scripts/notify-wrap.py", "Pre-Commit: Run All Hooks", "--", "python", "scripts/pre-commit.py"],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "showReuseMessage": false,
+        "close": false
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Deps: Sync Local Environment",
+      "detail": "Reinstall npm/pip deps if a dependency manifest changed since the last sync (same script the post-merge/post-checkout/post-commit git hooks run).",
+      "type": "process",
+      "command": "python",
+      "args": ["scripts/notify-wrap.py", "Deps: Sync Local Environment", "--", "python", "scripts/hooks/deps-sync.py"],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "showReuseMessage": false,
+        "close": false
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Deps: Recompile Python Lockfiles",
+      "detail": "Recompile requirements.txt / requirements-dev.txt from the .in floors (uv, universal). Run after editing requirements*.in.",
+      "type": "process",
+      "command": "python",
+      "args": ["scripts/notify-wrap.py", "Deps: Recompile Python Lockfiles", "--", "pwsh", "-ExecutionPolicy", "Bypass", "-Command", ".venv\\Scripts\\python.exe -m uv pip compile --universal --python-version 3.12 requirements.in -o requirements.txt && .venv\\Scripts\\python.exe -m uv pip compile --universal --python-version 3.12 requirements-dev.in -o requirements-dev.txt -c requirements.txt"],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "showReuseMessage": false,
+        "close": false
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Git: Install Deps-Sync Hooks",
+      "detail": "Install the post-merge/post-checkout/post-commit git hooks that auto-run 'Deps: Sync Local Environment' after every pull/branch switch.",
+      "type": "process",
+      "command": "python",
+      "args": ["scripts/notify-wrap.py", "Git: Install Deps-Sync Hooks", "--", "python", "scripts/hooks/deps-sync.py", "--install"],
       "presentation": {
         "reveal": "always",
         "panel": "shared",
@@ -456,8 +513,8 @@
     },
     {
       "label": "Test: All Checks",
+      "detail": "Tests only (pytest suites + E2E). Lint is NOT run here — /fix-all lints the working-tree diff after /fix-tests edits source, so an upfront full-repo lint would be stale and wasteful. Use 'Lint: Everything' or 'Lint: Changed Files' to lint standalone.",
       "dependsOn": [
-        "Lint: Everything",
         "Test: All Suites",
         "Test: Run E2E (headless)"
       ],

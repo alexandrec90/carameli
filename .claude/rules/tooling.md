@@ -11,7 +11,7 @@ paths:
 ## Scripts
 
 All new scripts under `scripts/` are written in Python for cross-environment
-compatibility (local Windows desktop, GitHub Actions, web, and mobile sessions).
+compatibility (local Windows desktop and GitHub Actions).
 
 - **Expose pure importable functions** guarded by `if __name__ == '__main__'` so pytest
   can test the logic without spawning a subprocess.

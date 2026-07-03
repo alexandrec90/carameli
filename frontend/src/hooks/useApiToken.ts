@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { api, type ApiTokenRow } from '../api/client'
 import { DEMO_VS_CUSTOMER_ID } from '../lib/constants'
+import { exportRowsCsv } from '../lib/csv'
 import { logger } from '../lib/logger'
 import type { DataColumn, DataPageProps } from '../lib/dataPage'
 
@@ -44,17 +45,7 @@ export function useApiToken(): DataPageProps {
   const rows = useMemo(() => (tokens ?? []).map(toRow), [tokens])
 
   const exportCsv = useCallback(() => {
-    const header = COLUMNS.map((c) => c.label).join(',')
-    const body = rows
-      .map((r) => COLUMNS.map((c) => `"${(r[c.key] ?? '').replace(/"/g, '""')}"`).join(','))
-      .join('\n')
-    const blob = new Blob([`${header}\n${body}`], { type: 'text/csv' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = 'api-tokens.csv'
-    a.click()
-    URL.revokeObjectURL(url)
+    exportRowsCsv(COLUMNS, rows, 'api-tokens.csv')
     logger.info('Exported API tokens CSV', { count: rows.length })
   }, [rows])
 

@@ -11,6 +11,7 @@ import {
   patchImg,
   resetOneIn,
   seedConfig,
+  shouldRevealImg,
 } from '../../skins/comic-book/editor/useEditorMode'
 
 describe('seedConfig', () => {
@@ -110,6 +111,26 @@ describe('patchImg / patchBubble', () => {
   it('is a no-op for an out-of-range index', () => {
     const base = seedConfig()
     expect(patchImg(base, 99, { scale: 5 })).toEqual(base)
+  })
+})
+
+describe('shouldRevealImg', () => {
+  it('reveals only the selected image panel', () => {
+    const selected = { kind: 'img', index: 3 } as const
+    expect(shouldRevealImg(true, selected, 3)).toBe(true)
+    expect(shouldRevealImg(true, selected, 2)).toBe(false)
+  })
+
+  it('does not reveal when the editor is inactive', () => {
+    expect(shouldRevealImg(false, { kind: 'img', index: 3 }, 3)).toBe(false)
+  })
+
+  it('does not reveal when nothing is selected', () => {
+    expect(shouldRevealImg(true, null, 0)).toBe(false)
+  })
+
+  it('does not reveal when a bubble (not the image) is selected', () => {
+    expect(shouldRevealImg(true, { kind: 'bubble', index: 3 }, 3)).toBe(false)
   })
 })
 

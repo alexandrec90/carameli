@@ -5,6 +5,16 @@ repos:
   # with scripts/lint-all.py — no version drift between the two.
   - repo: local
     hooks:
+      # First so the regenerated AGENTS.md/.agents mirrors are in place before
+      # markdownlint (and friends) run on them. Modifies files; the patched git
+      # hook auto-stages and retries (see scripts/install-pre-commit.py).
+      - id: sync-agents
+        name: sync CLAUDE -> AGENTS mirrors
+        language: system
+        entry: python scripts/sync-agents-context.py
+        files: (^|/)CLAUDE\.md$|^\.claude/
+        pass_filenames: false
+
       - id: detect-secrets
         name: detect-secrets
         language: system

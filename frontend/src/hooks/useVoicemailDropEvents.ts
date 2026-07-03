@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { api, type VoicemailDropEvent } from '../api/client'
 import { DEMO_VS_CUSTOMER_ID } from '../lib/constants'
+import { exportRowsCsv } from '../lib/csv'
 import { logger } from '../lib/logger'
 import type { DataColumn, DataPageProps } from '../lib/dataPage'
 
@@ -59,17 +60,7 @@ export function useVoicemailDropEvents(title: string, description: string): Data
   }, [])
 
   const exportCsv = useCallback(() => {
-    const header = COLUMNS.map((c) => c.label).join(',')
-    const body = rows
-      .map((r) => COLUMNS.map((c) => `"${(r[c.key] ?? '').replace(/"/g, '""')}"`).join(','))
-      .join('\n')
-    const blob = new Blob([`${header}\n${body}`], { type: 'text/csv' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = 'voicemail-drop-events.csv'
-    a.click()
-    URL.revokeObjectURL(url)
+    exportRowsCsv(COLUMNS, rows, 'voicemail-drop-events.csv')
     logger.info('Exported voicemail drop events CSV', { count: rows.length })
   }, [rows])
 

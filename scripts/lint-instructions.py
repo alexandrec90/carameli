@@ -8,7 +8,8 @@ honor-system, so a malformed instruction file fails on commit instead of silentl
 degrading the agent (or wasting an eval run):
 
   - Frontmatter schema  — rules need `description` + `paths`; skills need `name`,
-                          `description`, and `disable-model-invocation: true`.
+                          `description`, and `disable-model-invocation: true` (unless an
+                          orchestrated sub-skill documents the omission — see the check).
   - Dead links / deps   — markdown links to repo files resolve; a SKILL.md that
                           references `known-fixes.md` must have that sibling.
   - Size caps           — CLAUDE.md <= 200 lines, SKILL.md <= 500 (authoring.md).
@@ -16,7 +17,7 @@ degrading the agent (or wasting an eval run):
                           known-fixes short-circuit has a "Hard Rules" section; a
                           known-fixes.md is a well-formed markdown table.
 
-Stdlib only (runs in web/mobile sessions with no extra deps, like the hook scripts).
+Stdlib only (no extra deps, like the hook scripts).
 Pure functions are exposed for pytest (`scripts/hooks/tests/test_lint_instructions.py`);
 the __main__ guard walks the repo, prints findings as `path:line: [check] message`, and
 exits 1 if any are found.
@@ -100,6 +101,28 @@ def _nonempty_list(val) -> bool:
     return isinstance(val, list) and len(val) > 0
 
 
+def _documents_orchestration_exemption(text: str) -> bool:
+    """True when a skill's frontmatter justifies omitting `disable-model-invocation`.
+
+    Orchestrated sub-skills (invoked by another skill via the Skill tool) MUST omit
+    the flag — it blocks all Skill-tool invocation, including from a parent skill, so
+    setting it would break the parent's call (see .claude/rules/authoring.md). The
+    convention is to document the omission with a `# No disable-model-invocation`
+    comment in the frontmatter block. That comment is what distinguishes an
+    intentional exception (e.g. fix-tests, invoked by /fix-all) from an accidental
+    omission in a user-only skill that simply forgot the flag.
+    """
+    lines = text.splitlines()
+    if not lines or lines[0].strip() != "---":
+        return False
+    for line in lines[1:]:
+        if line.strip() == "---":
+            break
+        if line.lstrip().startswith("#") and "disable-model-invocation" in line:
+            return True
+    return False
+
+
 # ---------------------------------------------------------------------------- checks
 
 
@@ -135,9 +158,18 @@ def check_frontmatter(rel: str, text: str) -> list[Finding]:
             out.append(Finding(rel, 1, "frontmatter", "skill missing non-empty 'name'"))
         if not _nonempty_str(fm.get("description")):
             out.append(Finding(rel, 1, "frontmatter", "skill missing non-empty 'description'"))
-        if not _truthy(fm.get("disable-model-invocation")):
+        if not _truthy(
+            fm.get("disable-model-invocation")
+        ) and not _documents_orchestration_exemption(text):
             out.append(
-                Finding(rel, 1, "frontmatter", "skill must set 'disable-model-invocation: true'")
+                Finding(
+                    rel,
+                    1,
+                    "frontmatter",
+                    "skill must set 'disable-model-invocation: true' (or, for an "
+                    "orchestrated sub-skill invoked via the Skill tool, document the "
+                    "omission with a '# No disable-model-invocation' frontmatter comment)",
+                )
             )
     return out
 

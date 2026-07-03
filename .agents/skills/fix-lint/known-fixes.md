@@ -26,7 +26,7 @@ apply the documented fix directly instead of reasoning from scratch.
 | RUF012 | Mutable class attribute default (e.g., list on class) | Annotate as `ClassVar[...]` to mark intentional class-level state | 1 | 2026-04-20 | 2026-04-20 |
 | ASYNC221 | Async test calls blocking `subprocess.run` intentionally | Add targeted `# noqa: ASYNC221` on the intentional `subprocess.run(...)` line in slow migration tests | 1 | 2026-04-20 | 2026-04-20 |
 | E402 | Imports placed below executable/module code | Move module-level imports to the top import block; keep test helpers below imports | 1 | 2026-04-20 | 2026-04-20 |
-| MD040/fenced-code-language | Markdown fence opened with plain ``` and no language | Add a language tag (use `text` for directory trees/plain text snippets) | 1 | 2026-04-20 | 2026-04-20 |
+| MD040/fenced-code-language | Markdown fence opened with plain ``` and no language | Add a language tag (use `text` for directory trees/plain text snippets) | 2 | 2026-07-01 | 2026-04-20 |
 | MD024/no-duplicate-heading | Duplicate heading text in the same markdown file | Rename repeated headings with section-specific suffixes (e.g., `(B1)`, `(B2)`) | 2 | 2026-06-18 | 2026-04-20 |
 | Secret Keyword [not in baseline] | Example literals include `secret`-like values in tests/docs and trigger detect-secrets | Add `// pragma: allowlist secret` inline comment on the flagged line; for non-code files (workflows, state JSON) run `detect-secrets scan --update .secrets.baseline` | 3 | 2026-06-18 | 2026-04-20 |
 | S101 | `assert` in a pytest test file (or template) triggers ruff S101 | Add `# ruff: noqa: S101` at the top of the file — safe for test-only files | 1 | 2026-06-18 | 2026-06-18 |

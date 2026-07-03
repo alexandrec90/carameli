@@ -198,7 +198,7 @@ LINT_SECTIONS = [
         _keep_pip_audit,
     ),
     ("vulture", "# remove unused code at the reported locations", _keep_vulture),
-    ("detect-secrets", "detect-secrets scan --update .secrets.baseline", _keep_detect_secrets),
+    ("detect-secrets", "detect-secrets scan --baseline .secrets.baseline", _keep_detect_secrets),
     ("dotenv-linter", "# fix ordering / quoting in the reported .env file", _keep_dotenv),
     ("yamllint", "yamllint --strict -f parsable <file>", _keep_yamllint),
     ("actionlint", "actionlint", _keep_actionlint),
@@ -335,6 +335,17 @@ def filter_pytest_output(lines: list[str]) -> list[str]:
             i += 1
             continue
 
+        if re.match(r"^={3,}\s+warnings summary", l):
+            # The warnings summary (e.g. PytestWarning about a misapplied
+            # @pytest.mark.asyncio) is not a failure; its lines embed a
+            # `tests/foo.py:NN` substring that would otherwise survive the
+            # first-party-frame keep below and pad the failure block. End the
+            # block here so the summary body is dropped as non-actionable noise.
+            flush_block()
+            in_block = False
+            i += 1
+            continue
+
         if re.match(r"^={3,}\s+short test summary", l):
             flush_block()
             in_block = False
@@ -408,12 +419,63 @@ def filter_pytest_output(lines: list[str]) -> list[str]:
     return filtered
 
 
+# ---------------------------------------------------------------------------
+# vitest filtering -- the frontend runner streams every passing `✓` test, a
+# `RUN`/timing banner, and `stderr|`/`stdout|` capture blocks (React `act(...)`
+# warnings, expected `[WARN]` logs from negative-path tests). Generic denoise()
+# left all of that in, burying the handful of real failures. Keep only the
+# failing files/tests, the `Failed Tests` detail blocks, and the `Tests` summary.
+# ---------------------------------------------------------------------------
+
+# Structural lines: a failing-file glyph, failing-test glyph, its reason glyph,
+# a `FAIL` detail header, the `Tests` summary, or a separator/banner glyph. Any
+# of these also terminates a stderr/stdout capture block in progress. (The glyph
+# class also includes the passing-test marks so _VITEST_DROP_RE can drop them.)
+_VITEST_MARKER_RE = re.compile(
+    r"^\s*(?:[❯×→✓✔]|FAIL\b|PASS\b|RUN\b|Test Files\b|Tests\b|Start at\b|Duration\b|⎯)"  # noqa: RUF001
+)
+# Per-line noise to always drop: passing-test glyphs, and the run banner / timing
+# footer (`RUN` / `Test Files` / `Start at` / `Duration`). The `Tests` summary is
+# kept because count_test_summary() reads its per-test counts.
+_VITEST_DROP_RE = re.compile(r"^\s*(?:[✓✔]|PASS\b|RUN\b|Test Files\b|Start at\b|Duration\b)")
+_VITEST_CAPTURE_RE = re.compile(r"^\s*(?:stderr|stdout) \|")
+
+
+def filter_vitest_output(lines: list[str]) -> list[str]:
+    """Keep only actionable vitest lines; drop passing tests and capture blocks.
+
+    Falls back to `denoise` when filtering would strip everything, so the agent
+    always has something to act on. Pure -- unit-tested in `test_diagnostics.py`.
+    """
+    out: list[str] = []
+    skipping = False  # inside a stderr/stdout capture block (act/[WARN] noise)
+    for l in denoise(lines):
+        if _VITEST_CAPTURE_RE.match(l):
+            skipping = True
+            continue
+        if _VITEST_MARKER_RE.match(l):
+            skipping = False
+            if _VITEST_DROP_RE.match(l):
+                continue
+            out.append(l)
+            continue
+        if skipping:
+            continue
+        out.append(l)
+    return out or denoise(lines)
+
+
 # (report name, section header, parser, fix hint). pytest-format runners reuse
-# filter_pytest_output; other runners (vitest) get generic denoising.
+# filter_pytest_output; the vitest frontend runner uses filter_vitest_output.
 TEST_SECTIONS = [
     ("pytest", "pytest", filter_pytest_output, "pytest tests/unit/ <path::to::failing_test>"),
     ("hook-tests", "hook-tests", filter_pytest_output, "pytest scripts/hooks/tests"),
-    ("frontend-tests", "frontend-tests", denoise, "npm --prefix frontend run test:run"),
+    (
+        "frontend-tests",
+        "frontend-tests",
+        filter_vitest_output,
+        "npm --prefix frontend run test:run",
+    ),
     (
         "telnyx-sandbox",
         "telnyx-sandbox",

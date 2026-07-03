@@ -70,6 +70,10 @@ export default defineConfig(({ mode }) => {
     server: {
       port: 5173,
 
+      // The Docker-hosted MCP browser reaches the dev server via
+      // host.docker.internal; Vite's host check blocks it by default.
+      allowedHosts: ['host.docker.internal'],
+
       // On Windows, inotify file-change events don't propagate across the
       // Docker bind mount, so Vite's native watcher never sees edits and HMR
       // silently stops working (a restart is the only way changes show up).

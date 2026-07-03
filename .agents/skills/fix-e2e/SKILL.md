@@ -1,33 +1,38 @@
 ---
 name: fix-e2e
-disable-model-invocation: true
+# No disable-model-invocation: this skill is invoked programmatically by /fix-all
+# via the Skill tool. See .claude/rules/authoring.md (orchestrated sub-skill exception).
 description: 'Fixes E2E test failures collected in logs/e2e-failures.log.'
 ---
 
 # Skill: Fix E2E Failures
 
-> **Local session only.** This skill depends on the local stack and a browser runner.
-> It cannot run in web or mobile sessions.
+> Depends on the local stack and a browser runner being available.
 
-Fix Playwright E2E failures collected in `logs/e2e-failures.log`.
+Fix Playwright E2E failures collected in `logs/e2e-failures.log`. That log is written by the
+check-run script (`scripts/run-e2e.py`) whenever the E2E suite runs — **this skill never runs
+the full suite itself.** It reads the log, fixes the implicated code, and reruns only the
+specific failed spec to confirm.
+
+> **Verifying needs the local stack + frontend.** Reading the log and applying fixes works
+> without them, but confirming a fix reruns the spec against the running app (`:8000`) and
+> frontend (`:5173`), and `app/` fixes need `docker compose restart app` to take effect — a
+> bad one can break the stack, which hands off to `/fix-docker` (Step 4). If the stack isn't
+> up, apply the fix, stamp the log, and tell the user to bring it up (or re-run the check run)
+> to verify.
 
 ---
 
 ## Step 1 — Collect & Match Known Fixes
 
-Read these two files **in parallel** (single tool call):
+Read `logs/e2e-failures.log` and `.claude/skills/fix-e2e/known-fixes.md` in a **single parallel
+call** before anything else. Then act on the log's state:
 
-- `logs/e2e-failures.log`
-- `.claude/skills/fix-e2e/known-fixes.md`
-
-If the log file does not exist or is empty, regenerate it by running the headless E2E suite
-yourself. If the stack/frontend isn't up to run it, say so and stop.
-
-### Addressed check
-
-If the last line of `logs/e2e-failures.log` is `--- ADDRESSED`, the failures have
-already been fixed. Regenerate the log (re-run the headless E2E suite) and re-enter on the
-fresh output; if it's still stamped, there are no new failures — report that and **stop**.
+| Log state | Action |
+|---|---|
+| Empty | E2E is green — stop. |
+| Last line is `--- ADDRESSED`, or file missing | Stale/ungenerated — tell the user to re-run the check run (`scripts/run-e2e.py`, or the "Test: All Checks" task), then stop. Don't run the suite yourself. |
+| Non-empty, last line ≠ `--- ADDRESSED` | Fresh — proceed below. |
 
 ### Log quality gate
 
@@ -38,15 +43,18 @@ Before investing in fixes, scan the log for these signals of incomplete diagnost
 | A `# test_name[browser]` block has no traceback or error message lines (only a header + `# fix:` line) | The failure body wasn't captured — root cause is invisible |
 | A failure block is missing a `# fix:` line entirely | Fix hint extraction failed — the block lacks actionability |
 | A test appears failed in a summary but has no corresponding `# test_name` block | Failure body was dropped by the script's filter |
+| Passing-spec output, screenshots/trace paths, or browser chatter bury the actual failures | Noise — the runner's filter is too loose; the real failures are unfindable |
 
 If **any** quality problem is found:
 
-1. Identify which test(s) are affected and which output pattern is missing.
-2. Update the producing E2E runner to preserve the missing content (e.g., always emit a
-   `# fix:` hint, widen the block-capture logic to include assertion output).
-3. Note what was wrong and what you changed, then regenerate the log (re-run the headless
-   E2E suite).
-4. **Stop** — do not attempt fixes on a low-quality log.
+1. Identify which test(s) are affected and which output pattern is missing **or** what noise
+   is drowning the signal.
+2. Update the producing E2E runner: **widen** the capture when detail is missing (e.g., always
+   emit a `# fix:` hint, include assertion output), or **tighten** it when noise leaks (drop
+   passing specs / trace-path chatter). Update the runner's test in the same change.
+3. Note what was wrong and what you changed, then tell the user to regenerate the log (re-run
+   the check run).
+4. **Stop** — do not attempt fixes on a low-quality log, in either direction.
 
 ### Known-fix matching (mandatory — do this BEFORE any other file reads)
 
@@ -133,17 +141,33 @@ than 90 days ago.
 
 ---
 
-## Step 4 — Report
+## Step 4 — Verify, then report
 
-State clearly:
+Rerun **only the spec(s) you fixed** to confirm — never the whole suite (the check-run script
+owns that). E2E runs against the live stack, so the app and frontend (`:5173`) must be up:
 
-- Which failures were fixed (test name, what changed, which files were edited).
-- Which were skipped and why.
-- **Restart reminders** (as applicable):
-  - Backend files changed (`app/`): restart the app container so the change is live —
-    `docker compose restart app`.
-  - Frontend files changed (`frontend/src/`): Vite HMR should pick it up (manual restart
-    only needed for config changes like `vite.config.ts`).
+- `pytest tests/e2e/<spec>.py -k <test>` — the specific fixed test(s) only.
+- After `app/` edits, `docker compose restart app` **first** so the fix is live. Frontend
+  (`frontend/src/`) edits are picked up by Vite HMR — no restart (config changes like
+  `vite.config.ts` are the exception).
+
+After a `docker compose restart app`, if the rerun errors on a container/connection failure
+instead of a test assertion, a bad `app/` edit likely broke startup — check
+`docker compose ps`, and if `app` is unhealthy/exited/restarting, run
+`python scripts/docker-status.py` to refresh the `logs/docker/` artifacts with the current
+failure, then invoke `/fix-docker` — rather than treating it as a test failure. Refreshing
+first matters: `/fix-docker` skips any `logs/docker/` artifact stamped `--- ADDRESSED` from a
+prior pass, so without a regenerate it may triage stale state instead of the startup break you
+just caused.
+
+If a rerun still fails, fix and rerun those same spec(s) again — up to **4 rounds**, stopping
+early if a round ends with the same failures it began with (report the holdouts rather than
+spinning). If the stack/frontend isn't up, skip the rerun: report the fixes you applied and
+tell the user to bring the stack up (or re-run the check run) to verify.
+
+Then report: which failures were fixed (test name, what changed, which files were edited)
+and, for anything not fixed, an evidence-backed report — the failure, the evidence gathered,
+and 2–3 concrete options with a recommendation — never a bare "skipped".
 
 ---
 
@@ -151,17 +175,26 @@ State clearly:
 
 1. Edit only files directly implicated by the collected failures — never pre-emptive cleanup.
 2. One failure = one minimal fix. Do not restructure surrounding code.
-3. **Diagnose from the log, not by running the full E2E suite.** After a fix you may run the
-   single spec you fixed (e.g. `pytest tests/e2e/<spec>.py -k <test>`) to confirm it, provided the
-   stack and frontend (`:5173`) are up. Do not run the whole suite or dump raw output; reserve a
-   full re-run for the once-per-pass regenerate-and-loop.
-4. Skip the log file if already stamped `--- ADDRESSED` — regenerate it (re-run E2E) first.
+3. **Diagnose from the log, not by running the full E2E suite.** Verify only the spec(s) you
+   fixed (Step 4) — never the whole suite or raw output dumps; the check-run script owns full
+   runs.
+4. If the log is already stamped `--- ADDRESSED` or missing, don't run the suite — tell the user
+   to re-run the check run and stop.
 5. Only stamp the log after applying at least one code fix.
-6. E2E failures are usually app bugs, not test bugs — prefer fixing application code over
-   modifying tests. Only edit test files if the test itself is genuinely wrong.
+6. **Never skip, never relax, never appease.** E2E failures are usually app bugs, not test
+   bugs — fix the application code. Do not mark a failing spec skip/xfail. Do not delete
+   one — removing coverage is the user's call, made via the Stop-conditions report. A test
+   file may be edited only when evidence *outside the test* shows its expectation is
+   wrong — the feature's contract, a deliberate behavior change in this branch, a
+   documented API change — and the report must cite that evidence. An edit that only
+   weakens an assertion (widens a selector/matcher, drops a check, pads a timeout to
+   outwait a failure) is presumed appeasement: if you can't show the expectation was
+   wrong, leave the spec red and report it with the evidence gathered and 2–3 concrete
+   options.
 7. **Known fixes are mandatory short-circuits.** If a known-fix pattern matches, apply it
    immediately. Do not investigate, do not read additional files, do not re-derive the fix.
 8. **Do not read runtime logs (`carameli.log`) unless the fix hint says `5xx` and the route
    handler alone doesn't explain it.** Runtime logs are a last resort, not a first step.
-9. **Log quality gate is mandatory.** If any failure block has no error/traceback lines,
-    update the producing E2E runner and stop — never attempt fixes when root cause is invisible.
+9. **Log quality gate is mandatory (both directions).** If any failure block has no
+    error/traceback lines, *or* passing-spec/browser noise buries the failures, update the
+    producing E2E runner (and its test) and stop — never fix by hand from a suboptimal log.

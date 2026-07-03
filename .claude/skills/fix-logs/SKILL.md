@@ -7,8 +7,7 @@ argument-hint: '"backend" | "frontend" | "known-only" — optional scope filter'
 
 # Skill: Fix Log Errors
 
-> **Local session only.** This skill depends on the local runtime log produced by a
-> running stack. It cannot run in web or mobile sessions.
+> Depends on the local runtime log produced by a running stack.
 
 Fix code bugs surfaced in `logs/log-errors.log` (runtime ERROR/WARNING entries).
 
@@ -38,14 +37,16 @@ Before investing in fixes, scan the log for these signals of incomplete diagnost
 |---|---|
 | Lines that don't match `YYYY-MM-DD HH:MM:SS.mmm \| LEVEL \| module.path:lineno \| message` | Extractor captured raw/malformed lines — cannot map to source files |
 | `INFO` or `DEBUG` level lines are present | Level filter didn't work — log contains noise that should have been dropped |
+| The same error repeats dozens of times, or non-actionable WARNING floods bury the real bugs | Noise — the extractor isn't de-duplicating/scoping; the signal is unfindable |
 | Module path field is blank (e.g., `\|  \|` or `\| \|` with empty middle segment) | Module missing — cannot locate source file |
 
-If **any** quality problem is found:
+If **any** quality problem is found (missing detail **or** noise):
 
-1. Identify which pattern is broken.
-2. Update the producing log extractor to fix the level filter or format parser.
+1. Identify which pattern is broken, or what noise is drowning the signal.
+2. Update the producing log extractor: fix the level filter / format parser when detail is
+   missing, or tighten level-scoping / de-duplication when noise leaks. Update its test too.
 3. Note what was wrong and what you changed, then regenerate the log (re-run the extractor).
-4. **Stop** — do not attempt fixes on a low-quality log.
+4. **Stop** — do not attempt fixes on a low-quality log, in either direction.
 
 ### Known-fix matching (mandatory — do this BEFORE any other file reads)
 
@@ -159,8 +160,9 @@ State clearly:
 6. Only stamp the log after applying at least one code fix.
 7. **Known fixes are mandatory short-circuits.** If a known-fix pattern matches, apply it
    immediately. Do not investigate, do not read additional files, do not re-derive the fix.
-8. **Log quality gate is mandatory.** Lines without a `module.path:lineno` field cannot be
-   fixed — update the producing log extractor and stop.
+8. **Log quality gate is mandatory (both directions).** Lines without a `module.path:lineno`
+   field can't be fixed, and INFO/DEBUG or duplicate-error floods bury the real bugs — in either
+   case update the producing log extractor (and its test) and stop, never fix by hand.
 9. **known-only mode: never investigate.** When `known-only` is set, do not proceed past
     Step 1. Rewrite the log with only the unmatched errors, then stop. The expensive model
     reads the trimmed log as-is.

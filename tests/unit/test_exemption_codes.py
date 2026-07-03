@@ -35,8 +35,8 @@ async def _add_code(client, vs_id: int, **over) -> dict:
 
 
 async def test_add_exemption_code_success(client) -> None:
-    await _create_customer(client, 8001)
-    body = await _add_code(client, 8001)
+    await _create_customer(client, 8401)
+    body = await _add_code(client, 8401)
     assert body["code"] == "EXEMPT01"
     assert body["description"] == "Long distance override"
     assert body["call_restrictions"] == "international"
@@ -54,48 +54,48 @@ async def test_add_exemption_code_customer_not_found(client) -> None:
 
 
 async def test_list_exemption_codes_returns_customer_codes(client) -> None:
-    await _create_customer(client, 8002)
-    await _add_code(client, 8002, description="A", code="AAA")
-    await _add_code(client, 8002, description="B", code="BBB")
+    await _create_customer(client, 8402)
+    await _add_code(client, 8402, description="A", code="AAA")
+    await _add_code(client, 8402, description="B", code="BBB")
 
-    resp = await client.get(f"{_EC_BASE}/List/8002", headers=AUTH_HEADERS)
+    resp = await client.get(f"{_EC_BASE}/List/8402", headers=AUTH_HEADERS)
     assert resp.status_code == 200
     body = resp.json()
-    assert body["vs_customer_id"] == 8002
+    assert body["vs_customer_id"] == 8402
     assert {c["code"] for c in body["exemption_codes"]} == {"AAA", "BBB"}
 
 
 async def test_list_exemption_codes_empty(client) -> None:
-    await _create_customer(client, 8003)
-    resp = await client.get(f"{_EC_BASE}/List/8003", headers=AUTH_HEADERS)
+    await _create_customer(client, 8403)
+    resp = await client.get(f"{_EC_BASE}/List/8403", headers=AUTH_HEADERS)
     assert resp.status_code == 200
     assert resp.json()["exemption_codes"] == []
 
 
 async def test_list_exemption_codes_isolated_per_customer(client) -> None:
-    await _create_customer(client, 8004)
-    await _create_customer(client, 8005)
-    await _add_code(client, 8004, code="C1")
+    await _create_customer(client, 8404)
+    await _create_customer(client, 8405)
+    await _add_code(client, 8404, code="C1")
 
-    resp = await client.get(f"{_EC_BASE}/List/8005", headers=AUTH_HEADERS)
+    resp = await client.get(f"{_EC_BASE}/List/8405", headers=AUTH_HEADERS)
     assert resp.status_code == 200
     assert resp.json()["exemption_codes"] == []
 
 
 async def test_deactivate_exemption_code_success(client) -> None:
-    await _create_customer(client, 8006)
-    created = await _add_code(client, 8006, code="DEL1")
+    await _create_customer(client, 8406)
+    created = await _add_code(client, 8406, code="DEL1")
 
-    resp = await client.put(f"{_EC_BASE}/Deactivate/8006/{created['id']}", headers=AUTH_HEADERS)
+    resp = await client.put(f"{_EC_BASE}/Deactivate/8406/{created['id']}", headers=AUTH_HEADERS)
     assert resp.status_code == 200
     assert resp.json()["active"] is False
 
-    listed = await client.get(f"{_EC_BASE}/List/8006", headers=AUTH_HEADERS)
+    listed = await client.get(f"{_EC_BASE}/List/8406", headers=AUTH_HEADERS)
     assert listed.json()["exemption_codes"] == []
 
 
 async def test_deactivate_exemption_code_not_found(client) -> None:
-    await _create_customer(client, 8007)
-    resp = await client.put(f"{_EC_BASE}/Deactivate/8007/{uuid.uuid4()}", headers=AUTH_HEADERS)
+    await _create_customer(client, 8407)
+    resp = await client.put(f"{_EC_BASE}/Deactivate/8407/{uuid.uuid4()}", headers=AUTH_HEADERS)
     assert resp.status_code == 404
     assert resp.json()["detail"] == "Exemption code not found"

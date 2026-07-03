@@ -74,9 +74,8 @@ exception handler in `app/main.py` writes all unhandled 500s to the log — do n
 
 ## Tooling
 
-> **Local session only.** Everything in this section needs a local Docker Desktop daemon.
-> Web and mobile sessions have no Docker — do not attempt `docker` / `docker compose` there.
-> Make the code change and defer container/stack verification to a local session or CI.
+> Everything in this section needs the local Docker Desktop daemon. If it isn't running,
+> make the code change and defer container/stack verification until it is (or to CI).
 
 See `.claude/rules/tooling.md`. Running `docker` / `docker compose` directly is fine — the
 CLI shares Docker Desktop's daemon, so it operates on the same containers without conflict.
@@ -99,7 +98,15 @@ This project is vibe-coded. **Every rule below is mandatory.**
 
 ### Dependencies
 
-When adding a pip package, add it to `requirements.txt` (runtime) or `requirements-dev.txt` (dev/test only) in the same commit. Never leave an import that depends on an unlisted package.
+Python dependencies are lockfile-managed. The human-edited floors live in
+`requirements.in` (runtime) and `requirements-dev.in` (dev/test only); the
+`requirements*.txt` files are **compiled, fully pinned locks — never hand-edit them**.
+When adding a pip package: add the floor to the right `.in` file, then recompile both
+locks in the same commit (VS Code task "Deps: Recompile Python Lockfiles", or
+`python -m uv pip compile --universal --python-version 3.12 requirements.in -o requirements.txt`,
+same for `-dev`). Never leave an import that depends on an unlisted package.
+`--universal` is required — a non-universal compile on Windows silently drops
+Linux-only packages (e.g. `uvloop`) from the container's lock.
 
 ### Cross-cutting rules (enforced by scoped rule files)
 
@@ -125,11 +132,9 @@ the logic itself didn't change.
 - Use the `make-tests` skill to identify coverage gaps after significant changes
 - DB isolation rules (savepoint fixture, no raw sessions, no teardown cleanup) — `.claude/rules/testing.md`
 
-> **Local session only for execution.** Writing tests works anywhere, but *running*
-> `pytest` (needs the local Postgres/Docker stack), `ruff`, `mypy`, and `py_compile`
-> requires a local toolchain that web/mobile sessions don't have. In those sessions,
-> still write the required tests in the same change — just leave execution to a local
-> session or CI.
+> Running `pytest` needs the local Postgres/Docker stack; `ruff`, `mypy`, and
+> `py_compile` need the local toolchain. If those aren't available, still write the
+> required tests in the same change — just leave execution to CI.
 
 Run **targeted** tests to verify a change — the specific files or module you touched
 (e.g. `pytest tests/unit/test_<module>.py`), with the local Postgres container up. Do

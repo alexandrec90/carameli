@@ -1,14 +1,14 @@
 ---
 name: fix-docker
-disable-model-invocation: true
+# No disable-model-invocation: this skill is invoked programmatically by /fix-all and
+# /fix-tests via the Skill tool. See .claude/rules/authoring.md (orchestrated sub-skill exception).
 description: 'Fixes Docker stack failures from logs/docker/ artifacts. Use when the Docker stack fails to start, a container is unhealthy, or the build/migrate step errors.'
 argument-hint: '(no arguments)'
 ---
 
 # Skill: Fix Docker Errors
 
-> **Local session only.** This skill depends on the local Docker stack and its diagnostics.
-> It cannot run in web or mobile sessions.
+> Depends on the local Docker stack and its diagnostics being available.
 
 Fix Docker failures collected in `logs/docker/` artifact files.
 
@@ -53,6 +53,7 @@ incomplete diagnostics:
 | `health.log` is non-empty but has no container name, status, or service output | Docker status capture failed — the script got no usable output |
 | `app-logs.log` is empty or absent when `health.log` shows an unhealthy container | App log capture was skipped or failed |
 | An artifact contains only `Cannot connect to the Docker daemon` or `is the docker daemon running` | Docker is unreachable — infra issue, not a code fix |
+| Healthy-container logs or unrelated-service chatter bury the one unhealthy container | Noise — the status check dumped too much; the actionable failure is unfindable |
 
 If **any** quality problem is found:
 
@@ -61,6 +62,9 @@ If **any** quality problem is found:
 - **Empty capture when Docker is reachable**: update the producing status check to fix the
   capture logic (e.g., ensure `docker compose ps` output is written, ensure app logs are
   collected for unhealthy containers), then regenerate the diagnostics and **stop**.
+- **Noise burying the signal**: update the producing status check to scope captured logs to the
+  sick container(s) and drop healthy-service chatter, then regenerate and **stop**. Don't wade
+  through the noise to fix by hand.
 
 ### Triage table
 
@@ -140,11 +144,14 @@ so any `--- ADDRESSED` stamp from a prior pass is cleared automatically. Always 
 single-service form (`--no-build <service>`) when only one container is affected — it skips
 image pulls and build steps entirely and is the quickest path.
 
-After applying:
+After applying, **loop to green yourself** — don't hand a half-fixed stack back:
 
-1. Re-run the stack status check to refresh the health/config/app-logs diagnostics.
-2. Invoke `/fix-docker` again if any `logs/docker/` files still contain failures
-   (including the freshly written `build.log` or `restart.log`).
+1. Re-run the stack status check to refresh the health/config/app-logs diagnostics
+   (including the freshly written `build.log` / `restart.log`).
+2. If any `logs/docker/` artifact still shows failures, fix and re-verify again — up to
+   **4 rounds**, stopping early if a round ends with the **same failures** it began with
+   (report the stuck failures rather than spinning). Transient failures (image-pull
+   timeouts, daemon blips) don't block "green" — note and skip them.
 
 You may run the targeted single-service apply command yourself to verify the fix. Avoid destructive
 or full-stack commands (`down -v`, full restarts) — provide those for the user to run.
@@ -173,6 +180,7 @@ State clearly:
 4. Never modify secrets or credentials in `.env` — report what is missing and let the user fill it in.
 5. Skip artifacts already stamped `--- ADDRESSED` — they were fixed in a prior run.
 6. Only stamp an artifact after applying at least one code fix from it (not for transient-only files).
-7. **Log quality gate is mandatory.** Docker-unreachable errors are infra, not code — stop
-   immediately and say Docker Desktop needs to be running. For empty captures when Docker is
-   reachable, fix the producing status check and stop.
+7. **Log quality gate is mandatory (both directions).** Docker-unreachable errors are infra,
+   not code — stop immediately and say Docker Desktop needs to be running. For empty captures
+   *or* noise that buries the failing container when Docker is reachable, fix the producing
+   status check (and its test) and stop — never fix by hand from a suboptimal artifact.

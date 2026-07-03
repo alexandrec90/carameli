@@ -45,6 +45,20 @@ def test_skill_requires_disable_model_invocation():
     assert any("disable-model-invocation" in m for m in msgs)
 
 
+def test_orchestrated_subskill_may_omit_flag_with_comment():
+    # Orchestrated sub-skills (invoked by another skill via the Skill tool) must omit
+    # the flag; the documented `# No disable-model-invocation` comment exempts them.
+    rel = ".claude/skills/fix-lint/SKILL.md"
+    exempt = (
+        "---\n"
+        "name: fix-lint\n"
+        "# No disable-model-invocation: invoked programmatically by /fix-all via the Skill tool.\n"
+        "description: d\n"
+        "---\n"
+    )
+    assert lint.check_frontmatter(rel, exempt) == []
+
+
 def test_claude_md_needs_no_frontmatter():
     assert lint.check_frontmatter("CLAUDE.md", "# Project\nno frontmatter here\n") == []
 

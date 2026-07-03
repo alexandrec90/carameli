@@ -7,8 +7,7 @@ argument-hint: '(no arguments)'
 
 # Skill: Fix Pre-Commit Errors
 
-> **Local session only.** This skill depends on the local git hooks / pre-commit run.
-> It cannot run in web or mobile sessions.
+> Depends on the local git hooks / pre-commit run being available.
 
 Fix hook errors collected in `logs/pre-commit-errors.log`.
 
@@ -52,14 +51,16 @@ After parsing, check the triage list for these signals of incomplete diagnostics
 | A hook listed as `Failed` has no error lines in the triage list (empty block) | The hook's output wasn't captured — root cause is invisible |
 | Error lines from `ruff`, `bandit`, `mypy`, or `eslint` lack a `file:line` reference | Not self-locating — the agent cannot find the source file |
 | Lines under a `Failed` hook are only `Fixing <file>` reformatter output | Auto-fixed by the hook — should be classified as resolved, not failed |
+| A hook's block is flooded by one non-source file (e.g. a captured transcript/doc under `docs/`) burying real errors | Noise — that file shouldn't be linted; the actionable errors are unfindable |
 
-If **any** quality problem is found:
+If **any** quality problem is found (missing detail **or** noise):
 
 1. Identify which hook(s) are affected.
-2. Update the producing pre-commit runner to fix the capture or classification logic (e.g.,
-   redirect hook stderr, filter out `Fixing ...` lines, ensure error output is flushed).
+2. Update the producing pre-commit runner (and its test): fix the capture/classification when
+   detail is missing (redirect hook stderr, filter `Fixing ...` lines), or narrow the hook's
+   target when noise floods it (exclude the offending file/glob from that hook's config).
 3. Note what was wrong and what you changed, then regenerate the log (re-run the hooks).
-4. **Stop** — do not attempt fixes on a low-quality log.
+4. **Stop** — do not attempt fixes on a low-quality log, in either direction.
 
 ---
 
@@ -126,5 +127,6 @@ State clearly:
 2. After a fix, run at most the single hook you addressed to verify — don't re-run the full
    hook suite per edit or dump raw output.
 3. One error = one minimal fix. Do not restructure surrounding code.
-4. **Log quality gate is mandatory.** If any `Failed` hook has no captured error lines,
-   update the producing pre-commit runner and stop — never attempt fixes when root cause is invisible.
+4. **Log quality gate is mandatory (both directions).** If any `Failed` hook has no captured
+   error lines, *or* one non-source file floods a hook's block and buries real errors, update
+   the producing pre-commit runner (and its test) and stop — never fix by hand from a bad log.

@@ -243,6 +243,88 @@ def test_filter_empty_output():
     assert diag.filter_pytest_output([]) == []
 
 
+def test_filter_drops_warnings_summary():
+    # The warnings summary is not a failure; its lines embed `tests/foo.py:NN`
+    # and would otherwise survive the first-party-frame keep. They must be gone,
+    # while the real failure and its E-line stay.
+    raw = _raw("""
+        === FAILURES ===
+        ___ test_real ___
+            app/services/foo.py:42: in bar
+        E   AssertionError: boom
+        === warnings summary ===
+        tests/unit/test_agent_status.py:400: PytestWarning: marked with asyncio
+        tests/unit/test_config.py:10: PytestWarning: marked with asyncio
+        === short test summary info ===
+        FAILED tests/unit/test_real.py::test_real
+        === 1 failed in 0.5s ===
+    """)
+    result = diag.filter_pytest_output(raw)
+    assert any("AssertionError: boom" in l for l in result)
+    assert not any("PytestWarning" in l for l in result)
+    assert not any("test_agent_status.py:400" in l for l in result)
+
+
+# ---------------------------------------------------------------------------
+# filter_vitest_output -- the vitest (frontend) failure filter
+# ---------------------------------------------------------------------------
+
+
+def test_filter_vitest_drops_passing_and_keeps_failures():
+    raw = [
+        " RUN  v2.1.9 /frontend",
+        " ✓ src/tests/useSms.test.ts (4 tests) 390ms",
+        " ❯ src/tests/useApiToken.test.ts (4 tests | 1 failed) 381ms",  # noqa: RUF001
+        "   × useApiToken > surfaces an error when the request fails 92ms",  # noqa: RUF001
+        "     → 500 boom",
+        " Test Files  1 failed | 22 passed (23)",
+        "      Tests  1 failed | 144 passed (145)",
+        "   Duration  54.24s",
+    ]
+    result = diag.filter_vitest_output(raw)
+    assert not any("✓" in l for l in result)  # passing files dropped
+    assert not any("RUN  v2.1.9" in l for l in result)  # run banner dropped
+    assert not any("Duration" in l for l in result)  # timing footer dropped
+    assert not any("Test Files" in l for l in result)  # kept only the Tests summary
+    assert any("useApiToken.test.ts (4 tests | 1 failed)" in l for l in result)
+    assert any("× useApiToken" in l for l in result)  # noqa: RUF001
+    assert any("→ 500 boom" in l for l in result)
+    assert any("Tests  1 failed | 144 passed" in l for l in result)
+
+
+def test_filter_vitest_drops_stderr_capture_blocks():
+    # React act(...) warnings and expected [WARN] logs stream under a
+    # `stderr |` header from *passing* tests -- pure noise that must be dropped
+    # while the FAIL detail block survives.
+    raw = [
+        "stderr | src/tests/useSpeedDials.test.ts > re-fetches after create",
+        "An update to TestComponent inside a test was not wrapped in act(...).",
+        "act(() => {",
+        "  /* fire events that update state */",
+        "});",
+        " ✓ src/tests/useSpeedDials.test.ts (4 tests) 370ms",
+        "⎯⎯⎯ Failed Tests 1 ⎯⎯⎯",
+        " FAIL  src/tests/useApiToken.test.ts > surfaces an error when the request fails",
+        "Error: 500 boom",
+        " ❯ src/tests/useApiToken.test.ts:45:32",  # noqa: RUF001
+        "      Tests  1 failed | 144 passed (145)",
+    ]
+    result = diag.filter_vitest_output(raw)
+    assert not any("act(" in l for l in result)
+    assert not any("TestComponent" in l for l in result)
+    assert any("FAIL  src/tests/useApiToken.test.ts" in l for l in result)
+    assert any("Error: 500 boom" in l for l in result)
+    assert any("useApiToken.test.ts:45:32" in l for l in result)
+
+
+def test_filter_vitest_falls_back_when_all_stripped():
+    # If nothing matches the keep rules, fall back to denoise so the agent is
+    # never handed an empty section.
+    raw = ["> vitest run", "some unrecognised line"]
+    result = diag.filter_vitest_output(raw)
+    assert result == ["some unrecognised line"]
+
+
 # ---------------------------------------------------------------------------
 # digest_lint -- builds the lint-errors.log text from in-memory results
 # ---------------------------------------------------------------------------

@@ -9,7 +9,10 @@ paths:
   - app/api/vsapi/sms.py
   - app/api/vsapi/voicemail_drop.py
   - app/api/webhooks/**/*.py
-  - tests/**/*.py
+  - tests/**/test_*telnyx*.py
+  - tests/**/test_*jambonz*.py
+  - tests/**/test_*carrier*.py
+  - tests/**/test_*provider*.py
 ---
 
 # Rule: VoIP Provider Abstraction

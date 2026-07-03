@@ -25,7 +25,7 @@ Every migration file must have:
 
 - **Linear history only** — no branch labels. If `alembic heads` returns more than
   one head, fix it before creating a new migration. (`alembic heads` needs the local
-  DB/Docker stack; in web/mobile sessions, check for multiple heads by reading the
+  DB/Docker stack; without it, check for multiple heads by reading the
   `down_revision` values across `alembic/versions/` instead.)
 - **Data migrations** (INSERT/UPDATE/DELETE in `op.execute`) must be idempotent or
   guarded, because they may run more than once during development.

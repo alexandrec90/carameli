@@ -31,7 +31,11 @@ function makeEvent(over: Partial<VoicemailDropEvent> = {}): VoicemailDropEvent {
 }
 
 describe('useVoicemailDropEvents', () => {
-  beforeEach(() => listMock.mockReset())
+  // The block body is load-bearing — see the matching comment in useApiToken.test.ts
+  // and the pattern row in .claude/skills/fix-tests/known-fixes.md.
+  beforeEach(() => {
+    listMock.mockReset()
+  })
 
   it('loads events and maps them to rows', async () => {
     listMock.mockResolvedValue({ events: [makeEvent()], vs_customer_id: 1 })
