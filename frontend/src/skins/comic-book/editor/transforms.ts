@@ -70,6 +70,83 @@ export function imgTransformStyle(t: ImgTransform): CSSProperties {
   }
 }
 
+/**
+ * Map a CSS `object-position` anchor keyword pair (e.g. `'center bottom'`) to
+ * fractional coordinates in [0, 1]: x → 0 left / 0.5 center / 1 right,
+ * y → 0 top / 0.5 center / 1 bottom. Unknown/missing keywords fall back to 0.5.
+ */
+export function anchorToFractions(anchor: string): [number, number] {
+  const frac = (k: string, lo: string, hi: string): number =>
+    k === lo ? 0 : k === hi ? 1 : 0.5
+  const [x = 'center', y = 'center'] = anchor.trim().split(/\s+/)
+  return [frac(x, 'left', 'right'), frac(y, 'top', 'bottom')]
+}
+
+/**
+ * Full-source framing style: render the *entire* source image (no cover cropping),
+ * scaled and positioned so that at identity (scale 1 / offset 0) it is pixel-identical
+ * to {@link imgTransformStyle}'s `object-fit: cover` box. This is the panel image's
+ * real geometry once its natural size is known: the panel polygon clip supplies the
+ * comic-panel crop, so panning slides the picture under the panel window (re-framing
+ * it) instead of moving a pre-cropped box — no source pixels are ever discarded. In
+ * edit mode the selected image simply drops the clip, revealing the same geometry.
+ *
+ * Geometry: the cover box (`bounds`) renders the natural image (`nat`) at
+ * `coverScale = max(bw/nw, bh/nh)`; this draws the natural image at that same
+ * scale (× the transform's zoom) and positions its centre where the cover content's
+ * centre lands after `translate(offset) scale(t.scale)` about the box centre.
+ */
+export function fullImgStyle(
+  bounds: { w: number; h: number },
+  nat: { w: number; h: number },
+  t: ImgTransform,
+): CSSProperties {
+  const { w: bw, h: bh } = bounds
+  const { w: nw, h: nh } = nat
+  const cover = Math.max(bw / nw, bh / nh)
+  const fw = nw * cover
+  const fh = nh * cover
+  const [ax, ay] = anchorToFractions(t.anchor)
+  // Cover content centre in box coords (before the panel transform).
+  const cx = ax * (bw - fw) + fw / 2
+  const cy = ay * (bh - fh) + fh / 2
+  const ox = bw / 2
+  const oy = bh / 2
+  // Apply translate(offset) scale about the box centre, matching imgTransformStyle.
+  const centerX = ox + t.offsetX + t.scale * (cx - ox)
+  const centerY = oy + t.offsetY + t.scale * (cy - oy)
+  return {
+    position: 'absolute',
+    left: centerX - nw / 2,
+    top: centerY - nh / 2,
+    width: nw,
+    height: nh,
+    // The natural size must be honoured verbatim — override any global
+    // `img { max-width: 100% }` reset, which would otherwise cap the width to the
+    // wrapper and collapse this geometry (image flies off-screen).
+    maxWidth: 'none',
+    maxHeight: 'none',
+    objectFit: 'fill',
+    transform: `scale(${cover * t.scale})`,
+    transformOrigin: 'center center',
+  }
+}
+
+/**
+ * Style for the .cb-img-clip wrapper around a panel image. The panel polygon
+ * clip-path is what crops the full-source image ({@link fullImgStyle}) into the
+ * comic panel. `spill: true` drops the clip so the image pops out of its frame —
+ * z-index 4 lifts it above the panel-outline SVG (z-index 3) so the frame lines
+ * don't cross it (panels themselves are z-index:auto, so children escape into the
+ * root stacking context). The editor's full-reveal does the same unclipping while
+ * an image is selected.
+ */
+export function imgClipStyle(spill: boolean, reveal: boolean, clip: string): CSSProperties {
+  return spill || reveal
+    ? { clipPath: 'none', overflow: 'visible', zIndex: 4 }
+    : { clipPath: clip, overflow: 'hidden' }
+}
+
 /** Inline style for the .cb-panel-bubble wrapper (overrides the CSS defaults). */
 export function bubbleStyle(b: BubbleTransform): CSSProperties {
   return {

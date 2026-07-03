@@ -3,18 +3,15 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import type { LayoutProps } from '../types'
 import { BUBBLE_TYPES } from './editor/bubbleTypes'
 import { PANEL_IMG_TRANSFORMS, PANEL_BUBBLE_TRANSFORMS } from './editor/layoutConfig'
-import { imgTransformStyle, bubbleStyle } from './editor/transforms'
-import { useEditorMode } from './editor/useEditorMode'
+import { imgTransformStyle, fullImgStyle, imgClipStyle, bubbleStyle } from './editor/transforms'
+import { shouldRevealImg, useEditorMode } from './editor/useEditorMode'
+import {
+    drawLoadingRipple, drawWash, parseCssColor, washPhaseAt,
+    WASH_COVER_MS, WASH_HOLD_MS,
+} from './benDayWash'
 import './comic-book.css'
 
 // ─── Ben-Day dot renderer ────────────────────────────────────────────────────
-
-function parseCssColor(hex: string): [number, number, number] {
-    const r = parseInt(hex.slice(1, 3), 16)
-    const g = parseInt(hex.slice(3, 5), 16)
-    const b = parseInt(hex.slice(5, 7), 16)
-    return [r, g, b]
-}
 
 // Dots grow small→large along a directional gradient (halftone fade effect)
 function drawHalftoneGradient(
@@ -650,55 +647,6 @@ function toClipPath(pts: [number, number][], ox: number, oy: number): string {
     return `polygon(${pts.map(([x, y]) => `${x - ox}px ${y - oy}px`).join(', ')})`
 }
 
-// ─── Misregistration overlay ─────────────────────────────────────────────────
-
-function drawMisregLayer(
-    ctx: CanvasRenderingContext2D,
-    w: number,
-    h: number,
-    color: string,
-    accentHex: string,
-    panels: PanelPoly[],
-) {
-    const [r, g, b] = parseCssColor(accentHex)
-    ctx.clearRect(0, 0, w, h)
-    ctx.globalAlpha = 0.5
-    ctx.fillStyle = color === 'black' ? '#111111' : `rgb(${r},${g},${b})`
-    for (const p of panels) {
-        ctx.beginPath()
-        ctx.moveTo(p.vp[0][0], p.vp[0][1])
-        for (let i = 1; i < p.vp.length; i++) ctx.lineTo(p.vp[i][0], p.vp[i][1])
-        ctx.closePath()
-        ctx.fill()
-    }
-    ctx.globalAlpha = 1
-}
-
-// ─── Loading screen background: diagonal Ben-Day ripple ──────────────────────
-
-function drawLoadingBackground(ctx: CanvasRenderingContext2D, w: number, h: number, t: number) {
-    ctx.fillStyle = '#FAFAF2'
-    ctx.fillRect(0, 0, w, h)
-    const spacing = 20
-    const baseR = 4.5
-    const waveLen = 260       // distance between wave crests along x+y axis
-    const waveSpeed = 0.55    // wave cycles per second (top-left → bottom-right)
-    for (let x = spacing / 2; x < w; x += spacing) {
-        for (let y = spacing / 2; y < h; y += spacing) {
-            const diag = x + y
-            const phase = (diag / waveLen) * Math.PI * 2 - t * waveSpeed * Math.PI * 2
-            const wave = Math.sin(phase)            // -1 to 1
-            const t01 = (wave + 1) / 2              // 0 to 1
-            const radius = baseR * (0.12 + 0.88 * t01)
-            const alpha = 0.12 + 0.68 * t01
-            ctx.fillStyle = `rgba(255,224,51,${alpha.toFixed(2)})`
-            ctx.beginPath()
-            ctx.arc(x, y, Math.max(0.3, radius), 0, Math.PI * 2)
-            ctx.fill()
-        }
-    }
-}
-
 // ─── Page-accent map ─────────────────────────────────────────────────────────
 
 const PAGE_ACCENT: Record<string, string> = {
@@ -745,9 +693,9 @@ const EditorOverlay = import.meta.env.DEV
 
 // ─── Layout ──────────────────────────────────────────────────────────────────
 
-// children and navItems intentionally not rendered — panels-only foundation phase
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-export function Layout(_props: LayoutProps) {
+// children intentionally not rendered — panels-only foundation phase. navItems
+// only feeds the dev editor's page selector (no in-page nav chrome yet).
+export function Layout({ navItems }: LayoutProps) {
     const navigate = useNavigate()
     const location = useLocation()
     const editor = useEditorMode()
@@ -757,9 +705,9 @@ export function Layout(_props: LayoutProps) {
     const bubbleT = editor.active ? editor.config.bubbles : PANEL_BUBBLE_TRANSFORMS
 
     const panelDotRefs = useRef<(HTMLCanvasElement | null)[]>([])
-    const misregRefs = useRef<(HTMLCanvasElement | null)[]>([null, null, null, null])
+    const washRef = useRef<HTMLCanvasElement | null>(null)
+    const washRafRef = useRef<number>(0)
     const rafRef = useRef<number>(0)
-    const panelPolysRef = useRef<PanelPoly[]>([])
     const prevPathRef = useRef(location.pathname)
     const settledCountRef = useRef(0)
 
@@ -768,8 +716,12 @@ export function Layout(_props: LayoutProps) {
             ? []
             : computeLayout(window.innerWidth, window.innerHeight)
     )
-    const [transitioning, setTransitioning] = useState(false)
-    const [imgsVisible, setImgsVisible] = useState(true)  // false only during page transitions
+    // Natural (intrinsic) pixel size of each loaded panel image, captured on load.
+    // Drives fullImgStyle (the real panel framing); null until the img loads, during
+    // which the equivalent object-fit:cover fallback renders.
+    const [natSizes, setNatSizes] = useState<({ w: number; h: number } | null)[]>(
+        () => PANEL_IMAGES.map(() => null),
+    )
     // True once every panel image has loaded or errored.
     const [ready, setReady] = useState(false)
     // 0 on first visit (no cache), 400 on return visits (assets likely cached).
@@ -778,7 +730,12 @@ export function Layout(_props: LayoutProps) {
 
     const loadingCanvasRef = useRef<HTMLCanvasElement | null>(null)
     const loadingRafRef = useRef<number>(0)
+    const leaveRafRef = useRef<number>(0)
     const [dotCount, setDotCount] = useState(1)
+    // True while the loading sheet is being washed away to reveal the ready page.
+    const [loadingLeaving, setLoadingLeaving] = useState(false)
+    // Dev editor: force-show the loading screen so it can be previewed/tuned.
+    const [previewLoading, setPreviewLoading] = useState(false)
 
     const markSettled = useCallback(() => {
         settledCountRef.current += 1
@@ -786,6 +743,17 @@ export function Layout(_props: LayoutProps) {
     }, [])
 
     const accent = accentForPath(location.pathname)
+
+    // The loading overlay is live while assets load — or while the editor previews it.
+    const loadingActive = (showLoading && !ready) || previewLoading
+
+    // Editor toggle for the loading-screen preview: leaving it replays the exit
+    // wash; entering it cancels any in-flight exit so the sheet stays put.
+    const handlePreviewLoading = (on: boolean) => {
+        if (on === previewLoading) return
+        setLoadingLeaving(!on)
+        setPreviewLoading(on)
+    }
 
     // ── Ben-Day dot animation loop ────────────────────────────────────────────
     const animatePanelDots = useCallback(() => {
@@ -811,10 +779,7 @@ export function Layout(_props: LayoutProps) {
     const handleResize = useCallback(() => {
         const w = window.innerWidth
         const h = window.innerHeight
-        misregRefs.current.forEach(c => { if (c) { c.width = w; c.height = h } })
-        const polys = computeLayout(w, h)
-        panelPolysRef.current = polys
-        setPanelPolys(polys)
+        setPanelPolys(computeLayout(w, h))
     }, [])
 
     useLayoutEffect(() => { handleResize() }, [handleResize])
@@ -828,52 +793,63 @@ export function Layout(_props: LayoutProps) {
         }
     }, [handleResize, animatePanelDots])
 
-    // ── Page transition — misregistration effect ──────────────────────────────
+    // ── Page transition — Ben-Day wash ────────────────────────────────────────
+    // A halftone wave sweeps from the top-left corner: paper dots grow until they
+    // merge into a solid sheet carrying the loading screen's ripple, then the
+    // wave passes on and the dots shrink away to reveal the new page.
     useEffect(() => {
         if (location.pathname === prevPathRef.current) return
         prevPathRef.current = location.pathname
 
-        setImgsVisible(false)
-        setTransitioning(true)
+        const canvas = washRef.current
+        const ctx = canvas?.getContext('2d')
+        if (!canvas || !ctx) return
+        canvas.width = window.innerWidth
+        canvas.height = window.innerHeight
 
-        const w = window.innerWidth
-        const h = window.innerHeight
-        const layers: Array<[string, string]> = [
-            ['#00AEEF', 'cyan'],
-            ['#EC008C', 'magenta'],
-            ['#FFE033', 'yellow'],
-            ['#111111', 'black'],
-        ]
-        misregRefs.current.forEach((c, i) => {
-            if (!c) return
-            const ctx = c.getContext('2d')
-            if (!ctx) return
-            drawMisregLayer(ctx, w, h, layers[i][1], accent, panelPolysRef.current)
-        })
-
-        const t1 = setTimeout(() => setImgsVisible(true), 350)
-        const t2 = setTimeout(() => setTransitioning(false), 650)
-        return () => { clearTimeout(t1); clearTimeout(t2) }
+        const start = performance.now()
+        cancelAnimationFrame(washRafRef.current)
+        const loop = (now: number) => {
+            const { cover, reveal, done } = washPhaseAt(now - start)
+            drawWash(ctx, canvas.width, canvas.height, cover, reveal, now / 1000, accent)
+            if (done) {
+                ctx.clearRect(0, 0, canvas.width, canvas.height)
+                return
+            }
+            washRafRef.current = requestAnimationFrame(loop)
+        }
+        washRafRef.current = requestAnimationFrame(loop)
+        return () => cancelAnimationFrame(washRafRef.current)
     }, [location.pathname, accent])
 
     // Show "LOADING" after loaderDelay — 0 on first visit, 400 ms on return visits.
+    // When the page becomes ready while the overlay is up, hand off to the leave
+    // wash instead of snapping the overlay away.
     useEffect(() => {
-        if (ready) { localStorage.setItem('comic-book:loaded', '1'); setShowLoading(false); return }
+        if (ready) {
+            localStorage.setItem('comic-book:loaded', '1')
+            if (showLoading) {
+                setShowLoading(false)
+                setLoadingLeaving(true)
+            }
+            return
+        }
+        if (showLoading) return
         const timer = setTimeout(() => setShowLoading(true), loaderDelay)
         return () => clearTimeout(timer)
-    }, [ready, loaderDelay])
+    }, [ready, showLoading, loaderDelay])
 
     // ── Loading screen: cycling dots (1 → 2 → 3 → 1…) ───────────────────────────
     useEffect(() => {
-        if (!showLoading || ready) return
+        if (!loadingActive) return
         setDotCount(1)
         const id = setInterval(() => setDotCount(d => d === 3 ? 1 : d + 1), 450)
         return () => clearInterval(id)
-    }, [showLoading, ready])
+    }, [loadingActive])
 
     // ── Loading screen: animated Ben-Day dot background canvas ───────────────────
     useEffect(() => {
-        if (!showLoading || ready) return
+        if (!loadingActive) return
         const canvas = loadingCanvasRef.current
         if (!canvas) return
         const resize = () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight }
@@ -882,7 +858,7 @@ export function Layout(_props: LayoutProps) {
         const loop = () => {
             const ctx = canvas.getContext('2d')
             if (!ctx) return
-            drawLoadingBackground(ctx, canvas.width, canvas.height, performance.now() / 1000)
+            drawLoadingRipple(ctx, canvas.width, canvas.height, performance.now() / 1000, accent)
             loadingRafRef.current = requestAnimationFrame(loop)
         }
         loadingRafRef.current = requestAnimationFrame(loop)
@@ -890,7 +866,29 @@ export function Layout(_props: LayoutProps) {
             window.removeEventListener('resize', resize)
             cancelAnimationFrame(loadingRafRef.current)
         }
-    }, [showLoading, ready])
+    }, [loadingActive, accent])
+
+    // ── Loading screen exit: wash the ripple sheet away to reveal the page ───────
+    // Reuses the wash's reveal phase (cover pinned at 1) so the loading screen
+    // ends exactly the way a page transition does.
+    useEffect(() => {
+        if (!loadingLeaving) return
+        const canvas = loadingCanvasRef.current
+        const ctx = canvas?.getContext('2d')
+        if (!canvas || !ctx) { setLoadingLeaving(false); return }
+        const start = performance.now()
+        const loop = (now: number) => {
+            const { reveal, done } = washPhaseAt(WASH_COVER_MS + WASH_HOLD_MS + (now - start))
+            drawWash(ctx, canvas.width, canvas.height, 1, reveal, now / 1000, accent)
+            if (done) {
+                setLoadingLeaving(false)
+                return
+            }
+            leaveRafRef.current = requestAnimationFrame(loop)
+        }
+        leaveRafRef.current = requestAnimationFrame(loop)
+        return () => cancelAnimationFrame(leaveRafRef.current)
+    }, [loadingLeaving, accent])
 
     return (
         <>
@@ -908,6 +906,11 @@ export function Layout(_props: LayoutProps) {
                     // Both dots and images clip tightly to the panel polygon (element-relative px coords)
                     const dotClip = toClipPath(vp, bounds.x, bounds.y)
 
+                    // While editing, the selected image reveals its full self (clip off) so
+                    // the whole picture stays visible for framing; the panel outline SVG still
+                    // draws the crop shape on top. Unselected panels stay clipped.
+                    const revealFull = shouldRevealImg(editor.active, editor.selected, i)
+
                     return (
                         <div
                             key={i}
@@ -915,6 +918,7 @@ export function Layout(_props: LayoutProps) {
                                 'cb-panel',
                                 info.isLogo ? 'logo' : '',
                                 info.path ? 'clickable' : '',
+                                revealFull ? 'cb-panel-reveal' : '',
                             ].filter(Boolean).join(' ')}
                             role={info.path ? 'button' : undefined}
                             tabIndex={info.path ? 0 : undefined}
@@ -940,18 +944,18 @@ export function Layout(_props: LayoutProps) {
                                 className="cb-dots-panel-canvas"
                                 style={{ clipPath: dotClip }}
                             />
-                            {/* Image clip wrapper — clips the (zoomable/pannable) image to the
-                                panel polygon so overflow is hidden behind the panel edge, unless
-                                the image's `spill` flag lets it bleed into the gutter. */}
+                            {/* Image clip wrapper — the panel polygon clip IS the comic crop:
+                                the full source renders underneath (fullImgStyle) and this clip
+                                frames it. `spill` (and the editor's full-reveal selection) drops
+                                the clip so the image pops out over the frame lines. */}
                             <div
                                 className="cb-img-clip"
-                                style={
-                                    imgT[i].spill
-                                        ? { clipPath: 'none', overflow: 'visible' }
-                                        : { clipPath: dotClip, overflow: 'hidden' }
-                                }
+                                style={imgClipStyle(imgT[i].spill, revealFull, dotClip)}
                             >
-                                {/* Panel image — framed via PANEL_IMG_TRANSFORMS */}
+                                {/* Panel image — framed via PANEL_IMG_TRANSFORMS. Full-source
+                                    geometry once the natural size is known (so pan/zoom re-frames
+                                    the picture under the clip instead of moving a pre-cropped box);
+                                    identical cover-fit fallback until then. */}
                                 <img
                                     src={info.src}
                                     alt={info.alt}
@@ -959,15 +963,27 @@ export function Layout(_props: LayoutProps) {
                                     loading="eager"
                                     draggable={false}
                                     style={{
-                                        position: 'absolute',
-                                        left: 0,
-                                        top: 0,
-                                        width: bounds.w,
-                                        height: bounds.h,
-                                        opacity: imgsVisible ? 1 : 0,
-                                        ...imgTransformStyle(imgT[i]),
+                                        ...(natSizes[i]
+                                            ? fullImgStyle(bounds, natSizes[i]!, imgT[i])
+                                            : {
+                                                position: 'absolute',
+                                                left: 0,
+                                                top: 0,
+                                                width: bounds.w,
+                                                height: bounds.h,
+                                                ...imgTransformStyle(imgT[i]),
+                                            }),
                                     }}
-                                    onLoad={markSettled}
+                                    onLoad={e => {
+                                        const im = e.currentTarget
+                                        setNatSizes(prev => {
+                                            if (prev[i]) return prev
+                                            const next = prev.slice()
+                                            next[i] = { w: im.naturalWidth, h: im.naturalHeight }
+                                            return next
+                                        })
+                                        markSettled()
+                                    }}
                                     onError={e => {
                                         const t = e.currentTarget
                                         console.warn('[comic-book] Failed to load panel image:', t.src)
@@ -1015,7 +1031,7 @@ export function Layout(_props: LayoutProps) {
                     )
                 })}
 
-                {/* Layer 2 — Panel outline SVG (sits above images, below misreg) */}
+                {/* Layer 2 — Panel outline SVG (sits above images, below the wash) */}
                 <svg
                     className="cb-panel-svg"
                     aria-hidden="true"
@@ -1032,31 +1048,33 @@ export function Layout(_props: LayoutProps) {
                     ))}
                 </svg>
 
-                {/* Layer 3 — Misregistration canvases (CMYK, page transition only) */}
-                {(['cyan', 'magenta', 'yellow', 'black'] as const).map((name, i) => (
-                    <canvas
-                        key={name}
-                        ref={el => { misregRefs.current[i] = el }}
-                        className={[
-                            'cb-misreg-layer',
-                            transitioning ? 'active' : '',
-                            transitioning && name !== 'black' ? `drift-${name}` : '',
-                        ].filter(Boolean).join(' ')}
-                    />
-                ))}
+                {/* Layer 3 — Ben-Day wash canvas (page transitions; blank when idle) */}
+                <canvas ref={washRef} className="cb-wash-canvas" aria-hidden="true" />
 
             </div>
 
             {/* Dev-only editor overlay — never reached in a production build */}
             {EditorOverlay && editor.active && (
                 <Suspense fallback={null}>
-                    <EditorOverlay api={editor} panelPolys={panelPolys} />
+                    <EditorOverlay
+                        api={editor}
+                        panelPolys={panelPolys}
+                        pageSelect={{
+                            navItems,
+                            previewingLoading: previewLoading,
+                            onPreviewLoading: handlePreviewLoading,
+                        }}
+                    />
                 </Suspense>
             )}
 
-            {/* Loading indicator — outside cb-root so it's visible while the page is opacity:0 */}
-            {showLoading && !ready && (
-                <div className="cb-loading-overlay" aria-live="polite">
+            {/* Loading indicator — outside cb-root so it's visible while the page is opacity:0.
+                Stays mounted through the leave wash so the sheet can wash away over the page. */}
+            {(loadingActive || loadingLeaving) && (
+                <div
+                    className={`cb-loading-overlay${loadingLeaving ? ' cb-loading-leaving' : ''}`}
+                    aria-live="polite"
+                >
                     <canvas ref={loadingCanvasRef} className="cb-loading-canvas" />
                     <span className="cb-loading-text">
                         LOADING<span className="cb-loading-dots" aria-hidden="true">

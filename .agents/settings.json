@@ -1,4 +1,13 @@
 {
+  "env": {
+    "CLAUDE_CODE_ENABLE_TELEMETRY": "1",
+    "OTEL_METRICS_EXPORTER": "otlp",
+    "OTEL_LOGS_EXPORTER": "otlp",
+    "OTEL_EXPORTER_OTLP_PROTOCOL": "http/protobuf",
+    "OTEL_EXPORTER_OTLP_ENDPOINT": "http://localhost:4318",
+    "OTEL_METRIC_EXPORT_INTERVAL": "10000",
+    "OTEL_LOGS_EXPORT_INTERVAL": "5000"
+  },
   "permissions": {
     "allow": [
       "Bash(*)",
@@ -26,7 +35,10 @@
       "Bash(cp .claude/skills/refactor/state.json /tmp/_state-refactor.json)",
       "Edit(/.claude/skills/plan-handoff/**)",
       "Edit(/.claude/skills/check-boundaries/**)",
-      "Edit(/.claude/skills/check-logging/**)"
+      "Edit(/.claude/skills/check-logging/**)",
+      "Bash(npx vitest *)",
+      "Bash(npx tsc *)",
+      "Bash(npx eslint *)"
     ],
     "defaultMode": "bypassPermissions",
     "additionalDirectories": [
@@ -35,14 +47,5 @@
     ]
   },
   "effortLevel": "high",
-  "defaultModel": "sonnet",
-  "env": {
-    "CLAUDE_CODE_ENABLE_TELEMETRY": "1",
-    "OTEL_METRICS_EXPORTER": "otlp",
-    "OTEL_LOGS_EXPORTER": "otlp",
-    "OTEL_EXPORTER_OTLP_PROTOCOL": "http/protobuf",
-    "OTEL_EXPORTER_OTLP_ENDPOINT": "http://localhost:4318",
-    "OTEL_METRIC_EXPORT_INTERVAL": "10000",
-    "OTEL_LOGS_EXPORT_INTERVAL": "5000"
-  }
+  "defaultModel": "opus"
 }

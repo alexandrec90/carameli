@@ -13,10 +13,10 @@ paths:
 
 ## Tech Stack
 
-**Renderer:** React DOM + Canvas 2D (for Ben-Day dots, panel lines, misregistration overlays)
+**Renderer:** React DOM + Canvas 2D (for Ben-Day dots, panel lines, the wash overlay)
 **Animation:** CSS `@keyframes` + `requestAnimationFrame` canvas loops (no spring libraries)
 **Assets:** `<img>` tags pointing to Gemini-generated PNGs in `public/comic-book/` — desaturated via CSS `filter: grayscale(1)` at rest, re-colorized on hover via CSS custom-property driven `filter: sepia(1) saturate(X) hue-rotate(Ydeg)`
-**Page transitions:** misregistration effect — CMYK color mask canvases (C, M, Y, K layers) drift apart as the outgoing page fades out, collapse back as the incoming page fades in
+**Page transitions:** Ben-Day wash — a wave of paper-colored halftone dots sweeps diagonally from the top-left corner, merges into a solid sheet carrying the loading screen's ripple, then shrinks away to reveal the incoming page (`benDayWash.ts`)
 **Fonts:** `Bangers` (Google Fonts, display/headings), `Comic Neue` (body text)
 
 ## Color Palette
@@ -138,33 +138,63 @@ The dot canvas animates continuously with `requestAnimationFrame`, slowly shifti
 
 Asset images transition from grayscale to colorized via CSS `transition: filter 200ms ease-out`. No JS required.
 
-### Page transition — Misregistration effect
+### Page transition — Ben-Day wash
 
-When React Router changes the active route:
+All math and drawing live in `benDayWash.ts`; `Layout.tsx` listens for React Router
+`location` changes and drives a `requestAnimationFrame` loop on a single full-viewport
+canvas (`.cb-wash-canvas`, blank when idle). A halftone wave travels along the `x + y`
+diagonal from the top-left corner:
 
-1. **Phase 1 — Separation (300 ms):** Four full-viewport canvas layers (CMYK: cyan overlay, magenta overlay, yellow overlay, black/key panel lines) begin drifting in four different directions (e.g. `translate(-8px,-4px)`, `translate(6px,-6px)`, `translate(4px,8px)`, `translate(0,0)`). The outgoing page content `opacity` fades from 1 → 0 over 300 ms.
-2. **Phase 2 — Hold (50 ms):** All layers maximally offset. Canvas renders only the drifted layers.
-3. **Phase 3 — Collapse + reveal (300 ms):** Layers animate back to `translate(0,0)`. The incoming page content `opacity` fades from 0 → 1.
+1. **Phase 1 — Cover (420 ms):** paper-colored (`--cb-white`) dots grow inside a 220 px wave-front band until they merge into an opaque sheet (merge radius `spacing × 0.75` ≥ the `S·√2/2` tiling bound). The old page is washed away under the sheet.
+2. **Phase 2 — Hold (120 ms):** full coverage. The sheet carries the loading screen's diagonal Ben-Day ripple, tinted with the incoming page's accent color — visually identical to the loading overlay.
+3. **Phase 3 — Reveal (420 ms):** the same wave passes on; dots shrink behind the reveal front, uncovering the new page.
 
-Implementation: a `<MisregistrationOverlay>` canvas component with an `isTransitioning` prop lives in `Layout.tsx`. Listen for `location` changes from React Router and trigger the animation via `useEffect`.
+| Property | Value | Notes |
+| --- | --- | --- |
+| Grid spacing | `20 px` | shared with the loading ripple so the surfaces align |
+| Wave band depth | `220 px` | growing/shrinking dot edge |
+| Ripple wavelength / speed | `260 px` / `0.55 cycles·s⁻¹` | identical constants for wash and loading screen |
+| Easing | ease-in-out cubic per phase | `washPhaseAt(elapsedMs)` |
 
-Layer drift directions at 50% (0% and 100% are `translate(0,0)`):
-
-| Layer | Peak translation |
-| --- | --- |
-| Cyan | `(-8px, -4px)` |
-| Magenta | `(6px, -6px)` |
-| Yellow | `(4px, 8px)` |
-| Black (key) | `(0, 0)` — static |
+The loading overlay uses the same module: its background is `drawLoadingRipple` (paper +
+full ripple on the same grid), and when assets finish loading it exits via the wash's
+reveal phase (`drawWash` with cover pinned at 1) instead of snapping away — the loading
+screen and page transitions are one continuous visual system.
 
 ### Panel separator lines
 
 Drawn on a static `<canvas>` that sits behind content panels. Lines are redrawn on `resize`. Use canvas `lineCap: 'square'`, `lineWidth: 5`, `strokeStyle: '#111111'`.
 
+## Per-Panel Image & Bubble Framing
+
+`editor/layoutConfig.ts` is the **source of truth** for per-panel image framing
+(`PANEL_IMG_TRANSFORMS`: scale / offsetX / offsetY / anchor) and speech-bubble
+placement (`PANEL_BUBBLE_TRANSFORMS`: top / right / width / rotate). The renderer in
+`Layout.tsx` reads from these arrays — there are **no magic framing numbers** in
+`Layout.tsx` or `comic-book.css` for images/bubbles. To retune them, use the editor
+rather than hand-editing scattered values.
+
+### Dev-only visual editor
+
+| Property | Value | Notes |
+| --- | --- | --- |
+| Enable | `?edit=1` in dev | Flag persists in `localStorage['comic-book:edit']` |
+| Gate | `import.meta.env.DEV && (?edit=1 \|\| flag)` | Never ships — `?edit=1` is inert in prod |
+| Adjust | drag / wheel / handles / arrows | Move, zoom/resize, rotate (bubble), nudge (⇧×10) |
+| Pages | **Page** dropdown in toolbar | Switch route in edit mode (replays the wash); "Loading screen" entry previews the loading overlay + its exit wash |
+| Export | **Copy config** (or **.ts** download) | Paste output over the two `export const` blocks in `layoutConfig.ts` |
+| Reset all | clears working copy | Removes `localStorage['comic-book:editConfig']`, re-seeds from source |
+
+`EditorOverlay.tsx` is dynamically `import()`-ed behind the DEV gate so Rollup
+tree-shakes it (and `editor.css`) out of the production bundle. Only `layoutConfig.ts`
+(data) and `transforms.ts` (pure CSS/math) ship in prod. All editor math/serialization
+is pure and unit-tested in `frontend/src/tests/skins/`. See
+`frontend/src/skins/comic-book/editor/README.md` for the quick-start.
+
 ## Hard Rules Summary
 
 1. **Never use border-radius** on panels, buttons, or cards — flat ink-cut corners only
-2. **Never use CSS transitions for page navigation** — only the misregistration canvas effect
+2. **Never use CSS transitions for page navigation** — only the Ben-Day wash canvas effect
 3. **Never import Three.js, R3F, or any WebGL library** — this skin is canvas 2D + DOM only
 4. **Never use CSS gradients as backgrounds** — Ben-Day dots only; solid fills for panels
 5. **Never color assets with CSS color property** — always via `filter: sepia/saturate/hue-rotate`

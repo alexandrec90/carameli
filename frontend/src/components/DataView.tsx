@@ -43,7 +43,12 @@ export function DataView({
 
   const submit = useCallback(async () => {
     if (!form) return
-    await form.onSubmit(values, files)
+    const hasFiles = Object.values(files).some((f) => f !== null)
+    if (hasFiles) {
+      await form.onSubmit(values, files)
+    } else {
+      await form.onSubmit(values)
+    }
     if (form) setValues(blankFormValues(form))
     setFiles({})
     setShowForm(false)
@@ -203,7 +208,9 @@ export function DataView({
                       <td key={c.key} className="text-body-soft py-2.5 pr-4">
                         {c.kind === 'audio' ? (
                           row[c.key] ? (
-                            <audio controls src={row[c.key]} style={{ width: 200, height: 30 }} />
+                            <audio controls src={row[c.key]} style={{ width: 200, height: 30 }}>
+                              <track kind="captions" />
+                            </audio>
                           ) : null
                         ) : (
                           row[c.key] ?? ''

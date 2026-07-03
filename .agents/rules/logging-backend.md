@@ -2,7 +2,6 @@
 description: Backend structured logging conventions (Python / FastAPI)
 paths:
   - app/**/*.py
-  - tests/**/*.py
 ---
 
 # Rule: Backend Logging

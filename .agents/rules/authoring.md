@@ -119,40 +119,35 @@ See `.claude/rules/security.md` as the canonical example.
 
 ## Skills (`.claude/skills/`)
 
-- Every skill frontmatter must include `disable-model-invocation: true`.
+- Every skill frontmatter must include `disable-model-invocation: true`, **except
+  skills that another skill invokes programmatically via the Skill tool** (orchestrated
+  sub-skills). The flag blocks *all* Skill-tool invocation — including from a parent
+  skill — so an orchestrated sub-skill must omit it or the parent's call fails with
+  `cannot be used with Skill tool due to disable-model-invocation`. Currently `/fix-all`
+  invokes `fix-tests`, `fix-e2e`, `fix-lint`, and `fix-docker`, and both `/fix-tests` and
+  `/fix-e2e` delegate to `/fix-docker` when an `app/` restart breaks the stack — so those four
+  omit the flag (with a comment in their frontmatter explaining why). Skills that are only ever
+  started by the
+  user — or merely *suggested* in another skill's prose ("re-run `/fix-tests`") — keep the
+  flag.
 - If the skill generates scripts, those scripts must follow the conventions
   in `.claude/rules/tooling.md` (especially `-T` for `docker compose exec`).
 
 
-### Mobile / remote session compatibility
+### Environment dependencies
 
-Skills run in all session types: local VS Code, web browser, and mobile app.
-Hooks and host scripts only execute in local sessions where the Claude Code
-desktop app or CLI is running. Classify each skill as one of:
-
-| Class | Works on mobile? | Pattern |
-|---|---|---|
-| **Cross-environment** | Yes | Uses only Glob, Grep, Read, Write, Edit, Bash, Agent tools |
-| **Local-only** | No | Depends on the local stack (Docker / running services / git hooks) |
-
-**Cross-environment skills must:**
-
-- **Discovery:** use the Glob tool
-- **Grep checks:** use the Grep tool directly
-- **Config snapshot:** use the Read tool on the listed files
-- **State finalization:** write `state.json` directly — never write `state-updates.json` and wait for a Stop hook
-
-**Local-only skills** (`fix-pre-commit`,
-`fix-e2e`, `fix-logs`, `fix-docker`) must say so at the top of the SKILL.md:
+A skill that depends on the local environment (Docker stack, running services, git
+hooks, a browser runner) must say so in a one-line blockquote at the top of the
+SKILL.md, e.g.:
 
 ```markdown
-> **Local session only.** This skill depends on the local stack (Docker / running
-> services / git hooks). It cannot run in web or mobile sessions.
+> Depends on the local Docker stack and its diagnostics being available.
 ```
 
-Hooks remain a Windows-local performance shortcut; they must never be the only path
-for any step a cross-environment skill needs to complete.
-
+Hooks are a Windows-local performance shortcut; they must never be the only path for
+any step a skill needs to complete — skills use the Glob/Grep/Read/Write/Edit tools
+directly and write state files (e.g. `state.json`) themselves rather than waiting on
+a Stop hook.
 
 ### Hook output byte caps (token control)
 
@@ -207,3 +202,23 @@ short-circuit**, not a suggestion. Add it as a hard rule.
 After applying fixes, append `--- ADDRESSED` to the log artifact. On the next
 invocation, if the marker is present, tell the user to re-run the diagnostic task and
 stop. The diagnostic task overwrites the file, naturally clearing the marker.
+
+#### 4. Log-quality gate — both directions (mandatory)
+
+A fixer must never fix *from* a bad artifact. When the log is unusable, the fix belongs in
+the **producing script**, not the application code. Every `fix-*` SKILL.md must have a "Log
+quality gate" section that blocks on **both** failure modes:
+
+- **Missing detail** — a failure has no self-locating `file:line`, its traceback was stripped,
+  or a summary names a failure with no matching block. Root cause is invisible; editing source
+  would be a blind guess.
+- **Drowning in noise** — the real failures are buried under content an agent can't act on:
+  passing results, expected warnings, framework chatter (React `act(...)`, `PytestWarning`
+  summaries), or a single non-source file flooding a section. The signal is unfindable.
+
+In either case the skill must **not** touch application code. It edits the producing script
+named on the artifact's `# source:` header (or the shared filter in `scripts/diagnostics.py`)
+to widen the capture or tighten the noise, updates that script's test in the **same** change
+(`scripts/hooks/tests/test_diagnostics.py` for the lint/test runners), tells the user to
+regenerate the artifact, and stops. "Don't waste time on suboptimal logs" is the whole point of
+this gate — state it as a hard rule in the skill.

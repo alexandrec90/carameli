@@ -4,6 +4,8 @@ import type { CSSProperties } from 'react'
 import { logger } from '../../../lib/logger'
 import type { PanelPoly } from '../Layout'
 import InspectorPanel from './InspectorPanel'
+import PageSelect from './PageSelect'
+import type { PageSelectProps } from './PageSelect'
 import { serializeConfig, serializeConfigFile } from './transforms'
 import { useOverlayInteraction } from './useOverlayInteraction'
 import type { EditorModeApi } from './useEditorMode'
@@ -19,6 +21,7 @@ interface Rect {
 interface EditorOverlayProps {
   api: EditorModeApi
   panelPolys: PanelPoly[]
+  pageSelect: PageSelectProps
 }
 
 const PANEL_LABELS = [
@@ -74,7 +77,7 @@ function downloadConfig(text: string): void {
  * editor/layoutConfig.ts on disk (HMR then reloads it); Reset reverts unsaved edits
  * to the last saved file. Both degrade to the clipboard/download fallbacks.
  */
-export default function EditorOverlay({ api, panelPolys }: EditorOverlayProps) {
+export default function EditorOverlay({ api, panelPolys, pageSelect }: EditorOverlayProps) {
   useEffect(() => {
     logger.info('Comic-book editor overlay active', { panels: panelPolys.length })
   }, [panelPolys.length])
@@ -202,6 +205,7 @@ export default function EditorOverlay({ api, panelPolys }: EditorOverlayProps) {
       {/* Toolbar */}
       <div className="cb-ed-toolbar" role="region" aria-label="Comic-book editor">
         <div className="cb-ed-title">COMIC EDITOR</div>
+        <PageSelect {...pageSelect} />
         {selected ? (
           <InspectorPanel api={api} label={PANEL_LABELS[selected.index]} />
         ) : (

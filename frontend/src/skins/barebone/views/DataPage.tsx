@@ -180,7 +180,9 @@ export default function DataPage({
                                     <td key={c.key} style={{ padding: '6px 8px', borderBottom: '1px solid #eeeeee' }}>
                                         {c.kind === 'audio' ? (
                                             row[c.key] ? (
-                                                <audio controls src={row[c.key]} style={{ width: 200, height: 30 }} />
+                                                <audio controls src={row[c.key]} style={{ width: 200, height: 30 }}>
+                                                    <track kind="captions" />
+                                                </audio>
                                             ) : null
                                         ) : (
                                             row[c.key] ?? ''

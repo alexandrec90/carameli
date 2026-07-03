@@ -1,3 +1,6 @@
 **/node_modules/**
 **/.git/**
 **/.venv/**
+# Captured agent-session dumps (raw tool output, not prose) that don't match the
+# "*transcript*.md" naming convention excluded in scripts/lint-all.py.
+docs/vitest out of scope.md

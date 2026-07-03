@@ -50,8 +50,8 @@ async def test_list_api_tokens_short_key_masked(client) -> None:
 
 
 async def test_list_api_tokens_isolation(client) -> None:
-    await _create_customer(client, 8303, api_key="custA000000key00")
-    await _create_customer(client, 8304, api_key="custB000000key00")
+    await _create_customer(client, 8303, api_key="custA000000keyAA")
+    await _create_customer(client, 8304, api_key="custB000000keyBB")
 
     resp_a = await client.get(f"{_TOK_BASE}/List/8303", headers=AUTH_HEADERS)
     resp_b = await client.get(f"{_TOK_BASE}/List/8304", headers=AUTH_HEADERS)

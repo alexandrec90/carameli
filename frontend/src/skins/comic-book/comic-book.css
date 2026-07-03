@@ -73,17 +73,15 @@
   overflow: visible;
 }
 
-/* Misregistration overlay canvases (one per CMYK layer) */
-.cb-misreg-layer {
+/* Ben-Day wash canvas — page-transition halftone wave (blank when idle) */
+.cb-wash-canvas {
   position: absolute;
   inset: 0;
+  width: 100%;
+  height: 100%;
   pointer-events: none;
   z-index: 10;
-  mix-blend-mode: multiply;
-  opacity: 0;
-  transition: opacity 50ms linear;
 }
-.cb-misreg-layer.active { opacity: 0.6; }
 
 /* Nav caption box */
 .cb-nav {
@@ -134,13 +132,25 @@
 }
 .cb-nav-btn.active { background: var(--cb-accent); }
 
-/* ─── Image panels — overflow:visible set inline so images can bleed into gutters */
+/* ─── Image panels — overflow:visible set inline so images can bleed into gutters.
+   Deliberately NO z-index: a panel must not create a stacking context, so spilling
+   children (bubbles z-5, unclipped images z-4) escape into the root context and paint
+   ABOVE the panel-outline SVG (z-3) — frame lines must not cross pop-out elements.
+   Clipped content has no/low z-index and stays below the frame lines. */
 .cb-panel {
-  z-index: 2;
+  position: absolute;
 }
 
 .cb-panel.clickable {
   cursor: pointer;
+}
+
+/* Editor: the selected panel reveals its full (unclipped) image for framing. z-index 3
+   raises the revealed image over neighbouring panels' content, but the panel-outline
+   SVG (also z-index 3, painted later in the DOM) still draws on top, so the crop
+   shape stays visible while framing. */
+.cb-panel-reveal {
+  z-index: 3;
 }
 
 /* Clip wrapper around the panel image — holds overflow:hidden and the panel
@@ -293,11 +303,6 @@
   transition: opacity 180ms ease-out, transform 200ms cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
-.cb-panel:hover .cb-panel-bubble {
-  opacity: 1;
-  transform: scale(1) rotate(var(--cb-bubble-rot, -5deg));
-}
-
 /* Dev editor: keep every bubble visible without hover so they can be selected
    and reframed (the overlay sits above the panels and blocks :hover). The class
    is only ever applied in dev edit mode — harmless and unused in prod. */
@@ -306,13 +311,22 @@
   transform: scale(1) rotate(var(--cb-bubble-rot, -5deg));
 }
 
+.cb-panel:hover .cb-panel-bubble {
+  opacity: 1;
+  transform: scale(1) rotate(var(--cb-bubble-rot, -5deg));
+}
+
 /* Optional clip wrapper around a bubble (spill off) — mirrors .cb-img-clip so the
-   bubble is clipped to the panel polygon (supplied inline) instead of floating. */
+   bubble is clipped to the panel polygon (supplied inline) instead of floating.
+   z-index 1 creates a stacking context that traps the bubble's z-5 below the
+   panel-outline SVG (z-3): a clipped bubble sits behind the frame lines, while a
+   spilling bubble (no wrapper) escapes above them. */
 .cb-bubble-clip {
   position: absolute;
   inset: 0;
   overflow: hidden;
   pointer-events: none;
+  z-index: 1;
 }
 
 .cb-panel-bubble-img {
@@ -345,17 +359,6 @@
 .cb-asset:hover {
   filter: sepia(1) saturate(4) hue-rotate(var(--cb-hue-deg, 0deg));
 }
-
-/* ─── Misregistration animation keyframes ───────────────────────────────────── */
-@keyframes cb-drift-cyan    { 0%,100%{transform:translate(0,0)}  50%{transform:translate(-8px,-4px)} }
-
-@keyframes cb-drift-magenta { 0%,100%{transform:translate(0,0)}  50%{transform:translate(6px,-6px)}  }
-
-@keyframes cb-drift-yellow  { 0%,100%{transform:translate(0,0)}  50%{transform:translate(4px,8px)}   }
-
-.cb-misreg-layer.drift-cyan    { animation: cb-drift-cyan    300ms ease-in-out forwards; }
-.cb-misreg-layer.drift-magenta { animation: cb-drift-magenta 300ms ease-in-out forwards; }
-.cb-misreg-layer.drift-yellow  { animation: cb-drift-yellow  300ms ease-in-out forwards; }
 
 /* ─── Utility ────────────────────────────────────────────────────────────────── */
 .cb-title {
@@ -445,6 +448,23 @@
   animation:
     cb-loading-pop  450ms cubic-bezier(0.34, 1.56, 0.64, 1) both,
     cb-loading-bob  1.1s ease-in-out 450ms infinite alternate;
+}
+
+/* While the leave wash reveals the page, the canvas sheet is the only thing
+   allowed to cover the screen — the fallback fill must get out of the way. */
+.cb-loading-overlay.cb-loading-leaving {
+  background: transparent;
+}
+
+.cb-loading-overlay.cb-loading-leaving .cb-loading-text {
+  animation: cb-loading-out 260ms ease-in forwards;
+}
+
+@keyframes cb-loading-out {
+  to {
+    transform: scale(0.3) rotate(10deg);
+    opacity: 0;
+  }
 }
 
 /* Dot spans transition width/opacity so the box doesn't jerk */

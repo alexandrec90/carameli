@@ -48,8 +48,8 @@ async def test_callback_by_extension_success(client) -> None:
     """Valid request initiates the callback and returns call_sid + status."""
     from app.main import app
 
-    await _create_customer(client, 8001)
-    await _add_extension(client, 8001, "101")
+    await _create_customer(client, 8501)
+    await _add_extension(client, 8501, "101")
 
     app.state.engine.initiate_callback = AsyncMock(
         return_value={"call_id": "CS-cb-001", "status": "queued"}
@@ -58,7 +58,7 @@ async def test_callback_by_extension_success(client) -> None:
     resp = await client.post(
         f"{_CB_BASE}/ByExtension",
         json={
-            "vs_customer_id": 8001,
+            "vs_customer_id": 8501,
             "extension": "101",
             "destination_number": "+12125550100",
         },
@@ -90,10 +90,10 @@ async def test_callback_unknown_customer_returns_404(client) -> None:
 
 
 async def test_callback_unknown_extension_returns_404(client) -> None:
-    await _create_customer(client, 8002)
+    await _create_customer(client, 8502)
     resp = await client.post(
         f"{_CB_BASE}/ByExtension",
-        json={"vs_customer_id": 8002, "extension": "999", "destination_number": "+12125550100"},
+        json={"vs_customer_id": 8502, "extension": "999", "destination_number": "+12125550100"},
         headers=AUTH_HEADERS,
     )
     assert resp.status_code == 404
@@ -103,14 +103,14 @@ async def test_callback_unknown_extension_returns_404(client) -> None:
 async def test_callback_engine_error_returns_502(client) -> None:
     from app.main import app
 
-    await _create_customer(client, 8003)
-    await _add_extension(client, 8003, "201")
+    await _create_customer(client, 8503)
+    await _add_extension(client, 8503, "201")
 
     app.state.engine.initiate_callback = AsyncMock(side_effect=RuntimeError("Jambonz unavailable"))
 
     resp = await client.post(
         f"{_CB_BASE}/ByExtension",
-        json={"vs_customer_id": 8003, "extension": "201", "destination_number": "+12125550100"},
+        json={"vs_customer_id": 8503, "extension": "201", "destination_number": "+12125550100"},
         headers=AUTH_HEADERS,
     )
     assert resp.status_code == 502

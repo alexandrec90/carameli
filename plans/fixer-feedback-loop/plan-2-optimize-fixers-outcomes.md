@@ -42,7 +42,7 @@ File: `.claude/skills/optimize-fixers/SKILL.md`
 
 Add to the "Compute the delta" list:
 
-```
+```markdown
 - **Outcomes**: `current.fix_outcomes` (fixed/recurring/open/success_rate) and
   `current.recurring_errors` vs the snapshot equivalents (treat missing as absent).
 ```

@@ -90,5 +90,5 @@
     ]
   },
   "effortLevel": "high",
-  "defaultModel": "sonnet"
+  "defaultModel": "opus"
 }

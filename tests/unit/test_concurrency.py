@@ -49,32 +49,32 @@ async def test_concurrent_phone_line_add(concurrent_client) -> None:
 
     await concurrent_client.post(
         "/vsapi/1.0.0/VsCustomer/Create",
-        json={"vs_customer_id": 8001, "api_key": "key-8001"},
+        json={"vs_customer_id": 8901, "api_key": "key-8901"},
         headers=AUTH_HEADERS,
     )
 
     app.state.carrier.search_numbers = AsyncMock(
         side_effect=[
-            [{"phone_number": "+18001550001"}],
-            [{"phone_number": "+18001550002"}],
+            [{"phone_number": "+18901550001"}],
+            [{"phone_number": "+18901550002"}],
         ]
     )
     app.state.carrier.provision_number = AsyncMock(
         side_effect=[
-            {"sid": "PNconc001", "phone_number": "+18001550001"},
-            {"sid": "PNconc002", "phone_number": "+18001550002"},
+            {"sid": "PNconc001", "phone_number": "+18901550001"},
+            {"sid": "PNconc002", "phone_number": "+18901550002"},
         ]
     )
 
     results = await asyncio.gather(
         concurrent_client.post(
             "/vsapi/1.0.0/PhoneLine/Add",
-            json={"vs_customer_id": 8001, "area_code": "800"},
+            json={"vs_customer_id": 8901, "area_code": "800"},
             headers=AUTH_HEADERS,
         ),
         concurrent_client.post(
             "/vsapi/1.0.0/PhoneLine/Add",
-            json={"vs_customer_id": 8001, "area_code": "800"},
+            json={"vs_customer_id": 8901, "area_code": "800"},
             headers=AUTH_HEADERS,
         ),
     )
@@ -84,17 +84,31 @@ async def test_concurrent_phone_line_add(concurrent_client) -> None:
     assert len(numbers) == 2  # two distinct numbers, no collision
 
 
-async def test_concurrent_duplicate_customer_create(concurrent_client) -> None:
-    """Concurrent creation of the same vs_customer_id yields one 201 and one conflict — no 500s."""
+async def test_concurrent_duplicate_customer_create(concurrent_client, test_engine) -> None:
+    """Concurrent creation of the same vs_customer_id yields one 201 and one conflict — no 500s.
+
+    ``concurrent_client`` commits real rows that persist for the session (see its fixture
+    docstring), so a customer 8902 left behind by a prior — possibly interrupted — run would
+    make *both* requests conflict (409/409) and mask the expected 201. Guarantee a clean slate
+    up front via the real engine; this is a setup delete on a fixture-owned engine, not the
+    forbidden db_session teardown cleanup.
+    """
+    from sqlalchemy import delete
+
+    from app.models.customer import Customer
+
+    async with test_engine.begin() as conn:
+        await conn.execute(delete(Customer).where(Customer.vs_customer_id == 8902))
+
     results = await asyncio.gather(
         concurrent_client.post(
             "/vsapi/1.0.0/VsCustomer/Create",
-            json={"vs_customer_id": 8002, "api_key": "key-8002a"},
+            json={"vs_customer_id": 8902, "api_key": "key-8902a"},
             headers=AUTH_HEADERS,
         ),
         concurrent_client.post(
             "/vsapi/1.0.0/VsCustomer/Create",
-            json={"vs_customer_id": 8002, "api_key": "key-8002b"},
+            json={"vs_customer_id": 8902, "api_key": "key-8902b"},
             headers=AUTH_HEADERS,
         ),
     )

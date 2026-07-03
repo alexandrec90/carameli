@@ -12,8 +12,8 @@ a **markdown edit**, not a code edit. It reads the promptfoo eval artifact writt
 `npm run eval` and turns the with-instructions vs baseline delta into concrete edits
 to `CLAUDE.md`, `.claude/rules/*`, and `.claude/skills/*`.
 
-This skill is **cross-environment** (Read/Glob/Edit on JSON + markdown only — no PS1,
-no Docker), so it runs in local, web, and mobile sessions.
+This skill needs no local stack (Read/Glob/Edit on JSON + markdown only — no PS1,
+no Docker).
 
 It never runs the eval and never edits code. The loop is:
 **you run the eval → this skill edits markdown → you commit → you re-run the eval to confirm.**
@@ -191,3 +191,10 @@ State clearly:
    non-repeated run), treat it as **no signal**: make no edit — and especially no
    deletion (3b/3c) — off that row. Tell the user to re-run `npm run eval:stable`
    (repeated) and act only on a delta that survives the repeats.
+10. **Log-quality gate (both directions) — satisfied differently here.** Per
+    `.claude/rules/authoring.md`, every fixer refuses to act on a suboptimal artifact. This
+    skill's artifact is structured eval JSON, not a text log, so the two directions map to
+    existing rules: **missing signal** = a degenerate baseline (Step 3d → recommend a
+    `baselinePrompt`), **noise** = an `INCONCLUSIVE`/`provisional` row (Rule 9 → no edit).
+    Because the eval harness is **held out** (Rule 8), never "fix the producing script"
+    yourself — flag it for the user instead.

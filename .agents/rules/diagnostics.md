@@ -37,6 +37,15 @@ Strip everything an agent cannot act on:
 - **Passing results** -- only write failures to the artifact. Pass status belongs in terminal
   output, not the log file.
 - **INFO/DEBUG log captures** from test output -- keep WARNING/ERROR/CRITICAL only.
+- **No cry-wolf reporting** -- before reporting that the script changed something (auto-fix,
+  baseline update, file rewrite), **verify the change actually happened**: compare the file's
+  content before/after, and check the mutating command's exit code -- never assume it worked.
+  A status line that re-reports the same "N new findings" every run because its fix step
+  silently fails is a runner bug (this happened: `detect-secrets scan --update` does not exist
+  in detect-secrets 1.5, so the "376 new findings" auto-fix message repeated forever). It
+  trains humans and agents to dismiss the runner's output and sends the next agent in circles.
+  This applies to the runner's own terminal status lines, not just the artifact -- every
+  message a run emits must be actionable, or true and new.
 
 ## 3. Classify failures: code error vs environment vs auto-fixed
 
@@ -62,7 +71,10 @@ solved.
 
 - `ruff check --fix --unsafe-fixes` then `ruff format` before the reporting pass
 - `eslint --fix`, `stylelint --fix`, `markdownlint --fix` before capturing output
-- `pip-audit --fix` before the audit report
+- Exception — `pip-audit` is **report-only**: the auto-fix rule applies to files in the
+  repo, not to the environment. Auto-upgrading packages mutates the venv and silently
+  drifts it from `requirements*.txt` and CI. Vulnerable packages are fixed by a reviewed
+  dependency bump (Dependabot PR), never as a lint side effect.
 - Pre-commit hooks that auto-reformat: detect "files were modified by this hook", classify
   as `auto-fixed`, list the modified files
 
@@ -106,9 +118,9 @@ always has something to work with.
   - `logs/lint-errors.log` — consumed by `fix-lint`
   - `logs/test-failures.log` — consumed by `fix-tests` (backend pytest-format targets)
   - `logs/frontend-test-failures.log` — vitest failures, **CI only** (`run-tests.py` splits
-    them out via `diagnostics.digest_tests(..., include=FRONTEND_TEST_TARGETS)`). Local-session
-    only: vitest can't run on a cloud/mobile session, so the mobile `fix-all` path skips it
-    rather than spiralling on a failure it can't verify.
+    them out via `diagnostics.digest_tests(..., include=FRONTEND_TEST_TARGETS)`). Fixed
+    locally like every other artifact; a local run folds all sections into
+    `logs/test-failures.log`.
   - `logs/pre-commit-errors.log` — consumed by `fix-pre-commit`
   - `logs/docker/health.log`, `logs/docker/config.log`, `logs/docker/app-logs.log` — consumed by `fix-docker`
 - Each artifact carries a `# source:` header naming the runner that produced it

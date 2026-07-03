@@ -22,6 +22,10 @@ no bubble text/art lives in `Layout.tsx`.
    `localStorage.removeItem('comic-book:edit')`.
 2. Click a panel **image** or **bubble** to select it. (In edit mode every bubble
    is shown without hover so it can be selected.)
+   - The overlay blocks the panels' own click navigation, so use the **Page**
+     dropdown in the toolbar to move between pages (each switch replays the
+     Ben-Day wash transition). The **Loading screen** entry previews the loading
+     overlay; picking any page again replays its exit wash.
 3. Adjust:
    - **Drag** the selection to move.
    - **Drag the bottom-right handle** to zoom (image, in *and* out) / resize (bubble).
@@ -63,8 +67,11 @@ useEditorMode.ts    hook: flag detection, working copy, persistence, selection
 useOverlayInteraction.ts  pointer/wheel/keyboard wiring (thin)
 EditorOverlay.tsx   overlay UI: targets, outline, actions (dev-only, dynamically imported)
 InspectorPanel.tsx  selection inspector: read-outs, spill, bubble type/text, per-element reset
+PageSelect.tsx      toolbar dropdown: switch page / preview the loading screen
+pageSelection.ts    PURE helpers behind PageSelect (sentinel value, selection resolution)
 editor.css          overlay chrome styles
 ```
 
 All math/serialization is pure and unit-tested under
-`frontend/src/tests/skins/` (`editorTransformsMath`, `editorMode`, `editorSerialize`).
+`frontend/src/tests/skins/` (`editorTransformsMath`, `editorMode`, `editorSerialize`,
+`pageSelection`).
