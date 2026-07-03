@@ -15,6 +15,19 @@ words:
   - ngrok
   - sip
   - twiml
+  # Telephony / backend terms
+  - asmx
+  - cloudli
+  - dtmf
+  - hungup
+  - jambonz
+  - kwarg
+  - mypy
+  - payg
+  - pytest
+  - rtpengine
+  - smsws
+  - unposted
   # Three.js / R3F / 3D rendering terms
   - drei
   - glsl

@@ -188,10 +188,15 @@ All API routes are prefixed with `/vsapi/1.0.0/`.
 
 ## What's Not Yet Wired Up
 
+See [docs/prototype-roadmap.md](docs/prototype-roadmap.md) for the full VanillaSoft-prototype
+gap analysis and workstreams.
+
 | Feature | Status |
 | --- | --- |
-| VanillaSoft write-back on call events | Stubbed — marks `posted=true`, no actual write to VS SQL Server |
-| Inbound routing orchestration (SCI / pointers) | Webhooks receive calls but advanced routing logic is still evolving |
+| VanillaSoft write-back on call events | HTTP POST + ARQ retry exist, but the payload/auth don't match VanillaSoft's `CloudliController` contract yet; skipped when `VANILLASOFT_WEBHOOK_URL` is blank |
+| Inbound routing orchestration (SCI / pointers) | Inbound calls are answered but nothing routes them to an extension; SCI rules are stored, never consulted; `dtmf-result` handler missing |
+| Inbound SMS | `message.received` webhook only logs — not persisted, not forwarded to VanillaSoft |
+| DID provisioning (live) | `/PhoneLine/Add` reads `result["sid"]` but the Telnyx provider returns `provider_sid` — live purchases 502 after buying the number |
 | SMS, Call Events, Settings pages | UI placeholders — API endpoints are fully functional |
 | Recording → S3 storage | Dev: recording URLs stored from call-status callbacks, no S3 copy |
 
