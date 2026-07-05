@@ -1,0 +1,90 @@
+name: Dependabot auto-merge
+
+# Auto-merges patch/minor Dependabot PRs once the PR Gate passes.
+#
+# This repo is on a plan without branch protection, so GitHub's native
+# "auto-merge" (which gates on required checks) is unavailable. Instead we
+# split the work in two:
+#
+#   1. classify (on the PR itself) uses dependabot/fetch-metadata to read the
+#      semver bump type and labels the PR: `automerge` for patch/minor,
+#      `needs-manual-merge` for majors (which stay for you to review).
+#   2. merge (on PR Gate completion) merges the PR — but only if PR Gate
+#      succeeded AND the PR carries the `automerge` label.
+#
+# Majors are never merged automatically. If a patch/minor bump fails PR Gate,
+# it simply stays open with its `automerge` label and no merge happens.
+
+on:
+  pull_request:
+    branches: [master]
+  workflow_run:
+    workflows: ["PR Gate"]
+    types: [completed]
+
+# Elevated permissions are honoured for Dependabot-triggered runs when set
+# explicitly here (the default token is read-only for Dependabot).
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  classify:
+    name: Label by update type
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.actor == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch Dependabot metadata
+        id: meta
+        uses: dependabot/fetch-metadata@v2
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Label patch/minor as auto-mergeable
+        if: >-
+          steps.meta.outputs.update-type == 'version-update:semver-patch' ||
+          steps.meta.outputs.update-type == 'version-update:semver-minor'
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh pr edit "$PR_URL" --add-label automerge
+
+      - name: Label majors for manual review
+        if: steps.meta.outputs.update-type == 'version-update:semver-major'
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh pr edit "$PR_URL" --add-label needs-manual-merge
+
+  merge:
+    name: Merge if PR Gate passed
+    if: >-
+      github.event_name == 'workflow_run' &&
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.actor.login == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Merge auto-mergeable PR for this branch
+        env:
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          REPO: ${{ github.repository }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          pr=$(gh pr list --repo "$REPO" --head "$HEAD_BRANCH" --state open \
+            --json number,labels --jq '.[0]')
+          if [ -z "$pr" ] || [ "$pr" = "null" ]; then
+            echo "No open PR for branch '$HEAD_BRANCH'; nothing to merge."
+            exit 0
+          fi
+          number=$(echo "$pr" | jq -r '.number')
+          has_automerge=$(echo "$pr" | jq -r '[.labels[].name] | index("automerge") // empty')
+          if [ -z "$has_automerge" ]; then
+            echo "PR #$number is not labelled 'automerge' (likely a major); leaving for manual review."
+            exit 0
+          fi
+          echo "PR Gate passed and PR #$number is auto-mergeable; merging."
+          gh pr merge "$number" --repo "$REPO" --merge
