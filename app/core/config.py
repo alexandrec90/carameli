@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     telnyx_api_key: str = ""
     telnyx_webhook_base_url: str = "http://localhost:8000"
     telnyx_webhook_secret: str = ""
+    telnyx_messaging_profile_id: str = ""
 
     # Jambonz (populated by Track C)
     jambonz_base_url: str = "http://localhost:3000"
@@ -28,6 +29,7 @@ class Settings(BaseSettings):
     jambonz_account_sid: str = ""
     jambonz_webhook_base_url: str = "http://localhost:8000"
     jambonz_webhook_secret: str = ""
+    jambonz_record_all_calls: bool = False
 
     # S3-compatible media / recording storage (Track F)
     s3_bucket: str = ""
@@ -54,7 +56,11 @@ class Settings(BaseSettings):
 
     vanillasoft_webhook_url: str | None = Field(
         default=None,
-        description="VanillaSoft endpoint to POST completed call events",
+        description=(
+            "Base URL of the VanillaSoft.CloudliApi staging site; Carameli POSTs "
+            "notify/IncomingCall, notify/CallRecording, notify/IncomingSmsMessage and "
+            "notify/IncomingSmsMessageDeliveryReceipt under it"
+        ),
     )
     vanillasoft_webhook_secret: str | None = None
 

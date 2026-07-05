@@ -44,6 +44,36 @@ async def create_outbound(
     )
 
 
+async def create_inbound(
+    session: AsyncSession,
+    *,
+    customer_id: uuid.UUID | None,
+    phone_line_id: uuid.UUID | None,
+    message_sid: str | None,
+    from_number: str,
+    to_number: str,
+    body: str,
+) -> SmsMessage:
+    return await SmsMessageRepo(session).create(
+        customer_id=customer_id,
+        phone_line_id=phone_line_id,
+        message_sid=message_sid,
+        direction="inbound",
+        from_number=from_number,
+        to_number=to_number,
+        body=body,
+        delivery_status="received",
+    )
+
+
+async def get_by_message_sid(session: AsyncSession, message_sid: str) -> SmsMessage | None:
+    return await SmsMessageRepo(session).get_by_message_sid(message_sid)
+
+
+async def mark_posted(session: AsyncSession, message_id: uuid.UUID) -> None:
+    await SmsMessageRepo(session).mark_posted(message_id)
+
+
 async def update_delivery_status(
     session: AsyncSession,
     message_sid: str,

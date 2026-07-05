@@ -17,6 +17,10 @@ async def get_by_number(
     return await ExtensionRepo(session).get_by_number(customer_id, extension_number)
 
 
+async def get_by_id(session: AsyncSession, extension_id: uuid.UUID) -> Extension | None:
+    return await ExtensionRepo(session).get_by_id(extension_id)
+
+
 async def get_used_numbers(session: AsyncSession, customer_id: uuid.UUID) -> set[str]:
     return await ExtensionRepo(session).get_used_numbers(customer_id)
 

@@ -178,7 +178,7 @@ rather than hand-editing scattered values.
 
 | Property | Value | Notes |
 | --- | --- | --- |
-| Enable | `?edit=1` in dev | Flag persists in `localStorage['comic-book:edit']` |
+| Enable / disable | `?edit=1` / `?edit=0` in dev | Flag persists in `localStorage['comic-book:edit']`; `?edit=0` clears it |
 | Gate | `import.meta.env.DEV && (?edit=1 \|\| flag)` | Never ships — `?edit=1` is inert in prod |
 | Adjust | drag / wheel / handles / arrows | Move, zoom/resize, rotate (bubble), nudge (⇧×10) |
 | Pages | **Page** dropdown in toolbar | Switch route in edit mode (replays the wash); "Loading screen" entry previews the loading overlay + its exit wash |

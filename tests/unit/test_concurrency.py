@@ -61,8 +61,8 @@ async def test_concurrent_phone_line_add(concurrent_client) -> None:
     )
     app.state.carrier.provision_number = AsyncMock(
         side_effect=[
-            {"sid": "PNconc001", "phone_number": "+18901550001"},
-            {"sid": "PNconc002", "phone_number": "+18901550002"},
+            {"provider_sid": "PNconc001", "phone_number": "+18901550001"},
+            {"provider_sid": "PNconc002", "phone_number": "+18901550002"},
         ]
     )
 

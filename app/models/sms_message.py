@@ -4,7 +4,7 @@ import logging
 import uuid
 from datetime import datetime
 
-from sqlalchemy import ForeignKey, String, Text, text
+from sqlalchemy import Boolean, ForeignKey, String, Text, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func
@@ -33,6 +33,10 @@ class SmsMessage(Base):
     body: Mapped[str] = mapped_column(Text, nullable=False, default="")
     delivery_status: Mapped[str | None] = mapped_column(String(32), nullable=True)
     error_code: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    # True once the inbound message has been forwarded to VanillaSoft.
+    posted: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=text("false")
+    )
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), onupdate=func.now())
 

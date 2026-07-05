@@ -82,7 +82,7 @@ async def add_phone_line(
         session,
         customer_id=customer.id,
         phone_number=result["phone_number"],
-        provider_sid=result["sid"],
+        provider_sid=result["provider_sid"],
     )
     logger.info(
         "Phone line added number=%s sid=%s vs_customer_id=%s",

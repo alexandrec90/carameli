@@ -5,30 +5,43 @@ import hmac
 import logging
 from typing import Annotated, Any
 
-import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.database import get_session
+from app.core.sip import agent_sip_uri
+from app.models.phone_line import PhoneLine
 from app.schemas.call_event import WebhookAck
-from app.services import call_event_service, customer_service, phone_line_service
-from app.services.callback_state import pending_callbacks, pending_callbacks_lock
+from app.services import (
+    call_event_service,
+    callback_state,
+    customer_service,
+    extension_service,
+    phone_line_service,
+    pointer_service,
+    recording_links,
+    vanillasoft_notify,
+)
 
 logger = logging.getLogger(__name__)
 jambonz_router = APIRouter(prefix="/webhooks/jambonz", tags=["webhooks"])
 _TERMINAL_CALL_STATUSES = {"completed", "no-answer", "busy", "failed", "canceled"}
+
+# Jambonz config verb that starts native call recording (pushed to the
+# account's configured S3/MinIO bucket).
+_RECORD_START_VERB = {"verb": "config", "record": {"action": "startCallRecording"}}
 
 
 def _is_terminal_call_status(status: str | None) -> bool:
     return (status or "").lower() in _TERMINAL_CALL_STATUSES
 
 
-def _vanillasoft_headers() -> dict[str, str]:
-    if not settings.vanillasoft_webhook_secret:
-        return {}
-    return {"Authorization": f"Bearer {settings.vanillasoft_webhook_secret}"}
+def _recording_enabled(phone_line: PhoneLine | None = None) -> bool:
+    if settings.jambonz_record_all_calls:
+        return True
+    return bool(phone_line is not None and phone_line.recording_enabled)
 
 
 def _validate_jambonz_signature(raw_body: bytes, signature: str) -> None:
@@ -126,45 +139,41 @@ async def jambonz_call_status_webhook(
         logger.exception("Failed to persist Jambonz call event for call_sid=%s", call_sid)
         return JSONResponse({"status": "ok"})
 
-    # Write-back to VanillaSoft for terminal call states.
+    # Write-back to VanillaSoft for terminal call states (CloudliController contract).
     if settings.vanillasoft_webhook_url and _is_terminal_call_status(call_event.status):
         customer = None
         if call_event.customer_id:
             customer = await customer_service.get_by_id(session, call_event.customer_id)
-        vs_payload = {
-            "call_sid": call_event.call_sid,
-            "vs_customer_id": customer.vs_customer_id if customer else None,
-            "from": call_event.from_number,
-            "to": call_event.to_number,
-            "extension": call_event.extension,
-            "duration_seconds": call_event.duration_seconds,
-            "recording_url": call_event.recording_url,
-            "status": call_event.status,
-            "started_at": call_event.started_at.isoformat() if call_event.started_at else None,
-            "ended_at": call_event.ended_at.isoformat() if call_event.ended_at else None,
-        }
+        vs_customer_id = customer.vs_customer_id if customer else None
         try:
-            async with httpx.AsyncClient() as http_client:
-                resp = await http_client.post(
-                    settings.vanillasoft_webhook_url,
-                    json=vs_payload,
-                    headers=_vanillasoft_headers(),
-                    timeout=10.0,
-                )
-            if resp.is_success:
+            posted = await vanillasoft_notify.post_notification(
+                vanillasoft_notify.INCOMING_CALL_PATH,
+                vanillasoft_notify.incoming_call_payload(call_event, vs_customer_id),
+            )
+            if posted:
                 await call_event_service.mark_posted(session, call_event.id)
                 logger.info("Posted Jambonz call event %s to VanillaSoft", call_sid)
-            else:
-                logger.warning(
-                    "VanillaSoft webhook returned %s for call_sid=%s",
-                    resp.status_code,
-                    call_sid,
-                )
         except Exception:
             logger.exception(
                 "Failed to post Jambonz call event %s to VanillaSoft; will retry",
                 call_sid,
             )
+
+        # Recording availability notification — fired once the recording URL lands.
+        if call_event.recording_url:
+            try:
+                await vanillasoft_notify.post_notification(
+                    vanillasoft_notify.CALL_RECORDING_PATH,
+                    vanillasoft_notify.call_recording_payload(
+                        call_event,
+                        vs_customer_id,
+                        recording_links.public_recording_url(call_event.call_sid),
+                    ),
+                )
+            except Exception:
+                logger.exception(
+                    "Failed to post CallRecording notification for call_sid=%s", call_sid
+                )
 
     return JSONResponse({"status": "ok"})
 
@@ -246,7 +255,138 @@ async def jambonz_incoming_call_webhook(
             ]
         )
 
+    # Direct DID → extension routing via did_pointers.
+    if phone_line is not None:
+        try:
+            verbs = await _inbound_dial_verbs(
+                session, phone_line, from_number=data.get("from", "") or ""
+            )
+        except Exception:
+            logger.warning(
+                "Inbound routing failed for to=%s call_sid=%s", to_number, call_sid, exc_info=True
+            )
+            verbs = None
+        if verbs is not None:
+            logger.info("Routing inbound call_sid=%s to=%s to extension", call_sid, to_number)
+            return JSONResponse(verbs)
+
+    logger.warning(
+        "No inbound route for to=%s call_sid=%s; answering with no verbs", to_number, call_sid
+    )
     return JSONResponse([])
+
+
+async def _inbound_dial_verbs(
+    session: AsyncSession, phone_line: PhoneLine, from_number: str
+) -> list[dict[str, Any]] | None:
+    """Build the dial verb array for a DID mapped to an extension, or None."""
+    pointer = await pointer_service.get_for_phone_line(session, phone_line.id)
+    if pointer is None:
+        return None
+    ext = await extension_service.get_by_id(session, pointer.extension_id)
+    if ext is None:
+        return None
+    verbs: list[dict[str, Any]] = []
+    if _recording_enabled(phone_line):
+        verbs.append(_RECORD_START_VERB)
+    verbs.append(
+        {
+            "verb": "dial",
+            "callerId": from_number,
+            "target": [
+                {"type": "sip", "sipUri": agent_sip_uri(ext.sip_username, ext.sip_domain_sid)}
+            ],
+        }
+    )
+    return verbs
+
+
+@jambonz_router.post(
+    "/dtmf-result",
+    responses={
+        400: {"description": "Bad request (non-JSON body)"},
+        403: {"description": "Forbidden (invalid signature)"},
+    },
+    openapi_extra={
+        "requestBody": {
+            "required": True,
+            "content": {"application/json": {"schema": {"type": "object"}}},
+        }
+    },
+)
+async def jambonz_dtmf_result_webhook(
+    request: Request,
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> Response:
+    """Route gathered auto-attendant digits to the matching extension (or hang up)."""
+    # auth: signature validation
+    raw_body = await request.body()
+    signature = request.headers.get("X-Jambonz-Signature", "")
+    _validate_jambonz_signature(raw_body, signature)
+
+    try:
+        data: dict[str, Any] = await request.json()
+    except Exception:
+        logger.warning("Jambonz dtmf-result webhook received non-JSON body")
+        return Response(status_code=400)
+
+    if not isinstance(data, dict):
+        logger.warning(
+            "Jambonz dtmf-result webhook received non-dict payload type: %s",
+            type(data).__name__,
+        )
+        return Response(status_code=400)
+
+    call_sid: str = data.get("call_sid", "") or ""
+    to_number: str = data.get("to", "") or ""
+    digits: str = data.get("digits", "") or ""
+    logger.info(
+        "Jambonz dtmf-result webhook: call_sid=%s to=%s digits=%s", call_sid, to_number, digits
+    )
+
+    _reject_verbs = [
+        {"verb": "say", "text": "That extension was not found. Goodbye."},
+        {"verb": "hangup"},
+    ]
+
+    if not digits or not to_number:
+        return JSONResponse(_reject_verbs)
+
+    try:
+        phone_line = await phone_line_service.get_by_phone_number_global(session, to_number)
+        if phone_line is None:
+            return JSONResponse(_reject_verbs)
+        ext = await extension_service.get_by_number(session, phone_line.customer_id, digits)
+    except Exception:
+        logger.warning(
+            "dtmf-result extension lookup failed to=%s digits=%s call_sid=%s",
+            to_number,
+            digits,
+            call_sid,
+            exc_info=True,
+        )
+        return JSONResponse(_reject_verbs)
+
+    if ext is None:
+        logger.warning(
+            "dtmf-result: no extension %s for to=%s call_sid=%s", digits, to_number, call_sid
+        )
+        return JSONResponse(_reject_verbs)
+
+    verbs: list[dict[str, Any]] = []
+    if _recording_enabled(phone_line):
+        verbs.append(_RECORD_START_VERB)
+    verbs.append(
+        {
+            "verb": "dial",
+            "callerId": data.get("from", "") or "",
+            "target": [
+                {"type": "sip", "sipUri": agent_sip_uri(ext.sip_username, ext.sip_domain_sid)}
+            ],
+        }
+    )
+    logger.info("dtmf-result: routing call_sid=%s to extension %s", call_sid, digits)
+    return JSONResponse(verbs)
 
 
 @jambonz_router.post(
@@ -287,23 +427,25 @@ async def jambonz_outbound_answered_webhook(
     call_sid: str = data.get("call_sid", "") or ""
     from_number: str = data.get("from", "") or ""
     tag = data.get("tag")
-    agent_sip_uri = tag.get("agent_sip_uri") if isinstance(tag, dict) else None
+    sip_uri = tag.get("agent_sip_uri") if isinstance(tag, dict) else None
     logger.info("Jambonz outbound-answered webhook: call_sid=%s from=%s", call_sid, from_number)
 
-    if not agent_sip_uri:
+    if not sip_uri:
         logger.warning("outbound-answered: missing agent_sip_uri call_sid=%s", call_sid)
         return JSONResponse([])
 
-    logger.info("Bridging outbound call_sid=%s to agent=%s", call_sid, agent_sip_uri)
-    return JSONResponse(
-        [
-            {
-                "verb": "dial",
-                "callerId": from_number,
-                "target": [{"type": "sip", "sipUri": agent_sip_uri}],
-            }
-        ]
+    logger.info("Bridging outbound call_sid=%s to agent=%s", call_sid, sip_uri)
+    verbs: list[dict[str, Any]] = []
+    if _recording_enabled():
+        verbs.append(_RECORD_START_VERB)
+    verbs.append(
+        {
+            "verb": "dial",
+            "callerId": from_number,
+            "target": [{"type": "sip", "sipUri": sip_uri}],
+        }
     )
+    return JSONResponse(verbs)
 
 
 @jambonz_router.post(
@@ -344,20 +486,25 @@ async def jambonz_callback_answered_webhook(
     from_number: str = data.get("from", "") or ""
     logger.info("Jambonz callback-answered webhook: call_sid=%s from=%s", call_sid, from_number)
 
-    async with pending_callbacks_lock:
-        contact_number = pending_callbacks.pop(call_sid, None)
+    try:
+        contact_number = await callback_state.pop_pending_callback(call_sid)
+    except Exception:
+        logger.exception("callback-answered: Redis lookup failed for call_sid=%s", call_sid)
+        contact_number = None
 
     if not contact_number:
         logger.warning("callback-answered: no pending callback for call_sid=%s", call_sid)
         return JSONResponse([])
 
     logger.info("Bridging agent call_sid=%s to contact=%s", call_sid, contact_number)
-    return JSONResponse(
-        [
-            {
-                "verb": "dial",
-                "callerId": from_number,
-                "target": [{"type": "phone", "number": contact_number}],
-            }
-        ]
+    verbs: list[dict[str, Any]] = []
+    if _recording_enabled():
+        verbs.append(_RECORD_START_VERB)
+    verbs.append(
+        {
+            "verb": "dial",
+            "callerId": from_number,
+            "target": [{"type": "phone", "number": contact_number}],
+        }
     )
+    return JSONResponse(verbs)

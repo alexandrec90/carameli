@@ -344,7 +344,7 @@
   align-items: center;
   justify-content: center;
   text-align: center;
-  font-size: clamp(0.5rem, 1.6vw, 0.85rem);
+  font-size: clamp(0.75rem, 2vw, 1.125rem);
   color: #111;
   line-height: 1.2;
 }

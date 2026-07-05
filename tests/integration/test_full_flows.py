@@ -47,7 +47,7 @@ async def _create_customer(client, vs_id: int) -> dict:
 def _mock_carrier_provision(app, phone_number: str, sid: str) -> None:
     app.state.carrier.search_numbers = AsyncMock(return_value=[{"phone_number": phone_number}])
     app.state.carrier.provision_number = AsyncMock(
-        return_value={"sid": sid, "phone_number": phone_number}
+        return_value={"provider_sid": sid, "phone_number": phone_number}
     )
     app.state.carrier.release_number = AsyncMock(return_value=None)
     app.state.carrier.enable_sms = AsyncMock(return_value=None)

@@ -27,11 +27,13 @@ async def _setup(client, vs_id: int, phone_number: str) -> None:
 
     app.state.carrier.search_numbers = AsyncMock(return_value=[{"phone_number": phone_number}])
     app.state.carrier.provision_number = AsyncMock(
-        return_value={"sid": f"PNtest{vs_id}", "phone_number": phone_number}
+        return_value={"provider_sid": f"PNtest{vs_id}", "phone_number": phone_number}
     )
     app.state.carrier.enable_sms = AsyncMock(return_value=None)
     app.state.carrier.disable_sms = AsyncMock(return_value=None)
-    app.state.carrier.send_sms = AsyncMock(return_value={"sid": f"SMtest{vs_id}", "status": "sent"})
+    app.state.carrier.send_sms = AsyncMock(
+        return_value={"provider_sid": f"SMtest{vs_id}", "status": "sent"}
+    )
 
     await client.post(
         f"{_LINE_BASE}/Add",

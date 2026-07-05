@@ -36,7 +36,7 @@ async def test_phoneline_cross_customer_denied(client) -> None:
 
     app.state.carrier.search_numbers = AsyncMock(return_value=[{"phone_number": "+17001550000"}])
     app.state.carrier.provision_number = AsyncMock(
-        return_value={"sid": "PNiso7001", "phone_number": "+17001550000"}
+        return_value={"provider_sid": "PNiso7001", "phone_number": "+17001550000"}
     )
     await client.post(
         "/vsapi/1.0.0/PhoneLine/Add",

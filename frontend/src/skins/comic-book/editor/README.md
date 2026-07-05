@@ -18,8 +18,9 @@ no bubble text/art lives in `Layout.tsx`.
 
 1. Run the dev server and open the app with `?edit=1` in the URL
    (e.g. `http://localhost:5173/?edit=1`). The flag persists in `localStorage`
-   across client-side navigation; clear it by running
-   `localStorage.removeItem('comic-book:edit')`.
+   across client-side navigation; leave edit mode with `?edit=0` (which also
+   clears the persisted flag). Toggle back and forth via the URL as needed —
+   your unsaved working copy survives the round trip.
 2. Click a panel **image** or **bubble** to select it. (In edit mode every bubble
    is shown without hover so it can be selected.)
    - The overlay blocks the panels' own click navigation, so use the **Page**
@@ -30,13 +31,16 @@ no bubble text/art lives in `Layout.tsx`.
    - **Drag** the selection to move.
    - **Drag the bottom-right handle** to zoom (image, in *and* out) / resize (bubble).
    - **Drag the round top-right handle** to rotate (bubble only).
-   - **Wheel** over an image to zoom.
+   - **Wheel** over the selection to zoom (image) / resize (bubble).
    - **Arrow keys** nudge (hold **⇧** for ×10); **+/-** zoom/resize; **Esc** deselects.
    - **Allow spill outside panel** checkbox — off (default for images) clips the
      element to the panel polygon (overflow hidden behind the panel edge); on lets it
      bleed into the gutter (default for bubbles).
    - For bubbles: pick a **type** from the dropdown (sets artwork + font) and edit the
      **text** inline.
+   - The toolbar is **draggable by its COMIC EDITOR title bar** — move it off any
+     panel it covers. The position is clamped to the viewport and persists in
+     `localStorage` across reloads.
 4. Click **Save** to write the change straight back to `layoutConfig.ts` (a dev-only
    Vite endpoint, `POST /__comic-editor/save`); HMR reloads it. **Reset** discards
    unsaved edits and reverts to the last saved file.
@@ -65,6 +69,7 @@ layoutConfig.ts     PANEL_IMG_TRANSFORMS, PANEL_BUBBLE_TRANSFORMS — source of 
 transforms.ts       PURE helpers: CSS builders, drag/scale math, clamp, serializeConfig(File)
 useEditorMode.ts    hook: flag detection, working copy, persistence, selection
 useOverlayInteraction.ts  pointer/wheel/keyboard wiring (thin)
+useToolbarDrag.ts   hook: draggable toolbar position (viewport-clamped, persisted)
 EditorOverlay.tsx   overlay UI: targets, outline, actions (dev-only, dynamically imported)
 InspectorPanel.tsx  selection inspector: read-outs, spill, bubble type/text, per-element reset
 PageSelect.tsx      toolbar dropdown: switch page / preview the loading screen
@@ -74,4 +79,4 @@ editor.css          overlay chrome styles
 
 All math/serialization is pure and unit-tested under
 `frontend/src/tests/skins/` (`editorTransformsMath`, `editorMode`, `editorSerialize`,
-`pageSelection`).
+`pageSelection`, `editorToolbarDrag`).

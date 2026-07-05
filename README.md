@@ -210,6 +210,7 @@ gap analysis and workstreams.
 | `MCP_DOCKER` | `docker mcp gateway run` (Docker Desktop built-in) | USER (`~/.claude.json`) | Configured |
 | `github` | `ghcr.io/github/github-mcp-server` (Docker) | USER (`~/.claude.json`) | Configured |
 | `redis` | `@modelcontextprotocol/server-redis` | USER (`~/.claude.json`) | Configured — requires Redis port on localhost (see `docker-compose.override.yml`) |
+| `azure-devops` | `@azure-devops/mcp` | USER (`~/.claude.json`) | Configured — org `VanillaSoftCollection` (VanillaLand's ADO project), `azcli` auth |
 
 ### Installation gotchas (VS Code extension + Windows)
 
@@ -224,3 +225,4 @@ gap analysis and workstreams.
 
 - `MCP_DOCKER` uses Docker Desktop's built-in MCP gateway (`docker mcp gateway run`) — no npm package needed. `docker` is a real binary so the `cmd.exe /c` wrapper is **not** required.
 - Both servers are local-session-only (require Docker Desktop running).
+- `azure-devops` uses `azcli` authentication (no token stored in config) — requires `az login --allow-no-subscriptions` once per session/token-expiry, since the VanillaSoft AAD tenant has no accessible Azure subscriptions (Azure DevOps org access doesn't need one). Re-run that command if the server starts returning auth errors.

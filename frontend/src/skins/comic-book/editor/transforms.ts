@@ -48,9 +48,14 @@ export function dragBubble(
   }
 }
 
+/** Grow/shrink a bubble by a width delta in % of the panel box, clamped to BUBBLE_W. */
+export function scaleBubble(b: BubbleTransform, deltaWidthPct: number): BubbleTransform {
+  return { ...b, width: clamp(b.width + deltaWidthPct, BUBBLE_W.min, BUBBLE_W.max) }
+}
+
 /** Resize a bubble by a px handle delta → width %, clamped to BUBBLE_W. */
 export function resizeBubble(b: BubbleTransform, dWidthPx: number, panelW: number): BubbleTransform {
-  return { ...b, width: clamp(b.width + (dWidthPx / panelW) * 100, BUBBLE_W.min, BUBBLE_W.max) }
+  return scaleBubble(b, (dWidthPx / panelW) * 100)
 }
 
 /** Rotate a bubble by a degree delta, clamped to ROTATE. */

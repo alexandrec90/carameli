@@ -452,3 +452,42 @@ async def test_telnyx_sms_inbound_missing_timestamp_header_returns_403(client) -
     assert resp.status_code == 403
 
     settings.telnyx_webhook_secret = original
+
+
+# ---------------------------------------------------------------------------
+# initiate_callback — pending state goes to Redis (A8)
+# ---------------------------------------------------------------------------
+
+
+async def test_initiate_callback_stores_pending_state_in_redis(monkeypatch) -> None:
+    """initiate_callback stores agent_call_sid -> contact in the shared Redis store."""
+    from app.services import callback_state
+
+    store: dict[str, str] = {}
+    captured: dict[str, int | None] = {}
+
+    class _FakeRedis:
+        async def set(self, key: str, value: str, ex: int | None = None) -> None:
+            captured["ex"] = ex
+            store[key] = value
+
+        async def getdel(self, key: str) -> str | None:
+            return store.pop(key, None)
+
+        async def aclose(self) -> None:
+            return None
+
+    monkeypatch.setattr(callback_state, "get_redis_client", lambda: _FakeRedis())
+
+    engine = _make_engine()
+    fake_resp = _mock_response(200, {"sid": "JCcb001"})
+    engine._client.post = AsyncMock(return_value=fake_resp)
+
+    result = await engine.initiate_callback(
+        agent_sip_uri="sip:ext101@dom", contact_number="+12125550100", webhook_url="http://hook/cb"
+    )
+
+    assert result == {"call_id": "JCcb001", "status": "queued"}
+    assert captured["ex"] == callback_state.PENDING_CALLBACK_TTL_SECONDS
+    assert await callback_state.pop_pending_callback("JCcb001") == "+12125550100"
+    assert store == {}

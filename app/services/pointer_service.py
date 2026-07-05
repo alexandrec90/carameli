@@ -29,5 +29,9 @@ async def get(
     return await DidPointerRepo(session).get(phone_line_id=phone_line_id, extension_id=extension_id)
 
 
+async def get_for_phone_line(session: AsyncSession, phone_line_id: uuid.UUID) -> DidPointer | None:
+    return await DidPointerRepo(session).get_for_phone_line(phone_line_id)
+
+
 async def delete(session: AsyncSession, pointer: DidPointer) -> None:
     await DidPointerRepo(session).delete(pointer)

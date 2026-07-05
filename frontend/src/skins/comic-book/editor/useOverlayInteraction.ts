@@ -5,11 +5,11 @@ import type { PanelPoly } from '../Layout'
 import {
   BUBBLE_W,
   IMG_SCALE,
-  clamp,
   dragBubble,
   dragImg,
   resizeBubble,
   rotateBubble,
+  scaleBubble,
   scaleImg,
 } from './transforms'
 import type { BubbleTransform, ImgTransform } from './types'
@@ -24,6 +24,8 @@ const IMG_HANDLE_SCALE = 0.005
 const BUBBLE_ROTATE_DEG = 0.5
 /** Wheel `deltaY` → scale-delta factor for image zoom. */
 const WHEEL_SCALE = 0.001
+/** Wheel `deltaY` → bubble width-% factor (one 100px notch = 2% of the panel box). */
+const WHEEL_BUBBLE_W = 0.02
 
 interface DragState {
   id: number
@@ -105,8 +107,12 @@ export function useOverlayInteraction(
 
   const onWheel = (e: ReactWheelEvent) => {
     const sel = api.selected
-    if (!sel || sel.kind !== 'img') return
-    api.setImg(sel.index, scaleImg(api.config.images[sel.index], -e.deltaY * WHEEL_SCALE))
+    if (!sel) return
+    if (sel.kind === 'img') {
+      api.setImg(sel.index, scaleImg(api.config.images[sel.index], -e.deltaY * WHEEL_SCALE))
+    } else {
+      api.setBubble(sel.index, scaleBubble(api.config.bubbles[sel.index], -e.deltaY * WHEEL_BUBBLE_W))
+    }
   }
 
   // Keyboard: arrows nudge (Shift = 10px), +/- zoom/resize, Esc deselects.
@@ -139,10 +145,8 @@ export function useOverlayInteraction(
           case 'ArrowRight': api.setBubble(sel.index, dragBubble(cur, step, 0, bounds.w, bounds.h)); break
           case 'ArrowUp': api.setBubble(sel.index, dragBubble(cur, 0, -step, bounds.w, bounds.h)); break
           case 'ArrowDown': api.setBubble(sel.index, dragBubble(cur, 0, step, bounds.w, bounds.h)); break
-          case '+': case '=':
-            api.setBubble(sel.index, { width: clamp(cur.width + BUBBLE_W.step, BUBBLE_W.min, BUBBLE_W.max) }); break
-          case '-': case '_':
-            api.setBubble(sel.index, { width: clamp(cur.width - BUBBLE_W.step, BUBBLE_W.min, BUBBLE_W.max) }); break
+          case '+': case '=': api.setBubble(sel.index, scaleBubble(cur, BUBBLE_W.step)); break
+          case '-': case '_': api.setBubble(sel.index, scaleBubble(cur, -BUBBLE_W.step)); break
           case 'Escape': api.clear(); break
           default: handled = false
         }

@@ -5,7 +5,7 @@ from typing import Any, cast
 
 import httpx
 
-from app.services.callback_state import pending_callbacks, pending_callbacks_lock
+from app.services import callback_state
 
 logger = logging.getLogger(__name__)
 
@@ -235,8 +235,7 @@ class JambonzEngine:
             resp.raise_for_status()
         data = resp.json()
         call_sid = data.get("sid", data.get("call_sid", ""))
-        async with pending_callbacks_lock:
-            pending_callbacks[call_sid] = contact_number
+        await callback_state.set_pending_callback(call_sid, contact_number)
         logger.info(
             "Jambonz callback initiated: call_sid=%s agent=%s contact=%s",
             call_sid,

@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.auth import AuthContext, enforce_customer_scope, get_auth_context
 from app.core.config import settings
 from app.core.database import get_session
+from app.core.sip import agent_sip_uri
 from app.schemas.call_event import (
     CallEventListResponse,
     CallEventResponse,
@@ -23,6 +24,7 @@ from app.services import (
     customer_service,
     extension_service,
     phone_line_service,
+    recording_links,
 )
 
 logger = logging.getLogger(__name__)
@@ -76,11 +78,6 @@ async def initiate_outbound_call(
         )
         raise HTTPException(status_code=404, detail="Extension not found")
 
-    if ext.sip_domain_sid:
-        agent_sip_uri = f"sip:{ext.sip_username}@{ext.sip_domain_sid}"
-    else:
-        agent_sip_uri = ext.sip_username
-
     webhook_url = f"{settings.jambonz_webhook_base_url}/webhooks/jambonz/outbound-answered"
 
     engine = request.app.state.engine
@@ -89,7 +86,7 @@ async def initiate_outbound_call(
             from_=body.from_number,
             to=body.destination_number,
             webhook_url=webhook_url,
-            tag={"agent_sip_uri": agent_sip_uri},
+            tag={"agent_sip_uri": agent_sip_uri(ext.sip_username, ext.sip_domain_sid)},
         )
     except Exception as exc:
         logger.error(
@@ -203,6 +200,6 @@ async def get_recording(
         raise HTTPException(status_code=404, detail="No recording for this call")
     return CallRecordingResponse(
         call_sid=event.call_sid,
-        recording_url=event.recording_url,
+        recording_url=recording_links.public_recording_url(event.call_sid),
         duration_seconds=event.duration_seconds,
     )

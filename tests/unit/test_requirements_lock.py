@@ -34,9 +34,7 @@ def test_in_files_exist_as_lock_sources() -> None:
 
 def test_locks_are_fully_pinned() -> None:
     for name in ("requirements.txt", "requirements-dev.txt"):
-        unpinned = [
-            line for line in _requirement_lines(REPO_ROOT / name) if "==" not in line
-        ]
+        unpinned = [line for line in _requirement_lines(REPO_ROOT / name) if "==" not in line]
         assert not unpinned, (
             f"{name} must contain only compiled '==' pins (edit the .in file and "
             f"recompile instead — see CLAUDE.md > Dependencies). Offending: {unpinned}"

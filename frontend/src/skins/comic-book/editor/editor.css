@@ -109,6 +109,17 @@
   margin-bottom: 6px;
 }
 
+/* Drag grip — the title bar moves the whole toolbar. */
+.cb-ed-grip {
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.cb-ed-grip:active {
+  cursor: grabbing;
+}
+
 .cb-ed-label {
   font-weight: 700;
   color: #fff;

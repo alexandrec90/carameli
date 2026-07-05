@@ -91,7 +91,7 @@ async def _contract_env():
     carrier = MagicMock()
     carrier.search_numbers = AsyncMock(return_value=[{"phone_number": "+15005550001"}])
     carrier.provision_number = AsyncMock(
-        return_value={"sid": "PNcontract", "phone_number": "+15005550001"}
+        return_value={"provider_sid": "PNcontract", "phone_number": "+15005550001"}
     )
     carrier.release_number = AsyncMock(return_value=None)
     carrier.enable_sms = AsyncMock(return_value=None)

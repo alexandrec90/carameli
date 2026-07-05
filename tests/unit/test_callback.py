@@ -4,10 +4,35 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from app.services.callback_state import pending_callbacks, pending_callbacks_lock
+from app.services import callback_state
 from tests.conftest import AUTH_HEADERS
 
 pytestmark = pytest.mark.asyncio(loop_scope="session")
+
+
+class _FakeRedis:
+    """In-memory stand-in for the Redis client (external boundary mock)."""
+
+    def __init__(self, store: dict[str, str]) -> None:
+        self._store = store
+
+    async def set(self, key: str, value: str, ex: int | None = None) -> None:
+        self._store[key] = value
+
+    async def getdel(self, key: str) -> str | None:
+        return self._store.pop(key, None)
+
+    async def aclose(self) -> None:
+        return None
+
+
+@pytest.fixture
+def fake_redis_store(monkeypatch) -> dict[str, str]:
+    """Patch callback_state's Redis client with a dict-backed fake; returns the dict."""
+    store: dict[str, str] = {}
+    monkeypatch.setattr(callback_state, "get_redis_client", lambda: _FakeRedis(store))
+    return store
+
 
 _CUST_BASE = "/vsapi/1.0.0/VsCustomer"
 _EXT_BASE = "/vsapi/1.0.0/VsExtension"
@@ -28,7 +53,7 @@ async def _add_extension(client, vs_id: int, ext_number: str) -> dict:
     from app.main import app
 
     app.state.carrier.provision_number = AsyncMock(
-        return_value={"sid": f"PNtest{vs_id}", "phone_number": f"+1{vs_id}0000"}
+        return_value={"provider_sid": f"PNtest{vs_id}", "phone_number": f"+1{vs_id}0000"}
     )
     resp = await client.post(
         f"{_EXT_BASE}/Add",
@@ -122,13 +147,12 @@ async def test_callback_engine_error_returns_502(client) -> None:
 # ---------------------------------------------------------------------------
 
 
-async def test_callback_answered_returns_dial_verb(client) -> None:
+async def test_callback_answered_returns_dial_verb(client, fake_redis_store) -> None:
     """When the agent answers, the webhook returns a dial verb for the contact."""
     call_sid = "CS-answered-001"
     contact = "+13335550100"
 
-    async with pending_callbacks_lock:
-        pending_callbacks[call_sid] = contact
+    await callback_state.set_pending_callback(call_sid, contact)
 
     resp = await client.post(
         _CB_ANSWERED,
@@ -141,11 +165,10 @@ async def test_callback_answered_returns_dial_verb(client) -> None:
     assert verbs[0]["target"][0]["number"] == contact
 
     # State entry should be consumed
-    async with pending_callbacks_lock:
-        assert call_sid not in pending_callbacks
+    assert fake_redis_store == {}
 
 
-async def test_callback_answered_unknown_call_sid_returns_empty(client) -> None:
+async def test_callback_answered_unknown_call_sid_returns_empty(client, fake_redis_store) -> None:
     """No pending state for the call_sid: return empty verb array."""
     resp = await client.post(
         _CB_ANSWERED,
@@ -153,6 +176,40 @@ async def test_callback_answered_unknown_call_sid_returns_empty(client) -> None:
     )
     assert resp.status_code == 200
     assert resp.json() == []
+
+
+async def test_callback_answered_redis_down_returns_empty(client, monkeypatch) -> None:
+    """A Redis outage must not break webhook acknowledgement — empty verbs, no 5xx."""
+
+    def _broken_client():
+        raise ConnectionError("redis down")
+
+    monkeypatch.setattr(callback_state, "get_redis_client", _broken_client)
+    resp = await client.post(
+        _CB_ANSWERED,
+        json={"call_sid": "CS-redis-down", "from": "+17771110000"},
+    )
+    assert resp.status_code == 200
+    assert resp.json() == []
+
+
+async def test_pending_callback_set_uses_ttl(monkeypatch) -> None:
+    """set_pending_callback stores the contact under a TTL and pop consumes it."""
+    captured: dict[str, int | None] = {}
+    store: dict[str, str] = {}
+
+    class _TtlRedis(_FakeRedis):
+        async def set(self, key: str, value: str, ex: int | None = None) -> None:
+            captured["ex"] = ex
+            await super().set(key, value, ex=ex)
+
+    monkeypatch.setattr(callback_state, "get_redis_client", lambda: _TtlRedis(store))
+
+    await callback_state.set_pending_callback("CS-ttl-001", "+15550001111")
+
+    assert captured["ex"] == callback_state.PENDING_CALLBACK_TTL_SECONDS
+    assert await callback_state.pop_pending_callback("CS-ttl-001") == "+15550001111"
+    assert store == {}
 
 
 async def test_callback_answered_invalid_json_returns_400(client) -> None:

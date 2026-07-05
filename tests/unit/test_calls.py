@@ -267,5 +267,8 @@ async def test_get_recording_success(client) -> None:
     assert resp.status_code == 200
     body = resp.json()
     assert body["call_sid"] == "CArecording001"
-    assert body["recording_url"] == "https://recordings.example.com/RErecording001"
+    # The API returns the Carameli-served URL, not the raw provider URL.
+    from app.services import recording_links
+
+    assert body["recording_url"] == recording_links.public_recording_url("CArecording001")
     assert body["duration_seconds"] == 120

@@ -9,8 +9,12 @@ from app.services.providers.carrier.telnyx import TelnyxCarrier
 pytestmark = pytest.mark.asyncio(loop_scope="session")
 
 
-def _make_carrier() -> TelnyxCarrier:
-    return TelnyxCarrier(api_key="test-key", webhook_base_url="http://localhost:8000")
+def _make_carrier(messaging_profile_id: str = "MPtest001") -> TelnyxCarrier:
+    return TelnyxCarrier(
+        api_key="test-key",
+        webhook_base_url="http://localhost:8000",
+        messaging_profile_id=messaging_profile_id,
+    )
 
 
 def _mock_response(status_code: int, json_data: dict) -> MagicMock:
@@ -149,8 +153,9 @@ async def test_send_sms_raises_on_error() -> None:
 # ---------------------------------------------------------------------------
 
 
-async def test_enable_sms_calls_patch() -> None:
-    carrier = _make_carrier()
+async def test_enable_sms_patches_real_messaging_profile_id() -> None:
+    """enable_sms must assign the configured messaging profile, never None."""
+    carrier = _make_carrier(messaging_profile_id="MPreal123")
     fake_resp = _mock_response(200, {"data": {}})
     carrier._client.patch = AsyncMock(return_value=fake_resp)
 
@@ -159,9 +164,21 @@ async def test_enable_sms_calls_patch() -> None:
     carrier._client.patch.assert_awaited_once()
     call_args = carrier._client.patch.call_args
     assert "/phone_numbers/PN123abc" in call_args[0][0]
+    assert call_args.kwargs["json"] == {"messaging_profile_id": "MPreal123"}
 
 
-async def test_disable_sms_calls_patch() -> None:
+async def test_enable_sms_unconfigured_profile_raises() -> None:
+    """Without TELNYX_MESSAGING_PROFILE_ID, enable_sms fails fast instead of disabling SMS."""
+    carrier = _make_carrier(messaging_profile_id="")
+    carrier._client.patch = AsyncMock()
+
+    with pytest.raises(ValueError, match="TELNYX_MESSAGING_PROFILE_ID"):
+        await carrier.enable_sms("PN123abc")
+
+    carrier._client.patch.assert_not_awaited()
+
+
+async def test_disable_sms_calls_patch_with_null_profile() -> None:
     carrier = _make_carrier()
     fake_resp = _mock_response(200, {"data": {}})
     carrier._client.patch = AsyncMock(return_value=fake_resp)
@@ -171,6 +188,7 @@ async def test_disable_sms_calls_patch() -> None:
     carrier._client.patch.assert_awaited_once()
     call_args = carrier._client.patch.call_args
     assert "/phone_numbers/PN123abc" in call_args[0][0]
+    assert call_args.kwargs["json"] == {"messaging_profile_id": None}
 
 
 async def test_enable_sms_raises_on_error() -> None:

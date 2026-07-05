@@ -111,7 +111,7 @@ async def test_vanillasoft_writeback_failure_does_not_block_webhook(client, monk
     monkeypatch.setattr(settings, "jambonz_webhook_secret", "")
     monkeypatch.setattr(settings, "vanillasoft_webhook_url", "http://vanillasoft.test/callback")
 
-    with patch("app.api.webhooks.call_status.httpx.AsyncClient") as mock_client_cls:
+    with patch("app.services.vanillasoft_notify.httpx.AsyncClient") as mock_client_cls:
         mock_http = MagicMock()
         mock_http.__aenter__ = AsyncMock(return_value=mock_http)
         mock_http.__aexit__ = AsyncMock(return_value=False)

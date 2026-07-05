@@ -15,6 +15,7 @@ def get_carrier_provider() -> CarrierProvider:
         return TelnyxCarrier(
             api_key=settings.telnyx_api_key,
             webhook_base_url=settings.telnyx_webhook_base_url,
+            messaging_profile_id=settings.telnyx_messaging_profile_id,
         )
     raise ValueError(f"Unknown carrier provider: {settings.carrier_provider!r}")
 

@@ -29,7 +29,7 @@ async def _add_line(client, vs_id: int, phone_number: str) -> None:
 
     app.state.carrier.search_numbers = AsyncMock(return_value=[{"phone_number": phone_number}])
     app.state.carrier.provision_number = AsyncMock(
-        return_value={"sid": f"PNtest{vs_id}", "phone_number": phone_number}
+        return_value={"provider_sid": f"PNtest{vs_id}", "phone_number": phone_number}
     )
     resp = await client.post(
         f"{_LINE_BASE}/Add",

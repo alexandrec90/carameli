@@ -8,6 +8,7 @@ import PageSelect from './PageSelect'
 import type { PageSelectProps } from './PageSelect'
 import { serializeConfig, serializeConfigFile } from './transforms'
 import { useOverlayInteraction } from './useOverlayInteraction'
+import { useToolbarDrag } from './useToolbarDrag'
 import type { EditorModeApi } from './useEditorMode'
 import './editor.css'
 
@@ -84,6 +85,7 @@ export default function EditorOverlay({ api, panelPolys, pageSelect }: EditorOve
 
   const { selected, config } = api
   const interaction = useOverlayInteraction(api, panelPolys)
+  const toolbarDrag = useToolbarDrag()
   const [copied, setCopied] = useState(false)
   const [saved, setSaved] = useState(false)
 
@@ -202,9 +204,9 @@ export default function EditorOverlay({ api, panelPolys, pageSelect }: EditorOve
         </div>
       )}
 
-      {/* Toolbar */}
-      <div className="cb-ed-toolbar" role="region" aria-label="Comic-book editor">
-        <div className="cb-ed-title">COMIC EDITOR</div>
+      {/* Toolbar — draggable by its title grip so it can be moved off a panel */}
+      <div className="cb-ed-toolbar" role="region" aria-label="Comic-book editor" {...toolbarDrag.rootProps}>
+        <div className="cb-ed-title cb-ed-grip" title="Drag to move" {...toolbarDrag.gripProps}>COMIC EDITOR</div>
         <PageSelect {...pageSelect} />
         {selected ? (
           <InspectorPanel api={api} label={PANEL_LABELS[selected.index]} />

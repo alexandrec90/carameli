@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.auth import AuthContext, enforce_customer_scope, get_auth_context
 from app.core.database import get_session
 from app.schemas.recording import RecordingExportResponse
-from app.services import call_event_service, customer_service
+from app.services import call_event_service, customer_service, recording_links
 
 logger = logging.getLogger(__name__)
 
@@ -31,9 +31,8 @@ async def export_recording(
 ) -> RecordingExportResponse:
     """Return a download URL for a call recording scoped to the given customer.
 
-    If the recording_url stored on the call event is already a presigned or
-    direct URL it is returned as-is.  S3 presigned URL generation will be wired
-    in when the S3 client is initialised (tracked separately).
+    The returned URL is Carameli-served (token-authenticated ``/recordings/{call_sid}``),
+    which redirects to a presigned S3 URL or the provider URL at fetch time.
     """
     enforce_customer_scope(auth, customerId)
     logger.info("Recording export request vs_customer_id=%s call_sid=%s", customerId, call_sid)
@@ -57,4 +56,7 @@ async def export_recording(
         raise HTTPException(status_code=404, detail="No recording available")
 
     logger.info("Recording export url returned vs_customer_id=%s call_sid=%s", customerId, call_sid)
-    return RecordingExportResponse(call_sid=event.call_sid, download_url=event.recording_url)
+    return RecordingExportResponse(
+        call_sid=event.call_sid,
+        download_url=recording_links.public_recording_url(event.call_sid),
+    )

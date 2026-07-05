@@ -38,7 +38,8 @@
       "Edit(/.claude/skills/check-logging/**)",
       "Bash(npx vitest *)",
       "Bash(npx tsc *)",
-      "Bash(npx eslint *)"
+      "Bash(npx eslint *)",
+      "PowerShell(& \"frontend\\\\node_modules\\\\.bin\\\\cspell.cmd\" --config frontend\\\\cspell.config.yaml --no-progress --relative \"docs/prototype-roadmap.md\" \"README.md\" \"todo.md\")"
     ],
     "defaultMode": "bypassPermissions",
     "additionalDirectories": [

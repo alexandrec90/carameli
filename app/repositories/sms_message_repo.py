@@ -2,14 +2,16 @@ from __future__ import annotations
 
 import logging
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import select, update
+from sqlalchemy import and_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.sms_message import SmsMessage
 
 logger = logging.getLogger(__name__)
+
+_RETRY_AGE = timedelta(minutes=1)
 
 
 class SmsMessageRepo:
@@ -84,3 +86,25 @@ class SmsMessageRepo:
         )
         await self.session.commit()
         return result.scalar_one_or_none() is not None
+
+    async def get_unposted_inbound(self) -> list[SmsMessage]:
+        """Inbound messages not yet forwarded to VanillaSoft, older than 1 minute."""
+        cutoff = datetime.now(UTC).replace(tzinfo=None) - _RETRY_AGE
+        result = await self.session.execute(
+            select(SmsMessage)
+            .where(
+                and_(
+                    SmsMessage.posted.is_(False),
+                    SmsMessage.direction == "inbound",
+                    SmsMessage.created_at < cutoff,
+                )
+            )
+            .limit(100)
+        )
+        return list(result.scalars().all())
+
+    async def mark_posted(self, message_id: uuid.UUID) -> None:
+        await self.session.execute(
+            update(SmsMessage).where(SmsMessage.id == message_id).values(posted=True)
+        )
+        await self.session.commit()

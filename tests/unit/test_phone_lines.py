@@ -22,6 +22,30 @@ async def _create_customer(client, vs_id: int) -> dict:
     return resp.json()
 
 
+async def test_add_phone_line_real_provider_shape_regression(client) -> None:
+    """Regression (A1): the Telnyx provider returns {"provider_sid", "phone_number"} —
+    the handler must read provider_sid, not sid. With the old code every live
+    /PhoneLine/Add 502'd *after* buying the number."""
+    await _create_customer(client, 5000)
+
+    from app.main import app
+
+    # Exact shape returned by TelnyxCarrier.provision_number — no extra keys.
+    app.state.carrier.provision_number = AsyncMock(
+        return_value={"provider_sid": "PNreal5000", "phone_number": "+15005550000"}
+    )
+
+    resp = await client.post(
+        f"{_LINE_BASE}/Add",
+        json={"vs_customer_id": 5000, "phone_number": "+15005550000"},
+        headers=AUTH_HEADERS,
+    )
+    assert resp.status_code == 201, resp.json()
+    body = resp.json()
+    assert body["provider_sid"] == "PNreal5000"
+    assert body["phone_number"] == "+15005550000"
+
+
 async def test_add_phone_line_by_area_code(client) -> None:
     await _create_customer(client, 5001)
 
@@ -29,7 +53,7 @@ async def test_add_phone_line_by_area_code(client) -> None:
 
     app.state.carrier.search_numbers = AsyncMock(return_value=[{"phone_number": "+15005550100"}])
     app.state.carrier.provision_number = AsyncMock(
-        return_value={"sid": "PNtest5001", "phone_number": "+15005550100"}
+        return_value={"provider_sid": "PNtest5001", "phone_number": "+15005550100"}
     )
 
     resp = await client.post(
@@ -49,7 +73,7 @@ async def test_get_phone_line(client) -> None:
 
     app.state.carrier.search_numbers = AsyncMock(return_value=[{"phone_number": "+15025550100"}])
     app.state.carrier.provision_number = AsyncMock(
-        return_value={"sid": "PNtest5002", "phone_number": "+15025550100"}
+        return_value={"provider_sid": "PNtest5002", "phone_number": "+15025550100"}
     )
 
     await client.post(
@@ -76,7 +100,7 @@ async def test_deactivate_phone_line(client) -> None:
 
     app.state.carrier.search_numbers = AsyncMock(return_value=[{"phone_number": "+15045550100"}])
     app.state.carrier.provision_number = AsyncMock(
-        return_value={"sid": "PNtest5004", "phone_number": "+15045550100"}
+        return_value={"provider_sid": "PNtest5004", "phone_number": "+15045550100"}
     )
     app.state.carrier.release_number = AsyncMock(return_value=None)
 
@@ -102,7 +126,7 @@ async def test_get_phone_line_count(client) -> None:
 
     app.state.carrier.search_numbers = AsyncMock(return_value=[{"phone_number": "+15055550100"}])
     app.state.carrier.provision_number = AsyncMock(
-        return_value={"sid": "PNtest5005", "phone_number": "+15055550100"}
+        return_value={"provider_sid": "PNtest5005", "phone_number": "+15055550100"}
     )
 
     await client.post(
@@ -123,7 +147,7 @@ async def test_update_call_recording(client) -> None:
 
     app.state.carrier.search_numbers = AsyncMock(return_value=[{"phone_number": "+15065550100"}])
     app.state.carrier.provision_number = AsyncMock(
-        return_value={"sid": "PNtest5006", "phone_number": "+15065550100"}
+        return_value={"provider_sid": "PNtest5006", "phone_number": "+15065550100"}
     )
 
     await client.post(
@@ -212,7 +236,7 @@ async def test_add_phone_line_by_explicit_number(client) -> None:
     from app.main import app
 
     app.state.carrier.provision_number = AsyncMock(
-        return_value={"sid": "PNtest5023", "phone_number": "+15235550100"}
+        return_value={"provider_sid": "PNtest5023", "phone_number": "+15235550100"}
     )
 
     resp = await client.post(
@@ -279,7 +303,7 @@ async def test_deactivate_phone_line_carrier_error_returns_502(client) -> None:
 
     app.state.carrier.search_numbers = AsyncMock(return_value=[{"phone_number": "+15315550100"}])
     app.state.carrier.provision_number = AsyncMock(
-        return_value={"sid": "PNtest5031", "phone_number": "+15315550100"}
+        return_value={"provider_sid": "PNtest5031", "phone_number": "+15315550100"}
     )
     await client.post(
         f"{_LINE_BASE}/Add",
@@ -335,7 +359,7 @@ async def test_add_phone_line_toll_free_area_code(client) -> None:
 
     app.state.carrier.search_numbers = AsyncMock(return_value=[{"phone_number": "+18005550100"}])
     app.state.carrier.provision_number = AsyncMock(
-        return_value={"sid": "PNtf5100", "phone_number": "+18005550100"}
+        return_value={"provider_sid": "PNtf5100", "phone_number": "+18005550100"}
     )
 
     resp = await client.post(
@@ -360,7 +384,7 @@ async def test_add_phone_line_toll_free_prefixes_all_accepted(client) -> None:
         number = f"+1{prefix}5550100"
         app.state.carrier.search_numbers = AsyncMock(return_value=[{"phone_number": number}])
         app.state.carrier.provision_number = AsyncMock(
-            return_value={"sid": f"PNtf{vs_id}", "phone_number": number}
+            return_value={"provider_sid": f"PNtf{vs_id}", "phone_number": number}
         )
 
         resp = await client.post(
@@ -385,7 +409,7 @@ async def test_add_phone_line_international_area_code(client) -> None:
 
     app.state.carrier.search_numbers = AsyncMock(return_value=[{"phone_number": "+441614960000"}])
     app.state.carrier.provision_number = AsyncMock(
-        return_value={"sid": "PNgb5120", "phone_number": "+441614960000"}
+        return_value={"provider_sid": "PNgb5120", "phone_number": "+441614960000"}
     )
 
     resp = await client.post(
@@ -406,7 +430,7 @@ async def test_add_phone_line_by_number_with_country_code(client) -> None:
     from app.main import app
 
     app.state.carrier.provision_number = AsyncMock(
-        return_value={"sid": "PNca5121", "phone_number": "+16135550100"}
+        return_value={"provider_sid": "PNca5121", "phone_number": "+16135550100"}
     )
 
     resp = await client.post(
@@ -441,7 +465,7 @@ async def test_add_phone_line_country_code_lowercased_accepted(client) -> None:
 
     app.state.carrier.search_numbers = AsyncMock(return_value=[{"phone_number": "+15235550100"}])
     app.state.carrier.provision_number = AsyncMock(
-        return_value={"sid": "PNus5123", "phone_number": "+15235550100"}
+        return_value={"provider_sid": "PNus5123", "phone_number": "+15235550100"}
     )
 
     resp = await client.post(
@@ -464,7 +488,7 @@ async def _provision_line(client, vs_id: int, phone_number: str, area_code: str)
 
     app.state.carrier.search_numbers = AsyncMock(return_value=[{"phone_number": phone_number}])
     app.state.carrier.provision_number = AsyncMock(
-        return_value={"sid": f"PNaa{vs_id}", "phone_number": phone_number}
+        return_value={"provider_sid": f"PNaa{vs_id}", "phone_number": phone_number}
     )
     resp = await client.post(
         f"{_LINE_BASE}/Add",

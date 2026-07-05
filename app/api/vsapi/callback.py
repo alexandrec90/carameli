@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.auth import AuthContext, enforce_customer_scope, get_auth_context
 from app.core.config import settings
 from app.core.database import get_session
+from app.core.sip import agent_sip_uri
 from app.schemas.callback import CallbackRequest, CallbackResponse
 from app.services import customer_service, extension_service
 
@@ -54,19 +55,12 @@ async def callback_by_extension(
         )
         raise HTTPException(status_code=404, detail="Extension not found")
 
-    # Build the SIP URI for the agent from stored credentials.
-    # sip_domain_sid is used as the SIP domain identifier.
-    if ext.sip_domain_sid:
-        agent_sip_uri = f"sip:{ext.sip_username}@{ext.sip_domain_sid}"
-    else:
-        agent_sip_uri = ext.sip_username
-
     webhook_url = f"{settings.jambonz_webhook_base_url}/webhooks/jambonz/callback-answered"
 
     engine = request.app.state.engine
     try:
         result = await engine.initiate_callback(
-            agent_sip_uri=agent_sip_uri,
+            agent_sip_uri=agent_sip_uri(ext.sip_username, ext.sip_domain_sid),
             contact_number=body.destination_number,
             webhook_url=webhook_url,
         )

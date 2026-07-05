@@ -32,7 +32,7 @@ async def _add_phone_line(client, vs_id: int, number: str) -> None:
     from app.main import app
 
     app.state.carrier.provision_number = AsyncMock(
-        return_value={"sid": f"PNline{vs_id}", "phone_number": number}
+        return_value={"provider_sid": f"PNline{vs_id}", "phone_number": number}
     )
     resp = await client.post(
         f"{_LINE_BASE}/Add",

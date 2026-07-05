@@ -28,7 +28,7 @@ async def _create_customer_with_line(client, vs_id: int, phone_number: str) -> N
 
     app.state.carrier.search_numbers = AsyncMock(return_value=[{"phone_number": phone_number}])
     app.state.carrier.provision_number = AsyncMock(
-        return_value={"sid": f"PNrec{vs_id}", "phone_number": phone_number}
+        return_value={"provider_sid": f"PNrec{vs_id}", "phone_number": phone_number}
     )
 
     await client.post(
@@ -72,7 +72,12 @@ async def test_recording_export_returns_download_url(client) -> None:
     assert resp.status_code == 200
     body = resp.json()
     assert body["call_sid"] == call_sid
-    assert body["download_url"] == recording_url
+    # The export URL is Carameli-served (token-authenticated), not the raw provider URL.
+    from app.services import recording_links
+
+    assert body["download_url"] == recording_links.public_recording_url(call_sid)
+    assert "/recordings/" in body["download_url"]
+    assert "token=" in body["download_url"]
 
 
 # ---------------------------------------------------------------------------

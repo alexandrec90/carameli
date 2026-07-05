@@ -17,8 +17,9 @@ _TOLL_FREE_PREFIXES: frozenset[str] = frozenset({"800", "833", "844", "855", "86
 class TelnyxCarrier:
     """CarrierProvider implementation backed by the Telnyx REST API."""
 
-    def __init__(self, api_key: str, webhook_base_url: str) -> None:
+    def __init__(self, api_key: str, webhook_base_url: str, messaging_profile_id: str = "") -> None:
         self._webhook_base_url = webhook_base_url
+        self._messaging_profile_id = messaging_profile_id
         self._client = httpx.AsyncClient(
             base_url=_BASE_URL,
             headers={
@@ -119,12 +120,14 @@ class TelnyxCarrier:
         return {"sid": record["id"], "status": record.get("to", [{}])[0].get("status", "queued")}
 
     async def enable_sms(self, provider_sid: str) -> None:
+        # Telnyx enables SMS by assigning the number to a messaging profile;
+        # PATCHing None would detach it (i.e. disable SMS).
+        if not self._messaging_profile_id:
+            raise ValueError("TELNYX_MESSAGING_PROFILE_ID is not configured; cannot enable SMS")
         resp = await self._client.patch(
             f"/phone_numbers/{provider_sid}",
-            json={"messaging_profile_id": None},
+            json={"messaging_profile_id": self._messaging_profile_id},
         )
-        # Telnyx re-enables SMS by assigning the number back to a messaging profile.
-        # A 200 or 204 means the PATCH was accepted.
         if resp.is_error:
             logger.error(
                 "Telnyx enable_sms failed: sid=%s status=%s body=%s",

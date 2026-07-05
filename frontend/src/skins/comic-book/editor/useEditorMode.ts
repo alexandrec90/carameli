@@ -118,23 +118,37 @@ export function resetOneIn(
   return next
 }
 
-/** True when the dev editor should be active for this load. */
+/**
+ * Resolve the editor flag for this load. `?edit=1` switches the editor on and
+ * `?edit=0` switches it off; either way `storedFlag` is what the persisted flag
+ * should become (`null` = removed) so the outcome survives client-side
+ * navigation that drops the query. With no usable param, the stored flag decides.
+ */
+export function resolveEditFlag(
+  param: string | null,
+  stored: string | null,
+): { active: boolean; storedFlag: '1' | null } {
+  if (param === '1') return { active: true, storedFlag: '1' }
+  if (param === '0') return { active: false, storedFlag: null }
+  const active = stored === '1'
+  return { active, storedFlag: active ? '1' : null }
+}
+
+/** True when the dev editor should be active for this load. Persists the outcome. */
 function detectActive(): boolean {
   if (!import.meta.env.DEV || typeof window === 'undefined') return false
   const param = new URLSearchParams(window.location.search).get('edit')
-  if (param === '1') {
-    // Persist so the flag survives client-side navigation that drops the query.
-    try {
-      window.localStorage.setItem(FLAG_KEY, '1')
-    } catch (err) {
-      logger.warn('Could not persist comic-book editor flag', { key: FLAG_KEY, err: String(err) })
-    }
-    return true
-  }
   try {
-    return window.localStorage.getItem(FLAG_KEY) === '1'
-  } catch {
-    return false
+    const stored = window.localStorage.getItem(FLAG_KEY)
+    const { active, storedFlag } = resolveEditFlag(param, stored)
+    if (storedFlag !== stored) {
+      if (storedFlag === null) window.localStorage.removeItem(FLAG_KEY)
+      else window.localStorage.setItem(FLAG_KEY, storedFlag)
+    }
+    return active
+  } catch (err) {
+    logger.warn('Could not persist comic-book editor flag', { key: FLAG_KEY, err: String(err) })
+    return resolveEditFlag(param, null).active
   }
 }
 

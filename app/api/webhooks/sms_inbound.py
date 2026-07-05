@@ -10,7 +10,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.database import get_session
-from app.services import sms_message_service
+from app.services import (
+    customer_service,
+    phone_line_service,
+    sms_message_service,
+    vanillasoft_notify,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/webhooks/telnyx", tags=["webhooks"])
@@ -132,19 +137,81 @@ async def telnyx_sms_inbound(
         await _handle_delivery_receipt(session, payload)
         return Response(status_code=204)
 
-    from_number = payload.get("from", {}).get("phone_number", "")
-    to_numbers = [entry.get("phone_number", "") for entry in payload.get("to", [])]
-    text = payload.get("text", "")
-
-    logger.info(
-        "Telnyx inbound SMS: event_type=%s from=%s to=%s text=%r",
-        event_type,
-        from_number,
-        to_numbers,
-        text,
-    )
+    if event_type == "message.received":
+        await _handle_inbound_message(session, payload)
 
     return Response(status_code=204)
+
+
+async def _handle_inbound_message(session: AsyncSession, payload: dict[str, Any]) -> None:
+    """Persist an inbound SMS and forward it to VanillaSoft (notify/IncomingSmsMessage).
+
+    Failed forwards are retried by the ``retry_unposted_sms_messages`` ARQ job,
+    which picks up rows whose ``posted`` flag is still False.
+    """
+    message_sid: str = payload.get("id", "")
+    from_number: str = payload.get("from", {}).get("phone_number", "")
+    to_numbers = [entry.get("phone_number", "") for entry in payload.get("to", [])]
+    to_number = to_numbers[0] if to_numbers else ""
+    text: str = payload.get("text", "") or ""
+    media_urls = [m.get("url", "") for m in (payload.get("media") or []) if m.get("url")]
+
+    logger.info(
+        "Telnyx inbound SMS: message_sid=%s from=%s to=%s",
+        message_sid,
+        from_number,
+        to_numbers,
+    )
+
+    if not from_number or not to_number:
+        logger.warning("Telnyx inbound SMS missing from/to; skipping message_sid=%s", message_sid)
+        return
+
+    # Telnyx retries webhooks — a message_sid we already stored is a duplicate.
+    if message_sid:
+        existing = await sms_message_service.get_by_message_sid(session, message_sid)
+        if existing:
+            logger.info("Telnyx inbound SMS duplicate message_sid=%s; skipping", message_sid)
+            return
+
+    phone_line = None
+    customer = None
+    try:
+        phone_line = await phone_line_service.get_by_phone_number_global(session, to_number)
+        if phone_line:
+            customer = await customer_service.get_by_id(session, phone_line.customer_id)
+    except Exception:
+        logger.warning("Customer resolution failed for inbound SMS to=%s", to_number, exc_info=True)
+
+    try:
+        message = await sms_message_service.create_inbound(
+            session,
+            customer_id=phone_line.customer_id if phone_line else None,
+            phone_line_id=phone_line.id if phone_line else None,
+            message_sid=message_sid or None,
+            from_number=from_number,
+            to_number=to_number,
+            body=text,
+        )
+    except Exception:
+        logger.exception("Failed to persist inbound SMS message_sid=%s", message_sid)
+        return
+
+    if not settings.vanillasoft_webhook_url:
+        return
+
+    vs_customer_id = customer.vs_customer_id if customer else None
+    posted = await vanillasoft_notify.post_notification(
+        vanillasoft_notify.INCOMING_SMS_PATH,
+        vanillasoft_notify.sms_message_payload(message, vs_customer_id, media_urls),
+    )
+    if posted:
+        await sms_message_service.mark_posted(session, message.id)
+        logger.info("Forwarded inbound SMS %s to VanillaSoft", message_sid)
+    else:
+        logger.warning(
+            "Inbound SMS forward failed message_sid=%s; retry job will pick it up", message_sid
+        )
 
 
 async def _handle_delivery_receipt(session: AsyncSession, payload: dict[str, Any]) -> None:
@@ -178,4 +245,25 @@ async def _handle_delivery_receipt(session: AsyncSession, payload: dict[str, Any
     if not found:
         logger.warning(
             "Telnyx delivery receipt: no SmsMessage row found for message_sid=%s", message_sid
+        )
+        return
+
+    # Forward the receipt to VanillaSoft so it can update the SMS delivery status.
+    if not settings.vanillasoft_webhook_url:
+        return
+    try:
+        message = await sms_message_service.get_by_message_sid(session, message_sid)
+        if message is None:
+            return
+        vs_customer_id = None
+        if message.customer_id:
+            customer = await customer_service.get_by_id(session, message.customer_id)
+            vs_customer_id = customer.vs_customer_id if customer else None
+        await vanillasoft_notify.post_notification(
+            vanillasoft_notify.SMS_DELIVERY_RECEIPT_PATH,
+            vanillasoft_notify.sms_message_payload(message, vs_customer_id),
+        )
+    except Exception:
+        logger.exception(
+            "Failed to forward delivery receipt to VanillaSoft message_sid=%s", message_sid
         )

@@ -9,6 +9,7 @@ import {
   dragImg,
   resizeBubble,
   rotateBubble,
+  scaleBubble,
   scaleImg,
 } from '../../skins/comic-book/editor/transforms'
 import type { BubbleTransform, ImgTransform } from '../../skins/comic-book/editor/types'
@@ -103,6 +104,35 @@ describe('dragBubble', () => {
     const next = dragBubble(bubble({ width: 55, rotate: -5 }), 10, 10, 200, 100)
     expect(next.width).toBe(55)
     expect(next.rotate).toBe(-5)
+  })
+})
+
+describe('scaleBubble', () => {
+  it('adds the width % delta within range', () => {
+    expect(scaleBubble(bubble({ width: 40 }), 5).width).toBe(45)
+    expect(scaleBubble(bubble({ width: 40 }), -5).width).toBe(35)
+  })
+
+  it('clamps to BUBBLE_W.max and BUBBLE_W.min', () => {
+    expect(scaleBubble(bubble({ width: 85 }), 50).width).toBe(BUBBLE_W.max)
+    expect(scaleBubble(bubble({ width: 20 }), -50).width).toBe(BUBBLE_W.min)
+  })
+
+  it('leaves position, rotate, and text untouched', () => {
+    const next = scaleBubble(bubble(), 5)
+    expect(next).toEqual(bubble({ width: 60 }))
+  })
+
+  it('does not mutate the input', () => {
+    const base = bubble({ width: 55 })
+    scaleBubble(base, 10)
+    expect(base.width).toBe(55)
+  })
+
+  it('accumulates repeated wheel-notch deltas', () => {
+    let b = bubble({ width: 40 })
+    for (let i = 0; i < 5; i++) b = scaleBubble(b, 2)
+    expect(b.width).toBe(50)
   })
 })
 

@@ -22,7 +22,7 @@ async def test_phone_line_add_logs_entry_and_success(client, caplog) -> None:
 
     app.state.carrier.search_numbers = AsyncMock(return_value=[{"phone_number": "+16001550001"}])
     app.state.carrier.provision_number = AsyncMock(
-        return_value={"sid": "PNobs001", "phone_number": "+16001550001"}
+        return_value={"provider_sid": "PNobs001", "phone_number": "+16001550001"}
     )
 
     with caplog.at_level(logging.INFO, logger="app.api.vsapi.phone_lines"):
