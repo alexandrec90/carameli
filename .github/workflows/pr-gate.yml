@@ -1,11 +1,10 @@
 name: PR Gate
 
 on:
-  # Temporarily disabled: re-enable when tests are stable
-  # pull_request:
-  #   branches: [master]
-  # push:
-  #   branches: [master]
+  # Runs on every PR to master so the Dependabot auto-merge workflow has a
+  # green/red signal to gate on (see dependabot-automerge.yml).
+  pull_request:
+    branches: [master]
   workflow_dispatch:
 
 jobs:
