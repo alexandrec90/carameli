@@ -3,6 +3,7 @@ CloudliApi model shapes (IncomingCall.cs, CallRecording.cs, SmsMessage.cs)."""
 
 from __future__ import annotations
 
+import logging
 import uuid
 from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -179,10 +180,11 @@ async def test_sms_message_payload_outbound_flag() -> None:
 # ── post_notification ──────────────────────────────────────────────────────
 
 
-def _mock_http(is_success: bool = True, status_code: int = 200) -> AsyncMock:
+def _mock_http(is_success: bool = True, status_code: int = 200, text: str = "") -> AsyncMock:
     response = MagicMock()
     response.is_success = is_success
     response.status_code = status_code
+    response.text = text
     http = AsyncMock()
     http.__aenter__ = AsyncMock(return_value=http)
     http.__aexit__ = AsyncMock(return_value=False)
@@ -216,6 +218,77 @@ async def test_post_notification_non_2xx_returns_false(monkeypatch) -> None:
     http = _mock_http(is_success=False, status_code=500)
     with patch("app.services.vanillasoft_notify.httpx.AsyncClient", return_value=http):
         assert await vanillasoft_notify.post_notification("notify/IncomingCall", {}) is False
+
+
+async def test_post_notification_non_2xx_logs_body_and_ref(monkeypatch, caplog) -> None:
+    monkeypatch.setattr(settings, "vanillasoft_webhook_url", "http://vs.example.com")
+    monkeypatch.setattr(settings, "vanillasoft_webhook_secret", None)
+    http = _mock_http(is_success=False, status_code=400, text="Invalid customerId")
+    with (
+        patch("app.services.vanillasoft_notify.httpx.AsyncClient", return_value=http),
+        caplog.at_level(logging.WARNING, logger="app.services.vanillasoft_notify"),
+    ):
+        ok = await vanillasoft_notify.post_notification(
+            "notify/IncomingCall", {"callId": "CAfail001"}
+        )
+    assert ok is False
+    record = caplog.records[-1]
+    assert record.levelno == logging.WARNING
+    assert "400" in record.getMessage()
+    assert "ref=CAfail001" in record.getMessage()
+    assert "body=Invalid customerId" in record.getMessage()
+
+
+async def test_post_notification_5xx_logs_error_with_reference_id(monkeypatch, caplog) -> None:
+    monkeypatch.setattr(settings, "vanillasoft_webhook_url", "http://vs.example.com")
+    monkeypatch.setattr(settings, "vanillasoft_webhook_secret", None)
+    http = _mock_http(is_success=False, status_code=500, text="SqlException: timeout")
+    with (
+        patch("app.services.vanillasoft_notify.httpx.AsyncClient", return_value=http),
+        caplog.at_level(logging.WARNING, logger="app.services.vanillasoft_notify"),
+    ):
+        ok = await vanillasoft_notify.post_notification(
+            "notify/IncomingSmsMessage", {"referenceId": "SMfail001"}
+        )
+    assert ok is False
+    record = caplog.records[-1]
+    assert record.levelno == logging.ERROR
+    assert "ref=SMfail001" in record.getMessage()
+    assert "body=SqlException: timeout" in record.getMessage()
+
+
+async def test_post_notification_non_2xx_truncates_long_body(monkeypatch, caplog) -> None:
+    monkeypatch.setattr(settings, "vanillasoft_webhook_url", "http://vs.example.com")
+    monkeypatch.setattr(settings, "vanillasoft_webhook_secret", None)
+    http = _mock_http(is_success=False, status_code=400, text="x" * 5000)
+    with (
+        patch("app.services.vanillasoft_notify.httpx.AsyncClient", return_value=http),
+        caplog.at_level(logging.WARNING, logger="app.services.vanillasoft_notify"),
+    ):
+        ok = await vanillasoft_notify.post_notification("notify/IncomingCall", {})
+    assert ok is False
+    message = caplog.records[-1].getMessage()
+    assert "...[truncated]" in message
+    assert "x" * 2000 in message
+    assert "x" * 2001 not in message
+
+
+async def test_truncate_short_body_unchanged() -> None:
+    assert vanillasoft_notify._truncate("short body") == "short body"
+
+
+async def test_truncate_exact_limit_unchanged() -> None:
+    text = "y" * 2000
+    assert vanillasoft_notify._truncate(text) == text
+
+
+async def test_truncate_over_limit_capped_with_marker() -> None:
+    result = vanillasoft_notify._truncate("z" * 2001)
+    assert result == "z" * 2000 + "...[truncated]"
+
+
+async def test_truncate_custom_limit() -> None:
+    assert vanillasoft_notify._truncate("abcdef", limit=4) == "abcd...[truncated]"
 
 
 async def test_post_notification_connection_error_returns_false(monkeypatch) -> None:

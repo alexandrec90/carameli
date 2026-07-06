@@ -112,6 +112,13 @@ def call_recording_payload(
     }
 
 
+def _truncate(text: str, limit: int = 2000) -> str:
+    """Cap response-body text for logging; 2000 chars fits an ASP.NET error payload."""
+    if len(text) <= limit:
+        return text
+    return text[:limit] + "...[truncated]"
+
+
 def _headers() -> dict[str, str]:
     if not settings.vanillasoft_webhook_secret:
         return {}
@@ -132,5 +139,15 @@ async def post_notification(path: str, payload: dict[str, Any]) -> bool:
     if resp.is_success:
         logger.info("VanillaSoft notify POST ok path=%s", path)
         return True
-    logger.warning("VanillaSoft notify POST returned %s path=%s", resp.status_code, path)
+    # After phase 02 (honest receiver) the response body carries VanillaSoft's
+    # real failure detail — capture it. ref joins the failure to its
+    # call_events / sms_messages row; never log the whole payload (PII rule).
+    log = logger.error if resp.status_code >= 500 else logger.warning
+    log(
+        "VanillaSoft notify POST returned %s path=%s ref=%s body=%s",
+        resp.status_code,
+        path,
+        payload.get("callId") or payload.get("referenceId"),
+        _truncate(resp.text),
+    )
     return False
