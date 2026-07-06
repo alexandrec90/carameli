@@ -54,6 +54,19 @@ jobs:
           name: test-results-backend
           path: reports/
 
+  lock-markers:
+    # Dependabot rewrites requirements*.txt with bare pins, stripping the
+    # environment markers the uv --universal compile emits (breaks pip install
+    # on Windows dev machines). Fail fast so those rewrites can't merge.
+    name: Lockfile environment markers
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python scripts/check-lock-markers.py
+
   frontend:
     name: Frontend unit tests
     runs-on: ubuntu-latest
