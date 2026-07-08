@@ -218,6 +218,19 @@ async def test_call_summary_rejects_unknown_group_by(client) -> None:
     assert resp.status_code == 422
 
 
+async def test_get_existing_call_sids_batches_lookup(client, db_session) -> None:
+    """get_existing_call_sids returns only the sids that have a call_events row."""
+    customer_id = await _create_customer(client, 6200)
+    await _seed_event(db_session, customer_id, "CAexist6200a")
+    await _seed_event(db_session, customer_id, "CAexist6200b")
+
+    repo = CallEventRepo(db_session)
+    result = await repo.get_existing_call_sids(["CAexist6200a", "CAexist6200b", "CAnever6200"])
+
+    assert result == {"CAexist6200a", "CAexist6200b"}
+    assert await repo.get_existing_call_sids([]) == set()
+
+
 async def test_get_recording_not_found(client) -> None:
     resp = await client.get(
         "/vsapi/1.0.0/VsCall/Recording/CAmissing001",

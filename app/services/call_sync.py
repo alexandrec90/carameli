@@ -21,6 +21,15 @@ from app.services.agent_status_sync import (
 from app.services.agent_status_sync import (
     startup as engine_startup,
 )
+from app.services.reconciliation import (
+    reconcile_provider_records,
+)
+from app.services.reconciliation import (
+    shutdown as carrier_shutdown,
+)
+from app.services.reconciliation import (
+    startup as carrier_startup,
+)
 from app.services.sms_sync import retry_unposted_sms_messages
 
 logger = logging.getLogger(__name__)
@@ -68,13 +77,26 @@ async def retry_unposted_events(ctx: dict) -> None:
                 logger.exception("Retry: failed to post call event %s", event.call_sid)
 
 
+async def worker_startup(ctx: dict) -> None:
+    """Compose the worker startup hooks: call engine (agent status) + carrier (reconciliation)."""
+    await engine_startup(ctx)
+    await carrier_startup(ctx)
+
+
+async def worker_shutdown(ctx: dict) -> None:
+    """Compose the worker shutdown hooks in reverse: carrier first, then call engine."""
+    await carrier_shutdown(ctx)
+    await engine_shutdown(ctx)
+
+
 class WorkerSettings:
     functions: ClassVar[list] = []
     cron_jobs: ClassVar[list] = [
         cron(retry_unposted_events, second={0, 30}),
         cron(retry_unposted_sms_messages, second={0, 30}),
         cron(poll_agent_status, second={0, 30}),
+        cron(reconcile_provider_records, minute={0, 10, 20, 30, 40, 50}, second=0),
     ]
     redis_settings = RedisSettings.from_dsn(settings.redis_url)
-    on_startup = engine_startup
-    on_shutdown = engine_shutdown
+    on_startup = worker_startup
+    on_shutdown = worker_shutdown

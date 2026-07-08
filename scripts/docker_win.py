@@ -14,8 +14,16 @@ import re
 import subprocess
 from pathlib import Path
 
+import docker_common as dc
+
 DOCKER_DESKTOP_EXE = r"C:\Program Files\Docker\Docker\Docker Desktop.exe"
 DOCKER_STATE_DIRS = [r"%APPDATA%\Docker", r"%LOCALAPPDATA%\Docker"]
+
+# Docker Desktop processes to kill for a clean engine stop. Shared by
+# docker-restart-engine.py (recovery) and docker-prune.py (stop before
+# compaction) so the two never drift -- an incomplete stop is what lets
+# Docker Desktop remount the VHDX mid-compaction and wedge the engine.
+ENGINE_PROCESSES = ["Docker Desktop", "com.docker.backend", "com.docker.service"]
 
 
 def is_admin() -> bool:
@@ -135,6 +143,34 @@ def optimize_vhd(path: Path) -> tuple[int, list[str]]:
         errors="replace",
     )
     return p.returncode, (p.stdout or "").splitlines()
+
+
+def restart_engine(poll_timeout: int = 90, poll_interval: int = 5, log=print) -> bool:
+    """Full Docker Desktop recovery: kill -> wsl shutdown -> (service) -> relaunch -> poll.
+
+    Returns True once `docker info` succeeds within `poll_timeout`, else False.
+    Elevation is required for the service stop/start; without it this degrades to
+    a process-kill + relaunch, which clears most "Starting the Docker Engine"
+    hangs. Shared by docker-restart-engine.py (the recovery task) and
+    docker-prune.py (auto-recovery when the post-compaction relaunch stalls) so
+    the two can never drift.
+    """
+    admin = is_admin()
+    log("Stopping Docker Desktop...")
+    stop_processes(ENGINE_PROCESSES)
+    if admin:
+        stop_service("com.docker.service")
+    else:
+        log("  [WARN] Not Admin -- skipping service stop (process kill only)")
+    log("Shutting down WSL...")
+    wsl_shutdown()
+    if admin:
+        start_service("com.docker.service")
+    if not launch_docker_desktop():
+        log(f"  [ERROR] Docker Desktop not found at {DOCKER_DESKTOP_EXE}")
+        return False
+    log(f"Waiting for Docker engine (timeout {poll_timeout}s)...")
+    return dc.poll_until(docker_info_ok, timeout=poll_timeout, interval=poll_interval)
 
 
 def expand_state_dirs(dirs=None) -> list[Path]:

@@ -71,6 +71,7 @@ active skin's 3D canvas design constraints. Use the `add-ui-component` skill whe
 
 See `.claude/rules/logging-backend.md` and `.claude/rules/logging-frontend.md`. All activity lands in `logs/runtime/carameli.log`. The global
 exception handler in `app/main.py` writes all unhandled 500s to the log — do not remove it.
+When an integration error is hard to place, `docs/diagnostics-error-map.md` maps every failure mode to where its evidence lands.
 
 ## Tooling
 

@@ -12,11 +12,14 @@ from app.models.sms_message import SmsMessage
 
 logger = logging.getLogger(__name__)
 
-# Path suffixes under VANILLASOFT_WEBHOOK_URL (the VanillaSoft.CloudliApi base).
-INCOMING_CALL_PATH = "notify/IncomingCall"
-CALL_RECORDING_PATH = "notify/CallRecording"
-INCOMING_SMS_PATH = "notify/IncomingSmsMessage"
-SMS_DELIVERY_RECEIPT_PATH = "notify/IncomingSmsMessageDeliveryReceipt"
+# Endpoint suffixes; the full path is
+# {VANILLASOFT_WEBHOOK_URL}/{VANILLASOFT_NOTIFY_PREFIX}/{suffix}.
+# The prefix selects the receiver: "notify" = legacy CloudliController,
+# "carameli/notify" = honest CarameliNotifyController (post staging deploy).
+INCOMING_CALL_PATH = "IncomingCall"
+CALL_RECORDING_PATH = "CallRecording"
+INCOMING_SMS_PATH = "IncomingSmsMessage"
+SMS_DELIVERY_RECEIPT_PATH = "IncomingSmsMessageDeliveryReceipt"
 
 SMS_PROVIDER_NAME = "Carameli"
 
@@ -125,14 +128,24 @@ def _headers() -> dict[str, str]:
     return {"X-Cloudli-Auth": settings.vanillasoft_webhook_secret}
 
 
+def _notify_url(path: str) -> str:
+    """Join base URL, the configured notify prefix and the endpoint suffix."""
+    base = (settings.vanillasoft_webhook_url or "").rstrip("/")
+    prefix = settings.vanillasoft_notify_prefix.strip("/")
+    return f"{base}/{prefix}/{path.lstrip('/')}"
+
+
 async def post_notification(path: str, payload: dict[str, Any]) -> bool:
     """POST a notify payload to VanillaSoft; returns True on 2xx, never raises."""
     if not settings.vanillasoft_webhook_url:
         return False
-    url = settings.vanillasoft_webhook_url.rstrip("/") + "/" + path
+    url = _notify_url(path)
     try:
         async with httpx.AsyncClient() as client:
-            resp = await client.post(url, json=payload, headers=_headers(), timeout=10.0)
+            # 30 s: the honest receiver (phase 02) processes synchronously and the
+            # VanillaSoftWS SOAP hop can be slow; slower than that is a
+            # VanillaSoft-side bug to fix there, not a reason to shorten this.
+            resp = await client.post(url, json=payload, headers=_headers(), timeout=30.0)
     except Exception:
         logger.exception("VanillaSoft notify POST failed path=%s", path)
         return False

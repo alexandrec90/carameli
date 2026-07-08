@@ -152,6 +152,37 @@ async def test_retry_skips_non_terminal_status(monkeypatch) -> None:
         mock_repo.mark_posted.assert_not_awaited()
 
 
+async def test_worker_startup_initialises_engine_and_carrier() -> None:
+    """The composed startup hook creates both the call engine and the carrier."""
+    from app.services.call_sync import worker_startup
+
+    ctx: dict = {}
+    fake_engine = MagicMock()
+    fake_carrier = MagicMock()
+    with (
+        patch(
+            "app.services.providers.factory.get_call_engine_provider", return_value=fake_engine
+        ),
+        patch("app.services.providers.factory.get_carrier_provider", return_value=fake_carrier),
+    ):
+        await worker_startup(ctx)
+
+    assert ctx["engine"] is fake_engine
+    assert ctx["carrier"] is fake_carrier
+
+
+async def test_worker_shutdown_closes_both_providers() -> None:
+    """The composed shutdown hook drains both provider connection pools."""
+    from app.services.call_sync import worker_shutdown
+
+    fake_engine = AsyncMock()
+    fake_carrier = AsyncMock()
+    await worker_shutdown({"engine": fake_engine, "carrier": fake_carrier})
+
+    fake_engine.aclose.assert_awaited_once()
+    fake_carrier.aclose.assert_awaited_once()
+
+
 async def test_retry_warns_on_non_2xx_and_does_not_mark_posted(monkeypatch) -> None:
     """A non-2xx response does not mark the event as posted."""
     monkeypatch.setattr(settings, "vanillasoft_webhook_url", "http://vs.example.com/cloudliapi")

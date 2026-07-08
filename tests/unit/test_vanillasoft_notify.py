@@ -195,7 +195,10 @@ def _mock_http(is_success: bool = True, status_code: int = 200, text: str = "") 
 async def test_post_notification_unconfigured_returns_false(monkeypatch) -> None:
     monkeypatch.setattr(settings, "vanillasoft_webhook_url", None)
     with patch("app.services.vanillasoft_notify.httpx.AsyncClient") as mock_cls:
-        assert await vanillasoft_notify.post_notification("notify/IncomingCall", {}) is False
+        assert (
+            await vanillasoft_notify.post_notification(vanillasoft_notify.INCOMING_CALL_PATH, {})
+            is False
+        )
         mock_cls.assert_not_called()
 
 
@@ -204,7 +207,9 @@ async def test_post_notification_sends_cloudli_auth_header(monkeypatch) -> None:
     monkeypatch.setattr(settings, "vanillasoft_webhook_secret", "shared-secret")
     http = _mock_http()
     with patch("app.services.vanillasoft_notify.httpx.AsyncClient", return_value=http):
-        ok = await vanillasoft_notify.post_notification("notify/IncomingCall", {"a": 1})
+        ok = await vanillasoft_notify.post_notification(
+            vanillasoft_notify.INCOMING_CALL_PATH, {"a": 1}
+        )
     assert ok is True
     call = http.post.call_args
     assert call.args[0] == "http://vs.example.com/api/notify/IncomingCall"
@@ -212,12 +217,70 @@ async def test_post_notification_sends_cloudli_auth_header(monkeypatch) -> None:
     assert call.kwargs["json"] == {"a": 1}
 
 
+async def test_post_notification_timeout_covers_synchronous_receiver(monkeypatch) -> None:
+    """The honest receiver processes on the request thread (SOAP hop included), so the
+    client timeout must be 30 s — 10 s would abort still-running processing."""
+    monkeypatch.setattr(settings, "vanillasoft_webhook_url", "http://vs.example.com")
+    monkeypatch.setattr(settings, "vanillasoft_webhook_secret", None)
+    http = _mock_http()
+    with patch("app.services.vanillasoft_notify.httpx.AsyncClient", return_value=http):
+        await vanillasoft_notify.post_notification(vanillasoft_notify.INCOMING_CALL_PATH, {})
+    assert http.post.call_args.kwargs["timeout"] == 30.0
+
+
+async def test_notify_path_constants_are_bare_suffixes() -> None:
+    """The receiver prefix lives in VANILLASOFT_NOTIFY_PREFIX; a 'notify/' in a constant
+    would double the prefix in every URL."""
+    for constant in (
+        vanillasoft_notify.INCOMING_CALL_PATH,
+        vanillasoft_notify.CALL_RECORDING_PATH,
+        vanillasoft_notify.INCOMING_SMS_PATH,
+        vanillasoft_notify.SMS_DELIVERY_RECEIPT_PATH,
+    ):
+        assert "/" not in constant
+
+
+@pytest.mark.parametrize(
+    ("prefix", "expected_url"),
+    [
+        ("notify", "http://vs.example.com/api/notify/IncomingSmsMessage"),
+        ("carameli/notify", "http://vs.example.com/api/carameli/notify/IncomingSmsMessage"),
+    ],
+)
+async def test_post_notification_url_honours_notify_prefix(
+    monkeypatch, prefix: str, expected_url: str
+) -> None:
+    monkeypatch.setattr(settings, "vanillasoft_webhook_url", "http://vs.example.com/api")
+    monkeypatch.setattr(settings, "vanillasoft_webhook_secret", None)
+    monkeypatch.setattr(settings, "vanillasoft_notify_prefix", prefix)
+    http = _mock_http()
+    with patch("app.services.vanillasoft_notify.httpx.AsyncClient", return_value=http):
+        ok = await vanillasoft_notify.post_notification(vanillasoft_notify.INCOMING_SMS_PATH, {})
+    assert ok is True
+    assert http.post.call_args.args[0] == expected_url
+
+
+async def test_post_notification_url_normalizes_stray_slashes(monkeypatch) -> None:
+    monkeypatch.setattr(settings, "vanillasoft_webhook_url", "http://vs.example.com/api/")
+    monkeypatch.setattr(settings, "vanillasoft_webhook_secret", None)
+    monkeypatch.setattr(settings, "vanillasoft_notify_prefix", "/carameli/notify/")
+    http = _mock_http()
+    with patch("app.services.vanillasoft_notify.httpx.AsyncClient", return_value=http):
+        await vanillasoft_notify.post_notification(vanillasoft_notify.CALL_RECORDING_PATH, {})
+    assert (
+        http.post.call_args.args[0] == "http://vs.example.com/api/carameli/notify/CallRecording"
+    )
+
+
 async def test_post_notification_non_2xx_returns_false(monkeypatch) -> None:
     monkeypatch.setattr(settings, "vanillasoft_webhook_url", "http://vs.example.com")
     monkeypatch.setattr(settings, "vanillasoft_webhook_secret", None)
     http = _mock_http(is_success=False, status_code=500)
     with patch("app.services.vanillasoft_notify.httpx.AsyncClient", return_value=http):
-        assert await vanillasoft_notify.post_notification("notify/IncomingCall", {}) is False
+        assert (
+            await vanillasoft_notify.post_notification(vanillasoft_notify.INCOMING_CALL_PATH, {})
+            is False
+        )
 
 
 async def test_post_notification_non_2xx_logs_body_and_ref(monkeypatch, caplog) -> None:
@@ -229,7 +292,7 @@ async def test_post_notification_non_2xx_logs_body_and_ref(monkeypatch, caplog) 
         caplog.at_level(logging.WARNING, logger="app.services.vanillasoft_notify"),
     ):
         ok = await vanillasoft_notify.post_notification(
-            "notify/IncomingCall", {"callId": "CAfail001"}
+            vanillasoft_notify.INCOMING_CALL_PATH, {"callId": "CAfail001"}
         )
     assert ok is False
     record = caplog.records[-1]
@@ -248,7 +311,7 @@ async def test_post_notification_5xx_logs_error_with_reference_id(monkeypatch, c
         caplog.at_level(logging.WARNING, logger="app.services.vanillasoft_notify"),
     ):
         ok = await vanillasoft_notify.post_notification(
-            "notify/IncomingSmsMessage", {"referenceId": "SMfail001"}
+            vanillasoft_notify.INCOMING_SMS_PATH, {"referenceId": "SMfail001"}
         )
     assert ok is False
     record = caplog.records[-1]
@@ -265,7 +328,7 @@ async def test_post_notification_non_2xx_truncates_long_body(monkeypatch, caplog
         patch("app.services.vanillasoft_notify.httpx.AsyncClient", return_value=http),
         caplog.at_level(logging.WARNING, logger="app.services.vanillasoft_notify"),
     ):
-        ok = await vanillasoft_notify.post_notification("notify/IncomingCall", {})
+        ok = await vanillasoft_notify.post_notification(vanillasoft_notify.INCOMING_CALL_PATH, {})
     assert ok is False
     message = caplog.records[-1].getMessage()
     assert "...[truncated]" in message
@@ -296,7 +359,10 @@ async def test_post_notification_connection_error_returns_false(monkeypatch) -> 
     http = _mock_http()
     http.post = AsyncMock(side_effect=ConnectionError("down"))
     with patch("app.services.vanillasoft_notify.httpx.AsyncClient", return_value=http):
-        assert await vanillasoft_notify.post_notification("notify/IncomingCall", {}) is False
+        assert (
+            await vanillasoft_notify.post_notification(vanillasoft_notify.INCOMING_CALL_PATH, {})
+            is False
+        )
 
 
 async def test_incoming_call_payload_roundtrip_with_orm_event(db_session) -> None:

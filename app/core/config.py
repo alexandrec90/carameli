@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     telnyx_webhook_base_url: str = "http://localhost:8000"
     telnyx_webhook_secret: str = ""
     telnyx_messaging_profile_id: str = ""
+    telnyx_sandbox: bool = False  # TELNYX_SANDBOX=1 → no real records (reconciliation returns [])
 
     # Jambonz (populated by Track C)
     jambonz_base_url: str = "http://localhost:3000"
@@ -58,11 +59,26 @@ class Settings(BaseSettings):
         default=None,
         description=(
             "Base URL of the VanillaSoft.CloudliApi staging site; Carameli POSTs "
-            "notify/IncomingCall, notify/CallRecording, notify/IncomingSmsMessage and "
-            "notify/IncomingSmsMessageDeliveryReceipt under it"
+            "IncomingCall, CallRecording, IncomingSmsMessage and "
+            "IncomingSmsMessageDeliveryReceipt under it, behind "
+            "VANILLASOFT_NOTIFY_PREFIX"
         ),
     )
     vanillasoft_webhook_secret: str | None = None
+
+    # Reconciliation cron (phase 04): diffs provider records against local tables to
+    # catch webhooks that never arrived. Default-off — needs live provider credentials.
+    reconciliation_enabled: bool = False
+    reconciliation_lookback_minutes: int = 60
+    vanillasoft_notify_prefix: str = Field(
+        default="notify",
+        description=(
+            "Path prefix inserted between the webhook base URL and the notify "
+            "suffixes (IncomingCall, CallRecording, ...). 'notify' targets the "
+            "legacy fire-and-forget CloudliController; flip to 'carameli/notify' "
+            "once staging runs the honest CarameliNotifyController"
+        ),
+    )
 
     @field_validator("cors_origins", mode="before")
     @classmethod

@@ -386,3 +386,26 @@ async def test_sms_repo_get_unposted_inbound_filters(db_session) -> None:
     await repo.mark_posted(stale_inbound.id)
     unposted = await repo.get_unposted_inbound()
     assert stale_inbound.id not in {m.id for m in unposted}
+
+
+async def test_sms_repo_get_existing_message_sids_batches_lookup(db_session) -> None:
+    """get_existing_message_sids returns only the sids that have a row; unknowns are absent."""
+    from app.repositories.sms_message_repo import SmsMessageRepo
+
+    repo = SmsMessageRepo(db_session)
+    present = f"SMexist{uuid.uuid4().hex[:8]}"
+    await repo.create(
+        customer_id=None,
+        phone_line_id=None,
+        message_sid=present,
+        direction="inbound",
+        from_number="+12125550001",
+        to_number="+18105550100",
+        body="present",
+        delivery_status="received",
+    )
+
+    result = await repo.get_existing_message_sids([present, "SMnever_seen"])
+
+    assert result == {present}
+    assert await repo.get_existing_message_sids([]) == set()

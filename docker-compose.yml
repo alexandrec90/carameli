@@ -204,12 +204,29 @@ services:
     image: drachtio/rtpengine
     restart: unless-stopped
     network_mode: host
+    # Bypass the image's /entrypoint.sh. That script injects
+    # `--config-file /etc/rtpengine.conf`, whose `listen-http=MY_IP:8080` line
+    # starts a websocket listener bound to an auto-detected interface. Under
+    # Docker Desktop (WSL2 host networking) the autodetect resolves MY_IP to an
+    # IPv6 link-local (fe80::...) that libwebsockets cannot bind, which is fatal
+    # ("Failed to init websocket listener") and crash-loops the container.
+    # Running the binary directly with only the flags below skips that config
+    # file, so no websocket listener is ever started.
+    entrypoint: ["/usr/local/bin/rtpengine"]
+    # RTPENGINE_LOCAL_IP is the local address rtpengine binds RTP sockets to.
+    # Default 127.0.0.1 keeps dev working without guessing the WSL VM's (dynamic)
+    # IP. For real media relay set it to the host's local IP, optionally with an
+    # advertised public IP in `LOCAL!PUBLIC` form (see .env.example).
+    # --foreground + --log-stderr are required because we no longer load the
+    # config file that set them; without --foreground rtpengine daemonizes and
+    # the container's main process exits (restart loop with empty logs).
     command: >
-      rtpengine
-      --interface=${RTPENGINE_PUBLIC_IP}
+      --interface=${RTPENGINE_LOCAL_IP:-127.0.0.1}
       --listen-ng=127.0.0.1:2223
       --port-min=10000
       --port-max=10100
+      --foreground
+      --log-stderr
     stop_grace_period: 3s
     healthcheck:
       test:

@@ -51,6 +51,19 @@ class SmsMessageRepo:
         )
         return result.scalar_one_or_none()
 
+    async def get_existing_message_sids(self, message_sids: list[str]) -> set[str]:
+        """Return the subset of ``message_sids`` that already have an sms_messages row.
+
+        One batched ``SELECT ... WHERE message_sid IN (...)`` for the reconciliation
+        diff (avoids N per-sid queries). An empty input yields an empty set.
+        """
+        if not message_sids:
+            return set()
+        result = await self.session.execute(
+            select(SmsMessage.message_sid).where(SmsMessage.message_sid.in_(message_sids))
+        )
+        return {sid for sid in result.scalars().all() if sid is not None}
+
     async def list_for_customer(
         self,
         customer_id: uuid.UUID,
