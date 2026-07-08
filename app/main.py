@@ -21,6 +21,7 @@ from app.api.vg.frontend_logs import router as frontend_logs_router
 from app.api.vsapi import vsapi_router
 from app.api.webhooks.call_status import jambonz_router
 from app.api.webhooks.sms_inbound import router as sms_inbound_router
+from app.api.webhooks.vs_log import router as vs_log_router
 from app.core.config import settings
 from app.core.constants import DEFAULT_FRONTEND_ORIGIN
 from app.core.database import engine
@@ -106,6 +107,7 @@ app.include_router(auth_router)
 app.include_router(vsapi_router, responses=_UNAUTHORIZED)  # type: ignore[arg-type]
 app.include_router(jambonz_router)
 app.include_router(sms_inbound_router)
+app.include_router(vs_log_router)
 app.include_router(recording_download_router)
 app.include_router(frontend_logs_router, responses=_UNAUTHORIZED)  # type: ignore[arg-type]
 

@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime
 
 import httpx
 
 from app.core.constants import TELNYX_API_BASE_URL
+from app.services.providers.base import ProviderMessageRecord
 
 logger = logging.getLogger(__name__)
 
@@ -13,13 +15,25 @@ _BASE_URL = TELNYX_API_BASE_URL
 # NANP toll-free area-code prefixes (FCC-designated, fixed set).
 _TOLL_FREE_PREFIXES: frozenset[str] = frozenset({"800", "833", "844", "855", "866", "877", "888"})
 
+# Reconciliation reads Message Detail Records a page at a time. We ask for a
+# single generous page and rely on the server-side time filter — the lookback
+# window is short (default 60 min) so one page covers it.
+_RECENT_MESSAGES_PAGE_SIZE = 250
+
 
 class TelnyxCarrier:
     """CarrierProvider implementation backed by the Telnyx REST API."""
 
-    def __init__(self, api_key: str, webhook_base_url: str, messaging_profile_id: str = "") -> None:
+    def __init__(
+        self,
+        api_key: str,
+        webhook_base_url: str,
+        messaging_profile_id: str = "",
+        sandbox: bool = False,
+    ) -> None:
         self._webhook_base_url = webhook_base_url
         self._messaging_profile_id = messaging_profile_id
+        self._sandbox = sandbox
         self._client = httpx.AsyncClient(
             base_url=_BASE_URL,
             headers={
@@ -189,3 +203,67 @@ class TelnyxCarrier:
             for prefix in sorted(_TOLL_FREE_PREFIXES):
                 result.append({"area_code": prefix, "country": "US", "number_type": "toll-free"})
         return result
+
+    # ------------------------------------------------------------------
+    # Reconciliation
+    # ------------------------------------------------------------------
+
+    async def list_recent_messages(self, since: datetime) -> list[ProviderMessageRecord]:
+        """Return recent messages from Telnyx's detail records since ``since``.
+
+        Endpoint: GET /v2/detail_records filtered to messaging records. Telnyx
+        supports a ``created_at`` time filter with a plain API key, so we push the
+        ``since`` cutoff server-side and cap the response at one page
+        (``_RECENT_MESSAGES_PAGE_SIZE``) — the reconciliation window is short.
+
+        Consumed only through ``CarrierProvider.list_recent_messages`` by the
+        reconciliation cron; ``message_sid`` matches the inbound-SMS webhook id.
+
+        Sandbox mode (``TELNYX_SANDBOX=1``) has no real detail records, so return
+        an empty list without calling the API.
+        """
+        if self._sandbox:
+            logger.debug("Telnyx list_recent_messages: sandbox mode, returning no records")
+            return []
+
+        params: dict = {
+            "filter[record_type]": "messaging",
+            "filter[created_at][gte]": since.isoformat(),
+            "page[size]": _RECENT_MESSAGES_PAGE_SIZE,
+        }
+        resp = await self._client.get("/detail_records", params=params)
+        if resp.is_error:
+            logger.error(
+                "Telnyx list_recent_messages failed: since=%s status=%s body=%s",
+                since.isoformat(),
+                resp.status_code,
+                resp.text,
+            )
+            resp.raise_for_status()
+        data = resp.json().get("data", [])
+        records: list[ProviderMessageRecord] = []
+        for item in data:
+            message_sid = item.get("id") or item.get("message_id")
+            if not message_sid:
+                continue
+            records.append(
+                ProviderMessageRecord(
+                    message_sid=message_sid,
+                    direction=item.get("direction"),
+                    from_number=item.get("from"),
+                    to_number=item.get("to"),
+                    created_at=_parse_telnyx_datetime(item.get("created_at")),
+                    status=item.get("status"),
+                )
+            )
+        return records
+
+
+def _parse_telnyx_datetime(value: object) -> datetime | None:
+    """Parse a Telnyx ISO-8601 timestamp string into a datetime (None on failure)."""
+    if not value or not isinstance(value, str):
+        return None
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None

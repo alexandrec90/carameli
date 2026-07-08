@@ -1,13 +1,30 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime
 from typing import Any, cast
 
 import httpx
 
 from app.services import callback_state
+from app.services.providers.base import ProviderCallRecord
 
 logger = logging.getLogger(__name__)
+
+# Reconciliation reads the RecentCalls report a page at a time. We ask for a
+# single generous page and filter client-side by ``since`` rather than crawling
+# pagination — the lookback window is short (default 60 min) so one page covers it.
+_RECENT_CALLS_PAGE_SIZE = 500
+
+
+def _parse_jambonz_datetime(value: Any) -> datetime | None:
+    """Parse a Jambonz ISO-8601 timestamp string into a datetime (None on failure)."""
+    if not value or not isinstance(value, str):
+        return None
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
 
 
 class JambonzEngine:
@@ -181,6 +198,56 @@ class JambonzEngine:
         if isinstance(data, list):
             return cast(list[dict[Any, Any]], data)
         return cast(list[dict[Any, Any]], data.get("calls", data.get("data", [])))
+
+    async def list_recent_calls(self, since: datetime) -> list[ProviderCallRecord]:
+        """Return recent calls from the Jambonz RecentCalls report since ``since``.
+
+        Endpoint: GET /v1/Accounts/{account_sid}/RecentCalls (paginated, newest
+        first). Jambonz supports a ``days`` filter but not a precise timestamp
+        cutoff, so we fetch one large page and filter client-side by
+        ``attempted_at`` — the reconciliation lookback window is short enough that
+        a single page covers it (see ``_RECENT_CALLS_PAGE_SIZE``).
+
+        Consumed only through ``CallEngineProvider.list_recent_calls`` by the
+        reconciliation cron; ``call_sid`` matches the call-status webhook's sid.
+        """
+        url = f"/Accounts/{self._account_sid}/RecentCalls"
+        resp = await self._client.get(url, params={"page": 1, "count": _RECENT_CALLS_PAGE_SIZE})
+        if resp.is_error:
+            logger.error(
+                "Jambonz list_recent_calls failed: status=%s body=%s",
+                resp.status_code,
+                resp.text,
+            )
+            resp.raise_for_status()
+        data = resp.json()
+        rows = cast(
+            list[dict[str, Any]],
+            data if isinstance(data, list) else data.get("data", data.get("calls", [])),
+        )
+        records: list[ProviderCallRecord] = []
+        for row in rows:
+            call_sid = row.get("call_sid") or row.get("sid")
+            if not call_sid:
+                continue
+            started_at = _parse_jambonz_datetime(
+                row.get("attempted_at") or row.get("answered_at") or row.get("started_at")
+            )
+            # Drop rows older than the reconciliation window (report is newest-first,
+            # but be defensive and filter every row).
+            if started_at is not None and started_at < since:
+                continue
+            records.append(
+                ProviderCallRecord(
+                    call_sid=call_sid,
+                    direction=row.get("direction"),
+                    from_number=row.get("from"),
+                    to_number=row.get("to"),
+                    started_at=started_at,
+                    status=row.get("call_status") or row.get("status"),
+                )
+            )
+        return records
 
     async def get_registrations(self) -> list[dict]:
         """Return SIP registrations for this Jambonz account.

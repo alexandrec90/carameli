@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -9,11 +10,12 @@ from app.services.providers.carrier.telnyx import TelnyxCarrier
 pytestmark = pytest.mark.asyncio(loop_scope="session")
 
 
-def _make_carrier(messaging_profile_id: str = "MPtest001") -> TelnyxCarrier:
+def _make_carrier(messaging_profile_id: str = "MPtest001", sandbox: bool = False) -> TelnyxCarrier:
     return TelnyxCarrier(
         api_key="test-key",
         webhook_base_url="http://localhost:8000",
         messaging_profile_id=messaging_profile_id,
+        sandbox=sandbox,
     )
 
 
@@ -319,3 +321,74 @@ async def test_get_available_area_codes_raises_on_error() -> None:
 
     with pytest.raises(Exception, match="HTTP 500"):
         await carrier.get_available_area_codes("US", None)
+
+
+# ---------------------------------------------------------------------------
+# list_recent_messages (reconciliation)
+# ---------------------------------------------------------------------------
+
+
+async def test_list_recent_messages_sandbox_returns_empty_without_api_call() -> None:
+    carrier = _make_carrier(sandbox=True)
+    carrier._client.get = AsyncMock()
+
+    result = await carrier.list_recent_messages(datetime.now(UTC) - timedelta(minutes=60))
+
+    assert result == []
+    carrier._client.get.assert_not_awaited()
+
+
+async def test_list_recent_messages_maps_records() -> None:
+    carrier = _make_carrier()
+    since = datetime.now(UTC) - timedelta(minutes=60)
+    fake_resp = _mock_response(
+        200,
+        {
+            "data": [
+                {
+                    "id": "SM1",
+                    "from": "+14155550000",
+                    "to": "+12125550100",
+                    "direction": "inbound",
+                    "status": "delivered",
+                    "created_at": "2099-01-02T00:00:00Z",
+                }
+            ]
+        },
+    )
+    carrier._client.get = AsyncMock(return_value=fake_resp)
+
+    records = await carrier.list_recent_messages(since)
+
+    assert len(records) == 1
+    rec = records[0]
+    assert rec.message_sid == "SM1"
+    assert rec.from_number == "+14155550000"
+    assert rec.to_number == "+12125550100"
+    assert rec.direction == "inbound"
+    assert rec.status == "delivered"
+    assert rec.created_at is not None
+    # The since cutoff is pushed to the server-side filter.
+    params = carrier._client.get.call_args[1]["params"]
+    assert params["filter[record_type]"] == "messaging"
+    assert params["filter[created_at][gte]"] == since.isoformat()
+
+
+async def test_list_recent_messages_skips_rows_without_sid() -> None:
+    carrier = _make_carrier()
+    fake_resp = _mock_response(200, {"data": [{"from": "+14155550000"}]})
+    carrier._client.get = AsyncMock(return_value=fake_resp)
+
+    records = await carrier.list_recent_messages(datetime.now(UTC) - timedelta(minutes=60))
+
+    assert records == []
+
+
+async def test_list_recent_messages_raises_on_error() -> None:
+    carrier = _make_carrier()
+    fake_resp = _mock_response(500, {"errors": [{"detail": "server error"}]})
+    fake_resp.raise_for_status = MagicMock(side_effect=Exception("HTTP 500"))
+    carrier._client.get = AsyncMock(return_value=fake_resp)
+
+    with pytest.raises(Exception, match="HTTP 500"):
+        await carrier.list_recent_messages(datetime.now(UTC) - timedelta(minutes=60))

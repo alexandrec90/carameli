@@ -197,6 +197,19 @@ class CallEventRepo:
         result = await self.session.execute(select(CallEvent).where(CallEvent.call_sid == call_sid))
         return result.scalar_one_or_none()
 
+    async def get_existing_call_sids(self, call_sids: list[str]) -> set[str]:
+        """Return the subset of ``call_sids`` that already have a call_events row.
+
+        One batched ``SELECT ... WHERE call_sid IN (...)`` for the reconciliation
+        diff (avoids N per-sid queries). An empty input yields an empty set.
+        """
+        if not call_sids:
+            return set()
+        result = await self.session.execute(
+            select(CallEvent.call_sid).where(CallEvent.call_sid.in_(call_sids))
+        )
+        return set(result.scalars().all())
+
     async def get_by_call_sid_for_customer(
         self, call_sid: str, customer_id: uuid.UUID
     ) -> CallEvent | None:

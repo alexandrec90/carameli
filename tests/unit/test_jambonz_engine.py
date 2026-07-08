@@ -5,6 +5,7 @@ import hashlib
 import hmac
 import json
 import time
+from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -187,6 +188,85 @@ async def test_initiate_voicemail_drop_passes_audio_url_in_tag() -> None:
     assert result == {"call_id": "JC_vm001", "status": "queued"}
     posted_json = engine._client.post.call_args[1]["json"]
     assert posted_json["tag"]["audio_url"] == "https://s3.example.com/vm.mp3"
+
+
+# ---------------------------------------------------------------------------
+# list_recent_calls (reconciliation)
+# ---------------------------------------------------------------------------
+
+
+async def test_list_recent_calls_maps_records() -> None:
+    engine = _make_engine()
+    since = datetime.now(UTC) - timedelta(minutes=60)
+    fake_resp = _mock_response(
+        200,
+        {
+            "data": [
+                {
+                    "call_sid": "CA1",
+                    "from": "+14155550000",
+                    "to": "+12125550100",
+                    "direction": "inbound",
+                    "call_status": "completed",
+                    "attempted_at": "2099-01-02T00:00:00Z",
+                }
+            ]
+        },
+    )
+    engine._client.get = AsyncMock(return_value=fake_resp)
+
+    records = await engine.list_recent_calls(since)
+
+    assert len(records) == 1
+    rec = records[0]
+    assert rec.call_sid == "CA1"
+    assert rec.from_number == "+14155550000"
+    assert rec.to_number == "+12125550100"
+    assert rec.direction == "inbound"
+    assert rec.status == "completed"
+    assert rec.started_at is not None
+    # Report is requested from the RecentCalls endpoint.
+    assert "RecentCalls" in engine._client.get.call_args[0][0]
+
+
+async def test_list_recent_calls_filters_rows_older_than_since() -> None:
+    engine = _make_engine()
+    since = datetime.now(UTC) - timedelta(minutes=60)
+    fake_resp = _mock_response(
+        200,
+        {
+            "data": [
+                {"call_sid": "CAold", "attempted_at": "2000-01-01T00:00:00Z"},
+                {"call_sid": "CAnew", "attempted_at": "2099-01-01T00:00:00Z"},
+            ]
+        },
+    )
+    engine._client.get = AsyncMock(return_value=fake_resp)
+
+    records = await engine.list_recent_calls(since)
+
+    assert [r.call_sid for r in records] == ["CAnew"]
+
+
+async def test_list_recent_calls_skips_rows_without_sid() -> None:
+    engine = _make_engine()
+    since = datetime.now(UTC) - timedelta(minutes=60)
+    fake_resp = _mock_response(200, {"data": [{"from": "+14155550000"}]})
+    engine._client.get = AsyncMock(return_value=fake_resp)
+
+    records = await engine.list_recent_calls(since)
+
+    assert records == []
+
+
+async def test_list_recent_calls_raises_on_error() -> None:
+    engine = _make_engine()
+    fake_resp = _mock_response(500, {"error": "server error"})
+    fake_resp.raise_for_status = MagicMock(side_effect=Exception("HTTP 500"))
+    engine._client.get = AsyncMock(return_value=fake_resp)
+
+    with pytest.raises(Exception, match="HTTP 500"):
+        await engine.list_recent_calls(datetime.now(UTC) - timedelta(minutes=60))
 
 
 # ---------------------------------------------------------------------------
