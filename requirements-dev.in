@@ -5,15 +5,15 @@
 # container; the in-container test toolchain lives in requirements-test.in)
 pre-commit>=4.6.0
 pytest-playwright>=0.8.0
-locust>=2.44.4
+locust>=2.45.0
 mutmut>=3.2.0
 detect-secrets>=1.5.0
 pip-audit>=2.10.1
-mypy>=2.1.0
+mypy>=2.2.0
 vulture>=2.16
-ruff>=0.15.20
+ruff>=0.15.21
 yamllint>=1.35.0
-boto3>=1.43.40
+boto3>=1.43.46
 requests>=2.33.0
 win11toast>=0.9; sys_platform == "win32"
-uv>=0.11
+uv>=0.11.28
