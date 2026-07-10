@@ -1,0 +1,91 @@
+name: Dependabot lock repair
+
+on:
+  pull_request:
+    branches: [master]
+    types: [opened, reopened, synchronize]
+    paths:
+      - "requirements.in"
+      - "requirements-test.in"
+      - "requirements-dev.in"
+      - "requirements.txt"
+      - "requirements-test.txt"
+      - "requirements-dev.txt"
+
+# Dependabot's Linux resolver strips branches emitted by `uv --universal`.
+# Repair the locks on the bot branch, then explicitly dispatch PR Gate because
+# pushes made with GITHUB_TOKEN intentionally do not emit another PR event.
+permissions:
+  actions: write
+  contents: write
+
+concurrency:
+  group: dependabot-lock-repair-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  repair:
+    if: >-
+      github.actor == 'dependabot[bot]' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      startsWith(github.event.pull_request.head.ref, 'dependabot/pip/')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the Dependabot branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install the uv version selected by Dependabot
+        shell: bash
+        run: |
+          set -euo pipefail
+          uv_version=$(sed -nE 's/^uv==([^ ;]+).*/\1/p' requirements-dev.txt | head -n 1)
+          if [[ ! "$uv_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+([a-zA-Z0-9.-]+)?$ ]]; then
+            echo "requirements-dev.txt does not contain a valid uv pin" >&2
+            exit 1
+          fi
+          python -m pip install --disable-pip-version-check "uv==$uv_version"
+
+      - name: Recompile universal locks
+        run: python scripts/recompile-locks.py
+
+      - name: Validate repaired environment markers
+        run: python scripts/check-lock-markers.py
+
+      - name: Commit repaired locks
+        id: commit
+        shell: bash
+        env:
+          HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set -euo pipefail
+          unexpected=$(git status --short | awk '$2 !~ /^requirements(-test|-dev)?\.txt$/ {print}')
+          if [[ -n "$unexpected" ]]; then
+            echo "Lock repair changed unexpected files:" >&2
+            echo "$unexpected" >&2
+            exit 1
+          fi
+          if git diff --quiet -- requirements.txt requirements-test.txt requirements-dev.txt; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "Universal locks already match; no repair commit needed."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add requirements.txt requirements-test.txt requirements-dev.txt
+          git commit -m "chore(deps): repair universal Python lockfiles"
+          git push origin "HEAD:$HEAD_BRANCH"
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Run PR Gate on the repaired commit
+        if: steps.commit.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
+        run: gh workflow run pr-gate.yml --ref "$HEAD_BRANCH"
