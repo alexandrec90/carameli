@@ -68,13 +68,26 @@ def test_dependabot_workflow_repairs_then_dispatches_gate():
     assert 'gh workflow run pr-gate.yml --ref "$HEAD_BRANCH"' in workflow
 
 
-def test_typescript_majors_remain_enabled_but_manual_gated():
+def test_frontend_toolchain_majors_are_delayed_grouped_and_manual_gated():
     config = (REPO_ROOT / ".github/dependabot.yml").read_text(encoding="utf-8")
     automerge = (REPO_ROOT / ".github/workflows/dependabot-automerge.yml").read_text(
         encoding="utf-8"
     )
 
     assert "dependency-name: typescript" not in config
+    assert "semver-major-days: 30" in config
+    assert "lint-typecheck-toolchain:" in config
+    assert config.index("lint-typecheck-toolchain:") < config.index("minor-and-patch:")
+    for pattern in (
+        '"typescript"',
+        '"typescript-eslint"',
+        '"@typescript-eslint/*"',
+        '"eslint"',
+        '"@eslint/*"',
+        '"eslint-plugin-*"',
+        '"eslint-import-resolver-*"',
+    ):
+        assert f"- {pattern}" in config
     assert "steps.meta.outputs.update-type == 'version-update:semver-major'" in automerge
     assert "needs-manual-merge" in automerge
 
