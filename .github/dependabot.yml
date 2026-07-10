@@ -4,6 +4,10 @@ updates:
     directory: /frontend
     schedule:
       interval: weekly
+    # Major updates intentionally remain enabled but outside the auto-merge
+    # group. Dependabot opens them individually; CI tests compatibility and the
+    # auto-merge workflow labels them `needs-manual-merge`. Do not add a
+    # semver-major ignore here: it would freeze future compatible upgrades.
     groups:
       # Keep the test-environment stack in lockstep — vitest majors must move
       # together with happy-dom and testing-library (see known-fixes.md: the

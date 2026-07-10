@@ -31,10 +31,13 @@ jobs:
       startsWith(github.event.pull_request.head.ref, 'dependabot/pip/')
     runs-on: ubuntu-latest
     steps:
-      - name: Check out the Dependabot branch
+      - name: Check out the Dependabot change with current base tooling
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.ref }}
+          # The bot branch can predate this workflow's repair script. GitHub's
+          # synthetic merge commit contains both the bot update and current
+          # master, and remains a fast-forward descendant of the bot head.
+          ref: ${{ github.event.pull_request.merge_commit_sha }}
           fetch-depth: 0
 
       - uses: actions/setup-python@v5

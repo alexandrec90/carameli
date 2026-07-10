@@ -63,8 +63,20 @@ def test_dependabot_workflow_repairs_then_dispatches_gate():
     assert "github.actor == 'dependabot[bot]'" in workflow
     assert "head.repo.full_name == github.repository" in workflow
     assert "startsWith(github.event.pull_request.head.ref, 'dependabot/pip/')" in workflow
+    assert "ref: ${{ github.event.pull_request.merge_commit_sha }}" in workflow
     assert "python scripts/recompile-locks.py" in workflow
     assert 'gh workflow run pr-gate.yml --ref "$HEAD_BRANCH"' in workflow
+
+
+def test_typescript_majors_remain_enabled_but_manual_gated():
+    config = (REPO_ROOT / ".github/dependabot.yml").read_text(encoding="utf-8")
+    automerge = (REPO_ROOT / ".github/workflows/dependabot-automerge.yml").read_text(
+        encoding="utf-8"
+    )
+
+    assert "dependency-name: typescript" not in config
+    assert "steps.meta.outputs.update-type == 'version-update:semver-major'" in automerge
+    assert "needs-manual-merge" in automerge
 
 
 def test_automerge_matches_dispatched_gate_to_current_pr_head():
