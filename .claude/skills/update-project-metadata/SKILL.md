@@ -20,6 +20,7 @@ Read the following files using the Read tool (in parallel where independent):
 
 - `docker-compose.yml`
 - `requirements.txt`
+- `requirements-test.txt`
 - `requirements-dev.txt`
 - `frontend/package.json`
 - `app/core/config.py`
@@ -45,7 +46,8 @@ Reference — what to look for in each injected section:
 | --- | --- |
 | `docker-compose.yml` | Service names, ports, volumes |
 | `requirements.txt` | Python runtime deps |
-| `requirements-dev.txt` | Dev/test deps |
+| `requirements-test.txt` | In-container test toolchain (baked into the Docker dev image) |
+| `requirements-dev.txt` | Host-only dev tooling (includes the test lock via `-r`) |
 | `frontend/package.json` | JS runtime deps, scripts |
 | `app/core/config.py` | Env vars and external service references |
 | `pytest.ini` | Test runner config |

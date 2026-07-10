@@ -50,6 +50,9 @@ _MISSING_TOOL = [
     "is not installed",
     "Cannot find",
     "could not be found",
+    # Docker's wording when `docker compose exec <svc> <cmd>` can't find the
+    # binary inside the container (a `bash -c` wrapper says "command not found").
+    "executable file not found",
 ]
 _ENV_ERROR = [
     "ConnectionRefusedError",
@@ -517,8 +520,12 @@ def digest_tests(
         if code == 0:
             continue
         lines = strip_ansi_lines(lines)
+        # Environmental skips only apply when the suite never ran. If a test
+        # summary is present, tests executed and the failures are code errors --
+        # a skip pattern (e.g. ModuleNotFoundError) appearing inside a failing
+        # test's traceback must not swallow the whole target as "skipped".
         skip = get_skip_reason(lines)
-        if skip:
+        if skip and not any(count_test_summary(lines)):
             skips.append((name, skip))
             continue
         any_failed = True

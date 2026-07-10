@@ -38,8 +38,13 @@ HOOK_NAMES = ("post-merge", "post-checkout", "post-commit")
 MANIFESTS = {
     "frontend/package-lock.json": ("npm",),
     "requirements.txt": ("pip", "docker"),
+    # The compose dev image target bakes in requirements-test.txt (in-container
+    # pytest toolchain), so a change to it makes the app container stale. The
+    # host venv installs the dev lock, which includes the test pins via -r.
+    "requirements-test.txt": ("docker",),
     "requirements-dev.txt": ("pip",),
     "requirements.in": ("lock",),
+    "requirements-test.in": ("lock",),
     "requirements-dev.in": ("lock",),
     "Dockerfile": ("docker",),
     "docker-compose.yml": ("docker",),
@@ -47,7 +52,7 @@ MANIFESTS = {
 }
 
 DOCKER_NOTICE = (
-    "[deps-sync] app container is now stale (requirements.txt / Dockerfile / compose "
+    "[deps-sync] app container is now stale (requirements*.txt / Dockerfile / compose "
     "changed) -> run the 'Docker: Rebuild App' or 'Start: Full Stack (Docker Compose)' task"
 )
 

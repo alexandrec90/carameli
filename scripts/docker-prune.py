@@ -2,9 +2,11 @@
 """Tears down containers, prunes Docker, and compacts the WSL VHDX.
 
 Order matters: prune (daemon up) -> stop Docker Desktop -> wsl --shutdown ->
-compact -> relaunch + verify engine. Stopping Docker Desktop before the shutdown
-gives Optimize-VHD exclusive access to the VHDX; verifying the engine afterward
-stops the script from reporting success on a wedged "Starting the Docker Engine".
+compact -> relaunch + verify engine -> compose up + wait for health. Stopping
+Docker Desktop before the shutdown gives Optimize-VHD exclusive access to the
+VHDX; verifying the engine afterward stops the script from reporting success on
+a wedged "Starting the Docker Engine"; the final compose up restores the stack
+that step 1 tore down, so the task round-trips back to a healthy stack.
 
 On failure writes output to logs/docker/prune.log; on success clears it.
 The VHDX compaction step is Windows/WSL-specific.
@@ -35,6 +37,25 @@ ARTIFACT = "prune.log"
 # engine (which is exactly what happened before this guard existed).
 ENGINE_POLL_TIMEOUT = 90
 ENGINE_POLL_INTERVAL = 5
+
+# After `compose up -d`, wait for healthchecks to settle. Slowest starters
+# (jambonz, freeswitch) take ~30-60s from existing images.
+STACK_POLL_TIMEOUT = 120
+STACK_POLL_INTERVAL = 5
+
+
+def stack_settled(entries) -> bool:
+    """True when the stack is up and no container is sick or still starting.
+
+    `entries` are (service, status) pairs from docker ps. Containers without a
+    healthcheck ("Up 10 seconds") count as settled; "(health: starting)" and
+    freshly-Created containers do not, so we don't declare success mid-boot.
+    """
+    if not entries:
+        return False
+    if dc.sick_services(entries):
+        return False
+    return not any(dc.STARTING_RE.search(status) for _, status in entries)
 
 
 def engine_down_error(recover_hint: str = "scripts/docker-restart-engine.py") -> list[str]:
@@ -166,6 +187,41 @@ def main(argv=None) -> int:
     else:
         errors += engine_down_error()
         print("  [WARN] Docker engine did not come back -- see recovery hint in artifact")
+
+    # --- Step 7: bring the stack back up and wait for it to settle ---
+    # Step 1's `compose down` removed the containers; without this the task ends
+    # with the stack down and the user has to remember `docker compose up -d`.
+    # Skipped when the engine never came back (compose would just error).
+    if ready:
+        if step("Restarting stack", ["docker", "compose", "up", "-d"]):
+            print(f"Waiting for stack to settle (timeout {STACK_POLL_TIMEOUT}s)...")
+
+            # all_containers=False: the one-shot init services (jambonz-db-init,
+            # minio-init) exit 0 by design; with -a their "Exited (0)" would read
+            # as sick forever. Crash-looping services still show as "Restarting".
+            def stack_probe() -> bool:
+                lines, code, timed_out = dc.docker_ps("{{.Names}}|{{.Status}}", all_containers=False)
+                if code != 0 or timed_out:
+                    return False
+                return stack_settled(dc.parse_status_entries(lines, dc.project_name()))
+
+            if dc.poll_until(stack_probe, timeout=STACK_POLL_TIMEOUT, interval=STACK_POLL_INTERVAL):
+                print("  Stack is up and healthy.")
+            else:
+                lines, _, _ = dc.docker_ps("{{.Names}}|{{.Status}}", all_containers=False)
+                entries = dc.parse_status_entries(lines, dc.project_name())
+                sick = dc.sick_services(entries) or [
+                    svc for svc, st in entries if dc.STARTING_RE.search(st)
+                ]
+                errors += [
+                    f"=== Stack did not settle within {STACK_POLL_TIMEOUT}s after compose up ===",
+                    f"Sick/starting services: {', '.join(sick) or '(none reported -- docker ps failed?)'}",
+                    "Diagnose with: python scripts/docker-status.py",
+                    "",
+                ]
+                print("  [WARN] Stack did not settle -- run scripts/docker-status.py to diagnose")
+    else:
+        print("Skipping stack restart -- engine is down.")
 
     if not errors:
         dc.clear_artifact(ARTIFACT)

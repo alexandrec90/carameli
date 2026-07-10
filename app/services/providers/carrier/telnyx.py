@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 from datetime import datetime
 
@@ -19,6 +20,11 @@ _TOLL_FREE_PREFIXES: frozenset[str] = frozenset({"800", "833", "844", "855", "86
 # single generous page and rely on the server-side time filter — the lookback
 # window is short (default 60 min) so one page covers it.
 _RECENT_MESSAGES_PAGE_SIZE = 250
+
+# A number order can settle asynchronously; when its response omits the
+# phone-number resource id we poll the owned-numbers listing briefly.
+_PROVISION_LOOKUP_ATTEMPTS = 5
+_PROVISION_LOOKUP_DELAY_S = 1.0
 
 
 class TelnyxCarrier:
@@ -83,9 +89,12 @@ class TelnyxCarrier:
         return [{"phone_number": item["phone_number"]} for item in data]
 
     async def provision_number(self, number: str, country_code: str = "US") -> dict:
+        # Telnyx sells numbers through number orders; POST /v2/phone_numbers does
+        # not exist (it 404s with error 10005). The order response carries the
+        # phone-number resource id that release_number / enable_sms need.
         resp = await self._client.post(
-            "/phone_numbers",
-            json={"phone_number": number},
+            "/number_orders",
+            json={"phone_numbers": [{"phone_number": number}]},
         )
         if resp.is_error:
             logger.error(
@@ -95,11 +104,42 @@ class TelnyxCarrier:
                 resp.text,
             )
             resp.raise_for_status()
-        record = resp.json()["data"]
+        order = resp.json()["data"]
+        entry: dict = next(
+            (p for p in order.get("phone_numbers", []) if p.get("phone_number") == number),
+            {},
+        )
+        provider_sid = entry.get("id") or await self._lookup_phone_number_id(number)
         return {
-            "provider_sid": record["id"],
-            "phone_number": record["phone_number"],
+            "provider_sid": provider_sid,
+            "phone_number": number,
         }
+
+    async def _lookup_phone_number_id(self, number: str) -> str:
+        """Resolve the phone-number resource id for a number we just ordered.
+
+        A still-pending order can omit the resource id from its response; the
+        owned-numbers listing has it once the purchase lands, so poll briefly.
+        """
+        for _ in range(_PROVISION_LOOKUP_ATTEMPTS):
+            resp = await self._client.get(
+                "/phone_numbers", params={"filter[phone_number]": number}
+            )
+            if resp.is_error:
+                logger.error(
+                    "Telnyx phone-number lookup failed: number=%s status=%s body=%s",
+                    number,
+                    resp.status_code,
+                    resp.text,
+                )
+                resp.raise_for_status()
+            data = resp.json().get("data", [])
+            if data:
+                return str(data[0]["id"])
+            await asyncio.sleep(_PROVISION_LOOKUP_DELAY_S)
+        raise RuntimeError(
+            f"Telnyx number order for {number} settled without a phone-number id"
+        )
 
     async def release_number(self, provider_sid: str) -> None:
         resp = await self._client.delete(f"/phone_numbers/{provider_sid}")

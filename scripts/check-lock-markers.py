@@ -29,7 +29,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 
 FIX_HINT = (
     "# fix: python -m uv pip compile --universal --python-version 3.12 "
-    "requirements.in -o requirements.txt (same for -dev; VS Code task "
+    "requirements.in -o requirements.txt (same for -test and -dev; VS Code task "
     "'Deps: Recompile Python Lockfiles')"
 )
 
@@ -39,6 +39,10 @@ FIX_HINT = (
 # strips the markers or drops the win32-only lines entirely.
 SENTINELS: dict[str, dict[str, str]] = {
     "requirements.txt": {
+        "uvloop": "sys_platform != 'win32'",
+        "colorama": "sys_platform == 'win32'",
+    },
+    "requirements-test.txt": {
         "uvloop": "sys_platform != 'win32'",
         "colorama": "sys_platform == 'win32'",
     },

@@ -31,6 +31,13 @@ pytestmark = [
     ),
 ]
 
+# Telnyx has no Twilio-style magic test numbers (+1500555xxxx gets rejected with
+# "Invalid source number") — SMS tests need real DIDs owned by the account.
+_needs_sms_numbers = pytest.mark.skipif(
+    not (settings.telnyx_test_from_number and settings.telnyx_test_to_number),
+    reason="Set TELNYX_TEST_FROM_NUMBER and TELNYX_TEST_TO_NUMBER (owned Telnyx DIDs)",
+)
+
 
 def _make_carrier() -> TelnyxCarrier:
     return TelnyxCarrier(
@@ -73,11 +80,12 @@ async def test_provision_and_release_number(carrier: TelnyxCarrier) -> None:
     await carrier.release_number(provider_sid)
 
 
+@_needs_sms_numbers
 async def test_send_sms_sandbox(carrier: TelnyxCarrier) -> None:
-    """Send an SMS using Telnyx sandbox magic numbers and verify no exception."""
+    """Send an SMS between the account's own test DIDs and verify no exception."""
     result = await carrier.send_sms(
-        from_="+15005550006",
-        to="+15005550007",
+        from_=settings.telnyx_test_from_number,
+        to=settings.telnyx_test_to_number,
         body="Carameli sandbox test",
     )
     assert result is not None
@@ -96,6 +104,7 @@ async def test_send_sms_invalid_from_raises(carrier: TelnyxCarrier) -> None:
 
 
 @pytest.mark.chargeable
+@_needs_sms_numbers
 @pytest.mark.skipif(
     not os.getenv("NGROK_URL"),
     reason="Requires NGROK_URL for live callback testing",
@@ -106,8 +115,8 @@ async def test_sms_delivery_receipt_schema(
 ) -> None:
     """Send SMS and verify a live delivery receipt updates SmsMessage.delivery_status."""
     result = await carrier.send_sms(
-        from_="+15005550006",
-        to="+15005550007",
+        from_=settings.telnyx_test_from_number,
+        to=settings.telnyx_test_to_number,
         body="Carameli sandbox delivery receipt schema test",
     )
     message_sid = str(result.get("sid") or "")
@@ -119,8 +128,8 @@ async def test_sms_delivery_receipt_schema(
         phone_line_id=None,
         message_sid=message_sid,
         direction="outbound",
-        from_number="+15005550006",
-        to_number="+15005550007",
+        from_number=settings.telnyx_test_from_number,
+        to_number=settings.telnyx_test_to_number,
         body="Carameli sandbox delivery receipt schema test",
         delivery_status="queued",
     )

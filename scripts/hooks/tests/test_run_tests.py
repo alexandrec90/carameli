@@ -96,3 +96,41 @@ def test_resolve_argv_windows_npm_cmd(monkeypatch):
 def test_resolve_argv_non_windows_unchanged(monkeypatch):
     monkeypatch.setattr(rt.os, "name", "posix")
     assert rt.resolve_argv(["npm", "run", "test:run"]) == ["npm", "run", "test:run"]
+
+
+def test_telnyx_sandbox_argvs_exclude_chargeable_tests():
+    # Money guardrail: with live credentials, the chargeable provision test buys
+    # a real phone number. Neither routine runner path may ever include it.
+    for argv in (rt._LOCAL_TELNYX_SANDBOX_ARGV, rt._CI_TELNYX_SANDBOX_ARGV):
+        # Adjacent-pair check: the CI argv also contains `python -m pytest`,
+        # so a bare index("-m") would find the wrong flag.
+        assert ("-m", "not chargeable") in zip(argv, argv[1:])
+
+
+# ---------------------------------------------------------------------------
+# critical_skip_lines -- a skipped backend suite must fail the run, not pass it
+# ---------------------------------------------------------------------------
+
+
+def test_critical_skip_lines_pytest_not_installed():
+    lines = rt.critical_skip_lines([("pytest", "not installed")])
+    assert len(lines) == 2
+    assert "[FAIL]" in lines[0] and "'pytest'" in lines[0] and "did NOT run" in lines[0]
+    # The fix hint must be a runnable command (diagnostics.md section 5 spirit).
+    assert "pip install -r requirements-dev.txt" in lines[1]
+
+
+def test_critical_skip_lines_pytest_environment_error():
+    # Environment errors (stack down) still fail the run, but the pip-install
+    # hint would be wrong -- only the FAIL line is emitted.
+    lines = rt.critical_skip_lines([("pytest", "environment error")])
+    assert len(lines) == 1
+    assert "[FAIL]" in lines[0] and "environment error" in lines[0]
+
+
+def test_critical_skip_lines_ignores_non_critical_targets():
+    assert rt.critical_skip_lines([("telnyx-sandbox", "not installed")]) == []
+
+
+def test_critical_skip_lines_empty():
+    assert rt.critical_skip_lines([]) == []

@@ -22,9 +22,11 @@ UP_TIMEOUT = 120
 HEALTH_TIMEOUT = 90
 HEALTH_INTERVAL = 5
 
-_BROKEN_RE = re.compile(r"unhealthy|Exited|exited|Dead|dead", re.IGNORECASE)
+# `Exited (0)` is excluded from both failure patterns: one-shot init services
+# exit 0 on success (see docker_common.UNHEALTHY_RE).
+_BROKEN_RE = re.compile(r"unhealthy|exited(?! \(0\))|dead", re.IGNORECASE)
 _STARTING_RE = re.compile(r"starting|Created|created", re.IGNORECASE)
-_FAILURE_RE = re.compile(r"unhealthy|Exited|exited|Dead|dead|Created|created", re.IGNORECASE)
+_FAILURE_RE = re.compile(r"unhealthy|exited(?! \(0\))|dead|created", re.IGNORECASE)
 
 
 def _fail(message: str, body=None) -> int:

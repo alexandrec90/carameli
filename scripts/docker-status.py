@@ -22,7 +22,9 @@ APP_LOGS = "app-logs.log"
 # script (per .claude/rules/diagnostics.md) instead of guessing how to regenerate it.
 SOURCE = "# source: scripts/docker-status.py"
 
-_SICK_RE = re.compile(r"unhealthy|Exited|exited|Restarting", re.IGNORECASE)
+# `Exited (0)` is excluded: one-shot init services exit 0 on success (see
+# docker_common.UNHEALTHY_RE).
+_SICK_RE = re.compile(r"unhealthy|exited(?! \(0\))|Restarting", re.IGNORECASE)
 
 
 def main() -> int:

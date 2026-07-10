@@ -34,7 +34,12 @@ services:
         condition: service_healthy
 
   app:
-    build: .
+    # The dev target bakes requirements-test.txt into the image so
+    # `docker compose exec app pytest` (scripts/run-tests.py) survives rebuilds.
+    # Production builds use the default (last) `runtime` target instead.
+    build:
+      context: .
+      target: dev
     image: carameli-app
     restart: unless-stopped
     stop_grace_period: 3s
@@ -70,7 +75,9 @@ services:
       start_period: 15s
 
   worker:
-    build: .
+    build:
+      context: .
+      target: dev
     image: carameli-app
     restart: unless-stopped
     stop_grace_period: 3s

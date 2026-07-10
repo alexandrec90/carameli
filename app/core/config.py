@@ -23,6 +23,11 @@ class Settings(BaseSettings):
     telnyx_webhook_secret: str = ""
     telnyx_messaging_profile_id: str = ""
     telnyx_sandbox: bool = False  # TELNYX_SANDBOX=1 → no real records (reconciliation returns [])
+    # Owned Telnyx numbers for the live sandbox SMS tests. Telnyx has no Twilio-style
+    # magic test numbers (+1500555xxxx is rejected with "Invalid source number"), so
+    # the from-number must be a real DID on the account's messaging profile.
+    telnyx_test_from_number: str = ""
+    telnyx_test_to_number: str = ""
 
     # Jambonz (populated by Track C)
     jambonz_base_url: str = "http://localhost:3000"

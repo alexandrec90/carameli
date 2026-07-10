@@ -59,6 +59,9 @@ _CI_HOOK_ARGV = ["python", "-m", "pytest", "scripts/hooks/tests", "-q", "--color
 _CI_FRONTEND_ARGV = ["npm", "--prefix", "frontend", "run", "test:run"]
 _LOCAL_HOOK_ARGV = ["python", "-m", "pytest", "scripts/hooks/tests", "-q", "--color=no"]
 _LOCAL_FRONTEND_ARGV = ["npm", "--prefix", "frontend", "run", "test:run"]
+# Both telnyx argvs exclude `chargeable` tests: with real credentials configured,
+# test_provision_and_release_number BUYS a real number per run. Chargeable tests
+# are opt-in only (run the file manually with -k/-m) -- see .claude/rules/testing.md.
 _LOCAL_TELNYX_SANDBOX_ARGV = [
     "docker",
     "compose",
@@ -69,6 +72,8 @@ _LOCAL_TELNYX_SANDBOX_ARGV = [
     "app",
     "pytest",
     "tests/integration/test_telnyx_sandbox.py",
+    "-m",
+    "not chargeable",
     "-v",
     "--tb=short",
     "--no-header",
@@ -79,12 +84,18 @@ _CI_TELNYX_SANDBOX_ARGV = [
     "-m",
     "pytest",
     "tests/integration/test_telnyx_sandbox.py",
+    "-m",
+    "not chargeable",
     "-v",
     "--tb=short",
     "--no-header",
     "--color=no",
 ]
 _VALID_TARGETS = {"pytest", "hook-tests", "frontend-tests", "telnyx-sandbox"}
+# Targets whose silent skip invalidates the whole run. "pytest" is the entire
+# backend suite: if it is skipped (pytest missing from the app container, stack
+# down), a green banner would report success while zero backend tests ran.
+_CRITICAL_TARGETS = {"pytest"}
 # Order is cosmetic only (results are merged into one dict); pytest first so its
 # "Running pytest..." banner leads the interleaved output.
 _ALL_TARGETS = ("pytest", "hook-tests", "frontend-tests", "telnyx-sandbox")
@@ -236,6 +247,26 @@ def run_all() -> dict[str, tuple[list[str], int]]:
     return results
 
 
+def critical_skip_lines(skips: list[tuple[str, str]]) -> list[str]:
+    """Loud terminal lines for skipped targets that invalidate the run. Pure.
+
+    Environment noise stays out of the artifact (.claude/rules/diagnostics.md §3),
+    but a skipped critical target must still fail the run: the caller treats a
+    non-empty return as a failure.
+    """
+    lines: list[str] = []
+    for name, reason in skips:
+        if name not in _CRITICAL_TARGETS:
+            continue
+        lines.append(f"[FAIL] target '{name}' was skipped ({reason}) -- its tests did NOT run.")
+        if reason == "not installed":
+            lines.append(
+                "  fix: docker compose exec -T app pip install -r requirements-dev.txt"
+                " (durable: rebuild -- docker compose build app)"
+            )
+    return lines
+
+
 def run_ci() -> dict[str, tuple[list[str], int]]:
     print("\nRunning pytest + hook tests + frontend tests (CI)...")
     return {
@@ -292,6 +323,13 @@ def main() -> int:
             print("  (fix locally with /fix-tests)")
     else:
         any_failed, text, skips = diagnostics.digest_tests(results, label)
+
+    critical = critical_skip_lines(skips)
+    if critical:
+        any_failed = True
+        print()
+        for line in critical:
+            print(line)
 
     skipped = {s for s, _ in skips}
     statuses = [

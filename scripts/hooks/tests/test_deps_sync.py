@@ -11,8 +11,10 @@ def _seed_manifests(root, lock=b"lock-v1", req=b"req-v1", dev=b"dev-v1"):
     (root / "frontend").mkdir(parents=True, exist_ok=True)
     (root / "frontend" / "package-lock.json").write_bytes(lock)
     (root / "requirements.txt").write_bytes(req)
+    (root / "requirements-test.txt").write_bytes(b"test-v1")
     (root / "requirements-dev.txt").write_bytes(dev)
     (root / "requirements.in").write_bytes(b"req-in-v1")
+    (root / "requirements-test.in").write_bytes(b"test-in-v1")
     (root / "requirements-dev.in").write_bytes(b"dev-in-v1")
     (root / "Dockerfile").write_bytes(b"FROM python:3.12")
     (root / "docker-compose.yml").write_bytes(b"services: {}")
@@ -121,6 +123,49 @@ def test_requirements_change_installs_and_notifies_docker(tmp_path, monkeypatch,
     out = capsys.readouterr().out
     assert len(calls) == 1 and "pip" in calls[0]  # venv reinstalled...
     assert "container is now stale" in out  # ...and the container flagged
+
+
+def test_dev_requirements_change_installs_without_docker_notice(tmp_path, monkeypatch, capsys):
+    # The dev lock is host-only (the container bakes requirements-test.txt), so
+    # a dev-lock change reinstalls the venv but must not cry container-stale.
+    _seed_manifests(tmp_path)
+    state = tmp_path / ".git" / "deps-fingerprint.json"
+    state.parent.mkdir()
+    monkeypatch.setattr(ds, "REPO_ROOT", tmp_path)
+    monkeypatch.setattr(ds, "STATE_FILE", state)
+    ds.main([])  # baseline
+
+    class Result:
+        returncode = 0
+
+    calls: list[list[str]] = []
+    monkeypatch.setattr(ds.subprocess, "run", lambda argv, cwd: (calls.append(argv), Result())[1])
+
+    (tmp_path / "requirements-dev.txt").write_bytes(b"dev-v2")
+    assert ds.main([]) == 0
+    out = capsys.readouterr().out
+    assert len(calls) == 1 and "pip" in calls[0]
+    assert "container is now stale" not in out
+
+
+def test_test_lock_change_notifies_docker_without_install(tmp_path, monkeypatch, capsys):
+    # requirements-test.txt is baked into the container image only -- a change
+    # flags the container stale but plans no host install.
+    _seed_manifests(tmp_path)
+    state = tmp_path / ".git" / "deps-fingerprint.json"
+    state.parent.mkdir()
+    monkeypatch.setattr(ds, "REPO_ROOT", tmp_path)
+    monkeypatch.setattr(ds, "STATE_FILE", state)
+    ds.main([])  # baseline
+    monkeypatch.setattr(
+        ds.subprocess,
+        "run",
+        lambda *a, **k: (_ for _ in ()).throw(AssertionError("must not install")),
+    )
+
+    (tmp_path / "requirements-test.txt").write_bytes(b"test-v2")
+    assert ds.main([]) == 0
+    assert "container is now stale" in capsys.readouterr().out
 
 
 def test_plan_skips_npm_when_not_on_path(tmp_path, monkeypatch, capsys):

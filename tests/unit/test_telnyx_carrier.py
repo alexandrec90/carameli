@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from app.services.providers.carrier import telnyx as telnyx_module
 from app.services.providers.carrier.telnyx import TelnyxCarrier
 
 pytestmark = pytest.mark.asyncio(loop_scope="session")
@@ -71,14 +72,73 @@ async def test_search_numbers_raises_on_error() -> None:
 # ---------------------------------------------------------------------------
 
 
-async def test_provision_number_returns_sid_and_number() -> None:
+async def test_provision_number_orders_and_returns_sid_and_number() -> None:
+    # Telnyx sells numbers via POST /number_orders (POST /phone_numbers 404s);
+    # the phone-number resource id comes from the order's phone_numbers entries.
     carrier = _make_carrier()
-    fake_resp = _mock_response(200, {"data": {"id": "PN123abc", "phone_number": "+14155550100"}})
+    fake_resp = _mock_response(
+        200,
+        {
+            "data": {
+                "id": "order123",
+                "status": "success",
+                "phone_numbers": [{"id": "PN123abc", "phone_number": "+14155550100"}],
+            }
+        },
+    )
     carrier._client.post = AsyncMock(return_value=fake_resp)
 
     result = await carrier.provision_number("+14155550100")
 
     assert result == {"provider_sid": "PN123abc", "phone_number": "+14155550100"}
+    call_args = carrier._client.post.call_args
+    assert call_args[0][0] == "/number_orders"
+    assert call_args.kwargs["json"] == {"phone_numbers": [{"phone_number": "+14155550100"}]}
+
+
+async def test_provision_number_pending_order_falls_back_to_lookup() -> None:
+    # A pending order can omit the resource id; it is resolved from the
+    # owned-numbers listing instead.
+    carrier = _make_carrier()
+    order_resp = _mock_response(
+        200,
+        {
+            "data": {
+                "id": "order123",
+                "status": "pending",
+                "phone_numbers": [{"phone_number": "+14155550100"}],
+            }
+        },
+    )
+    lookup_resp = _mock_response(
+        200, {"data": [{"id": "PN123abc", "phone_number": "+14155550100"}]}
+    )
+    carrier._client.post = AsyncMock(return_value=order_resp)
+    carrier._client.get = AsyncMock(return_value=lookup_resp)
+
+    result = await carrier.provision_number("+14155550100")
+
+    assert result == {"provider_sid": "PN123abc", "phone_number": "+14155550100"}
+    carrier._client.get.assert_awaited_once()
+    params = carrier._client.get.call_args.kwargs["params"]
+    assert params == {"filter[phone_number]": "+14155550100"}
+
+
+async def test_provision_number_lookup_exhausted_raises(monkeypatch) -> None:
+    monkeypatch.setattr(telnyx_module, "_PROVISION_LOOKUP_ATTEMPTS", 2)
+    monkeypatch.setattr(telnyx_module, "_PROVISION_LOOKUP_DELAY_S", 0.0)
+    carrier = _make_carrier()
+    order_resp = _mock_response(
+        200, {"data": {"id": "order123", "status": "pending", "phone_numbers": []}}
+    )
+    empty_lookup = _mock_response(200, {"data": []})
+    carrier._client.post = AsyncMock(return_value=order_resp)
+    carrier._client.get = AsyncMock(return_value=empty_lookup)
+
+    with pytest.raises(RuntimeError, match="phone-number id"):
+        await carrier.provision_number("+14155550100")
+
+    assert carrier._client.get.await_count == 2
 
 
 async def test_provision_number_raises_on_error() -> None:

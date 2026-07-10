@@ -446,10 +446,10 @@
     },
     {
       "label": "Deps: Recompile Python Lockfiles",
-      "detail": "Recompile requirements.txt / requirements-dev.txt from the .in floors (uv, universal). Run after editing requirements*.in.",
+      "detail": "Recompile requirements.txt / requirements-test.txt / requirements-dev.txt from the .in floors (uv, universal). Run after editing requirements*.in.",
       "type": "process",
       "command": "python",
-      "args": ["scripts/notify-wrap.py", "Deps: Recompile Python Lockfiles", "--", "pwsh", "-ExecutionPolicy", "Bypass", "-Command", ".venv\\Scripts\\python.exe -m uv pip compile --universal --python-version 3.12 requirements.in -o requirements.txt && .venv\\Scripts\\python.exe -m uv pip compile --universal --python-version 3.12 requirements-dev.in -o requirements-dev.txt -c requirements.txt"],
+      "args": ["scripts/notify-wrap.py", "Deps: Recompile Python Lockfiles", "--", "pwsh", "-ExecutionPolicy", "Bypass", "-Command", ".venv\\Scripts\\python.exe -m uv pip compile --universal --python-version 3.12 requirements.in -o requirements.txt && .venv\\Scripts\\python.exe -m uv pip compile --universal --python-version 3.12 requirements-test.in -o requirements-test.txt -c requirements.txt && .venv\\Scripts\\python.exe -m uv pip compile --universal --python-version 3.12 requirements-dev.in -o requirements-dev.txt -c requirements-test.txt"],
       "presentation": {
         "reveal": "always",
         "panel": "shared",

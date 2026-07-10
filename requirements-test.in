@@ -1,0 +1,18 @@
+-r requirements.in
+
+
+# Test toolchain baked into the app container image (Dockerfile `dev` target),
+# so `docker compose exec app pytest` works. Keep this to what the in-container
+# suite (tests/, minus the addopts-ignored e2e/load dirs) actually needs --
+# host-only tooling (ruff, mypy, playwright, locust, ...) belongs in
+# requirements-dev.in, which includes this file.
+pytest>=9.0.3
+pytest-asyncio>=1.4.0
+pytest-xdist>=3.5.0
+pytest-testmon>=2.1.0
+pytest-timeout>=2.3.0
+pytest-benchmark>=4.0.0
+pytest-mock>=3.14.0
+hypothesis>=6.156.1
+schemathesis>=4.22.3
+limits>=2.0.0

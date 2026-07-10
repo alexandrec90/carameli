@@ -1,21 +1,12 @@
--r requirements.in
+-r requirements-test.in
 
 
-# Local developer tooling (host machine)
+# Local developer tooling (host machine only -- never installed in the
+# container; the in-container test toolchain lives in requirements-test.in)
 pre-commit>=4.6.0
-limits>=2.0.0
-pytest>=9.0.3
-pytest-asyncio>=1.4.0
-pytest-xdist>=3.5.0
-pytest-testmon>=2.1.0
-pytest-timeout>=2.3.0
-pytest-benchmark>=4.0.0
-pytest-mock>=3.14.0
 pytest-playwright>=0.8.0
-hypothesis>=6.156.1
 locust>=2.44.4
 mutmut>=3.2.0
-schemathesis>=4.22.3
 detect-secrets>=1.5.0
 pip-audit>=2.10.1
 mypy>=2.1.0

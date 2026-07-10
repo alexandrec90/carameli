@@ -15,6 +15,14 @@ def test_status_source_header():
     assert status.SOURCE.startswith("# source: ")
 
 
+def test_status_sick_re_exited_zero_is_healthy():
+    # One-shot init services (minio-init, jambonz-db-init) exit 0 on success and
+    # must not land in health.log's "Unhealthy/exited services" triage.
+    assert not status._SICK_RE.search("Exited (0) About an hour ago")
+    assert status._SICK_RE.search("Exited (1) 5 minutes ago")
+    assert status._SICK_RE.search("Up 2 minutes (unhealthy)")
+
+
 def test_migrate_app_running():
     assert migrate.app_running(["Up 3 minutes (healthy)"]) is True
     assert migrate.app_running(["running"]) is True
@@ -54,6 +62,19 @@ def test_prune_deep_removes_all_unused():
     argvs = [argv for _, argv in prune.prune_steps(deep=True)]
     assert ["docker", "image", "prune", "-af"] in argvs
     assert ["docker", "builder", "prune", "-af"] in argvs
+
+
+def test_prune_stack_settled():
+    # Settled = at least one container, none sick, none still starting.
+    assert prune.stack_settled([]) is False
+    assert prune.stack_settled([("app", "Up 30 seconds (healthy)")]) is True
+    # No-healthcheck services ("Up N seconds" plain) count as settled.
+    assert prune.stack_settled([("worker", "Up 30 seconds"), ("app", "Up 1 minute (healthy)")]) is True
+    # Mid-boot healthcheck must NOT settle -- jambonz takes ~30-60s.
+    assert prune.stack_settled([("jambonz", "Up 5 seconds (health: starting)")]) is False
+    # Sick containers never settle.
+    assert prune.stack_settled([("rtpengine", "Restarting (255) 2 seconds ago")]) is False
+    assert prune.stack_settled([("app", "Up (healthy)"), ("db", "Up (unhealthy)")]) is False
 
 
 def test_prune_never_touches_volumes():

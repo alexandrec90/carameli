@@ -29,6 +29,18 @@ def test_sick_services_default_pattern():
     assert dc.sick_services(entries) == ["redis", "db"]
 
 
+def test_sick_services_exited_zero_is_healthy():
+    # One-shot init services (minio-init, jambonz-db-init) exit 0 on success;
+    # only nonzero exit codes (or a bare "Exited") count as sick.
+    entries = [
+        ("minio-init", "Exited (0) About an hour ago"),
+        ("jambonz-db-init", "Exited (0) About an hour ago"),
+        ("db", "Exited (137) 5 minutes ago"),
+        ("worker", "Exited"),
+    ]
+    assert dc.sick_services(entries) == ["db", "worker"]
+
+
 def test_sick_services_dedupes_preserving_order():
     entries = [("app", "unhealthy"), ("app", "Exited"), ("db", "dead")]
     assert dc.sick_services(entries) == ["app", "db"]

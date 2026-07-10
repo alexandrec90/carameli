@@ -51,6 +51,16 @@ def test_get_skip_reason_missing_tool():
     assert diag.get_skip_reason(["command not found: ruff"]) == "not installed"
 
 
+def test_get_skip_reason_docker_exec_missing_binary():
+    # `docker compose exec app pytest` when the binary is missing from the
+    # container fails with Docker's OCI wording, not bash's "command not found".
+    line = (
+        "OCI runtime exec failed: exec failed: unable to start container process: "
+        'exec: "pytest": executable file not found in $PATH'
+    )
+    assert diag.get_skip_reason([line]) == "not installed"
+
+
 def test_get_skip_reason_env_error():
     assert diag.get_skip_reason(["connection refused"]) == "environment error"
 
@@ -61,6 +71,35 @@ def test_get_skip_reason_real_error():
 
 def test_get_skip_reason_empty():
     assert diag.get_skip_reason([]) is None
+
+
+# ---------------------------------------------------------------------------
+# digest_tests -- skip classification must not swallow real test failures
+# ---------------------------------------------------------------------------
+
+
+def test_digest_tests_reports_failures_even_with_skip_pattern_in_output():
+    # Regression: a Telnyx 404 body contains "could not be found", which matches
+    # a _MISSING_TOOL pattern -- but the summary line proves the suite ran, so
+    # the 2 failures are code errors, not an environmental skip.
+    lines = [
+        "tests/integration/test_telnyx_sandbox.py::test_provision FAILED",
+        'E   httpx.HTTPStatusError: Client error "404 Not Found"',
+        '  "detail": "The requested resource or URL could not be found.",',
+        "==== 2 failed, 3 passed, 1 skipped in 6.85s ====",
+    ]
+    failed, text, skips = diag.digest_tests({"telnyx-sandbox": (lines, 1)}, "label")
+    assert failed
+    assert skips == []
+    assert "# telnyx-sandbox" in text
+
+
+def test_digest_tests_skips_when_suite_never_ran():
+    lines = ['OCI runtime exec failed: exec: "pytest": executable file not found in $PATH']
+    failed, text, skips = diag.digest_tests({"telnyx-sandbox": (lines, 1)}, "label")
+    assert not failed
+    assert text == ""
+    assert skips == [("telnyx-sandbox", "not installed")]
 
 
 def test_source_header():

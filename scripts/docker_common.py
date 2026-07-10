@@ -22,7 +22,9 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 DOCKER_LOG_DIR = REPO_ROOT / "logs" / "docker"
 
 # Statuses that mean a container is broken vs still coming up.
-UNHEALTHY_RE = re.compile(r"unhealthy|Exited|exited|Dead|dead|Restarting", re.IGNORECASE)
+# `Exited (0)` is excluded: one-shot init services (minio-init, jambonz-db-init)
+# exit 0 on success, which is their healthy end state, not a failure.
+UNHEALTHY_RE = re.compile(r"unhealthy|exited(?! \(0\))|dead|Restarting", re.IGNORECASE)
 STARTING_RE = re.compile(r"starting|Created|created", re.IGNORECASE)
 
 
