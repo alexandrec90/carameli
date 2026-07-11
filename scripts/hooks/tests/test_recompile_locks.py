@@ -130,6 +130,20 @@ def test_dependabot_watches_actions_and_docker_ecosystems():
     assert "package-ecosystem: docker" in config
 
 
+def test_python_base_image_is_never_bot_bumped():
+    # Docker tags make 3.12→3.14 a semver-minor, which auto-merged (PR #43)
+    # against locks compiled for 3.12 with no image build in CI. The runtime
+    # moves with the locks and CI config, deliberately.
+    config = (REPO_ROOT / ".github/dependabot.yml").read_text(encoding="utf-8")
+    dockerfile = (REPO_ROOT / "Dockerfile").read_text(encoding="utf-8")
+
+    docker_block = config[config.index("package-ecosystem: docker") :]
+    assert 'dependency-name: "python"' in docker_block
+    assert "version-update:semver-minor" in docker_block
+    assert "python:3.14" not in dockerfile
+    assert dockerfile.count("FROM python:3.12-slim") == 2
+
+
 def test_pr_gate_typechecks_builds_and_runs_hook_tests():
     # Unit tests alone let compile breaks through (react-router 7 and
     # tailwind 4 both merged green while breaking tsc/vite build); the gate
