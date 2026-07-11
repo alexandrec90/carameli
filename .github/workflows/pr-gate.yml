@@ -54,7 +54,7 @@ jobs:
         run: pytest tests/integration/test_full_flows.py tests/integration/test_contract.py -x -q --tb=short --junit-xml=reports/junit-integration.xml
       - name: Upload test results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: test-results-backend
           path: reports/
