@@ -1,21 +1,30 @@
 name: Dependabot auto-merge
 
-# Auto-merges patch/minor Dependabot PRs once the PR Gate passes.
+# Auto-merges Dependabot PRs once the PR Gate passes:
+#   - patch/minor bumps of anything
+#   - major bumps where every updated dependency is a devDependency
+#     (dev tooling can only break CI, and the PR Gate just verified CI)
+# Majors that touch a runtime (production or transitive) dependency are
+# labelled `needs-manual-merge` and stay open for review.
 #
 # This repo is on a plan without branch protection, so GitHub's native
 # "auto-merge" (which gates on required checks) is unavailable. Instead we
 # split the work in two:
 #
-#   1. classify (on the PR itself) uses dependabot/fetch-metadata to read the
-#      semver bump type and labels the PR: `automerge` for patch/minor,
-#      `needs-manual-merge` for majors (which stay for you to review).
+#   1. classify (on the PR itself) reads dependabot/fetch-metadata's
+#      per-dependency JSON and labels the PR `automerge` or
+#      `needs-manual-merge` per the policy above.
 #   2. merge (on PR Gate completion) merges the PR — but only if PR Gate
-#      succeeded AND the PR carries the `automerge` label. A workflow-dispatch
-#      run is accepted only for a repaired pip branch whose current head SHA is
-#      exactly the commit tested by PR Gate (see dependabot-lock-repair.yml).
+#      succeeded on the PR's current head AND the PR carries the `automerge`
+#      label.
 #
-# Majors are never merged automatically. If a patch/minor bump fails PR Gate,
-# it simply stays open with its `automerge` label and no merge happens.
+# Repaired pip branches never reach the merge job here: a PR Gate run
+# dispatched with GITHUB_TOKEN emits no workflow_run event (GitHub's
+# recursion guard), so dependabot-lock-repair.yml watches the run it
+# dispatched and merges the PR itself.
+#
+# If an auto-mergeable bump fails PR Gate, it simply stays open with its
+# `automerge` label and no merge happens.
 
 on:
   pull_request:
@@ -44,37 +53,39 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Label patch/minor as auto-mergeable
-        if: >-
-          steps.meta.outputs.update-type == 'version-update:semver-patch' ||
-          steps.meta.outputs.update-type == 'version-update:semver-minor'
+      - name: Label by bump type and dependency scope
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh pr edit "$PR_URL" --add-label automerge
-
-      - name: Label majors for manual review
-        if: steps.meta.outputs.update-type == 'version-update:semver-major'
-        env:
-          PR_URL: ${{ github.event.pull_request.html_url }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh pr edit "$PR_URL" --add-label needs-manual-merge
+          UPDATED_DEPS_JSON: ${{ steps.meta.outputs.updated-dependencies-json }}
+        run: |
+          set -euo pipefail
+          # Automerge only when every updated dependency is a patch/minor, or
+          # a major confined to devDependencies. Unknown update types fall
+          # through to manual review.
+          label=$(jq -r '
+            if length > 0 and all(.[];
+                .updateType == "version-update:semver-patch" or
+                .updateType == "version-update:semver-minor" or
+                (.updateType == "version-update:semver-major" and
+                 .dependencyType == "direct:development"))
+            then "automerge"
+            else "needs-manual-merge"
+            end' <<<"$UPDATED_DEPS_JSON")
+          gh pr edit "$PR_URL" --add-label "$label"
 
   merge:
     name: Merge if PR Gate passed
     if: >-
       github.event_name == 'workflow_run' &&
       github.event.workflow_run.conclusion == 'success' &&
-      ((github.event.workflow_run.event == 'pull_request' &&
-        github.event.workflow_run.actor.login == 'dependabot[bot]') ||
-       (github.event.workflow_run.event == 'workflow_dispatch' &&
-        startsWith(github.event.workflow_run.head_branch, 'dependabot/pip/')))
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.actor.login == 'dependabot[bot]'
     runs-on: ubuntu-latest
     steps:
       - name: Merge auto-mergeable PR for this branch
         env:
           HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
-          RUN_EVENT: ${{ github.event.workflow_run.event }}
           RUN_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
           REPO: ${{ github.repository }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -93,13 +104,13 @@ jobs:
             echo "PR #$number is not authored by Dependabot; refusing to merge."
             exit 1
           fi
-          if [ "$RUN_EVENT" = "workflow_dispatch" ] && [ "$head_sha" != "$RUN_HEAD_SHA" ]; then
-            echo "PR #$number moved after PR Gate tested $RUN_HEAD_SHA; refusing to merge."
-            exit 1
+          if [ "$head_sha" != "$RUN_HEAD_SHA" ]; then
+            echo "PR #$number moved past the gated commit $RUN_HEAD_SHA; the newer head's own PR Gate run owns it."
+            exit 0
           fi
           has_automerge=$(echo "$pr" | jq -r '[.labels[].name] | index("automerge") // empty')
           if [ -z "$has_automerge" ]; then
-            echo "PR #$number is not labelled 'automerge' (likely a major); leaving for manual review."
+            echo "PR #$number is not labelled 'automerge' (likely a runtime major); leaving for manual review."
             exit 0
           fi
           echo "PR Gate passed and PR #$number is auto-mergeable; merging."

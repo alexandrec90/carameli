@@ -15,9 +15,14 @@ on:
 # Dependabot's Linux resolver strips branches emitted by `uv --universal`.
 # Repair the locks on the bot branch, then explicitly dispatch PR Gate because
 # pushes made with GITHUB_TOKEN intentionally do not emit another PR event.
+# The same recursion guard suppresses the dispatched run's workflow_run event,
+# so dependabot-automerge.yml can never see it — this workflow watches the run
+# it dispatched and, when it passes, merges the PR itself (same guards as the
+# auto-merge workflow: Dependabot author, unchanged head, `automerge` label).
 permissions:
   actions: write
   contents: write
+  pull-requests: write
 
 concurrency:
   group: dependabot-lock-repair-${{ github.event.pull_request.number }}
@@ -25,6 +30,7 @@ concurrency:
 
 jobs:
   repair:
+    timeout-minutes: 30
     if: >-
       github.actor == 'dependabot[bot]' &&
       github.event.pull_request.head.repo.full_name == github.repository &&
@@ -85,10 +91,51 @@ jobs:
           git commit -m "chore(deps): repair universal Python lockfiles"
           git push origin "HEAD:$HEAD_BRANCH"
           echo "changed=true" >> "$GITHUB_OUTPUT"
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
-      - name: Run PR Gate on the repaired commit
+      - name: Gate the repaired commit, then merge
         if: steps.commit.outputs.changed == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
-        run: gh workflow run pr-gate.yml --ref "$HEAD_BRANCH"
+          REPAIRED_SHA: ${{ steps.commit.outputs.sha }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          gh workflow run pr-gate.yml --repo "$REPO" --ref "$HEAD_BRANCH"
+          # `gh workflow run` returns before the run exists; poll for the run
+          # created for exactly the repaired commit.
+          run_id=""
+          for _ in $(seq 1 24); do
+            sleep 5
+            run_id=$(gh run list --repo "$REPO" --workflow pr-gate.yml \
+              --event workflow_dispatch --branch "$HEAD_BRANCH" --limit 10 \
+              --json databaseId,headSha \
+              --jq "[.[] | select(.headSha == \"$REPAIRED_SHA\")][0].databaseId // empty")
+            [ -n "$run_id" ] && break
+          done
+          if [ -z "$run_id" ]; then
+            echo "Dispatched PR Gate run for $REPAIRED_SHA never appeared." >&2
+            exit 1
+          fi
+          gh run watch "$run_id" --repo "$REPO" --interval 15 --exit-status
+          pr=$(gh pr view "$PR_NUMBER" --repo "$REPO" --json state,author,headRefOid,labels)
+          state=$(echo "$pr" | jq -r '.state')
+          author=$(echo "$pr" | jq -r '.author.login')
+          head_sha=$(echo "$pr" | jq -r '.headRefOid')
+          if [ "$state" != "OPEN" ] || [ "$author" != "app/dependabot" ]; then
+            echo "PR #$PR_NUMBER is $state and authored by $author; not merging."
+            exit 0
+          fi
+          if [ "$head_sha" != "$REPAIRED_SHA" ]; then
+            echo "PR #$PR_NUMBER moved past the repaired commit; a newer repair run owns it."
+            exit 0
+          fi
+          has_automerge=$(echo "$pr" | jq -r '[.labels[].name] | index("automerge") // empty')
+          if [ -z "$has_automerge" ]; then
+            echo "PR #$PR_NUMBER is not labelled 'automerge' (likely a runtime major); leaving for manual review."
+            exit 0
+          fi
+          echo "PR Gate passed on the repaired commit; merging PR #$PR_NUMBER."
+          gh pr merge "$PR_NUMBER" --repo "$REPO" --merge
