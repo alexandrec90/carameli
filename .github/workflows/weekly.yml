@@ -112,15 +112,15 @@ jobs:
       GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: weekly-migration-results
           path: reports/migration
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: weekly-resilience-results
           path: reports/resilience
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: mutation-report
           path: reports/mutation
