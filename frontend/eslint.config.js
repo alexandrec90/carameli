@@ -1,6 +1,7 @@
 import js from '@eslint/js'
 import globals from 'globals'
-import importPlugin from 'eslint-plugin-import'
+import { createTypeScriptImportResolver } from 'eslint-import-resolver-typescript'
+import importX from 'eslint-plugin-import-x'
 import jsxA11y from 'eslint-plugin-jsx-a11y'
 import reactPlugin from 'eslint-plugin-react'
 import reactHooks from 'eslint-plugin-react-hooks'
@@ -25,23 +26,21 @@ export default [
       react: reactPlugin,
       'react-hooks': reactHooks,
       'jsx-a11y': jsxA11y,
-      import: importPlugin,
+      'import-x': importX,
     },
     settings: {
       react: {
         version: 'detect',
       },
-      'import/core-modules': ['vitest'],
-      'import/resolver': {
-        typescript: true,
-      },
+      'import-x/core-modules': ['vitest'],
+      'import-x/resolver-next': [createTypeScriptImportResolver()],
     },
     rules: {
       ...reactPlugin.configs.recommended.rules,
       ...reactHooks.configs.recommended.rules,
       ...jsxA11y.configs.recommended.rules,
       'react/react-in-jsx-scope': 'off',
-      'import/no-unresolved': 'error',
+      'import-x/no-unresolved': 'error',
     },
   },
 ]

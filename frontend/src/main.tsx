@@ -26,7 +26,7 @@ window.addEventListener('unhandledrejection', (event) => {
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <BrowserRouter future={{ v7_startTransition: true }}>
+    <BrowserRouter>
       <SkinProvider>
         <App />
       </SkinProvider>

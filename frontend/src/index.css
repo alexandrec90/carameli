@@ -1,6 +1,7 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+/* Tailwind 4 no longer auto-loads the JS config; keep the custom
+   keyframes/animations defined there. */
+@config "../tailwind.config.js";
 
 /* ─── Design Tokens ─────────────────────────────────────────────────────────── */
 
