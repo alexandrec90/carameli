@@ -45,6 +45,11 @@ jobs:
         run: alembic upgrade head
       - name: Run backend unit tests
         run: pytest tests/unit/ -x -q --tb=short --junit-xml=reports/junit-unit.xml
+      - name: Run hook and workflow script tests
+        # Excluded from the app suite by pytest.ini (testpaths = tests), so run
+        # explicitly — these cover scripts/ and the Dependabot workflow
+        # invariants and otherwise only execute in on-demand runs.
+        run: pytest scripts/hooks/tests/ -q --tb=short --junit-xml=reports/junit-hooks.xml
       - name: Run critical integration tests
         run: pytest tests/integration/test_full_flows.py tests/integration/test_contract.py -x -q --tb=short --junit-xml=reports/junit-integration.xml
       - name: Upload test results
@@ -82,3 +87,8 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
       - run: npm run test:run
+      - name: Typecheck + production build
+        # Unit tests only exercise imported modules; tsc + vite build catch
+        # compile breaks anywhere in src/, which majors that auto-merge (dev
+        # tooling) or wait green for review (runtime) must not slip past.
+        run: npm run build

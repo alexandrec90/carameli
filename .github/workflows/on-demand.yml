@@ -67,9 +67,11 @@ jobs:
         run: npm ci --prefix frontend
 
       - name: Install actionlint
+        # Fail loudly: a silently skipped install means workflow files go
+        # unchecked while the run still reports green for them.
         run: |
           curl -sSfL https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash \
-            | bash -s -- -b /usr/local/bin 2>/dev/null || echo "actionlint install skipped"
+            | bash -s -- -b /usr/local/bin
 
       - name: Apply migrations
         run: alembic upgrade head

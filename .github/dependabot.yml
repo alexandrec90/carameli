@@ -50,3 +50,23 @@ updates:
         update-types:
           - "minor"
           - "patch"
+
+  # CI actions (actions/checkout, setup-node, …). Majors land as individual
+  # PRs and are gated for manual review by the auto-merge classifier.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      minor-and-patch:
+        update-types:
+          - "minor"
+          - "patch"
+
+  # Base images in the Dockerfile (python:3.12-slim). Compose service images
+  # (postgres, redis, …) are pinned majors chosen to match production and are
+  # bumped deliberately, not by bot.
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
