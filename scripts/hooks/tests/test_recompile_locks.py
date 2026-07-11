@@ -110,6 +110,17 @@ def test_frontend_toolchain_majors_are_delayed_grouped_and_manual_gated():
     assert "needs-manual-merge" in automerge
 
 
+def test_stylelint_moves_as_one_toolchain():
+    # stylelint majors and stylelint-config-standard majors pin each other;
+    # separate PRs (48/49) each failed npm ci on peer conflicts.
+    config = (REPO_ROOT / ".github/dependabot.yml").read_text(encoding="utf-8")
+
+    assert "stylelint-toolchain:" in config
+    assert '- "stylelint"' in config
+    assert '- "stylelint-*"' in config
+    assert config.index("stylelint-toolchain:") < config.index("minor-and-patch:")
+
+
 def test_dependabot_watches_actions_and_docker_ecosystems():
     # npm and pip alone leave CI actions (actions/checkout@vN, …) and the
     # Dockerfile base image silently unmaintained.
