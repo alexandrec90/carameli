@@ -103,10 +103,11 @@ jobs:
       - run: npm ci --prefix frontend
       - name: Install actionlint
         # Fail loudly: a silently skipped install means workflow files go
-        # unchecked while the run still reports green for them.
+        # unchecked while the run still reports green for them. NB: the args
+        # are positional ([[VERSION] DIR]) — this script does not take -b.
         run: |
           curl -sSfL https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash \
-            | bash -s -- -b /usr/local/bin
+            | bash -s -- latest /usr/local/bin
       - name: Install dotenv-linter
         # Same fail-loudly rationale as actionlint.
         run: |
