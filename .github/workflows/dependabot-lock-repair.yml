@@ -38,7 +38,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out the Dependabot change with current base tooling
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           # The bot branch can predate this workflow's repair script. GitHub's
           # synthetic merge commit contains both the bot update and current
