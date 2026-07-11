@@ -33,7 +33,7 @@ jobs:
       - run: pytest tests/unit/test_migration_concerns.py -v -m slow --junit-xml=reports/junit-migration-weekly.xml
       - name: Upload migration result
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: weekly-migration-results
           path: reports/junit-migration-weekly.xml
@@ -70,7 +70,7 @@ jobs:
       - run: pytest tests/integration/test_resilience.py -v --junit-xml=reports/junit-resilience-weekly.xml
       - name: Upload resilience result
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: weekly-resilience-results
           path: reports/junit-resilience-weekly.xml
@@ -94,7 +94,7 @@ jobs:
           mutmut results > reports/mutation-report.txt
           echo "Mutation score:" >> reports/mutation-report.txt
           mutmut results | tail -5 >> reports/mutation-report.txt
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: mutation-report
@@ -215,7 +215,7 @@ jobs:
           fi
       - name: Upload weekly summary
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: weekly-reliability-summary
           path: reports/weekly-summary.md
