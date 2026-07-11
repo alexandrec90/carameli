@@ -23,7 +23,7 @@ jobs:
       DATABASE_URL: postgresql+asyncpg://carameli:carameli_local_dev@localhost:5432/carameli
       API_KEY_SECRET: weekly-test-key
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
@@ -58,7 +58,7 @@ jobs:
       REDIS_URL: redis://localhost:6379
       API_KEY_SECRET: weekly-test-key
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
@@ -80,7 +80,7 @@ jobs:
     runs-on: ubuntu-latest
     continue-on-error: true
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
@@ -111,7 +111,7 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/download-artifact@v8
         with:
           name: weekly-migration-results

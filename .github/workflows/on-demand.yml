@@ -44,7 +44,7 @@ jobs:
     steps:
       # On workflow_dispatch: check out the chosen base branch.
       # On push to a fix/auto-** branch: check out that same branch (default ref).
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ github.event.inputs.base_branch || github.ref }}
           fetch-depth: 0
