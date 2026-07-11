@@ -27,6 +27,17 @@ updates:
           - "major"
           - "minor"
           - "patch"
+      # stylelint and its shared configs pin each other's majors: stylelint 17
+      # alone conflicts with stylelint-config-standard 37, and config-standard
+      # 40 alone demands stylelint 17. Evaluate them as one PR.
+      stylelint-toolchain:
+        patterns:
+          - "stylelint"
+          - "stylelint-*"
+        update-types:
+          - "major"
+          - "minor"
+          - "patch"
       # Keep the test-environment stack in lockstep — vitest majors must move
       # together with happy-dom and testing-library (see known-fixes.md: the
       # vitest 2→4 upgrade left happy-dom six majors behind).
