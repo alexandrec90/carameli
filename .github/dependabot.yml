@@ -81,3 +81,12 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    ignore:
+      # 3.12→3.14 counts as semver-minor, so it auto-merged (PR #43) while the
+      # locks are compiled --python-version 3.12 and CI runs 3.12 — and no CI
+      # job builds the image. The Python runtime moves deliberately, together
+      # with the locks and CI, never by bot.
+      - dependency-name: "python"
+        update-types:
+          - "version-update:semver-major"
+          - "version-update:semver-minor"
