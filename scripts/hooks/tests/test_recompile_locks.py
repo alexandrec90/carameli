@@ -110,6 +110,26 @@ def test_frontend_toolchain_majors_are_delayed_grouped_and_manual_gated():
     assert "needs-manual-merge" in automerge
 
 
+def test_dependabot_watches_actions_and_docker_ecosystems():
+    # npm and pip alone leave CI actions (actions/checkout@vN, …) and the
+    # Dockerfile base image silently unmaintained.
+    config = (REPO_ROOT / ".github/dependabot.yml").read_text(encoding="utf-8")
+
+    assert "package-ecosystem: github-actions" in config
+    assert "package-ecosystem: docker" in config
+
+
+def test_pr_gate_typechecks_builds_and_runs_hook_tests():
+    # Unit tests alone let compile breaks through (react-router 7 and
+    # tailwind 4 both merged green while breaking tsc/vite build); the gate
+    # must build for real. Hook/workflow tests are excluded from the app
+    # suite by pytest.ini, so the gate must invoke them explicitly.
+    gate = (REPO_ROOT / ".github/workflows/pr-gate.yml").read_text(encoding="utf-8")
+
+    assert "npm run build" in gate
+    assert "pytest scripts/hooks/tests/" in gate
+
+
 def test_automerge_classifies_dev_only_majors_as_automergeable():
     # Patch/minor bumps and majors confined to devDependencies auto-merge; a
     # major touching any runtime dependency stays manual. The per-dependency
