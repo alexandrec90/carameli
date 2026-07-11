@@ -115,9 +115,7 @@ async def test_inbound_call_posts(live_client: CarameliClient, live_config: E2EC
 
 
 @pytest.mark.manual
-async def test_click_to_call_attended(
-    live_client: CarameliClient, live_config: E2EConfig
-) -> None:
+async def test_click_to_call_attended(live_client: CarameliClient, live_config: E2EConfig) -> None:
     """Attended click-to-call via Callback/ByExtension — a human must answer the agent leg."""
     extension = os.getenv("E2E_EXTENSION")
     if not extension:

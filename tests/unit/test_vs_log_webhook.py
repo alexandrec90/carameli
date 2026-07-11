@@ -42,9 +42,7 @@ def _entry(
 async def test_happy_path_emits_under_vs_logger(client, caplog, monkeypatch):
     monkeypatch.setattr(settings, "vanillasoft_webhook_secret", _SECRET)
     with caplog.at_level(logging.DEBUG):
-        resp = await client.post(
-            _WEBHOOK, json=_entry(), headers={"X-Cloudli-Auth": _SECRET}
-        )
+        resp = await client.post(_WEBHOOK, json=_entry(), headers={"X-Cloudli-Auth": _SECRET})
 
     assert resp.status_code == 204
     recs = [r for r in caplog.records if r.name == "vs.Carameli.Client"]
@@ -58,9 +56,7 @@ async def test_happy_path_emits_under_vs_logger(client, caplog, monkeypatch):
 async def test_wrong_secret_returns_403(client, caplog, monkeypatch):
     monkeypatch.setattr(settings, "vanillasoft_webhook_secret", _SECRET)
     with caplog.at_level(logging.DEBUG):
-        resp = await client.post(
-            _WEBHOOK, json=_entry(), headers={"X-Cloudli-Auth": "wrong"}
-        )
+        resp = await client.post(_WEBHOOK, json=_entry(), headers={"X-Cloudli-Auth": "wrong"})
     assert resp.status_code == 403
     assert not [r for r in caplog.records if r.name.startswith("vs.")]
 

@@ -267,9 +267,7 @@ async def test_post_notification_url_normalizes_stray_slashes(monkeypatch) -> No
     http = _mock_http()
     with patch("app.services.vanillasoft_notify.httpx.AsyncClient", return_value=http):
         await vanillasoft_notify.post_notification(vanillasoft_notify.CALL_RECORDING_PATH, {})
-    assert (
-        http.post.call_args.args[0] == "http://vs.example.com/api/carameli/notify/CallRecording"
-    )
+    assert http.post.call_args.args[0] == "http://vs.example.com/api/carameli/notify/CallRecording"
 
 
 async def test_post_notification_non_2xx_returns_false(monkeypatch) -> None:

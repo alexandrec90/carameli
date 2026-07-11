@@ -7,8 +7,9 @@ One entrypoint for every environment:
     Runs host tools from the venv; `alembic check` runs inside the app container.
   - **CI (GitHub Actions):** `python scripts/lint-all.py` with `CI=true` set.
     Runs the same host tools directly (no Docker stack); `alembic check` runs
-    against the service Postgres. Auto-fixes land in the working tree for the
-    workflow to commit.
+    against the service Postgres. Auto-fixes land in the working tree; the PR
+    Gate lint job fails on any resulting diff so fixes get committed locally,
+    never silently re-applied per run.
 
 Two scoping modes:
   - **Full (default):** every tool runs over the whole tree.
@@ -406,9 +407,10 @@ def t_detect_secrets(changed: list[str] | None = None) -> dict:
     return {"detect-secrets": ([], 0)}
 
 
-# CI runs the same host tools as the desktop lint task, minus the ones that
-# either mutate a committed baseline (detect-secrets) or are enforced elsewhere
-# (dotenv-linter / lint-instructions run via pre-commit locally).
+# CI runs every tool the desktop lint task runs, minus detect-secrets, which
+# mutates the committed baseline — the local pre-commit hook owns secrets.
+# There is no other local enforcement: the pre-commit lint hooks are gone, so
+# any tool missing from CI_TOOLS is not enforced anywhere.
 LOCAL_TOOLS = [
     t_ruff,
     t_eslint,
@@ -425,19 +427,7 @@ LOCAL_TOOLS = [
     t_actionlint,
     t_lint_instructions,
 ]
-CI_TOOLS = [
-    t_ruff,
-    t_eslint,
-    t_tsc,
-    t_stylelint,
-    t_markdownlint,
-    t_mypy,
-    t_pip_audit,
-    t_vulture,
-    t_alembic_check,
-    t_yamllint,
-    t_actionlint,
-]
+CI_TOOLS = [t for t in LOCAL_TOOLS if t is not t_detect_secrets]
 
 
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:

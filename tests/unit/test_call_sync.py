@@ -160,9 +160,7 @@ async def test_worker_startup_initialises_engine_and_carrier() -> None:
     fake_engine = MagicMock()
     fake_carrier = MagicMock()
     with (
-        patch(
-            "app.services.providers.factory.get_call_engine_provider", return_value=fake_engine
-        ),
+        patch("app.services.providers.factory.get_call_engine_provider", return_value=fake_engine),
         patch("app.services.providers.factory.get_carrier_provider", return_value=fake_carrier),
     ):
         await worker_startup(ctx)

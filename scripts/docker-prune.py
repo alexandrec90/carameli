@@ -70,6 +70,7 @@ def engine_down_error(recover_hint: str = "scripts/docker-restart-engine.py") ->
         "",
     ]
 
+
 def prune_steps(deep: bool) -> list[tuple[str, list[str]]]:
     """Docker cleanup passes, run in order.
 
@@ -178,7 +179,9 @@ def main(argv=None) -> int:
         start_service("com.docker.service")
     print(f"Relaunching Docker Desktop (waiting up to {ENGINE_POLL_TIMEOUT}s for engine)...")
     launch_docker_desktop()
-    ready = dc.poll_until(docker_info_ok, timeout=ENGINE_POLL_TIMEOUT, interval=ENGINE_POLL_INTERVAL)
+    ready = dc.poll_until(
+        docker_info_ok, timeout=ENGINE_POLL_TIMEOUT, interval=ENGINE_POLL_INTERVAL
+    )
     if not ready:
         print("  [WARN] Engine slow to start -- auto-escalating to full recovery...")
         ready = restart_engine(poll_timeout=ENGINE_POLL_TIMEOUT, poll_interval=ENGINE_POLL_INTERVAL)
@@ -200,7 +203,9 @@ def main(argv=None) -> int:
             # minio-init) exit 0 by design; with -a their "Exited (0)" would read
             # as sick forever. Crash-looping services still show as "Restarting".
             def stack_probe() -> bool:
-                lines, code, timed_out = dc.docker_ps("{{.Names}}|{{.Status}}", all_containers=False)
+                lines, code, timed_out = dc.docker_ps(
+                    "{{.Names}}|{{.Status}}", all_containers=False
+                )
                 if code != 0 or timed_out:
                     return False
                 return stack_settled(dc.parse_status_entries(lines, dc.project_name()))

@@ -6,16 +6,25 @@ from conftest import load_module
 la = load_module("scripts/lint-all.py")
 
 
-def test_ci_excludes_local_only_tools():
-    # detect-secrets mutates a committed baseline; dotenv-linter / lint-instructions
-    # are enforced via pre-commit locally -- none should run in CI.
-    for tool in (la.t_detect_secrets, la.t_dotenv, la.t_lint_instructions):
-        assert tool in la.LOCAL_TOOLS
-        assert tool not in la.CI_TOOLS
+def test_ci_excludes_only_detect_secrets():
+    # detect-secrets mutates a committed baseline, so the local pre-commit hook
+    # owns it. Every other tool must run in CI: the local lint hooks are gone,
+    # so a tool absent from CI_TOOLS is not enforced anywhere.
+    assert la.t_detect_secrets in la.LOCAL_TOOLS
+    assert set(la.LOCAL_TOOLS) - set(la.CI_TOOLS) == {la.t_detect_secrets}
 
 
 def test_core_linters_run_everywhere():
-    for tool in (la.t_ruff, la.t_mypy, la.t_eslint, la.t_tsc, la.t_vulture, la.t_alembic_check):
+    for tool in (
+        la.t_ruff,
+        la.t_mypy,
+        la.t_eslint,
+        la.t_tsc,
+        la.t_vulture,
+        la.t_alembic_check,
+        la.t_dotenv,
+        la.t_lint_instructions,
+    ):
         assert tool in la.LOCAL_TOOLS
         assert tool in la.CI_TOOLS
 
