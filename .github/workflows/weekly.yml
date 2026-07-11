@@ -23,8 +23,8 @@ jobs:
       DATABASE_URL: postgresql+asyncpg://carameli:carameli_local_dev@localhost:5432/carameli
       API_KEY_SECRET: weekly-test-key
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
           cache: pip
@@ -33,7 +33,7 @@ jobs:
       - run: pytest tests/unit/test_migration_concerns.py -v -m slow --junit-xml=reports/junit-migration-weekly.xml
       - name: Upload migration result
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: weekly-migration-results
           path: reports/junit-migration-weekly.xml
@@ -58,8 +58,8 @@ jobs:
       REDIS_URL: redis://localhost:6379
       API_KEY_SECRET: weekly-test-key
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
           cache: pip
@@ -70,7 +70,7 @@ jobs:
       - run: pytest tests/integration/test_resilience.py -v --junit-xml=reports/junit-resilience-weekly.xml
       - name: Upload resilience result
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: weekly-resilience-results
           path: reports/junit-resilience-weekly.xml
@@ -80,8 +80,8 @@ jobs:
     runs-on: ubuntu-latest
     continue-on-error: true
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
           cache: pip
@@ -94,7 +94,7 @@ jobs:
           mutmut results > reports/mutation-report.txt
           echo "Mutation score:" >> reports/mutation-report.txt
           mutmut results | tail -5 >> reports/mutation-report.txt
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: mutation-report
@@ -111,16 +111,16 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
         with:
           name: weekly-migration-results
           path: reports/migration
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: weekly-resilience-results
           path: reports/resilience
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: mutation-report
           path: reports/mutation
@@ -215,7 +215,7 @@ jobs:
           fi
       - name: Upload weekly summary
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: weekly-reliability-summary
           path: reports/weekly-summary.md

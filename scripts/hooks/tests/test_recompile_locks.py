@@ -110,6 +110,17 @@ def test_frontend_toolchain_majors_are_delayed_grouped_and_manual_gated():
     assert "needs-manual-merge" in automerge
 
 
+def test_stylelint_moves_as_one_toolchain():
+    # stylelint majors and stylelint-config-standard majors pin each other;
+    # separate PRs (48/49) each failed npm ci on peer conflicts.
+    config = (REPO_ROOT / ".github/dependabot.yml").read_text(encoding="utf-8")
+
+    assert "stylelint-toolchain:" in config
+    assert '- "stylelint"' in config
+    assert '- "stylelint-*"' in config
+    assert config.index("stylelint-toolchain:") < config.index("minor-and-patch:")
+
+
 def test_dependabot_watches_actions_and_docker_ecosystems():
     # npm and pip alone leave CI actions (actions/checkout@vN, …) and the
     # Dockerfile base image silently unmaintained.
@@ -117,6 +128,20 @@ def test_dependabot_watches_actions_and_docker_ecosystems():
 
     assert "package-ecosystem: github-actions" in config
     assert "package-ecosystem: docker" in config
+
+
+def test_python_base_image_is_never_bot_bumped():
+    # Docker tags make 3.12→3.14 a semver-minor, which auto-merged (PR #43)
+    # against locks compiled for 3.12 with no image build in CI. The runtime
+    # moves with the locks and CI config, deliberately.
+    config = (REPO_ROOT / ".github/dependabot.yml").read_text(encoding="utf-8")
+    dockerfile = (REPO_ROOT / "Dockerfile").read_text(encoding="utf-8")
+
+    docker_block = config[config.index("package-ecosystem: docker") :]
+    assert 'dependency-name: "python"' in docker_block
+    assert "version-update:semver-minor" in docker_block
+    assert "python:3.14" not in dockerfile
+    assert dockerfile.count("FROM python:3.12-slim") == 2
 
 
 def test_pr_gate_typechecks_builds_and_runs_hook_tests():

@@ -30,7 +30,10 @@ export default [
     },
     settings: {
       react: {
-        version: 'detect',
+        // 'detect' calls context.getFilename(), removed in eslint 10 —
+        // eslint-plugin-react crashes until it ships eslint-10 support.
+        // Keep in sync with the react major in package.json.
+        version: '19.2',
       },
       'import-x/core-modules': ['vitest'],
       'import-x/resolver-next': [createTypeScriptImportResolver()],

@@ -1,4 +1,7 @@
 ### Build stage — compile C extensions, then discard the compiler toolchain
+# Python version is coordinated with the uv-compiled locks
+# (--python-version 3.12), CI's setup-python, and CLAUDE.md — bump all
+# together, deliberately (dependabot.yml ignores bot bumps of this tag).
 FROM python:3.12-slim AS builder
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
