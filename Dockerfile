@@ -1,5 +1,5 @@
 ### Build stage — compile C extensions, then discard the compiler toolchain
-FROM python:3.12-slim AS builder
+FROM python:3.14-slim AS builder
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
@@ -20,7 +20,7 @@ COPY requirements-test.txt ./
 RUN pip install --no-cache-dir --prefix=/install -r requirements-test.txt
 
 ### Shared runtime base — slim image, no compiler
-FROM python:3.12-slim AS base
+FROM python:3.14-slim AS base
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq5 \
