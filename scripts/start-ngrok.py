@@ -154,7 +154,7 @@ def main() -> int:
         print(f"  {manual_hint}")
     else:
         if webhook_url:
-            print(f"Telnyx messaging-profile webhook updated -> {webhook_url}")
+            print(f"Telnyx messaging-profile webhook updated & confirmed live -> {webhook_url}")
         else:
             print(f"Skipped Telnyx webhook update (Telnyx credentials not set). {manual_hint}")
 

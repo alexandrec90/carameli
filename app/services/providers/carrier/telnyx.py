@@ -30,6 +30,12 @@ _PROVISION_LOOKUP_DELAY_S = 1.0
 # (message.finalized) to. Configured on the messaging profile, not per-number.
 _SMS_WEBHOOK_PATH = "/webhooks/telnyx/sms-inbound"
 
+# A messaging-profile PATCH is accepted immediately but can take a moment to be
+# reflected on read (and applied to routing); poll the profile until the new
+# webhook URL comes back before treating the change as live.
+_WEBHOOK_CONFIRM_ATTEMPTS = 10
+_WEBHOOK_CONFIRM_DELAY_S = 1.0
+
 
 class TelnyxCarrier:
     """CarrierProvider implementation backed by the Telnyx REST API."""
@@ -205,7 +211,7 @@ class TelnyxCarrier:
             )
             resp.raise_for_status()
 
-    async def set_webhook_url(self, base_url: str | None = None) -> str:
+    async def set_webhook_url(self, base_url: str | None = None, confirm: bool = True) -> str:
         """Point the account's messaging profile at Carameli's inbound-SMS webhook.
 
         Telnyx delivers inbound SMS and delivery receipts to the URL configured on
@@ -216,7 +222,12 @@ class TelnyxCarrier:
 
         ``base_url`` overrides the carrier's configured webhook base (the ngrok
         bootstrap passes the freshly-minted tunnel URL); it defaults to the base
-        this carrier was constructed with. Returns the full webhook URL that was set.
+        this carrier was constructed with.
+
+        The PATCH is accepted instantly but takes a beat to apply, which races a
+        test run that fires immediately after. When ``confirm`` is set (the
+        default) this polls the profile until the new URL is reflected, so callers
+        only proceed once the change is live. Returns the full webhook URL set.
         """
         if not self._messaging_profile_id:
             raise ValueError(
@@ -237,12 +248,41 @@ class TelnyxCarrier:
                 resp.text,
             )
             resp.raise_for_status()
+
+        if confirm:
+            await self._confirm_webhook_url(webhook_url)
+
         logger.info(
             "Telnyx messaging profile %s webhook set to %s",
             self._messaging_profile_id,
             webhook_url,
         )
         return webhook_url
+
+    async def _confirm_webhook_url(self, expected_url: str) -> None:
+        """Poll the messaging profile until its ``webhook_url`` reflects ``expected_url``.
+
+        Guards the read-after-write race: a freshly-PATCHed profile can still
+        report the old URL for a moment, and firing an SMS test in that window
+        would hit the stale callback. Raises RuntimeError if it never settles.
+        """
+        for _ in range(_WEBHOOK_CONFIRM_ATTEMPTS):
+            resp = await self._client.get(f"/messaging_profiles/{self._messaging_profile_id}")
+            if resp.is_error:
+                logger.error(
+                    "Telnyx webhook confirm lookup failed: profile=%s status=%s body=%s",
+                    self._messaging_profile_id,
+                    resp.status_code,
+                    resp.text,
+                )
+                resp.raise_for_status()
+            if resp.json().get("data", {}).get("webhook_url") == expected_url:
+                return
+            await asyncio.sleep(_WEBHOOK_CONFIRM_DELAY_S)
+        raise RuntimeError(
+            f"Telnyx messaging profile {self._messaging_profile_id} did not reflect "
+            f"webhook_url={expected_url} after {_WEBHOOK_CONFIRM_ATTEMPTS} attempts"
+        )
 
     # ------------------------------------------------------------------
     # Area codes
