@@ -74,6 +74,16 @@ workflow. Never add a paid test to `run-tests.py`'s `_ALL_TARGETS`, and never re
 a live provider. Opt in explicitly per tier (`-m sandbox`, `-m chargeable`,
 `RUN_LIVE_E2E=1 ... -m paid`).
 
+**Recurring-cost cleanup (mandatory for `chargeable`).** A provisioned Telnyx DID is a
+*recurring monthly* charge from the moment it is ordered — not a one-off. Any test that
+provisions a number (or any other billable, persisted provider resource) must release it
+in a `finally`, with the resource id resolved **before** the first assertion, so an
+assertion failure or a flaky release can never leak the resource into a monthly bill.
+Never place an `assert` between the order and the release outside the `try`. This is the
+only place in the suite that buys a recurring resource; keep it that way — reuse the
+pre-owned `TELNYX_TEST_*` / `E2E_DID_*` numbers for send/receive tests rather than
+provisioning new ones.
+
 Skipped/xfail tests must include a linked issue or a one-line reason in the marker.
 Test failures are fixed in application code, not by relaxing assertions.
 

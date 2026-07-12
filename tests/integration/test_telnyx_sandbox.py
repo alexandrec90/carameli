@@ -67,18 +67,27 @@ async def test_search_numbers_returns_results(carrier: TelnyxCarrier) -> None:
 
 @pytest.mark.chargeable
 async def test_provision_and_release_number(carrier: TelnyxCarrier) -> None:
-    """Provision and release a sandbox DID (may incur a small sandbox charge)."""
+    """Provision and release a sandbox DID (may incur a small sandbox charge).
+
+    A Telnyx DID is a *recurring monthly* charge the instant it is ordered, so the
+    release runs in a ``finally``: an assertion failure (or a flaky release) between
+    the order and the cleanup must never leave the number on the account accruing a
+    monthly fee. Release is best-effort-but-loud -- if it raises, the test fails so
+    the leak is surfaced rather than silently billed.
+    """
     numbers = await carrier.search_numbers(area_code="415", count=1)
     assert numbers, "No numbers available in sandbox for area 415"
 
     number = numbers[0]["phone_number"]
     provisioned = await carrier.provision_number(number)
-    assert provisioned["phone_number"] == number
-
+    # Resolve the sid before any assertion so the finally can always release.
     provider_sid = provisioned.get("sid") or provisioned.get("provider_sid")
-    assert provider_sid, "Provision response did not include sid/provider_sid"
-
-    await carrier.release_number(provider_sid)
+    try:
+        assert provisioned["phone_number"] == number
+        assert provider_sid, "Provision response did not include sid/provider_sid"
+    finally:
+        if provider_sid:
+            await carrier.release_number(provider_sid)
 
 
 @_needs_sms_numbers
