@@ -41,7 +41,10 @@ jobs:
       - name: Full unit suite
         run: pytest tests/unit/ -q --tb=short --junit-xml=reports/junit-unit-nightly.xml
       - name: Full integration suite
-        run: pytest tests/integration/ -q --tb=short -k "not sandbox" --junit-xml=reports/junit-integration-nightly.xml
+        # -m "not paid" excludes every paid tier (sandbox/chargeable/live_e2e) by
+        # marker -- robust where the old -k "not sandbox" name-match was not, and
+        # the guarantee that no automated pipeline ever hits a live provider.
+        run: pytest tests/integration/ -q --tb=short -m "not paid" --junit-xml=reports/junit-integration-nightly.xml
       - name: Adversarial webhook tests
         run: pytest tests/unit/test_webhooks.py -q -k "403 or sig or tamper or replay"
       - name: Upload results

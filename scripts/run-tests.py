@@ -6,9 +6,11 @@ One entrypoint for every environment:
   - **Local desktop:** `python scripts/run-tests.py` runs the full suite inside
     the app container (xdist). `--fast` runs the changed-only set via testmon,
     falling back to a full xdist run (with --testmon-noselect) when testmon
-    selects more than half the suite. `--all` runs every target (pytest, hook,
-    frontend, telnyx) in one process and merges them into a single artifact, so
-    the aggregate VS Code task no longer fans out into racing writers.
+    selects more than half the suite. `--all` runs every FREE target (pytest,
+    hook, frontend) in one process and merges them into a single artifact, so
+    the aggregate VS Code task no longer fans out into racing writers. Paid tiers
+    (telnyx-sandbox and the live_e2e suite) are excluded from `--all` and run only
+    via their own opt-in tasks -- no aggregate or CI path touches a live provider.
   - **CI (GitHub Actions):** `python scripts/run-tests.py` with `CI=true` runs
     pytest + hook tests + frontend tests directly on the runner (no Docker stack).
     Backend failures go to `logs/test-failures.log`; frontend (vitest) failures
@@ -34,7 +36,13 @@ import script_common
 REPO_ROOT = Path(__file__).resolve().parents[1]
 IS_CI = bool(os.environ.get("CI"))
 
-_ADDOPTS = "--ignore=tests/e2e --ignore=tests/load --ignore=tests/quarantine"
+# Mirrors pytest.ini's addopts: the `-o addopts=` override below REPLACES the ini
+# value, so the paid-tier exclusion (-m "not paid") and the dir ignores must be
+# repeated here or testmon fast-mode would silently collect paid tests.
+_ADDOPTS = (
+    "--ignore=tests/e2e --ignore=tests/live_e2e --ignore=tests/load "
+    '--ignore=tests/quarantine -m "not paid"'
+)
 _PYTEST_FULL = "pytest -v --tb=short --no-header --color=no --durations=20 -n auto --dist=worksteal"
 _PYTEST_TESTMON = (
     f"pytest -v --tb=short --no-header --color=no --durations=20 -o addopts='{_ADDOPTS}' --testmon"
@@ -59,9 +67,14 @@ _CI_HOOK_ARGV = ["python", "-m", "pytest", "scripts/hooks/tests", "-q", "--color
 _CI_FRONTEND_ARGV = ["npm", "--prefix", "frontend", "run", "test:run"]
 _LOCAL_HOOK_ARGV = ["python", "-m", "pytest", "scripts/hooks/tests", "-q", "--color=no"]
 _LOCAL_FRONTEND_ARGV = ["npm", "--prefix", "frontend", "run", "test:run"]
-# Both telnyx argvs exclude `chargeable` tests: with real credentials configured,
-# test_provision_and_release_number BUYS a real number per run. Chargeable tests
-# are opt-in only (run the file manually with -k/-m) -- see .claude/rules/testing.md.
+# The telnyx-sandbox target is a PAID tier and opt-in only (the dedicated "Test:
+# Run Telnyx Sandbox" task) -- it is deliberately absent from _ALL_TARGETS so the
+# free "Test: All Suites" aggregate never touches a live provider. The `-m` here
+# is `sandbox and not chargeable`: `sandbox` opts back in over the global
+# `-m "not paid"` default (see _ADDOPTS / pytest.ini), while `not chargeable`
+# still excludes the tier-2 tests that BUY a real number / send real SMS per run
+# (test_provision_and_release_number). Run those manually with `-m chargeable`.
+_TELNYX_SANDBOX_MARKER = "sandbox and not chargeable"
 _LOCAL_TELNYX_SANDBOX_ARGV = [
     "docker",
     "compose",
@@ -73,7 +86,7 @@ _LOCAL_TELNYX_SANDBOX_ARGV = [
     "pytest",
     "tests/integration/test_telnyx_sandbox.py",
     "-m",
-    "not chargeable",
+    _TELNYX_SANDBOX_MARKER,
     "-v",
     "--tb=short",
     "--no-header",
@@ -85,20 +98,84 @@ _CI_TELNYX_SANDBOX_ARGV = [
     "pytest",
     "tests/integration/test_telnyx_sandbox.py",
     "-m",
-    "not chargeable",
+    _TELNYX_SANDBOX_MARKER,
     "-v",
     "--tb=short",
     "--no-header",
     "--color=no",
 ]
-_VALID_TARGETS = {"pytest", "hook-tests", "frontend-tests", "telnyx-sandbox"}
+# telnyx-chargeable -- PAID tier 2, opt-in only. `-m chargeable` selects ONLY the
+# money-spending tests (buys a DID, sends real SMS); it does NOT re-run the tier-1
+# sandbox reads. `chargeable` opts back in over the global `-m "not paid"` default.
+_TELNYX_CHARGEABLE_MARKER = "chargeable"
+_LOCAL_TELNYX_CHARGEABLE_ARGV = [
+    "docker",
+    "compose",
+    "exec",
+    "-T",
+    "-e",
+    "TELNYX_SANDBOX=1",
+    "app",
+    "pytest",
+    "tests/integration/test_telnyx_sandbox.py",
+    "-m",
+    _TELNYX_CHARGEABLE_MARKER,
+    "-v",
+    "--tb=short",
+    "--no-header",
+    "--color=no",
+]
+_CI_TELNYX_CHARGEABLE_ARGV = [
+    "python",
+    "-m",
+    "pytest",
+    "tests/integration/test_telnyx_sandbox.py",
+    "-m",
+    _TELNYX_CHARGEABLE_MARKER,
+    "-v",
+    "--tb=short",
+    "--no-header",
+    "--color=no",
+]
+# live-e2e -- PAID tier 3, opt-in only. Runs ONLY the live suite (real infra, real
+# money) and excludes `manual` (needs a human to answer). Runs on the host, not in
+# the container: the suite observes the live stack from outside (see
+# tests/live_e2e/conftest.py). `-o addopts=` wipes pytest.ini's addopts so its
+# `--ignore=tests/live_e2e` and `-m "not paid"` defaults don't deselect the suite;
+# `-m "live_e2e and not manual"` then selects exactly this tier.
+_LIVE_E2E_MARKER = "live_e2e and not manual"
+_LIVE_E2E_ARGV = [
+    "python",
+    "-m",
+    "pytest",
+    "tests/live_e2e",
+    "-o",
+    "addopts=",
+    "-m",
+    _LIVE_E2E_MARKER,
+    "-v",
+    "--tb=short",
+    "--no-header",
+    "--color=no",
+]
+_VALID_TARGETS = {
+    "pytest",
+    "hook-tests",
+    "frontend-tests",
+    "telnyx-sandbox",
+    "telnyx-chargeable",
+    "live-e2e",
+}
 # Targets whose silent skip invalidates the whole run. "pytest" is the entire
 # backend suite: if it is skipped (pytest missing from the app container, stack
 # down), a green banner would report success while zero backend tests ran.
 _CRITICAL_TARGETS = {"pytest"}
 # Order is cosmetic only (results are merged into one dict); pytest first so its
-# "Running pytest..." banner leads the interleaved output.
-_ALL_TARGETS = ("pytest", "hook-tests", "frontend-tests", "telnyx-sandbox")
+# "Running pytest..." banner leads the interleaved output. Only FREE targets
+# belong here: "Test: All Suites" runs this set, so a paid tier (telnyx-sandbox,
+# a valid opt-in --target) must never be added -- it would hit a live provider on
+# every aggregate run. Paid tiers are opt-in via their own dedicated tasks.
+_ALL_TARGETS = ("pytest", "hook-tests", "frontend-tests")
 _WINDOWS_BATCH_LAUNCHERS = {"npm", "npx", "vite"}
 
 
@@ -225,6 +302,14 @@ def run_named_target(target: str) -> dict[str, tuple[list[str], int]]:
         argv = _CI_TELNYX_SANDBOX_ARGV if IS_CI else _LOCAL_TELNYX_SANDBOX_ARGV
         env = {"TELNYX_SANDBOX": "1"} if IS_CI else None
         return {"telnyx-sandbox": run_argv(argv, extra_env=env)}
+    if target == "telnyx-chargeable":
+        argv = _CI_TELNYX_CHARGEABLE_ARGV if IS_CI else _LOCAL_TELNYX_CHARGEABLE_ARGV
+        env = {"TELNYX_SANDBOX": "1"} if IS_CI else None
+        return {"telnyx-chargeable": run_argv(argv, extra_env=env)}
+    if target == "live-e2e":
+        # Host-run (not in-container); RUN_LIVE_E2E=1 satisfies the suite's skip
+        # gate, and the E2E_* vars come from the caller's environment/.env.
+        return {"live-e2e": run_argv(_LIVE_E2E_ARGV, extra_env={"RUN_LIVE_E2E": "1"})}
     raise ValueError(f"Unknown test target: {target}")
 
 

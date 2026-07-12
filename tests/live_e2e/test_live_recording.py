@@ -31,6 +31,7 @@ from tests.live_e2e.test_live_call import _parse_dt, _telnyx_hangup, _telnyx_ori
 _SKIP = live_e2e_skip_reason()
 pytestmark = [
     pytest.mark.asyncio(loop_scope="session"),
+    pytest.mark.paid,
     pytest.mark.live_e2e,
     pytest.mark.skipif(_SKIP is not None, reason=_SKIP or ""),
     pytest.mark.skipif(

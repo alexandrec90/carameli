@@ -102,11 +102,59 @@ def test_resolve_argv_non_windows_unchanged(monkeypatch):
 
 def test_telnyx_sandbox_argvs_exclude_chargeable_tests():
     # Money guardrail: with live credentials, the chargeable provision test buys
-    # a real phone number. Neither routine runner path may ever include it.
+    # a real phone number. Neither routine runner path may ever include it. The
+    # `sandbox and not chargeable` marker also opts back in over the global
+    # `-m "not paid"` default so the dedicated task still runs the tier-1 reads.
     for argv in (rt._LOCAL_TELNYX_SANDBOX_ARGV, rt._CI_TELNYX_SANDBOX_ARGV):
         # Adjacent-pair check: the CI argv also contains `python -m pytest`,
         # so a bare index("-m") would find the wrong flag.
-        assert ("-m", "not chargeable") in itertools.pairwise(argv)
+        assert ("-m", "sandbox and not chargeable") in itertools.pairwise(argv)
+        assert "not chargeable" in rt._TELNYX_SANDBOX_MARKER
+
+
+def test_all_targets_excludes_paid_tiers():
+    # "Test: All Suites" runs _ALL_TARGETS; a paid tier there would hit a live
+    # provider on every aggregate run. The three paid tiers stay valid opt-in
+    # --targets but must never be in the free aggregate.
+    paid_targets = {"telnyx-sandbox", "telnyx-chargeable", "live-e2e"}
+    assert paid_targets.isdisjoint(rt._ALL_TARGETS)
+    assert paid_targets <= rt._VALID_TARGETS
+    assert set(rt._ALL_TARGETS) == {"pytest", "hook-tests", "frontend-tests"}
+
+
+def test_each_paid_tier_runs_only_its_own_tier():
+    # A tier task must run ONLY its tier, never re-run the cheaper tiers below it.
+    # tier 1: sandbox reads, excludes chargeable.
+    assert rt._TELNYX_SANDBOX_MARKER == "sandbox and not chargeable"
+    # tier 2: chargeable ONLY -- not the tier-1 sandbox reads.
+    assert rt._TELNYX_CHARGEABLE_MARKER == "chargeable"
+    # tier 3: live_e2e ONLY, and never the human-attended `manual` variant.
+    assert rt._LIVE_E2E_MARKER == "live_e2e and not manual"
+
+
+def test_live_e2e_argv_clears_addopts_and_runs_on_host():
+    # The suite is host-run and ignored by pytest.ini's addopts (--ignore +
+    # -m "not paid"); the target must wipe addopts (-o addopts=) or nothing is
+    # collected, and it must not shell into the container.
+    argv = rt._LIVE_E2E_ARGV
+    assert ("-o", "addopts=") in itertools.pairwise(argv)
+    assert ("-m", rt._LIVE_E2E_MARKER) in itertools.pairwise(argv)
+    assert "docker" not in argv
+
+
+def test_run_named_target_routes_every_paid_tier(monkeypatch):
+    # Each paid tier is reachable as an opt-in --target and returns under its own
+    # key. Stub run_argv so no real provider/live call is made.
+    monkeypatch.setattr(rt, "run_argv", lambda argv, extra_env=None: ([" ".join(argv)], 0))
+    for target in ("telnyx-sandbox", "telnyx-chargeable", "live-e2e"):
+        result = rt.run_named_target(target)
+        assert set(result) == {target}
+
+
+def test_addopts_excludes_paid_by_default():
+    # The testmon `-o addopts=` override REPLACES pytest.ini's addopts, so the
+    # paid-tier exclusion must be repeated here or fast mode collects paid tests.
+    assert '-m "not paid"' in rt._ADDOPTS
 
 
 # ---------------------------------------------------------------------------
