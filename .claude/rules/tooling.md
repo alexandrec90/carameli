@@ -63,3 +63,23 @@ the file.
 When a workflow references `${{ secrets.* }}` or `${{ vars.* }}`, use the `gh` CLI
 to create or update the value — do not ask the user to use the GitHub web UI.
 `gh` is installed, authenticated as `alexandrec90`, with `repo` + `workflow` scopes.
+
+## CI feedback loop (don't diagnose the gate one round at a time)
+
+The PR Gate `lint` job runs `scripts/lint-all.py` — the same entrypoint available
+locally. Use it as a pre-flight, not a remote oracle:
+
+- **Run `python scripts/lint-all.py` before pushing a branch the gate will lint.**
+  One local pass surfaces every ruff/mypy/eslint/stylelint/dotenv failure at once;
+  discovering them one CI round at a time burns gate runs and wall-clock. The
+  SessionStart hook (`.claude/hooks/session-start.sh`) provisions the toolchain so
+  this works in a fresh web sandbox — if a tool is missing, fix the hook, don't skip
+  the check.
+- **When a gate job fails, read the filtered artifact, not the raw job log.** The
+  `lint` and test jobs upload `logs/lint-errors.log` / `logs/test-failures.log` —
+  pre-filtered to actionable lines (see `.claude/rules/diagnostics.md`). A raw CI job
+  log buries the real error under ~1000 lines of Postgres/Redis container boot noise;
+  reading it wastes context. If you must read a job log, request a small tail window.
+- **When polling a PR for merge, keep the check to one line of git** (e.g.
+  `git fetch -q && git merge-base --is-ancestor <sha> origin/master`) rather than
+  refetching the full PR object or job logs each cycle.

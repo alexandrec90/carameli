@@ -69,7 +69,9 @@ def test_prune_stack_settled():
     assert prune.stack_settled([]) is False
     assert prune.stack_settled([("app", "Up 30 seconds (healthy)")]) is True
     # No-healthcheck services ("Up N seconds" plain) count as settled.
-    assert prune.stack_settled([("worker", "Up 30 seconds"), ("app", "Up 1 minute (healthy)")]) is True
+    assert (
+        prune.stack_settled([("worker", "Up 30 seconds"), ("app", "Up 1 minute (healthy)")]) is True
+    )
     # Mid-boot healthcheck must NOT settle -- jambonz takes ~30-60s.
     assert prune.stack_settled([("jambonz", "Up 5 seconds (health: starting)")]) is False
     # Sick containers never settle.

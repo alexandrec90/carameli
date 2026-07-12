@@ -1,9 +1,14 @@
 #!/usr/bin/env python3
-"""Runs `pre-commit install` then patches the generated git hooks to pipe errors
+"""Runs `pre-commit install` then patches the generated git hook to pipe errors
 to logs/pre-commit-errors.log and activate the venv. Safe to re-run any time.
 
-The pure `patch_hook_content` function is unit-tested in
-`scripts/hooks/tests/test_install_pre_commit.py`.
+Only the pre-commit stage is installed: no hooks use the pre-push stage anymore
+(CI owns every slow check via the PR Gate lint job), and an empty pre-commit
+invocation still costs seconds per push. A leftover pre-push hook from an
+earlier install is removed.
+
+The pure `patch_hook_content` / `remove_stale_hooks` functions are unit-tested
+in `scripts/hooks/tests/test_install_pre_commit.py`.
 """
 
 import subprocess
@@ -15,6 +20,8 @@ from script_common import venv_exe
 REPO_ROOT = Path(__file__).resolve().parents[1]
 HOOK_FILES = [
     REPO_ROOT / ".git" / "hooks" / "pre-commit",
+]
+STALE_HOOK_FILES = [
     REPO_ROOT / ".git" / "hooks" / "pre-push",
 ]
 
@@ -116,6 +123,19 @@ def patch_hook_content(content: str) -> tuple[str | None, str]:
     return None, "unrecognized"
 
 
+def remove_stale_hooks(paths: list[Path]) -> list[str]:
+    """Delete leftover git hooks from stages this project no longer uses.
+
+    Returns the file names actually removed (missing files are a no-op).
+    """
+    removed: list[str] = []
+    for path in paths:
+        if path.exists():
+            path.unlink()
+            removed.append(path.name)
+    return removed
+
+
 def _install() -> int:
     return subprocess.run(
         [
@@ -125,8 +145,6 @@ def _install() -> int:
             "install",
             "--hook-type",
             "pre-commit",
-            "--hook-type",
-            "pre-push",
         ],
         cwd=REPO_ROOT,
     ).returncode
@@ -168,6 +186,9 @@ def main() -> int:
                 file=sys.stderr,
             )
             return 1
+
+    for name in remove_stale_hooks(STALE_HOOK_FILES):
+        print(f"  [pass] removed stale {name} hook (no pre-push-stage hooks remain)")
 
     print("\n  PRE-COMMIT HOOK INSTALLED + PATCHED")
     return 0

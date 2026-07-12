@@ -242,9 +242,7 @@ class CarameliClient:
     async def aclose(self) -> None:
         await self._client.aclose()
 
-    async def send_sms(
-        self, customer_id: int, from_: str, to: str, body: str
-    ) -> httpx.Response:
+    async def send_sms(self, customer_id: int, from_: str, to: str, body: str) -> httpx.Response:
         """POST an outbound SMS via VsMessaging/Sms/Send."""
         return await self._client.post(
             f"{VSAPI_PREFIX}/VsMessaging/Sms/Send/{customer_id}",

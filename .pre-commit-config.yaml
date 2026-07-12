@@ -1,13 +1,16 @@
 fail_fast: true
 
+# Local hooks are intentionally minimal — nothing here may be slow. Every lint,
+# type, dead-code, and audit check is CI-owned: the PR Gate `lint` job runs
+# scripts/lint-all.py (the same entrypoint as the desktop lint task), and
+# branch protection on master blocks merges until the gate passes. Run
+# `python scripts/lint-all.py` locally only when you want early feedback.
 repos:
-  # All hooks use language: system so they share the venv/local binaries
-  # with scripts/lint-all.py — no version drift between the two.
   - repo: local
     hooks:
-      # First so the regenerated AGENTS.md/.agents mirrors are in place before
-      # markdownlint (and friends) run on them. Modifies files; the patched git
-      # hook auto-stages and retries (see scripts/install-pre-commit.py).
+      # A generator, not a check, so CI can't own it: regenerates the
+      # AGENTS.md/.agents mirrors from CLAUDE.md/.claude. Modifies files; the
+      # patched git hook auto-stages and retries (see scripts/install-pre-commit.py).
       - id: sync-agents
         name: sync CLAUDE -> AGENTS mirrors
         language: system
@@ -15,98 +18,10 @@ repos:
         files: (^|/)CLAUDE\.md$|^\.claude/
         pass_filenames: false
 
+      # The one check that must stay local: a secret that reaches the remote
+      # is leaked even if CI later goes red.
       - id: detect-secrets
         name: detect-secrets
         language: system
         entry: detect-secrets-hook --baseline .secrets.baseline
         exclude: (\.secrets\.baseline|\.env\.example)$
-
-      - id: ruff
-        name: ruff
-        language: system
-        entry: ruff check --fix --unsafe-fixes
-        types: [python]
-
-      - id: ruff-format
-        name: ruff-format
-        language: system
-        entry: ruff format
-        types: [python]
-
-      # dmypy (daemon mode) keeps analysis state across runs — subsequent
-      # commits only re-check changed files instead of the whole project.
-      - id: mypy
-        name: mypy
-        language: system
-        entry: dmypy run -- app/
-        files: ^app/
-        types: [python]
-        pass_filenames: false
-
-      # Slow / advisory hooks — run on push, not every commit
-      - id: vulture
-        name: vulture
-        language: system
-        entry: vulture app/ --min-confidence 80 --ignore-names "cls,ctx,opts"
-        files: ^app/
-        types: [python]
-        pass_filenames: false
-        stages: [pre-push]
-
-      - id: pip-audit
-        name: pip-audit
-        language: system
-        entry: pip-audit --ignore-vuln CVE-2026-4539
-        files: requirements.*\.txt$
-        pass_filenames: false
-        stages: [pre-push]
-
-  # .env files — dotenv-linter installed locally (cargo install dotenv-linter)
-  - repo: local
-    hooks:
-      - id: dotenv-linter
-        name: dotenv-linter
-        language: system
-        entry: dotenv-linter check
-        files: ^\.env
-        types: [file]
-
-  # Frontend — uses the project's own node_modules, reads existing ESLint/stylelint/markdownlint configs
-  - repo: local
-    hooks:
-      - id: eslint
-        name: ESLint
-        language: system
-        entry: npm --prefix frontend run lint:eslint -- --fix
-        files: ^frontend/src/.*\.[jt]sx?$
-        pass_filenames: false
-
-      - id: stylelint
-        name: Stylelint
-        language: system
-        entry: npm --prefix frontend exec -- stylelint --fix
-        files: ^frontend/src/.*\.css$
-
-      - id: tsc
-        name: TypeScript
-        language: system
-        entry: npm --prefix frontend run lint:types
-        files: ^frontend/src/.*\.[jt]sx?$
-        pass_filenames: false
-        stages: [pre-push]
-
-      - id: markdownlint
-        name: Markdownlint
-        language: system
-        entry: npm --prefix frontend exec -- markdownlint -c ".markdownlint.json" --fix
-        files: \.md$
-
-  # GitHub Actions workflow linter
-  - repo: local
-    hooks:
-      - id: actionlint
-        name: actionlint
-        language: system
-        entry: actionlint
-        files: ^\.github/workflows/.*\.ya?ml$
-        pass_filenames: false

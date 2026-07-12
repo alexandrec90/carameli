@@ -79,12 +79,16 @@ def _patch_repos(
     call_repo.get_existing_call_sids = AsyncMock(return_value=existing_call_sids or set())
     sms_repo = AsyncMock()
     sms_repo.get_existing_message_sids = AsyncMock(return_value=existing_message_sids or set())
-    return patch.multiple(
-        "app.services.reconciliation",
-        async_session_factory=lambda: _mock_session(),
-        CallEventRepo=lambda _s: call_repo,
-        SmsMessageRepo=lambda _s: sms_repo,
-    ), call_repo, sms_repo
+    return (
+        patch.multiple(
+            "app.services.reconciliation",
+            async_session_factory=lambda: _mock_session(),
+            CallEventRepo=lambda _s: call_repo,
+            SmsMessageRepo=lambda _s: sms_repo,
+        ),
+        call_repo,
+        sms_repo,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -235,9 +239,7 @@ async def test_carrier_failure_does_not_kill_call_diff(monkeypatch, caplog) -> N
 async def test_startup_sets_carrier_on_ctx() -> None:
     ctx: dict = {}
     fake_carrier = AsyncMock()
-    with patch(
-        "app.services.providers.factory.get_carrier_provider", return_value=fake_carrier
-    ):
+    with patch("app.services.providers.factory.get_carrier_provider", return_value=fake_carrier):
         await startup(ctx)
 
     assert ctx["carrier"] is fake_carrier

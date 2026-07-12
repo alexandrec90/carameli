@@ -1,5 +1,7 @@
 """Tests for scripts/run-tests.py pure helpers (testmon selection parsing)."""
 
+import itertools
+
 from conftest import load_module
 
 rt = load_module("scripts/run-tests.py")
@@ -104,7 +106,7 @@ def test_telnyx_sandbox_argvs_exclude_chargeable_tests():
     for argv in (rt._LOCAL_TELNYX_SANDBOX_ARGV, rt._CI_TELNYX_SANDBOX_ARGV):
         # Adjacent-pair check: the CI argv also contains `python -m pytest`,
         # so a bare index("-m") would find the wrong flag.
-        assert ("-m", "not chargeable") in zip(argv, argv[1:])
+        assert ("-m", "not chargeable") in itertools.pairwise(argv)
 
 
 # ---------------------------------------------------------------------------

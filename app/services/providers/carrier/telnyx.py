@@ -122,9 +122,7 @@ class TelnyxCarrier:
         owned-numbers listing has it once the purchase lands, so poll briefly.
         """
         for _ in range(_PROVISION_LOOKUP_ATTEMPTS):
-            resp = await self._client.get(
-                "/phone_numbers", params={"filter[phone_number]": number}
-            )
+            resp = await self._client.get("/phone_numbers", params={"filter[phone_number]": number})
             if resp.is_error:
                 logger.error(
                     "Telnyx phone-number lookup failed: number=%s status=%s body=%s",
@@ -137,9 +135,7 @@ class TelnyxCarrier:
             if data:
                 return str(data[0]["id"])
             await asyncio.sleep(_PROVISION_LOOKUP_DELAY_S)
-        raise RuntimeError(
-            f"Telnyx number order for {number} settled without a phone-number id"
-        )
+        raise RuntimeError(f"Telnyx number order for {number} settled without a phone-number id")
 
     async def release_number(self, provider_sid: str) -> None:
         resp = await self._client.delete(f"/phone_numbers/{provider_sid}")
