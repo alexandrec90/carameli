@@ -192,7 +192,7 @@
       "problemMatcher": []
     },
     {
-      "label": "Test: Run pytest",
+      "label": "Test: Run pytest — free",
       "type": "process",
       "command": "python",
       "args": ["scripts/notify-wrap.py", "Test: Run pytest", "--", "python", "scripts/run-tests.py"],
@@ -206,7 +206,7 @@
       "problemMatcher": []
     },
     {
-      "label": "Test: All Suites",
+      "label": "Test: All Suites — free",
       "type": "process",
       "command": "python",
       "args": ["scripts/notify-wrap.py", "Test: All Suites", "--", "python", "scripts/run-tests.py", "--all"],
@@ -220,7 +220,7 @@
       "problemMatcher": []
     },
     {
-      "label": "Test: Run pytest (fast, changed only)",
+      "label": "Test: Run pytest (fast, changed only) — free",
       "type": "process",
       "command": "python",
       "args": ["scripts/notify-wrap.py", "Test: Run pytest (fast)", "--", "python", "scripts/run-tests.py", "--fast"],
@@ -234,7 +234,7 @@
       "problemMatcher": []
     },
     {
-      "label": "Test: Run Frontend",
+      "label": "Test: Run Frontend — free",
       "type": "process",
       "command": "python",
       "args": ["scripts/notify-wrap.py", "Test: Run Frontend", "--", "python", "scripts/run-tests.py", "--target", "frontend-tests"],
@@ -248,7 +248,7 @@
       "problemMatcher": []
     },
     {
-      "label": "Test: Run E2E (headless)",
+      "label": "Test: Run E2E (headless) — free",
       "type": "process",
       "command": "python",
       "args": ["scripts/notify-wrap.py", "Test: Run E2E (headless)", "--", "python", "scripts/run-e2e.py"],
@@ -262,7 +262,7 @@
       "problemMatcher": []
     },
     {
-      "label": "Test: Run E2E (headed)",
+      "label": "Test: Run E2E (headed) — free",
       "type": "process",
       "command": "python",
       "args": ["scripts/notify-wrap.py", "Test: Run E2E (headed)", "--", "python", "scripts/run-e2e.py", "--headed"],
@@ -276,7 +276,7 @@
       "problemMatcher": []
     },
     {
-      "label": "Test: Run pytest (slow)",
+      "label": "Test: Run pytest (slow) — free",
       "type": "process",
       "command": "python",
       "args": ["scripts/notify-wrap.py", "Test: Run pytest (slow)", "--", "docker", "compose", "exec", "-T", "app", "pytest", "-m", "slow", "-v", "--tb=short"],
@@ -290,7 +290,7 @@
       "problemMatcher": []
     },
     {
-      "label": "Test: Run Telnyx Sandbox (paid tier 1 — sandbox reads, ~free)",
+      "label": "Test: Run Telnyx Sandbox (paid tier 1 — free / $0, sandbox reads)",
       "detail": "Opt-in paid tier 1. Live Telnyx sandbox reads only (-m 'sandbox and not chargeable'); needs TELNYX_SANDBOX=1 creds. Does not run tier 2/3.",
       "type": "process",
       "command": "python",
@@ -305,7 +305,7 @@
       "problemMatcher": []
     },
     {
-      "label": "Test: Run Telnyx Chargeable (paid tier 2 — SPENDS money)",
+      "label": "Test: Run Telnyx Chargeable (paid tier 2 — est. ~US$1/run: buys a DID + SMS)",
       "detail": "Opt-in paid tier 2 ONLY (-m chargeable): buys a real DID and sends real SMS. Does not re-run tier 1. Needs TELNYX_SANDBOX=1 creds.",
       "type": "process",
       "command": "python",
@@ -320,7 +320,7 @@
       "problemMatcher": []
     },
     {
-      "label": "Test: Run Live E2E (paid tier 3 — real infra + money)",
+      "label": "Test: Run Live E2E (paid tier 3 — est. ~US$0.05-0.25/run: live calls/SMS/recordings)",
       "detail": "Opt-in paid tier 3 ONLY (-m 'live_e2e and not manual'): real calls/SMS/recordings against live infra. Does not re-run tier 1/2. Needs RUN_LIVE_E2E=1 + E2E_* env against a running stack.",
       "type": "process",
       "command": "python",
@@ -335,7 +335,7 @@
       "problemMatcher": []
     },
     {
-      "label": "Test: Run E2E (cross-browser)",
+      "label": "Test: Run E2E (cross-browser) — free",
       "type": "process",
       "command": "python",
       "args": ["scripts/notify-wrap.py", "Test: Run E2E (cross-browser)", "--", "python", "scripts/run-e2e.py", "--cross-browser"],
@@ -349,7 +349,7 @@
       "problemMatcher": []
     },
     {
-      "label": "Test: Run Load (Locust)",
+      "label": "Test: Run Load (Locust) — free (local infra)",
       "type": "process",
       "command": "python",
       "args": ["scripts/notify-wrap.py", "Test: Run Load (Locust)", "--", "python", "scripts/run-load.py"],
@@ -363,7 +363,7 @@
       "problemMatcher": []
     },
     {
-      "label": "Test: Run Mutation (mutmut)",
+      "label": "Test: Run Mutation (mutmut) — free",
       "type": "process",
       "command": "python",
       "args": ["scripts/notify-wrap.py", "Test: Run Mutation (mutmut)", "--", "python", "scripts/run-mutation.py"],
@@ -377,7 +377,7 @@
       "problemMatcher": []
     },
     {
-      "label": "Test: Run Hook Tests (pytest)",
+      "label": "Test: Run Hook Tests (pytest) — free",
       "type": "process",
       "command": "python",
       "args": ["scripts/notify-wrap.py", "Test: Run Hook Tests", "--", "python", "scripts/run-tests.py", "--target", "hook-tests"],
@@ -543,11 +543,11 @@
       "problemMatcher": []
     },
     {
-      "label": "Test: All Checks",
+      "label": "Test: All Checks — free",
       "detail": "Tests only (pytest suites + E2E). Lint is NOT run here — /fix-all lints the working-tree diff after /fix-tests edits source, so an upfront full-repo lint would be stale and wasteful. Use 'Lint: Everything' or 'Lint: Changed Files' to lint standalone.",
       "dependsOn": [
-        "Test: All Suites",
-        "Test: Run E2E (headless)"
+        "Test: All Suites — free",
+        "Test: Run E2E (headless) — free"
       ],
       "dependsOrder": "parallel",
       "group": "test",
