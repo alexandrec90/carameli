@@ -273,7 +273,9 @@ async def test_set_webhook_url_patches_messaging_profile() -> None:
     carrier = _make_carrier(messaging_profile_id="MPreal123")
     expected = "http://localhost:8000/webhooks/telnyx/sms-inbound"
     carrier._client.patch = AsyncMock(return_value=_mock_response(200, {"data": {}}))
-    carrier._client.get = AsyncMock(return_value=_mock_response(200, {"data": {"webhook_url": expected}}))
+    carrier._client.get = AsyncMock(
+        return_value=_mock_response(200, {"data": {"webhook_url": expected}})
+    )
 
     result = await carrier.set_webhook_url()
 
@@ -293,7 +295,9 @@ async def test_set_webhook_url_override_base_strips_trailing_slash() -> None:
     carrier = _make_carrier(messaging_profile_id="MPreal123")
     expected = "https://abc123.ngrok-free.dev/webhooks/telnyx/sms-inbound"
     carrier._client.patch = AsyncMock(return_value=_mock_response(200, {"data": {}}))
-    carrier._client.get = AsyncMock(return_value=_mock_response(200, {"data": {"webhook_url": expected}}))
+    carrier._client.get = AsyncMock(
+        return_value=_mock_response(200, {"data": {"webhook_url": expected}})
+    )
 
     result = await carrier.set_webhook_url(base_url="https://abc123.ngrok-free.dev/")
 
@@ -309,7 +313,9 @@ async def test_set_webhook_url_confirm_polls_until_reflected(monkeypatch) -> Non
     carrier._client.patch = AsyncMock(return_value=_mock_response(200, {"data": {}}))
     carrier._client.get = AsyncMock(
         side_effect=[
-            _mock_response(200, {"data": {"webhook_url": "https://stale.example/webhooks/telnyx/sms-inbound"}}),
+            _mock_response(
+                200, {"data": {"webhook_url": "https://stale.example/webhooks/telnyx/sms-inbound"}}
+            ),
             _mock_response(200, {"data": {"webhook_url": expected}}),
         ]
     )

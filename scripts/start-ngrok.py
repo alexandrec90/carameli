@@ -124,9 +124,7 @@ def main() -> int:
         print(f"Starting ngrok on reserved domain {domain}...")
     else:
         print("Starting ngrok (ephemeral URL — set NGROK_DOMAIN for a stable one)...")
-    subprocess.Popen(
-        build_ngrok_args(domain), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
-    )
+    subprocess.Popen(build_ngrok_args(domain), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
     url = poll_tunnel_url()
     if not url:
