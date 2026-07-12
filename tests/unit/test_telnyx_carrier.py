@@ -264,6 +264,64 @@ async def test_enable_sms_raises_on_error() -> None:
 
 
 # ---------------------------------------------------------------------------
+# set_webhook_url
+# ---------------------------------------------------------------------------
+
+
+async def test_set_webhook_url_patches_messaging_profile() -> None:
+    """Sets the messaging-profile webhook to the configured base + inbound-SMS path."""
+    carrier = _make_carrier(messaging_profile_id="MPreal123")
+    fake_resp = _mock_response(200, {"data": {}})
+    carrier._client.patch = AsyncMock(return_value=fake_resp)
+
+    result = await carrier.set_webhook_url()
+
+    assert result == "http://localhost:8000/webhooks/telnyx/sms-inbound"
+    call_args = carrier._client.patch.call_args
+    assert call_args[0][0] == "/messaging_profiles/MPreal123"
+    assert call_args.kwargs["json"] == {
+        "webhook_url": "http://localhost:8000/webhooks/telnyx/sms-inbound",
+        "webhook_api_version": "2",
+    }
+
+
+async def test_set_webhook_url_override_base_strips_trailing_slash() -> None:
+    """An override base URL wins over the configured one and trailing slashes are trimmed."""
+    carrier = _make_carrier(messaging_profile_id="MPreal123")
+    fake_resp = _mock_response(200, {"data": {}})
+    carrier._client.patch = AsyncMock(return_value=fake_resp)
+
+    result = await carrier.set_webhook_url(base_url="https://abc123.ngrok-free.dev/")
+
+    assert result == "https://abc123.ngrok-free.dev/webhooks/telnyx/sms-inbound"
+    assert (
+        carrier._client.patch.call_args.kwargs["json"]["webhook_url"]
+        == "https://abc123.ngrok-free.dev/webhooks/telnyx/sms-inbound"
+    )
+
+
+async def test_set_webhook_url_unconfigured_profile_raises() -> None:
+    """Without TELNYX_MESSAGING_PROFILE_ID there is no profile to PATCH."""
+    carrier = _make_carrier(messaging_profile_id="")
+    carrier._client.patch = AsyncMock()
+
+    with pytest.raises(ValueError, match="TELNYX_MESSAGING_PROFILE_ID"):
+        await carrier.set_webhook_url(base_url="https://abc123.ngrok-free.dev")
+
+    carrier._client.patch.assert_not_awaited()
+
+
+async def test_set_webhook_url_raises_on_error() -> None:
+    carrier = _make_carrier(messaging_profile_id="MPreal123")
+    fake_resp = _mock_response(422, {"errors": [{"detail": "invalid url"}]})
+    fake_resp.raise_for_status = MagicMock(side_effect=Exception("HTTP 422"))
+    carrier._client.patch = AsyncMock(return_value=fake_resp)
+
+    with pytest.raises(Exception, match="HTTP 422"):
+        await carrier.set_webhook_url(base_url="https://abc123.ngrok-free.dev")
+
+
+# ---------------------------------------------------------------------------
 # get_available_area_codes
 # ---------------------------------------------------------------------------
 

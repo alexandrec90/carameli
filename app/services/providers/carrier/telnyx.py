@@ -26,6 +26,10 @@ _RECENT_MESSAGES_PAGE_SIZE = 250
 _PROVISION_LOOKUP_ATTEMPTS = 5
 _PROVISION_LOOKUP_DELAY_S = 1.0
 
+# Path Telnyx delivers inbound SMS (message.received) and delivery receipts
+# (message.finalized) to. Configured on the messaging profile, not per-number.
+_SMS_WEBHOOK_PATH = "/webhooks/telnyx/sms-inbound"
+
 
 class TelnyxCarrier:
     """CarrierProvider implementation backed by the Telnyx REST API."""
@@ -200,6 +204,45 @@ class TelnyxCarrier:
                 resp.text,
             )
             resp.raise_for_status()
+
+    async def set_webhook_url(self, base_url: str | None = None) -> str:
+        """Point the account's messaging profile at Carameli's inbound-SMS webhook.
+
+        Telnyx delivers inbound SMS and delivery receipts to the URL configured on
+        the *messaging profile* (PATCH /v2/messaging_profiles/{id}), not per-number,
+        so one call repoints every DID assigned to the profile. This lets
+        ``scripts/start-ngrok.py`` update Telnyx whenever the tunnel URL changes
+        instead of editing it by hand in the portal.
+
+        ``base_url`` overrides the carrier's configured webhook base (the ngrok
+        bootstrap passes the freshly-minted tunnel URL); it defaults to the base
+        this carrier was constructed with. Returns the full webhook URL that was set.
+        """
+        if not self._messaging_profile_id:
+            raise ValueError(
+                "TELNYX_MESSAGING_PROFILE_ID is not configured; cannot set webhook URL"
+            )
+        base = (base_url or self._webhook_base_url).rstrip("/")
+        webhook_url = f"{base}{_SMS_WEBHOOK_PATH}"
+        resp = await self._client.patch(
+            f"/messaging_profiles/{self._messaging_profile_id}",
+            json={"webhook_url": webhook_url, "webhook_api_version": "2"},
+        )
+        if resp.is_error:
+            logger.error(
+                "Telnyx set_webhook_url failed: profile=%s url=%s status=%s body=%s",
+                self._messaging_profile_id,
+                webhook_url,
+                resp.status_code,
+                resp.text,
+            )
+            resp.raise_for_status()
+        logger.info(
+            "Telnyx messaging profile %s webhook set to %s",
+            self._messaging_profile_id,
+            webhook_url,
+        )
+        return webhook_url
 
     # ------------------------------------------------------------------
     # Area codes
