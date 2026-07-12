@@ -61,8 +61,18 @@ create new event loops inside tests. Do not use `asyncio.run()`.
 | Marker | Meaning | Excluded from |
 | --- | --- | --- |
 | `slow` | Migration round-trips and other long-running tests | Default run, PR gate |
-| `chargeable` | May incur real or sandbox provider charges | Default run, PR gate, nightly |
-| `sandbox` | Requires live sandbox credentials | Default run — needs `TELNYX_SANDBOX=1` |
+| `paid` | **Umbrella** — costs money or needs paid live infra | **Everything** — `pytest.ini` sets `addopts = ... -m "not paid"` |
+| `sandbox` | Paid tier 1 — live sandbox creds (`TELNYX_SANDBOX=1`), reads only | Default/CI (implies `paid`) |
+| `chargeable` | Paid tier 2 — small real/sandbox charges (buys DIDs, sends SMS) | Default/CI (implies `paid`) |
+| `live_e2e` / `manual` | Paid tier 3 — real infra, real money (`RUN_LIVE_E2E=1`) | Default/CI (implies `paid`) |
+
+**The paid/free contract.** Cost is *tiered*, not flat. Every cost-incurring test carries
+`paid` **plus** its tier marker; the global `-m "not paid"` in `addopts` is the one guard
+that keeps all three tiers out of every default run, the `--all` aggregate, and every CI
+workflow. Never add a paid test to `run-tests.py`'s `_ALL_TARGETS`, and never remove the
+`-m "not paid"` default without an equivalent guard — an automated pipeline must never hit
+a live provider. Opt in explicitly per tier (`-m sandbox`, `-m chargeable`,
+`RUN_LIVE_E2E=1 ... -m paid`).
 
 Skipped/xfail tests must include a linked issue or a one-line reason in the marker.
 Test failures are fixed in application code, not by relaxing assertions.
@@ -71,8 +81,8 @@ Test failures are fixed in application code, not by relaxing assertions.
 @pytest.mark.slow
 async def test_migration_round_trip(...): ...
 
+# Tier 2: carries `paid` (module pytestmark), `sandbox`, and `chargeable`.
 @pytest.mark.chargeable
-@pytest.mark.sandbox
 async def test_provision_and_release_number(...): ...
 ```
 

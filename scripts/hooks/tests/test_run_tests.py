@@ -102,11 +102,29 @@ def test_resolve_argv_non_windows_unchanged(monkeypatch):
 
 def test_telnyx_sandbox_argvs_exclude_chargeable_tests():
     # Money guardrail: with live credentials, the chargeable provision test buys
-    # a real phone number. Neither routine runner path may ever include it.
+    # a real phone number. Neither routine runner path may ever include it. The
+    # `sandbox and not chargeable` marker also opts back in over the global
+    # `-m "not paid"` default so the dedicated task still runs the tier-1 reads.
     for argv in (rt._LOCAL_TELNYX_SANDBOX_ARGV, rt._CI_TELNYX_SANDBOX_ARGV):
         # Adjacent-pair check: the CI argv also contains `python -m pytest`,
         # so a bare index("-m") would find the wrong flag.
-        assert ("-m", "not chargeable") in itertools.pairwise(argv)
+        assert ("-m", "sandbox and not chargeable") in itertools.pairwise(argv)
+        assert "not chargeable" in rt._TELNYX_SANDBOX_MARKER
+
+
+def test_all_targets_excludes_paid_tiers():
+    # "Test: All Suites" runs _ALL_TARGETS; a paid tier there would hit a live
+    # provider on every aggregate run. telnyx-sandbox stays a valid opt-in
+    # --target but must never be in the free aggregate.
+    assert "telnyx-sandbox" not in rt._ALL_TARGETS
+    assert "telnyx-sandbox" in rt._VALID_TARGETS
+    assert set(rt._ALL_TARGETS) == {"pytest", "hook-tests", "frontend-tests"}
+
+
+def test_addopts_excludes_paid_by_default():
+    # The testmon `-o addopts=` override REPLACES pytest.ini's addopts, so the
+    # paid-tier exclusion must be repeated here or fast mode collects paid tests.
+    assert '-m "not paid"' in rt._ADDOPTS
 
 
 # ---------------------------------------------------------------------------

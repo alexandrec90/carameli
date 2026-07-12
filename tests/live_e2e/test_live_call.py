@@ -26,6 +26,7 @@ from tests.live_e2e.helpers import CarameliClient, E2EConfig, live_e2e_skip_reas
 _SKIP = live_e2e_skip_reason()
 pytestmark = [
     pytest.mark.asyncio(loop_scope="session"),
+    pytest.mark.paid,
     pytest.mark.live_e2e,
     pytest.mark.skipif(_SKIP is not None, reason=_SKIP or ""),
 ]

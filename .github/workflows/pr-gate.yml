@@ -51,7 +51,10 @@ jobs:
         # invariants and otherwise only execute in on-demand runs.
         run: pytest scripts/hooks/tests/ -q --tb=short --junit-xml=reports/junit-hooks.xml
       - name: Run critical integration tests
-        run: pytest tests/integration/test_full_flows.py tests/integration/test_contract.py -x -q --tb=short --junit-xml=reports/junit-integration.xml
+        # -m "not paid" is redundant with pytest.ini's addopts but kept explicit:
+        # the PR gate must never hit a live provider even if a paid test is later
+        # added to one of these files.
+        run: pytest tests/integration/test_full_flows.py tests/integration/test_contract.py -x -q --tb=short -m "not paid" --junit-xml=reports/junit-integration.xml
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v7

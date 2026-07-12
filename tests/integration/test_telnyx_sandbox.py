@@ -20,6 +20,7 @@ from app.services.providers.carrier.telnyx import TelnyxCarrier
 
 pytestmark = [
     pytest.mark.asyncio(loop_scope="session"),
+    pytest.mark.paid,
     pytest.mark.sandbox,
     pytest.mark.skipif(
         os.getenv("TELNYX_SANDBOX") != "1",

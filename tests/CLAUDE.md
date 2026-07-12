@@ -61,9 +61,23 @@ live DB, so fall back to static analysis only there. Always also pass `ruff chec
 
 | Marker | When to apply | Excluded from default run |
 | --- | --- | --- |
-| `slow` | Migration round-trips, long Alembic operations | Yes |
-| `chargeable` | Tests that may incur provider charges | Yes |
-| `sandbox` | Requires live sandbox credentials (`TELNYX_SANDBOX=1`) | Yes |
+| `slow` | Migration round-trips, long Alembic operations | Yes (`-m slow` to run) |
+| `paid` | **Umbrella** — any test that costs money or needs paid live infra | Yes — `pytest.ini` sets `addopts = ... -m "not paid"`, so no default/CI run collects one |
+| `sandbox` | Paid **tier 1** — live sandbox creds (`TELNYX_SANDBOX=1`), reads only, ~free | Yes (implies `paid`) |
+| `chargeable` | Paid **tier 2** — small real charges (buys DIDs, sends SMS) | Yes (implies `paid`) |
+| `live_e2e` / `manual` | Paid **tier 3** — real infra, real money (`RUN_LIVE_E2E=1`, see `tests/live_e2e/`) | Yes (implies `paid`) |
+
+**Paid vs free separation.** Every cost-incurring test carries `paid` *and* its tier
+marker. The global `-m "not paid"` in `addopts` is the single guard that keeps paid
+tests out of every default, `--all`, and CI run. Opt in explicitly:
+
+- `pytest -m sandbox` / the **Test: Run Telnyx Sandbox** task (tier 1, no charges)
+- `pytest -m chargeable` (tier 2 — knowingly spends)
+- `RUN_LIVE_E2E=1 pytest tests/live_e2e -m paid` (tier 3)
+
+The free **Test: All Suites** aggregate (`run-tests.py --all`) runs only free targets —
+paid tiers are not in `_ALL_TARGETS`. When adding a paid test, apply `paid` plus the
+tier marker so a cheap sandbox read is never lumped in with a real-money live call.
 
 See `.claude/rules/testing.md` for the settings mutation pattern needed by sandbox/webhook tests.
 
