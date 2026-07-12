@@ -104,7 +104,68 @@ _CI_TELNYX_SANDBOX_ARGV = [
     "--no-header",
     "--color=no",
 ]
-_VALID_TARGETS = {"pytest", "hook-tests", "frontend-tests", "telnyx-sandbox"}
+# telnyx-chargeable -- PAID tier 2, opt-in only. `-m chargeable` selects ONLY the
+# money-spending tests (buys a DID, sends real SMS); it does NOT re-run the tier-1
+# sandbox reads. `chargeable` opts back in over the global `-m "not paid"` default.
+_TELNYX_CHARGEABLE_MARKER = "chargeable"
+_LOCAL_TELNYX_CHARGEABLE_ARGV = [
+    "docker",
+    "compose",
+    "exec",
+    "-T",
+    "-e",
+    "TELNYX_SANDBOX=1",
+    "app",
+    "pytest",
+    "tests/integration/test_telnyx_sandbox.py",
+    "-m",
+    _TELNYX_CHARGEABLE_MARKER,
+    "-v",
+    "--tb=short",
+    "--no-header",
+    "--color=no",
+]
+_CI_TELNYX_CHARGEABLE_ARGV = [
+    "python",
+    "-m",
+    "pytest",
+    "tests/integration/test_telnyx_sandbox.py",
+    "-m",
+    _TELNYX_CHARGEABLE_MARKER,
+    "-v",
+    "--tb=short",
+    "--no-header",
+    "--color=no",
+]
+# live-e2e -- PAID tier 3, opt-in only. Runs ONLY the live suite (real infra, real
+# money) and excludes `manual` (needs a human to answer). Runs on the host, not in
+# the container: the suite observes the live stack from outside (see
+# tests/live_e2e/conftest.py). `-o addopts=` wipes pytest.ini's addopts so its
+# `--ignore=tests/live_e2e` and `-m "not paid"` defaults don't deselect the suite;
+# `-m "live_e2e and not manual"` then selects exactly this tier.
+_LIVE_E2E_MARKER = "live_e2e and not manual"
+_LIVE_E2E_ARGV = [
+    "python",
+    "-m",
+    "pytest",
+    "tests/live_e2e",
+    "-o",
+    "addopts=",
+    "-m",
+    _LIVE_E2E_MARKER,
+    "-v",
+    "--tb=short",
+    "--no-header",
+    "--color=no",
+]
+_VALID_TARGETS = {
+    "pytest",
+    "hook-tests",
+    "frontend-tests",
+    "telnyx-sandbox",
+    "telnyx-chargeable",
+    "live-e2e",
+}
 # Targets whose silent skip invalidates the whole run. "pytest" is the entire
 # backend suite: if it is skipped (pytest missing from the app container, stack
 # down), a green banner would report success while zero backend tests ran.
@@ -241,6 +302,14 @@ def run_named_target(target: str) -> dict[str, tuple[list[str], int]]:
         argv = _CI_TELNYX_SANDBOX_ARGV if IS_CI else _LOCAL_TELNYX_SANDBOX_ARGV
         env = {"TELNYX_SANDBOX": "1"} if IS_CI else None
         return {"telnyx-sandbox": run_argv(argv, extra_env=env)}
+    if target == "telnyx-chargeable":
+        argv = _CI_TELNYX_CHARGEABLE_ARGV if IS_CI else _LOCAL_TELNYX_CHARGEABLE_ARGV
+        env = {"TELNYX_SANDBOX": "1"} if IS_CI else None
+        return {"telnyx-chargeable": run_argv(argv, extra_env=env)}
+    if target == "live-e2e":
+        # Host-run (not in-container); RUN_LIVE_E2E=1 satisfies the suite's skip
+        # gate, and the E2E_* vars come from the caller's environment/.env.
+        return {"live-e2e": run_argv(_LIVE_E2E_ARGV, extra_env={"RUN_LIVE_E2E": "1"})}
     raise ValueError(f"Unknown test target: {target}")
 
 

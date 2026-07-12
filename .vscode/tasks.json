@@ -290,7 +290,8 @@
       "problemMatcher": []
     },
     {
-      "label": "Test: Run Telnyx Sandbox",
+      "label": "Test: Run Telnyx Sandbox (paid tier 1 — sandbox reads, ~free)",
+      "detail": "Opt-in paid tier 1. Live Telnyx sandbox reads only (-m 'sandbox and not chargeable'); needs TELNYX_SANDBOX=1 creds. Does not run tier 2/3.",
       "type": "process",
       "command": "python",
       "args": ["scripts/notify-wrap.py", "Test: Run Telnyx Sandbox", "--", "python", "scripts/run-tests.py", "--target", "telnyx-sandbox"],
@@ -298,6 +299,36 @@
       "presentation": {
         "reveal": "always",
         "panel": "shared",
+        "showReuseMessage": false,
+        "close": false
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Test: Run Telnyx Chargeable (paid tier 2 — SPENDS money)",
+      "detail": "Opt-in paid tier 2 ONLY (-m chargeable): buys a real DID and sends real SMS. Does not re-run tier 1. Needs TELNYX_SANDBOX=1 creds.",
+      "type": "process",
+      "command": "python",
+      "args": ["scripts/notify-wrap.py", "Test: Run Telnyx Chargeable", "--", "python", "scripts/run-tests.py", "--target", "telnyx-chargeable"],
+      "group": "test",
+      "presentation": {
+        "reveal": "always",
+        "panel": "new",
+        "showReuseMessage": false,
+        "close": false
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Test: Run Live E2E (paid tier 3 — real infra + money)",
+      "detail": "Opt-in paid tier 3 ONLY (-m 'live_e2e and not manual'): real calls/SMS/recordings against live infra. Does not re-run tier 1/2. Needs RUN_LIVE_E2E=1 + E2E_* env against a running stack.",
+      "type": "process",
+      "command": "python",
+      "args": ["scripts/notify-wrap.py", "Test: Run Live E2E", "--", "python", "scripts/run-tests.py", "--target", "live-e2e"],
+      "group": "test",
+      "presentation": {
+        "reveal": "always",
+        "panel": "new",
         "showReuseMessage": false,
         "close": false
       },
