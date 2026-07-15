@@ -1,10 +1,19 @@
 name: Nightly
 
 on:
-  # Temporarily disabled: re-enable when tests are stable
-  # schedule:
-  #   - cron: "0 2 * * *"
+  schedule:
+    - cron: "0 2 * * *"
   workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Serialize runs (a manual dispatch during the scheduled run, or a slow run
+# overrunning into the next night) without cancelling — a nightly full suite is
+# worth letting finish.
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
 
 jobs:
   backend-full:
@@ -29,11 +38,7 @@ jobs:
       SESSION_SECRET: nightly-session-secret
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-python@v6
-        with:
-          python-version: "3.12"
-          cache: pip
-      - run: pip install -r requirements.txt -r requirements-dev.txt
+      - uses: ./.github/actions/setup-python-env
       - name: Prepare reports directory
         run: mkdir -p reports
       - name: Apply migrations
@@ -62,12 +67,9 @@ jobs:
         working-directory: frontend
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v6
+      - uses: ./.github/actions/setup-node-env
         with:
-          node-version: "20"
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
-      - run: npm ci
+          install: "true"
       - run: mkdir -p ../reports
       - run: npm run test:run -- --reporter=junit --outputFile=../reports/junit-frontend-nightly.xml
 
@@ -77,16 +79,8 @@ jobs:
     needs: [backend-full]
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-python@v6
-        with:
-          python-version: "3.12"
-          cache: pip
-      - uses: actions/setup-node@v6
-        with:
-          node-version: "20"
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
-      - run: pip install -r requirements.txt -r requirements-dev.txt
+      - uses: ./.github/actions/setup-python-env
+      - uses: ./.github/actions/setup-node-env
       - run: playwright install --with-deps
       - name: Start backend + frontend
         run: |

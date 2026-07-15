@@ -1,0 +1,25 @@
+name: Set up Python env
+description: >-
+  Set up Python 3.12 with pip caching and install the compiled runtime + dev
+  locks. The repository must already be checked out (a local composite action
+  runs from the workspace), so callers keep their own actions/checkout step —
+  its args (ref, fetch-depth) differ per job.
+
+inputs:
+  extra-packages:
+    description: >-
+      Space-separated extra packages to install after the locks (e.g. "mutmut"
+      for the weekly mutation job). Empty by default.
+    required: false
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-python@v6
+      with:
+        python-version: "3.12"
+        cache: pip
+    - name: Install Python dependencies
+      shell: bash
+      run: pip install -r requirements.txt -r requirements-dev.txt ${{ inputs.extra-packages }}

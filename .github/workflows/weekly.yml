@@ -1,10 +1,18 @@
 name: Weekly Hardening
 
 on:
-  # Temporarily disabled: re-enable when tests are stable
-  # schedule:
-  #   - cron: "0 3 * * 0"
+  schedule:
+    - cron: "0 3 * * 0"
   workflow_dispatch:
+
+# Read-only by default; the weekly-reliability-report job opts into issues:write
+# for its own steps via a job-level permissions block.
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
 
 jobs:
   migration-round-trip:
@@ -24,13 +32,13 @@ jobs:
       API_KEY_SECRET: weekly-test-key
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-python@v6
-        with:
-          python-version: "3.12"
-          cache: pip
-      - run: pip install -r requirements.txt -r requirements-dev.txt
+      - uses: ./.github/actions/setup-python-env
       - run: mkdir -p reports
-      - run: pytest tests/unit/test_migration_concerns.py -v -m slow --junit-xml=reports/junit-migration-weekly.xml
+      # "slow and not paid": a bare -m slow would REPLACE pytest.ini's default
+      # -m "not paid" (last -m wins), dropping the paid-tier exclusion for this
+      # job. Re-assert it so a future paid+slow test here can never hit a live
+      # provider -- no scheduled job may ever charge.
+      - run: pytest tests/unit/test_migration_concerns.py -v -m "slow and not paid" --junit-xml=reports/junit-migration-weekly.xml
       - name: Upload migration result
         if: always()
         uses: actions/upload-artifact@v7
@@ -59,11 +67,7 @@ jobs:
       API_KEY_SECRET: weekly-test-key
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-python@v6
-        with:
-          python-version: "3.12"
-          cache: pip
-      - run: pip install -r requirements.txt -r requirements-dev.txt
+      - uses: ./.github/actions/setup-python-env
       - run: mkdir -p reports
       - name: Apply migrations
         run: alembic upgrade head
@@ -81,11 +85,9 @@ jobs:
     continue-on-error: true
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-python@v6
+      - uses: ./.github/actions/setup-python-env
         with:
-          python-version: "3.12"
-          cache: pip
-      - run: pip install -r requirements.txt -r requirements-dev.txt mutmut
+          extra-packages: mutmut
       - run: mkdir -p reports
       - name: Run mutation tests
         run: mutmut run || true

@@ -14,6 +14,7 @@ The pure tree helpers are unit-tested in
 `scripts/hooks/tests/test_sync_agents_context.py`.
 """
 
+import os
 import shutil
 import subprocess
 import sys
@@ -24,21 +25,32 @@ PRUNE_DIRS = {".git", "node_modules", ".venv", "__pycache__"}
 
 
 def iter_files(root: Path):
-    """Yield files under root, skipping PRUNE_DIRS anywhere in the tree."""
-    for path in root.rglob("*"):
-        if path.is_file() and not (PRUNE_DIRS & set(path.parts)):
-            yield path
+    """Yield files under root, pruning PRUNE_DIRS so their subtrees are never walked.
+
+    rglob would stat every entry inside node_modules/.venv (~60k files) before
+    filtering; pruning dirnames in-place keeps this a sub-second walk.
+    """
+    for dirpath, dirnames, filenames in os.walk(root):
+        dirnames[:] = [d for d in dirnames if d not in PRUNE_DIRS]
+        for name in filenames:
+            yield Path(dirpath) / name
 
 
 def sync_claude_md(root: Path) -> tuple[int, int]:
     """Copy CLAUDE.md -> AGENTS.md everywhere; purge orphan AGENTS.md. (copied, deleted)."""
     copied = deleted = 0
-    for claude in iter_files(root):
-        if claude.name == "CLAUDE.md":
-            shutil.copyfile(claude, claude.with_name("AGENTS.md"))
-            copied += 1
-    for agents in iter_files(root):
-        if agents.name == "AGENTS.md" and not agents.with_name("CLAUDE.md").exists():
+    claude_files: list[Path] = []
+    agents_files: list[Path] = []
+    for path in iter_files(root):
+        if path.name == "CLAUDE.md":
+            claude_files.append(path)
+        elif path.name == "AGENTS.md":
+            agents_files.append(path)
+    for claude in claude_files:
+        shutil.copyfile(claude, claude.with_name("AGENTS.md"))
+        copied += 1
+    for agents in agents_files:
+        if not agents.with_name("CLAUDE.md").exists():
             agents.unlink()
             deleted += 1
     return copied, deleted

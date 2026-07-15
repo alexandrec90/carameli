@@ -25,6 +25,7 @@ The harness preloads all source files:
 Read the following files using the Read tool (in parallel where independent):
 
 - `.pre-commit-config.yaml`
+- `requirements-test.txt`
 - `requirements-dev.txt`
 - `frontend/package.json`
 - `.vscode/tasks.json`
@@ -45,7 +46,8 @@ Reference — what to look for in each injected section:
 | Section | What to look for |
 | --- | --- |
 | `.pre-commit-config.yaml` | Every hook `id` — each is an enforced meta tool |
-| `requirements-dev.txt` | Dev-only Python packages: test runners, linters, security scanners, property-based testing |
+| `requirements-test.txt` | In-container test toolchain: test runners, property-based/contract testing |
+| `requirements-dev.txt` | Host-only dev packages: linters, security scanners, type checkers (includes the test lock via `-r`) |
 | `frontend/package.json` | `devDependencies` — ESLint plugins, type checker, Vitest, Stylelint, cspell, markdownlint, Vite plugins |
 | `.vscode/tasks.json` | Every task `label` — maps to a developer workflow action |
 | `scripts/` listing | Every helper script name (`.py`) |

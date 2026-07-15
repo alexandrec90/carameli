@@ -61,8 +61,28 @@ create new event loops inside tests. Do not use `asyncio.run()`.
 | Marker | Meaning | Excluded from |
 | --- | --- | --- |
 | `slow` | Migration round-trips and other long-running tests | Default run, PR gate |
-| `chargeable` | May incur real or sandbox provider charges | Default run, PR gate, nightly |
-| `sandbox` | Requires live sandbox credentials | Default run — needs `TELNYX_SANDBOX=1` |
+| `paid` | **Umbrella** — costs money or needs paid live infra | **Everything** — `pytest.ini` sets `addopts = ... -m "not paid"` |
+| `sandbox` | Paid tier 1 — live sandbox creds (`TELNYX_SANDBOX=1`), reads only | Default/CI (implies `paid`) |
+| `chargeable` | Paid tier 2 — small real/sandbox charges (buys DIDs, sends SMS) | Default/CI (implies `paid`) |
+| `live_e2e` / `manual` | Paid tier 3 — real infra, real money (`RUN_LIVE_E2E=1`) | Default/CI (implies `paid`) |
+
+**The paid/free contract.** Cost is *tiered*, not flat. Every cost-incurring test carries
+`paid` **plus** its tier marker; the global `-m "not paid"` in `addopts` is the one guard
+that keeps all three tiers out of every default run, the `--all` aggregate, and every CI
+workflow. Never add a paid test to `run-tests.py`'s `_ALL_TARGETS`, and never remove the
+`-m "not paid"` default without an equivalent guard — an automated pipeline must never hit
+a live provider. Opt in explicitly per tier (`-m sandbox`, `-m chargeable`,
+`RUN_LIVE_E2E=1 ... -m paid`).
+
+**Recurring-cost cleanup (mandatory for `chargeable`).** A provisioned Telnyx DID is a
+*recurring monthly* charge from the moment it is ordered — not a one-off. Any test that
+provisions a number (or any other billable, persisted provider resource) must release it
+in a `finally`, with the resource id resolved **before** the first assertion, so an
+assertion failure or a flaky release can never leak the resource into a monthly bill.
+Never place an `assert` between the order and the release outside the `try`. This is the
+only place in the suite that buys a recurring resource; keep it that way — reuse the
+pre-owned `TELNYX_TEST_*` / `E2E_DID_*` numbers for send/receive tests rather than
+provisioning new ones.
 
 Skipped/xfail tests must include a linked issue or a one-line reason in the marker.
 Test failures are fixed in application code, not by relaxing assertions.
@@ -71,8 +91,8 @@ Test failures are fixed in application code, not by relaxing assertions.
 @pytest.mark.slow
 async def test_migration_round_trip(...): ...
 
+# Tier 2: carries `paid` (module pytestmark), `sandbox`, and `chargeable`.
 @pytest.mark.chargeable
-@pytest.mark.sandbox
 async def test_provision_and_release_number(...): ...
 ```
 

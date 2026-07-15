@@ -1,0 +1,52 @@
+# Destructive-task template: evaluates the /fix-prs skill's ONE headless-testable
+# slice — its offline/degraded path (SKILL Step 0). The gh checkout → push → merge
+# lifecycle can't run in a throwaway worktree with no remote/PR (that gap is
+# documented in evals/README.md), so this task seeds the state that path handles:
+# `gh` unreachable + a canonical failure artifact already in logs/. The skill should
+# recognise it, route the backend-test failure to /fix-tests, and repair the fixture.
+#
+# Flow (all inside a throwaway worktree — the real repo is never touched):
+#   1. setup.cjs seeds logs/test-failures.log describing a failing test
+#   2. the agent runs /fix-prs, which (no reachable PR) falls back to the local fix
+#   3. verify.cjs runs the repaired code and reports pass/fail as metadata
+#
+# NOTE: the worktree is checked out from committed HEAD, so the fixture and this task
+# must be committed before `npm run eval` — uncommitted files won't be present.
+
+- metadata:
+    # Ablating the skill dir makes the /fix-prs arm fall back to baselinePrompt, so
+    # ablation measures "skill scaffolding vs unguided agent on the same problem".
+    targets:
+      - .claude/skills/fix-prs
+  # Multi-step: recognise degraded path, pick the fixer, then fix a logic bug —
+  # capable (Sonnet) tier, matching fix-tests-logic-bug.
+  providers: [with-instructions-capable, baseline-capable]
+  vars:
+    prompt: /fix-prs
+    # The stripped baseline has no /fix-prs skill, so a bare "/fix-prs" would just
+    # error. Hand the baseline the skill's plain-English degraded job instead, so the
+    # comparison is "skill scaffolding vs an unguided agent". The with-instructions
+    # arm ignores this and runs the real /fix-prs.
+    baselinePrompt: >-
+      One or more PRs (or the current checkout) have failing checks, but no PR is
+      reachable here. A canonical failure artifact is in logs/test-failures.log. Read
+      it, find the bug in the implicated source file, and fix it with the smallest edit.
+    setup: tasks/fix-prs-triage/setup.cjs
+    verify: tasks/fix-prs-triage/verify.cjs
+  # Weighted so correctness dominates (>= 0.7 passes); efficiency asserts pull the
+  # score down and surface in the with-vs-baseline delta but don't flip a correct fix.
+  threshold: 0.7
+  assert:
+    # Correctness: the bug is actually fixed. The point of the task.
+    - type: javascript
+      value: context.providerResponse?.metadata?.verifyPassed === true
+      weight: 3
+    # The agent acted rather than just reporting.
+    - type: javascript
+      value: context.providerResponse?.metadata?.madeAnEdit === true
+      weight: 1
+    # Spiral guard: the degraded path is a short-circuit — reach the fix without
+    # thrashing on gh calls or reading half the repo.
+    - type: javascript
+      value: '(context.providerResponse?.metadata?.readsBeforeFirstEdit ?? 99) <= 6'
+      weight: 1

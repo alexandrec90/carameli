@@ -71,6 +71,7 @@ active skin's 3D canvas design constraints. Use the `add-ui-component` skill whe
 
 See `.claude/rules/logging-backend.md` and `.claude/rules/logging-frontend.md`. All activity lands in `logs/runtime/carameli.log`. The global
 exception handler in `app/main.py` writes all unhandled 500s to the log — do not remove it.
+When an integration error is hard to place, `docs/diagnostics-error-map.md` maps every failure mode to where its evidence lands.
 
 ## Tooling
 
@@ -98,15 +99,27 @@ This project is vibe-coded. **Every rule below is mandatory.**
 
 ### Dependencies
 
-Python dependencies are lockfile-managed. The human-edited floors live in
-`requirements.in` (runtime) and `requirements-dev.in` (dev/test only); the
-`requirements*.txt` files are **compiled, fully pinned locks — never hand-edit them**.
-When adding a pip package: add the floor to the right `.in` file, then recompile both
-locks in the same commit (VS Code task "Deps: Recompile Python Lockfiles", or
+Python dependencies are lockfile-managed. The human-edited floors live in three
+`.in` files; the `requirements*.txt` files are **compiled, fully pinned locks —
+never hand-edit them**.
+
+| Floors file | Scope | Installed where |
+| --- | --- | --- |
+| `requirements.in` | runtime | prod image, container, host venv, CI |
+| `requirements-test.in` (includes `-r requirements.in`) | in-container test toolchain (pytest stack, contract-test deps) | Docker `dev` image target, host venv (via dev), CI |
+| `requirements-dev.in` (includes `-r requirements-test.in`) | host-only tooling (ruff, mypy, playwright, locust, …) | host venv, CI — **never the container image** |
+
+When adding a pip package: add the floor to the right `.in` file (if the
+container suite imports it → `-test`; host/CI tooling only → `-dev`), then
+recompile the locks in the same commit (VS Code task "Deps: Recompile Python
+Lockfiles", or
 `python -m uv pip compile --universal --python-version 3.12 requirements.in -o requirements.txt`,
-same for `-dev`). Never leave an import that depends on an unlisted package.
-`--universal` is required — a non-universal compile on Windows silently drops
-Linux-only packages (e.g. `uvloop`) from the container's lock.
+then `-test` with `-c requirements.txt`, then `-dev` with `-c requirements-test.txt`).
+Never leave an import that depends on an unlisted package. `--universal` is
+required — a non-universal compile on Windows silently drops Linux-only packages
+(e.g. `uvloop`) from the container's lock. Keep host-only tooling out of
+`requirements-test.in`: the Docker dev image bakes that lock, and the full dev
+lock balloons it ~5x (playwright, mypy, locust alone are ~250MB).
 
 ### Cross-cutting rules (enforced by scoped rule files)
 
