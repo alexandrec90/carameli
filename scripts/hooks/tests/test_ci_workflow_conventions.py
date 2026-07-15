@@ -93,8 +93,7 @@ def test_scheduled_suites_do_not_cancel_in_progress():
     for name in ("nightly.yml", "weekly.yml"):
         text = _read(WORKFLOWS_DIR / name)
         assert "cancel-in-progress: false" in text, (
-            f"{name}: a scheduled full suite must be allowed to finish "
-            "(cancel-in-progress: false)."
+            f"{name}: a scheduled full suite must be allowed to finish (cancel-in-progress: false)."
         )
 
 
@@ -107,9 +106,7 @@ def test_sandbox_workflow_is_dispatch_only():
     # purpose (to say "never add one").
     text = _read(WORKFLOWS_DIR / SANDBOX_WORKFLOW)
     trigger_block = text.split("\npermissions:", 1)[0]
-    code_lines = [
-        ln for ln in trigger_block.splitlines() if not ln.lstrip().startswith("#")
-    ]
+    code_lines = [ln for ln in trigger_block.splitlines() if not ln.lstrip().startswith("#")]
     for forbidden in ("schedule:", "pull_request:", "push:"):
         offenders = [ln for ln in code_lines if ln.strip().startswith(forbidden)]
         assert not offenders, (

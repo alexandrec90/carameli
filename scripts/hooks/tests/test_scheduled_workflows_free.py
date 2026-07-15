@@ -73,7 +73,7 @@ def test_no_scheduled_pytest_invocation_can_collect_paid():
             checked += 1
             assert _is_paid_safe(cmd), (
                 f"{path.name}: pytest invocation may collect a paid test -- it overrides "
-                f'-m / addopts without re-asserting `not paid`:\n  {cmd}\n'
+                f"-m / addopts without re-asserting `not paid`:\n  {cmd}\n"
                 'Add `not paid` to its -m selection (e.g. -m "slow and not paid").'
             )
     # Sanity: the scan actually reached the pytest steps it is meant to protect.
@@ -82,8 +82,10 @@ def test_no_scheduled_pytest_invocation_can_collect_paid():
 
 def test_helper_flags_bare_dash_m_slow_as_unsafe():
     # The exact regression this guard exists for: a bare `-m slow` drops `not paid`.
-    assert _is_paid_safe('pytest tests/unit/test_migration_concerns.py -m slow') is False
-    assert _is_paid_safe('pytest tests/unit/test_migration_concerns.py -m "slow and not paid"') is True
+    assert _is_paid_safe("pytest tests/unit/test_migration_concerns.py -m slow") is False
+    assert (
+        _is_paid_safe('pytest tests/unit/test_migration_concerns.py -m "slow and not paid"') is True
+    )
     # No override -> inherits the addopts default -> safe.
     assert _is_paid_safe("pytest tests/integration/test_resilience.py -v") is True
     # Wiping addopts without re-adding the exclusion is unsafe.

@@ -22,7 +22,9 @@ def test_parse_dotenv_basic_and_quotes_and_comments():
     )
     values = mod.parse_dotenv(text)
     assert values["TELNYX_API_KEY"] == "abc123"  # pragma: allowlist secret
-    assert values["TELNYX_WEBHOOK_SECRET"] == "wh secret"  # quotes stripped  # pragma: allowlist secret
+    assert (
+        values["TELNYX_WEBHOOK_SECRET"] == "wh secret"
+    )  # quotes stripped  # pragma: allowlist secret
     assert values["TELNYX_TEST_FROM_NUMBER"] == "+15551234567"  # single quotes
     assert values["TELNYX_TEST_TO_NUMBER"] == "+15559999999"  # export prefix
     assert values["TELNYX_WEBHOOK_BASE_URL"] == "https://x.ngrok-free.app"

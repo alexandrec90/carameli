@@ -144,7 +144,9 @@ def main(argv: list[str] | None = None) -> int:
         repo = args.repo or _resolve_repo()
     except (subprocess.CalledProcessError, FileNotFoundError) as exc:
         print(f"error: could not resolve the GitHub repo via gh: {exc}", file=sys.stderr)
-        print("Is the GitHub CLI installed and authenticated? Try `gh auth status`.", file=sys.stderr)
+        print(
+            "Is the GitHub CLI installed and authenticated? Try `gh auth status`.", file=sys.stderr
+        )
         return 1
 
     print(f"Syncing {args.env_file.name} -> {repo} environment '{args.environment}'")

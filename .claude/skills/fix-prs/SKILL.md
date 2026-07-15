@@ -66,22 +66,31 @@ determined and need no investigation.
 
 Read the failing **PR Gate** job names and map them. **Do not read the raw CI job log** — it
 buries the real error under ~1000 lines of container-boot noise (see `.claude/rules/tooling.md`).
-Pull the filtered artifact only to learn the failure *class*
-(`gh run download <run-id> -n lint-errors -D logs/` gives the canonical `logs/lint-errors.log`),
-then reproduce locally to get the clean artifact the fixer consumes.
+Pull the filtered artifact **first** — before any local run — to learn the failure *class*
+(`gh run download <run-id> -n lint-errors -D logs/` gives the canonical `logs/lint-errors.log`;
+delete any stale `logs/<name>.log` beforehand — `gh run download` refuses to overwrite an
+existing file), then reproduce locally to get the clean artifact the fixer consumes.
+
+**Skip local reproduction for project-global checks.** Some check results don't depend on
+the diff at all — pip-audit depends on the advisory DB and the installed environment, so a
+local run can both miss what CI flagged and flag local-only venv drift CI never sees. For
+those classes the CI artifact is authoritative: if it plus known-fixes fully determines the
+fix (e.g. lockfile vuln → recompile), apply the fix directly and run the check locally only
+*afterwards*, as verification.
 
 | Failing PR Gate job | Reproduce locally (produces the artifact) | Fixer |
 |---|---|---|
 | Backend unit + integration | `python scripts/run-tests.py` | `/fix-tests` |
 | Frontend unit tests | `python scripts/run-tests.py --target frontend-tests` | `/fix-tests` |
-| Lint | `python scripts/lint-all.py --changed` | `/fix-lint` |
+| Lint | `python scripts/lint-all.py --paths $(git diff --name-only origin/master...HEAD)` — **never `--changed` here**: it scopes to the working-tree diff, which Step 0 guarantees is clean, so it lints 0 files and vacuously passes. `--changed` is only meaningful mid-fix, after a fixer has edited files. | `/fix-lint` |
 | Lockfile environment markers | recompile locks (see known-fixes) | — (commit the recompiled locks) |
 | E2E (nightly / on-demand, not the PR Gate) | `python scripts/run-e2e.py` | `/fix-e2e` |
 
 ## Step 3 — Reproduce locally
 
 `gh pr checkout <N>` (safe — the tree is clean per Step 0), **then** run the mapped check
-script(s). The checkout is what makes this a reproduction: the scripts test whatever is on
+script(s) — unless Step 2 already fully determined the fix for a project-global check, in
+which case apply it and verify after. The checkout is what makes this a reproduction: the scripts test whatever is on
 disk, so without it they'd exercise `master`, not the PR. With the PR's branch checked out they
 write the canonical `logs/*.log` artifacts in the exact format the fixers consume — this is why
 local beats parsing CI: one command regenerates a clean, filtered log and the fixer reruns only
