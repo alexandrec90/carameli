@@ -758,6 +758,34 @@
       "problemMatcher": []
     },
     {
+      "label": "Sandbox: Sync Creds to GitHub (.env → sandbox env)",
+      "detail": "Push the TELNYX_* sandbox creds from .env into the GitHub 'sandbox' environment (secrets + the base-URL variable). Run this whenever you add/update those values in .env. Empty/missing keys are skipped, never blanked. Pass nothing else — .env is the source of truth.",
+      "type": "process",
+      "command": "python",
+      "args": ["scripts/notify-wrap.py", "Sandbox: Sync Creds", "--", "python", "scripts/sync-sandbox-secrets.py"],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "showReuseMessage": false,
+        "close": false
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Sandbox: Sync Creds + Run Tests",
+      "detail": "Sync .env → the 'sandbox' environment, then dispatch the 'Sandbox Tests' workflow (paid tier 1, ~free Telnyx sandbox reads). Use when you want to confirm the creds actually work end-to-end; a plain sync alone does not need this.",
+      "type": "process",
+      "command": "python",
+      "args": ["scripts/notify-wrap.py", "Sandbox: Sync + Run", "--", "python", "scripts/sync-sandbox-secrets.py", "--run"],
+      "presentation": {
+        "reveal": "always",
+        "panel": "new",
+        "showReuseMessage": false,
+        "close": false
+      },
+      "problemMatcher": []
+    },
+    {
       "label": "Lint: Instruction Files",
       "type": "process",
       "command": "python",

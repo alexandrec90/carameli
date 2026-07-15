@@ -13,6 +13,16 @@ def test_iter_files_skips_prune_dirs(tmp_path):
     assert names == {"a.txt"}
 
 
+def test_iter_files_skips_nested_prune_dirs(tmp_path):
+    # Prune dirs anywhere in the tree (e.g. frontend/node_modules) are skipped.
+    nested = tmp_path / "frontend" / "node_modules" / "pkg"
+    nested.mkdir(parents=True)
+    (nested / "b.txt").write_text("b", encoding="utf-8")
+    (tmp_path / "frontend" / "a.txt").write_text("a", encoding="utf-8")
+    names = {p.name for p in mod.iter_files(tmp_path)}
+    assert names == {"a.txt"}
+
+
 def test_sync_claude_md_copies_and_purges(tmp_path):
     sub = tmp_path / "pkg"
     sub.mkdir()

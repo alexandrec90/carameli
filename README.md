@@ -112,10 +112,15 @@ The repository is wired for three CI tiers:
 - `Nightly` (full backend, frontend, and cross-browser coverage)
 - `Weekly Hardening` (migration/resilience/mutation and reliability summary)
 
-Configure a branch protection rule for `master` that requires these checks before merge:
+Merges to `master` are gated by the `Dependabot auto-merge` workflow, which waits for
+`PR Gate` to succeed before merging — this repo's plan (private, no GitHub Pro) has no
+branch protection. If you upgrade to GitHub Pro or make the repo public, add a branch
+protection ruleset on `master` requiring the four PR Gate checks:
 
-- `PR Gate / backend`
-- `PR Gate / frontend`
+- `Backend unit + integration`
+- `Lint`
+- `Frontend unit tests`
+- `Lockfile environment markers`
 
 For weekly reporting, create and pin an open GitHub issue titled `Weekly Test Reliability Report`.
 The weekly workflow auto-discovers that issue by title and posts the summary comment there.

@@ -1,0 +1,24 @@
+name: Set up Node env
+description: >-
+  Set up Node 20 with npm caching keyed on the frontend lockfile. The
+  repository must already be checked out. Optionally runs `npm ci` for the
+  frontend workspace.
+
+inputs:
+  install:
+    description: Run `npm ci --prefix frontend` after setup when "true".
+    required: false
+    default: "false"
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@v6
+      with:
+        node-version: "20"
+        cache: npm
+        cache-dependency-path: frontend/package-lock.json
+    - name: Install Node dependencies
+      if: inputs.install == 'true'
+      shell: bash
+      run: npm ci --prefix frontend

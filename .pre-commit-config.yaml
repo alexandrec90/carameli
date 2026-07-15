@@ -2,8 +2,9 @@ fail_fast: true
 
 # Local hooks are intentionally minimal — nothing here may be slow. Every lint,
 # type, dead-code, and audit check is CI-owned: the PR Gate `lint` job runs
-# scripts/lint-all.py (the same entrypoint as the desktop lint task), and
-# branch protection on master blocks merges until the gate passes. Run
+# scripts/lint-all.py (the same entrypoint as the desktop lint task). Merges to
+# master are gated by the Dependabot auto-merge workflow, which waits for PR Gate
+# to pass before merging (this repo's plan has no branch protection). Run
 # `python scripts/lint-all.py` locally only when you want early feedback.
 repos:
   - repo: local

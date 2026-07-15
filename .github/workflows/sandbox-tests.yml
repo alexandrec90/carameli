@@ -1,0 +1,96 @@
+name: Sandbox Tests
+
+# Manually dispatched ONLY. This is the single workflow permitted to run a paid
+# tier -- tier 1 "sandbox": live Telnyx sandbox credentials, reads only, ~free
+# (see pytest.ini markers). It must NEVER gain a `schedule:` trigger: an
+# automated run hitting a live provider is exactly the invariant the repo
+# forbids. Two guards enforce dispatch-only here:
+#   * scripts/hooks/tests/test_ci_workflow_conventions.py asserts no schedule:,
+#   * scripts/hooks/tests/test_scheduled_workflows_free.py would (if a schedule:
+#     were ever added) reject the `-m sandbox` step for dropping `not paid`.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Serialize manual runs; never cancel one mid-flight (a paid run may be part way
+# through talking to the provider).
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  sandbox:
+    name: Telnyx sandbox tier
+    runs-on: ubuntu-latest
+    # The `sandbox` environment scopes the credentials below to this job. Attach
+    # a required-reviewer protection rule to it if you want a manual gate before
+    # each run (recommended once you add the chargeable tier, which spends real
+    # money). Create it once with:
+    #   gh api -X PUT repos/OWNER/REPO/environments/sandbox
+    environment: sandbox
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: carameli
+          # Throwaway password for the ephemeral CI service container, not a secret.
+          POSTGRES_PASSWORD: carameli_local_dev # pragma: allowlist secret
+          POSTGRES_DB: carameli
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd="pg_isready -U carameli"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+    env:
+      DATABASE_URL: postgresql+asyncpg://carameli:carameli_local_dev@localhost:5432/carameli # pragma: allowlist secret
+      REDIS_URL: redis://localhost:6379
+      # Throwaway app secrets — these are NOT the sandbox provider credentials.
+      API_KEY_SECRET: ci-test-key # pragma: allowlist secret
+      SESSION_SECRET: ci-session-secret # pragma: allowlist secret
+      # Tier-1 opt-in flag: the sandbox tests skip unless this is exactly "1".
+      TELNYX_SANDBOX: "1"
+      # Real sandbox credentials, scoped to the `sandbox` environment. Populate
+      # with `gh secret set <NAME> --env sandbox`; absent → the tests skip.
+      TELNYX_API_KEY: ${{ secrets.TELNYX_API_KEY }}
+      TELNYX_WEBHOOK_SECRET: ${{ secrets.TELNYX_WEBHOOK_SECRET }}
+      TELNYX_MESSAGING_PROFILE_ID: ${{ secrets.TELNYX_MESSAGING_PROFILE_ID }}
+      # Owned Telnyx DIDs used by the SMS send/receive sandbox tests.
+      TELNYX_TEST_FROM_NUMBER: ${{ secrets.TELNYX_TEST_FROM_NUMBER }}
+      TELNYX_TEST_TO_NUMBER: ${{ secrets.TELNYX_TEST_TO_NUMBER }}
+      # Non-secret base URL (your stable ngrok domain) as an environment var.
+      TELNYX_WEBHOOK_BASE_URL: ${{ vars.TELNYX_WEBHOOK_BASE_URL }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup-python-env
+      - name: Prepare reports directory
+        run: mkdir -p reports
+      - name: Apply migrations
+        run: alembic upgrade head
+      - name: Preflight — sandbox credentials present
+        # Fail loudly instead of a silent all-skipped green run: the sandbox
+        # tests are `pytest.mark.skipif` on TELNYX_SANDBOX / TELNYX_API_KEY, so
+        # an unconfigured environment would otherwise report "passed" having run
+        # nothing at all.
+        run: |
+          if [ -z "$TELNYX_API_KEY" ]; then
+            echo "::error::TELNYX_API_KEY is empty on the 'sandbox' environment."
+            echo "Set the sandbox credentials, then re-dispatch:"
+            echo "  gh secret set TELNYX_API_KEY --env sandbox"
+            exit 1
+          fi
+      - name: Run sandbox tests
+        # `-m sandbox` overrides pytest.ini's default `-m \"not paid\"` (last -m
+        # wins) to opt into tier 1. Safe because this workflow is dispatch-only.
+        run: pytest -m sandbox -v --junit-xml=reports/junit-sandbox.xml
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: sandbox-test-results
+          path: reports/

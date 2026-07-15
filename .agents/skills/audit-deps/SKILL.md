@@ -1,14 +1,16 @@
 ---
 name: audit-deps
 disable-model-invocation: true
-description: 'Audits requirements.txt and requirements-dev.txt for unused, missing, or misplaced Python dependencies. Use when adding or removing packages, or when imports do not match listed requirements.'
+description: 'Audits the requirements floor files (.in) for unused, missing, or misplaced Python dependencies. Use when adding or removing packages, or when imports do not match listed requirements.'
 argument-hint: 'No arguments needed — always scans and applies any required updates.'
 ---
 
 # Skill: Audit Python Dependencies
 
-Scan the codebase imports against `requirements.txt` and `requirements-dev.txt` to
-find misplaced, unused, or missing dependencies.
+Scan the codebase imports against the three human-edited floor files to find
+misplaced, unused, or missing dependencies. The `requirements*.txt` files are
+compiled locks — **never hand-edit them**; every fix lands in a `.in` file
+followed by a lock recompile (see CLAUDE.md → Guardrails → Dependencies).
 
 ---
 
@@ -18,9 +20,10 @@ Read all of the following **in parallel**:
 
 | File | What to extract |
 | --- | --- |
-| `requirements.txt` | Prod dependencies (pinned or lower-bounded) |
-| `requirements-dev.txt` | Dev dependencies (includes `-r requirements.txt`) |
-| `Dockerfile` | Which requirements file is installed in the image |
+| `requirements.in` | Runtime floors (installed everywhere, incl. prod image) |
+| `requirements-test.in` | In-container test toolchain floors (includes `-r requirements.in`) |
+| `requirements-dev.in` | Host-only tooling floors (includes `-r requirements-test.in`) |
+| `Dockerfile` | Which lock each image stage installs (`runtime` → requirements.txt, `dev` → requirements-test.txt) |
 
 ---
 
@@ -29,13 +32,14 @@ Read all of the following **in parallel**:
 Scan **first-party Python source** for all third-party imports:
 
 1. Grep `app/**/*.py` for `import` and `from ... import` statements.
-2. Grep `tests/**/*.py` for the same.
-3. Grep `alembic/**/*.py` for the same.
+2. Grep `tests/**/*.py` for the same — note which are under the
+   container-excluded dirs (`tests/e2e/`, `tests/load/`, `tests/quarantine/`;
+   see `pytest.ini` addopts) since those run on the host only.
+3. Grep `alembic/**/*.py` and `scripts/**/*.py` for the same.
 
 For each import, resolve the PyPI package name (e.g., `import sqlalchemy` maps to
-`sqlalchemy`, `from fastapi import ...` maps to `fastapi`, `import asyncpg` maps to
-`asyncpg`). Use common mapping knowledge for packages where the import name differs
-from the PyPI name:
+`sqlalchemy`, `from fastapi import ...` maps to `fastapi`). Use common mapping
+knowledge for packages where the import name differs from the PyPI name:
 
 | Import | PyPI package |
 | --- | --- |
@@ -51,20 +55,22 @@ from the PyPI name:
 
 ## Step 3 — Classify Each Dependency
 
-For each requirement in both files, classify it:
+For each floor in the three `.in` files, classify it:
 
 | Classification | Rule |
 | --- | --- |
-| **Used in prod** | Imported by files under `app/` or `alembic/` |
-| **Used in dev only** | Imported only by files under `tests/` or dev tooling |
+| **Runtime** | Imported by files under `app/` or `alembic/` → `requirements.in` |
+| **Container test** | Imported by container-run tests (`tests/` minus e2e/load/quarantine) or required by `pytest.ini` options → `requirements-test.in` |
+| **Host tooling** | Only used by host-run tests (e2e/load), lint/type tools, or `scripts/` → `requirements-dev.in` |
 | **Unused** | Not imported anywhere |
-| **Transitive** | Not imported directly but is a known dependency of another package (e.g., `asyncpg` is required by `sqlalchemy[asyncio]`) |
+| **Transitive** | Not imported directly but is a known dependency of another package (e.g., `asyncpg` via `sqlalchemy[asyncio]`) |
 
 Also check for:
 
-- **Missing from requirements**: imported in source but not listed in either file.
-- **Misplaced**: listed in `requirements.txt` (prod) but only used in tests/dev.
-- **Misplaced**: listed in `requirements-dev.txt` but imported in `app/` (should be in prod).
+- **Missing from requirements**: imported in source but not listed in any floor file.
+- **Misplaced**: listed in a floor file whose scope doesn't match where it's imported
+  (e.g. a package in `requirements-dev.in` that container tests import belongs in
+  `requirements-test.in`; anything imported from `app/` belongs in `requirements.in`).
 
 ---
 
@@ -85,28 +91,27 @@ Otherwise, print:
 
 | Package | Current File | Issue | Recommendation |
 |---|---|---|---|
-| locust | requirements-dev.txt | Correct | No change |
-| hypothesis | requirements.txt | Dev-only (tests/) | Move to requirements-dev.txt |
-| pyjwt | (missing) | Imported in app/core/auth.py | Add to requirements.txt |
-| some-unused-lib | requirements.txt | Not imported anywhere | Remove |
+| locust | requirements-dev.in | Correct | No change |
+| hypothesis | requirements-dev.in | Container tests import it | Move to requirements-test.in |
+| pyjwt | (missing) | Imported in app/core/auth.py | Add to requirements.in |
+| some-unused-lib | requirements.in | Not imported anywhere | Remove |
 ```
 
 ---
 
 ## Step 5 — Apply Updates
 
-For each issue:
+All edits target the `.in` floor files only:
 
-- **Misplaced prod→dev**: Remove from `requirements.txt`, add to `requirements-dev.txt`
-  (after the `-r requirements.txt` line).
-- **Misplaced dev→prod**: Remove from `requirements-dev.txt`, add to `requirements.txt`.
-- **Missing**: Add to the appropriate file with a `>=` lower bound matching the
+- **Misplaced**: Move the floor line to the correct `.in` file (keep its version bound).
+- **Missing**: Add to the appropriate `.in` file with a `>=` lower bound matching the
   currently installed version (check with `pip show <package>` if available, otherwise
   use a reasonable recent version).
 - **Unused**: Remove the line. If uncertain (could be a transitive dep), note it in
   the report but do not remove.
 
-Preserve existing version specifiers, comments, and sort order.
+Preserve existing version specifiers, comments, and sort order. Then recompile the
+locks in the same change (VS Code task "Deps: Recompile Python Lockfiles").
 
 ---
 
@@ -116,10 +121,10 @@ Print a final summary of changes made and any packages flagged as uncertain.
 
 ## Checklist
 
-- [ ] `requirements.txt` and `requirements-dev.txt` read
-- [ ] All `app/`, `tests/`, and `alembic/` imports scanned
-- [ ] Each dependency classified (prod / dev / unused / transitive / missing)
-- [ ] Misplaced dependencies moved to correct file
-- [ ] Missing dependencies added
-- [ ] Unused dependencies removed (or flagged if uncertain)
+- [ ] All three `.in` floor files read
+- [ ] All `app/`, `tests/`, `alembic/`, and `scripts/` imports scanned
+- [ ] Each dependency classified (runtime / container-test / host-tooling / unused / transitive / missing)
+- [ ] Misplaced floors moved to the correct `.in` file
+- [ ] Missing floors added, unused removed (or flagged if uncertain)
+- [ ] Locks recompiled (never hand-edited)
 - [ ] Final summary printed
