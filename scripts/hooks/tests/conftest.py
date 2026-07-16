@@ -23,5 +23,8 @@ def load_module(relpath: str):
     mod_name = path.stem.replace("-", "_")
     spec = importlib.util.spec_from_file_location(mod_name, path)
     module = importlib.util.module_from_spec(spec)
+    # Register before exec (importlib docs): stdlib introspection such as
+    # dataclasses' string-annotation resolution looks the module up by name.
+    sys.modules[mod_name] = module
     spec.loader.exec_module(module)
     return module

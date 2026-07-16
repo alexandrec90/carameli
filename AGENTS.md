@@ -97,6 +97,13 @@ so surfacing useful ones saves time.
 
 This project is vibe-coded. **Every rule below is mandatory.**
 
+### Instruction-file feedback loop
+
+If an instruction in a skill, rule, or CLAUDE.md sent you into a dead end or a wasted
+operation — or a mistake you made would have been prevented by one — flag it in your
+report with the file, the line, and a proposed edit (authoring conventions:
+`.claude/rules/authoring.md`). Never silently work around a bad instruction.
+
 ### Dependencies
 
 Python dependencies are lockfile-managed. The human-edited floors live in three

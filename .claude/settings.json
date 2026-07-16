@@ -78,7 +78,27 @@
         ]
       }
     ],
+    "PostToolUseFailure": [
+      {
+        "matcher": ".*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PostToolUseFailure\",\"additionalContext\":\"Failure retro (project policy): if this tool failure traces to an instruction file (a skill, rule, or CLAUDE.md prescribing a wrong command, stale path, or missing guard), flag it with the exact file and line and a proposed edit in your final report - do not just work around it. Routine exploratory failures need no mention.\"},\"suppressOutput\":true}'"
+          }
+        ]
+      }
+    ],
     "PostToolUse": [
+      {
+        "matcher": "^Skill$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PostToolUse\",\"additionalContext\":\"Skill retro (project policy): before your final report, check whether any step of this skill run failed, no-oped, or wasted an operation because of how the skill/rule markdown is written. If so, flag it to the user with the exact file and line and a proposed edit - never silently work around bad instructions.\"},\"suppressOutput\":true}'"
+          }
+        ]
+      },
       {
         "matcher": "^(Edit|Write|MultiEdit|apply_patch|create_file)$",
         "hooks": [
