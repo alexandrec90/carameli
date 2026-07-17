@@ -2,6 +2,7 @@
 
 import itertools
 
+import pytest
 from conftest import load_module
 
 rt = load_module("scripts/run-tests.py")
@@ -45,6 +46,30 @@ def test_parse_cli_args_target_equals_form():
 
 def test_parse_cli_args_all_flag():
     assert rt.parse_cli_args(["--all"]) == (False, "all")
+
+
+def test_parse_cli_args_unknown_arg_raises():
+    # An unrecognized flag must never fall through to the default full-suite
+    # run (--help once silently started one).
+    with pytest.raises(ValueError, match="--helpp"):
+        rt.parse_cli_args(["--helpp"])
+
+
+def test_parse_cli_args_dangling_target_raises():
+    with pytest.raises(ValueError, match="--target"):
+        rt.parse_cli_args(["--target"])
+
+
+def test_help_requested():
+    assert rt.help_requested(["--help"]) is True
+    assert rt.help_requested(["-h"]) is True
+    assert rt.help_requested(["--fast"]) is False
+    assert rt.help_requested([]) is False
+
+
+def test_usage_names_every_valid_target():
+    for target in rt._VALID_TARGETS:
+        assert target in rt.USAGE
 
 
 def test_run_all_merges_every_target(monkeypatch):

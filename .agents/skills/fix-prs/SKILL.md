@@ -80,7 +80,7 @@ fix (e.g. lockfile vuln → recompile), apply the fix directly and run the check
 
 | Failing PR Gate job | Reproduce locally (produces the artifact) | Fixer |
 |---|---|---|
-| Backend unit + integration | `python scripts/run-tests.py` | `/fix-tests` |
+| Backend unit + integration | `python scripts/run-tests.py` — **but if the CI artifact (junit XML / filtered log) localizes the failure to one target, scope it** (`--target hook-tests`, etc.): a full local run can bury the gate's one failure under local-env noise the fixer will chase | `/fix-tests` |
 | Frontend unit tests | `python scripts/run-tests.py --target frontend-tests` | `/fix-tests` |
 | Lint | `python scripts/lint-all.py --paths $(git diff --name-only origin/master...HEAD)` — **never `--changed` here**: it scopes to the working-tree diff, which Step 0 guarantees is clean, so it lints 0 files and vacuously passes. `--changed` is only meaningful mid-fix, after a fixer has edited files. | `/fix-lint` |
 | Lockfile environment markers | recompile locks (see known-fixes) | — (commit the recompiled locks) |
