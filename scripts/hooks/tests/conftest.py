@@ -21,7 +21,20 @@ def load_module(relpath: str):
     """Load a hook script (path relative to repo root) as a module object."""
     path = REPO_ROOT / relpath
     mod_name = path.stem.replace("-", "_")
+    # Cache like a real import: re-registering an already-loaded name would
+    # replace the module object other modules bound at their import time and
+    # break cross-module identity (e.g. prune.restart_engine is
+    # docker_win.restart_engine).
+    if mod_name in sys.modules:
+        return sys.modules[mod_name]
     spec = importlib.util.spec_from_file_location(mod_name, path)
     module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
+    # Register before exec (importlib docs): stdlib introspection such as
+    # dataclasses' string-annotation resolution looks the module up by name.
+    sys.modules[mod_name] = module
+    try:
+        spec.loader.exec_module(module)
+    except BaseException:
+        del sys.modules[mod_name]
+        raise
     return module
