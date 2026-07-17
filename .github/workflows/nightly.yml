@@ -89,10 +89,16 @@ jobs:
         # the runner has none, so seed it from the committed dev defaults.
         # npm ci runs foregrounded via setup-node-env above — backgrounding it
         # with the dev server made the 30s Vite wait race a cold npm install.
+        # The chown hands the bind-mounted logs/ (created root-owned by the
+        # containers) back to the runner user: host pytest imports app.main,
+        # whose logging config opens logs/runtime/carameli.log for append and
+        # dies with PermissionError otherwise. Containers run as root and keep
+        # write access regardless.
         run: |
           cp .env.example .env
           docker compose up -d
           timeout 120 bash -c 'until curl -sf http://localhost:8000/health; do sleep 2; done'
+          sudo chown -R "$(id -u):$(id -g)" logs
           (cd frontend && npm run dev &)
           timeout 60 bash -c 'until curl -sf http://localhost:5173; do sleep 2; done'
       - name: Run cross-browser E2E

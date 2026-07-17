@@ -98,6 +98,12 @@ error under ~1000 lines of container-boot noise (see `.claude/rules/tooling.md`)
 a local reproduction is enough; download an uploaded artifact (`gh run download <run-id> -n <name>`)
 only to learn *which* tests failed (the junit XML) when the job name alone is ambiguous.
 
+Exception — a failing **workflow-plumbing** step (startup, compose up, artifact download) produces
+no artifact, so the log is the only evidence. Read a targeted window, not a tail:
+`gh run view <run-id> --log-failed | grep '##\[error\]'` to get the failure timestamp, then awk the
+±30s window around it (`awk -F'\t' '$3 >= "<t-30s>" && $3 <= "<t>"'`). A plain `tail` lands in
+post-job cleanup noise, and `grep`-guessing keywords takes three passes to converge.
+
 | Failing job (workflow) | Reproduce locally (produces the fixer's artifact) | Fixer |
 |---|---|---|
 | Full backend suite (Nightly) | `python scripts/run-tests.py` | `/fix-tests` |
@@ -126,6 +132,13 @@ tree is clean per Step 0):
 ```
 git checkout master && git pull && git checkout -b fix/<workflow>-<YYYY-MM-DD>
 ```
+
+The tree state was captured at Step 0, but **re-check `git status --porcelain` immediately before
+branching** — a concurrent session may have committed or moved the work in the meantime (this
+happened: a parallel session moved the dirty file to its own branch mid-run, and the stale Step-0
+snapshot turned the preservation commit into a confusing no-op). If the state differs from Step 0,
+re-derive the preservation plan — `git reflog` is the fast arbiter of where the work went — instead
+of proceeding on the stale snapshot.
 
 **Then** run the mapped check script(s). They write the canonical `logs/*.log` artifacts in the exact
 format the fixers consume — this is why local beats parsing CI: one command regenerates a clean,
