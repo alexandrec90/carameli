@@ -265,8 +265,28 @@ def parse_testmon_selection(dual_out: str) -> tuple[int, int]:
     return selected, total
 
 
+USAGE = """usage: python scripts/run-tests.py [--fast] [--all] [--target <name>]
+
+  (no args)        full backend suite (in-container xdist locally; direct on CI)
+  --fast           changed-only via testmon, xdist fallback (default suite only)
+  --all            every FREE target (pytest, hook-tests, frontend-tests)
+  --target <name>  one of: pytest, hook-tests, frontend-tests, webhook-e2e,
+                   telnyx-sandbox, telnyx-chargeable, live-e2e
+
+Failures are written to logs/test-failures.log (frontend split out on CI)."""
+
+
+def help_requested(argv: list[str]) -> bool:
+    """True when the args ask for usage. Pure."""
+    return "-h" in argv or "--help" in argv
+
+
 def parse_cli_args(argv: list[str]) -> tuple[bool, str | None]:
-    """Return (`fast`, `target`) from the CLI args."""
+    """Return (`fast`, `target`) from the CLI args.
+
+    Raises ValueError on any unrecognized argument — an unknown flag falling
+    through must never start the default full-suite run (`.claude/rules/tooling.md`).
+    """
     fast = False
     target: str | None = None
 
@@ -282,6 +302,8 @@ def parse_cli_args(argv: list[str]) -> tuple[bool, str | None]:
         elif arg == "--target" and i + 1 < len(argv):
             target = argv[i + 1]
             i += 1
+        else:
+            raise ValueError(f"Unknown argument: {arg}")
         i += 1
 
     return fast, target
@@ -388,7 +410,15 @@ def run_ci() -> dict[str, tuple[list[str], int]]:
 
 
 def main() -> int:
-    fast, target = parse_cli_args(sys.argv[1:])
+    if help_requested(sys.argv[1:]):
+        print(USAGE)
+        return 0
+    try:
+        fast, target = parse_cli_args(sys.argv[1:])
+    except ValueError as exc:
+        print(exc, file=sys.stderr)
+        print(USAGE, file=sys.stderr)
+        return 2
     if target and target != "all" and target not in _VALID_TARGETS:
         print(
             "Unknown --target. Expected one of: " + ", ".join(sorted(_VALID_TARGETS)),
