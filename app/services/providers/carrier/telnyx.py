@@ -100,8 +100,11 @@ class TelnyxCarrier:
 
     async def provision_number(self, number: str, country_code: str = "US") -> dict:
         # Telnyx sells numbers through number orders; POST /v2/phone_numbers does
-        # not exist (it 404s with error 10005). The order response carries the
-        # phone-number resource id that release_number / enable_sms need.
+        # not exist (it 404s with error 10005). The order response's
+        # phone_numbers[].id is the *number-order-phone-number* record id, not
+        # the phone-number resource id that release_number / enable_sms need
+        # (DELETE /phone_numbers/<order-entry-id> 404s), so the sid is always
+        # resolved from the owned-numbers listing instead.
         resp = await self._client.post(
             "/number_orders",
             json={"phone_numbers": [{"phone_number": number}]},
@@ -114,22 +117,17 @@ class TelnyxCarrier:
                 resp.text,
             )
             resp.raise_for_status()
-        order = resp.json()["data"]
-        entry: dict = next(
-            (p for p in order.get("phone_numbers", []) if p.get("phone_number") == number),
-            {},
-        )
-        provider_sid = entry.get("id") or await self._lookup_phone_number_id(number)
         return {
-            "provider_sid": provider_sid,
+            "provider_sid": await self._lookup_phone_number_id(number),
             "phone_number": number,
         }
 
     async def _lookup_phone_number_id(self, number: str) -> str:
         """Resolve the phone-number resource id for a number we just ordered.
 
-        A still-pending order can omit the resource id from its response; the
-        owned-numbers listing has it once the purchase lands, so poll briefly.
+        The owned-numbers listing is the only source of the real resource id
+        (order responses carry number-order record ids). A still-pending order
+        may not have landed on the account yet, so poll briefly.
         """
         for _ in range(_PROVISION_LOOKUP_ATTEMPTS):
             resp = await self._client.get("/phone_numbers", params={"filter[phone_number]": number})

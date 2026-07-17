@@ -74,19 +74,25 @@ async def test_search_numbers_raises_on_error() -> None:
 
 async def test_provision_number_orders_and_returns_sid_and_number() -> None:
     # Telnyx sells numbers via POST /number_orders (POST /phone_numbers 404s);
-    # the phone-number resource id comes from the order's phone_numbers entries.
+    # the sid must come from the owned-numbers listing — the order response's
+    # phone_numbers[].id is the number-order record id, and releasing with it
+    # 404s against DELETE /phone_numbers (regression: sandbox run 29537431897).
     carrier = _make_carrier()
-    fake_resp = _mock_response(
+    order_resp = _mock_response(
         200,
         {
             "data": {
                 "id": "order123",
                 "status": "success",
-                "phone_numbers": [{"id": "PN123abc", "phone_number": "+14155550100"}],
+                "phone_numbers": [{"id": "NOPN-order-entry", "phone_number": "+14155550100"}],
             }
         },
     )
-    carrier._client.post = AsyncMock(return_value=fake_resp)
+    lookup_resp = _mock_response(
+        200, {"data": [{"id": "PN123abc", "phone_number": "+14155550100"}]}
+    )
+    carrier._client.post = AsyncMock(return_value=order_resp)
+    carrier._client.get = AsyncMock(return_value=lookup_resp)
 
     result = await carrier.provision_number("+14155550100")
 
@@ -94,11 +100,13 @@ async def test_provision_number_orders_and_returns_sid_and_number() -> None:
     call_args = carrier._client.post.call_args
     assert call_args[0][0] == "/number_orders"
     assert call_args.kwargs["json"] == {"phone_numbers": [{"phone_number": "+14155550100"}]}
+    params = carrier._client.get.call_args.kwargs["params"]
+    assert params == {"filter[phone_number]": "+14155550100"}
 
 
 async def test_provision_number_pending_order_falls_back_to_lookup() -> None:
-    # A pending order can omit the resource id; it is resolved from the
-    # owned-numbers listing instead.
+    # A pending order lists no resource id at all; the owned-numbers listing
+    # resolves it once the purchase lands.
     carrier = _make_carrier()
     order_resp = _mock_response(
         200,
