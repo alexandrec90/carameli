@@ -107,6 +107,29 @@ def build_artifact(lines: list[str], exit_code: int, fail_count: int) -> str:
     return diagnostics.build_e2e_artifact(lines, exit_code, fail_count)
 
 
+def build_pytest_cmd(venv_python: str, headed: bool, cross_browser: bool) -> list[str]:
+    """Build the pytest command. E2E always runs on the host venv — the container
+    image deliberately excludes playwright (host-only dev tooling, see the
+    Dependencies section of the root CLAUDE.md), so an in-container run can only
+    ever ImportError."""
+    cmd = [
+        venv_python,
+        "-m",
+        "pytest",
+        "tests/e2e/",
+        "-v",
+        "--tb=short",
+        "--no-header",
+        "-p",
+        "no:warnings",
+    ]
+    if cross_browser:
+        cmd += ["--browser=chromium", "--browser=firefox", "--browser=webkit"]
+    if headed:
+        cmd.append("--headed")
+    return cmd
+
+
 def main(argv=None) -> int:
     args = sys.argv[1:] if argv is None else argv
     headed = "--headed" in args or "-Headed" in args
@@ -134,54 +157,7 @@ def main(argv=None) -> int:
             failed=False,
         )
 
-    if cross_browser:
-        cmd = [
-            "docker",
-            "compose",
-            "exec",
-            "-T",
-            "app",
-            "pytest",
-            "tests/e2e/",
-            "--browser=chromium",
-            "--browser=firefox",
-            "--browser=webkit",
-            "-v",
-            "--tb=short",
-        ]
-        print("Running E2E tests...")
-        # Output streams live (uncaptured), so there are no per-test statuses to
-        # report; the shared banner still gives a consistent pass/fail close.
-        code = subprocess.run(cmd, cwd=REPO_ROOT).returncode
-        artifact_text = (
-            ""
-            if code == 0
-            else "# e2e-cross-browser\n"
-            "# fix: inspect docker compose app logs and failing Playwright specs\n"
-            + " ".join(cmd)
-            + "\n"
-        )
-        return script_common.emit_report(
-            noun="E2E",
-            artifact_path=ARTIFACT,
-            statuses=[],
-            artifact_text=artifact_text,
-            failed=code != 0,
-        )
-
-    cmd = [
-        str(venv_python),
-        "-m",
-        "pytest",
-        "tests/e2e/",
-        "-v",
-        "--tb=short",
-        "--no-header",
-        "-p",
-        "no:warnings",
-    ]
-    if headed:
-        cmd.append("--headed")
+    cmd = build_pytest_cmd(str(venv_python), headed, cross_browser)
 
     print("Running E2E tests...")
     # Stream pytest's output line by line so the user sees per-test progress as

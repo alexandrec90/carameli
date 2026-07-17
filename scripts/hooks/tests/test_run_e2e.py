@@ -114,3 +114,26 @@ def test_build_artifact_collection_error_fallback():
     art = mod.build_artifact(lines, exit_code=2, fail_count=0)
     assert "# e2e-collection-error" in art
     assert "ImportError" in art
+
+
+def test_build_pytest_cmd_default_runs_host_pytest():
+    cmd = mod.build_pytest_cmd("/venv/python", headed=False, cross_browser=False)
+    assert cmd[:3] == ["/venv/python", "-m", "pytest"]
+    assert "--headed" not in cmd
+    assert not any(arg.startswith("--browser") for arg in cmd)
+
+
+def test_build_pytest_cmd_cross_browser_stays_on_host():
+    # Regression: the container image has no playwright, so cross-browser must
+    # run on the host venv like every other mode — never via docker compose exec.
+    cmd = mod.build_pytest_cmd("/venv/python", headed=False, cross_browser=True)
+    assert cmd[0] == "/venv/python"
+    assert "docker" not in cmd
+    assert "--browser=chromium" in cmd
+    assert "--browser=firefox" in cmd
+    assert "--browser=webkit" in cmd
+
+
+def test_build_pytest_cmd_headed_appends_flag():
+    cmd = mod.build_pytest_cmd("/venv/python", headed=True, cross_browser=False)
+    assert cmd[-1] == "--headed"
