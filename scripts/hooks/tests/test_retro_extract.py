@@ -14,15 +14,21 @@ mod = load_module(".claude/skills/retro/extract.py")
 
 def _tool_use(tool_id, name, tool_input):
     return json.dumps(
-        {"type": "assistant", "message": {"content": [
-            {"type": "tool_use", "id": tool_id, "name": name, "input": tool_input}
-        ]}}
+        {
+            "type": "assistant",
+            "message": {
+                "content": [{"type": "tool_use", "id": tool_id, "name": name, "input": tool_input}]
+            },
+        }
     )
 
 
 def _tool_result(tool_id, text, is_error=False):
-    block = {"type": "tool_result", "tool_use_id": tool_id,
-             "content": [{"type": "text", "text": text}]}
+    block = {
+        "type": "tool_result",
+        "tool_use_id": tool_id,
+        "content": [{"type": "text", "text": text}],
+    }
     if is_error:
         block["is_error"] = True
     return json.dumps({"type": "user", "message": {"content": [block]}})
@@ -34,23 +40,26 @@ def _write_transcript(path, lines):
 
 
 def _sample_transcript(tmp_path):
-    return _write_transcript(tmp_path / "session.jsonl", [
-        _tool_use("t1", "Bash", {"command": "git status --porcelain"}),
-        _tool_result("t1", "M app/main.py"),
-        # Vacuous: check-style call, empty result, not an error
-        _tool_use("t2", "Bash", {"command": "python scripts/lint-all.py --changed"}),
-        _tool_result("t2", ""),
-        # Failure with snippet
-        _tool_use("t3", "Edit", {"file_path": "app/main.py"}),
-        _tool_result("t3", "old_string not found in file", is_error=True),
-        # Repeated call (2x)
-        _tool_use("t4", "Bash", {"command": "docker compose ps"}),
-        _tool_result("t4", "app running"),
-        _tool_use("t5", "Bash", {"command": "docker compose ps"}),
-        _tool_result("t5", "app running"),
-        "not json at all",  # malformed lines are skipped, not fatal
-        json.dumps({"type": "summary", "summary": "no message key"}),
-    ])
+    return _write_transcript(
+        tmp_path / "session.jsonl",
+        [
+            _tool_use("t1", "Bash", {"command": "git status --porcelain"}),
+            _tool_result("t1", "M app/main.py"),
+            # Vacuous: check-style call, empty result, not an error
+            _tool_use("t2", "Bash", {"command": "python scripts/lint-all.py --changed"}),
+            _tool_result("t2", ""),
+            # Failure with snippet
+            _tool_use("t3", "Edit", {"file_path": "app/main.py"}),
+            _tool_result("t3", "old_string not found in file", is_error=True),
+            # Repeated call (2x)
+            _tool_use("t4", "Bash", {"command": "docker compose ps"}),
+            _tool_result("t4", "app running"),
+            _tool_use("t5", "Bash", {"command": "docker compose ps"}),
+            _tool_result("t5", "app running"),
+            "not json at all",  # malformed lines are skipped, not fatal
+            json.dumps({"type": "summary", "summary": "no message key"}),
+        ],
+    )
 
 
 def test_parse_collects_calls_results_and_errors(tmp_path):
@@ -89,10 +98,15 @@ def test_render_caps_call_list_head_tail(tmp_path):
 
 
 def test_render_empty_sections_say_none(tmp_path):
-    digest = mod.parse_transcript(_write_transcript(tmp_path / "clean.jsonl", [
-        _tool_use("t1", "Read", {"file_path": "README.md"}),
-        _tool_result("t1", "contents here"),
-    ]))
+    digest = mod.parse_transcript(
+        _write_transcript(
+            tmp_path / "clean.jsonl",
+            [
+                _tool_use("t1", "Read", {"file_path": "README.md"}),
+                _tool_result("t1", "contents here"),
+            ],
+        )
+    )
     out = mod.render(digest, head=50, tail=50)
     assert out.count("(none)") == 3  # FAILED, REPEATED, VACUOUS all clean
 
@@ -108,10 +122,15 @@ def test_input_key_prefers_known_fields_and_truncates():
 
 def test_main_selects_newest_and_supports_prefix_and_list(tmp_path, capsys):
     import os
-    old = _write_transcript(tmp_path / "aaa-old.jsonl",
-                            [_tool_use("t1", "Bash", {"command": "old cmd"}), _tool_result("t1", "x")])
-    new = _write_transcript(tmp_path / "bbb-new.jsonl",
-                            [_tool_use("t1", "Bash", {"command": "new cmd"}), _tool_result("t1", "x")])
+
+    old = _write_transcript(
+        tmp_path / "aaa-old.jsonl",
+        [_tool_use("t1", "Bash", {"command": "old cmd"}), _tool_result("t1", "x")],
+    )
+    new = _write_transcript(
+        tmp_path / "bbb-new.jsonl",
+        [_tool_use("t1", "Bash", {"command": "new cmd"}), _tool_result("t1", "x")],
+    )
     os.utime(old, (1000, 1000))
     os.utime(new, (2000, 2000))
 

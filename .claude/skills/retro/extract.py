@@ -5,6 +5,7 @@ Prints one line per tool call plus signal sections (failures, repeats, vacuous
 results) so the /retro skill can judge a session without ever loading the raw
 transcript into model context. Output is ASCII-only and capped head+tail.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -136,9 +137,9 @@ def render(digest: Digest, head: int, tail: int) -> str:
     counts: dict[tuple[str, str], int] = {}
     for c in calls:
         counts[(c.tool, c.key)] = counts.get((c.tool, c.key), 0) + 1
-    repeats = sorted(
-        ((n, t, k) for (t, k), n in counts.items() if n >= 2), key=lambda r: -r[0]
-    )[:15]
+    repeats = sorted(((n, t, k) for (t, k), n in counts.items() if n >= 2), key=lambda r: -r[0])[
+        :15
+    ]
     out.extend(f"{n}x {t}  {k}" for n, t, k in repeats)
     if not repeats:
         out.append("(none)")
