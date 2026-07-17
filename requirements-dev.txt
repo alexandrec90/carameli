@@ -39,12 +39,12 @@ blinker==1.9.0
     # via flask
 boolean-py==5.0
     # via license-expression
-boto3==1.43.46
+boto3==1.43.50
     # via
     #   -c requirements-test.txt
     #   -r requirements-dev.in
     #   -r requirements.in
-botocore==1.43.46
+botocore==1.43.50
     # via
     #   -c requirements-test.txt
     #   boto3
@@ -112,7 +112,7 @@ execnet==2.1.2
     # via
     #   -c requirements-test.txt
     #   pytest-xdist
-fastapi==0.139.0
+fastapi==0.139.2
     # via
     #   -c requirements-test.txt
     #   -r requirements.in
@@ -179,7 +179,7 @@ hypothesis==6.156.6
     #   hypothesis-graphql
     #   hypothesis-jsonschema
     #   schemathesis
-hypothesis-graphql==0.13.0
+hypothesis-graphql==0.13.1
     # via
     #   -c requirements-test.txt
     #   schemathesis
@@ -212,7 +212,7 @@ jsonschema==4.26.0
     # via
     #   -c requirements-test.txt
     #   hypothesis-jsonschema
-jsonschema-rs==0.47.0
+jsonschema-rs==0.48.0
     # via
     #   -c requirements-test.txt
     #   schemathesis
@@ -222,7 +222,7 @@ jsonschema-specifications==2025.9.1
     #   jsonschema
 libcst==1.8.6
     # via mutmut
-librt==0.12.0 ; platform_python_implementation != 'PyPy'
+librt==0.13.0 ; platform_python_implementation != 'PyPy'
     # via mypy
 license-expression==30.4.4
     # via cyclonedx-python-lib
@@ -264,7 +264,7 @@ msgpack==1.2.1
     #   locust
 mutmut==3.6.0
     # via -r requirements-dev.in
-mypy==2.2.0
+mypy==2.3.0
     # via -r requirements-dev.in
 mypy-extensions==1.1.0
     # via mypy
@@ -471,13 +471,13 @@ rpds-py==2026.6.3
     #   -c requirements-test.txt
     #   jsonschema
     #   referencing
-ruff==0.15.21
+ruff==0.15.22
     # via -r requirements-dev.in
 s3transfer==0.19.0
     # via
     #   -c requirements-test.txt
     #   boto3
-schemathesis==4.22.4
+schemathesis==4.23.0
     # via
     #   -c requirements-test.txt
     #   -r requirements-test.in
@@ -556,7 +556,7 @@ urllib3==2.7.0
     #   botocore
     #   geventhttpclient
     #   requests
-uv==0.11.28
+uv==0.11.29
     # via -r requirements-dev.in
 uvicorn==0.51.0
     # via
