@@ -480,10 +480,28 @@ TEST_SECTIONS = [
         "npm --prefix frontend run test:run",
     ),
     (
+        "webhook-e2e",
+        "webhook-e2e",
+        filter_pytest_output,
+        "docker compose exec -T app pytest tests/integration/test_webhook_e2e.py -v",
+    ),
+    (
         "telnyx-sandbox",
         "telnyx-sandbox",
         filter_pytest_output,
         "TELNYX_SANDBOX=1 pytest tests/integration/test_telnyx_sandbox.py -v --tb=short",
+    ),
+    (
+        "telnyx-chargeable",
+        "telnyx-chargeable",
+        filter_pytest_output,
+        "TELNYX_SANDBOX=1 pytest tests/integration/test_telnyx_sandbox.py -m chargeable -v",
+    ),
+    (
+        "live-e2e",
+        "live-e2e",
+        filter_pytest_output,
+        "python scripts/run-tests.py --target live-e2e",
     ),
 ]
 

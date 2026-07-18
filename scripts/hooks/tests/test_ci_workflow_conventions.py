@@ -120,7 +120,7 @@ def test_sandbox_workflow_opts_into_the_sandbox_tier_via_environment():
     text = _read(WORKFLOWS_DIR / SANDBOX_WORKFLOW)
     # Runs the tier-1 marker (not the free default), behind a GitHub environment
     # so its credentials are scoped and a reviewer gate can be attached.
-    assert "pytest -m sandbox" in text
+    assert 'pytest -m "sandbox and not chargeable"' in text
     assert "environment: sandbox" in text
     assert "${{ secrets.TELNYX_API_KEY }}" in text
     assert 'TELNYX_SANDBOX: "1"' in text

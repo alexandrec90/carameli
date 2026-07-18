@@ -291,8 +291,23 @@
       "problemMatcher": []
     },
     {
-      "label": "Test: Run Telnyx Sandbox (paid tier 1 — free / $0, sandbox reads)",
-      "detail": "Opt-in paid tier 1. Live Telnyx sandbox reads only (-m 'sandbox and not chargeable'); needs TELNYX_SANDBOX=1 creds. Does not run tier 2/3.",
+      "label": "Test: Webhook Reachability via ngrok — free",
+      "detail": "Runs only the five public tunnel/API/webhook reachability checks. No real calls, SMS, DID purchases, or live-provider actions.",
+      "type": "process",
+      "command": "python",
+      "args": ["scripts/notify-wrap.py", "Test: Webhook Reachability", "--", "python", "scripts/run-tests.py", "--target", "webhook-e2e"],
+      "group": "test",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "showReuseMessage": false,
+        "close": false
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Test: Run Telnyx Sandbox Reads (separate opt-in tier 1 — no billable actions)",
+      "detail": "Separate from every free aggregate. Runs live Telnyx reads and expected-error probes only (-m 'sandbox and not chargeable'); excludes SMS sends, DID purchases, delivery callbacks, and tiers 2/3.",
       "type": "process",
       "command": "python",
       "args": ["scripts/notify-wrap.py", "Test: Run Telnyx Sandbox", "--", "python", "scripts/run-tests.py", "--target", "telnyx-sandbox"],
@@ -774,7 +789,7 @@
     },
     {
       "label": "Sandbox: Sync Creds + Run Tests",
-      "detail": "Sync .env → the 'sandbox' environment, then dispatch the 'Sandbox Tests' workflow (paid tier 1, ~free Telnyx sandbox reads). Use when you want to confirm the creds actually work end-to-end; a plain sync alone does not need this.",
+      "detail": "Sync .env → the 'sandbox' environment, then dispatch the separate tier-1 read-only workflow. Successful SMS sends, DID purchases, and delivery callbacks remain excluded as chargeable tests.",
       "type": "process",
       "command": "python",
       "args": ["scripts/notify-wrap.py", "Sandbox: Sync + Run", "--", "python", "scripts/sync-sandbox-secrets.py", "--run"],

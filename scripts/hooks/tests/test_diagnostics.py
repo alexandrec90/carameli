@@ -4,6 +4,12 @@ import textwrap
 
 import diagnostics as diag
 
+
+def test_test_sections_cover_every_named_external_target():
+    names = {name for name, *_ in diag.TEST_SECTIONS}
+    assert {"webhook-e2e", "telnyx-sandbox", "telnyx-chargeable", "live-e2e"} <= names
+
+
 # ---------------------------------------------------------------------------
 # count_test_summary
 # ---------------------------------------------------------------------------
