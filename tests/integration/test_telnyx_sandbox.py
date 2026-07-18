@@ -90,6 +90,7 @@ async def test_provision_and_release_number(carrier: TelnyxCarrier) -> None:
             await carrier.release_number(provider_sid)
 
 
+@pytest.mark.chargeable
 @_needs_sms_numbers
 async def test_send_sms_sandbox(carrier: TelnyxCarrier) -> None:
     """Send an SMS between the account's own test DIDs and verify no exception."""

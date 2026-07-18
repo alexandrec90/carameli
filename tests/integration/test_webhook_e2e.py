@@ -91,7 +91,7 @@ async def test_jambonz_call_status_webhook_reachable():
 async def test_telnyx_webhook_reachable():
     """Telnyx webhook endpoint responds through the tunnel."""
     resp = await _post(
-        "/webhooks/telnyx",
+        "/webhooks/telnyx/sms-inbound",
         json={
             "data": {
                 "event_type": "message.received",
