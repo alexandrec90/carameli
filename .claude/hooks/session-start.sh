@@ -22,13 +22,20 @@ cd "${CLAUDE_PROJECT_DIR:-.}" || exit 0
 # to upgrade distro-owned packages like PyYAML — and `scripts/lint-all.py`
 # already prepends ./.venv/bin to PATH, so ruff/mypy/pytest resolve without any
 # extra wiring. Match CI: runtime locks + dev linters together.
+#
+# uv (the same resolver that compiled the locks) does the heavy install — an
+# order of magnitude faster than pip on a cold sandbox. One small pip install
+# bootstraps uv at the version pinned in the dev lock, so the installer version
+# is single-sourced from requirements-dev.txt rather than duplicated here.
 echo "[session-start] Installing Python toolchain into .venv (runtime + dev linters)..."
 [ -d .venv ] || python3 -m venv .venv
-./.venv/bin/python -m pip install --quiet --disable-pip-version-check --upgrade pip \
-  || echo "[session-start] WARN: pip self-upgrade failed"
+uv_version="$(sed -nE 's/^uv==([^ ;]+).*/\1/p' requirements-dev.txt | head -n 1)"
 ./.venv/bin/python -m pip install --quiet --disable-pip-version-check \
+  "uv==${uv_version:?requirements-dev.txt has no uv pin}" \
+  || echo "[session-start] WARN: uv bootstrap failed — dependency install may fail"
+./.venv/bin/python -m uv pip install --quiet --python ./.venv/bin/python \
   -r requirements.txt -r requirements-dev.txt \
-  || echo "[session-start] WARN: pip install failed — ruff/mypy/pytest may be unavailable"
+  || echo "[session-start] WARN: uv install failed — ruff/mypy/pytest may be unavailable"
 
 # Persist the venv on PATH for every turn, so bare ruff/pytest/python resolve to
 # it (not only under lint-all.py's internal PATH shim).

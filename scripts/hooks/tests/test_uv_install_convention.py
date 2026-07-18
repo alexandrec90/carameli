@@ -4,7 +4,8 @@ uv (the same resolver that compiles the locks via `scripts/recompile-locks.py`)
 is the installer across every environment that materializes the compiled locks:
 
   * the Docker image build (`Dockerfile`, builder + builder-test stages),
-  * CI (`.github/actions/setup-python-env`), and
+  * CI (`.github/actions/setup-python-env`),
+  * the web-sandbox provisioning hook (`.claude/hooks/session-start.sh`), and
   * the local post-merge reinstall hook (`scripts/hooks/deps-sync.py`, covered
     by test_deps_sync.py).
 
@@ -19,6 +20,7 @@ from conftest import REPO_ROOT
 
 DOCKERFILE = REPO_ROOT / "Dockerfile"
 COMPOSITE = REPO_ROOT / ".github" / "actions" / "setup-python-env" / "action.yml"
+SESSION_START = REPO_ROOT / ".claude" / "hooks" / "session-start.sh"
 
 
 def _read(path) -> str:
@@ -55,4 +57,19 @@ def test_composite_action_installs_the_locks_with_uv():
     )
     assert "pip install -r requirements.txt -r requirements-dev.txt" not in text, (
         "the composite still installs the locks with pip; use uv instead."
+    )
+
+
+def test_session_start_hook_installs_the_locks_with_uv():
+    text = _read(SESSION_START)
+    # uv does the heavy install; the one pip call only bootstraps uv itself.
+    assert "uv pip install" in text, (
+        "session-start.sh should install the toolchain via `uv pip install`."
+    )
+    # uv's version is single-sourced from the dev lock, not hard-coded.
+    assert 'uv==${uv_version' in text, (
+        "session-start.sh should bootstrap the uv version pinned in requirements-dev.txt."
+    )
+    assert "pip install --quiet --disable-pip-version-check \\\n  -r requirements.txt" not in text, (
+        "session-start.sh still installs the locks with pip; use uv instead."
     )
