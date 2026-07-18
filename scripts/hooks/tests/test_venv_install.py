@@ -7,9 +7,7 @@ vi = load_module("scripts/venv-install.py")
 
 
 def test_venv_python_layout_per_os(tmp_path):
-    assert vi.venv_python(tmp_path, windows=True) == (
-        tmp_path / ".venv" / "Scripts" / "python.exe"
-    )
+    assert vi.venv_python(tmp_path, windows=True) == (tmp_path / ".venv" / "Scripts" / "python.exe")
     assert vi.venv_python(tmp_path, windows=False) == tmp_path / ".venv" / "bin" / "python"
 
 

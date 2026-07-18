@@ -67,9 +67,9 @@ def test_session_start_hook_installs_the_locks_with_uv():
         "session-start.sh should install the toolchain via `uv pip install`."
     )
     # uv's version is single-sourced from the dev lock, not hard-coded.
-    assert 'uv==${uv_version' in text, (
+    assert "uv==${uv_version" in text, (
         "session-start.sh should bootstrap the uv version pinned in requirements-dev.txt."
     )
-    assert "pip install --quiet --disable-pip-version-check \\\n  -r requirements.txt" not in text, (
-        "session-start.sh still installs the locks with pip; use uv instead."
-    )
+    assert (
+        "pip install --quiet --disable-pip-version-check \\\n  -r requirements.txt" not in text
+    ), "session-start.sh still installs the locks with pip; use uv instead."

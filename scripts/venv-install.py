@@ -33,8 +33,8 @@ def venv_python(root: Path, *, windows: bool | None = None) -> Path:
     """Path to the venv interpreter (OS-specific bin dir layout)."""
     if windows is None:
         windows = sys.platform.startswith("win")
-    return root / ".venv" / ("Scripts" if windows else "bin") / (
-        "python.exe" if windows else "python"
+    return (
+        root / ".venv" / ("Scripts" if windows else "bin") / ("python.exe" if windows else "python")
     )
 
 
