@@ -132,18 +132,21 @@ The weekly workflow auto-discovers that issue by title and posts the summary com
 Your `.env` already has provider placeholders. To test live calls and SMS:
 
 1. Update `.env` with valid Telnyx + Jambonz credentials
-2. For webhooks (call status and SMS inbound), expose the API via ngrok:
+2. For webhooks (call status and SMS inbound), run the VS Code task
+   **Start: ngrok + Sync URLs + Recreate App/Worker**. It starts the stable dev
+   domain assigned to your ngrok account, synchronizes all public URL settings,
+   updates the Telnyx messaging-profile webhook when its credentials are set,
+   and recreates the app and worker so they reload `.env`.
+
+   The equivalent command is:
 
    ```bash
-   ngrok http 8000
+   python scripts/start-ngrok.py
    ```
 
-3. Set `JAMBONZ_WEBHOOK_BASE_URL` and `TELNYX_WEBHOOK_BASE_URL` in `.env` to the ngrok HTTPS URL
-4. Restart the app:
-
-   ```bash
-   docker compose restart app
-   ```
+3. Confirm the task reports the expected ngrok URL and a successful Telnyx
+   webhook update. Without Telnyx credentials, it prints the URL to configure
+   manually instead.
 
 ---
 

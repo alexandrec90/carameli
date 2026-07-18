@@ -1,18 +1,17 @@
 #!/usr/bin/env python3
-"""Starts ngrok, waits for the tunnel URL, patches .env, repoints Telnyx, and restarts the app.
+"""Start ngrok, synchronize public URLs, repoint Telnyx, and recreate services.
 
-Set ``NGROK_DOMAIN`` (in .env or the environment) to pin a reserved/static ngrok
-domain so the tunnel URL never changes — every ngrok account gets one free dev
-domain (``<name>.ngrok-free.dev``). With a stable domain you configure Telnyx
-once and this script's repoint step becomes a no-op that just confirms it.
+Current ngrok accounts receive one stable, automatically assigned dev domain.
+Running ``ngrok http 8000`` reuses that domain, so no custom domain flag is
+needed. The URL reported by ngrok remains the source of truth and is written to
+every Carameli setting that needs the public API origin.
 
 When ``TELNYX_API_KEY`` and ``TELNYX_MESSAGING_PROFILE_ID`` are set, the script
 also PATCHes the Telnyx messaging profile so inbound SMS / delivery receipts
 follow the new URL — no manual portal edit. Without them it prints the URL to
 set by hand instead.
 
-The pure `set_env_var`, `extract_https_url`, `get_env_value`, and `build_ngrok_args`
-helpers are unit-tested in `scripts/hooks/tests/test_start_ngrok.py`.
+The pure helpers are unit-tested in `scripts/hooks/tests/test_start_ngrok.py`.
 """
 
 import json
@@ -27,7 +26,12 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 ENV_FILE = REPO_ROOT / ".env"
 NGROK_API = "http://localhost:4040/api/tunnels"
-WEBHOOK_KEYS = ["JAMBONZ_WEBHOOK_BASE_URL", "TELNYX_WEBHOOK_BASE_URL", "NGROK_URL"]
+PUBLIC_URL_KEYS = [
+    "JAMBONZ_WEBHOOK_BASE_URL",
+    "TELNYX_WEBHOOK_BASE_URL",
+    "NGROK_URL",
+    "E2E_BASE_URL",
+]
 
 
 def set_env_var(content: str, key: str, val: str) -> tuple[str, bool]:
@@ -42,7 +46,7 @@ def get_env_value(content: str, key: str) -> str:
     """Return the value of `KEY=...` from .env content, or '' if absent/blank.
 
     The live environment takes precedence over the file so an exported override
-    (e.g. a per-shell `NGROK_DOMAIN`) wins.
+    wins.
     """
     env_val = os.environ.get(key)
     if env_val:
@@ -54,17 +58,61 @@ def get_env_value(content: str, key: str) -> str:
 def extract_https_url(tunnels_json: dict) -> str | None:
     """Return the first https public_url from an ngrok /api/tunnels payload."""
     for tunnel in tunnels_json.get("tunnels", []):
-        if tunnel.get("proto") == "https":
-            return tunnel.get("public_url")
+        public_url = tunnel.get("public_url")
+        if tunnel.get("proto") == "https" and isinstance(public_url, str):
+            return public_url
     return None
 
 
-def build_ngrok_args(domain: str = "") -> list[str]:
-    """Build the ngrok CLI args, pinning a reserved static domain when configured."""
-    args = ["ngrok", "http", "8000"]
-    if domain:
-        args.append(f"--domain={domain}")
-    return args
+def build_ngrok_args() -> list[str]:
+    """Build the CLI args that reuse the account's assigned dev domain."""
+    return ["ngrok", "http", "8000"]
+
+
+def build_compose_recreate_args() -> list[str]:
+    """Build the command that reloads .env without recreating dependencies."""
+    return [
+        "docker",
+        "compose",
+        "up",
+        "-d",
+        "--force-recreate",
+        "--no-deps",
+        "app",
+        "worker",
+    ]
+
+
+def build_webhook_test_args(url: str) -> list[str]:
+    """Build the targeted webhook test command shown after setup."""
+    return [
+        "docker",
+        "compose",
+        "exec",
+        "-T",
+        "-e",
+        f"NGROK_URL={url}",
+        "app",
+        "pytest",
+        "tests/integration/test_webhook_e2e.py",
+        "-v",
+    ]
+
+
+def sync_public_urls(content: str, url: str) -> tuple[str, list[tuple[str, bool]]]:
+    """Set every public URL key and report whether each key already existed."""
+    results: list[tuple[str, bool]] = []
+    for key in PUBLIC_URL_KEYS:
+        content, updated = set_env_var(content, key, url)
+        results.append((key, updated))
+    return content, results
+
+
+def ensure_repo_root_importable() -> None:
+    """Make first-party packages importable when this file runs from scripts/."""
+    repo_root = str(REPO_ROOT)
+    if repo_root not in sys.path:
+        sys.path.insert(0, repo_root)
 
 
 def push_webhook_to_telnyx(base_url: str, api_key: str, messaging_profile_id: str) -> str | None:
@@ -77,6 +125,8 @@ def push_webhook_to_telnyx(base_url: str, api_key: str, messaging_profile_id: st
     """
     if not api_key or not messaging_profile_id:
         return None
+
+    ensure_repo_root_importable()
 
     import asyncio
 
@@ -112,7 +162,6 @@ def poll_tunnel_url(attempts: int = 20) -> str | None:
 
 def main() -> int:
     content = ENV_FILE.read_text(encoding="utf-8")
-    domain = get_env_value(content, "NGROK_DOMAIN")
 
     # Kill any existing ngrok process.
     subprocess.run(
@@ -120,11 +169,12 @@ def main() -> int:
     )
     time.sleep(1)
 
-    if domain:
-        print(f"Starting ngrok on reserved domain {domain}...")
-    else:
-        print("Starting ngrok (ephemeral URL — set NGROK_DOMAIN for a stable one)...")
-    subprocess.Popen(build_ngrok_args(domain), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    print("Starting ngrok on the account's assigned dev domain...")
+    try:
+        subprocess.Popen(build_ngrok_args(), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except OSError as exc:
+        print(f"Could not start ngrok: {exc}", file=sys.stderr)
+        return 1
 
     url = poll_tunnel_url()
     if not url:
@@ -135,8 +185,8 @@ def main() -> int:
         return 1
 
     print(f"Tunnel URL: {url}")
-    for key in WEBHOOK_KEYS:
-        content, updated = set_env_var(content, key, url)
+    content, sync_results = sync_public_urls(content, url)
+    for key, updated in sync_results:
         print(f"{'Updated' if updated else 'Added'} {key} in .env")
     ENV_FILE.write_text(content, encoding="utf-8", newline="")
 
@@ -145,10 +195,12 @@ def main() -> int:
     api_key = get_env_value(content, "TELNYX_API_KEY")
     messaging_profile_id = get_env_value(content, "TELNYX_MESSAGING_PROFILE_ID")
     manual_hint = f"Set the messaging-profile webhook to {url}/webhooks/telnyx/sms-inbound by hand."
+    telnyx_failed = False
     try:
         webhook_url = push_webhook_to_telnyx(url, api_key, messaging_profile_id)
-    except Exception as exc:  # surface the reason; never abort the container restart
-        print(f"WARNING: failed to update Telnyx webhook via API: {exc}", file=sys.stderr)
+    except Exception as exc:  # recreate locally, then return a failing task status
+        telnyx_failed = True
+        print(f"ERROR: failed to update Telnyx webhook via API: {exc}", file=sys.stderr)
         print(f"  {manual_hint}")
     else:
         if webhook_url:
@@ -156,15 +208,22 @@ def main() -> int:
         else:
             print(f"Skipped Telnyx webhook update (Telnyx credentials not set). {manual_hint}")
 
-    print("Restarting app container...")
-    subprocess.run(["docker", "compose", "restart", "app"], cwd=REPO_ROOT)
+    print("Recreating app and worker containers so they reload .env...")
+    compose_result = subprocess.run(build_compose_recreate_args(), cwd=REPO_ROOT)
+    if compose_result.returncode != 0:
+        print(
+            f"ERROR: Docker Compose exited with code {compose_result.returncode}.",
+            file=sys.stderr,
+        )
+        return compose_result.returncode
+
+    if telnyx_failed:
+        return 1
 
     print(f"\nDone. Webhook base URL: {url}")
     print("ngrok dashboard: http://localhost:4040")
     print("\nTo run webhook e2e tests:")
-    print(
-        f"  docker compose exec -e NGROK_URL={url} app pytest tests/integration/test_webhook_e2e.py -v"
-    )
+    print(f"  {' '.join(build_webhook_test_args(url))}")
     return 0
 
 

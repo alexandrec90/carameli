@@ -102,9 +102,10 @@
       "problemMatcher": []
     },
     {
-      "label": "Start: ngrok + Patch .env + Restart App",
-      "type": "shell",
-      "command": "python scripts/start-ngrok.py",
+      "label": "Start: ngrok + Sync URLs + Recreate App/Worker",
+      "type": "process",
+      "command": "python",
+      "args": ["scripts/notify-wrap.py", "Start: ngrok + Sync URLs", "--", "python", "scripts/start-ngrok.py"],
       "presentation": {
         "reveal": "always",
         "panel": "shared",

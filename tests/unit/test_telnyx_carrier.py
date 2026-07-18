@@ -301,13 +301,13 @@ async def test_set_webhook_url_patches_messaging_profile() -> None:
 async def test_set_webhook_url_override_base_strips_trailing_slash() -> None:
     """An override base URL wins over the configured one and trailing slashes are trimmed."""
     carrier = _make_carrier(messaging_profile_id="MPreal123")
-    expected = "https://abc123.ngrok-free.dev/webhooks/telnyx/sms-inbound"
+    expected = "https://abc123.ngrok-free.app/webhooks/telnyx/sms-inbound"
     carrier._client.patch = AsyncMock(return_value=_mock_response(200, {"data": {}}))
     carrier._client.get = AsyncMock(
         return_value=_mock_response(200, {"data": {"webhook_url": expected}})
     )
 
-    result = await carrier.set_webhook_url(base_url="https://abc123.ngrok-free.dev/")
+    result = await carrier.set_webhook_url(base_url="https://abc123.ngrok-free.app/")
 
     assert result == expected
     assert carrier._client.patch.call_args.kwargs["json"]["webhook_url"] == expected
@@ -317,7 +317,7 @@ async def test_set_webhook_url_confirm_polls_until_reflected(monkeypatch) -> Non
     """Read-after-write: keep polling while the profile still reports the old URL."""
     monkeypatch.setattr(telnyx_module, "_WEBHOOK_CONFIRM_DELAY_S", 0.0)
     carrier = _make_carrier(messaging_profile_id="MPreal123")
-    expected = "https://abc123.ngrok-free.dev/webhooks/telnyx/sms-inbound"
+    expected = "https://abc123.ngrok-free.app/webhooks/telnyx/sms-inbound"
     carrier._client.patch = AsyncMock(return_value=_mock_response(200, {"data": {}}))
     carrier._client.get = AsyncMock(
         side_effect=[
@@ -328,7 +328,7 @@ async def test_set_webhook_url_confirm_polls_until_reflected(monkeypatch) -> Non
         ]
     )
 
-    result = await carrier.set_webhook_url(base_url="https://abc123.ngrok-free.dev")
+    result = await carrier.set_webhook_url(base_url="https://abc123.ngrok-free.app")
 
     assert result == expected
     assert carrier._client.get.await_count == 2
@@ -345,7 +345,7 @@ async def test_set_webhook_url_confirm_exhausted_raises(monkeypatch) -> None:
     )
 
     with pytest.raises(RuntimeError, match="did not reflect"):
-        await carrier.set_webhook_url(base_url="https://abc123.ngrok-free.dev")
+        await carrier.set_webhook_url(base_url="https://abc123.ngrok-free.app")
 
     assert carrier._client.get.await_count == 3
 
@@ -356,9 +356,9 @@ async def test_set_webhook_url_confirm_false_skips_poll() -> None:
     carrier._client.patch = AsyncMock(return_value=_mock_response(200, {"data": {}}))
     carrier._client.get = AsyncMock()
 
-    result = await carrier.set_webhook_url(base_url="https://abc123.ngrok-free.dev", confirm=False)
+    result = await carrier.set_webhook_url(base_url="https://abc123.ngrok-free.app", confirm=False)
 
-    assert result == "https://abc123.ngrok-free.dev/webhooks/telnyx/sms-inbound"
+    assert result == "https://abc123.ngrok-free.app/webhooks/telnyx/sms-inbound"
     carrier._client.get.assert_not_awaited()
 
 
@@ -368,7 +368,7 @@ async def test_set_webhook_url_unconfigured_profile_raises() -> None:
     carrier._client.patch = AsyncMock()
 
     with pytest.raises(ValueError, match="TELNYX_MESSAGING_PROFILE_ID"):
-        await carrier.set_webhook_url(base_url="https://abc123.ngrok-free.dev")
+        await carrier.set_webhook_url(base_url="https://abc123.ngrok-free.app")
 
     carrier._client.patch.assert_not_awaited()
 
@@ -380,7 +380,7 @@ async def test_set_webhook_url_raises_on_error() -> None:
     carrier._client.patch = AsyncMock(return_value=fake_resp)
 
     with pytest.raises(Exception, match="HTTP 422"):
-        await carrier.set_webhook_url(base_url="https://abc123.ngrok-free.dev")
+        await carrier.set_webhook_url(base_url="https://abc123.ngrok-free.app")
 
 
 # ---------------------------------------------------------------------------
