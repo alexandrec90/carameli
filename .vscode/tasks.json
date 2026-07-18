@@ -38,7 +38,7 @@
       "label": "Install: Dev Dependencies (venv)",
       "type": "process",
       "command": "python",
-      "args": ["scripts/notify-wrap.py", "Install: Dev Dependencies (venv)", "--", ".venv\\Scripts\\python.exe", "-m", "pip", "install", "-r", "requirements-dev.txt"],
+      "args": ["scripts/notify-wrap.py", "Install: Dev Dependencies (venv)", "--", "python", "scripts/venv-install.py"],
       "presentation": {
         "reveal": "always",
         "panel": "shared",
