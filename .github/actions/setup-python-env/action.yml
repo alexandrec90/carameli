@@ -19,7 +19,16 @@ runs:
     - uses: actions/setup-python@v6
       with:
         python-version: "3.12"
-        cache: pip
-    - name: Install Python dependencies
+    - name: Install uv (version from the compiled dev lock)
       shell: bash
-      run: pip install -r requirements.txt -r requirements-dev.txt ${{ inputs.extra-packages }}
+      run: |
+        set -euo pipefail
+        uv_version=$(sed -nE 's/^uv==([^ ;]+).*/\1/p' requirements-dev.txt | head -n 1)
+        if [[ ! "$uv_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+([a-zA-Z0-9.-]+)?$ ]]; then
+          echo "requirements-dev.txt does not contain a valid uv pin" >&2
+          exit 1
+        fi
+        python -m pip install --disable-pip-version-check "uv==$uv_version"
+    - name: Install Python dependencies with uv
+      shell: bash
+      run: uv pip install --system -r requirements.txt -r requirements-dev.txt ${{ inputs.extra-packages }}

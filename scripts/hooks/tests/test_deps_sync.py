@@ -49,7 +49,10 @@ def test_plan_maps_manifests_to_installs(tmp_path, monkeypatch):
 
     pip_only = ds.plan(["requirements.txt"], tmp_path, venv_py)
     assert len(pip_only) == 1
-    assert pip_only[0][1][:3] == [str(venv_py), "-m", "pip"]
+    assert pip_only[0][1][:4] == [str(venv_py), "-m", "uv", "pip"]
+    # uv must target the venv interpreter, not its own environment.
+    assert "--python" in pip_only[0][1]
+    assert pip_only[0][1][pip_only[0][1].index("--python") + 1] == str(venv_py)
     assert pip_only[0][2] == tmp_path
 
     npm_only = ds.plan(["frontend/package-lock.json"], tmp_path, venv_py)
