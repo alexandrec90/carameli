@@ -101,15 +101,21 @@ def plan(
             )
     if "pip" in kinds:
         py = str(venv_python) if venv_python else sys.executable
+        # uv (installed into the venv via the dev lock) is the installer, same
+        # resolver as the compiled locks. `--python <py>` targets the venv so
+        # packages land there rather than in uv's own environment.
         installs.append(
             (
-                "requirements*.txt -> pip install",
+                "requirements*.txt -> uv pip install",
                 [
                     py,
                     "-m",
+                    "uv",
                     "pip",
                     "install",
                     "-q",
+                    "--python",
+                    py,
                     "-r",
                     "requirements.txt",
                     "-r",

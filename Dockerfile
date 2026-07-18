@@ -4,6 +4,12 @@
 # together, deliberately (dependabot.yml ignores bot bumps of this tag).
 FROM python:3.12-slim AS builder
 
+# uv is the installer for every dependency layer here: the same resolver that
+# compiled the locks, an order of magnitude faster than pip. The pinned tag is
+# maintained by dependabot's `docker` ecosystem; keep it in step with the
+# `uv==` pin in requirements-dev.txt when bumping by hand.
+COPY --from=ghcr.io/astral-sh/uv:0.11.29 /uv /bin/uv
+
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     libpq-dev \
@@ -11,7 +17,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /build
 COPY requirements.txt ./
-RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
+RUN uv pip install --python python3 --no-cache --prefix=/install -r requirements.txt
 
 ### Test-deps stage — layers the in-container test toolchain onto the runtime
 ### set in /install. Uses requirements-test.txt (pytest stack + contract-test
@@ -20,7 +26,7 @@ RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
 FROM builder AS builder-test
 
 COPY requirements-test.txt ./
-RUN pip install --no-cache-dir --prefix=/install -r requirements-test.txt
+RUN uv pip install --python python3 --no-cache --prefix=/install -r requirements-test.txt
 
 ### Shared runtime base — slim image, no compiler
 FROM python:3.12-slim AS base
