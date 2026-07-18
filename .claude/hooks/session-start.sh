@@ -37,9 +37,19 @@ if [ -n "${CLAUDE_ENV_FILE:-}" ]; then
 fi
 
 echo "[session-start] Installing frontend toolchain (eslint/stylelint/tsc)..."
-# npm install (not ci) so a warm cached container reuses node_modules.
+# npm install (not ci) so a warm cached container reuses node_modules. The
+# container's npm may differ from the lockfile author's and rewrite lockfile
+# metadata on install; that churn trips the stop hook's dirty-tree check on
+# otherwise read-only sessions, so restore the lockfile if it was clean before.
+LOCKFILE=frontend/package-lock.json
+lockfile_was_clean=false
+git diff --quiet -- "$LOCKFILE" 2>/dev/null && lockfile_was_clean=true
 npm install --prefix frontend --no-audit --no-fund \
   || echo "[session-start] WARN: npm install failed — frontend linters may be unavailable"
+if $lockfile_was_clean && ! git diff --quiet -- "$LOCKFILE" 2>/dev/null; then
+  git checkout -- "$LOCKFILE" \
+    && echo "[session-start] Restored $LOCKFILE (npm install metadata churn)"
+fi
 
 # External lint binaries lint-all.py shells out to, installed to a PATH dir so
 # `shutil.which(...)` finds them. Best-effort: the runner skips a missing tool
