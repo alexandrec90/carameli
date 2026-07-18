@@ -2,7 +2,7 @@
 
 import itertools
 
-from conftest import load_module
+from conftest import REPO_ROOT, load_module
 
 rt = load_module("scripts/run-tests.py")
 
@@ -112,6 +112,22 @@ def test_telnyx_sandbox_argvs_exclude_chargeable_tests():
         assert "not chargeable" in rt._TELNYX_SANDBOX_MARKER
 
 
+def test_successful_sms_send_is_marked_chargeable():
+    text = (REPO_ROOT / "tests" / "integration" / "test_telnyx_sandbox.py").read_text(
+        encoding="utf-8"
+    )
+    assert "@pytest.mark.chargeable\n@_needs_sms_numbers\nasync def test_send_sms_sandbox" in text
+
+
+def test_webhook_e2e_target_runs_only_tunnel_reachability_file():
+    for argv in (rt._LOCAL_WEBHOOK_E2E_ARGV, rt._CI_WEBHOOK_E2E_ARGV):
+        assert "tests/integration/test_webhook_e2e.py" in argv
+        assert "test_telnyx_sandbox.py" not in " ".join(argv)
+    assert "-T" in rt._LOCAL_WEBHOOK_E2E_ARGV
+    assert "webhook-e2e" in rt._VALID_TARGETS
+    assert "webhook-e2e" not in rt._ALL_TARGETS
+
+
 def test_all_targets_excludes_paid_tiers():
     # "Test: All Suites" runs _ALL_TARGETS; a paid tier there would hit a live
     # provider on every aggregate run. The three paid tiers stay valid opt-in
@@ -149,6 +165,15 @@ def test_run_named_target_routes_every_paid_tier(monkeypatch):
     for target in ("telnyx-sandbox", "telnyx-chargeable", "live-e2e"):
         result = rt.run_named_target(target)
         assert set(result) == {target}
+
+
+def test_run_named_target_routes_webhook_e2e(monkeypatch):
+    monkeypatch.setattr(rt, "run_argv", lambda argv, extra_env=None: ([" ".join(argv)], 0))
+
+    result = rt.run_named_target("webhook-e2e")
+
+    assert set(result) == {"webhook-e2e"}
+    assert "tests/integration/test_webhook_e2e.py" in result["webhook-e2e"][0][0]
 
 
 def test_addopts_excludes_paid_by_default():

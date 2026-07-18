@@ -67,13 +67,36 @@ _CI_HOOK_ARGV = ["python", "-m", "pytest", "scripts/hooks/tests", "-q", "--color
 _CI_FRONTEND_ARGV = ["npm", "--prefix", "frontend", "run", "test:run"]
 _LOCAL_HOOK_ARGV = ["python", "-m", "pytest", "scripts/hooks/tests", "-q", "--color=no"]
 _LOCAL_FRONTEND_ARGV = ["npm", "--prefix", "frontend", "run", "test:run"]
+_LOCAL_WEBHOOK_E2E_ARGV = [
+    "docker",
+    "compose",
+    "exec",
+    "-T",
+    "app",
+    "pytest",
+    "tests/integration/test_webhook_e2e.py",
+    "-v",
+    "--tb=short",
+    "--no-header",
+    "--color=no",
+]
+_CI_WEBHOOK_E2E_ARGV = [
+    "python",
+    "-m",
+    "pytest",
+    "tests/integration/test_webhook_e2e.py",
+    "-v",
+    "--tb=short",
+    "--no-header",
+    "--color=no",
+]
 # The telnyx-sandbox target is a PAID tier and opt-in only (the dedicated "Test:
 # Run Telnyx Sandbox" task) -- it is deliberately absent from _ALL_TARGETS so the
 # free "Test: All Suites" aggregate never touches a live provider. The `-m` here
 # is `sandbox and not chargeable`: `sandbox` opts back in over the global
 # `-m "not paid"` default (see _ADDOPTS / pytest.ini), while `not chargeable`
-# still excludes the tier-2 tests that BUY a real number / send real SMS per run
-# (test_provision_and_release_number). Run those manually with `-m chargeable`.
+# still excludes tier-2 tests that buy a real number, send real SMS, or wait for
+# delivery callbacks. Run those manually with `-m chargeable`.
 _TELNYX_SANDBOX_MARKER = "sandbox and not chargeable"
 _LOCAL_TELNYX_SANDBOX_ARGV = [
     "docker",
@@ -162,14 +185,14 @@ _VALID_TARGETS = {
     "pytest",
     "hook-tests",
     "frontend-tests",
+    "webhook-e2e",
     "telnyx-sandbox",
     "telnyx-chargeable",
     "live-e2e",
 }
-# Targets whose silent skip invalidates the whole run. "pytest" is the entire
-# backend suite: if it is skipped (pytest missing from the app container, stack
-# down), a green banner would report success while zero backend tests ran.
-_CRITICAL_TARGETS = {"pytest"}
+# Targets whose silent skip invalidates the whole run. A dedicated reachability
+# run with no NGROK_URL must fail instead of reporting an all-skipped green pass.
+_CRITICAL_TARGETS = {"pytest", "webhook-e2e"}
 # Order is cosmetic only (results are merged into one dict); pytest first so its
 # "Running pytest..." banner leads the interleaved output. Only FREE targets
 # belong here: "Test: All Suites" runs this set, so a paid tier (telnyx-sandbox,
@@ -298,6 +321,9 @@ def run_named_target(target: str) -> dict[str, tuple[list[str], int]]:
         return {"hook-tests": run_argv(_CI_HOOK_ARGV if IS_CI else _LOCAL_HOOK_ARGV)}
     if target == "frontend-tests":
         return {"frontend-tests": run_argv(_CI_FRONTEND_ARGV if IS_CI else _LOCAL_FRONTEND_ARGV)}
+    if target == "webhook-e2e":
+        argv = _CI_WEBHOOK_E2E_ARGV if IS_CI else _LOCAL_WEBHOOK_E2E_ARGV
+        return {"webhook-e2e": run_argv(argv)}
     if target == "telnyx-sandbox":
         argv = _CI_TELNYX_SANDBOX_ARGV if IS_CI else _LOCAL_TELNYX_SANDBOX_ARGV
         env = {"TELNYX_SANDBOX": "1"} if IS_CI else None

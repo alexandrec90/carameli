@@ -1,7 +1,8 @@
 name: Sandbox Tests
 
 # Manually dispatched ONLY. This is the single workflow permitted to run a paid
-# tier -- tier 1 "sandbox": live Telnyx sandbox credentials, reads only, ~free
+# tier -- tier 1 "sandbox": live Telnyx credentials, reads and expected-error
+# probes only; every successful write carries the excluded `chargeable` marker
 # (see pytest.ini markers). It must NEVER gain a `schedule:` trigger: an
 # automated run hitting a live provider is exactly the invariant the repo
 # forbids. Two guards enforce dispatch-only here:
@@ -60,7 +61,7 @@ jobs:
       TELNYX_API_KEY: ${{ secrets.TELNYX_API_KEY }}
       TELNYX_WEBHOOK_SECRET: ${{ secrets.TELNYX_WEBHOOK_SECRET }}
       TELNYX_MESSAGING_PROFILE_ID: ${{ secrets.TELNYX_MESSAGING_PROFILE_ID }}
-      # Owned Telnyx DIDs used by the SMS send/receive sandbox tests.
+      # Owned Telnyx DIDs are available for separately dispatched chargeable tests.
       TELNYX_TEST_FROM_NUMBER: ${{ secrets.TELNYX_TEST_FROM_NUMBER }}
       TELNYX_TEST_TO_NUMBER: ${{ secrets.TELNYX_TEST_TO_NUMBER }}
       # Non-secret base URL (your stable ngrok domain) as an environment var.
@@ -84,10 +85,9 @@ jobs:
             echo "  gh secret set TELNYX_API_KEY --env sandbox"
             exit 1
           fi
-      - name: Run sandbox tests
-        # `-m sandbox` overrides pytest.ini's default `-m \"not paid\"` (last -m
-        # wins) to opt into tier 1. Safe because this workflow is dispatch-only.
-        run: pytest -m sandbox -v --junit-xml=reports/junit-sandbox.xml
+      - name: Run sandbox read-only tests
+        # Opt into tier 1 while explicitly retaining the billable-action guard.
+        run: pytest -m "sandbox and not chargeable" -v --junit-xml=reports/junit-sandbox.xml
       - name: Upload results
         if: always()
         uses: actions/upload-artifact@v7
