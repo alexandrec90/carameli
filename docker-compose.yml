@@ -2,6 +2,7 @@ services:
   db:
     image: postgres:18
     restart: unless-stopped
+    command: ["postgres", "-c", "shared_preload_libraries=pg_stat_statements"]
     environment:
       POSTGRES_USER: carameli
       POSTGRES_PASSWORD: carameli_local_dev
@@ -32,6 +33,32 @@ services:
     depends_on:
       db:
         condition: service_healthy
+
+  db-backup:
+    build:
+      context: ./backup
+    image: carameli-db-backup
+    restart: unless-stopped
+    environment:
+      PGHOST: db
+      PGPORT: 5432
+      PGUSER: carameli
+      PGPASSWORD: "${BACKUP_DATABASE_PASSWORD:-carameli_local_dev}"
+      PGDATABASE: carameli
+      BACKUP_S3_ENDPOINT: "${BACKUP_S3_ENDPOINT:-http://minio:9000}"
+      BACKUP_S3_ACCESS_KEY_ID: "${BACKUP_S3_ACCESS_KEY_ID:-minioadmin}"
+      BACKUP_S3_SECRET_ACCESS_KEY: "${BACKUP_S3_SECRET_ACCESS_KEY:-minioadmin}"
+      BACKUP_S3_BUCKET: "${BACKUP_S3_BUCKET:-carameli-backups}"
+      BACKUP_INTERVAL_SECONDS: "${BACKUP_INTERVAL_SECONDS:-86400}"
+      BACKUP_KEEP_COUNT: "${BACKUP_KEEP_COUNT:-14}"
+      HEARTBEAT_URL: "${HEARTBEAT_URL:-}"
+    depends_on:
+      db:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
 
   app:
     # The dev target bakes requirements-test.txt into the image so
@@ -173,6 +200,9 @@ services:
   redis:
     image: redis:7-alpine
     restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redisdata:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -342,10 +372,34 @@ services:
       - "9090:9090"
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus-alerts.yml:/etc/prometheus/prometheus-alerts.yml:ro
       - promdata:/prometheus
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"
       - "--storage.tsdb.retention.time=15d"
+    depends_on:
+      - alertmanager
+
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    restart: unless-stopped
+    profiles: ["monitoring"]
+    ports:
+      - "9093:9093"
+    environment:
+      ALERTMANAGER_WEBHOOK_URL: "${ALERTMANAGER_WEBHOOK_URL:-http://host.docker.internal:9099/alerts}"
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >-
+        sed "s|http://host.docker.internal:9099/alerts|$${ALERTMANAGER_WEBHOOK_URL}|g"
+        /etc/alertmanager/alertmanager.yml
+        > /tmp/alertmanager.yml
+        && exec /bin/alertmanager
+        --config.file=/tmp/alertmanager.yml
+        --storage.path=/alertmanager
+    volumes:
+      - ./alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanagerdata:/alertmanager
 
   grafana:
     image: grafana/grafana:10.4.0
@@ -357,8 +411,32 @@ services:
       GF_SECURITY_ADMIN_PASSWORD: "${GRAFANA_ADMIN_PASSWORD:-admin}"
     volumes:
       - grafanadata:/var/lib/grafana
+      - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
     depends_on:
       - prometheus
+      - influxdb
+
+  uptime-kuma:
+    image: louislam/uptime-kuma:1
+    restart: unless-stopped
+    profiles: ["monitoring"]
+    ports:
+      - "3002:3001"
+    volumes:
+      - kumadata:/app/data
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "require('http').get('http://localhost:3001/',r=>process.exit(r.statusCode>=500?1:0)).on('error',()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
 
   minio:
     image: minio/minio:latest
@@ -379,14 +457,30 @@ services:
       retries: 10
       start_period: 5s
 
-  # One-shot: creates the recordings bucket in MinIO if it doesn't exist.
+  # One-shot: creates the recordings and database-backup buckets, then aligns the
+  # recordings lifecycle with RETENTION_DAYS. Backup pruning is handled separately.
   minio-init:
     image: minio/mc:latest
     restart: "no"
+    environment:
+      RETENTION_DAYS: "${RETENTION_DAYS:-0}"
     entrypoint: >
       sh -c "
       mc alias set local http://minio:9000 minioadmin minioadmin &&
       mc mb --ignore-existing local/carameli-recordings &&
+      mc mb --ignore-existing local/carameli-backups &&
+      if [ \"$$RETENTION_DAYS\" -gt 0 ]; then
+        if mc ilm rule ls --json local/carameli-recordings 2>/dev/null |
+          grep -Eq '\"Days\"[[:space:]]*:[[:space:]]*'\"$$RETENTION_DAYS\"'([,}])'; then
+          echo \"Recording lifecycle already set to $$RETENTION_DAYS days\";
+        else
+          mc ilm rule rm --all --force local/carameli-recordings >/dev/null 2>&1 || true;
+          mc ilm rule add --expire-days \"$$RETENTION_DAYS\" local/carameli-recordings;
+        fi;
+      else
+        mc ilm rule rm --all --force local/carameli-recordings >/dev/null 2>&1 || true;
+        echo 'Recording lifecycle disabled';
+      fi &&
       echo 'Bucket ready'
       "
     depends_on:
@@ -395,9 +489,12 @@ services:
 
 volumes:
   pgdata:
+  redisdata:
   jambonzdata:
   influxdata:
   frontend_node_modules:
   promdata:
+  alertmanagerdata:
   grafanadata:
+  kumadata:
   miniodata:

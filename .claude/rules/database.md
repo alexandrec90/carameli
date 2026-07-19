@@ -30,8 +30,8 @@ paths:
 
 - **Soft-delete** with `active: Mapped[bool] = mapped_column(default=True)`.
   Never hard-delete `customers`, `phone_lines`, or `extensions` rows.
-  Hard-deletes are only acceptable for `call_events` rows older than the
-  retention window.
+  Hard-deletes are only acceptable for `call_events` and `sms_messages` rows
+  older than the retention window.
 
 - **`customer_id` FK columns must declare `index=True`** — every migration that
   creates a customer-scoped table also runs `op.create_index("ix_<table>_customer_id", ...)`.

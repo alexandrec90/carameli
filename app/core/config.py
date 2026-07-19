@@ -45,6 +45,11 @@ class Settings(BaseSettings):
     s3_region: str = "us-east-1"
 
     redis_url: str = "redis://redis:6379"
+    heartbeat_url: str = ""
+
+    # Shared retention window for posted call/SMS history and recording objects.
+    # Zero (or a negative value) leaves retention disabled.
+    retention_days: int = 0
 
     rate_limit_sms: str = "60/minute"
     rate_limit_calls: str = "30/minute"
@@ -54,6 +59,10 @@ class Settings(BaseSettings):
 
     log_level: str = "INFO"
     log_file: str = "logs/runtime/carameli.log"
+
+    sentry_dsn: str = ""
+    sentry_environment: str = "dev"
+    sentry_traces_sample_rate: float = 0.0
 
     cors_origins: Annotated[list[str], NoDecode] = Field(
         default=["http://localhost:5173"],

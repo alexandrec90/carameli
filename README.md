@@ -72,6 +72,104 @@ docker compose run --rm app alembic upgrade head
 
 ---
 
+## Backups
+
+The `db-backup` sidecar creates a PostgreSQL custom-format dump on startup and then
+nightly. Dumps are uploaded to the `carameli-backups` bucket and the newest 14 are kept;
+`BACKUP_INTERVAL_SECONDS`, `BACKUP_KEEP_COUNT`, and the `BACKUP_S3_*` settings in
+`.env` override those defaults. Production deployments should use separate backup
+credentials and an external S3-compatible endpoint.
+
+Verify the newest backup by restoring it into a disposable database and reading the
+`call_events` table:
+
+```bash
+python scripts/backup_restore_test.py
+```
+
+Run that check at least monthly. For a real recovery, stop application writes, download
+the selected dump, copy it into the PostgreSQL container, and restore it into a prepared
+database:
+
+```bash
+docker compose cp carameli-20260718T010000Z.dump db:/tmp/carameli.dump
+docker compose exec -T db pg_restore -U carameli -Fc --clean --if-exists -d carameli /tmp/carameli.dump
+```
+
+Test this procedure before relying on it. These dumps provide nightly recovery points,
+not point-in-time recovery; move to pgBackRest or wal-g with continuous WAL archiving
+when the recovery-point objective requires it.
+
+---
+
+## Error Tracking
+
+Unhandled API and ARQ worker errors can be sent to either Sentry SaaS or a
+Sentry-compatible GlitchTip deployment. Copy the project DSN from the selected service
+into `.env`; both the `app` and `worker` services read the same settings:
+
+```dotenv
+SENTRY_DSN=https://public-key@sentry.example.com/project-id
+SENTRY_ENVIRONMENT=production
+SENTRY_TRACES_SAMPLE_RATE=0.0
+```
+
+Leave `SENTRY_DSN` blank to keep error tracking disabled. The default sample rate keeps
+performance tracing off, and the SDK's default PII collection remains off. Restart the
+app and worker after changing these settings.
+
+---
+
+## Monitoring and alerting
+
+Start the provisioned Prometheus, Alertmanager, Grafana, OpenTelemetry Collector, and
+Uptime Kuma with the monitoring profile:
+
+```bash
+docker compose --profile monitoring up -d
+```
+
+Prometheus is available on `:9090`, Alertmanager on `:9093`, Grafana on `:3001`, and
+Uptime Kuma on `:3002`. Grafana automatically loads the Prometheus and Jambonz InfluxDB
+datasources plus the **Carameli Operations** dashboard. Set `GRAFANA_ADMIN_PASSWORD` and
+point `ALERTMANAGER_WEBHOOK_URL` at an operator-managed paging bridge before production
+use. The default receiver URL is only a local placeholder and will not deliver pages
+unless a listener is running there.
+
+On the first visit to Uptime Kuma, create the administrator account, configure a
+notification channel, and add these HTTP monitors:
+
+- Carameli from the Compose network: `http://app:8000/health`
+- Carameli through its public route: the production or ngrok URL ending in `/health`
+- Jambonz from the Compose network: `http://jambonz:3000/health`
+
+For scheduled-job dead-man checks, create six **Push** monitors with push tokens
+`call-event-retry`, `sms-retry`, `agent-status`, `provider-reconciliation`, `retention`,
+and `backup`. Set their expected intervals to match the jobs (30 seconds, 10 minutes, or
+daily, with a reasonable grace period), then configure:
+
+```dotenv
+HEARTBEAT_URL=http://uptime-kuma:3001/api/push
+```
+
+The worker and backup sidecar append the matching token to that base URL after a
+successful run. Leave `HEARTBEAT_URL` blank to disable these pings. A hosted
+healthchecks.io-style endpoint can be used instead if it accepts the same
+`<base-url>/<job-token>` convention.
+
+Kuma on the Carameli host is outside the application containers, but it cannot detect a
+completely dead host or network. For true outside-in coverage, also monitor the public
+`/health` URL from another machine or a hosted service such as UptimeRobot's free tier,
+or run Kuma on a separate host.
+
+The call-volume alert treats weekdays from 13:00 through 21:00 UTC as business hours,
+which approximates 09:00–17:00 US Eastern during daylight time. Adjust the recording
+rule in `prometheus-alerts.yml` when the deployment uses another timezone. A hosted
+Grafana Cloud stack can scrape the same `/metrics` endpoint, but remote-write credentials
+and hosted alert routing are intentionally not included here.
+
+---
+
 ## Exploring the API
 
 FastAPI auto-generates interactive docs at:

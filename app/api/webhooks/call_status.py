@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.database import get_session
+from app.core.metrics import WEBHOOK_FAILURES_TOTAL
 from app.core.sip import agent_sip_uri
 from app.models.phone_line import PhoneLine
 from app.schemas.call_event import WebhookAck
@@ -54,6 +55,7 @@ def _validate_jambonz_signature(raw_body: bytes, signature: str) -> None:
         hashlib.sha256,
     ).hexdigest()
     if not hmac.compare_digest(expected, signature):
+        WEBHOOK_FAILURES_TOTAL.inc()
         raise HTTPException(status_code=403, detail="Invalid Jambonz signature")
 
 
@@ -96,10 +98,12 @@ async def jambonz_call_status_webhook(
     try:
         data: dict[str, Any] = await request.json()
     except Exception:
+        WEBHOOK_FAILURES_TOTAL.inc()
         logger.warning("Jambonz call-status webhook received non-JSON body")
         return Response(status_code=400)
 
     if not isinstance(data, dict):
+        WEBHOOK_FAILURES_TOTAL.inc()
         logger.warning(
             "Jambonz call-status webhook received non-dict payload type: %s", type(data).__name__
         )
@@ -129,6 +133,7 @@ async def jambonz_call_status_webhook(
                 customer_id = phone_line.customer_id
                 break
     except Exception:
+        WEBHOOK_FAILURES_TOTAL.inc()
         logger.warning("Customer resolution failed for call_sid=%s", call_sid, exc_info=True)
 
     try:
@@ -136,6 +141,7 @@ async def jambonz_call_status_webhook(
             session, customer_id=customer_id, payload=payload
         )
     except Exception:
+        WEBHOOK_FAILURES_TOTAL.inc()
         logger.exception("Failed to persist Jambonz call event for call_sid=%s", call_sid)
         return JSONResponse({"status": "ok"})
 
@@ -154,6 +160,7 @@ async def jambonz_call_status_webhook(
                 await call_event_service.mark_posted(session, call_event.id)
                 logger.info("Posted Jambonz call event %s to VanillaSoft", call_sid)
         except Exception:
+            WEBHOOK_FAILURES_TOTAL.inc()
             logger.exception(
                 "Failed to post Jambonz call event %s to VanillaSoft; will retry",
                 call_sid,
@@ -171,6 +178,7 @@ async def jambonz_call_status_webhook(
                     ),
                 )
             except Exception:
+                WEBHOOK_FAILURES_TOTAL.inc()
                 logger.exception(
                     "Failed to post CallRecording notification for call_sid=%s", call_sid
                 )
@@ -203,10 +211,12 @@ async def jambonz_incoming_call_webhook(
     try:
         data: dict[str, Any] = await request.json()
     except Exception:
+        WEBHOOK_FAILURES_TOTAL.inc()
         logger.warning("Jambonz incoming-call webhook received non-JSON body")
         return Response(status_code=400)
 
     if not isinstance(data, dict):
+        WEBHOOK_FAILURES_TOTAL.inc()
         logger.warning(
             "Jambonz incoming-call webhook received non-dict payload type: %s",
             type(data).__name__,
@@ -224,6 +234,7 @@ async def jambonz_incoming_call_webhook(
     try:
         phone_line = await phone_line_service.get_by_phone_number_global(session, to_number)
     except Exception:
+        WEBHOOK_FAILURES_TOTAL.inc()
         logger.warning(
             "Failed to look up phone line for incoming call to=%s call_sid=%s",
             to_number,
@@ -262,6 +273,7 @@ async def jambonz_incoming_call_webhook(
                 session, phone_line, from_number=data.get("from", "") or ""
             )
         except Exception:
+            WEBHOOK_FAILURES_TOTAL.inc()
             logger.warning(
                 "Inbound routing failed for to=%s call_sid=%s", to_number, call_sid, exc_info=True
             )
@@ -327,10 +339,12 @@ async def jambonz_dtmf_result_webhook(
     try:
         data: dict[str, Any] = await request.json()
     except Exception:
+        WEBHOOK_FAILURES_TOTAL.inc()
         logger.warning("Jambonz dtmf-result webhook received non-JSON body")
         return Response(status_code=400)
 
     if not isinstance(data, dict):
+        WEBHOOK_FAILURES_TOTAL.inc()
         logger.warning(
             "Jambonz dtmf-result webhook received non-dict payload type: %s",
             type(data).__name__,
@@ -358,6 +372,7 @@ async def jambonz_dtmf_result_webhook(
             return JSONResponse(_reject_verbs)
         ext = await extension_service.get_by_number(session, phone_line.customer_id, digits)
     except Exception:
+        WEBHOOK_FAILURES_TOTAL.inc()
         logger.warning(
             "dtmf-result extension lookup failed to=%s digits=%s call_sid=%s",
             to_number,
@@ -414,10 +429,12 @@ async def jambonz_outbound_answered_webhook(
     try:
         data: dict[str, Any] = await request.json()
     except Exception:
+        WEBHOOK_FAILURES_TOTAL.inc()
         logger.warning("Jambonz outbound-answered webhook received non-JSON body")
         return Response(status_code=400)
 
     if not isinstance(data, dict):
+        WEBHOOK_FAILURES_TOTAL.inc()
         logger.warning(
             "Jambonz outbound-answered webhook received non-dict payload type: %s",
             type(data).__name__,
@@ -472,10 +489,12 @@ async def jambonz_callback_answered_webhook(
     try:
         data: dict[str, Any] = await request.json()
     except Exception:
+        WEBHOOK_FAILURES_TOTAL.inc()
         logger.warning("Jambonz callback-answered webhook received non-JSON body")
         return Response(status_code=400)
 
     if not isinstance(data, dict):
+        WEBHOOK_FAILURES_TOTAL.inc()
         logger.warning(
             "Jambonz callback-answered webhook received non-dict payload type: %s",
             type(data).__name__,
@@ -489,6 +508,7 @@ async def jambonz_callback_answered_webhook(
     try:
         contact_number = await callback_state.pop_pending_callback(call_sid)
     except Exception:
+        WEBHOOK_FAILURES_TOTAL.inc()
         logger.exception("callback-answered: Redis lookup failed for call_sid=%s", call_sid)
         contact_number = None
 

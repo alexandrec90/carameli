@@ -1,5 +1,5 @@
 {
-  "last_run": "2026-03-09",
+  "last_run": "2026-07-18",
   "modules": [
     {
       "module": "app/api/vsapi/voicemail_drop.py",
@@ -25,22 +25,36 @@
     {
       "module": "app/api/webhooks/call_status.py",
       "test_file": "tests/unit/test_webhooks.py",
-      "last_reviewed": "2026-03-09",
-      "git_hash": "08e47bedc475f92aeee92ff9749473786018642d",
-      "gaps_found": 2
+      "last_reviewed": "2026-07-18",
+      "git_hash": "UNCOMMITTED",
+      "gaps_found": 0
     },
     {
       "module": "app/api/webhooks/sms_inbound.py",
-      "test_file": "tests/unit/test_jambonz_engine.py",
-      "last_reviewed": "2026-03-09",
-      "git_hash": "b2ea6c835ab7ef885fe23efb5148a30156ffe0f8",
-      "gaps_found": 2
+      "test_file": "tests/unit/test_webhooks.py",
+      "last_reviewed": "2026-07-18",
+      "git_hash": "UNCOMMITTED",
+      "gaps_found": 0
+    },
+    {
+      "module": "app/core/metrics.py",
+      "test_file": "tests/unit/test_metrics.py",
+      "last_reviewed": "2026-07-18",
+      "git_hash": "UNCOMMITTED",
+      "gaps_found": 0
+    },
+    {
+      "module": "app/core/heartbeat.py",
+      "test_file": "tests/unit/test_heartbeat.py",
+      "last_reviewed": "2026-07-18",
+      "git_hash": "UNCOMMITTED",
+      "gaps_found": 0
     },
     {
       "module": "app/services/call_sync.py",
       "test_file": "tests/unit/test_call_sync.py",
-      "last_reviewed": "2026-03-09",
-      "git_hash": "08e47bedc475f92aeee92ff9749473786018642d",
+      "last_reviewed": "2026-07-18",
+      "git_hash": "UNCOMMITTED",
       "gaps_found": 0
     },
     {
