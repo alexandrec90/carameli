@@ -54,6 +54,68 @@ To run in the background (detached):
 docker compose up -d --build
 ```
 
+The Jambonz/FreeSWITCH/rtpengine telephony services only start when
+`COMPOSE_PROFILES=telephony` is set in `.env` (it ships in `.env.example` — if you
+copied `.env` before that line existed, add it). Without it you get the slim stack:
+db, pgbouncer, redis, app, worker, frontend, minio.
+
+---
+
+## Parallel Worktrees (two agents, two stacks)
+
+Two coding agents can work on separate branches at once, each with its own checkout
+and its own Docker stack. Everything expensive is shared — the `.git` object store
+(via `git worktree`), Docker image layers, and (with `uv`) the Python package cache —
+so a second stack costs well under 1 GB, mostly the frontend `node_modules` volume
+and a fresh Postgres volume. Volumes, network, and containers are namespaced by the
+Compose project name, so data stays fully independent.
+
+Setup, from the primary checkout:
+
+```bash
+git worktree add ../carameli-b <branch-name>
+cd ../carameli-b
+cp ../carameli/.env .env            # then edit — see below
+uv venv && uv pip sync requirements-dev.txt   # hardlinks from uv's global cache
+docker compose up -d                # slim stack on offset ports
+```
+
+In the copied `.env`, set the worktree block (template in `.env.example`):
+
+```bash
+COMPOSE_PROJECT_NAME=carameli-b   # MUST equal the worktree directory name
+# COMPOSE_PROFILES=telephony      # REMOVE — telephony runs in the primary stack only
+APP_HOST_PORT=8001
+FRONTEND_HOST_PORT=5174
+DB_HOST_PORT=5433
+REDIS_HOST_PORT=6380
+MINIO_HOST_PORT=9002
+MINIO_CONSOLE_HOST_PORT=9003
+```
+
+Rules that keep the stacks independent:
+
+- **`COMPOSE_PROJECT_NAME` must equal the directory name.** It namespaces the stack
+  and tags the app image (`carameli-app-<project>`, so parallel builds from diverging
+  branches can't clobber each other), and `scripts/docker_common.py` reads it for
+  `docker ps` filtering.
+- **Telephony is single-instance per machine** — rtpengine uses host networking
+  (fixed ng port 2223, RTP range 10000–10100), so only the primary stack runs the
+  `telephony` profile. Tests don't need it: they mock at the `CallEngineProvider`
+  boundary. Live-call/webhook work happens in the primary worktree.
+- **Every `*_HOST_PORT` offset is required** while the primary stack is up, or
+  `docker compose up` fails with "port is already allocated".
+- **Default-port tooling stays in the primary worktree:** `scripts/run-e2e.py`,
+  `scripts/run-ci.py`, `scripts/run-load.py` hardcode `localhost:8000`/`5173`, and the
+  `monitoring` profile's host ports are fixed. `scripts/run-tests.py`, `pytest`,
+  and the linters work per-worktree (compose exec targets the cwd's project).
+- **`docker compose down -v` is project-scoped** (safe to reset one stack), but
+  daemon-wide commands like `docker system prune` hit both stacks — don't run them
+  while the other agent's stack is up.
+
+Tearing down: `docker compose down -v` inside the worktree, then
+`git worktree remove ../carameli-b`, then `docker image rm carameli-app-carameli-b`.
+
 ---
 
 ## Running the Database Migration
