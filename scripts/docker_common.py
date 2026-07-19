@@ -12,6 +12,7 @@ Artifacts land in `logs/docker/*.log` and are consumed by the `fix-docker`
 skill (see `.claude/rules/diagnostics.md`).
 """
 
+import os
 import re
 import subprocess
 import time
@@ -28,9 +29,30 @@ UNHEALTHY_RE = re.compile(r"unhealthy|exited(?! \(0\))|dead|Restarting", re.IGNO
 STARTING_RE = re.compile(r"starting|Created|created", re.IGNORECASE)
 
 
+def _dotenv_value(key: str, env_file: Path) -> str:
+    """First value of `key` in a dotenv file ('' if absent). No interpolation."""
+    if not env_file.is_file():
+        return ""
+    for line in env_file.read_text(encoding="utf-8").splitlines():
+        stripped = line.strip()
+        if stripped.startswith(f"{key}="):
+            return stripped.split("=", 1)[1].strip().strip("'\"")
+    return ""
+
+
 def project_name() -> str:
-    """Compose project name = lowercased leaf of the repo root (Compose v2 default)."""
-    return REPO_ROOT.name.lower()
+    """Compose project name, matching Compose v2 precedence.
+
+    COMPOSE_PROJECT_NAME from the environment, then from the repo-root .env,
+    then the lowercased leaf of the repo root (Compose's default). Parallel
+    worktree stacks pin COMPOSE_PROJECT_NAME in their .env (README.md,
+    "Parallel Worktrees"); the `docker ps` filters here must match whatever
+    name Compose actually used.
+    """
+    explicit = os.environ.get("COMPOSE_PROJECT_NAME", "") or _dotenv_value(
+        "COMPOSE_PROJECT_NAME", REPO_ROOT / ".env"
+    )
+    return (explicit or REPO_ROOT.name).lower()
 
 
 def project_filter() -> str:

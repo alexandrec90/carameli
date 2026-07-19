@@ -60,3 +60,33 @@ def test_format_artifact_structure():
 
 def test_project_name_is_lowercase():
     assert dc.project_name() == dc.project_name().lower()
+
+
+def test_project_name_prefers_environ(monkeypatch, tmp_path):
+    (tmp_path / ".env").write_text("COMPOSE_PROJECT_NAME=from-dotenv\n", encoding="utf-8")
+    monkeypatch.setattr(dc, "REPO_ROOT", tmp_path)
+    monkeypatch.setenv("COMPOSE_PROJECT_NAME", "From-Env")
+    assert dc.project_name() == "from-env"
+
+
+def test_project_name_falls_back_to_dotenv(monkeypatch, tmp_path):
+    (tmp_path / ".env").write_text(
+        "# comment\nOTHER=x\nCOMPOSE_PROJECT_NAME='carameli-b'\n", encoding="utf-8"
+    )
+    monkeypatch.setattr(dc, "REPO_ROOT", tmp_path)
+    monkeypatch.delenv("COMPOSE_PROJECT_NAME", raising=False)
+    assert dc.project_name() == "carameli-b"
+
+
+def test_project_name_defaults_to_repo_dir_leaf(monkeypatch, tmp_path):
+    worktree = tmp_path / "Carameli-B"
+    worktree.mkdir()
+    monkeypatch.setattr(dc, "REPO_ROOT", worktree)
+    monkeypatch.delenv("COMPOSE_PROJECT_NAME", raising=False)
+    assert dc.project_name() == "carameli-b"
+
+
+def test_dotenv_value_missing_file_and_key(tmp_path):
+    assert dc._dotenv_value("COMPOSE_PROJECT_NAME", tmp_path / ".env") == ""
+    (tmp_path / ".env").write_text("OTHER=x\n", encoding="utf-8")
+    assert dc._dotenv_value("COMPOSE_PROJECT_NAME", tmp_path / ".env") == ""

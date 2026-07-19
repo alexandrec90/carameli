@@ -1,3 +1,6 @@
+# Host port bindings and the app image tag are parametrized so a second git
+# worktree can run its own stack side-by-side (independent volumes/network via
+# the Compose project name). See README.md, "Parallel Worktrees" section.
 services:
   db:
     image: postgres:18
@@ -7,7 +10,7 @@ services:
       POSTGRES_PASSWORD: carameli_local_dev
       POSTGRES_DB: carameli
     ports:
-      - "5432:5432"
+      - "${DB_HOST_PORT:-5432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql
     healthcheck:
@@ -40,13 +43,16 @@ services:
     build:
       context: .
       target: dev
-    image: carameli-app
+    # Tag includes the project name so parallel worktree stacks don't clobber
+    # each other's builds (both would otherwise rebuild the same `carameli-app`
+    # tag from diverging branches). Each worktree's .env sets COMPOSE_PROJECT_NAME.
+    image: carameli-app-${COMPOSE_PROJECT_NAME:-carameli}
     restart: unless-stopped
     stop_grace_period: 3s
     command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload", "--reload-dir", "/app/app"]
     # In production remove the host port binding; nginx proxies to app:8000 internally.
     ports:
-      - "8000:8000"
+      - "${APP_HOST_PORT:-8000}:8000"
     env_file:
       - .env
     environment:
@@ -78,7 +84,7 @@ services:
     build:
       context: .
       target: dev
-    image: carameli-app
+    image: carameli-app-${COMPOSE_PROJECT_NAME:-carameli}
     restart: unless-stopped
     stop_grace_period: 3s
     command: arq app.services.call_sync.WorkerSettings
@@ -120,12 +126,14 @@ services:
     working_dir: /app
     command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
     ports:
-      - "5173:5173"
+      - "${FRONTEND_HOST_PORT:-5173}:5173"
     volumes:
       - ./frontend:/app
       - frontend_node_modules:/app/node_modules
     environment:
-      - VITE_API_BASE_URL=http://localhost:8000
+      # The browser calls the API on the host-mapped port, so this must track
+      # APP_HOST_PORT when a worktree stack offsets its ports.
+      - VITE_API_BASE_URL=http://localhost:${APP_HOST_PORT:-8000}
       - VITE_PROXY_TARGET=http://app:8000
       # Windows bind mounts don't deliver inotify events to the container, so
       # Vite's watcher needs polling for HMR to work. See frontend/vite.config.ts.
@@ -142,10 +150,19 @@ services:
       start_period: 60s
 
   # --- Jambonz call engine stack ---
+  #
+  # Everything below (through `jambonz`) carries the `telephony` profile: it only
+  # starts when COMPOSE_PROFILES=telephony is set (in .env — the default for the
+  # primary checkout via .env.example) or `--profile telephony` is passed.
+  # Parallel worktree stacks leave the profile off: pytest mocks the
+  # CallEngineProvider boundary, and rtpengine's host networking (fixed ng port
+  # 2223 + RTP range 10000-10100) means only ONE telephony stack can run per
+  # machine anyway. Its host ports stay hardcoded for the same reason.
 
   influxdb:
     image: influxdb:1.8
     restart: unless-stopped
+    profiles: ["telephony"]
     volumes:
       - influxdata:/var/lib/influxdb
     healthcheck:
@@ -157,6 +174,7 @@ services:
   jambonz-db:
     image: mariadb:11
     restart: unless-stopped
+    profiles: ["telephony"]
     environment:
       MARIADB_ROOT_PASSWORD: jambonz_root
       MARIADB_DATABASE: jambonz
@@ -182,6 +200,7 @@ services:
   freeswitch:
     image: drachtio/drachtio-freeswitch-mrf
     restart: unless-stopped
+    profiles: ["telephony"]
     stop_grace_period: 3s
     ports:
       - "5060:5060/udp"
@@ -210,6 +229,7 @@ services:
   rtpengine:
     image: drachtio/rtpengine
     restart: unless-stopped
+    profiles: ["telephony"]
     network_mode: host
     # Bypass the image's /entrypoint.sh. That script injects
     # `--config-file /etc/rtpengine.conf`, whose `listen-http=MY_IP:8080` line
@@ -251,6 +271,7 @@ services:
   jambonz-db-init:
     image: ghcr.io/jambonz/api-server
     restart: "no"
+    profiles: ["telephony"]
     working_dir: /opt/app
     command: node db/upgrade-jambonz-db.js
     environment:
@@ -266,6 +287,7 @@ services:
   jambonz:
     image: ghcr.io/jambonz/api-server
     restart: unless-stopped
+    profiles: ["telephony"]
     stop_grace_period: 3s
     ports:
       - "3000:3000"
@@ -364,8 +386,8 @@ services:
     image: minio/minio:latest
     restart: unless-stopped
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      - "${MINIO_HOST_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_HOST_PORT:-9001}:9001"
     environment:
       MINIO_ROOT_USER: minioadmin
       MINIO_ROOT_PASSWORD: minioadmin

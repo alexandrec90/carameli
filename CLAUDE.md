@@ -84,6 +84,11 @@ Be deliberate with destructive lifecycle ops on a running stack: `down -v` wipes
 and `restart` / `up --build` can drop the user's session — confirm before those. Use `-T`
 with `docker compose exec` (see tooling.md).
 
+Two worktrees can run side-by-side stacks for parallel agents (README.md, "Parallel Worktrees").
+The Jambonz/FreeSWITCH services only start with `COMPOSE_PROFILES=telephony` (set in the
+primary checkout's `.env`, via `.env.example`) — secondary worktree stacks omit it and offset
+their `*_HOST_PORT` vars.
+
 ## MCP Tools
 
 Configured MCP servers are documented in `README.md` (MCP Tools section). Installation
