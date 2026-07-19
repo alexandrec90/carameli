@@ -96,9 +96,9 @@ MINIO_CONSOLE_HOST_PORT=9003
 Rules that keep the stacks independent:
 
 - **`COMPOSE_PROJECT_NAME` must equal the directory name.** It namespaces the stack
-  and tags the app image (`carameli-app-<project>`, so parallel builds from diverging
-  branches can't clobber each other), and `scripts/docker_common.py` reads it for
-  `docker ps` filtering.
+  and tags the locally-built images (`carameli-app-<project>` and
+  `carameli-db-backup-<project>`, so parallel builds from diverging branches can't
+  clobber each other), and `scripts/docker_common.py` reads it for `docker ps` filtering.
 - **Telephony is single-instance per machine** — rtpengine uses host networking
   (fixed ng port 2223, RTP range 10000–10100), so only the primary stack runs the
   `telephony` profile. Tests don't need it: they mock at the `CallEngineProvider`
@@ -114,7 +114,8 @@ Rules that keep the stacks independent:
   while the other agent's stack is up.
 
 Tearing down: `docker compose down -v` inside the worktree, then
-`git worktree remove ../carameli-b`, then `docker image rm carameli-app-carameli-b`.
+`git worktree remove ../carameli-b`, then remove its built images:
+`docker image rm carameli-app-carameli-b carameli-db-backup-carameli-b`.
 
 ---
 

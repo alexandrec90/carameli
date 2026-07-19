@@ -40,7 +40,10 @@ services:
   db-backup:
     build:
       context: ./backup
-    image: carameli-db-backup
+    # Tag includes the project name for the same reason as the app image below:
+    # parallel worktree stacks building from diverging ./backup contexts must not
+    # clobber each other's image. See README.md, "Parallel Worktrees".
+    image: carameli-db-backup-${COMPOSE_PROJECT_NAME:-carameli}
     restart: unless-stopped
     environment:
       PGHOST: db
