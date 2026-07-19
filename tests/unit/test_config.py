@@ -31,6 +31,14 @@ def test_list_passthrough() -> None:
     assert result == ["http://a.com", "http://b.com"]
 
 
+async def test_retention_defaults_to_disabled() -> None:
+    assert Settings(_env_file=None).retention_days == 0
+
+
+async def test_heartbeat_defaults_to_disabled() -> None:
+    assert Settings(_env_file=None).heartbeat_url == ""
+
+
 def test_wildcard_cors_falls_back_to_localhost() -> None:
     # Verify the module-level sanitization: the CORS middleware must not
     # expose "*" as an allowed origin (browsers reject wildcard + credentials).

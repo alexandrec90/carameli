@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.database import get_session
+from app.core.metrics import WEBHOOK_FAILURES_TOTAL
 from app.services import (
     customer_service,
     phone_line_service,
@@ -47,6 +48,7 @@ def _validate_telnyx_signature(raw_body: bytes, signature: str, timestamp: str) 
         return  # dev mode — skip
 
     if _Ed25519PublicKey is None:
+        WEBHOOK_FAILURES_TOTAL.inc()
         raise HTTPException(
             status_code=500,
             detail="Server misconfiguration: missing cryptography dependency",
@@ -55,12 +57,14 @@ def _validate_telnyx_signature(raw_body: bytes, signature: str, timestamp: str) 
     try:
         ts = int(timestamp)
     except (ValueError, TypeError):
+        WEBHOOK_FAILURES_TOTAL.inc()
         raise HTTPException(
             status_code=403, detail="Missing or invalid telnyx-timestamp header"
         ) from None
 
     now = datetime.now(tz=UTC).timestamp()
     if abs(now - ts) > _MAX_TIMESTAMP_AGE_SECONDS:
+        WEBHOOK_FAILURES_TOTAL.inc()
         raise HTTPException(status_code=403, detail="Timestamp too old (replay protection)")
 
     signed_payload = f"{timestamp}|".encode() + raw_body
@@ -71,6 +75,7 @@ def _validate_telnyx_signature(raw_body: bytes, signature: str, timestamp: str) 
         sig_bytes = base64.b64decode(signature)
         public_key.verify(sig_bytes, signed_payload)
     except Exception:
+        WEBHOOK_FAILURES_TOTAL.inc()
         raise HTTPException(status_code=403, detail="Invalid Telnyx signature") from None
 
 
@@ -123,10 +128,12 @@ async def telnyx_sms_inbound(
     try:
         body: dict[str, Any] = await request.json()
     except Exception:
+        WEBHOOK_FAILURES_TOTAL.inc()
         logger.warning("Telnyx sms-inbound webhook received non-JSON body")
         return Response(status_code=400)
 
     if not isinstance(body, dict):
+        WEBHOOK_FAILURES_TOTAL.inc()
         logger.warning("Telnyx sms-inbound webhook received non-object JSON body")
         return Response(status_code=400)
 
@@ -181,6 +188,7 @@ async def _handle_inbound_message(session: AsyncSession, payload: dict[str, Any]
         if phone_line:
             customer = await customer_service.get_by_id(session, phone_line.customer_id)
     except Exception:
+        WEBHOOK_FAILURES_TOTAL.inc()
         logger.warning("Customer resolution failed for inbound SMS to=%s", to_number, exc_info=True)
 
     try:
@@ -194,6 +202,7 @@ async def _handle_inbound_message(session: AsyncSession, payload: dict[str, Any]
             body=text,
         )
     except Exception:
+        WEBHOOK_FAILURES_TOTAL.inc()
         logger.exception("Failed to persist inbound SMS message_sid=%s", message_sid)
         return
 
@@ -264,6 +273,7 @@ async def _handle_delivery_receipt(session: AsyncSession, payload: dict[str, Any
             vanillasoft_notify.sms_message_payload(message, vs_customer_id),
         )
     except Exception:
+        WEBHOOK_FAILURES_TOTAL.inc()
         logger.exception(
             "Failed to forward delivery receipt to VanillaSoft message_sid=%s", message_sid
         )

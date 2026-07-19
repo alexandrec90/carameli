@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Awaitable, Callable
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import httpx
 import pytest
 
 from app.core.config import settings
-from app.services.call_sync import retry_unposted_events
+from app.services import call_sync
+from app.services.call_sync import _run_scheduled_job, retry_unposted_events
 
 pytestmark = pytest.mark.asyncio(loop_scope="session")
 
@@ -160,11 +163,13 @@ async def test_worker_startup_initialises_engine_and_carrier() -> None:
     fake_engine = MagicMock()
     fake_carrier = MagicMock()
     with (
+        patch("app.services.call_sync.init_error_tracking") as mock_init_error_tracking,
         patch("app.services.providers.factory.get_call_engine_provider", return_value=fake_engine),
         patch("app.services.providers.factory.get_carrier_provider", return_value=fake_carrier),
     ):
         await worker_startup(ctx)
 
+    mock_init_error_tracking.assert_called_once_with()
     assert ctx["engine"] is fake_engine
     assert ctx["carrier"] is fake_carrier
 
@@ -203,3 +208,79 @@ async def test_retry_warns_on_non_2xx_and_does_not_mark_posted(monkeypatch) -> N
 
     mock_http.post.assert_awaited_once()
     mock_repo.mark_posted.assert_not_awaited()
+
+
+async def test_scheduled_job_pings_after_success() -> None:
+    order: list[str] = []
+
+    async def job(ctx: dict) -> None:
+        assert ctx == _CTX
+        order.append("job")
+
+    async def heartbeat(slug: str) -> None:
+        order.append(slug)
+
+    with patch("app.services.call_sync.ping", side_effect=heartbeat) as mock_ping:
+        await _run_scheduled_job(_CTX, job, "test-job")
+
+    assert order == ["job", "test-job"]
+    mock_ping.assert_awaited_once_with("test-job")
+
+
+async def test_scheduled_job_still_succeeds_when_ping_fails(monkeypatch) -> None:
+    monkeypatch.setattr(settings, "heartbeat_url", "https://heartbeat.invalid/push")
+
+    async def job(ctx: dict) -> None:
+        assert ctx == _CTX
+
+    with patch(
+        "app.core.heartbeat.httpx.AsyncClient",
+        side_effect=httpx.ConnectError("offline"),
+    ):
+        await _run_scheduled_job(_CTX, job, "test-job")
+
+
+async def test_scheduled_job_does_not_ping_after_failure() -> None:
+    async def job(ctx: dict) -> None:
+        raise RuntimeError("cron failed")
+
+    with (
+        patch("app.services.call_sync.ping") as mock_ping,
+        pytest.raises(RuntimeError, match="cron failed"),
+    ):
+        await _run_scheduled_job(_CTX, job, "test-job")
+
+    mock_ping.assert_not_awaited()
+
+
+@pytest.mark.parametrize(
+    ("wrapper", "job", "slug"),
+    [
+        (
+            call_sync.retry_unposted_events_cron,
+            call_sync.retry_unposted_events,
+            "call-event-retry",
+        ),
+        (
+            call_sync.retry_unposted_sms_messages_cron,
+            call_sync.retry_unposted_sms_messages,
+            "sms-retry",
+        ),
+        (call_sync.poll_agent_status_cron, call_sync.poll_agent_status, "agent-status"),
+        (
+            call_sync.reconcile_provider_records_cron,
+            call_sync.reconcile_provider_records,
+            "provider-reconciliation",
+        ),
+        (call_sync.purge_expired_cron, call_sync.retention.purge_expired, "retention"),
+    ],
+)
+async def test_cron_wrapper_uses_expected_job_and_slug(
+    wrapper: Callable[[dict], Awaitable[None]],
+    job: Callable[[dict], Awaitable[None]],
+    slug: str,
+) -> None:
+    with patch("app.services.call_sync._run_scheduled_job", new_callable=AsyncMock) as run:
+        await wrapper(_CTX)
+
+    run.assert_awaited_once_with(_CTX, job, slug)

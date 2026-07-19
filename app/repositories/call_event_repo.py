@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from sqlalchemy import Integer, and_, case, cast, func, select, update
+from sqlalchemy import Integer, and_, case, cast, delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.call_event import CallEvent
@@ -17,6 +17,7 @@ _TERMINAL_CALL_STATUSES = {"completed", "no-answer", "busy", "failed", "canceled
 
 # Grouping dimensions supported by the CDR summary report (cloudli spec sections 30-34).
 SUMMARY_GROUP_BY = ("extension", "number")
+_DELETE_BATCH_SIZE = 10_000
 
 
 @dataclass(frozen=True)
@@ -243,3 +244,33 @@ class CallEventRepo:
             .values(posted=True, matched_at=_utcnow_naive())
         )
         await self.session.commit()
+
+    async def delete_older_than(
+        self,
+        cutoff: datetime,
+        *,
+        batch_size: int = _DELETE_BATCH_SIZE,
+    ) -> int:
+        """Delete posted events before ``cutoff`` in independently committed batches."""
+        if batch_size <= 0:
+            raise ValueError("batch_size must be greater than zero")
+
+        total_deleted = 0
+        while True:
+            batch_ids = (
+                select(CallEvent.id)
+                .where(
+                    CallEvent.created_at < cutoff,
+                    CallEvent.posted.is_(True),
+                )
+                .order_by(CallEvent.created_at, CallEvent.id)
+                .limit(batch_size)
+            )
+            result = await self.session.execute(
+                delete(CallEvent).where(CallEvent.id.in_(batch_ids)).returning(CallEvent.id)
+            )
+            deleted = len(result.scalars().all())
+            await self.session.commit()
+            total_deleted += deleted
+            if deleted == 0:
+                return total_deleted

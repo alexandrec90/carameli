@@ -3,17 +3,21 @@ from __future__ import annotations
 import logging
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from typing import Annotated
 
 import httpx
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, PlainTextResponse
+from fastapi.responses import JSONResponse, Response
+from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from prometheus_fastapi_instrumentator import Instrumentator
+from redis.asyncio import Redis
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 from sqlalchemy import text
 from sqlalchemy.exc import DataError
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.auth import router as auth_router
 from app.api.recording_download import router as recording_download_router
@@ -24,9 +28,12 @@ from app.api.webhooks.sms_inbound import router as sms_inbound_router
 from app.api.webhooks.vs_log import router as vs_log_router
 from app.core.config import settings
 from app.core.constants import DEFAULT_FRONTEND_ORIGIN
-from app.core.database import engine
+from app.core.database import engine, get_session
+from app.core.error_tracking import init_error_tracking
 from app.core.limiter import limiter
 from app.core.logging_config import configure_logging
+from app.core.metrics import refresh_operational_metrics
+from app.core.redis import get_redis
 from app.services.providers.factory import (
     get_call_engine_provider,
     get_carrier_provider,
@@ -38,7 +45,8 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
-    # Startup
+    # Initialise process-wide integrations before accepting traffic.
+    init_error_tracking()
     logger.info("Starting Carameli…")
     app.state.carrier = get_carrier_provider()
     app.state.engine = get_call_engine_provider()
@@ -54,11 +62,25 @@ app = FastAPI(
 )
 
 # Instrument before other middleware so metrics capture the full request lifecycle.
-Instrumentator().instrument(app).expose(
-    app,
-    response_class=PlainTextResponse,
+Instrumentator().instrument(app)
+
+
+@app.get(
+    "/metrics",
+    response_class=Response,
     responses={200: {"content": {"text/plain": {}}, "description": "Prometheus metrics"}},
 )
+async def metrics_endpoint(
+    session: Annotated[AsyncSession, Depends(get_session)],
+    redis: Annotated[Redis, Depends(get_redis)],
+) -> Response:
+    """Refresh operational gauges and return the Prometheus exposition."""
+    await refresh_operational_metrics(session, redis)
+    return Response(
+        content=generate_latest(),
+        headers={"Content-Type": CONTENT_TYPE_LATEST},
+    )
+
 
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore[arg-type]

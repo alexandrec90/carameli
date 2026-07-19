@@ -80,15 +80,19 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-python-env
-      - uses: ./.github/actions/setup-node-env
-        with:
-          install: "true"
       - run: playwright install --with-deps
       - name: Start backend + frontend
         # docker compose requires .env (env_file: on the app/worker services);
         # the runner has none, so seed it from the committed dev defaults.
-        # npm ci runs foregrounded via setup-node-env above — backgrounding it
-        # with the dev server made the 30s Vite wait race a cold npm install.
+        # .env.example ships production-only CORS_ORIGINS, but the compose
+        # frontend bakes VITE_API_BASE_URL=http://localhost:8000 into the
+        # bundle, so the browser calls the backend cross-origin from
+        # localhost:5173 — append a dev origin (last occurrence wins in both
+        # docker compose env_file and pydantic-settings) or every fetch is
+        # CORS-blocked in all three browsers.
+        # The compose frontend service serves 5173 (it runs npm install itself
+        # into a named volume — cold install is slow, hence the long wait), so
+        # no host Node toolchain is needed in this job.
         # The chown hands the bind-mounted logs/ (created root-owned by the
         # containers) back to the runner user: host pytest imports app.main,
         # whose logging config opens logs/runtime/carameli.log for append and
@@ -96,11 +100,11 @@ jobs:
         # write access regardless.
         run: |
           cp .env.example .env
+          echo "CORS_ORIGINS=http://localhost:5173" >> .env
           docker compose up -d
           timeout 120 bash -c 'until curl -sf http://localhost:8000/health; do sleep 2; done'
           sudo chown -R "$(id -u):$(id -g)" logs
-          (cd frontend && npm run dev &)
-          timeout 60 bash -c 'until curl -sf http://localhost:5173; do sleep 2; done'
+          timeout 300 bash -c 'until curl -sf http://localhost:5173; do sleep 2; done'
       - name: Run cross-browser E2E
         run: pytest tests/e2e/ --browser=chromium --browser=firefox --browser=webkit -q
       - name: Upload Playwright traces

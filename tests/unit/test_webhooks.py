@@ -6,11 +6,19 @@ import hmac as _stdlib_hmac
 import time
 
 import pytest
+from prometheus_client import REGISTRY
 
 from app.core.config import settings
 from app.repositories.call_event_repo import CallEventRepo
 
 pytestmark = pytest.mark.asyncio(loop_scope="session")
+
+
+@pytest.fixture(autouse=True)
+def _disable_webhook_signatures(monkeypatch) -> None:
+    """Keep general webhook tests independent of credentials in the local .env."""
+    monkeypatch.setattr(settings, "jambonz_webhook_secret", "")
+    monkeypatch.setattr(settings, "telnyx_webhook_secret", "")
 
 
 @pytest.mark.parametrize("terminal_status", ["no-answer", "busy", "failed", "canceled"])
@@ -149,6 +157,7 @@ async def test_jambonz_valid_signature_accepted(client, monkeypatch) -> None:
 
 
 async def test_jambonz_invalid_signature_returns_403(client, monkeypatch) -> None:
+    failures_before = REGISTRY.get_sample_value("carameli_webhook_failures_total") or 0
     monkeypatch.setattr(settings, "jambonz_webhook_secret", "webhook-key")
     body = b'{"call_sid":"CAbadsig","call_status":"completed"}'
     resp = await client.post(
@@ -157,6 +166,7 @@ async def test_jambonz_invalid_signature_returns_403(client, monkeypatch) -> Non
         headers={"Content-Type": "application/json", "X-Jambonz-Signature": "bad"},
     )
     assert resp.status_code == 403
+    assert REGISTRY.get_sample_value("carameli_webhook_failures_total") == failures_before + 1
 
 
 async def test_jambonz_tampered_payload_returns_403(client, monkeypatch) -> None:
@@ -219,6 +229,7 @@ async def test_telnyx_valid_signature_accepted(client, monkeypatch) -> None:
 
 @pytest.mark.skipif(not _HAS_CRYPTOGRAPHY, reason="cryptography package not installed")
 async def test_telnyx_invalid_signature_returns_403(client, monkeypatch) -> None:
+    failures_before = REGISTRY.get_sample_value("carameli_webhook_failures_total") or 0
     _, pub_b64 = _make_telnyx_keypair()
     body = b'{"data":{"event_type":"message.received","payload":{}}}'
     ts = str(int(time.time()))
@@ -233,6 +244,7 @@ async def test_telnyx_invalid_signature_returns_403(client, monkeypatch) -> None
         },
     )
     assert resp.status_code == 403
+    assert REGISTRY.get_sample_value("carameli_webhook_failures_total") == failures_before + 1
 
 
 @pytest.mark.skipif(not _HAS_CRYPTOGRAPHY, reason="cryptography package not installed")

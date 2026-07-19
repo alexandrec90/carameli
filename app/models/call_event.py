@@ -4,7 +4,7 @@ import logging
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, ForeignKey, Integer, String, text
+from sqlalchemy import Boolean, ForeignKey, Index, Integer, String, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func
@@ -16,19 +16,26 @@ logger = logging.getLogger(__name__)
 
 class CallEvent(Base):
     __tablename__ = "call_events"
+    __table_args__ = (
+        Index(
+            "ix_call_events_unposted_created_at",
+            "created_at",
+            postgresql_where=text("posted = false"),
+        ),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()")
     )
     customer_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("customers.id"), nullable=True
+        UUID(as_uuid=True), ForeignKey("customers.id"), nullable=True, index=True
     )
     call_sid: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
     direction: Mapped[str] = mapped_column(String(20), default="outbound")
     from_number: Mapped[str | None] = mapped_column(String(20), nullable=True)
     to_number: Mapped[str | None] = mapped_column(String(20), nullable=True)
     extension: Mapped[str | None] = mapped_column(String(20), nullable=True)
-    started_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    started_at: Mapped[datetime | None] = mapped_column(nullable=True, index=True)
     answered_at: Mapped[datetime | None] = mapped_column(nullable=True)
     ended_at: Mapped[datetime | None] = mapped_column(nullable=True)
     duration_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)

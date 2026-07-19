@@ -4,7 +4,7 @@ import logging
 import uuid
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import and_, select, update
+from sqlalchemy import and_, delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.sms_message import SmsMessage
@@ -12,6 +12,7 @@ from app.models.sms_message import SmsMessage
 logger = logging.getLogger(__name__)
 
 _RETRY_AGE = timedelta(minutes=1)
+_DELETE_BATCH_SIZE = 10_000
 
 
 class SmsMessageRepo:
@@ -121,3 +122,33 @@ class SmsMessageRepo:
             update(SmsMessage).where(SmsMessage.id == message_id).values(posted=True)
         )
         await self.session.commit()
+
+    async def delete_older_than(
+        self,
+        cutoff: datetime,
+        *,
+        batch_size: int = _DELETE_BATCH_SIZE,
+    ) -> int:
+        """Delete posted messages before ``cutoff`` in independently committed batches."""
+        if batch_size <= 0:
+            raise ValueError("batch_size must be greater than zero")
+
+        total_deleted = 0
+        while True:
+            batch_ids = (
+                select(SmsMessage.id)
+                .where(
+                    SmsMessage.created_at < cutoff,
+                    SmsMessage.posted.is_(True),
+                )
+                .order_by(SmsMessage.created_at, SmsMessage.id)
+                .limit(batch_size)
+            )
+            result = await self.session.execute(
+                delete(SmsMessage).where(SmsMessage.id.in_(batch_ids)).returning(SmsMessage.id)
+            )
+            deleted = len(result.scalars().all())
+            await self.session.commit()
+            total_deleted += deleted
+            if deleted == 0:
+                return total_deleted
