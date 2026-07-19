@@ -145,9 +145,7 @@ class SmsMessageRepo:
                 .limit(batch_size)
             )
             result = await self.session.execute(
-                delete(SmsMessage)
-                .where(SmsMessage.id.in_(batch_ids))
-                .returning(SmsMessage.id)
+                delete(SmsMessage).where(SmsMessage.id.in_(batch_ids)).returning(SmsMessage.id)
             )
             deleted = len(result.scalars().all())
             await self.session.commit()

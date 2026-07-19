@@ -52,7 +52,9 @@ async def test_init_error_tracking_passes_configured_settings(
     assert kwargs["dsn"] == dsn
     assert kwargs["environment"] == "staging"
     assert kwargs["traces_sample_rate"] == 0.25
-    assert any(isinstance(integration, FastApiIntegration) for integration in kwargs["integrations"])
+    assert any(
+        isinstance(integration, FastApiIntegration) for integration in kwargs["integrations"]
+    )
     assert any(isinstance(integration, ArqIntegration) for integration in kwargs["integrations"])
     assert "send_default_pii" not in kwargs
     assert "error tracking enabled environment=staging" in caplog.messages

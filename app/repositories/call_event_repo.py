@@ -267,9 +267,7 @@ class CallEventRepo:
                 .limit(batch_size)
             )
             result = await self.session.execute(
-                delete(CallEvent)
-                .where(CallEvent.id.in_(batch_ids))
-                .returning(CallEvent.id)
+                delete(CallEvent).where(CallEvent.id.in_(batch_ids)).returning(CallEvent.id)
             )
             deleted = len(result.scalars().all())
             await self.session.commit()
