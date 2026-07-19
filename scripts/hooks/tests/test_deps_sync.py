@@ -1,10 +1,21 @@
 """Tests for scripts/hooks/deps-sync.py (lockfile-change -> local reinstall)."""
 
 import json
+import subprocess
 
 from conftest import load_module
 
 ds = load_module("scripts/hooks/deps-sync.py")
+
+
+def _git(*args, cwd):
+    subprocess.run(
+        ["git", "-c", "user.name=t", "-c", "user.email=t@e", *args],
+        cwd=cwd,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
 
 
 def _seed_manifests(root, lock=b"lock-v1", req=b"req-v1", dev=b"dev-v1"):
@@ -192,6 +203,41 @@ def test_install_hooks_writes_shims_and_respects_foreign_hooks(tmp_path, capsys)
     assert sorted(p.name for p in written) == sorted(n for n in ds.HOOK_NAMES if n != "post-merge")
     assert "something-else" in (tmp_path / "post-merge").read_text(encoding="utf-8")
     assert "not ours" in capsys.readouterr().err
+
+
+def test_state_file_prefers_module_override(monkeypatch, tmp_path):
+    # When the module global is set (as the tests do), state_file() returns it
+    # verbatim and never shells out to git.
+    override = tmp_path / "custom-fingerprint.json"
+    monkeypatch.setattr(ds, "STATE_FILE", override)
+    assert ds.state_file() == override
+
+
+def test_state_file_writable_in_linked_worktree(tmp_path, monkeypatch):
+    # Regression: a linked worktree's `.git` is a FILE, so the old hardcoded
+    # REPO_ROOT/.git/deps-fingerprint.json raised FileNotFoundError on write.
+    # git_path() must resolve to a real, writable location instead.
+    main_repo = tmp_path / "main"
+    main_repo.mkdir()
+    _git("init", "-q", cwd=main_repo)
+    _git("commit", "-q", "--allow-empty", "-m", "init", cwd=main_repo)
+
+    worktree = tmp_path / "wt"
+    _git("worktree", "add", "-q", str(worktree), cwd=main_repo)
+    assert (worktree / ".git").is_file(), "sanity: worktree .git is a pointer file"
+
+    monkeypatch.setattr(ds, "REPO_ROOT", worktree)
+    monkeypatch.setattr(ds, "STATE_FILE", None)  # force git resolution
+
+    resolved = ds.state_file()
+    # The write that used to crash the post-checkout hook must now succeed.
+    resolved.write_text("{}", encoding="utf-8")
+    assert resolved.is_file()
+    # And it lands in this worktree's private git dir, not a stray ./.git/ tree.
+    assert "worktrees" in resolved.as_posix()
+
+    # hooks resolve to the shared common dir (not per-worktree).
+    assert ds.git_path("hooks").as_posix().endswith("main/.git/hooks")
 
 
 def test_main_records_baseline_without_installing(tmp_path, monkeypatch, capsys):

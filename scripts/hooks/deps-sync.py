@@ -5,7 +5,8 @@ Runs as a git post-merge / post-checkout / post-commit hook (installed by
 `--install`) and as the "Deps: Sync Local Environment" VS Code task — pulls,
 branch switches, and local manifest-editing commits all trigger the same
 fingerprint check. Compares a SHA-256 fingerprint
-of the dependency manifests against the one recorded in `.git/deps-fingerprint.json`:
+of the dependency manifests against the one recorded in `deps-fingerprint.json`
+inside the checkout's git dir (worktree-aware -- see `state_file`):
 
 - First run (no recorded state): records a baseline, installs nothing. A fresh
   clone runs its initial install explicitly via the Install tasks.
@@ -29,7 +30,11 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-STATE_FILE = REPO_ROOT / ".git" / "deps-fingerprint.json"
+# Resolved lazily from the checkout's real git dir in state_file(); tests
+# override this module global with a tmp path. It is NOT a hardcoded
+# REPO_ROOT / ".git" / ... path because `.git` is a gitdir-pointer *file* (not a
+# directory) in a linked worktree, where that path would raise FileNotFoundError.
+STATE_FILE: Path | None = None
 HOOK_NAMES = ("post-merge", "post-checkout", "post-commit")
 
 # Manifest -> what a change to it invalidates. "npm"/"pip" trigger a local
@@ -68,6 +73,32 @@ SHIM = """#!/bin/sh
 [ -f scripts/hooks/deps-sync.py ] || exit 0
 python scripts/hooks/deps-sync.py
 """
+
+
+def git_path(name: str) -> Path:
+    """Absolute path to `name` inside this checkout's git dir.
+
+    Uses `git rev-parse --git-path`, which resolves correctly in a linked
+    worktree -- where `.git` is a gitdir-pointer *file*, so a hardcoded
+    REPO_ROOT / ".git" / name lands under a non-directory and raises
+    FileNotFoundError. Returns `.git/<name>` for the main checkout, the
+    per-worktree `.git/worktrees/<wt>/<name>` for a linked worktree, and the
+    shared `.git/hooks` for `hooks` (hooks live in the common dir).
+    """
+    out = subprocess.run(
+        ["git", "rev-parse", "--git-path", name],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.strip()
+    p = Path(out)
+    return p if p.is_absolute() else REPO_ROOT / p
+
+
+def state_file() -> Path:
+    """Fingerprint file location: the module override if set, else git-resolved."""
+    return STATE_FILE if STATE_FILE is not None else git_path("deps-fingerprint.json")
 
 
 def fingerprint(root: Path) -> dict[str, str]:
@@ -144,18 +175,19 @@ def install_hooks(hooks_dir: Path) -> list[Path]:
 
 def main(argv: list[str]) -> int:
     if "--install" in argv:
-        written = install_hooks(REPO_ROOT / ".git" / "hooks")
+        written = install_hooks(git_path("hooks"))
         for hook in written:
             print(f"[deps-sync] installed {hook.relative_to(REPO_ROOT)}")
         return 0 if written else 1
 
     current = fingerprint(REPO_ROOT)
-    if not STATE_FILE.exists():
-        STATE_FILE.write_text(json.dumps(current, indent=2), encoding="utf-8")
+    sf = state_file()
+    if not sf.exists():
+        sf.write_text(json.dumps(current, indent=2), encoding="utf-8")
         print("[deps-sync] baseline recorded -- no install on first run")
         return 0
 
-    recorded = json.loads(STATE_FILE.read_text(encoding="utf-8"))
+    recorded = json.loads(sf.read_text(encoding="utf-8"))
     changed = changed_manifests(current, recorded)
     if not changed:
         return 0
@@ -188,7 +220,7 @@ def main(argv: list[str]) -> int:
                 failures += 1
 
     if failures == 0:
-        STATE_FILE.write_text(json.dumps(current, indent=2), encoding="utf-8")
+        sf.write_text(json.dumps(current, indent=2), encoding="utf-8")
         print(f"[deps-sync] done -- {len(changed)} manifest(s) synced")
     return 1 if failures else 0
 
