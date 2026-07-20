@@ -21,7 +21,7 @@ def test_refuses_dirty_worktree_without_fetching(monkeypatch, capsys):
     monkeypatch.setattr(git_sync, "run_git", fake_run_git)
 
     assert git_sync.main() == 1
-    assert calls == [(('status', '--porcelain'), {'capture_output': True})]
+    assert calls == [(("status", "--porcelain"), {"capture_output": True})]
     assert "never stash" in capsys.readouterr().err
 
 
