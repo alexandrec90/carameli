@@ -85,9 +85,27 @@ and `restart` / `up --build` can drop the user's session — confirm before thos
 with `docker compose exec` (see tooling.md).
 
 Two worktrees can run side-by-side stacks for parallel agents (README.md, "Parallel Worktrees").
-The Jambonz/FreeSWITCH services only start with `COMPOSE_PROFILES=telephony` (set in the
-primary checkout's `.env`, via `.env.example`) — secondary worktree stacks omit it and offset
-their `*_HOST_PORT` vars.
+The Jambonz/FreeSWITCH services only start with `COMPOSE_PROFILES=telephony` — secondary
+worktree stacks omit it and offset their `*_HOST_PORT` vars.
+
+### Local dev: Docker resource footprint
+
+This is a ~16 GB laptop and Docker is memory-heavy, so the stack is trimmed to stay usable.
+Before any step that needs a container (stack up, `pytest`, E2E, migrations):
+
+- **Confirm the daemon is up first.** Run `docker ps` — if it errors with an `npipe`/daemon
+  message, Docker Desktop is stopped. Start it, or defer that step to CI and just make the
+  code change (per the blockquote above).
+- **Telephony is opt-in here.** `COMPOSE_PROFILES=telephony` is **commented out in the local
+  (gitignored) `.env`**, so FreeSWITCH/jambonz/rtpengine/influxdb/jambonz-db do NOT auto-start.
+  Bring them up only when testing real calls: `docker compose --profile telephony up -d`.
+  (`.env.example` still ships it enabled for fresh clones.)
+- **Run one stack at a time.** Stop the other worktree's stack (`docker compose -p <project>
+  down`) instead of running both simultaneously.
+- **Resource caps are in place.** `~/.wslconfig` caps the WSL2 VM (memory/cores + idle
+  reclaim) and `docker-compose.override.yml` sets a per-service `mem_limit` on every container.
+  If something OOMs, check `docker inspect <name> --format '{{.State.OOMKilled}}'` and bump
+  that service's limit.
 
 ## MCP Tools
 
