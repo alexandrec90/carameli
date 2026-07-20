@@ -12,6 +12,8 @@
   "builder.autoDetectDevServer": true,
   "builder.launchType": "editor",
   "python.defaultInterpreterPath": "${workspaceFolder}\\.venv\\Scripts\\python.exe",
+  "ruff.importStrategy": "fromEnvironment",
+  "ruff.interpreter": ["${workspaceFolder}\\.venv\\Scripts\\python.exe"],
   "python.testing.pytestEnabled": true,
   "python.testing.unittestEnabled": false,
   "python.testing.pytestArgs": [

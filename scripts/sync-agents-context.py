@@ -6,7 +6,8 @@ CLAUDE.md / .claude/ are the source of truth; run this after editing them.
   1. Copy every CLAUDE.md to AGENTS.md in the same directory.
   2. Purge orphaned AGENTS.md (no sibling CLAUDE.md) -- AGENTS.md is derived.
   3. Mirror .claude/ -> .agents/ (copy new/changed, remove orphans), excluding
-     settings.json (it carries a hooks block that must never reach .agents).
+     settings.json (hooks must never reach .agents) and settings.local.json
+     (machine-local configuration must not be mirrored).
   4. Regenerate .agents/settings.json from .claude/settings.json with hooks
      stripped (via sync-agents-settings.py).
 
@@ -22,6 +23,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 PRUNE_DIRS = {".git", "node_modules", ".venv", "__pycache__"}
+AGENT_MIRROR_EXCLUDE_NAMES = frozenset({"settings.json", "settings.local.json"})
 
 
 def iter_files(root: Path):
@@ -99,8 +101,8 @@ def main() -> int:
         print("  skipped  .claude/ (not found)")
         return 0
 
-    mirror_tree(claude_dir, agents_dir, exclude_names={"settings.json"})
-    print("  mirrored .claude/ -> .agents/ (settings.json excluded)")
+    mirror_tree(claude_dir, agents_dir, exclude_names=AGENT_MIRROR_EXCLUDE_NAMES)
+    print("  mirrored .claude/ -> .agents/ (settings files excluded)")
 
     claude_settings = claude_dir / "settings.json"
     if claude_settings.exists():

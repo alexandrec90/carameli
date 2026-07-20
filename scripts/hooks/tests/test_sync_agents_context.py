@@ -56,15 +56,17 @@ def test_mirror_tree_copies_changed_and_removes_orphans(tmp_path):
     assert not (dest / "orphan.txt").exists()
 
 
-def test_mirror_tree_excludes_named_files(tmp_path):
+def test_mirror_tree_excludes_agent_settings_files(tmp_path):
     src = tmp_path / "src"
     dest = tmp_path / "dest"
     src.mkdir()
     dest.mkdir()
-    (src / "settings.json").write_text("SRC", encoding="utf-8")
-    (dest / "settings.json").write_text("DEST", encoding="utf-8")
+    for name in ("settings.json", "settings.local.json"):
+        (src / name).write_text("SRC", encoding="utf-8")
+        (dest / name).write_text("DEST", encoding="utf-8")
 
-    mod.mirror_tree(src, dest, exclude_names={"settings.json"})
+    mod.mirror_tree(src, dest, exclude_names=mod.AGENT_MIRROR_EXCLUDE_NAMES)
 
-    # Excluded file is neither overwritten nor deleted.
-    assert (dest / "settings.json").read_text(encoding="utf-8") == "DEST"
+    # Excluded files are neither overwritten nor deleted.
+    for name in ("settings.json", "settings.local.json"):
+        assert (dest / name).read_text(encoding="utf-8") == "DEST"
