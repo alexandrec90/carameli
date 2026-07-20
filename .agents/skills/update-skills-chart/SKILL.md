@@ -1,19 +1,31 @@
 ---
 name: update-skills-chart
 disable-model-invocation: true
-description: 'Scans the Carameli skill catalog and updates charts/skills/skills chart.md if skills were added, removed, or changed. Use after creating, updating, or removing any skill file.'
-argument-hint: 'No arguments needed — always scans and applies any required updates.'
+description: 'Maintains the optional Carameli skills chart by comparing project skill metadata with charts/skills/skills chart.md. Use after creating, updating, or removing any skill file; if the chart is not configured, report that and stop.'
+argument-hint: 'No arguments needed — checks the optional chart and updates it when configured.'
 ---
 
 # Skill: Update Skills Chart
 
-Scan the project's `.claude/skills/` directory and the built-in skill list, diff
-against the current `charts/skills/skills chart.md`, and patch the chart where it
-is out of date.
+Check whether `charts/skills/skills chart.md` exists. If it does, scan the
+project's `.claude/skills/` directory and the built-in skill list, diff them
+against the chart, and patch it where it is out of date.
 
 ---
 
-## Step 1 — Read the Source Files
+## Step 1 — Resolve the Chart Target
+
+Check for `charts/skills/skills chart.md` before scanning skill metadata.
+
+If the file does not exist, do not create it implicitly. Print:
+
+```text
+Skills chart is not configured at charts/skills/skills chart.md — no changes needed.
+```
+
+Then stop. This is a successful no-op, not an error.
+
+## Step 2 — Read the Source Files
 
 The harness preloads all skill metadata and the current chart:
 
@@ -32,7 +44,7 @@ that are **not** project-specific (e.g. `update-config`, `keybindings-help`,
 
 ---
 
-## Step 2 — Build the Canonical Skill List
+## Step 3 — Build the Canonical Skill List
 
 From the evidence gathered, create an internal table of **all skills** with these
 columns:
@@ -57,9 +69,9 @@ columns:
 
 ---
 
-## Step 3 — Diff Against Current Chart
+## Step 4 — Diff Against Current Chart
 
-Compare the canonical skill list from Step 2 against every row in the current
+Compare the canonical skill list from Step 3 against every row in the current
 `charts/skills/skills chart.md`.
 
 Identify:
@@ -81,9 +93,9 @@ and stop.
 
 ---
 
-## Step 4 — Apply Updates
+## Step 5 — Apply Updates
 
-### 4a — Update skill rows
+### 5a — Update skill rows
 
 Edit `charts/skills/skills chart.md` following these rules:
 
@@ -93,7 +105,7 @@ Edit `charts/skills/skills chart.md` following these rules:
 - If a skill doesn't fit any existing category, add a new section in logical order before the "Built-in / System Skills" section (which always comes last).
 - Update the `> Last updated:` date at the top to today's date.
 
-### 4b — Update Recommended Workflows
+### 5b — Update Recommended Workflows
 
 Review the Recommended Workflows section at the bottom:
 
@@ -103,7 +115,7 @@ Review the Recommended Workflows section at the bottom:
 
 ---
 
-## Step 5 — Report
+## Step 6 — Report
 
 After applying updates, print:
 
@@ -123,4 +135,4 @@ After applying updates, print:
 ```
 
 If no changes were made (diff was empty), confirm with the "up to date" message
-from Step 3.
+from Step 4.
