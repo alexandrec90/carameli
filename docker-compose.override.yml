@@ -1,4 +1,36 @@
 services:
+  # Per-service memory ceilings so no single dev container can balloon and
+  # starve the host. Tuned for a memory-constrained laptop; the WSL2 VM as a
+  # whole is also capped in ~/.wslconfig. Bump a value if a container OOMs
+  # (check `docker inspect <name> --format '{{.State.OOMKilled}}'`).
+  db:
+    mem_limit: 512m
+  pgbouncer:
+    mem_limit: 128m
+  db-backup:
+    mem_limit: 128m
+  app:
+    mem_limit: 768m
+  worker:
+    mem_limit: 512m
+  frontend:
+    mem_limit: 1g
   redis:
+    mem_limit: 256m
     ports:
       - "${REDIS_HOST_PORT:-6379}:6379"
+  minio:
+    mem_limit: 512m
+
+  # Telephony profile (only starts with --profile telephony). Capped too so an
+  # occasional call-testing session doesn't blow past the VM limit.
+  influxdb:
+    mem_limit: 512m
+  jambonz-db:
+    mem_limit: 512m
+  freeswitch:
+    mem_limit: 1g
+  rtpengine:
+    mem_limit: 256m
+  jambonz:
+    mem_limit: 768m
