@@ -7,9 +7,10 @@ One entrypoint for every environment:
     Runs host tools from the venv; `alembic check` runs inside the app container.
   - **CI (GitHub Actions):** `python scripts/lint-all.py` with `CI=true` set.
     Runs the same host tools directly (no Docker stack); `alembic check` runs
-    against the service Postgres. Auto-fixes land in the working tree; the PR
-    Gate lint job fails on any resulting diff so fixes get committed locally,
-    never silently re-applied per run.
+    against the service Postgres. Genuine, unfixable findings fail this run.
+    Auto-fixes land in the working tree but are cosmetic and non-blocking — the
+    lint-fix PostToolUse hook applies them on-edit, so the PR Gate reports any
+    residual drift as a notice rather than failing on it.
 
 Two scoping modes:
   - **Full (default):** every tool runs over the whole tree.
