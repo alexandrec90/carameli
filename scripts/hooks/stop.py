@@ -16,7 +16,8 @@ into the session so it is fixed here instead of after a CI round-trip:
     needs no Docker, so it runs even under a stack-down-by-default policy,
   - Tier 2b: `run-tests.py --fast` when app/ or tests/ Python changed and the app
     container is up (in-container, paid-safe via the global `-m "not paid"`
-    default); skipped with the stack down (Postgres has no free substitute),
+    default); skipped with the stack down unless `CARAMELI_STOP_TESTS_AUTOSTART=1`,
+    which brings app+deps up on demand, runs the tests, then stops what it started,
   - Tier 3: `check-lock-markers.py` when a requirements file changed, and vitest
     when frontend/src changed.
 It is loop-guarded (`stop_hook_active`), opt-out-able (`CARAMELI_SKIP_STOP_VERIFY=1`),
@@ -29,6 +30,7 @@ the verification helpers (`stop_hook_active`, `verify_enabled`, `changed_paths`,
 independently tested script.
 """
 
+import contextlib
 import json
 import os
 import re
@@ -64,6 +66,15 @@ _REQ_RE = re.compile(r"(^|/)requirements[^/]*\.(in|txt)$")
 
 # Opt-out: set to "1" to skip pre-stop verification entirely.
 SKIP_VERIFY_ENV = "CARAMELI_SKIP_STOP_VERIFY"
+
+# Opt-in: set to "1" to let Tier 2b bring up the app container (+ its compose
+# deps: db/redis/pgbouncer) on demand when app/tests changed and the stack is
+# down, run the tests, then stop only the services this hook started. Off by
+# default so the stack-down-to-save-memory policy holds unless asked. The runner
+# execs pytest inside the app container, so this is app+deps, not literally
+# db+redis alone -- still far leaner than the full stack (no worker/frontend/
+# minio/telephony).
+AUTOSTART_ENV = "CARAMELI_STOP_TESTS_AUTOSTART"
 
 # (skill, schema) pairs finalized on every stop. Safe to call when artifacts are
 # absent: finalize-state.py exits 0 in that case.
@@ -255,10 +266,71 @@ def stack_app_running(repo_root: Path = REPO_ROOT) -> bool:
     return "app" in result.stdout.split()
 
 
+def autostart_enabled(env: dict[str, str]) -> bool:
+    """True when the operator opted into on-demand app-container autostart."""
+    return env.get(AUTOSTART_ENV) == "1"
+
+
+def services_to_stop(before: set[str], after: set[str]) -> list[str]:
+    """Services this hook started (running now, not before) -- what to stop again."""
+    return sorted(after - before)
+
+
+def _compose_running_services(repo_root: Path = REPO_ROOT) -> set[str]:
+    try:
+        result = subprocess.run(
+            ["docker", "compose", "ps", "--services", "--status", "running"],
+            cwd=repo_root,
+            capture_output=True,
+            text=True,
+            timeout=15,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return set()
+    return set(result.stdout.split()) if result.returncode == 0 else set()
+
+
+def _compose_up_app(repo_root: Path = REPO_ROOT) -> bool:
+    """Bring up the app service and its deps, waiting for health. False on failure
+    (daemon down, build error, timeout) so Tier 2b skips instead of blocking."""
+    try:
+        result = subprocess.run(
+            ["docker", "compose", "up", "-d", "--wait", "app"],
+            cwd=repo_root,
+            capture_output=True,
+            text=True,
+            timeout=300,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    return result.returncode == 0
+
+
+def _compose_stop(services: list[str], repo_root: Path = REPO_ROOT) -> None:
+    """Stop (not remove) the given services, freeing their memory. Best-effort."""
+    if not services:
+        return
+    with contextlib.suppress(OSError, subprocess.TimeoutExpired):
+        subprocess.run(
+            ["docker", "compose", "stop", *services],
+            cwd=repo_root,
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+
+
 def _command_for(name: str) -> tuple[list[str], Path, str | None] | None:
     """(argv, cwd, artifact_path) for a check, or None when its tool is absent."""
     if name == CHECK_LINT:
-        return ([sys.executable, str(LINT_ALL), "--changed"], REPO_ROOT, "logs/lint-errors.log")
+        # --no-secrets: detect-secrets is the pre-commit hook's job (and already
+        # out of CI_TOOLS); skipping it is the one always-on cost we drop here,
+        # which also stops the Stop hook churning .secrets.baseline.
+        return (
+            [sys.executable, str(LINT_ALL), "--changed", "--no-secrets"],
+            REPO_ROOT,
+            "logs/lint-errors.log",
+        )
     if name == CHECK_SCRIPT_TESTS:
         return ([sys.executable, "-m", "pytest", "scripts/hooks/tests/", "-q"], REPO_ROOT, None)
     if name == CHECK_TESTS:
@@ -318,8 +390,21 @@ def verify(raw_stdin: str, env: dict[str, str]) -> int:
     paths = changed_paths(_git_status_porcelain(REPO_ROOT))
     # Only probe Docker when a DB-backed test could run -- a scripts/ or docs-only
     # change never needs the stack, so it must not pay the probe cost.
-    stack_up = stack_app_running() if any(_is_app_or_tests(p) for p in paths) else False
-    failures = run_checks(select_checks(paths, stack_up))
+    need_db = any(_is_app_or_tests(p) for p in paths)
+    stack_up = stack_app_running() if need_db else False
+
+    started: list[str] = []
+    if need_db and not stack_up and autostart_enabled(env):
+        before = _compose_running_services()
+        if _compose_up_app():
+            stack_up = True
+            started = services_to_stop(before, _compose_running_services())
+
+    try:
+        failures = run_checks(select_checks(paths, stack_up))
+    finally:
+        _compose_stop(started)  # stop only what we started; no-op when empty
+
     if failures:
         _print_verify_failures(failures)
         return 2

@@ -70,6 +70,21 @@ def test_parse_args_modes():
     assert la._parse_args([]).paths is None
     assert la._parse_args(["--changed"]).changed is True
     assert la._parse_args(["--paths", "a.py", "b.py"]).paths == ["a.py", "b.py"]
+    assert la._parse_args([]).no_secrets is False
+    assert la._parse_args(["--no-secrets"]).no_secrets is True
+
+
+def test_select_tools_no_secrets_drops_detect_secrets():
+    # Local default includes detect-secrets; --no-secrets removes it.
+    assert la.t_detect_secrets in la.select_tools(is_ci=False)
+    assert la.t_detect_secrets not in la.select_tools(is_ci=False, no_secrets=True)
+    # CI never runs detect-secrets, with or without the flag.
+    assert la.t_detect_secrets not in la.select_tools(is_ci=True)
+    assert la.t_detect_secrets not in la.select_tools(is_ci=True, no_secrets=True)
+    # The flag drops only detect-secrets, nothing else.
+    assert set(la.select_tools(is_ci=False)) - set(
+        la.select_tools(is_ci=False, no_secrets=True)
+    ) == {la.t_detect_secrets}
 
 
 # Each tool short-circuits to a clean pass (no subprocess) when the changed set

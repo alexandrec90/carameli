@@ -213,3 +213,84 @@ def test_verify_returns_zero_when_clean(monkeypatch):
     monkeypatch.setattr(hook, "stack_app_running", lambda *a, **k: False)
     monkeypatch.setattr(hook, "run_checks", lambda names: [])
     assert hook.verify("{}", {}) == 0
+
+
+# --- Tier 2b autostart ------------------------------------------------------
+
+
+def test_autostart_enabled_opt_in():
+    assert hook.autostart_enabled({}) is False
+    assert hook.autostart_enabled({"CARAMELI_STOP_TESTS_AUTOSTART": "0"}) is False
+    assert hook.autostart_enabled({"CARAMELI_STOP_TESTS_AUTOSTART": "1"}) is True
+
+
+def test_services_to_stop_only_newly_started():
+    before = {"redis"}
+    after = {"redis", "db", "pgbouncer", "app"}
+    assert hook.services_to_stop(before, after) == ["app", "db", "pgbouncer"]
+    # Nothing new started -> nothing to stop.
+    assert hook.services_to_stop({"app"}, {"app"}) == []
+
+
+def test_verify_does_not_autostart_when_opted_out(monkeypatch):
+    monkeypatch.setattr(hook, "_git_status_porcelain", lambda root: " M app/main.py\n")
+    monkeypatch.setattr(hook, "stack_app_running", lambda *a, **k: False)
+    called = {"up": False, "stop": False}
+    monkeypatch.setattr(hook, "_compose_up_app", lambda *a, **k: called.__setitem__("up", True))
+    monkeypatch.setattr(hook, "_compose_stop", lambda *a, **k: called.__setitem__("stop", True))
+    seen = {}
+
+    def _record(names):
+        seen["names"] = names
+        return []
+
+    monkeypatch.setattr(hook, "run_checks", _record)
+
+    assert hook.verify("{}", {}) == 0
+    assert called["up"] is False  # autostart off by default
+    assert hook.CHECK_TESTS not in seen["names"]  # DB tier skipped
+
+
+def test_verify_autostarts_and_stops_only_started(monkeypatch):
+    monkeypatch.setattr(hook, "_git_status_porcelain", lambda root: " M app/main.py\n")
+    monkeypatch.setattr(hook, "stack_app_running", lambda *a, **k: False)
+    running = iter([set(), {"db", "redis", "app"}])  # before up, after up
+    monkeypatch.setattr(hook, "_compose_running_services", lambda *a, **k: next(running))
+    monkeypatch.setattr(hook, "_compose_up_app", lambda *a, **k: True)
+    stopped = {}
+    monkeypatch.setattr(
+        hook, "_compose_stop", lambda services, **k: stopped.setdefault("svc", services)
+    )
+    seen = {}
+
+    def _record(names):
+        seen["names"] = names
+        return []
+
+    monkeypatch.setattr(hook, "run_checks", _record)
+
+    assert hook.verify("{}", {"CARAMELI_STOP_TESTS_AUTOSTART": "1"}) == 0
+    assert hook.CHECK_TESTS in seen["names"]  # DB tier ran once stack came up
+    assert stopped["svc"] == ["app", "db", "redis"]  # only what we started
+
+
+def test_verify_autostart_failure_skips_tests_and_stops_nothing(monkeypatch):
+    monkeypatch.setattr(hook, "_git_status_porcelain", lambda root: " M app/main.py\n")
+    monkeypatch.setattr(hook, "stack_app_running", lambda *a, **k: False)
+    monkeypatch.setattr(hook, "_compose_running_services", lambda *a, **k: set())
+    monkeypatch.setattr(hook, "_compose_up_app", lambda *a, **k: False)  # daemon down
+    stopped = {}
+    monkeypatch.setattr(
+        hook, "_compose_stop", lambda services, **k: stopped.setdefault("svc", services)
+    )
+    seen = {}
+
+    def _record(names):
+        seen["names"] = names
+        return []
+
+    monkeypatch.setattr(hook, "run_checks", _record)
+
+    assert hook.verify("{}", {"CARAMELI_STOP_TESTS_AUTOSTART": "1"}) == 0
+    assert hook.CHECK_TESTS not in seen["names"]  # up failed -> DB tier skipped
+    assert stopped["svc"] == []  # nothing started -> nothing stopped
