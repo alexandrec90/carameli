@@ -55,6 +55,7 @@ def _upgrade_to_head(sync_connection: Connection) -> None:
     cfg.attributes["connection"] = sync_connection
     command.upgrade(cfg, "head")
 
+
 # All async tests run on a single session-scoped event loop so that
 # the session-scoped engine/connection pool stays valid across tests.
 pytestmark = pytest.mark.asyncio(loop_scope="session")
