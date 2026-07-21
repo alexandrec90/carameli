@@ -22,15 +22,37 @@ services:
   minio:
     mem_limit: 512m
 
-  # Telephony profile (only starts with --profile telephony). Capped too so an
-  # occasional call-testing session doesn't blow past the VM limit.
+  # Telephony + monitoring profiles: opt-in, on-demand only. `restart: "no"`
+  # overrides the base compose's `unless-stopped` so these NEVER rejoin the
+  # auto-boot herd when Docker Desktop starts — profiles gate `up`, but the
+  # restart policy is what the daemon honors on boot. Spin them up deliberately
+  # (`docker compose --profile telephony up -d`, `--profile monitoring`) and
+  # they stay down again after the next Docker Desktop restart.
+  # mem_limits are kept so an occasional session can't blow past the VM cap.
   influxdb:
+    restart: "no"
     mem_limit: 512m
   jambonz-db:
+    restart: "no"
     mem_limit: 512m
   freeswitch:
+    restart: "no"
     mem_limit: 1g
   rtpengine:
+    restart: "no"
     mem_limit: 256m
   jambonz:
+    restart: "no"
     mem_limit: 768m
+
+  # Monitoring profile (--profile monitoring). Opt-in like telephony above.
+  otel-collector:
+    restart: "no"
+  prometheus:
+    restart: "no"
+  alertmanager:
+    restart: "no"
+  grafana:
+    restart: "no"
+  uptime-kuma:
+    restart: "no"
