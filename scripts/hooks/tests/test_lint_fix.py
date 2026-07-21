@@ -1,0 +1,154 @@
+"""Tests for scripts/hooks/lint-fix.py."""
+
+import subprocess
+
+from conftest import load_module
+
+lint_fix = load_module("scripts/hooks/lint-fix.py")
+
+
+def result(returncode: int = 0, stdout: str = "", stderr: str = ""):
+    return subprocess.CompletedProcess([], returncode, stdout, stderr)
+
+
+# ---- parse_hook_input ------------------------------------------------------
+
+
+def test_parse_hook_input_empty_is_none():
+    assert lint_fix.parse_hook_input("") is None
+
+
+def test_parse_hook_input_malformed_is_none():
+    assert lint_fix.parse_hook_input("{not json") is None
+
+
+def test_parse_hook_input_non_dict_is_none():
+    assert lint_fix.parse_hook_input("[1, 2]") is None
+
+
+def test_parse_hook_input_valid_dict():
+    assert lint_fix.parse_hook_input('{"tool_name": "Edit"}') == {"tool_name": "Edit"}
+
+
+# ---- extract_path ----------------------------------------------------------
+
+
+def test_extract_path_none_input():
+    assert lint_fix.extract_path(None) is None
+
+
+def test_extract_path_snake_case():
+    payload = {"tool_name": "Edit", "tool_input": {"file_path": "app/main.py"}}
+    assert lint_fix.extract_path(payload) == "app/main.py"
+
+
+def test_extract_path_camel_case():
+    payload = {"toolName": "Write", "toolInput": {"filePath": "app/x.py"}}
+    assert lint_fix.extract_path(payload) == "app/x.py"
+
+
+def test_extract_path_rejects_other_tools():
+    payload = {"tool_name": "Bash", "tool_input": {"file_path": "app/main.py"}}
+    assert lint_fix.extract_path(payload) is None
+
+
+def test_extract_path_missing_path_is_none():
+    assert lint_fix.extract_path({"tool_name": "Edit", "tool_input": {}}) is None
+
+
+def test_extract_path_non_dict_tool_input():
+    assert lint_fix.extract_path({"tool_name": "Edit", "tool_input": "nope"}) is None
+
+
+# ---- is_lintable -----------------------------------------------------------
+
+
+def test_is_lintable_python():
+    assert lint_fix.is_lintable("app/main.py")
+    assert lint_fix.is_lintable("app/types.pyi")
+
+
+def test_is_lintable_rejects_non_python():
+    assert not lint_fix.is_lintable("README.md")
+    assert not lint_fix.is_lintable("frontend/src/app.tsx")
+
+
+# ---- find_ruff -------------------------------------------------------------
+
+
+def test_find_ruff_prefers_venv(tmp_path):
+    venv_bin = tmp_path / ".venv" / "bin"
+    venv_bin.mkdir(parents=True)
+    ruff = venv_bin / "ruff"
+    ruff.write_text("#!/bin/sh\n")
+    assert lint_fix.find_ruff(tmp_path) == str(ruff)
+
+
+def test_find_ruff_falls_back_to_path(tmp_path, monkeypatch):
+    monkeypatch.setattr(lint_fix.shutil, "which", lambda name: "/usr/bin/ruff")
+    assert lint_fix.find_ruff(tmp_path) == "/usr/bin/ruff"
+
+
+# ---- main ------------------------------------------------------------------
+
+
+def _payload(path: str) -> str:
+    return f'{{"tool_name": "Edit", "tool_input": {{"file_path": "{path}"}}}}'
+
+
+def test_main_skips_non_python(monkeypatch):
+    monkeypatch.setattr(lint_fix, "_read_stdin", lambda: _payload("README.md"))
+    called = []
+    monkeypatch.setattr(lint_fix, "find_ruff", lambda root: called.append("ruff") or "ruff")
+    assert lint_fix.main() == 0
+    assert called == []  # returned before resolving ruff
+
+
+def test_main_noop_when_ruff_missing(monkeypatch, tmp_path):
+    f = tmp_path / "x.py"
+    f.write_text("x = 1\n")
+    monkeypatch.setattr(lint_fix, "_read_stdin", lambda: _payload(str(f)))
+    monkeypatch.setattr(lint_fix, "find_ruff", lambda root: None)
+    assert lint_fix.main() == 0
+
+
+def test_main_clean_file_returns_zero(monkeypatch, tmp_path):
+    f = tmp_path / "x.py"
+    f.write_text("x = 1\n")
+    monkeypatch.setattr(lint_fix, "_read_stdin", lambda: _payload(str(f)))
+    monkeypatch.setattr(lint_fix, "find_ruff", lambda root: "ruff")
+    monkeypatch.setattr(lint_fix, "_run", lambda ruff, *args: result(returncode=0))
+    assert lint_fix.main() == 0
+
+
+def test_main_relays_remaining_errors(monkeypatch, tmp_path, capsys):
+    f = tmp_path / "x.py"
+    f.write_text("x = 1\n")
+    monkeypatch.setattr(lint_fix, "_read_stdin", lambda: _payload(str(f)))
+    monkeypatch.setattr(lint_fix, "find_ruff", lambda root: "ruff")
+
+    calls = []
+
+    def fake_run(ruff, *args):
+        calls.append(args)
+        # `format` and `check --fix` succeed silently; the final reporting
+        # `check` (no --fix) surfaces the unfixable finding.
+        if args[0] == "check" and "--fix" not in args:
+            return result(returncode=1, stdout="x.py:1:1: F821 undefined name\n")
+        return result(returncode=0)
+
+    monkeypatch.setattr(lint_fix, "_run", fake_run)
+
+    assert lint_fix.main() == 2
+    err = capsys.readouterr().err
+    assert "F821" in err
+    # Fixers ran before the reporting check.
+    assert ("format", str(f)) in calls
+    assert ("check", "--fix", str(f)) in calls
+
+
+def test_main_missing_file_returns_zero(monkeypatch, tmp_path):
+    missing = tmp_path / "gone.py"
+    monkeypatch.setattr(lint_fix, "_read_stdin", lambda: _payload(str(missing)))
+    monkeypatch.setattr(lint_fix, "find_ruff", lambda root: "ruff")
+    assert lint_fix.main() == 0

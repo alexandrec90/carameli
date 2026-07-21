@@ -7,9 +7,10 @@ One entrypoint for every environment:
     Runs host tools from the venv; `alembic check` runs inside the app container.
   - **CI (GitHub Actions):** `python scripts/lint-all.py` with `CI=true` set.
     Runs the same host tools directly (no Docker stack); `alembic check` runs
-    against the service Postgres. Auto-fixes land in the working tree; the PR
-    Gate lint job fails on any resulting diff so fixes get committed locally,
-    never silently re-applied per run.
+    against the service Postgres. Genuine, unfixable findings fail this run.
+    Auto-fixes land in the working tree but are cosmetic and non-blocking — the
+    lint-fix PostToolUse hook applies them on-edit, so the PR Gate reports any
+    residual drift as a notice rather than failing on it.
 
 Two scoping modes:
   - **Full (default):** every tool runs over the whole tree.
@@ -446,13 +447,30 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Explicit repo-relative paths to treat as the changed set (implies "
         "--changed; overrides git detection).",
     )
+    p.add_argument(
+        "--no-secrets",
+        action="store_true",
+        help="Skip the detect-secrets scan (the one always-on tool). Used by the "
+        "Stop hook: detect-secrets is owned by the pre-commit hook, already "
+        "excluded from CI_TOOLS, and its full-tree scan is the only per-run cost "
+        "(and baseline-churn source) not worth paying on every stop.",
+    )
     return p.parse_args(argv)
+
+
+def select_tools(is_ci: bool, no_secrets: bool = False):
+    """The tool set to run. CI drops detect-secrets already; `no_secrets` drops it
+    for local callers (the Stop hook) that leave it to the pre-commit hook."""
+    tools = CI_TOOLS if is_ci else LOCAL_TOOLS
+    if no_secrets:
+        tools = [t for t in tools if t is not t_detect_secrets]
+    return tools
 
 
 def main(argv: list[str] | None = None) -> int:
     args = _parse_args(argv)
     _ensure_venv_on_path()
-    tools = CI_TOOLS if IS_CI else LOCAL_TOOLS
+    tools = select_tools(IS_CI, args.no_secrets)
 
     if args.paths is not None:
         changed: list[str] | None = changed_files(args.paths)
