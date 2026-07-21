@@ -1,12 +1,17 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any, cast
 
 import pytest
+from alembic.config import Config
+from alembic.script import ScriptDirectory
 from sqlalchemy import inspect as sa_inspect
 from sqlalchemy import text
 
 pytestmark = pytest.mark.asyncio(loop_scope="session")
+
+_ALEMBIC_DIR = Path(__file__).resolve().parent.parent.parent / "alembic"
 
 _EXPECTED_INDEXES = {
     "call_events": {
@@ -51,3 +56,23 @@ async def test_pg_stat_statements_extension_exists(db_session) -> None:
     )
 
     assert result.scalar_one() is True
+
+
+async def test_schema_is_migration_built_at_head(db_session) -> None:
+    """The test DB must be built by running the Alembic migrations, not
+    Base.metadata.create_all.
+
+    create_all only builds model-defined tables, so migration-only objects
+    (the pg_stat_statements extension above, raw-SQL DDL, CHECK constraints,
+    functions) would silently be absent and the test DB would drift from a
+    migrated production DB. Two facts prove the migration path ran:
+    ``alembic_version`` exists (create_all never creates it), and it is
+    stamped at the current head revision (schema fully upgraded).
+    """
+    cfg = Config()
+    cfg.set_main_option("script_location", str(_ALEMBIC_DIR))
+    head = ScriptDirectory.from_config(cfg).get_current_head()
+    assert head is not None
+
+    result = await db_session.execute(text("SELECT version_num FROM alembic_version"))
+    assert result.scalar_one() == head
