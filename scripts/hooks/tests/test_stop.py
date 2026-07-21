@@ -72,3 +72,144 @@ def test_archive_targets_present_rejects_non_object_and_garbage():
     assert hook.archive_targets_present("[1, 2, 3]") is False
     assert hook.archive_targets_present("not json") is False
     assert hook.archive_targets_present("") is False
+
+
+# --- pre-stop verification --------------------------------------------------
+
+
+def test_stop_hook_active_true_only_when_flagged():
+    assert hook.stop_hook_active('{"stop_hook_active": true}') is True
+    assert hook.stop_hook_active('{"stop_hook_active": false}') is False
+    assert hook.stop_hook_active('{"cwd": "/repo"}') is False
+    assert hook.stop_hook_active("not json") is False
+    assert hook.stop_hook_active("[1, 2]") is False
+
+
+def test_verify_enabled_opt_out():
+    assert hook.verify_enabled({}) is True
+    assert hook.verify_enabled({"CARAMELI_SKIP_STOP_VERIFY": "0"}) is True
+    assert hook.verify_enabled({"CARAMELI_SKIP_STOP_VERIFY": "1"}) is False
+
+
+def test_changed_paths_parses_status_and_renames():
+    porcelain = " M app/main.py\n?? scripts/new.py\nR  app/old.py -> app/renamed.py\n\n"
+    assert hook.changed_paths(porcelain) == [
+        "app/main.py",
+        "scripts/new.py",
+        "app/renamed.py",
+    ]
+
+
+def test_changed_paths_empty():
+    assert hook.changed_paths("") == []
+
+
+def test_path_predicates():
+    assert hook._is_py("app/x.py") and hook._is_py("app/y.pyi")
+    assert not hook._is_py("README.md")
+    assert hook._is_frontend("frontend/src/App.tsx")
+    assert not hook._is_frontend("frontend/vite.config.ts")
+    assert hook._is_reqs("requirements.txt")
+    assert hook._is_reqs("requirements-dev.in")
+    assert not hook._is_reqs("app/requirements_notes.md")
+    assert hook._is_script("scripts/hooks/stop.py")
+    assert not hook._is_script("scripts/notes.md")
+    assert hook._is_app_or_tests("app/main.py") and hook._is_app_or_tests("tests/unit/t.py")
+    assert not hook._is_app_or_tests("scripts/x.py")
+
+
+def test_select_checks_empty_diff_runs_nothing():
+    assert hook.select_checks([], True) == []
+
+
+def test_select_checks_app_python_with_stack_runs_lint_and_db_tests():
+    checks = hook.select_checks(["app/main.py"], True)
+    assert checks == [hook.CHECK_LINT, hook.CHECK_TESTS]
+
+
+def test_select_checks_app_python_without_stack_skips_db_tests():
+    checks = hook.select_checks(["app/main.py"], False)
+    assert checks == [hook.CHECK_LINT]
+
+
+def test_select_checks_scripts_run_host_tests_without_stack():
+    # The key stack-down case: a scripts/ change is verified on the host with no
+    # Docker, so it is caught even when the DB-backed tier is unavailable.
+    checks = hook.select_checks(["scripts/hooks/stop.py"], False)
+    assert checks == [hook.CHECK_LINT, hook.CHECK_SCRIPT_TESTS]
+    assert hook.CHECK_TESTS not in checks
+
+
+def test_select_checks_scripts_change_does_not_probe_db_tier():
+    # A scripts-only change never adds the in-container DB tier, even stack-up.
+    checks = hook.select_checks(["scripts/hooks/stop.py"], True)
+    assert checks == [hook.CHECK_LINT, hook.CHECK_SCRIPT_TESTS]
+
+
+def test_select_checks_reqs_adds_lock_markers():
+    checks = hook.select_checks(["requirements.txt"], False)
+    assert hook.CHECK_LOCKS in checks and hook.CHECK_TESTS not in checks
+
+
+def test_select_checks_frontend_adds_vitest():
+    checks = hook.select_checks(["frontend/src/App.tsx"], False)
+    assert checks == [hook.CHECK_LINT, hook.CHECK_FRONTEND]
+
+
+def test_select_checks_non_relevant_change_runs_lint_only():
+    # A docs edit still runs lint (lint-all --changed self-scopes to a no-op),
+    # but never tests / locks / frontend.
+    assert hook.select_checks(["README.md"], True) == [hook.CHECK_LINT]
+
+
+def test_run_checks_skips_missing_tool(monkeypatch):
+    monkeypatch.setattr(hook, "_command_for", lambda name: None)
+    assert hook.run_checks([hook.CHECK_FRONTEND]) == []
+
+
+def test_run_checks_collects_failures(monkeypatch):
+    import subprocess as sp
+
+    monkeypatch.setattr(hook, "_command_for", lambda name: (["true"], hook.REPO_ROOT, None))
+    monkeypatch.setattr(
+        hook.subprocess,
+        "run",
+        lambda *a, **k: sp.CompletedProcess([], 1, "boom\n", "bad line\n"),
+    )
+    failures = hook.run_checks([hook.CHECK_LINT])
+    assert len(failures) == 1
+    assert failures[0][0] == hook.CHECK_LINT
+    assert "bad line" in failures[0][2]
+
+
+def test_run_checks_oserror_is_skip_not_failure(monkeypatch):
+    def boom(*a, **k):
+        raise OSError("no such tool")
+
+    monkeypatch.setattr(hook, "_command_for", lambda name: (["nope"], hook.REPO_ROOT, None))
+    monkeypatch.setattr(hook.subprocess, "run", boom)
+    assert hook.run_checks([hook.CHECK_LINT]) == []
+
+
+def test_verify_skips_when_loop_active(monkeypatch):
+    monkeypatch.setattr(hook, "run_checks", lambda names: [("lint", None, "x")])
+    assert hook.verify('{"stop_hook_active": true}', {}) == 0
+
+
+def test_verify_skips_when_opted_out(monkeypatch):
+    monkeypatch.setattr(hook, "run_checks", lambda names: [("lint", None, "x")])
+    assert hook.verify("{}", {"CARAMELI_SKIP_STOP_VERIFY": "1"}) == 0
+
+
+def test_verify_returns_two_on_failure(monkeypatch):
+    monkeypatch.setattr(hook, "_git_status_porcelain", lambda root: " M app/main.py\n")
+    monkeypatch.setattr(hook, "stack_app_running", lambda *a, **k: False)
+    monkeypatch.setattr(hook, "run_checks", lambda names: [("lint", "logs/lint-errors.log", "")])
+    assert hook.verify("{}", {}) == 2
+
+
+def test_verify_returns_zero_when_clean(monkeypatch):
+    monkeypatch.setattr(hook, "_git_status_porcelain", lambda root: " M app/main.py\n")
+    monkeypatch.setattr(hook, "stack_app_running", lambda *a, **k: False)
+    monkeypatch.setattr(hook, "run_checks", lambda names: [])
+    assert hook.verify("{}", {}) == 0
