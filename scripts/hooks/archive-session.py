@@ -659,10 +659,24 @@ def _error_log_path(cwd):
 # ---------------------------------------------------------------------------
 
 
+def read_stdin_payload():
+    """Parse the hook payload from stdin as UTF-8, tolerant of odd bytes.
+
+    Mirrors stop.py's reader: decode the raw bytes as UTF-8 with surrogateescape
+    rather than the process locale (cp1252 on Windows), which would mis-decode the
+    UTF-8 the parent writes to this child's stdin.
+    """
+    buffer = getattr(sys.stdin, "buffer", None)
+    raw = buffer.read() if buffer is not None else sys.stdin.read()
+    if isinstance(raw, bytes):
+        raw = raw.decode("utf-8", errors="surrogateescape")
+    return json.loads(raw)
+
+
 def main():
     cwd = ""
     try:
-        hook_input = json.load(sys.stdin)
+        hook_input = read_stdin_payload()
         session_id = hook_input.get("session_id", "unknown")
         transcript_path = hook_input.get("transcript_path", "")
         cwd = hook_input.get("cwd", "")
