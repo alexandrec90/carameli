@@ -119,6 +119,16 @@ async def test_engine() -> AsyncGenerator[AsyncEngine, None]:
                 # fingerprint is sha256 hex (16 chars, [0-9a-f]) -- safe to
                 # interpolate; COMMENT ON does not accept bind parameters.
                 await conn.execute(text(f"COMMENT ON SCHEMA public IS 'fingerprint={fingerprint}'"))
+            # Migration 013 enables pg_stat_statements, but the test DB is built
+            # from Base.metadata (create_all), which never builds migration-only
+            # objects like extensions -- and the slow-path DROP SCHEMA above
+            # drops the extension the CI `alembic upgrade head` step created.
+            # Recreate it on every primary setup (both paths) so a from-models
+            # test DB matches a migration-built one, keeping
+            # test_schema_indexes.py::test_pg_stat_statements_extension_exists
+            # green on a cold CI database. CREATE EXTENSION succeeds without
+            # shared_preload_libraries (the catalog row is what the test checks).
+            await conn.execute(text("CREATE EXTENSION IF NOT EXISTS pg_stat_statements"))
         else:
             # Non-primary workers: ensure tables exist (no-op after primary's
             # fast path, and also after primary's slow path via create_all).
