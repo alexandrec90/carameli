@@ -520,21 +520,6 @@
       "problemMatcher": []
     },
     {
-      "label": "Git: Sync Branch with origin/master (No Stash)",
-      "detail": "Fetch origin, then rebase the current branch onto origin/master. Refuses dirty worktrees and explicitly disables autostash; resolve rebase conflicts or run 'git rebase --abort' if needed.",
-      "type": "process",
-      "command": "python",
-      "args": ["scripts/notify-wrap.py", "Git: Sync Branch", "--", "python", "scripts/git-sync.py"],
-      "presentation": {
-        "reveal": "always",
-        "panel": "dedicated",
-        "clear": true,
-        "showReuseMessage": false,
-        "close": false
-      },
-      "problemMatcher": []
-    },
-    {
       "label": "Git: Untrack Ignored Files",
       "type": "process",
       "command": "python",
