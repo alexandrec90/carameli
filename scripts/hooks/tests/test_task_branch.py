@@ -105,3 +105,18 @@ class TestAutoBranchDecision:
 
     def test_detached_head_does_not_fire(self):
         assert tb.auto_branch_decision("", "claude/x-0722", tree_dirty=False) == (False, None)
+
+
+class TestPlatformManagesBranch:
+    def test_true_when_remote_flag_set(self):
+        # Claude Code on the web / mobile sets CLAUDE_CODE_REMOTE=true.
+        assert tb.platform_manages_branch({"CLAUDE_CODE_REMOTE": "true"}) is True
+
+    def test_false_when_flag_absent(self):
+        assert tb.platform_manages_branch({}) is False
+
+    def test_false_when_flag_not_literal_true(self):
+        # Only the literal "true" counts -- mirrors session-start.sh's check.
+        assert tb.platform_manages_branch({"CLAUDE_CODE_REMOTE": "1"}) is False
+        assert tb.platform_manages_branch({"CLAUDE_CODE_REMOTE": "false"}) is False
+        assert tb.platform_manages_branch({"CLAUDE_CODE_REMOTE": ""}) is False
