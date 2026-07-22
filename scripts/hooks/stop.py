@@ -122,10 +122,21 @@ def archive_targets_present(raw_stdin: str) -> bool:
 
 
 def _read_stdin() -> str:
-    """Best-effort read of the hook payload; '' when stdin is a tty or unreadable."""
+    """Best-effort read of the hook payload; '' when stdin is a tty or unreadable.
+
+    Decodes the raw stdin bytes as UTF-8 (the encoding Claude Code writes the hook
+    payload in) with surrogateescape, instead of trusting the process locale. On
+    Windows that locale is cp1252, which mis-decodes non-ASCII payload bytes into
+    lone surrogates on read and then raises UnicodeEncodeError when the same string
+    is written to the archive child (position-2642 '\\udc9d' crash). surrogateescape
+    lets any byte round-trip back out unchanged when re-encoded for the child.
+    """
     try:
         if sys.stdin is None or sys.stdin.isatty():
             return ""
+        buffer = getattr(sys.stdin, "buffer", None)
+        if buffer is not None:
+            return buffer.read().decode("utf-8", errors="surrogateescape")
         return sys.stdin.read()
     except (OSError, ValueError):
         return ""
@@ -495,11 +506,14 @@ def main() -> int:
     save_snapshot(PROFILE, SNAPSHOT)
 
     if archive_targets_present(raw_stdin):
+        # encoding+errors (not text=True) so the child's stdin pipe is UTF-8, not
+        # the Windows cp1252 locale that crashes on surrogate-escaped bytes.
         subprocess.run(
             [sys.executable, str(ARCHIVE_SESSION)],
             cwd=REPO_ROOT,
             input=raw_stdin,
-            text=True,
+            encoding="utf-8",
+            errors="surrogateescape",
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )
