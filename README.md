@@ -133,6 +133,29 @@ git config --global rerere.enabled true   # resolve each recurring conflict once
 git maintenance start                      # periodic background fetch keeps origin/master fresh
 ```
 
+### Task lifecycle: fresh branch in, PR out
+
+For the vibe-coding loop where every task lands its own small PR to `master`, the
+lifecycle is automated at both ends and stays isolated per task:
+
+1. **Start (automatic).** The `UserPromptSubmit` hook
+   (`scripts/hooks/branch-per-task.py`) cuts a fresh `claude/<slug>-<mmdd>` branch off the
+   latest `origin/master` **only when a prompt arrives while you are on `master`** — i.e.
+   when you begin new work. On any other branch it is a no-op, so it never cuts a branch
+   mid-task. A dirty `master` carries your changes onto the new branch instead of resetting
+   (no clobber).
+2. **Work.** The Stop hook (`scripts/hooks/stop.py`) reproduces the PR-gate checks on the
+   diff at each turn and relays failures back into the session, so they are fixed in-context
+   rather than after a CI round-trip.
+3. **Finish (explicit).** Run **`/ship`** when the task is done: it pre-flights lint, commits,
+   pushes (with retry), opens a PR against `master`, and offers to subscribe the session to
+   the PR's CI/review activity for autofix. `/ship` is explicit-only so a PR is never opened on
+   half-finished work; `scripts/ship.py` owns the tested mechanics.
+
+Checks stay layered by purpose, not merged into one hook: pre-commit holds only what CI
+*can't* own (secret scanning + the AGENTS mirror generator), the Stop hook is the in-session
+CI mirror, and the PR Gate is the authoritative gate that `dependabot-automerge.yml` waits on.
+
 Tearing down: `docker compose down -v` inside the worktree, then
 `git worktree remove ../carameli-b`, then remove its built images:
 `docker image rm carameli-app-carameli-b carameli-db-backup-carameli-b`.
