@@ -83,3 +83,14 @@ locally. Use it as a pre-flight, not a remote oracle:
 - **When polling a PR for merge, keep the check to one line of git** (e.g.
   `git fetch -q && git merge-base --is-ancestor <sha> origin/master`) rather than
   refetching the full PR object or job logs each cycle.
+- **Batch autofixes into one push.** Every push re-runs the full PR Gate, so fix
+  *all* failures the filtered artifact lists in a single round, then push once —
+  not one push per fix. The Stop hook's local re-verify before that push makes the
+  fix more likely complete, cutting follow-up rounds.
+- **Right-size the model for the autofix loop (opt-in).** The loop's cost is
+  dominated by re-loaded context per round, and trivial CI fixes (a lint nit, a
+  missing import, a snapshot update) don't need Opus/high-effort. When the failure
+  is clearly mechanical, running the autofix turn at a lower model/effort cuts token
+  cost with no quality loss; reserve the full model for failures that need real
+  diagnosis. This is a judgement call per failure, not a hard switch — the default
+  config (`.claude/settings.json`) stays on the capable model.

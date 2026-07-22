@@ -8,13 +8,32 @@ On every stop, best-effort and always exiting 0:
   - normalize known-fixes tables when explicitly enabled,
   - typecheck the frontend when skin files changed.
 
-`save_snapshot`, `skin_changed`, `should_normalize`, and `archive_targets_present`
-are pure and unit-tested (`scripts/hooks/tests/test_stop.py`); each external step is
-its own importable, independently tested script.
+Then a pre-stop verification phase (Tiers 1-3) reproduces the PR-gate checks
+locally, scoped to the working-tree diff, and exits 2 to relay any failure back
+into the session so it is fixed here instead of after a CI round-trip:
+  - Tier 1: `lint-all.py --changed` (ruff/mypy/vulture/eslint/... , no infra),
+  - Tier 2a: host `pytest scripts/hooks/tests/` when a scripts/ file changed --
+    needs no Docker, so it runs even under a stack-down-by-default policy,
+  - Tier 2b: host `pytest` (app/ or tests/ Python changed) against db+redis --
+    no app container, so the footprint is just db+redis. Uses them if up; else,
+    only with `CARAMELI_STOP_TESTS_AUTOSTART=1`, brings db+redis up on demand,
+    runs, then stops what it started. Paid-safe via pytest.ini's `-m "not paid"`,
+  - Tier 3: `check-lock-markers.py` when a requirements file changed, and vitest
+    when frontend/src changed.
+It is loop-guarded (`stop_hook_active`), opt-out-able (`CARAMELI_SKIP_STOP_VERIFY=1`),
+gated on relevant files changing, and skips cleanly when tooling/infra is absent.
+
+`save_snapshot`, `skin_changed`, `should_normalize`, `archive_targets_present`, and
+the verification helpers (`stop_hook_active`, `verify_enabled`, `changed_paths`,
+`select_checks`, `run_checks`) are pure and unit-tested
+(`scripts/hooks/tests/test_stop.py`); each external step is its own importable,
+independently tested script.
 """
 
+import contextlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -27,6 +46,40 @@ SNAPSHOT = REPO_ROOT / "logs/agent/skills-profile.optimized.json"
 FINALIZE_STATE = REPO_ROOT / "scripts/hooks/finalize-state.py"
 NORMALIZE_KNOWN_FIXES = REPO_ROOT / "scripts/hooks/normalize-known-fixes.py"
 ARCHIVE_SESSION = REPO_ROOT / "scripts/hooks/archive-session.py"
+
+# --- Pre-stop verification (Tiers 1-3) -------------------------------------
+# Reproduce the PR-gate checks locally, scoped to the working-tree diff, so an
+# agent fixes them in-session instead of after a CI round-trip. Each is gated on
+# a relevant file changing; Tier 2b (DB tests) additionally needs db+redis
+# reachable; all skip cleanly when their tooling/infra is absent.
+LINT_ALL = REPO_ROOT / "scripts/lint-all.py"
+CHECK_LOCK_MARKERS = REPO_ROOT / "scripts/check-lock-markers.py"
+
+CHECK_LINT = "lint"  # Tier 1: lint-all.py --changed (no infra)
+CHECK_SCRIPT_TESTS = "script-tests"  # Tier 2a: host pytest scripts/hooks/tests (no infra)
+CHECK_TESTS = "tests"  # Tier 2b: host pytest tests/ against db+redis (paid-safe)
+CHECK_LOCKS = "lock-markers"  # Tier 3: check-lock-markers.py (deps changed)
+CHECK_FRONTEND = "frontend"  # Tier 3: vitest (frontend/src changed)
+
+# DB credentials mirror docker-compose.yml's POSTGRES_* and CI's env block; host
+# pytest connects over the published ports (resolved via `docker compose port`).
+_DB_USER = "carameli"
+_DB_PASSWORD = "carameli_local_dev"  # noqa: S105 -- local dev DB password, not a secret
+_DB_NAME = "carameli"
+
+_REQ_RE = re.compile(r"(^|/)requirements[^/]*\.(in|txt)$")
+
+# Opt-out: set to "1" to skip pre-stop verification entirely.
+SKIP_VERIFY_ENV = "CARAMELI_SKIP_STOP_VERIFY"
+
+# Opt-in: set to "1" to let Tier 2b bring up ONLY db+redis on demand when
+# app/tests changed and they are down, run host pytest against them, then stop
+# only the services this hook started. Off by default so the stack-down-to-save-
+# memory policy holds unless asked. Host pytest (not in-container) means the app
+# container is never needed -- peak footprint is db+redis (~0.75 GB) vs the full
+# stack (~4 GB). Tests inherit pytest.ini's `-m "not paid"`, so they can never
+# bill a live provider.
+AUTOSTART_ENV = "CARAMELI_STOP_TESTS_AUTOSTART"
 
 # (skill, schema) pairs finalized on every stop. Safe to call when artifacts are
 # absent: finalize-state.py exits 0 in that case.
@@ -107,6 +160,334 @@ def _git_skin_status(repo_root: Path) -> str:
     return result.stdout if result.returncode == 0 else ""
 
 
+# --- Pre-stop verification helpers (pure; unit-tested in test_stop.py) ------
+
+
+def stop_hook_active(raw_stdin: str) -> bool:
+    """True when this stop is already a continuation triggered by a stop hook.
+
+    Claude Code sets `stop_hook_active` on the payload once a Stop hook has
+    blocked and the agent resumed. Honouring it prevents an infinite
+    fix -> stop -> block loop: verification runs on the first stop only.
+    """
+    try:
+        payload = json.loads(raw_stdin)
+    except (json.JSONDecodeError, TypeError):
+        return False
+    return bool(isinstance(payload, dict) and payload.get("stop_hook_active"))
+
+
+def verify_enabled(env: dict[str, str]) -> bool:
+    """False when the operator has opted out of pre-stop verification."""
+    return env.get(SKIP_VERIFY_ENV) != "1"
+
+
+def changed_paths(porcelain: str) -> list[str]:
+    """Repo-relative paths from `git status --porcelain` (handles renames/quotes)."""
+    paths: list[str] = []
+    for line in porcelain.splitlines():
+        if not line.strip():
+            continue
+        rest = line[3:] if len(line) > 3 else line.strip()
+        if " -> " in rest:  # rename: "R  old -> new" -> keep the new path
+            rest = rest.split(" -> ", 1)[1]
+        paths.append(rest.strip().strip('"'))
+    return paths
+
+
+def _is_py(path: str) -> bool:
+    return path.endswith((".py", ".pyi"))
+
+
+def _is_frontend(path: str) -> bool:
+    return path.startswith("frontend/src/")
+
+
+def _is_reqs(path: str) -> bool:
+    return bool(_REQ_RE.search(path))
+
+
+def _is_script(path: str) -> bool:
+    """A Python file under scripts/ -- covered by the infra-free host test suite."""
+    return path.startswith("scripts/") and _is_py(path)
+
+
+def host_test_targets(paths: list[str]) -> list[str]:
+    """pytest targets for the DB tier, or [] when no app/tests Python changed.
+
+    An app/ change can break tests anywhere, and without testmon we cannot map it
+    to specific tests -- run the whole unit suite. A tests-only change runs just
+    the changed test files (fast, precise).
+    """
+    if any(_is_py(p) and p.startswith("app/") for p in paths):
+        return ["tests/unit"]
+    return sorted(p for p in paths if p.startswith("tests/") and _is_py(p))
+
+
+def select_checks(paths: list[str]) -> list[str]:
+    """The infra-light checks to run for this diff (the DB tier is separate).
+
+    - lint runs whenever anything changed (lint-all.py --changed self-scopes
+      internally, so an irrelevant edit is a fast no-op).
+    - script-tests (host pytest scripts/hooks/tests) run when a scripts/ file
+      changed. These need no Docker, so they run even with the stack down.
+    - lock-markers run when a requirements file changed.
+    - frontend (vitest) runs when frontend/src changed; tsc/eslint are already
+      covered by lint's changed-scope, so this adds only the unit tests.
+
+    The DB-backed tier (app/ or tests/ Python) is handled by run_db_tests(),
+    which needs db+redis and so has its own reachability/autostart gating.
+    """
+    if not paths:
+        return []
+    checks = [CHECK_LINT]
+    if any(_is_script(p) for p in paths):
+        checks.append(CHECK_SCRIPT_TESTS)
+    if any(_is_reqs(p) for p in paths):
+        checks.append(CHECK_LOCKS)
+    if any(_is_frontend(p) for p in paths):
+        checks.append(CHECK_FRONTEND)
+    return checks
+
+
+def _git_status_porcelain(repo_root: Path) -> str:
+    try:
+        result = subprocess.run(
+            ["git", "status", "--porcelain"],
+            cwd=repo_root,
+            capture_output=True,
+            text=True,
+        )
+    except OSError:
+        return ""
+    return result.stdout if result.returncode == 0 else ""
+
+
+def autostart_enabled(env: dict[str, str]) -> bool:
+    """True when the operator opted into on-demand db+redis autostart."""
+    return env.get(AUTOSTART_ENV) == "1"
+
+
+def services_to_stop(before: set[str], after: set[str]) -> list[str]:
+    """Services this hook started (running now, not before) -- what to stop again."""
+    return sorted(after - before)
+
+
+def _compose_running_services(repo_root: Path = REPO_ROOT) -> set[str]:
+    try:
+        result = subprocess.run(
+            ["docker", "compose", "ps", "--services", "--status", "running"],
+            cwd=repo_root,
+            capture_output=True,
+            text=True,
+            timeout=15,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return set()
+    return set(result.stdout.split()) if result.returncode == 0 else set()
+
+
+def db_redis_running(repo_root: Path = REPO_ROOT) -> bool:
+    """True when both db and redis are up (whether via the full stack or db+redis
+    alone) -- host pytest can reach them either way."""
+    return {"db", "redis"}.issubset(_compose_running_services(repo_root))
+
+
+def _compose_up_db_redis(repo_root: Path = REPO_ROOT) -> bool:
+    """Bring up ONLY db+redis, waiting for health. False on failure (daemon down,
+    timeout) so the DB tier skips instead of blocking."""
+    try:
+        result = subprocess.run(
+            ["docker", "compose", "up", "-d", "--wait", "db", "redis"],
+            cwd=repo_root,
+            capture_output=True,
+            text=True,
+            timeout=180,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    return result.returncode == 0
+
+
+def _compose_stop(services: list[str], repo_root: Path = REPO_ROOT) -> None:
+    """Stop (not remove) the given services, freeing their memory. Best-effort."""
+    if not services:
+        return
+    with contextlib.suppress(OSError, subprocess.TimeoutExpired):
+        subprocess.run(
+            ["docker", "compose", "stop", *services],
+            cwd=repo_root,
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+
+
+def _parse_host_port(output: str) -> str | None:
+    """Extract the host port from `docker compose port` output (e.g. '0.0.0.0:5432',
+    '[::]:5432', '127.0.0.1:5433')."""
+    line = next((ln for ln in reversed(output.splitlines()) if ln.strip()), "")
+    if ":" not in line:
+        return None
+    port = line.rsplit(":", 1)[1].strip()
+    return port if port.isdigit() else None
+
+
+def _compose_host_port(
+    service: str, container_port: int, repo_root: Path = REPO_ROOT
+) -> str | None:
+    try:
+        result = subprocess.run(
+            ["docker", "compose", "port", service, str(container_port)],
+            cwd=repo_root,
+            capture_output=True,
+            text=True,
+            timeout=15,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    return _parse_host_port(result.stdout) if result.returncode == 0 else None
+
+
+def host_db_env(repo_root: Path = REPO_ROOT) -> dict[str, str] | None:
+    """Env for host pytest to reach the containers over their published ports, or
+    None when a port cannot be resolved (containers not actually up)."""
+    db_port = _compose_host_port("db", 5432, repo_root)
+    redis_port = _compose_host_port("redis", 6379, repo_root)
+    if not db_port or not redis_port:
+        return None
+    db_url = f"postgresql+asyncpg://{_DB_USER}:{_DB_PASSWORD}@localhost:{db_port}/{_DB_NAME}"
+    return {
+        "DATABASE_URL": db_url,
+        "DIRECT_DATABASE_URL": db_url,
+        "REDIS_URL": f"redis://localhost:{redis_port}",
+        "API_KEY_SECRET": os.environ.get("API_KEY_SECRET", "ci-test-key"),
+        "SESSION_SECRET": os.environ.get("SESSION_SECRET", "ci-session-secret"),
+    }
+
+
+def run_db_tests(
+    paths: list[str], env: dict[str, str], repo_root: Path = REPO_ROOT
+) -> list[tuple[str, str | None, str]]:
+    """Tier 2b: host pytest for changed app/tests against db+redis.
+
+    Runs on the host (no app container) so the footprint is just db+redis. Uses
+    them if already up; otherwise, only with autostart opted in, brings up db+redis,
+    runs, then stops exactly what it started. Any infra gap (daemon down, up
+    failure, unresolved ports) is a clean skip -> deferred to CI, never a block.
+    """
+    targets = host_test_targets(paths)
+    if not targets:
+        return []
+
+    started: list[str] = []
+    if not db_redis_running(repo_root):
+        if not autostart_enabled(env):
+            return []
+        before = _compose_running_services(repo_root)
+        if not _compose_up_db_redis(repo_root):
+            return []
+        started = services_to_stop(before, _compose_running_services(repo_root))
+
+    try:
+        db_env = host_db_env(repo_root)
+        if db_env is None:
+            return []
+        argv = [sys.executable, "-m", "pytest", *targets, "-q"]
+        try:
+            result = subprocess.run(
+                argv,
+                cwd=repo_root,
+                capture_output=True,
+                text=True,
+                env={**os.environ, **db_env},
+            )
+        except OSError:
+            return []
+        if result.returncode == 0:
+            return []
+        tail = (result.stdout + result.stderr).strip().splitlines()[-20:]
+        return [(CHECK_TESTS, None, "\n".join(tail))]
+    finally:
+        _compose_stop(started, repo_root)
+
+
+def _command_for(name: str) -> tuple[list[str], Path, str | None] | None:
+    """(argv, cwd, artifact_path) for a check, or None when its tool is absent."""
+    if name == CHECK_LINT:
+        # --no-secrets: detect-secrets is the pre-commit hook's job (and already
+        # out of CI_TOOLS); skipping it is the one always-on cost we drop here,
+        # which also stops the Stop hook churning .secrets.baseline.
+        return (
+            [sys.executable, str(LINT_ALL), "--changed", "--no-secrets"],
+            REPO_ROOT,
+            "logs/lint-errors.log",
+        )
+    if name == CHECK_SCRIPT_TESTS:
+        return ([sys.executable, "-m", "pytest", "scripts/hooks/tests/", "-q"], REPO_ROOT, None)
+    if name == CHECK_LOCKS:
+        return ([sys.executable, str(CHECK_LOCK_MARKERS)], REPO_ROOT, None)
+    if name == CHECK_FRONTEND:
+        npm = shutil.which("npm")
+        if not npm:
+            return None
+        return ([npm, "run", "test:run"], REPO_ROOT / "frontend", None)
+    return None
+
+
+def run_checks(names: list[str]) -> list[tuple[str, str | None, str]]:
+    """Run selected checks; return (name, artifact, tail) for each that failed.
+
+    A missing tool or an OS error is a skip, never a failure: verification must
+    never block the agent because of a local tooling gap.
+    """
+    failures: list[tuple[str, str | None, str]] = []
+    for name in names:
+        spec = _command_for(name)
+        if spec is None:
+            continue
+        argv, cwd, artifact = spec
+        try:
+            result = subprocess.run(argv, cwd=cwd, capture_output=True, text=True)
+        except OSError:
+            continue
+        if result.returncode != 0:
+            tail = (result.stdout + result.stderr).strip().splitlines()[-15:]
+            failures.append((name, artifact, "\n".join(tail)))
+    return failures
+
+
+def _print_verify_failures(failures: list[tuple[str, str | None, str]]) -> None:
+    lines = ["Pre-stop verification found issues that would fail CI -- fix before finishing:"]
+    for name, artifact, tail in failures:
+        if artifact and (REPO_ROOT / artifact).exists():
+            lines.append(f"  - {name}: see {artifact}")
+        else:
+            lines.append(f"  - {name}:")
+            if tail:
+                lines.extend(f"      {ln}" for ln in tail.splitlines())
+    lines.append(
+        "Re-run locally: python scripts/lint-all.py --changed | python scripts/run-tests.py --fast"
+    )
+    lines.append(f"(Set {SKIP_VERIFY_ENV}=1 to skip this gate.)")
+    print("\n".join(lines), file=sys.stderr)
+
+
+def verify(raw_stdin: str, env: dict[str, str]) -> int:
+    """Run pre-stop verification. Returns 2 (block, relay) on failure, else 0."""
+    if stop_hook_active(raw_stdin) or not verify_enabled(env):
+        return 0
+    paths = changed_paths(_git_status_porcelain(REPO_ROOT))
+    # Infra-light tiers (lint, script-tests, locks, frontend) plus the DB tier,
+    # which manages its own db+redis reachability/autostart/teardown internally.
+    failures = run_checks(select_checks(paths))
+    failures += run_db_tests(paths, env)
+    if failures:
+        _print_verify_failures(failures)
+        return 2
+    return 0
+
+
 def main() -> int:
     raw_stdin = _read_stdin()
 
@@ -155,7 +536,10 @@ def main() -> int:
                 stderr=subprocess.DEVNULL,
             )
 
-    return 0
+    # Pre-stop verification runs last: it may exit 2 to block the stop and relay
+    # failures back into the session. All best-effort side effects above have
+    # already run and always exit 0, so a blocked stop never loses that work.
+    return verify(raw_stdin, os.environ)
 
 
 if __name__ == "__main__":

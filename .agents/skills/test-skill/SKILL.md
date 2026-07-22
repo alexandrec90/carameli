@@ -1,7 +1,6 @@
 ---
 name: test-skill
 disable-model-invocation: true
-description: 'Validates Claude-style skill behavior by exercising frontmatter hooks and a ! command placeholder, then writing a timestamped sentinel file. Use when checking Copilot/Claude agent compatibility end-to-end.'
 description: 'Validates Claude-style skill behavior by exercising frontmatter hooks and a suggested verification command. Use when checking Copilot/Claude agent compatibility end-to-end.'
 argument-hint: '(no arguments)'
 ---

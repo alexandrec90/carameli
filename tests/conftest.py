@@ -3,15 +3,18 @@ from __future__ import annotations
 import hashlib
 import os
 from collections.abc import AsyncGenerator
+from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
 import pytest_asyncio
+from alembic.config import Config
 from httpx import ASGITransport, AsyncClient
 from limits.storage import storage_from_string
 from limits.strategies import STRATEGIES as LIMIT_STRATEGIES
 from slowapi.middleware import SlowAPIMiddleware
 from sqlalchemy import text
+from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -20,10 +23,38 @@ from sqlalchemy.ext.asyncio import (
 )
 
 import app.models
+from alembic import command
 from app.core.config import settings
 from app.core.database import Base, get_session
 from app.core.limiter import limiter as rate_limiter
 from app.main import app
+
+# Alembic project layout, resolved relative to the repo root (tests/../alembic)
+# so the schema build works regardless of the pytest invocation directory.
+_ALEMBIC_DIR = Path(__file__).resolve().parent.parent / "alembic"
+_VERSIONS_DIR = _ALEMBIC_DIR / "versions"
+
+
+def _upgrade_to_head(sync_connection: Connection) -> None:
+    """Build the schema by running Alembic migrations on an existing connection.
+
+    Injecting the connection via ``cfg.attributes["connection"]`` makes the
+    migrations run inside the caller's transaction (see
+    ``alembic/env.py::run_migrations_online``), so the schema build stays part
+    of the fixture's session-setup transaction and advisory lock -- no second
+    connection, no early commit.
+
+    A bare ``Config()`` (no .ini file) is deliberate: it leaves
+    ``config_file_name`` unset so ``env.py`` skips ``fileConfig``, which would
+    otherwise re-run logging config with ``disable_existing_loggers`` and
+    silence the app loggers mid-test-session.
+    """
+    cfg = Config()
+    cfg.set_main_option("script_location", str(_ALEMBIC_DIR))
+    cfg.set_main_option("sqlalchemy.url", settings.database_url)
+    cfg.attributes["connection"] = sync_connection
+    command.upgrade(cfg, "head")
+
 
 # All async tests run on a single session-scoped event loop so that
 # the session-scoped engine/connection pool stays valid across tests.
@@ -34,11 +65,18 @@ pytestmark = pytest.mark.asyncio(loop_scope="session")
 
 
 def _schema_fingerprint() -> str:
-    """SHA256 prefix of a stable representation of Base.metadata.
+    """SHA256 prefix of a stable representation of the schema's sources.
 
-    Changes whenever any table name, column name, or column type changes.
-    Used to decide whether the test DB schema still matches the current
-    models so we can skip the expensive DROP/CREATE/create_all path.
+    Combines Base.metadata (table/column names + types) with the contents of
+    every Alembic migration file. Changes whenever a model changes *or* a
+    migration is added or edited. Used to decide whether the test DB schema is
+    still current so we can skip the expensive DROP/CREATE/migrate rebuild.
+
+    Migrations must feed the fingerprint because the schema is now built by
+    running them (not create_all): a migration that adds a migration-only
+    object (an extension, raw-SQL DDL, a CHECK constraint) leaves Base.metadata
+    unchanged, so without hashing the migrations a warm DB would keep taking
+    the TRUNCATE fast path and never pick the new object up.
     """
     parts = [
         (
@@ -47,7 +85,11 @@ def _schema_fingerprint() -> str:
         )
         for table in sorted(Base.metadata.tables.values(), key=lambda t: t.name)
     ]
-    return hashlib.sha256(repr(parts).encode()).hexdigest()[:16]
+    migrations = [
+        (path.name, hashlib.sha256(path.read_bytes()).hexdigest())
+        for path in sorted(_VERSIONS_DIR.glob("*.py"))
+    ]
+    return hashlib.sha256(repr((parts, migrations)).encode()).hexdigest()[:16]
 
 
 @pytest_asyncio.fixture(scope="session")
@@ -74,14 +116,16 @@ async def test_engine() -> AsyncGenerator[AsyncEngine, None]:
     #    phase, ensuring a clean state at run start without touching
     #    anything during teardown.
     #
-    # Session reset strategy: the primary worker fingerprints Base.metadata
-    # and compares it to a comment stored on the public schema by a previous
-    # run.  If they match, it TRUNCATEs all tables with RESTART IDENTITY
-    # CASCADE (~100ms, atomic, resets sequences).  If they differ (first
-    # run, or models changed), it falls back to DROP SCHEMA + CREATE SCHEMA
-    # + create_all (~1-3s) and stamps the new fingerprint.  Both paths
-    # guarantee every table is empty at session start — the defence against
-    # data leaking from a crashed previous run.
+    # Session reset strategy: the primary worker fingerprints the schema
+    # sources (Base.metadata + every migration file) and compares it to a
+    # comment stored on the public schema by a previous run.  If they match, it
+    # TRUNCATEs all tables with RESTART IDENTITY CASCADE (~100ms, atomic, resets
+    # sequences).  If they differ (first run, or models/migrations changed), it
+    # falls back to DROP SCHEMA + CREATE SCHEMA + `alembic upgrade head` (~1-3s)
+    # and stamps the new fingerprint.  Building the slow path from migrations
+    # (not create_all) keeps the test DB faithful to production, including
+    # migration-only objects.  Both paths guarantee every table is empty at
+    # session start — the defence against data leaking from a crashed run.
     #
     # Advisory lock key 7654321987 is also acquired by _contract_env so
     # that schemathesis tests serialise with this setup.
@@ -112,17 +156,24 @@ async def test_engine() -> AsyncGenerator[AsyncEngine, None]:
                         text(f"TRUNCATE TABLE {table_list} RESTART IDENTITY CASCADE")
                     )
             else:
-                # Slow path: first run, or schema drift -- full rebuild.
+                # Slow path: first run, or schema drift -- full rebuild by
+                # running the Alembic migrations, NOT Base.metadata.create_all.
+                # create_all only builds model-defined tables, so any
+                # migration-only object (extensions like pg_stat_statements,
+                # raw-SQL DDL, CHECK constraints, functions) would silently be
+                # absent and the test DB would diverge from a migrated prod DB.
+                # Building from migrations keeps the two faithful.
                 await conn.execute(text("DROP SCHEMA public CASCADE"))
                 await conn.execute(text("CREATE SCHEMA public"))
-                await conn.run_sync(Base.metadata.create_all)
+                await conn.run_sync(_upgrade_to_head)
                 # fingerprint is sha256 hex (16 chars, [0-9a-f]) -- safe to
                 # interpolate; COMMENT ON does not accept bind parameters.
                 await conn.execute(text(f"COMMENT ON SCHEMA public IS 'fingerprint={fingerprint}'"))
         else:
-            # Non-primary workers: ensure tables exist (no-op after primary's
-            # fast path, and also after primary's slow path via create_all).
-            # Lock released when this transaction commits.
+            # Non-primary workers: ensure tables exist. No-op after the primary
+            # committed the migration-built schema above (create_all checks
+            # first); it never runs migrations, so it cannot double-stamp
+            # alembic_version. Lock released when this transaction commits.
             await conn.run_sync(Base.metadata.create_all)
 
     try:

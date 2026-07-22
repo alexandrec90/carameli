@@ -114,11 +114,59 @@ Rules that keep the stacks independent:
   while the other agent's stack is up.
 
 To incorporate changes merged by another worktree, first commit the current worktree's
-changes, then run the VS Code task **Git: Sync Branch with origin/master (No Stash)**.
-It fetches `origin` and rebases the checked-out branch onto `origin/master`; it refuses
-dirty worktrees and explicitly disables autostash. If Git reports conflicts, resolve
-them and run `git rebase --continue`, or restore the pre-sync state with
-`git rebase --abort`. Rebasing changes the IDs of local commits that are replayed.
+changes, then fetch and rebase the checked-out branch onto `origin/master`:
+`git fetch origin && git rebase origin/master`. If Git reports conflicts, resolve them
+and run `git rebase --continue`, or restore the pre-sync state with `git rebase --abort`.
+Rebasing changes the IDs of local commits that are replayed.
+
+**Automatic drift control (local sessions only, no manual command).** The `SessionStart`
+hook (`.claude/hooks/session-start.sh`) runs `scripts/hooks/session-sync.py` once at the
+start of every **local** Claude Code session, so each session begins rebased on the latest
+`origin/master`. It refuses a dirty tree (a silent no-op whenever you have uncommitted work
+— it never touches your edits), auto-aborts and leaves the branch untouched on conflicts,
+and passes `--gpg-sign` when `commit.gpgsign` is set so replayed commits stay Verified.
+**It never runs in cloud/remote (Claude Code on the web) sessions** — there the platform
+owns the branch lifecycle, and rebasing from inside would rewrite SHAs, diverge from the
+remote, and strip signatures. To reduce drift further, run these one-time git settings on
+each machine (they need no per-session command):
+
+```bash
+git config --global rerere.enabled true   # resolve each recurring conflict once, reused across rebases
+git maintenance start                      # periodic background fetch keeps origin/master fresh
+```
+
+### Task lifecycle: fresh branch in, PR out
+
+For the vibe-coding loop where every task lands its own small PR to `master`, the
+lifecycle is automated at both ends and stays isolated per task. **In steady state you
+only ever type `/ship`** — the start of the next task is automatic:
+
+1. **Start (automatic after the previous `/ship`).** The `UserPromptSubmit` hook
+   (`scripts/hooks/branch-per-task.py`) cuts a fresh `claude/<slug>-<mmdd>` branch off the
+   latest `origin/master` on two safe triggers: sitting on `master` (primary checkout), or
+   sitting on the branch `/ship` just shipped with a clean tree. `/ship` records the shipped
+   branch in a per-worktree marker (`.git/.../carameli-shipped`); the hook consumes it and
+   clears it, so it fires exactly once and never mid-task. This makes the worktree case
+   automatic: after you ship, your next prompt starts a fresh branch on its own.
+   - **`/task "<description>"`** (`scripts/start-task.py`) is the manual override for the
+     cases the marker can't cover — the first task of a fresh checkout, or resuming after
+     abandoning work without shipping. Creating a *new* branch off `origin/master` is allowed
+     in a worktree even while `master` is checked out in the primary tree. Refuses a dirty
+     tree — `/ship` or stash first. (Fully automatic staleness detection isn't safe: the local
+     signals can't tell a freshly-cut empty branch from a merged one, which is why the marker,
+     set by an explicit ship, is the trigger rather than a guess.)
+2. **Work.** The Stop hook (`scripts/hooks/stop.py`) reproduces the PR-gate checks on the
+   diff at each turn and relays failures back into the session, so they are fixed in-context
+   rather than after a CI round-trip.
+3. **Finish (explicit — the one command you type).** Run **`/ship`** when the task is done:
+   it pre-flights lint, commits, pushes (with retry), drops the shipped marker, opens a PR
+   against `master`, and offers to subscribe the session to the PR's CI/review activity for
+   autofix. `/ship` is explicit-only so a PR is never opened on half-finished work;
+   `scripts/ship.py` owns the tested mechanics.
+
+Checks stay layered by purpose, not merged into one hook: pre-commit holds only what CI
+*can't* own (secret scanning + the AGENTS mirror generator), the Stop hook is the in-session
+CI mirror, and the PR Gate is the authoritative gate that `dependabot-automerge.yml` waits on.
 
 Tearing down: `docker compose down -v` inside the worktree, then
 `git worktree remove ../carameli-b`, then remove its built images:

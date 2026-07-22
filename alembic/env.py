@@ -56,7 +56,15 @@ async def run_async_migrations() -> None:
 
 
 def run_migrations_online() -> None:
-    asyncio.run(run_async_migrations())
+    # A caller (e.g. the pytest schema-setup fixture) can inject an already-open
+    # connection via config.attributes["connection"] to run the migrations
+    # inside its own transaction. Otherwise open a fresh async engine as usual
+    # (CLI `alembic upgrade`, CI migrate step, app deploys).
+    connectable = config.attributes.get("connection", None)
+    if connectable is not None:
+        do_run_migrations(connectable)
+    else:
+        asyncio.run(run_async_migrations())
 
 
 if context.is_offline_mode():
