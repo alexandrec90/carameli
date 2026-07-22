@@ -1,5 +1,6 @@
 """Tests for scripts/hooks/lint-fix.py."""
 
+import json
 import subprocess
 
 from conftest import load_module
@@ -93,7 +94,18 @@ def test_find_ruff_falls_back_to_path(tmp_path, monkeypatch):
 
 
 def _payload(path: str) -> str:
-    return f'{{"tool_name": "Edit", "tool_input": {{"file_path": "{path}"}}}}'
+    # json.dumps, not an f-string: a Windows tmp_path (C:\Users\...\Temp\...) embedded
+    # raw makes \U/\A/\T invalid JSON escapes, so parse_hook_input returns None and
+    # main() returns 0 before reaching the branch under test.
+    return json.dumps({"tool_name": "Edit", "tool_input": {"file_path": path}})
+
+
+def test_payload_survives_windows_paths():
+    # Regression: the helper used to interpolate the path into JSON with an f-string,
+    # so a Windows tmp_path silently failed to parse and every main() test below that
+    # asserts `== 0` passed vacuously (main() returns 0 on an unparseable payload).
+    win = r"C:\Users\Admin\AppData\Local\Temp\pytest-1\test_x0\x.py"
+    assert lint_fix.extract_path(lint_fix.parse_hook_input(_payload(win))) == win
 
 
 def test_main_skips_non_python(monkeypatch):
