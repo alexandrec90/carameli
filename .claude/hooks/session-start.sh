@@ -10,6 +10,37 @@
 # re-runs are cheap (venv reused, pip/npm no-op when satisfied).
 set -uo pipefail
 
+# --- Keep this branch current with origin/master (once per session) ----------
+# Parallel worktrees drift from master the longer their branches live; this
+# rebases the checked-out branch onto origin/master at session start so each
+# session begins current, with no manual command. It reuses scripts/git-sync.py
+# (the same rebase the "Git: Sync Branch" VS Code task runs), which refuses a
+# dirty tree and disables autostash — so it is a no-op whenever you have
+# uncommitted work and never touches your edits. Runs in BOTH local and remote
+# sessions, so it sits above the remote-only provisioning guard below. Wrapped
+# so a failure can never abort the hook.
+(
+  cd "${CLAUDE_PROJECT_DIR:-.}" || exit 0
+  branch="$(git branch --show-current 2>/dev/null)"
+  # Nothing to do on master itself, or with detached HEAD.
+  if [ -n "$branch" ] && [ "$branch" != "master" ]; then
+    echo "[session-start] Syncing '$branch' onto origin/master (no-op if tree is dirty)..."
+    if ! python3 scripts/git-sync.py; then
+      # On conflicts git-sync leaves a rebase in progress. Auto-abort so the
+      # session starts in a known-clean state; the manual VS Code task is the
+      # place to resolve conflicts interactively (see README, Parallel Worktrees).
+      rebase_merge="$(git rev-parse --git-path rebase-merge 2>/dev/null)"
+      rebase_apply="$(git rev-parse --git-path rebase-apply 2>/dev/null)"
+      if [ -d "$rebase_merge" ] || [ -d "$rebase_apply" ]; then
+        git rebase --abort 2>/dev/null
+        echo "[session-start] origin/master had conflicting changes — auto-sync aborted, branch left untouched. Run the 'Git: Sync Branch with origin/master' task to rebase and resolve."
+      else
+        echo "[session-start] Branch sync skipped (dirty tree or offline) — sync manually when ready."
+      fi
+    fi
+  fi
+) || true
+
 # Only provision the remote (Claude Code on the web) sandbox; a no-op elsewhere.
 if [ "${CLAUDE_CODE_REMOTE:-}" != "true" ]; then
   exit 0

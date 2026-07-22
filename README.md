@@ -119,6 +119,20 @@ changes, then fetch and rebase the checked-out branch onto `origin/master`:
 and run `git rebase --continue`, or restore the pre-sync state with `git rebase --abort`.
 Rebasing changes the IDs of local commits that are replayed.
 
+**Automatic drift control (no manual command).** The `SessionStart` hook
+(`.claude/hooks/session-start.sh`) runs that same `scripts/git-sync.py` once at the start
+of every Claude Code session, so each session begins rebased on the latest `origin/master`.
+Because `git-sync.py` refuses a dirty tree, it is a silent no-op whenever you have
+uncommitted work — it never touches your edits. If the rebase hits conflicts the hook
+auto-aborts and leaves the branch untouched, pointing you at the manual task above to
+resolve interactively. To reduce drift further, run these one-time git settings on each
+machine (they need no per-session command):
+
+```bash
+git config --global rerere.enabled true   # resolve each recurring conflict once, reused across rebases
+git maintenance start                      # periodic background fetch keeps origin/master fresh
+```
+
 Tearing down: `docker compose down -v` inside the worktree, then
 `git worktree remove ../carameli-b`, then remove its built images:
 `docker image rm carameli-app-carameli-b carameli-db-backup-carameli-b`.
