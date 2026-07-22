@@ -119,14 +119,16 @@ changes, then fetch and rebase the checked-out branch onto `origin/master`:
 and run `git rebase --continue`, or restore the pre-sync state with `git rebase --abort`.
 Rebasing changes the IDs of local commits that are replayed.
 
-**Automatic drift control (no manual command).** The `SessionStart` hook
-(`.claude/hooks/session-start.sh`) runs that same `scripts/git-sync.py` once at the start
-of every Claude Code session, so each session begins rebased on the latest `origin/master`.
-Because `git-sync.py` refuses a dirty tree, it is a silent no-op whenever you have
-uncommitted work — it never touches your edits. If the rebase hits conflicts the hook
-auto-aborts and leaves the branch untouched, pointing you at the manual task above to
-resolve interactively. To reduce drift further, run these one-time git settings on each
-machine (they need no per-session command):
+**Automatic drift control (local sessions only, no manual command).** The `SessionStart`
+hook (`.claude/hooks/session-start.sh`) runs `scripts/hooks/session-sync.py` once at the
+start of every **local** Claude Code session, so each session begins rebased on the latest
+`origin/master`. It refuses a dirty tree (a silent no-op whenever you have uncommitted work
+— it never touches your edits), auto-aborts and leaves the branch untouched on conflicts,
+and passes `--gpg-sign` when `commit.gpgsign` is set so replayed commits stay Verified.
+**It never runs in cloud/remote (Claude Code on the web) sessions** — there the platform
+owns the branch lifecycle, and rebasing from inside would rewrite SHAs, diverge from the
+remote, and strip signatures. To reduce drift further, run these one-time git settings on
+each machine (they need no per-session command):
 
 ```bash
 git config --global rerere.enabled true   # resolve each recurring conflict once, reused across rebases
