@@ -114,11 +114,10 @@ Rules that keep the stacks independent:
   while the other agent's stack is up.
 
 To incorporate changes merged by another worktree, first commit the current worktree's
-changes, then run the VS Code task **Git: Sync Branch with origin/master (No Stash)**.
-It fetches `origin` and rebases the checked-out branch onto `origin/master`; it refuses
-dirty worktrees and explicitly disables autostash. If Git reports conflicts, resolve
-them and run `git rebase --continue`, or restore the pre-sync state with
-`git rebase --abort`. Rebasing changes the IDs of local commits that are replayed.
+changes, then fetch and rebase the checked-out branch onto `origin/master`:
+`git fetch origin && git rebase origin/master`. If Git reports conflicts, resolve them
+and run `git rebase --continue`, or restore the pre-sync state with `git rebase --abort`.
+Rebasing changes the IDs of local commits that are replayed.
 
 Tearing down: `docker compose down -v` inside the worktree, then
 `git worktree remove ../carameli-b`, then remove its built images:
