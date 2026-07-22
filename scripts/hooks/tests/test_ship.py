@@ -83,3 +83,34 @@ class TestPushRetry:
         assert ship._push("b", sleep=slept.append) is False
         assert len(calls) == 1  # no retry on a non-network error
         assert slept == []
+
+
+class TestShippedMarker:
+    def _wire(self, monkeypatch, *, branch, lint_ok, push_ok, clean=True):
+        monkeypatch.setattr(ship, "current_branch", lambda: branch)
+        monkeypatch.setattr(ship, "_porcelain", lambda: "" if clean else " M x.py\n")
+        monkeypatch.setattr(ship, "_run_lint", lambda: lint_ok)
+        monkeypatch.setattr(ship, "_push", lambda b: push_ok)
+        marked = []
+        monkeypatch.setattr(ship, "write_shipped_marker", marked.append)
+        return marked
+
+    def test_marker_written_on_successful_ship(self, monkeypatch):
+        marked = self._wire(monkeypatch, branch="claude/x-0722", lint_ok=True, push_ok=True)
+        assert ship.main([]) == ship.EXIT_OK
+        assert marked == ["claude/x-0722"]
+
+    def test_marker_not_written_when_push_fails(self, monkeypatch):
+        marked = self._wire(monkeypatch, branch="claude/x-0722", lint_ok=True, push_ok=False)
+        assert ship.main([]) == ship.EXIT_PUSH_FAILED
+        assert marked == []
+
+    def test_marker_not_written_when_lint_fails(self, monkeypatch):
+        marked = self._wire(monkeypatch, branch="claude/x-0722", lint_ok=False, push_ok=True)
+        assert ship.main([]) == ship.EXIT_LINT_FAILED
+        assert marked == []
+
+    def test_preflight_does_not_write_marker(self, monkeypatch):
+        marked = self._wire(monkeypatch, branch="claude/x-0722", lint_ok=True, push_ok=True)
+        assert ship.main(["--preflight"]) == ship.EXIT_OK
+        assert marked == []

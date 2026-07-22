@@ -21,6 +21,12 @@ BRANCH_PREFIX = "claude/"
 SLUG_MAX_LEN = 40
 _SLUG_STRIP_RE = re.compile(r"[^a-z0-9]+")
 
+# Per-worktree marker file (under the worktree's git dir) recording the branch
+# `/ship` last shipped. The branch-per-task hook uses it to auto-cut a fresh
+# branch on the next prompt: once a branch is shipped it is "spent", so starting
+# new work should leave it. Resolve its path with `git rev-parse --git-path`.
+SHIPPED_MARKER_NAME = "carameli-shipped"
+
 
 def parse_prompt(raw_stdin: str) -> str:
     """Extract the prompt text from a UserPromptSubmit payload; '' when absent."""
@@ -72,3 +78,29 @@ def checkout_base(tree_dirty: bool) -> str | None:
     resetting onto origin/master could clobber them.
     """
     return None if tree_dirty else f"origin/{DEFAULT_BRANCH}"
+
+
+def auto_branch_decision(
+    current_branch: str,
+    shipped_branch: str,
+    tree_dirty: bool,
+    default_branch: str = DEFAULT_BRANCH,
+) -> tuple[bool, str | None]:
+    """Should the hook auto-branch now, and on which base?
+
+    Returns (should_branch, base_ref). base_ref None means "branch from the
+    current HEAD carrying uncommitted changes" (only for the dirty-master case).
+
+    Two triggers, both safe against branching mid-task:
+      - On the default branch (primary checkout): always start fresh work here.
+        Carry a dirty tree rather than clobber it.
+      - On the branch `/ship` just shipped, with a clean tree (worktree case):
+        the branch is spent, so cut the next task off origin/master. The clean-
+        tree guard means unshipped edits are never yanked; the caller clears the
+        marker after, so an empty fresh branch never re-triggers (no loop).
+    """
+    if should_branch(current_branch, default_branch):
+        return True, checkout_base(tree_dirty)
+    if shipped_branch and current_branch == shipped_branch and not tree_dirty:
+        return True, f"origin/{default_branch}"
+    return False, None

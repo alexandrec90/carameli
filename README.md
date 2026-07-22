@@ -136,25 +136,31 @@ git maintenance start                      # periodic background fetch keeps ori
 ### Task lifecycle: fresh branch in, PR out
 
 For the vibe-coding loop where every task lands its own small PR to `master`, the
-lifecycle is automated at both ends and stays isolated per task:
+lifecycle is automated at both ends and stays isolated per task. **In steady state you
+only ever type `/ship`** — the start of the next task is automatic:
 
-1. **Start.** Cut a fresh `claude/<slug>-<mmdd>` branch off the latest `origin/master`:
-   - **In a worktree** (you are never on `master`, always on a stale/merged branch): run
-     **`/task "<description>"`** (`scripts/start-task.py`). Creating a *new* branch off
-     `origin/master` is allowed in a worktree even while `master` is checked out in the
-     primary tree. It refuses a dirty tree — `/ship` or stash first.
-   - **In the primary checkout on `master`:** the `UserPromptSubmit` hook
-     (`scripts/hooks/branch-per-task.py`) does it automatically when a prompt arrives, and
-     no-ops on any other branch so it never cuts a branch mid-task. Auto-detecting a stale
-     branch to re-branch from isn't safe (the local signals can't tell a freshly-cut empty
-     branch from a merged one), which is why the worktree path is the explicit `/task`.
+1. **Start (automatic after the previous `/ship`).** The `UserPromptSubmit` hook
+   (`scripts/hooks/branch-per-task.py`) cuts a fresh `claude/<slug>-<mmdd>` branch off the
+   latest `origin/master` on two safe triggers: sitting on `master` (primary checkout), or
+   sitting on the branch `/ship` just shipped with a clean tree. `/ship` records the shipped
+   branch in a per-worktree marker (`.git/.../carameli-shipped`); the hook consumes it and
+   clears it, so it fires exactly once and never mid-task. This makes the worktree case
+   automatic: after you ship, your next prompt starts a fresh branch on its own.
+   - **`/task "<description>"`** (`scripts/start-task.py`) is the manual override for the
+     cases the marker can't cover — the first task of a fresh checkout, or resuming after
+     abandoning work without shipping. Creating a *new* branch off `origin/master` is allowed
+     in a worktree even while `master` is checked out in the primary tree. Refuses a dirty
+     tree — `/ship` or stash first. (Fully automatic staleness detection isn't safe: the local
+     signals can't tell a freshly-cut empty branch from a merged one, which is why the marker,
+     set by an explicit ship, is the trigger rather than a guess.)
 2. **Work.** The Stop hook (`scripts/hooks/stop.py`) reproduces the PR-gate checks on the
    diff at each turn and relays failures back into the session, so they are fixed in-context
    rather than after a CI round-trip.
-3. **Finish (explicit).** Run **`/ship`** when the task is done: it pre-flights lint, commits,
-   pushes (with retry), opens a PR against `master`, and offers to subscribe the session to
-   the PR's CI/review activity for autofix. `/ship` is explicit-only so a PR is never opened on
-   half-finished work; `scripts/ship.py` owns the tested mechanics.
+3. **Finish (explicit — the one command you type).** Run **`/ship`** when the task is done:
+   it pre-flights lint, commits, pushes (with retry), drops the shipped marker, opens a PR
+   against `master`, and offers to subscribe the session to the PR's CI/review activity for
+   autofix. `/ship` is explicit-only so a PR is never opened on half-finished work;
+   `scripts/ship.py` owns the tested mechanics.
 
 Checks stay layered by purpose, not merged into one hook: pre-commit holds only what CI
 *can't* own (secret scanning + the AGENTS mirror generator), the Stop hook is the in-session

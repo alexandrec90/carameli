@@ -7,16 +7,19 @@ argument-hint: 'Short description of the task (used for the branch name)'
 
 # Skill: Start a task on a fresh branch
 
-The start-of-task partner to `/ship`. Cuts a fresh `claude/<slug>-<mmdd>` branch
-from the latest `origin/master` so each task is isolated and current. Explicit
-because the "I'm starting something new" boundary can't be inferred safely — the
-local signals can't tell a freshly-cut empty branch from a stale merged one.
+Cuts a fresh `claude/<slug>-<mmdd>` branch from the latest `origin/master` so
+each task is isolated and current.
 
-This is the entry point for the **worktree** workflow: you are never on `master`
-(it's checked out in the primary worktree) and always sit on a stale, already-
-shipped branch, so the auto branch-per-task hook never fires. Creating a *new*
-branch off `origin/master` is allowed in a worktree even while `master` is
-checked out elsewhere.
+**Usually you won't need this** — after you `/ship`, the branch-per-task hook
+auto-starts the next task's branch on your next prompt (via the shipped marker
+`/ship` drops). `/task` is the **manual override** for the cases the marker can't
+cover: the first task of a fresh checkout, or resuming after you abandoned work
+without shipping. It's explicit because the "I'm starting something new" boundary
+can't be inferred safely — the local signals can't tell a freshly-cut empty
+branch from a stale merged one.
+
+Creating a *new* branch off `origin/master` is allowed in a worktree even while
+`master` is checked out in the primary tree.
 
 ## Step 1 — Start the branch
 

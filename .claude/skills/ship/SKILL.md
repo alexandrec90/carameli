@@ -56,7 +56,8 @@ python scripts/ship.py
 This re-asserts the branch, requires a clean tree (so commit first), runs the
 changed-scope lint gate, and pushes with network-error backoff. Non-zero exit
 codes: `4` dirty tree, `5` lint failed (see `logs/lint-errors.log`), `6` push
-failed. Resolve and re-run.
+failed. Resolve and re-run. On success it drops the per-worktree shipped marker,
+so your next prompt auto-starts a fresh task branch (no `/task` needed).
 
 ## Step 5 — Open the PR
 

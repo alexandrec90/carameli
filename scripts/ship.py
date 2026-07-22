@@ -18,10 +18,14 @@ The decision helpers (`is_shippable`, `tree_clean`, `backoff_delays`,
 
 from __future__ import annotations
 
+import contextlib
 import subprocess
 import sys
 import time
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[0]))
+import task_branch as tb
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_BRANCH = "master"
@@ -84,6 +88,18 @@ def current_branch() -> str:
 def _porcelain() -> str:
     result = _git("status", "--porcelain")
     return result.stdout if result.returncode == 0 else ""
+
+
+def write_shipped_marker(branch: str) -> None:
+    """Record `branch` as shipped in the per-worktree marker, so the next prompt
+    auto-starts a fresh task branch (see scripts/hooks/branch-per-task.py).
+    Best-effort: a marker failure must never fail a successful ship."""
+    result = _git("rev-parse", "--git-path", tb.SHIPPED_MARKER_NAME)
+    if result.returncode != 0 or not result.stdout.strip():
+        return
+    path = REPO_ROOT / result.stdout.strip()
+    with contextlib.suppress(OSError):
+        path.write_text(branch + "\n", encoding="utf-8")
 
 
 def _run_lint() -> bool:
@@ -152,6 +168,9 @@ def main(argv: list[str] | None = None) -> int:
     if not _push(branch):
         print("ship: push failed after retries.", file=sys.stderr)
         return EXIT_PUSH_FAILED
+
+    # Mark this branch shipped so the next prompt auto-starts a fresh task branch.
+    write_shipped_marker(branch)
 
     print(f"ship: pushed '{branch}'. Open a PR against '{DEFAULT_BRANCH}'.")
     return EXIT_OK

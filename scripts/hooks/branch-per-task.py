@@ -7,10 +7,12 @@ whatever branch happened to be checked out and the branches drift. This hook
 handles the "start" half automatically for the PRIMARY checkout: when a prompt
 arrives while sitting on `master`, it cuts a new `claude/<slug>` branch.
 
-It only acts on the default branch. On any other branch (mid-task on a
-`claude/...` branch) it is a fast no-op -- it must never cut a branch mid-task.
-Worktrees are never on `master`, so there the explicit `/task` command
-(`scripts/start-task.py`) is the entry point instead; this hook no-ops.
+It fires on two safe triggers (see `task_branch.auto_branch_decision`): sitting
+on the default branch (primary checkout), or sitting on the branch `/ship` just
+shipped with a clean tree (the worktree case -- `/ship` drops a per-worktree
+marker, this hook consumes it). On any other branch, or mid-task, it is a fast
+no-op -- it must never cut a branch mid-task. The marker is cleared after an
+auto-branch so an empty fresh branch never re-triggers.
 
 Best-effort and always exit 0: a failure here can never block the prompt. The
 decision/formatting helpers live in `scripts/task_branch.py` (shared with
@@ -60,6 +62,36 @@ def _existing_branches() -> set[str]:
     return {line.strip() for line in result.stdout.splitlines() if line.strip()}
 
 
+def _marker_path() -> Path | None:
+    """Resolve the per-worktree shipped-marker path via `git rev-parse`."""
+    try:
+        result = _git("rev-parse", "--git-path", tb.SHIPPED_MARKER_NAME)
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    if result.returncode != 0:
+        return None
+    raw = result.stdout.strip()
+    return Path(raw) if raw else None
+
+
+def _read_shipped_marker() -> str:
+    """Branch name `/ship` recorded, or '' when there is no marker."""
+    path = _marker_path()
+    if path is None or not path.exists():
+        return ""
+    try:
+        return path.read_text(encoding="utf-8").strip()
+    except OSError:
+        return ""
+
+
+def _clear_shipped_marker() -> None:
+    path = _marker_path()
+    if path is not None:
+        with contextlib.suppress(OSError):
+            path.unlink(missing_ok=True)
+
+
 def _emit_context(text: str) -> None:
     """Feed a note back into the session as UserPromptSubmit additionalContext."""
     print(
@@ -82,18 +114,19 @@ def main() -> int:
     except (OSError, ValueError):
         raw = ""
 
-    if not tb.should_branch(_current_branch()):
-        return 0  # mid-task on a feature branch, or detached, or a worktree -- no-op.
+    current = _current_branch()
+    shipped = _read_shipped_marker()
+    dirty = _tree_dirty()
+    should, base = tb.auto_branch_decision(current, shipped, dirty)
+    if not should:
+        return 0  # mid-task, or on an unshipped feature branch, or detached -- no-op.
 
-    # Starting new work on master: refresh origin so the cut is from latest.
+    # Starting new work: refresh origin so the cut is from latest.
     # Offline is fine -- fall back to whatever origin/master we already have.
     with contextlib.suppress(OSError, subprocess.TimeoutExpired):
         _git("fetch", "--prune", "origin", tb.DEFAULT_BRANCH, timeout=60.0)
 
-    dirty = _tree_dirty()
     name = tb.branch_name(tb.slugify(tb.parse_prompt(raw)), _existing_branches())
-    base = tb.checkout_base(dirty)
-
     argv = ["checkout", "-b", name] + ([base] if base else [])
     try:
         result = _git(*argv)
@@ -102,8 +135,12 @@ def main() -> int:
     if result.returncode != 0:
         return 0  # never block the prompt on a git failure.
 
+    # Consume the marker so the fresh (empty) branch never re-triggers.
+    _clear_shipped_marker()
+
     if base:
-        _emit_context(f"Started task on fresh branch '{name}' (cut from {base}).")
+        origin = f" (the shipped '{shipped}' was left behind)" if shipped == current else ""
+        _emit_context(f"Started task on fresh branch '{name}' (cut from {base}){origin}.")
     else:
         _emit_context(
             f"Started task on fresh branch '{name}' carrying your uncommitted "

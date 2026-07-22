@@ -76,3 +76,32 @@ class TestCheckoutBase:
 
     def test_dirty_tree_bases_on_head(self):
         assert tb.checkout_base(tree_dirty=True) is None
+
+
+class TestAutoBranchDecision:
+    def test_on_master_clean_bases_on_origin(self):
+        assert tb.auto_branch_decision("master", "", tree_dirty=False) == (True, "origin/master")
+
+    def test_on_master_dirty_carries_changes(self):
+        assert tb.auto_branch_decision("master", "", tree_dirty=True) == (True, None)
+
+    def test_on_shipped_branch_clean_bases_on_origin(self):
+        # The worktree case: sitting on the branch /ship just shipped, tree clean.
+        decision = tb.auto_branch_decision("claude/x-0722", "claude/x-0722", tree_dirty=False)
+        assert decision == (True, "origin/master")
+
+    def test_on_shipped_branch_dirty_does_not_fire(self):
+        # Unshipped edits on top of a shipped branch -- never yank them.
+        decision = tb.auto_branch_decision("claude/x-0722", "claude/x-0722", tree_dirty=True)
+        assert decision == (False, None)
+
+    def test_on_unrelated_feature_branch_does_not_fire(self):
+        # Mid-task on a branch that is not the shipped one.
+        decision = tb.auto_branch_decision("claude/y-0722", "claude/x-0722", tree_dirty=False)
+        assert decision == (False, None)
+
+    def test_no_marker_only_master_fires(self):
+        assert tb.auto_branch_decision("claude/x-0722", "", tree_dirty=False) == (False, None)
+
+    def test_detached_head_does_not_fire(self):
+        assert tb.auto_branch_decision("", "claude/x-0722", tree_dirty=False) == (False, None)
