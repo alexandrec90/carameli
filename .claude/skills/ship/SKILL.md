@@ -10,8 +10,8 @@ argument-hint: 'Optional PR title'
 Takes the finished work on the current feature branch all the way to an open PR
 against `master`, then hands the PR to the CI-autofix loop. Explicit-invocation
 only (`/ship`) — it pushes and opens a PR, so it must never fire mid-task. The
-branch itself is created by the branch-per-task `UserPromptSubmit` hook
-(`scripts/hooks/branch-per-task.py`) when you start work on `master`.
+branch was created at the start of the task — by `/task` (worktrees) or the
+branch-per-task hook (primary checkout on `master`).
 
 Run the steps in order. Stop and report if a step fails — do not open a PR from
 a branch that failed pre-flight.
@@ -25,18 +25,13 @@ python scripts/ship.py --preflight
 Exit `3` means you are on `master` or detached HEAD — there is nothing to ship
 from. Report that and stop; the work needs to be on a `claude/...` branch first.
 
-## Step 2 — Test + lint locally
+## Step 2 — Confirm tests
 
-The Stop hook already reproduces the PR-gate checks on the diff, but confirm the
-change is green before pushing so CI is a formality, not the first check:
-
-```bash
-python scripts/lint-all.py --changed
-```
-
-Fix anything in `logs/lint-errors.log`. If you touched code, make sure its tests
-exist and pass (project rule: tests ship in the same commit) — run the targeted
-suite for what you changed.
+The Stop hook already reproduces the PR-gate checks on the diff, and Step 4's
+`ship.py` runs the changed-scope lint gate before it pushes — so do **not** run
+`lint-all.py` here (that would just repeat Step 4's pass). Instead, make sure the
+code you touched has tests and they pass (project rule: tests ship in the same
+commit) — run the targeted suite for what you changed.
 
 ## Step 3 — Commit
 
@@ -84,6 +79,14 @@ Ask the user whether to watch the PR (unless they already said to). If yes:
 This repo has no branch protection; `dependabot-automerge.yml` merges once the
 PR Gate passes. If the user wants hands-off merge, enable it with
 `mcp__github__enable_pr_auto_merge`.
+
+**Cost note (autofix loop).** The autofix loop is the expensive part of the
+workflow — each round wakes a fresh turn that reloads context. Keep it cheap:
+batch *all* failures from one PR-Gate run into a single fix + push (each push
+re-runs the full gate), and read the filtered artifact (`logs/lint-errors.log`,
+`logs/test-failures.log`), never the raw CI job log. See
+`.claude/rules/tooling.md` (CI feedback loop) for running the loop at a lower
+model/effort when the fixes are trivial.
 
 ## Report
 

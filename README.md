@@ -138,12 +138,16 @@ git maintenance start                      # periodic background fetch keeps ori
 For the vibe-coding loop where every task lands its own small PR to `master`, the
 lifecycle is automated at both ends and stays isolated per task:
 
-1. **Start (automatic).** The `UserPromptSubmit` hook
-   (`scripts/hooks/branch-per-task.py`) cuts a fresh `claude/<slug>-<mmdd>` branch off the
-   latest `origin/master` **only when a prompt arrives while you are on `master`** — i.e.
-   when you begin new work. On any other branch it is a no-op, so it never cuts a branch
-   mid-task. A dirty `master` carries your changes onto the new branch instead of resetting
-   (no clobber).
+1. **Start.** Cut a fresh `claude/<slug>-<mmdd>` branch off the latest `origin/master`:
+   - **In a worktree** (you are never on `master`, always on a stale/merged branch): run
+     **`/task "<description>"`** (`scripts/start-task.py`). Creating a *new* branch off
+     `origin/master` is allowed in a worktree even while `master` is checked out in the
+     primary tree. It refuses a dirty tree — `/ship` or stash first.
+   - **In the primary checkout on `master`:** the `UserPromptSubmit` hook
+     (`scripts/hooks/branch-per-task.py`) does it automatically when a prompt arrives, and
+     no-ops on any other branch so it never cuts a branch mid-task. Auto-detecting a stale
+     branch to re-branch from isn't safe (the local signals can't tell a freshly-cut empty
+     branch from a merged one), which is why the worktree path is the explicit `/task`.
 2. **Work.** The Stop hook (`scripts/hooks/stop.py`) reproduces the PR-gate checks on the
    diff at each turn and relays failures back into the session, so they are fixed in-context
    rather than after a CI round-trip.
