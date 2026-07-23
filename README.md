@@ -112,6 +112,12 @@ Rules that keep the stacks independent:
 - **`docker compose down -v` is project-scoped** (safe to reset one stack), but
   daemon-wide commands like `docker system prune` hit both stacks — don't run them
   while the other agent's stack is up.
+- **Telemetry export is shared, not offset.** `OTEL_EXPORTER_OTLP_ENDPOINT`
+  (`http://localhost:4318`, set in `.claude/settings.json`) is the same for both
+  CLIs — the `*_HOST_PORT` offsets don't cover it. That's fine when a single
+  collector listens on 4318 (both agents' metrics/logs land there together); just
+  don't expect per-worktree isolation of telemetry, and if you run a per-worktree
+  collector, offset its port and override the env var in that worktree.
 
 To incorporate changes merged by another worktree, first commit the current worktree's
 changes, then fetch and rebase the checked-out branch onto `origin/master`:
@@ -127,8 +133,11 @@ start of every **local** Claude Code session, so each session begins rebased on 
 and passes `--gpg-sign` when `commit.gpgsign` is set so replayed commits stay Verified.
 **It never runs in cloud/remote (Claude Code on the web) sessions** — there the platform
 owns the branch lifecycle, and rebasing from inside would rewrite SHAs, diverge from the
-remote, and strip signatures. To reduce drift further, run these one-time git settings on
-each machine (they need no per-session command):
+remote, and strip signatures. Run these one-time git settings on each machine (they need
+no per-session command). **They are effectively required once two agents run in parallel:**
+both branches rebase onto a fast-moving `origin/master`, so the same conflicts recur across
+sessions (rerere replays their resolutions) and a stale `origin/master` makes every rebase
+conflict more (maintenance keeps it fresh in the background):
 
 ```bash
 git config --global rerere.enabled true   # resolve each recurring conflict once, reused across rebases

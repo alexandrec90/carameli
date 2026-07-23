@@ -95,10 +95,39 @@ class TestShippedMarker:
         monkeypatch.setattr(ship, "write_shipped_marker", marked.append)
         return marked
 
-    def test_marker_written_on_successful_ship(self, monkeypatch):
+    def test_push_mode_does_not_write_marker(self, monkeypatch):
+        # Regression: the marker must NOT be dropped at push time. Dropping it
+        # before the PR exists is what orphaned a pushed-but-un-PR'd branch when
+        # PR creation failed or the session died between push and PR.
         marked = self._wire(monkeypatch, branch="claude/x-0722", lint_ok=True, push_ok=True)
         assert ship.main([]) == ship.EXIT_OK
+        assert marked == []
+
+    def test_mark_shipped_writes_marker(self, monkeypatch):
+        marked = self._wire(monkeypatch, branch="claude/x-0722", lint_ok=True, push_ok=True)
+        assert ship.main(["--mark-shipped"]) == ship.EXIT_OK
         assert marked == ["claude/x-0722"]
+
+    def test_mark_shipped_rejected_on_master(self, monkeypatch):
+        # You can't arm the marker from master -- is_shippable gates it first.
+        marked = self._wire(monkeypatch, branch="master", lint_ok=True, push_ok=True)
+        assert ship.main(["--mark-shipped"]) == ship.EXIT_NOT_SHIPPABLE
+        assert marked == []
+
+    def test_mark_shipped_does_not_push_or_lint(self, monkeypatch):
+        # --mark-shipped is a post-PR bookkeeping step: no clean-tree check, no
+        # lint, no push -- so it works even with a dirty tree after the PR opened.
+        pushed = []
+        linted = []
+        monkeypatch.setattr(ship, "current_branch", lambda: "claude/x-0722")
+        monkeypatch.setattr(ship, "_porcelain", lambda: " M x.py\n")  # dirty
+        monkeypatch.setattr(ship, "_run_lint", lambda: linted.append(True) or True)
+        monkeypatch.setattr(ship, "_push", lambda b: pushed.append(b) or True)
+        marked = []
+        monkeypatch.setattr(ship, "write_shipped_marker", marked.append)
+        assert ship.main(["--mark-shipped"]) == ship.EXIT_OK
+        assert marked == ["claude/x-0722"]
+        assert pushed == [] and linted == []
 
     def test_marker_not_written_when_push_fails(self, monkeypatch):
         marked = self._wire(monkeypatch, branch="claude/x-0722", lint_ok=True, push_ok=False)

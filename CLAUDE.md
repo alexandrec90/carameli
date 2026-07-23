@@ -100,8 +100,15 @@ Before any step that needs a container (stack up, `pytest`, E2E, migrations):
   (gitignored) `.env`**, so FreeSWITCH/jambonz/rtpengine/influxdb/jambonz-db do NOT auto-start.
   Bring them up only when testing real calls: `docker compose --profile telephony up -d`.
   (`.env.example` still ships it enabled for fresh clones.)
-- **Run one stack at a time.** Stop the other worktree's stack (`docker compose -p <project>
-  down`) instead of running both simultaneously.
+- **Two slim stacks can coexist — memory is the real ceiling, not disk.** The worktree
+  stacks share the git object store, Docker image layers, and the uv cache, so a second
+  *non-telephony* stack costs well under 1 GB (see README, "Parallel Worktrees"). That's
+  fine for parallel test/lint work, which mocks at the provider boundary and never needs
+  telephony. What this ~16 GB laptop can't always hold is **two Claude CLIs on Opus/high
+  plus both full stacks** at once: if something OOMs, stop the other worktree's stack
+  (`docker compose -p <project> down`) before continuing. Telephony is single-instance per
+  machine (primary stack only — rtpengine uses host networking), so live-call/webhook work
+  is never parallel regardless.
 - **Resource caps are in place.** `~/.wslconfig` caps the WSL2 VM (memory/cores + idle
   reclaim) and `docker-compose.override.yml` sets a per-service `mem_limit` on every container.
   If something OOMs, check `docker inspect <name> --format '{{.State.OOMKilled}}'` and bump

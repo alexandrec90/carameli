@@ -56,8 +56,12 @@ python scripts/ship.py
 This re-asserts the branch, requires a clean tree (so commit first), runs the
 changed-scope lint gate, and pushes with network-error backoff. Non-zero exit
 codes: `4` dirty tree, `5` lint failed (see `logs/lint-errors.log`), `6` push
-failed. Resolve and re-run. On success it drops the per-worktree shipped marker,
-so your next prompt auto-starts a fresh task branch (no `/task` needed).
+failed. Resolve and re-run.
+
+This step does **not** arm the shipped marker — that happens in Step 6, *after*
+the PR is open. If a run dies between here and the PR, nothing is orphaned:
+re-running `/ship` on the pushed branch no-ops the push and continues to the PR
+(the whole skill is idempotent/resumable from any step).
 
 ## Step 5 — Open the PR
 
@@ -70,7 +74,20 @@ filling the template if one exists:
 
 Do **not** create the PR if any earlier step failed.
 
-## Step 6 — Start the autofix loop
+## Step 6 — Arm the next task branch (only after the PR is open)
+
+```bash
+python scripts/ship.py --mark-shipped
+```
+
+Run this **only after Step 5 succeeded** and you have a PR URL. It drops the
+per-worktree shipped marker so your next prompt auto-starts a fresh task branch
+(no `/task` needed). Arming it here — not at push time — is deliberate: if the
+marker were set at push and the PR step failed, the next prompt would branch
+away and silently orphan the pushed branch. If Step 5 did not produce a PR, skip
+this — leave the branch un-marked so the work isn't abandoned.
+
+## Step 7 — Start the autofix loop
 
 Ask the user whether to watch the PR (unless they already said to). If yes:
 
@@ -82,12 +99,18 @@ PR Gate passes. If the user wants hands-off merge, enable it with
 `mcp__github__enable_pr_auto_merge`.
 
 **Cost note (autofix loop).** The autofix loop is the expensive part of the
-workflow — each round wakes a fresh turn that reloads context. Keep it cheap:
-batch *all* failures from one PR-Gate run into a single fix + push (each push
-re-runs the full gate), and read the filtered artifact (`logs/lint-errors.log`,
-`logs/test-failures.log`), never the raw CI job log. See
-`.claude/rules/tooling.md` (CI feedback loop) for running the loop at a lower
-model/effort when the fixes are trivial.
+workflow — each round wakes a fresh turn that reloads context, and it runs in
+parallel across every open PR. Keep it cheap:
+
+- Batch *all* failures from one PR-Gate run into a single fix + push (each push
+  re-runs the full gate).
+- Read the filtered artifact (`logs/lint-errors.log`, `logs/test-failures.log`),
+  never the raw CI job log.
+- **Default a mechanical-fix round to a lower model/effort.** When the failure is
+  clearly mechanical (a lint nit, a missing import, a snapshot/format update),
+  run that autofix turn at a cheaper model — don't reserve Opus/high for it.
+  Escalate back to the capable model only when a failure needs real diagnosis.
+  See `.claude/rules/tooling.md` (CI feedback loop) for the full rationale.
 
 ## Report
 
