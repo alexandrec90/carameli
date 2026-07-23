@@ -5,11 +5,23 @@ The /ship skill drives the semantic steps (commit message, PR body, subscribing
 to PR activity via the GitHub MCP tools). This script owns the mechanical,
 testable half so those steps run against a branch that is actually shippable:
 
-  --preflight : assert we are on a feature branch (not master, not detached).
-                Cheap, no lint, no network -- run it FIRST to fail fast.
-  (default)   : assert feature branch + clean tree, run the changed-scope lint
-                pre-flight (the same gate CI runs), then push -u origin with
-                network-error backoff. Prints the branch + base for the PR.
+  --preflight    : assert we are on a feature branch (not master, not detached).
+                   Cheap, no lint, no network -- run it FIRST to fail fast.
+  (default)      : assert feature branch + clean tree, run the changed-scope lint
+                   pre-flight (the same gate CI runs), then push -u origin with
+                   network-error backoff. Prints the branch + base for the PR.
+                   Does NOT drop the shipped marker -- see --mark-shipped.
+  --mark-shipped : record the branch in the per-worktree shipped marker so the
+                   next prompt auto-starts a fresh task branch. The /ship skill
+                   runs this ONLY after the PR is open, so a session that dies
+                   between push and PR never orphans a pushed branch behind a
+                   marker (the next prompt would be a mid-task no-op, and
+                   re-running /ship resumes: the push no-ops, then the PR opens).
+
+The default and --mark-shipped modes are deliberately separate because dropping
+the marker at push time (before the PR exists) is exactly what orphans a pushed
+branch when PR creation fails or the session ends: the marker then steers the
+next prompt onto a brand-new branch, silently abandoning un-PR'd work.
 
 The decision helpers (`is_shippable`, `tree_clean`, `backoff_delays`,
 `parse_lint_ok`) are pure and unit-tested in
@@ -138,6 +150,7 @@ def _push(branch: str, sleep=time.sleep) -> bool:
 def main(argv: list[str] | None = None) -> int:
     argv = sys.argv[1:] if argv is None else argv
     preflight_only = "--preflight" in argv
+    mark_shipped = "--mark-shipped" in argv
 
     branch = current_branch()
     ok, reason = is_shippable(branch)
@@ -147,6 +160,14 @@ def main(argv: list[str] | None = None) -> int:
 
     if preflight_only:
         print(f"ship: '{branch}' is shippable.")
+        return EXIT_OK
+
+    if mark_shipped:
+        # Runs only after the PR is open (see the /ship skill). Arming the marker
+        # here -- not at push time -- is what keeps a push-but-no-PR branch from
+        # being orphaned by the next prompt's auto-branch.
+        write_shipped_marker(branch)
+        print(f"ship: marked '{branch}' shipped; the next prompt starts a fresh task branch.")
         return EXIT_OK
 
     if not tree_clean(_porcelain()):
@@ -169,10 +190,13 @@ def main(argv: list[str] | None = None) -> int:
         print("ship: push failed after retries.", file=sys.stderr)
         return EXIT_PUSH_FAILED
 
-    # Mark this branch shipped so the next prompt auto-starts a fresh task branch.
-    write_shipped_marker(branch)
-
-    print(f"ship: pushed '{branch}'. Open a PR against '{DEFAULT_BRANCH}'.")
+    # NB: the shipped marker is intentionally NOT dropped here. It is armed by a
+    # separate `--mark-shipped` run only after the PR is open, so a session that
+    # dies between this push and PR creation cannot orphan a pushed branch.
+    print(
+        f"ship: pushed '{branch}'. Open a PR against '{DEFAULT_BRANCH}', then run "
+        f"'python scripts/ship.py --mark-shipped' to arm the next task branch."
+    )
     return EXIT_OK
 
 
