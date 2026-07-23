@@ -15,6 +15,7 @@ from __future__ import annotations
 import datetime as _dt
 import json
 import re
+from collections.abc import Mapping
 
 DEFAULT_BRANCH = "master"
 BRANCH_PREFIX = "claude/"
@@ -104,3 +105,19 @@ def auto_branch_decision(
     if shipped_branch and current_branch == shipped_branch and not tree_dirty:
         return True, f"origin/{default_branch}"
     return False, None
+
+
+def platform_manages_branch(env: Mapping[str, str]) -> bool:
+    """True in a cloud/remote session (Claude Code on the web / mobile), where the
+    platform owns the branch lifecycle -- so the auto-branch hook must stand down.
+
+    On the web/mobile the platform checks out and tracks a `claude/...` branch and
+    handles commit/PR. Cutting a *new* local branch here -- which the shipped-marker
+    path would do on the prompt after `/ship` -- diverges HEAD from the branch the
+    mobile app tracks, so later work lands on a branch its UI never shows. The
+    primary-checkout (`master`) trigger never fires remotely anyway (the platform
+    never leaves you on `master`), so standing the whole hook down is a no-op there
+    and closes the shipped-marker hole. Mirrors the `CLAUDE_CODE_REMOTE` guard in
+    `.claude/hooks/session-start.sh`.
+    """
+    return env.get("CLAUDE_CODE_REMOTE") == "true"

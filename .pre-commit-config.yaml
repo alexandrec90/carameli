@@ -9,9 +9,13 @@ fail_fast: true
 repos:
   - repo: local
     hooks:
-      # A generator, not a check, so CI can't own it: regenerates the
-      # AGENTS.md/.agents mirrors from CLAUDE.md/.claude. Modifies files; the
-      # patched git hook auto-stages and retries (see scripts/install-pre-commit.py).
+      # A generator: regenerates the AGENTS.md/.agents/.codex/hooks.json mirrors
+      # from CLAUDE.md/.claude. Generation stays LOCAL (CI must not commit derived
+      # files back — it would need write access and hide the diff from review); it
+      # modifies files, and the patched git hook auto-stages and retries (see
+      # scripts/install-pre-commit.py). CI does not run this hook, but the PR Gate
+      # `mirror-sync` job *verifies* its output is in sync, catching a bypassed or
+      # uninstalled hook.
       - id: sync-agents
         name: sync CLAUDE -> AGENTS mirrors
         language: system

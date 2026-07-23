@@ -163,6 +163,34 @@ jobs:
           python-version: "3.12"
       - run: python scripts/check-lock-markers.py
 
+  mirror-sync:
+    # AGENTS.md, .agents/, .agents/settings.json and .codex/hooks.json are all
+    # GENERATED from CLAUDE.md + .claude/ by scripts/sync-agents-context.py (run
+    # locally by the sync-agents pre-commit hook). CI deliberately does not
+    # regenerate-and-commit them: that needs write access, hides the derived
+    # diff from review, and makes .claude vs the mirrors ambiguous as the source
+    # of truth. It only *verifies* — regenerate on a clean checkout, then fail if
+    # anything changed, which means a commit landed with the pre-commit hook
+    # uninstalled or bypassed (--no-verify) and the mirrors drifted. Fast,
+    # Python-only, no DB/node needed.
+    name: Generated mirrors in sync
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Regenerate mirrors from .claude/ + CLAUDE.md
+        run: python scripts/sync-agents-context.py
+      - name: Fail if the mirrors drifted
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "::error::Generated mirrors are stale. Run 'python scripts/sync-agents-context.py' and commit the result, or install the hook that does it automatically: 'python scripts/install-pre-commit.py'."
+            git status --porcelain
+            git diff
+            exit 1
+          fi
+
   frontend:
     name: Frontend unit tests
     runs-on: ubuntu-latest

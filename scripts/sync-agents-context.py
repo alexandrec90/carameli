@@ -10,6 +10,8 @@ CLAUDE.md / .claude/ are the source of truth; run this after editing them.
      (machine-local configuration must not be mirrored).
   4. Regenerate .agents/settings.json from .claude/settings.json with hooks
      stripped (via sync-agents-settings.py).
+  5. Regenerate .codex/hooks.json from the same .claude/settings.json hooks
+     block, path-transformed for Codex (via sync-codex-hooks.py).
 
 The pure tree helpers are unit-tested in
 `scripts/hooks/tests/test_sync_agents_context.py`.
@@ -119,6 +121,22 @@ def main() -> int:
             print("sync-agents-settings.py failed", file=sys.stderr)
             return 1
         print("  regenerated .agents/settings.json (hooks stripped)")
+
+        codex_hooks = REPO_ROOT / ".codex" / "hooks.json"
+        if codex_hooks.parent.exists():
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(REPO_ROOT / "scripts" / "sync-codex-hooks.py"),
+                    str(claude_settings),
+                    str(codex_hooks),
+                ],
+                cwd=REPO_ROOT,
+            )
+            if result.returncode != 0:
+                print("sync-codex-hooks.py failed", file=sys.stderr)
+                return 1
+            print("  regenerated .codex/hooks.json (from .claude/settings.json hooks)")
 
     print("\nDone.")
     return 0

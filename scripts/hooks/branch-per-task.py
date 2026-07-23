@@ -21,6 +21,7 @@ decision/formatting helpers live in `scripts/task_branch.py` (shared with
 
 import contextlib
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -113,6 +114,13 @@ def main() -> int:
             raw = sys.stdin.read()
     except (OSError, ValueError):
         raw = ""
+
+    # Cloud/remote (Claude Code on the web / mobile): the platform owns the branch
+    # lifecycle. Standing down here keeps a post-`/ship` prompt from cutting a new
+    # local branch that diverges from the one the mobile app tracks. See
+    # tb.platform_manages_branch and the guard in .claude/hooks/session-start.sh.
+    if tb.platform_manages_branch(os.environ):
+        return 0
 
     current = _current_branch()
     shipped = _read_shipped_marker()
