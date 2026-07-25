@@ -125,14 +125,16 @@ def main() -> int:
     current = _current_branch()
     shipped = _read_shipped_marker()
     dirty = _tree_dirty()
-    should, base = tb.auto_branch_decision(current, shipped, dirty)
+    # Resolve the repo's default branch (main/master/...) rather than assuming one.
+    default_branch = tb.detect_default_branch(_git)
+    should, base = tb.auto_branch_decision(current, shipped, dirty, default_branch)
     if not should:
         return 0  # mid-task, or on an unshipped feature branch, or detached -- no-op.
 
     # Starting new work: refresh origin so the cut is from latest.
-    # Offline is fine -- fall back to whatever origin/master we already have.
+    # Offline is fine -- fall back to whatever origin/<default> we already have.
     with contextlib.suppress(OSError, subprocess.TimeoutExpired):
-        _git("fetch", "--prune", "origin", tb.DEFAULT_BRANCH, timeout=60.0)
+        _git("fetch", "--prune", "origin", default_branch, timeout=60.0)
 
     name = tb.branch_name(tb.slugify(tb.parse_prompt(raw)), _existing_branches())
     argv = ["checkout", "-b", name] + ([base] if base else [])
@@ -152,7 +154,7 @@ def main() -> int:
     else:
         _emit_context(
             f"Started task on fresh branch '{name}' carrying your uncommitted "
-            f"changes (tree was dirty, so it was not reset onto origin/{tb.DEFAULT_BRANCH})."
+            f"changes (tree was dirty, so it was not reset onto origin/{default_branch})."
         )
     return 0
 

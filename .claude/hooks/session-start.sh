@@ -26,9 +26,20 @@ if [ "${CLAUDE_CODE_REMOTE:-}" != "true" ]; then
   (
     cd "${CLAUDE_PROJECT_DIR:-.}" || exit 0
     branch="$(git branch --show-current 2>/dev/null)"
-    # Nothing to do on master itself, or with detached HEAD.
-    if [ -n "$branch" ] && [ "$branch" != "master" ]; then
-      echo "[session-start] Syncing '$branch' onto origin/master (no-op if tree is dirty)..."
+    # Resolve the repo's default branch (main/master/...) rather than assuming one:
+    # origin/HEAD (set at clone), else probe origin/main then origin/master.
+    default_branch="$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null)"
+    default_branch="${default_branch#origin/}"
+    if [ -z "$default_branch" ]; then
+      if git rev-parse --verify --quiet refs/remotes/origin/main >/dev/null 2>&1; then
+        default_branch="main"
+      else
+        default_branch="master"
+      fi
+    fi
+    # Nothing to do on the default branch itself, or with detached HEAD.
+    if [ -n "$branch" ] && [ "$branch" != "$default_branch" ]; then
+      echo "[session-start] Syncing '$branch' onto origin/$default_branch (no-op if tree is dirty)..."
       if ! python3 scripts/hooks/session-sync.py; then
         # On conflicts the rebase is left in progress. Auto-abort so the session
         # starts in a known-clean state; resolve conflicts manually instead.
@@ -36,7 +47,7 @@ if [ "${CLAUDE_CODE_REMOTE:-}" != "true" ]; then
         rebase_apply="$(git rev-parse --git-path rebase-apply 2>/dev/null)"
         if [ -d "$rebase_merge" ] || [ -d "$rebase_apply" ]; then
           git rebase --abort 2>/dev/null
-          echo "[session-start] origin/master had conflicting changes — auto-sync aborted, branch left untouched. Sync manually to resolve."
+          echo "[session-start] origin/$default_branch had conflicting changes — auto-sync aborted, branch left untouched. Sync manually to resolve."
         else
           echo "[session-start] Branch sync skipped (dirty tree or offline) — sync manually when ready."
         fi

@@ -6,12 +6,14 @@ CLAUDE.md / .claude/ are the source of truth; run this after editing them.
   1. Copy every CLAUDE.md to AGENTS.md in the same directory.
   2. Purge orphaned AGENTS.md (no sibling CLAUDE.md) -- AGENTS.md is derived.
   3. Mirror .claude/ -> .agents/ (copy new/changed, remove orphans), excluding
-     settings.json (hooks must never reach .agents) and settings.local.json
-     (machine-local configuration must not be mirrored).
-  4. Regenerate .agents/settings.json from .claude/settings.json with hooks
-     stripped (via sync-agents-settings.py).
-  5. Regenerate .codex/hooks.json from the same .claude/settings.json hooks
-     block, path-transformed for Codex (via sync-codex-hooks.py).
+     settings.json and settings.local.json. Codex reads AGENTS.md and
+     .agents/plugins/marketplace.json out of .agents/ -- it has no notion of an
+     .agents/settings.json, and machine-local config must not be mirrored.
+  4. Regenerate .codex/hooks.json from the .claude/settings.json hooks block,
+     path-transformed for Codex (via sync-codex-hooks.py).
+
+Codex's own settings live in .codex/config.toml (approval/sandbox/env) and
+~/.codex/config.toml (model, reasoning effort) -- never in .agents/.
 
 The pure tree helpers are unit-tested in
 `scripts/hooks/tests/test_sync_agents_context.py`.
@@ -108,20 +110,6 @@ def main() -> int:
 
     claude_settings = claude_dir / "settings.json"
     if claude_settings.exists():
-        result = subprocess.run(
-            [
-                sys.executable,
-                str(REPO_ROOT / "scripts" / "sync-agents-settings.py"),
-                str(claude_settings),
-                str(agents_dir / "settings.json"),
-            ],
-            cwd=REPO_ROOT,
-        )
-        if result.returncode != 0:
-            print("sync-agents-settings.py failed", file=sys.stderr)
-            return 1
-        print("  regenerated .agents/settings.json (hooks stripped)")
-
         codex_hooks = REPO_ROOT / ".codex" / "hooks.json"
         if codex_hooks.parent.exists():
             result = subprocess.run(

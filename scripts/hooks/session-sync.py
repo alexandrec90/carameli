@@ -20,7 +20,13 @@ from __future__ import annotations
 
 import subprocess
 import sys
+from pathlib import Path
 
+# scripts/ on path so the shared, stdlib-only helper imports before the venv.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from task_branch import detect_default_branch
+
+# Fallback upstream; main() resolves the real one per-repo via detect_default_branch.
 UPSTREAM = "origin/master"
 UPSTREAM_REF = "refs/remotes/origin/master"
 
@@ -66,19 +72,24 @@ def main() -> int:
         print("Cannot sync while HEAD is detached. Check out a branch first.", file=sys.stderr)
         return 1
 
-    print(f"Syncing '{branch.stdout.strip()}' with {UPSTREAM}...", flush=True)
     fetch = run_git("fetch", "--prune", "origin")
     if fetch.returncode != 0:
         return fetch.returncode
 
-    verify = run_git("rev-parse", "--verify", "--quiet", UPSTREAM_REF, capture_output=True)
+    # Resolve the repo's default branch (main/master/...) rather than assuming one.
+    default_branch = detect_default_branch(lambda *a: run_git(*a, capture_output=True))
+    upstream = f"origin/{default_branch}"
+    upstream_ref = f"refs/remotes/origin/{default_branch}"
+    print(f"Syncing '{branch.stdout.strip()}' onto {upstream}...", flush=True)
+
+    verify = run_git("rev-parse", "--verify", "--quiet", upstream_ref, capture_output=True)
     if verify.returncode != 0:
-        print(f"{UPSTREAM} was not found after fetching.", file=sys.stderr)
+        print(f"{upstream} was not found after fetching.", file=sys.stderr)
         return 1
 
     gpgsign = run_git("config", "--get", "commit.gpgsign", capture_output=True)
     commit_gpgsign = gpgsign.stdout if gpgsign.returncode == 0 else ""
-    return run_git(*rebase_argv(commit_gpgsign)).returncode
+    return run_git(*rebase_argv(commit_gpgsign, upstream)).returncode
 
 
 if __name__ == "__main__":

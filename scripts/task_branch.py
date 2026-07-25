@@ -15,8 +15,16 @@ from __future__ import annotations
 import datetime as _dt
 import json
 import re
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
+from typing import TYPE_CHECKING
 
+if TYPE_CHECKING:
+    import subprocess
+
+# Fallback default branch. The real default is resolved per-repo by
+# `detect_default_branch()` (callers pass it in), so this is only the value the
+# pure helpers assume when a caller does not override -- keeping the module
+# project-agnostic while the branch name stays out of the logic.
 DEFAULT_BRANCH = "master"
 BRANCH_PREFIX = "claude/"
 SLUG_MAX_LEN = 40
@@ -26,7 +34,31 @@ _SLUG_STRIP_RE = re.compile(r"[^a-z0-9]+")
 # `/ship` last shipped. The branch-per-task hook uses it to auto-cut a fresh
 # branch on the next prompt: once a branch is shipped it is "spent", so starting
 # new work should leave it. Resolve its path with `git rev-parse --git-path`.
-SHIPPED_MARKER_NAME = "carameli-shipped"
+# Project-agnostic name so the harness vendors unchanged.
+SHIPPED_MARKER_NAME = "agent-shipped"
+
+
+def detect_default_branch(
+    git: Callable[..., subprocess.CompletedProcess[str]], fallback: str = "main"
+) -> str:
+    """The remote's default branch, project-agnostically. Replaces a hardcoded name.
+
+    Resolves `origin/HEAD` (the symbolic ref set at clone time); if that is not set,
+    probes `origin/main` then `origin/master`; if neither exists, returns `fallback`.
+    `git(*args)` must return a CompletedProcess capturing stdout -- injected so this
+    stays pure and unit-testable without spawning git.
+    """
+    head = git("symbolic-ref", "--quiet", "refs/remotes/origin/HEAD")
+    ref = (head.stdout or "").strip()
+    if head.returncode == 0 and ref.startswith("refs/remotes/origin/"):
+        return ref.rsplit("/", 1)[1]
+    for candidate in ("main", "master"):
+        if (
+            git("rev-parse", "--verify", "--quiet", f"refs/remotes/origin/{candidate}").returncode
+            == 0
+        ):
+            return candidate
+    return fallback
 
 
 def parse_prompt(raw_stdin: str) -> str:
@@ -71,14 +103,14 @@ def branch_name(slug: str, existing: set[str], today: _dt.date | None = None) ->
     return f"{base}-{n}"
 
 
-def checkout_base(tree_dirty: bool) -> str | None:
-    """Which ref to base a new branch on when auto-branching from `master`.
+def checkout_base(tree_dirty: bool, default_branch: str = DEFAULT_BRANCH) -> str | None:
+    """Which ref to base a new branch on when auto-branching from the default branch.
 
-    Clean tree -> branch from `origin/master` (start current). Dirty tree ->
+    Clean tree -> branch from `origin/<default_branch>` (start current). Dirty tree ->
     None: branch from the current HEAD carrying the uncommitted changes, because
-    resetting onto origin/master could clobber them.
+    resetting onto the default branch could clobber them.
     """
-    return None if tree_dirty else f"origin/{DEFAULT_BRANCH}"
+    return None if tree_dirty else f"origin/{default_branch}"
 
 
 def auto_branch_decision(
@@ -101,7 +133,7 @@ def auto_branch_decision(
         marker after, so an empty fresh branch never re-triggers (no loop).
     """
     if should_branch(current_branch, default_branch):
-        return True, checkout_base(tree_dirty)
+        return True, checkout_base(tree_dirty, default_branch)
     if shipped_branch and current_branch == shipped_branch and not tree_dirty:
         return True, f"origin/{default_branch}"
     return False, None

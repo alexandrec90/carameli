@@ -39,7 +39,17 @@ import subprocess
 import sys
 from pathlib import Path
 
+# scripts/hooks/ on path so the sibling, stdlib-only config helper imports before
+# the venv (same pattern as branch-per-task.py's task_branch import).
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import harness_config
+
 REPO_ROOT = (Path(__file__).parent / "../..").resolve()
+# Everything project-specific below (env prefix, DB creds/ports, frontend layout,
+# source-tree shape, finalize targets) is sourced from .agent-harness.toml so this
+# script can be vendored unchanged across projects. See harness_config.py.
+CFG = harness_config.load(REPO_ROOT)
+
 PROFILE = REPO_ROOT / "logs/agent/skills-profile.json"
 SNAPSHOT = REPO_ROOT / "logs/agent/skills-profile.optimized.json"
 
@@ -55,40 +65,56 @@ ARCHIVE_SESSION = REPO_ROOT / "scripts/hooks/archive-session.py"
 LINT_ALL = REPO_ROOT / "scripts/lint-all.py"
 CHECK_LOCK_MARKERS = REPO_ROOT / "scripts/check-lock-markers.py"
 
+# Interpreter candidates for the verification checks, relative to the repo root.
+VENV_PYTHONS = (".venv/Scripts/python.exe", ".venv/bin/python")
+
+
+def verify_python(repo_root: Path | None = None) -> str:
+    """Interpreter for the verification checks -- the project venv, not the launcher.
+
+    The hooks are wired as `python3 <script>`, and on Windows `python3` resolves
+    to the Microsoft Store shim: an interpreter with none of the project's
+    dependencies installed. Running the checks under it fails on tooling rather
+    than on the code -- `-m pytest` dies with "No module named pytest" and
+    lint-all.py cannot import its linters -- which reads as a real CI failure and
+    is unfixable by editing source. Resolve the venv explicitly; fall back to the
+    launching interpreter only when there is no venv (fresh clone, CI).
+
+    `repo_root` defaults to REPO_ROOT at call time, not import time, so the
+    module-level constant stays overridable.
+    """
+    root = REPO_ROOT if repo_root is None else repo_root
+    for rel in VENV_PYTHONS:
+        candidate = root / rel
+        if candidate.exists():
+            return str(candidate)
+    return sys.executable
+
+
 CHECK_LINT = "lint"  # Tier 1: lint-all.py --changed (no infra)
 CHECK_SCRIPT_TESTS = "script-tests"  # Tier 2a: host pytest scripts/hooks/tests (no infra)
 CHECK_TESTS = "tests"  # Tier 2b: host pytest tests/ against db+redis (paid-safe)
 CHECK_LOCKS = "lock-markers"  # Tier 3: check-lock-markers.py (deps changed)
 CHECK_FRONTEND = "frontend"  # Tier 3: vitest (frontend/src changed)
 
-# DB credentials mirror docker-compose.yml's POSTGRES_* and CI's env block; host
-# pytest connects over the published ports (resolved via `docker compose port`).
-_DB_USER = "carameli"
-_DB_PASSWORD = "carameli_local_dev"  # noqa: S105 -- local dev DB password, not a secret
-_DB_NAME = "carameli"
-
 _REQ_RE = re.compile(r"(^|/)requirements[^/]*\.(in|txt)$")
 
-# Opt-out: set to "1" to skip pre-stop verification entirely.
-SKIP_VERIFY_ENV = "CARAMELI_SKIP_STOP_VERIFY"
-
-# Opt-in: set to "1" to let Tier 2b bring up ONLY db+redis on demand when
-# app/tests changed and they are down, run host pytest against them, then stop
-# only the services this hook started. Off by default so the stack-down-to-save-
-# memory policy holds unless asked. Host pytest (not in-container) means the app
-# container is never needed -- peak footprint is db+redis (~0.75 GB) vs the full
-# stack (~4 GB). Tests inherit pytest.ini's `-m "not paid"`, so they can never
-# bill a live provider.
-AUTOSTART_ENV = "CARAMELI_STOP_TESTS_AUTOSTART"
+# Harness control env vars, prefixed per project (CFG.env_prefix, e.g. CARAMELI):
+#   *_SKIP_STOP_VERIFY -- opt out of pre-stop verification entirely.
+#   *_STOP_TESTS_AUTOSTART -- opt in to Tier 2b bringing up ONLY db+redis on
+#     demand when app/tests changed and they are down, running host pytest, then
+#     stopping only what it started. Off by default so the stack-down-to-save-
+#     memory policy holds. Host pytest (no app container) keeps the peak footprint
+#     at db+redis (~0.75 GB) vs the full stack (~4 GB); tests inherit pytest.ini's
+#     `-m "not paid"` so they can never bill a live provider.
+#   *_NORMALIZE_KNOWN_FIXES_ON_STOP -- opt in to known-fixes normalization.
+SKIP_VERIFY_ENV = CFG.env("SKIP_STOP_VERIFY")
+AUTOSTART_ENV = CFG.env("STOP_TESTS_AUTOSTART")
+NORMALIZE_ENV = CFG.env("NORMALIZE_KNOWN_FIXES_ON_STOP")
 
 # (skill, schema) pairs finalized on every stop. Safe to call when artifacts are
-# absent: finalize-state.py exits 0 in that case.
-FINALIZE_TARGETS = (
-    ("audit-design-flaws", "audit"),
-    ("make-tests", "modules"),
-    ("make-frontend-tests", "modules"),
-    ("refactor", "files"),
-)
+# absent: finalize-state.py exits 0 in that case. Project-specific -> manifest.
+FINALIZE_TARGETS = CFG.finalize_targets
 
 
 def save_snapshot(profile: Path, snapshot: Path) -> int:
@@ -105,7 +131,7 @@ def save_snapshot(profile: Path, snapshot: Path) -> int:
 
 def should_normalize(env: dict[str, str]) -> bool:
     """True when known-fixes normalization is explicitly enabled."""
-    return env.get("CARAMELI_NORMALIZE_KNOWN_FIXES_ON_STOP") == "1"
+    return env.get(NORMALIZE_ENV) == "1"
 
 
 def archive_targets_present(raw_stdin: str) -> bool:
@@ -150,7 +176,7 @@ def skin_changed(porcelain: str) -> bool:
 def _git_skin_status(repo_root: Path) -> str:
     try:
         result = subprocess.run(
-            ["git", "status", "--porcelain", "--", "frontend/src/skins"],
+            ["git", "status", "--porcelain", "--", CFG.frontend.skin],
             cwd=repo_root,
             capture_output=True,
             text=True,
@@ -200,7 +226,7 @@ def _is_py(path: str) -> bool:
 
 
 def _is_frontend(path: str) -> bool:
-    return path.startswith("frontend/src/")
+    return path.startswith(CFG.frontend.src)
 
 
 def _is_reqs(path: str) -> bool:
@@ -219,9 +245,9 @@ def host_test_targets(paths: list[str]) -> list[str]:
     to specific tests -- run the whole unit suite. A tests-only change runs just
     the changed test files (fast, precise).
     """
-    if any(_is_py(p) and p.startswith("app/") for p in paths):
-        return ["tests/unit"]
-    return sorted(p for p in paths if p.startswith("tests/") and _is_py(p))
+    if any(_is_py(p) and p.startswith(CFG.app_dir) for p in paths):
+        return [CFG.unit_tests]
+    return sorted(p for p in paths if p.startswith(CFG.tests_dir) and _is_py(p))
 
 
 def select_checks(paths: list[str]) -> list[str]:
@@ -245,7 +271,7 @@ def select_checks(paths: list[str]) -> list[str]:
         checks.append(CHECK_SCRIPT_TESTS)
     if any(_is_reqs(p) for p in paths):
         checks.append(CHECK_LOCKS)
-    if any(_is_frontend(p) for p in paths):
+    if CFG.frontend.enabled and any(_is_frontend(p) for p in paths):
         checks.append(CHECK_FRONTEND)
     return checks
 
@@ -290,7 +316,7 @@ def _compose_running_services(repo_root: Path = REPO_ROOT) -> set[str]:
 def db_redis_running(repo_root: Path = REPO_ROOT) -> bool:
     """True when both db and redis are up (whether via the full stack or db+redis
     alone) -- host pytest can reach them either way."""
-    return {"db", "redis"}.issubset(_compose_running_services(repo_root))
+    return set(CFG.db.services).issubset(_compose_running_services(repo_root))
 
 
 def _compose_up_db_redis(repo_root: Path = REPO_ROOT) -> bool:
@@ -298,7 +324,7 @@ def _compose_up_db_redis(repo_root: Path = REPO_ROOT) -> bool:
     timeout) so the DB tier skips instead of blocking."""
     try:
         result = subprocess.run(
-            ["docker", "compose", "up", "-d", "--wait", "db", "redis"],
+            ["docker", "compose", "up", "-d", "--wait", *CFG.db.services],
             cwd=repo_root,
             capture_output=True,
             text=True,
@@ -352,18 +378,18 @@ def _compose_host_port(
 def host_db_env(repo_root: Path = REPO_ROOT) -> dict[str, str] | None:
     """Env for host pytest to reach the containers over their published ports, or
     None when a port cannot be resolved (containers not actually up)."""
-    db_port = _compose_host_port("db", 5432, repo_root)
-    redis_port = _compose_host_port("redis", 6379, repo_root)
+    db = CFG.db
+    db_port = _compose_host_port(db.db_service, db.db_port, repo_root)
+    redis_port = _compose_host_port(db.redis_service, db.redis_port, repo_root)
     if not db_port or not redis_port:
         return None
-    db_url = f"postgresql+asyncpg://{_DB_USER}:{_DB_PASSWORD}@localhost:{db_port}/{_DB_NAME}"
-    return {
-        "DATABASE_URL": db_url,
-        "DIRECT_DATABASE_URL": db_url,
-        "REDIS_URL": f"redis://localhost:{redis_port}",
-        "API_KEY_SECRET": os.environ.get("API_KEY_SECRET", "ci-test-key"),
-        "SESSION_SECRET": os.environ.get("SESSION_SECRET", "ci-session-secret"),
-    }
+    db_url = f"{db.url_scheme}://{db.user}:{db.password}@localhost:{db_port}/{db.name}"
+    env: dict[str, str] = {name: db_url for name in db.url_env}
+    env[db.redis_env] = f"redis://localhost:{redis_port}"
+    # Extra secrets host pytest needs; an already-set os.environ value wins.
+    for name, default in db.test_env.items():
+        env[name] = os.environ.get(name, default)
+    return env
 
 
 def run_db_tests(
@@ -376,6 +402,8 @@ def run_db_tests(
     runs, then stops exactly what it started. Any infra gap (daemon down, up
     failure, unresolved ports) is a clean skip -> deferred to CI, never a block.
     """
+    if not CFG.db.enabled:
+        return []
     targets = host_test_targets(paths)
     if not targets:
         return []
@@ -393,7 +421,7 @@ def run_db_tests(
         db_env = host_db_env(repo_root)
         if db_env is None:
             return []
-        argv = [sys.executable, "-m", "pytest", *targets, "-q"]
+        argv = [verify_python(), "-m", "pytest", *targets, "-q"]
         try:
             result = subprocess.run(
                 argv,
@@ -419,19 +447,19 @@ def _command_for(name: str) -> tuple[list[str], Path, str | None] | None:
         # out of CI_TOOLS); skipping it is the one always-on cost we drop here,
         # which also stops the Stop hook churning .secrets.baseline.
         return (
-            [sys.executable, str(LINT_ALL), "--changed", "--no-secrets"],
+            [verify_python(), str(LINT_ALL), "--changed", "--no-secrets"],
             REPO_ROOT,
             "logs/lint-errors.log",
         )
     if name == CHECK_SCRIPT_TESTS:
-        return ([sys.executable, "-m", "pytest", "scripts/hooks/tests/", "-q"], REPO_ROOT, None)
+        return ([verify_python(), "-m", "pytest", "scripts/hooks/tests/", "-q"], REPO_ROOT, None)
     if name == CHECK_LOCKS:
-        return ([sys.executable, str(CHECK_LOCK_MARKERS)], REPO_ROOT, None)
+        return ([verify_python(), str(CHECK_LOCK_MARKERS)], REPO_ROOT, None)
     if name == CHECK_FRONTEND:
         npm = shutil.which("npm")
         if not npm:
             return None
-        return ([npm, "run", "test:run"], REPO_ROOT / "frontend", None)
+        return ([npm, *CFG.frontend.test_cmd], REPO_ROOT / CFG.frontend.dir, None)
     return None
 
 
@@ -526,12 +554,12 @@ def main() -> int:
             stderr=subprocess.DEVNULL,
         )
 
-    if skin_changed(_git_skin_status(REPO_ROOT)):
+    if CFG.frontend.enabled and skin_changed(_git_skin_status(REPO_ROOT)):
         npm = shutil.which("npm")
         if npm:
             subprocess.run(
-                [npm, "run", "typecheck"],
-                cwd=REPO_ROOT / "frontend",
+                [npm, *CFG.frontend.typecheck_cmd],
+                cwd=REPO_ROOT / CFG.frontend.dir,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
             )

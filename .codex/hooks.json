@@ -5,7 +5,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \".claude/hooks/session-start.sh\""
+            "command": "python3 \"$(git rev-parse --show-toplevel)/scripts/hooks/codex-hook-adapter.py\" --event SessionStart -- python3 \"$(git rev-parse --show-toplevel)/scripts/hooks/codex-session-start.py\""
           }
         ]
       }
@@ -15,7 +15,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"scripts/hooks/branch-per-task.py\""
+            "command": "python3 \"$(git rev-parse --show-toplevel)/scripts/hooks/codex-hook-adapter.py\" --event UserPromptSubmit -- python3 \"$(git rev-parse --show-toplevel)/scripts/hooks/branch-per-task.py\""
           }
         ]
       }
@@ -26,7 +26,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"scripts/hooks/enforce-capped-bash.py\""
+            "command": "python3 \"$(git rev-parse --show-toplevel)/scripts/hooks/codex-hook-adapter.py\" --event PreToolUse -- python3 \"$(git rev-parse --show-toplevel)/scripts/hooks/enforce-capped-bash.py\""
           }
         ]
       },
@@ -35,42 +35,22 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"scripts/hooks/pretool.py\""
-          }
-        ]
-      }
-    ],
-    "PostToolUseFailure": [
-      {
-        "matcher": ".*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PostToolUseFailure\",\"additionalContext\":\"Failure retro (project policy): if this tool failure traces to an instruction file (a skill, rule, or CLAUDE.md prescribing a wrong command, stale path, or missing guard), flag it with the exact file and line and a proposed edit in your final report - do not just work around it. Routine exploratory failures need no mention.\"},\"suppressOutput\":true}'"
+            "command": "python3 \"$(git rev-parse --show-toplevel)/scripts/hooks/codex-hook-adapter.py\" --event PreToolUse -- python3 \"$(git rev-parse --show-toplevel)/scripts/hooks/pretool.py\""
           }
         ]
       }
     ],
     "PostToolUse": [
       {
-        "matcher": "^Skill$",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PostToolUse\",\"additionalContext\":\"Skill retro (project policy): before your final report, check whether any step of this skill run failed, no-oped, or wasted an operation because of how the skill/rule markdown is written. If so, flag it to the user with the exact file and line and a proposed edit - never silently work around bad instructions.\"},\"suppressOutput\":true}'"
-          }
-        ]
-      },
-      {
         "matcher": "^(Edit|Write|MultiEdit|apply_patch|create_file)$",
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \".claude/skills/add-db-model/after-model-edit.py\""
+            "command": "python3 \"$(git rev-parse --show-toplevel)/scripts/hooks/codex-hook-adapter.py\" --event PostToolUse -- python3 \"$(git rev-parse --show-toplevel)/.claude/skills/add-db-model/after-model-edit.py\""
           },
           {
             "type": "command",
-            "command": "python3 \"scripts/hooks/lint-fix.py\""
+            "command": "python3 \"$(git rev-parse --show-toplevel)/scripts/hooks/codex-hook-adapter.py\" --event PostToolUse -- python3 \"$(git rev-parse --show-toplevel)/scripts/hooks/lint-fix.py\""
           }
         ]
       }
@@ -80,7 +60,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"scripts/hooks/stop.py\""
+            "command": "python3 \"$(git rev-parse --show-toplevel)/scripts/hooks/codex-hook-adapter.py\" --event Stop -- python3 \"$(git rev-parse --show-toplevel)/scripts/hooks/stop.py\""
           }
         ]
       }

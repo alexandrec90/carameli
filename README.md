@@ -9,7 +9,7 @@ Self-hosted VoIP microservice powered by Telnyx + Jambonz. Drop-in replacement f
 - **Docker Desktop** (running)
 - That's it — everything else runs inside containers
 
-If you only run Docker-based tasks (`Start: Full Stack`, `DB: Apply Migrations`, `Test: Run pytest`), Docker is enough.
+If you only run Docker-based tasks (`Start: Full Stack`, `DB: Apply Migrations`, `Test: Run Suite`), Docker is enough.
 
 If you also want to run all local lint/dev tasks from VS Code, install these host tools once:
 
@@ -176,6 +176,38 @@ only ever type `/ship`** — the start of the next task is automatic:
 Checks stay layered by purpose, not merged into one hook: pre-commit holds only what CI
 *can't* own (secret scanning + the AGENTS mirror generator), the Stop hook is the in-session
 CI mirror, and the PR Gate is the authoritative gate that `dependabot-automerge.yml` waits on.
+
+### Claude/Codex hook synchronization
+
+Treat `.claude/settings.json` as the source of truth for shared hook wiring. The
+`sync-agents` pre-commit hook runs `scripts/sync-agents-context.py`, which regenerates
+`.codex/hooks.json` through `scripts/sync-codex-hooks.py`; the installed Git hook stages
+that generated file on the retry. PR Gate independently reruns the same generator and
+fails on drift.
+
+The mandatory hook test suite also loads the real settings, regenerates Codex hooks in
+memory, and checks the committed output, handler paths, adapter wrapping, explicit
+unsupported-event/matcher allowlists, and the expected event/matcher topology. Adding a
+new Claude hook event therefore fails generation until it is deliberately classified as
+supported or unsupported; changing the generated topology requires updating the contract
+snapshot after checking Codex compatibility.
+
+Run the deterministic checks locally with:
+
+```bash
+python scripts/sync-agents-context.py
+pytest scripts/hooks/tests/test_sync_codex_hooks.py scripts/hooks/tests/test_codex_hooks_contract.py -q
+```
+
+An additional live smoke test launches an authenticated, ephemeral `codex exec` session
+inside a temporary Git repository and verifies generated `SessionStart`,
+`UserPromptSubmit`, and `Stop` hooks. It carries the `paid` marker and is excluded by the
+default `not paid` test policy because it uses model capacity and depends on Codex
+authentication. Opt in explicitly with:
+
+```bash
+pytest scripts/hooks/tests/test_codex_hooks_live.py -q -m codex_live
+```
 
 Tearing down: `docker compose down -v` inside the worktree, then
 `git worktree remove ../carameli-b`, then remove its built images:

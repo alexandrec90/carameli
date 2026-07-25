@@ -388,3 +388,40 @@ def test_run_db_tests_up_failure_skips_and_stops_nothing(monkeypatch):
 
     assert hook.run_db_tests(["app/main.py"], {"CARAMELI_STOP_TESTS_AUTOSTART": "1"}) == []
     assert "svc" not in stopped  # returns before try/finally -> _compose_stop never called
+
+
+# --- verify_python: run the checks in the venv, not the launching interpreter ---
+# The hooks are wired as `python3 <script>`; on Windows that resolves to the
+# Microsoft Store shim, which has no pytest and none of the project's linters, so
+# every check failed on tooling rather than on the code.
+
+
+def test_verify_python_prefers_windows_venv(tmp_path):
+    py = tmp_path / ".venv/Scripts/python.exe"
+    py.parent.mkdir(parents=True)
+    py.write_text("")
+
+    assert hook.verify_python(tmp_path) == str(py)
+
+
+def test_verify_python_prefers_posix_venv(tmp_path):
+    py = tmp_path / ".venv/bin/python"
+    py.parent.mkdir(parents=True)
+    py.write_text("")
+
+    assert hook.verify_python(tmp_path) == str(py)
+
+
+def test_verify_python_falls_back_to_launcher_without_venv(tmp_path):
+    assert hook.verify_python(tmp_path) == sys.executable
+
+
+def test_verify_python_used_by_lint_and_test_checks(tmp_path, monkeypatch):
+    py = tmp_path / ".venv/Scripts/python.exe"
+    py.parent.mkdir(parents=True)
+    py.write_text("")
+    monkeypatch.setattr(hook, "REPO_ROOT", tmp_path)
+
+    for check in (hook.CHECK_LINT, hook.CHECK_SCRIPT_TESTS, hook.CHECK_LOCKS):
+        argv, _cwd, _artifact = hook._command_for(check)
+        assert argv[0] == str(py), f"{check} must run under the venv interpreter"
