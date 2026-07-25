@@ -3,7 +3,7 @@
 
 When a raw audit exceeds the violation/touched-file thresholds, edits must be
 applied in bounded batches described by `batch-plan.json`. This hook builds that
-plan on first trip and blocks (exit 42) write-tool calls that touch files outside
+plan on first trip and blocks (exit EXIT_BLOCK) write-tool calls that touch files outside
 the currently active batch.
 
 Decision logic is exposed as pure functions (`tally`, `build_plan`,
@@ -18,7 +18,18 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+# Claude Code hook contract: 0 allows the call, 2 blocks it and feeds stderr back
+# to the model. Every other non-zero code is reported as a non-blocking hook
+# *error* and the tool call proceeds anyway -- so a blocking hook MUST use 2 and
+# MUST write its reason to stderr. See scripts/hooks/tests/test_hook_exit_contract.py.
+EXIT_BLOCK = 2
+
 REPO_ROOT = (Path(__file__).parent / "../..").resolve()
+
+# A batch plan describes one audit run. Left on disk it arms this gate forever:
+# a plan from a finished/abandoned audit will block edits to every file it does
+# not list, long after the audit is over. Plans older than this stand down.
+PLAN_MAX_AGE_DAYS = 7
 
 VIOLATIONS_THRESHOLD = 25
 TOUCHED_FILES_THRESHOLD = 15
@@ -241,7 +252,7 @@ def evaluate_target(
 
     max_files = int(current_batch.get("maxFiles", PER_BATCH_FILE_CAP))
     if len(target_files) > max_files:
-        return 42, [
+        return EXIT_BLOCK, [
             f"Blocked: current batch '{current_batch.get('id')}' allows at most "
             f"{max_files} files per edit operation (got {len(target_files)})."
         ]
@@ -252,7 +263,7 @@ def evaluate_target(
     ]
 
     if outside:
-        return 42, [
+        return EXIT_BLOCK, [
             f"Blocked by Step 2.5 caps: current batch '{current_batch.get('id')}' "
             f"({current_batch.get('group')}) only permits files listed in batch-plan.json.",
             "Out-of-batch file(s): " + ", ".join(outside[:5]),
@@ -260,6 +271,31 @@ def evaluate_target(
         ]
 
     return 0, []
+
+
+def plan_is_stale(plan: Any, now: datetime | None = None) -> bool:
+    """True if a batch plan is too old to still be gating edits.
+
+    A plan with no parseable `generatedAt` is treated as stale: an
+    unattributable plan should not silently arm the gate forever.
+    """
+    now = now or datetime.now(UTC)
+    if not isinstance(plan, dict):
+        return True
+
+    stamp = plan.get("generatedAt")
+    if not isinstance(stamp, str) or not stamp.strip():
+        return True
+
+    try:
+        generated = datetime.fromisoformat(stamp.replace("Z", "+00:00"))
+    except ValueError:
+        return True
+
+    if generated.tzinfo is None:
+        generated = generated.replace(tzinfo=UTC)
+
+    return (now - generated).days > PLAN_MAX_AGE_DAYS
 
 
 def _load_json(path: Path) -> Any:
@@ -314,7 +350,19 @@ def main() -> int:
     try:
         plan = _load_json(plan_path)
     except (OSError, json.JSONDecodeError):
-        return 42
+        return EXIT_BLOCK
+
+    # Stand down on a plan left over from a finished/abandoned audit rather than
+    # gating every edit in the repo against a months-old batch list.
+    if plan_is_stale(plan):
+        print(
+            f"enforce-audit-batch-caps: ignoring batch plan older than "
+            f"{PLAN_MAX_AGE_DAYS} days (generatedAt={plan.get('generatedAt')!r}). "
+            f"Delete {plan_path.name} / {active_path.name} to clear this notice, "
+            f"or re-run the audit to regenerate them.",
+            file=sys.stderr,
+        )
+        return 0
 
     active_id = None
     if active_path.exists():
@@ -325,17 +373,22 @@ def main() -> int:
 
     current_batch = find_batch(plan, active_id)
     if not current_batch:
-        print("Blocked: Step 2.5 batch caps are active but no current batch is selected.")
+        print(
+            "Blocked: Step 2.5 batch caps are active but no current batch is selected.",
+            file=sys.stderr,
+        )
         print(
             "Set .claude/skills/audit-design-flaws/batch-active.json with "
-            '{"currentBatchId":"<batch-id>"}.'
+            '{"currentBatchId":"<batch-id>"}.',
+            file=sys.stderr,
         )
-        return 42
+        return EXIT_BLOCK
 
     target_files = files_from_tool_payload(payload, REPO_ROOT)
     exit_code, messages = evaluate_target(current_batch, target_files)
     for message in messages:
-        print(message)
+        # stderr, not stdout: only stderr is surfaced for a blocking hook.
+        print(message, file=sys.stderr)
     return exit_code
 
 

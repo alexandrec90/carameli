@@ -55,7 +55,7 @@ def test_removed_ps1_wrapper_no_longer_allowed():
     # invoke-capped.ps1 was deleted; the .ps1 form must now be blocked.
     cmd = 'pwsh -File scripts/hooks/invoke-capped.ps1 -Command "ls"'
     code, _ = hook.decide(payload("Bash", cmd))
-    assert code == 42
+    assert code == hook.EXIT_BLOCK
 
 
 # --- decide: block paths ---
@@ -63,19 +63,19 @@ def test_removed_ps1_wrapper_no_longer_allowed():
 
 def test_uncapped_bash_blocks():
     code, msg = hook.decide(payload("Bash", "ls -la"))
-    assert code == 42
+    assert code == hook.EXIT_BLOCK
     assert "Blocked uncapped Bash command" in msg
 
 
 def test_missing_command_blocks():
     code, msg = hook.decide(payload("Bash"))
-    assert code == 42
+    assert code == hook.EXIT_BLOCK
     assert "missing command text" in msg
 
 
 def test_blank_command_blocks():
     code, msg = hook.decide(payload("Bash", "   "))
-    assert code == 42
+    assert code == hook.EXIT_BLOCK
     assert "missing command text" in msg
 
 
@@ -92,7 +92,7 @@ def test_blank_command_blocks():
 )
 def test_alternate_key_shapes_still_block_uncapped(raw):
     code, _ = hook.decide(raw)
-    assert code == 42
+    assert code == hook.EXIT_BLOCK
 
 
 # --- is_capped / get_value units ---

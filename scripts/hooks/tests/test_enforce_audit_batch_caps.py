@@ -1,5 +1,6 @@
 """Unit tests for the audit-design-flaws Step 2.5 batch-cap enforcer."""
 
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from conftest import load_module
@@ -150,12 +151,60 @@ def test_evaluate_target_allows_audit_batch_pointer():
 def test_evaluate_target_too_many_files_blocks():
     batch = {"id": "high-1", "maxFiles": 1, "files": ["app/a.py", "app/b.py"]}
     code, messages = hook.evaluate_target(batch, ["app/a.py", "app/b.py"])
-    assert code == 42
+    assert code == hook.EXIT_BLOCK
     assert "at most 1 files" in messages[0]
 
 
 def test_evaluate_target_out_of_batch_blocks():
     batch = {"id": "low-1", "group": "low-risk mechanical", "maxFiles": 10, "files": ["app/a.py"]}
     code, messages = hook.evaluate_target(batch, ["app/zzz.py"])
-    assert code == 42
+    assert code == hook.EXIT_BLOCK
     assert any("app/zzz.py" in m for m in messages)
+
+
+# --- plan_is_stale: a leftover plan must not arm the gate forever ---
+#
+# Regression: a batch plan generated 2026-05-25 was still gating every edit in
+# the repo two months later, because the hook armed on the plan file merely
+# existing. It went unnoticed only because the hook's exit code (42) meant it
+# never actually blocked -- see test_hook_exit_contract.py.
+
+
+def _plan(stamp):
+    return {"version": 1, "generatedAt": stamp, "batches": []}
+
+
+def test_fresh_plan_is_not_stale():
+    now = datetime(2026, 7, 25, tzinfo=UTC)
+    assert hook.plan_is_stale(_plan("2026-07-24T00:00:00Z"), now) is False
+
+
+def test_plan_at_the_age_limit_is_not_stale():
+    now = datetime(2026, 7, 25, tzinfo=UTC)
+    edge = now - timedelta(days=hook.PLAN_MAX_AGE_DAYS)
+    assert hook.plan_is_stale(_plan(edge.isoformat()), now) is False
+
+
+def test_plan_past_the_age_limit_is_stale():
+    now = datetime(2026, 7, 25, tzinfo=UTC)
+    old = now - timedelta(days=hook.PLAN_MAX_AGE_DAYS + 1)
+    assert hook.plan_is_stale(_plan(old.isoformat()), now) is True
+
+
+def test_the_real_stale_plan_that_caused_this():
+    now = datetime(2026, 7, 25, tzinfo=UTC)
+    assert hook.plan_is_stale(_plan("2026-05-25T00:51:38.8295838Z"), now) is True
+
+
+def test_naive_timestamp_is_treated_as_utc():
+    now = datetime(2026, 7, 25, tzinfo=UTC)
+    assert hook.plan_is_stale(_plan("2026-07-24T00:00:00"), now) is False
+
+
+def test_unattributable_plan_is_stale():
+    """No usable generatedAt -> stand down rather than gate on an unknown plan."""
+    now = datetime(2026, 7, 25, tzinfo=UTC)
+    assert hook.plan_is_stale({"batches": []}, now) is True
+    assert hook.plan_is_stale(_plan(""), now) is True
+    assert hook.plan_is_stale(_plan("not-a-date"), now) is True
+    assert hook.plan_is_stale(None, now) is True

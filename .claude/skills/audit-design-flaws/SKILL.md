@@ -325,6 +325,13 @@ both sides can import from directly.
 - After each batch: **do not re-run checks**. Apply fixes, update `state.json`
   fingerprints and set touched fixed entries to `status = fixed`, apply
   prevention updates for fired checks, and update `known-flaws.md`.
+- **When the audit ends (finished or abandoned), delete `raw-audit.json`,
+  `batch-plan.json`, and `batch-active.json`.** They are per-run artifacts and
+  the hook arms on `raw-audit.json` merely existing, so a leftover plan keeps
+  gating every edit in the repo against a stale batch list. `state.json` is the
+  exception -- it is persistent, do not clear it (see Hard Rule 9).
+  As a backstop the hook ignores plans older than `PLAN_MAX_AGE_DAYS` (7) and
+  says so on stderr, but that is a safety net, not a substitute for teardown.
 
 ---
 
