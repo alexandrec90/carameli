@@ -31,11 +31,11 @@ attrs==26.1.0
     # via
     #   jsonschema
     #   referencing
-boto3==1.43.50
+boto3==1.43.55
     # via
     #   -c requirements.txt
     #   -r requirements.in
-botocore==1.43.50
+botocore==1.43.55
     # via
     #   -c requirements.txt
     #   boto3
@@ -110,7 +110,7 @@ httpx==0.28.1
     # via
     #   -c requirements.txt
     #   -r requirements.in
-hypothesis==6.156.6
+hypothesis==6.161.2
     # via
     #   -r requirements-test.in
     #   hypothesis-graphql
@@ -135,7 +135,7 @@ jmespath==1.1.0
     #   botocore
 jsonschema==4.26.0
     # via hypothesis-jsonschema
-jsonschema-rs==0.48.0
+jsonschema-rs==0.48.5
     # via schemathesis
 jsonschema-specifications==2025.9.1
     # via jsonschema
@@ -265,9 +265,9 @@ s3transfer==0.19.0
     # via
     #   -c requirements.txt
     #   boto3
-schemathesis==4.23.0
+schemathesis==4.24.2
     # via -r requirements-test.in
-sentry-sdk==2.66.0
+sentry-sdk==2.66.1
     # via
     #   -c requirements.txt
     #   -r requirements.in
