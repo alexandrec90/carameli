@@ -24,6 +24,12 @@ VIOLATIONS_THRESHOLD = 25
 TOUCHED_FILES_THRESHOLD = 15
 PER_BATCH_FILE_CAP = 10
 HIGH_RISK_PER_BATCH = 1
+EXEMPT_PATHS = frozenset(
+    {
+        ".claude/skills/audit-design-flaws/batch-active.json",
+        ".claude/skills/test-skill/.active",
+    }
+)
 
 WRITE_TOOLS = {"Edit", "Write", "MultiEdit", "apply_patch", "create_file"}
 CHECKS = ("A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L")
@@ -41,7 +47,7 @@ GROUP_LABELS = {
 
 _PATCH_HEADER_RE = re.compile(r'\*\*\*\s+(?:Update|Add|Delete)\s+File:\s+([^\r\n"]+)')
 _POSIX_PATH_RE = re.compile(r"(app|frontend|tests|alembic|scripts|\.claude)/[A-Za-z0-9_\-./]+")
-_WIN_PATH_RE = re.compile(r'[A-Za-z]:\\\\[^"\s]+')
+_WIN_PATH_RE = re.compile(r'[A-Za-z]:\\[^"\s]+')
 
 
 def get_value(obj: Any, *paths: str) -> Any:
@@ -73,7 +79,7 @@ def to_repo_relative(path: str, base: Path) -> str | None:
             return normalized[len(prefix) :]
         return None
 
-    return normalized.lstrip("./")
+    return normalized[2:] if normalized.startswith("./") else normalized
 
 
 def collect_violation_files(violation: Any, base: Path) -> set[str]:
@@ -181,24 +187,30 @@ def files_from_tool_payload(payload: dict[str, Any], base: Path) -> list[str]:
     if tool_input is None:
         return []
 
-    try:
-        blob = json.dumps(tool_input, separators=(",", ":"))
-    except (TypeError, ValueError):
-        blob = str(tool_input)
+    def strings(value: Any):
+        if isinstance(value, str):
+            yield value
+        elif isinstance(value, dict):
+            for nested in value.values():
+                yield from strings(nested)
+        elif isinstance(value, (list, tuple)):
+            for nested in value:
+                yield from strings(nested)
 
     found: set[str] = set()
-    for match in _PATCH_HEADER_RE.findall(blob):
-        rel = to_repo_relative(match, base)
-        if rel:
-            found.add(rel)
-    for match in _POSIX_PATH_RE.finditer(blob):
-        rel = to_repo_relative(match.group(0), base)
-        if rel:
-            found.add(rel)
-    for match in _WIN_PATH_RE.findall(blob):
-        rel = to_repo_relative(match.replace("\\\\", "/"), base)
-        if rel:
-            found.add(rel)
+    for text in strings(tool_input):
+        for match in _PATCH_HEADER_RE.findall(text):
+            rel = to_repo_relative(match, base)
+            if rel:
+                found.add(rel)
+        for match in _POSIX_PATH_RE.finditer(text):
+            rel = to_repo_relative(match.group(0), base)
+            if rel:
+                found.add(rel)
+        for match in _WIN_PATH_RE.findall(text):
+            rel = to_repo_relative(match, base)
+            if rel:
+                found.add(rel)
 
     return sorted(found)
 
@@ -217,6 +229,12 @@ def evaluate_target(
     current_batch: dict[str, Any], target_files: list[str]
 ) -> tuple[int, list[str]]:
     """Pure enforcement: map a batch + target files to (exit_code, messages)."""
+
+    def normalized(path: str) -> str:
+        result = path.replace("\\", "/")
+        return result[2:] if result.startswith("./") else result
+
+    target_files = [path for path in target_files if normalized(path) not in EXEMPT_PATHS]
     if not target_files:
         # Can't infer target paths reliably; fail open to avoid false positives.
         return 0, []

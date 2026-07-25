@@ -12,6 +12,10 @@ BASE = Path("/repo")
 def test_to_repo_relative_posix():
     assert hook.to_repo_relative("app/models/user.py", BASE) == "app/models/user.py"
     assert hook.to_repo_relative("./tests/test_x.py", BASE) == "tests/test_x.py"
+    assert (
+        hook.to_repo_relative(".claude/skills/test-skill/.active", BASE)
+        == ".claude/skills/test-skill/.active"
+    )
 
 
 def test_to_repo_relative_backslashes():
@@ -85,6 +89,27 @@ def test_files_from_tool_payload_patch_header():
     assert "app/models/user.py" in hook.files_from_tool_payload(payload, BASE)
 
 
+def test_files_from_codex_multiline_patch_does_not_absorb_patch_body():
+    payload = {
+        "tool_name": "apply_patch",
+        "tool_input": {
+            "input": (
+                "*** Begin Patch\n"
+                "*** Add File: logs/codex-live-edit-probe.py\n"
+                "+x=1\n"
+                "*** End Patch\n"
+            )
+        },
+    }
+    assert hook.files_from_tool_payload(payload, BASE) == ["logs/codex-live-edit-probe.py"]
+
+
+def test_files_from_tool_payload_windows_path():
+    base = Path("C:/repo")
+    payload = {"tool_input": {"file_path": r"C:\repo\scripts\hooks\x.py"}}
+    assert hook.files_from_tool_payload(payload, base) == ["scripts/hooks/x.py"]
+
+
 def test_find_batch_falls_back_to_current_id():
     plan = {"currentBatchId": "low-1", "batches": [{"id": "low-1", "files": []}]}
     assert hook.find_batch(plan, None)["id"] == "low-1"
@@ -99,6 +124,27 @@ def test_evaluate_target_within_batch_allows():
 def test_evaluate_target_empty_fails_open():
     batch = {"id": "low-1", "maxFiles": 10, "files": ["app/a.py"]}
     assert hook.evaluate_target(batch, []) == (0, [])
+
+
+def test_evaluate_target_allows_test_skill_control_marker():
+    batch = {"id": "low-1", "maxFiles": 1, "files": ["app/a.py"]}
+    assert hook.evaluate_target(batch, [".claude/skills/test-skill/.active"]) == (0, [])
+
+
+def test_evaluate_target_ignores_control_marker_in_mixed_edit():
+    batch = {"id": "low-1", "maxFiles": 1, "files": ["app/a.py"]}
+    assert hook.evaluate_target(
+        batch,
+        ["app/a.py", ".claude/skills/test-skill/.active"],
+    ) == (0, [])
+
+
+def test_evaluate_target_allows_audit_batch_pointer():
+    batch = {"id": "low-1", "maxFiles": 1, "files": ["app/a.py"]}
+    assert hook.evaluate_target(
+        batch,
+        [".claude/skills/audit-design-flaws/batch-active.json"],
+    ) == (0, [])
 
 
 def test_evaluate_target_too_many_files_blocks():

@@ -135,5 +135,5 @@
     ]
   },
   "effortLevel": "high",
-  "defaultModel": "opus"
+  "model": "opus"
 }

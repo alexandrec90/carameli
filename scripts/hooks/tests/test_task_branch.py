@@ -1,10 +1,43 @@
 """Unit tests for the shared task-branch helpers (scripts/task_branch.py)."""
 
 import datetime as dt
+import subprocess
 
 from conftest import load_module
 
 tb = load_module("scripts/task_branch.py")
+
+
+def _cp(returncode: int = 0, stdout: str = "") -> subprocess.CompletedProcess:
+    """A CompletedProcess stand-in for injecting fake `git` results."""
+    return subprocess.CompletedProcess([], returncode, stdout, "")
+
+
+class TestDetectDefaultBranch:
+    def test_reads_branch_from_origin_head(self):
+        def git(*args):
+            return _cp(0, "refs/remotes/origin/main\n") if args[0] == "symbolic-ref" else _cp(1)
+
+        assert tb.detect_default_branch(git) == "main"
+
+    def test_master_from_origin_head(self):
+        def git(*args):
+            return _cp(0, "refs/remotes/origin/master\n") if args[0] == "symbolic-ref" else _cp(1)
+
+        assert tb.detect_default_branch(git) == "master"
+
+    def test_probes_master_when_head_unset_and_no_main(self):
+        def git(*args):
+            if args[0] == "symbolic-ref":
+                return _cp(1)  # origin/HEAD not set
+            # rev-parse: only origin/master resolves.
+            return _cp(0) if args[-1] == "refs/remotes/origin/master" else _cp(1)
+
+        assert tb.detect_default_branch(git) == "master"
+
+    def test_falls_back_when_nothing_resolves(self):
+        assert tb.detect_default_branch(lambda *a: _cp(1)) == "main"
+        assert tb.detect_default_branch(lambda *a: _cp(1), fallback="trunk") == "trunk"
 
 
 class TestParsePrompt:
@@ -77,6 +110,9 @@ class TestCheckoutBase:
     def test_dirty_tree_bases_on_head(self):
         assert tb.checkout_base(tree_dirty=True) is None
 
+    def test_respects_custom_default_branch(self):
+        assert tb.checkout_base(tree_dirty=False, default_branch="main") == "origin/main"
+
 
 class TestAutoBranchDecision:
     def test_on_master_clean_bases_on_origin(self):
@@ -105,6 +141,13 @@ class TestAutoBranchDecision:
 
     def test_detached_head_does_not_fire(self):
         assert tb.auto_branch_decision("", "claude/x-0722", tree_dirty=False) == (False, None)
+
+    def test_custom_default_branch_bases_on_it(self):
+        # On a `main`-default repo, cutting from master's origin would be wrong.
+        assert tb.auto_branch_decision("main", "", tree_dirty=False, default_branch="main") == (
+            True,
+            "origin/main",
+        )
 
 
 class TestPlatformManagesBranch:

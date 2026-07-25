@@ -25,6 +25,28 @@ compatibility (local Windows desktop and GitHub Actions).
 - `scripts/hooks/tests/` is excluded from the app test suite automatically because
   `pytest.ini` sets `testpaths = tests`.
 
+### Portable agent harness (`.agent-harness.toml` + `scripts/sync-harness.py`)
+
+The hook scripts are designed to be **vendored unchanged across projects**. Anything
+project-specific lives in `.agent-harness.toml` at the repo root, read by
+`scripts/hooks/harness_config.py` (stdlib `tomllib`, never raises — a missing/bad
+manifest falls back to neutral defaults).
+
+- **Never hard-code project specifics in a hook script.** Env-var prefix, DB
+  creds/ports/service names, the frontend layout, the `app/`/`tests/` shape, and the
+  Stop-hook `finalize_targets` all come from `Config` (see `stop.py`'s `CFG`). New
+  project-specific behaviour gets a manifest field + a `harness_config` default, not an
+  `if project == …` branch.
+- **The shared harness repo is the source of truth; each project commits a vendored
+  copy.** `scripts/sync-harness.py` manages it: `--check` (drift-fails, wired into the
+  PR-gate `mirror-sync` job), `--pull` (adopt upstream), `--push` (author a change / seed
+  the shared repo). The shared-repo path comes from `--src` or `$AGENT_HARNESS_DIR`; every
+  mode **no-ops cleanly when unset**, so CI is green before the shared repo is adopted.
+  The vendored file set is `sync-harness.py`'s `MANIFEST` — extend it as more scripts are
+  decoupled; `.agent-harness.toml` is deliberately **not** in it (it is per-project config).
+- This is the same single-source→committed-mirror pattern as `.claude/` →
+  `.agents/`/`.codex/`, lifted from intra-repo to cross-repo.
+
 ### VS Code tasks
 
 - Use `"type": "process"` tasks in `tasks.json` so VS Code monitors the process

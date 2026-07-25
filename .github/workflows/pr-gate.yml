@@ -164,7 +164,7 @@ jobs:
       - run: python scripts/check-lock-markers.py
 
   mirror-sync:
-    # AGENTS.md, .agents/, .agents/settings.json and .codex/hooks.json are all
+    # AGENTS.md, .agents/ and .codex/hooks.json are all
     # GENERATED from CLAUDE.md + .claude/ by scripts/sync-agents-context.py (run
     # locally by the sync-agents pre-commit hook). CI deliberately does not
     # regenerate-and-commit them: that needs write access, hides the derived
@@ -190,6 +190,13 @@ jobs:
             git diff
             exit 1
           fi
+      # Cross-repo: verify the vendored shared agent-harness (scripts/hooks/*, see
+      # scripts/sync-harness.py's MANIFEST) matches the shared harness repo. This
+      # no-ops (exit 0) until the shared repo is adopted. To activate it: check the
+      # shared repo out in a prior step (e.g. actions/checkout with `repository:` +
+      # `path: .agent-harness-src`) and set AGENT_HARNESS_DIR to that path.
+      - name: Vendored agent-harness in sync
+        run: python scripts/sync-harness.py --check
 
   frontend:
     name: Frontend unit tests

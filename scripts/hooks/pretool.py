@@ -3,7 +3,7 @@
 
 Order of operations:
   1. Enforce audit-design-flaws Step 2.5 batch caps (may block with exit 42).
-  2. When the test-skill marker is active, write its frontmatter-hook artifact.
+  2. When the test-skill marker is active, write its workspace-hook artifact.
 
 Marker selection is exposed as a pure function (`select_marker_scripts`) for unit
 testing; see `scripts/hooks/tests/test_pretool.py`.
@@ -33,7 +33,13 @@ def main() -> int:
 
     # 1. Batch caps run before anything else and can block the tool call.
     if ENFORCE_CAPS.exists():
-        result = subprocess.run([sys.executable, str(ENFORCE_CAPS)], input=raw, text=True)
+        result = subprocess.run(
+            [sys.executable, str(ENFORCE_CAPS)],
+            input=raw,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+        )
         if result.returncode != 0:
             return result.returncode
 

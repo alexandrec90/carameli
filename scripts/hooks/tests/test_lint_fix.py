@@ -2,6 +2,7 @@
 
 import json
 import subprocess
+from pathlib import Path
 
 from conftest import load_module
 
@@ -61,6 +62,41 @@ def test_extract_path_non_dict_tool_input():
     assert lint_fix.extract_path({"tool_name": "Edit", "tool_input": "nope"}) is None
 
 
+def test_extract_paths_from_codex_apply_patch_payload():
+    patch = """*** Begin Patch
+*** Update File: scripts/a.py
+@@
+*** Add File: scripts/b.py
++x = 1
+*** Delete File: README.md
+*** End Patch
+"""
+    payload = {"tool_name": "apply_patch", "tool_input": {"input": patch}}
+    assert lint_fix.extract_paths(payload) == [
+        "scripts/a.py",
+        "scripts/b.py",
+        "README.md",
+    ]
+
+
+def test_extract_paths_from_codex_freeform_tool_input():
+    patch = "*** Begin Patch\n*** Update File: scripts/a.py\n*** End Patch\n"
+    payload = {"tool_name": "apply_patch", "tool_input": patch}
+    assert lint_fix.extract_paths(payload) == ["scripts/a.py"]
+
+
+def test_extract_paths_from_live_codex_command_payload():
+    patch = "*** Begin Patch\n*** Update File: C:\\repo\\scripts\\a.py\n@@\n+x=1\n*** End Patch\n"
+    payload = {"tool_name": "apply_patch", "tool_input": {"command": patch}}
+    assert lint_fix.extract_paths(payload) == [r"C:\repo\scripts\a.py"]
+
+
+def test_extract_paths_deduplicates_patch_targets():
+    patch = "*** Update File: app/main.py\n*** Update File: app/main.py\n"
+    payload = {"tool_name": "apply_patch", "tool_input": {"input": patch}}
+    assert lint_fix.extract_paths(payload) == ["app/main.py"]
+
+
 # ---- is_lintable -----------------------------------------------------------
 
 
@@ -98,6 +134,11 @@ def _payload(path: str) -> str:
     # raw makes \U/\A/\T invalid JSON escapes, so parse_hook_input returns None and
     # main() returns 0 before reaching the branch under test.
     return json.dumps({"tool_name": "Edit", "tool_input": {"file_path": path}})
+
+
+def _patch_payload(*paths: str) -> str:
+    patch = "\n".join(f"*** Update File: {path}" for path in paths)
+    return json.dumps({"tool_name": "apply_patch", "tool_input": {"input": patch}})
 
 
 def test_payload_survives_windows_paths():
@@ -164,3 +205,51 @@ def test_main_missing_file_returns_zero(monkeypatch, tmp_path):
     monkeypatch.setattr(lint_fix, "_read_stdin", lambda: _payload(str(missing)))
     monkeypatch.setattr(lint_fix, "find_ruff", lambda root: "ruff")
     assert lint_fix.main() == 0
+
+
+def test_main_lints_every_python_file_in_codex_patch(monkeypatch, tmp_path):
+    first = tmp_path / "a.py"
+    second = tmp_path / "b.py"
+    first.write_text("x = 1\n")
+    second.write_text("y = 2\n")
+    monkeypatch.setattr(
+        lint_fix,
+        "_read_stdin",
+        lambda: _patch_payload(str(first), str(second), "README.md"),
+    )
+    monkeypatch.setattr(lint_fix, "find_ruff", lambda root: "ruff")
+    calls = []
+    monkeypatch.setattr(
+        lint_fix,
+        "_run",
+        lambda ruff, *args: calls.append(args) or result(returncode=0),
+    )
+
+    assert lint_fix.main() == 0
+    assert ("format", str(first)) in calls
+    assert ("format", str(second)) in calls
+    assert not any("README.md" in call for args in calls for call in args)
+
+
+# ---- ruff_arg: repo-relative POSIX so per-file-ignores globs match ----------
+
+
+def test_ruff_arg_repo_relative_posix_inside_project():
+    target = lint_fix.REPO_ROOT / "scripts" / "hooks" / "stop.py"
+    assert lint_fix.ruff_arg(target, lint_fix.REPO_ROOT) == "scripts/hooks/stop.py"
+
+
+def test_ruff_arg_relativises_despite_lowercase_drive():
+    # Regression: Claude Code's payload sends a lowercase-drive absolute path
+    # (`c:\...`) while the hook runs with an uppercase-drive cwd. Passing that
+    # straight to ruff defeated per-file-ignores; ruff_arg must still relativise
+    # it (resolve() canonicalises the drive case) to the same repo-relative path.
+    root = lint_fix.REPO_ROOT
+    lower_drive_root = Path(str(root)[:1].lower() + str(root)[1:])
+    target = lower_drive_root / "scripts" / "hooks" / "stop.py"
+    assert lint_fix.ruff_arg(target, root) == "scripts/hooks/stop.py"
+
+
+def test_ruff_arg_absolute_when_outside_project(tmp_path):
+    outside = tmp_path / "x.py"
+    assert lint_fix.ruff_arg(outside, lint_fix.REPO_ROOT) == str(outside)

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""test-skill helper: writes marker artifacts proving a hook/bang path ran.
+"""test-skill helper: writes marker artifacts proving a workspace hook ran.
 
-Used by the test-skill harness to confirm that frontmatter hooks and bang
-commands fire. Pure `write_artifacts` is unit-tested via
+Used by the test-skill harness to confirm that lifecycle hooks fire. Pure
+helpers are unit-tested via
 `scripts/hooks/tests/test_write_artifacts.py`.
 """
 
@@ -14,6 +14,11 @@ from pathlib import Path
 REPO_ROOT = (Path(__file__).parent / "../../..").resolve()
 
 
+def utc_timestamp() -> str:
+    """Return the current UTC time in the skill's required ISO ``Z`` form."""
+    return datetime.now(UTC).isoformat().replace("+00:00", "Z")
+
+
 def write_artifacts(mode: str, repo_root: Path, timestamp: str) -> list[Path]:
     """Write the artifacts for `mode` ('hook' or 'bang'). Returns written paths."""
     log_dir = repo_root / "logs/agent"
@@ -21,7 +26,7 @@ def write_artifacts(mode: str, repo_root: Path, timestamp: str) -> list[Path]:
 
     if mode == "hook":
         target = log_dir / "test-skill-hook.txt"
-        target.write_text(f"hello from frontmatter hook at {timestamp}")
+        target.write_text(f"hello from workspace hook at {timestamp}")
         return [target]
 
     bang = log_dir / "test-skill-bang.txt"
@@ -36,7 +41,7 @@ def main() -> int:
     parser.add_argument("--mode", required=True, choices=("hook", "bang"))
     args = parser.parse_args()
 
-    written = write_artifacts(args.mode, REPO_ROOT, datetime.now(UTC).isoformat())
+    written = write_artifacts(args.mode, REPO_ROOT, utc_timestamp())
     if args.mode == "bang":
         for _path in written:
             pass
