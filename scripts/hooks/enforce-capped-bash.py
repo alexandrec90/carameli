@@ -12,6 +12,12 @@ import sys
 
 DEFAULT_MAX_BYTES = 4000
 
+# Claude Code hook contract: 0 allows the call, 2 blocks it and feeds stderr back
+# to the model. Every other non-zero code is reported as a non-blocking hook
+# *error* and the tool call proceeds anyway -- so a blocking hook MUST use 2 and
+# MUST write its reason to stderr. See scripts/hooks/tests/test_hook_exit_contract.py.
+EXIT_BLOCK = 2
+
 ALLOWED_PATTERNS = [
     r"scripts/hooks/invoke-capped\.py",
     r"\|\s*head\s*-c\s*\d+",
@@ -48,7 +54,7 @@ def is_capped(command: str) -> bool:
 def decide(raw: str) -> tuple[int, str]:
     """Pure decision: map raw stdin payload to (exit_code, message).
 
-    exit_code 0 allows the call, 42 blocks it. message may be empty.
+    exit_code 0 allows the call, EXIT_BLOCK blocks it. message may be empty.
     """
     if not raw.strip():
         return 0, ""
@@ -67,20 +73,21 @@ def decide(raw: str) -> tuple[int, str]:
     )
     if not command or not command.strip():
         return (
-            42,
+            EXIT_BLOCK,
             "enforce-capped-bash: Bash tool call is missing command text; blocking by policy.",
         )
 
     if is_capped(command):
         return 0, ""
 
-    return 42, BLOCK_MESSAGE
+    return EXIT_BLOCK, BLOCK_MESSAGE
 
 
 def main() -> int:
     exit_code, message = decide(sys.stdin.read())
     if message:
-        print(message)
+        # stderr, not stdout: only stderr is surfaced for a blocking hook.
+        print(message, file=sys.stderr)
     return exit_code
 
 

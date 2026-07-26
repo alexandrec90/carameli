@@ -2,7 +2,10 @@
 """PreToolUse dispatcher (portable replacement for copilot-settings-pretool.ps1).
 
 Order of operations:
-  1. Enforce audit-design-flaws Step 2.5 batch caps (may block with exit 42).
+  1. Enforce audit-design-flaws Step 2.5 batch caps (may block with exit 2).
+
+The child's exit code is propagated verbatim, so it must already speak the
+Claude Code hook contract (0 allow / 2 block, reason on stderr).
   2. When the test-skill marker is active, write its workspace-hook artifact.
 
 Marker selection is exposed as a pure function (`select_marker_scripts`) for unit
