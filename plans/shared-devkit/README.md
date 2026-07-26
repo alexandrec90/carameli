@@ -103,7 +103,7 @@ What it already provides, which the remaining channels inherit rather than rebui
 | --- | --- |
 | `sync-harness.py` (`--check/--pull/--push/--list`) | Working, unit-tested |
 | `harness_config.py` + `.agent-harness.toml` seam | Working, unit-tested (`test_harness_config.py`) |
-| 17-file `MANIFEST`, byte-verified against Carameli | In sync as of devkit `d08f2de` (= `v0.1.0`) |
+| 17-file `MANIFEST`, byte-verified against Carameli | In sync as of devkit `67e6863` (= `v0.2.0`) |
 | Isolated CI (ruff + 151 stdlib-only hook tests) | Green |
 
 Its limitation is **scope, not design**: it shares 17 files. Carameli has 43 skills,
