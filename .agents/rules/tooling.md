@@ -38,12 +38,33 @@ manifest falls back to neutral defaults).
   project-specific behaviour gets a manifest field + a `harness_config` default, not an
   `if project == …` branch.
 - **The shared harness repo is the source of truth; each project commits a vendored
-  copy.** `scripts/sync-harness.py` manages it: `--check` (drift-fails, wired into the
+  copy.** It is [`alexandrec90/devkit`](https://github.com/alexandrec90/devkit) — renamed
+  from `agent-harness` on 2026-07-25. The **internal** names still use the old spelling on
+  purpose (`.agent-harness.toml`, `$AGENT_HARNESS_DIR`, `HARNESS_VERSION`,
+  `sync-harness.py`): `sync-harness.py` is itself in the `MANIFEST`, so renaming it changes
+  the very path list the drift check compares by, and that has to happen atomically across
+  every consuming repo. Use the old names until that migration lands.
+  `scripts/sync-harness.py` manages the copy: `--check` (drift-fails, wired into the
   PR-gate `mirror-sync` job), `--pull` (adopt upstream), `--push` (author a change / seed
-  the shared repo). The shared-repo path comes from `--src` or `$AGENT_HARNESS_DIR`; every
-  mode **no-ops cleanly when unset**, so CI is green before the shared repo is adopted.
+  the shared repo). The shared-repo path comes from `--src` or `$AGENT_HARNESS_DIR`.
+  `HARNESS_VERSION` records which upstream commit the vendored copy corresponds to; it is
+  written by `--pull` and must match the tag `pr-gate.yml` pins.
   The vendored file set is `sync-harness.py`'s `MANIFEST` — extend it as more scripts are
   decoupled; `.agent-harness.toml` is deliberately **not** in it (it is per-project config).
+- **Every mode no-ops clean (exit 0) when `$AGENT_HARNESS_DIR` is unset.** That is correct
+  pre-adoption behaviour and a trap afterwards: the PR gate called `--check` for months
+  without setting the variable, so it passed green while checking nothing, and was hiding
+  real drift. The gate now checks the harness out itself (public repo, pinned tag) and sets
+  the variable. **If you ever see `--check` print "nothing to do (skipping)" in CI, the
+  gate is inert — fix the wiring, don't ignore the line.**
+- **When authoring a harness change, pick a direction deliberately.** `--push` if this
+  project authored it (e.g. Carameli's `# pragma: allowlist secret` comments, which exist
+  because this repo runs detect-secrets and the harness does not — harmless upstream,
+  required here). `--pull` to adopt upstream. Never hand-edit one side to match the other:
+  that resolves the symptom and loses the provenance.
+- **The harness checkout must come *after* any `git status --porcelain` step** in the same
+  job. It lands an untracked `.agent-harness-src/` in the workspace, which the `mirror-sync`
+  drift check would otherwise report as stale mirrors.
 - This is the same single-source→committed-mirror pattern as `.claude/` →
   `.agents/`/`.codex/`, lifted from intra-repo to cross-repo.
 
@@ -54,6 +75,7 @@ manifest falls back to neutral defaults).
 - Set `"close": false` in `presentation` so the terminal stays open for review.
 - **Wrap with `notify-wrap.py` for Windows toast notifications** — never call
   `notify.py` from inside a script. Notifications are a task-layer concern only:
+
   ```jsonc
   { "command": "python", "args": ["scripts/notify-wrap.py", "Task Name", "--", "python", "scripts/your-script.py"] }
   ```

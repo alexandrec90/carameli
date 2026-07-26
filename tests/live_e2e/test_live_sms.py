@@ -2,7 +2,7 @@
 
 One real SMS from DID A to DID B exercises *both* directions: it is A's outbound and
 B's inbound. We never send twice. See ``helpers.py`` for the env contract and
-``docs/diagnostics-error-map.md`` for how to run and what it costs.
+``docs/operations/diagnostics-error-map.md`` for how to run and what it costs.
 
 The airtight assertion is the notify log line: with the honest receiver (phase 02) a
 logged "notify POST ok" means VanillaSoft *durably processed* the event — that's the

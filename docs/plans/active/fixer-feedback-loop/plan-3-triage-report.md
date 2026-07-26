@@ -1,7 +1,7 @@
 # Plan 3 — Fixer triage report skill
 
 **Depends on:** Plan 1 (merged). **Parallel with:** Plan 2. **Feeds:** Plan 4.
-**Read first:** `plans/fixer-feedback-loop/README.md` (data contract).
+**Read first:** `docs/plans/active/fixer-feedback-loop/README.md` (data contract).
 
 ## Goal
 

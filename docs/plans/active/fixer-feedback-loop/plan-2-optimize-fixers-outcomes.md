@@ -1,7 +1,7 @@
 # Plan 2 — optimize-fixers consumes outcome data
 
 **Depends on:** Plan 1 (merged). **Parallel with:** Plan 3.
-**Read first:** `plans/fixer-feedback-loop/README.md` (data contract).
+**Read first:** `docs/plans/active/fixer-feedback-loop/README.md` (data contract).
 
 ## Goal
 

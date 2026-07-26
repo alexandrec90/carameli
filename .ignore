@@ -2,5 +2,6 @@
 # Leading / anchors to workspace root — avoids shadowing same-named dirs deeper in the tree
 
 /charts/
-/docs/
+/artifacts/
+/.local/
 /skins/

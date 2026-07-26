@@ -208,7 +208,7 @@ def t_markdownlint(changed: list[str] | None = None) -> dict:
     if changed is not None and not _sel(changed, _is_md):
         return {"markdownlint": ([], 0)}
     return {
-        # Captured agent transcripts (e.g. "docs/failed fix-all transcript.md")
+        # Captured agent transcripts (e.g. "artifacts/transcripts/fixer-run-transcript.md")
         # are raw tool output, not prose -- they legitimately carry inline HTML
         # and fenced code, generating hundreds of unfixable findings that bury
         # real markdown errors. Exclude any *transcript*.md from the lint.

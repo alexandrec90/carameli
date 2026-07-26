@@ -1,0 +1,11 @@
+{
+  "manifest_version": 3,
+  "name": "Cloudli Mapper Pro",
+  "version": "2.1",
+  "permissions": ["activeTab", "scripting", "storage", "tabs", "downloads"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": { "default_popup": "popup.html" },
+  "host_permissions": ["https://connect.cloudli.com/*"]
+}

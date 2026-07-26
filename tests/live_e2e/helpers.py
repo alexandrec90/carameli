@@ -11,7 +11,7 @@ reading, ``E2EConfig.from_env``, ``live_e2e_skip_reason``) is unit-tested in
 ``tests/unit/test_e2e_helpers.py`` so this phase carries same-commit coverage even
 when nobody runs the (money-costing) live suite.
 
-Environment contract (see also ``.env.example`` and ``docs/diagnostics-error-map.md``):
+Environment contract (see also ``.env.example`` and ``docs/operations/diagnostics-error-map.md``):
 
 | Var                      | Meaning                                                       |
 | ------------------------ | ------------------------------------------------------------ |

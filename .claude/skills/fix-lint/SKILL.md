@@ -42,7 +42,8 @@ to regenerate the log.
 
 **Noise gate (mandatory — the inverse).** A section must hold *only* errors worth fixing. If one
 tool's section is flooded by a single file that shouldn't be linted at all — e.g. hundreds of
-markdownlint errors from a captured transcript/doc under `docs/` — that noise buries real source
+markdownlint errors from a captured transcript under `artifacts/transcripts/` — that noise
+buries real source
 errors in the sections below it. Don't start fixing the flood. **Narrow** the runner's target in
 the script named on the `# source:` header (e.g. add the offending path to markdownlint's
 `--ignore` set in `scripts/lint-all.py`, or exclude it in `.markdownlint.json`), or **tighten**

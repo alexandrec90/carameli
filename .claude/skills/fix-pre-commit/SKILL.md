@@ -51,7 +51,7 @@ After parsing, check the triage list for these signals of incomplete diagnostics
 | A hook listed as `Failed` has no error lines in the triage list (empty block) | The hook's output wasn't captured — root cause is invisible |
 | Error lines from `ruff`, `bandit`, `mypy`, or `eslint` lack a `file:line` reference | Not self-locating — the agent cannot find the source file |
 | Lines under a `Failed` hook are only `Fixing <file>` reformatter output | Auto-fixed by the hook — should be classified as resolved, not failed |
-| A hook's block is flooded by one non-source file (e.g. a captured transcript/doc under `docs/`) burying real errors | Noise — that file shouldn't be linted; the actionable errors are unfindable |
+| A hook's block is flooded by one non-source file (e.g. a captured transcript under `artifacts/transcripts/`) burying real errors | Noise — that file shouldn't be linted; the actionable errors are unfindable |
 
 If **any** quality problem is found (missing detail **or** noise):
 

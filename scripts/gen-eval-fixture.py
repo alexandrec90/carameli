@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Scaffold a promptfoo eval task from a real `error -> fix commit -> outcome` triple.
 
-Plan 4 of the fixer feedback loop (see `plans/fixer-feedback-loop/`). Given a
+Plan 4 of the fixer feedback loop (see `docs/plans/active/fixer-feedback-loop/`). Given a
 triage-flagged error signature, its owning `fix-*` skill, and the `last_commit`
 SHA of the fix attempt, this turns the *pre-fix* (broken) state of the changed
 source file into a committed-style destructive eval task under `evals/tasks/`,
