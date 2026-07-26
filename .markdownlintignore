@@ -1,3 +1,8 @@
 **/node_modules/**
 **/.git/**
 **/.venv/**
+# Local/generated material (see .gitignore). Captured agent-session dumps live in
+# artifacts/transcripts/ -- raw tool output, not prose, so they emit hundreds of
+# unfixable findings that bury real errors. Ignore the tree rather than relying on
+# the "*transcript*.md" filename glob in scripts/lint-all.py, which a rename breaks.
+artifacts/**
