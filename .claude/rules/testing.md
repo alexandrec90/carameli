@@ -16,14 +16,14 @@ The fixture wraps each test in a PostgreSQL transaction and rolls it back
 unconditionally on teardown:
 
 ```python
-await conn.begin()                         # outer transaction — never committed
+await conn.begin()  # outer transaction — never committed
 async_sessionmaker(
     bind=conn,
     expire_on_commit=False,
     join_transaction_mode="create_savepoint",  # REQUIRED — see below
 )
 # ... yield session ...
-await conn.rollback()                      # undo everything the test wrote
+await conn.rollback()  # undo everything the test wrote
 ```
 
 `join_transaction_mode="create_savepoint"` is **mandatory**. Without it,
@@ -118,5 +118,5 @@ settings.log_level = "DEBUG"
 try:
     ...
 finally:
-  settings.log_level = orig
+    settings.log_level = orig
 ```

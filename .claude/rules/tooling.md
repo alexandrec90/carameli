@@ -119,6 +119,15 @@ locally. Use it as a pre-flight, not a remote oracle:
   SessionStart hook (`.claude/hooks/session-start.sh`) provisions the toolchain so
   this works in a fresh web sandbox — if a tool is missing, fix the hook, don't skip
   the check.
+- **A full run auto-fixes on disk, so expect a dirty tree afterwards.** `ruff`,
+  `eslint`, `stylelint`, and `markdownlint` all run with `--fix` before the reporting
+  pass (see `.claude/rules/diagnostics.md`, "Auto-fix before reporting"), so `git status`
+  after a full run shows real edits, not noise. **`ruff format` also formats Python code
+  blocks inside Markdown** (ruff ≥ 0.16), which means instruction files, `SKILL.md`s, and
+  plan docs get reformatted too — the first full run after a ruff bump can touch dozens of
+  `.md` files that no one edited. Review and commit those; don't revert them and don't
+  assume the tree was already clean. `--changed` scopes the fixers to the working-tree
+  diff and is the safer pre-flight mid-task.
 - **When a gate job fails, read the filtered artifact, not the raw job log.** The
   `lint` and test jobs upload `logs/lint-errors.log` / `logs/test-failures.log` —
   pre-filtered to actionable lines (see `.claude/rules/diagnostics.md`). A raw CI job

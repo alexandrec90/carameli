@@ -136,32 +136,41 @@ async def test_shutdown_no_engine_does_not_raise():
 from __future__ import annotations
 import pytest
 from unittest.mock import patch
+
 pytestmark = pytest.mark.asyncio(loop_scope="session")
+
 
 def test_get_carrier_provider_telnyx():
     from app.services.providers.factory import get_carrier_provider
     from app.services.providers.carrier.telnyx import TelnyxCarrier
+
     provider = get_carrier_provider()
     assert isinstance(provider, TelnyxCarrier)
+
 
 def test_get_carrier_provider_unknown_raises():
     from app.services.providers.factory import get_carrier_provider
     from app.core.config import settings
+
     original = settings.carrier_provider
     settings.carrier_provider = "nonexistent"
     with pytest.raises(ValueError, match="nonexistent"):
         get_carrier_provider()
     settings.carrier_provider = original
 
+
 def test_get_call_engine_provider_jambonz():
     from app.services.providers.factory import get_call_engine_provider
     from app.services.providers.engine.jambonz import JambonzEngine
+
     provider = get_call_engine_provider()
     assert isinstance(provider, JambonzEngine)
+
 
 def test_get_call_engine_provider_unknown_raises():
     from app.services.providers.factory import get_call_engine_provider
     from app.core.config import settings
+
     original = settings.call_engine_provider
     settings.call_engine_provider = "nonexistent"
     with pytest.raises(ValueError, match="nonexistent"):
@@ -177,9 +186,11 @@ Endpoint: `POST /vg/1.0.0/frontend-logs` — returns 204, requires auth.
 from __future__ import annotations
 import pytest
 from tests.conftest import AUTH_HEADERS
+
 pytestmark = pytest.mark.asyncio(loop_scope="session")
 
 _URL = "/vg/1.0.0/frontend-logs"
+
 
 async def test_ingest_logs_returns_204(client):
     resp = await client.post(
@@ -189,6 +200,7 @@ async def test_ingest_logs_returns_204(client):
     )
     assert resp.status_code == 204
 
+
 async def test_ingest_logs_requires_auth(client):
     resp = await client.post(
         _URL,
@@ -196,9 +208,11 @@ async def test_ingest_logs_requires_auth(client):
     )
     assert resp.status_code == 401
 
+
 async def test_ingest_empty_batch(client):
     resp = await client.post(_URL, json={"entries": []}, headers=AUTH_HEADERS)
     assert resp.status_code == 204
+
 
 @pytest.mark.parametrize("level", ["debug", "info", "warn", "warning", "error", "UNKNOWN"])
 async def test_ingest_all_levels(client, level):
@@ -208,6 +222,7 @@ async def test_ingest_all_levels(client, level):
         headers=AUTH_HEADERS,
     )
     assert resp.status_code == 204
+
 
 async def test_ingest_with_context(client):
     resp = await client.post(
@@ -227,26 +242,33 @@ Do **not** mutate the global `settings` object — instantiate a fresh `Settings
 from __future__ import annotations
 import pytest
 from app.core.config import Settings
+
 pytestmark = pytest.mark.asyncio(loop_scope="session")
+
 
 def _make(cors_origins_str: str) -> list[str]:
     s = Settings.model_construct()
     return Settings.parse_cors_origins(cors_origins_str)
 
+
 def test_comma_separated():
     result = Settings.parse_cors_origins("http://a.com, http://b.com")
     assert result == ["http://a.com", "http://b.com"]
+
 
 def test_json_array_string():
     result = Settings.parse_cors_origins('["http://a.com","http://b.com"]')
     assert result == ["http://a.com", "http://b.com"]
 
+
 def test_empty_string_returns_empty_list():
     assert Settings.parse_cors_origins("") == []
+
 
 def test_whitespace_only_items_stripped():
     result = Settings.parse_cors_origins("http://a.com,  ,http://b.com")
     assert result == ["http://a.com", "http://b.com"]
+
 
 def test_list_passthrough():
     result = Settings.parse_cors_origins(["http://a.com", " http://b.com "])
@@ -265,17 +287,23 @@ Read `test_health.py`. Add:
 ```python
 from sqlalchemy.exc import DataError
 
+
 async def test_data_error_returns_422(client):
     # Trigger a DataError by sending a string where an integer is required
     # Pick any endpoint that has an integer path param (e.g. GET /vsapi/1.0.0/VsCustomer/Get/not-an-int)
     # The DataError handler in main.py should convert this to 422
     resp = await client.get("/vsapi/1.0.0/VsCustomer/Get/not-an-int", headers=AUTH_HEADERS)
-    assert resp.status_code in (404, 422)  # 422 if DataError path triggers, 404 if FastAPI rejects first
+    assert resp.status_code in (
+        404,
+        422,
+    )  # 422 if DataError path triggers, 404 if FastAPI rejects first
+
 
 async def test_unhandled_exception_returns_500_without_leaking_details(client):
     # Patch a service to raise RuntimeError, verify the response body has no traceback
     from unittest.mock import patch, AsyncMock
     from app.services import customer_service
+
     with patch.object(customer_service, "get_by_id", AsyncMock(side_effect=RuntimeError("secret"))):
         resp = await client.get("/vsapi/1.0.0/VsCustomer/Get/999", headers=AUTH_HEADERS)
     assert resp.status_code == 500
@@ -313,6 +341,7 @@ Add a shared helper at the top of the security section:
 import hashlib
 import hmac as _stdlib_hmac
 
+
 def _jambonz_sig(body: bytes, secret: str) -> str:
     return _stdlib_hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
 ```
@@ -335,6 +364,7 @@ async def test_jambonz_valid_signature_accepted(client):
     settings.jambonz_webhook_secret = orig
     assert resp.status_code == 200
 
+
 # 2. Invalid signature rejected (already partially covered — make explicit)
 async def test_jambonz_invalid_signature_returns_403(client):
     settings.jambonz_webhook_secret = "real-secret"  # pragma: allowlist secret
@@ -346,6 +376,7 @@ async def test_jambonz_invalid_signature_returns_403(client):
     )
     settings.jambonz_webhook_secret = ""
     assert resp.status_code == 403
+
 
 # 3. Tampered payload: sign the original, modify the body
 async def test_jambonz_tampered_payload_returns_403(client):
@@ -362,6 +393,7 @@ async def test_jambonz_tampered_payload_returns_403(client):
     settings.jambonz_webhook_secret = ""
     assert resp.status_code == 403
 
+
 # 4. Empty signature header with secret configured
 async def test_jambonz_empty_signature_returns_403(client):
     settings.jambonz_webhook_secret = "nonempty"  # pragma: allowlist secret
@@ -373,6 +405,7 @@ async def test_jambonz_empty_signature_returns_403(client):
     )
     settings.jambonz_webhook_secret = ""
     assert resp.status_code == 403
+
 
 # 5. No secret configured → signature not validated (dev mode)
 async def test_jambonz_no_secret_configured_skips_validation(client):
@@ -398,11 +431,13 @@ import base64
 import time
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
+
 def _make_telnyx_keypair():
     priv = Ed25519PrivateKey.generate()
     pub_bytes = priv.public_key().public_bytes_raw()
     pub_b64 = base64.b64encode(pub_bytes).decode()
     return priv, pub_b64
+
 
 def _telnyx_sign(priv: Ed25519PrivateKey, body: bytes, ts: str) -> str:
     signed_payload = f"{ts}|".encode() + body
@@ -422,12 +457,15 @@ async def test_telnyx_valid_signature_accepted(client):
     resp = await client.post(
         "/webhooks/telnyx/sms-inbound",
         content=body,
-        headers={"Content-Type": "application/json",
-                 "telnyx-signature-ed25519": sig,
-                 "telnyx-timestamp": ts},
+        headers={
+            "Content-Type": "application/json",
+            "telnyx-signature-ed25519": sig,
+            "telnyx-timestamp": ts,
+        },
     )
     settings.telnyx_webhook_secret = ""
     assert resp.status_code == 204
+
 
 # 2. Invalid signature rejected
 async def test_telnyx_invalid_signature_returns_403(client):
@@ -438,12 +476,15 @@ async def test_telnyx_invalid_signature_returns_403(client):
     resp = await client.post(
         "/webhooks/telnyx/sms-inbound",
         content=body,
-        headers={"Content-Type": "application/json",
-                 "telnyx-signature-ed25519": base64.b64encode(b"badsig").decode(),
-                 "telnyx-timestamp": ts},
+        headers={
+            "Content-Type": "application/json",
+            "telnyx-signature-ed25519": base64.b64encode(b"badsig").decode(),
+            "telnyx-timestamp": ts,
+        },
     )
     settings.telnyx_webhook_secret = ""
     assert resp.status_code == 403
+
 
 # 3. Stale timestamp (> 300 s old) rejected
 async def test_telnyx_stale_timestamp_returns_403(client):
@@ -455,12 +496,15 @@ async def test_telnyx_stale_timestamp_returns_403(client):
     resp = await client.post(
         "/webhooks/telnyx/sms-inbound",
         content=body,
-        headers={"Content-Type": "application/json",
-                 "telnyx-signature-ed25519": sig,
-                 "telnyx-timestamp": ts},
+        headers={
+            "Content-Type": "application/json",
+            "telnyx-signature-ed25519": sig,
+            "telnyx-timestamp": ts,
+        },
     )
     settings.telnyx_webhook_secret = ""
     assert resp.status_code == 403
+
 
 # 4. Missing timestamp header
 async def test_telnyx_missing_timestamp_returns_403(client):
@@ -474,6 +518,7 @@ async def test_telnyx_missing_timestamp_returns_403(client):
     settings.telnyx_webhook_secret = ""
     assert resp.status_code == 403
 
+
 # 5. Tampered payload with valid signature for original body
 async def test_telnyx_tampered_payload_returns_403(client):
     priv, pub_b64 = _make_telnyx_keypair()
@@ -485,12 +530,15 @@ async def test_telnyx_tampered_payload_returns_403(client):
     resp = await client.post(
         "/webhooks/telnyx/sms-inbound",
         content=tampered,
-        headers={"Content-Type": "application/json",
-                 "telnyx-signature-ed25519": sig,
-                 "telnyx-timestamp": ts},
+        headers={
+            "Content-Type": "application/json",
+            "telnyx-signature-ed25519": sig,
+            "telnyx-timestamp": ts,
+        },
     )
     settings.telnyx_webhook_secret = ""
     assert resp.status_code == 403
+
 
 # 6. No secret configured → signature check skipped
 async def test_telnyx_no_secret_configured_skips_validation(client):
@@ -516,17 +564,21 @@ Tests for `app/core/session.py` — `sign_token` / `verify_signed_token`:
 ```python
 from app.core.session import sign_token, verify_signed_token, COOKIE_NAME
 
+
 def test_sign_and_verify_roundtrip():
     signed = sign_token("my-token")
     assert verify_signed_token(signed) == "my-token"
+
 
 def test_tampered_signature_returns_none():
     signed = sign_token("my-token")
     tampered = signed[:-3] + "xxx"
     assert verify_signed_token(tampered) is None
 
+
 def test_missing_dot_returns_none():
     assert verify_signed_token("nodot") is None
+
 
 def test_empty_string_returns_none():
     assert verify_signed_token("") is None
@@ -544,12 +596,14 @@ async def test_create_session_sets_cookie(client):
     assert resp.json() == {"ok": True}
     assert "carameli_session" in resp.cookies
 
+
 # DELETE /auth/session → clears cookie
 async def test_destroy_session_clears_cookie(client):
     await client.post("/auth/session")  # set it first
     resp = await client.delete("/auth/session")
     assert resp.status_code == 200
     assert resp.json() == {"ok": True}
+
 
 # GET /auth/me with valid Bearer token → returns auth context
 async def test_me_with_bearer_returns_context(client):
@@ -559,21 +613,25 @@ async def test_me_with_bearer_returns_context(client):
     assert data["authenticated"] is True
     assert data["is_admin"] is True
 
+
 # GET /auth/me with valid session cookie → returns auth context
 async def test_me_with_session_cookie_returns_context(client):
     await client.post("/auth/session")
     resp = await client.get("/auth/me")  # cookie is auto-sent by httpx
     assert resp.status_code == 200
 
+
 # GET /auth/me with no credentials → 401
 async def test_me_unauthenticated_returns_401(client):
     resp = await client.get("/auth/me")
     assert resp.status_code == 401
 
+
 # GET /auth/me with wrong API key → 401
 async def test_me_wrong_api_key_returns_401(client):
     resp = await client.get("/auth/me", headers={"Authorization": "Bearer wrong"})
     assert resp.status_code == 401
+
 
 # GET /auth/me with tampered cookie → 401
 async def test_me_tampered_cookie_returns_401(client):
@@ -599,11 +657,13 @@ async def _create_customer_with_key(client, vs_id: int, api_key: str) -> dict:
     assert resp.status_code == 201
     return resp.json()
 
+
 # Phone line: customer B cannot read customer A's phone lines
 async def test_phoneline_cross_customer_denied(client):
     await _create_customer_with_key(client, 9001, "key-9001")
     await _create_customer_with_key(client, 9002, "key-9002")
     from app.main import app
+
     app.state.carrier.search_numbers = AsyncMock(return_value=[{"phone_number": "+19001550000"}])
     app.state.carrier.provision_number = AsyncMock(
         return_value={"sid": "PNiso001", "phone_number": "+19001550000"}
@@ -619,6 +679,7 @@ async def test_phoneline_cross_customer_denied(client):
         headers={"Authorization": "Bearer key-9002"},
     )
     assert resp.status_code == 403
+
 
 # Repeat the same pattern for extensions and SMS
 # (one test per resource type is sufficient for isolation confidence)
@@ -668,10 +729,15 @@ import asyncio
 from unittest.mock import AsyncMock
 from tests.conftest import AUTH_HEADERS
 
+
 # 1. Duplicate webhook: same call_sid delivered twice concurrently → exactly one DB row
 async def test_concurrent_duplicate_webhook_creates_one_row(client, db_session):
-    payload = {"call_sid": "CAconc001", "call_status": "completed",
-               "from": "+14155550000", "to": "+14155550001"}
+    payload = {
+        "call_sid": "CAconc001",
+        "call_status": "completed",
+        "from": "+14155550000",
+        "to": "+14155550001",
+    }
     results = await asyncio.gather(
         client.post("/webhooks/jambonz/call-status", json=payload),
         client.post("/webhooks/jambonz/call-status", json=payload),
@@ -679,44 +745,68 @@ async def test_concurrent_duplicate_webhook_creates_one_row(client, db_session):
     assert all(r.status_code == 200 for r in results)
     from sqlalchemy import select
     from app.models.call_event import CallEvent
-    rows = (await db_session.execute(
-        select(CallEvent).where(CallEvent.call_sid == "CAconc001")
-    )).scalars().all()
+
+    rows = (
+        (await db_session.execute(select(CallEvent).where(CallEvent.call_sid == "CAconc001")))
+        .scalars()
+        .all()
+    )
     assert len(rows) == 1
+
 
 # 2. Concurrent phone line add: two simultaneous requests for different area codes
 # for the same customer → both succeed, two distinct phone line rows
 async def test_concurrent_phone_line_add(client, db_session):
     from app.main import app
+
     # Create customer first (serial)
-    await client.post("/vsapi/1.0.0/VsCustomer/Create",
-                      json={"vs_customer_id": 8001, "api_key": "key-8001"},
-                      headers=AUTH_HEADERS)
-    app.state.carrier.search_numbers = AsyncMock(side_effect=[
-        [{"phone_number": "+18001550001"}],
-        [{"phone_number": "+18001550002"}],
-    ])
-    app.state.carrier.provision_number = AsyncMock(side_effect=[
-        {"sid": "PNconc001", "phone_number": "+18001550001"},
-        {"sid": "PNconc002", "phone_number": "+18001550002"},
-    ])
+    await client.post(
+        "/vsapi/1.0.0/VsCustomer/Create",
+        json={"vs_customer_id": 8001, "api_key": "key-8001"},
+        headers=AUTH_HEADERS,
+    )
+    app.state.carrier.search_numbers = AsyncMock(
+        side_effect=[
+            [{"phone_number": "+18001550001"}],
+            [{"phone_number": "+18001550002"}],
+        ]
+    )
+    app.state.carrier.provision_number = AsyncMock(
+        side_effect=[
+            {"sid": "PNconc001", "phone_number": "+18001550001"},
+            {"sid": "PNconc002", "phone_number": "+18001550002"},
+        ]
+    )
     results = await asyncio.gather(
-        client.post("/vsapi/1.0.0/PhoneLine/Add",
-                    json={"vs_customer_id": 8001, "area_code": "800"}, headers=AUTH_HEADERS),
-        client.post("/vsapi/1.0.0/PhoneLine/Add",
-                    json={"vs_customer_id": 8001, "area_code": "800"}, headers=AUTH_HEADERS),
+        client.post(
+            "/vsapi/1.0.0/PhoneLine/Add",
+            json={"vs_customer_id": 8001, "area_code": "800"},
+            headers=AUTH_HEADERS,
+        ),
+        client.post(
+            "/vsapi/1.0.0/PhoneLine/Add",
+            json={"vs_customer_id": 8001, "area_code": "800"},
+            headers=AUTH_HEADERS,
+        ),
     )
     assert all(r.status_code == 201 for r in results)
     numbers = {r.json()["phone_number"] for r in results}
     assert len(numbers) == 2  # distinct numbers, no collision
 
+
 # 3. Concurrent customer creation with same vs_customer_id → only one succeeds (409 or unique constraint)
 async def test_concurrent_duplicate_customer_create(client):
     results = await asyncio.gather(
-        client.post("/vsapi/1.0.0/VsCustomer/Create",
-                    json={"vs_customer_id": 8002, "api_key": "key-8002a"}, headers=AUTH_HEADERS),
-        client.post("/vsapi/1.0.0/VsCustomer/Create",
-                    json={"vs_customer_id": 8002, "api_key": "key-8002b"}, headers=AUTH_HEADERS),
+        client.post(
+            "/vsapi/1.0.0/VsCustomer/Create",
+            json={"vs_customer_id": 8002, "api_key": "key-8002a"},
+            headers=AUTH_HEADERS,
+        ),
+        client.post(
+            "/vsapi/1.0.0/VsCustomer/Create",
+            json={"vs_customer_id": 8002, "api_key": "key-8002b"},
+            headers=AUTH_HEADERS,
+        ),
     )
     status_codes = {r.status_code for r in results}
     assert 201 in status_codes

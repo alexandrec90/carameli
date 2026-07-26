@@ -92,8 +92,8 @@ async def test_send_sms_sandbox():
     carrier = _make_carrier()
     # Telnyx sandbox test numbers: use a provisioned sandbox DID as both from/to
     result = await carrier.send_sms(
-        from_="+15005550006",   # Telnyx magic sandbox from-number
-        to="+15005550007",      # Telnyx magic sandbox to-number
+        from_="+15005550006",  # Telnyx magic sandbox from-number
+        to="+15005550007",  # Telnyx magic sandbox to-number
         body="Carameli sandbox test",
     )
     assert result is not None
@@ -110,6 +110,7 @@ async def test_provision_invalid_number_raises_provider_error():
     carrier = _make_carrier()
     with pytest.raises(Exception):  # narrows to HTTPException(502) at the handler layer
         await carrier.provision_number("+10000000000")  # guaranteed invalid
+
 
 async def test_send_sms_invalid_from_raises():
     """Sending SMS from an unprovisionable number raises."""
@@ -144,6 +145,7 @@ async def test_sms_delivery_receipt_schema(client):
 def _make_carrier():
     from app.services.providers.carrier.telnyx import TelnyxCarrier
     from app.core.config import settings
+
     return TelnyxCarrier(
         api_key=settings.telnyx_api_key,
         webhook_base_url=settings.telnyx_webhook_base_url,
@@ -173,6 +175,7 @@ TELNYX_SANDBOX=1 docker compose exec app pytest tests/integration/test_telnyx_sa
 All external I/O is mocked at the app.state.carrier / app.state.engine boundary.
 Redis is patched at the arq connection layer.
 """
+
 from __future__ import annotations
 import asyncio
 from unittest.mock import AsyncMock, patch, MagicMock
@@ -192,6 +195,7 @@ cron scheduler pulls from Redis. Simulate a Redis connection error at the ARQ le
 async def test_retry_unposted_events_survives_redis_error():
     """retry_unposted_events must not crash if Redis is unavailable."""
     from app.services.call_sync import retry_unposted_events
+
     with patch("app.core.database.async_session_factory") as mock_factory:
         mock_session = AsyncMock()
         mock_session.__aenter__ = AsyncMock(return_value=mock_session)
@@ -211,8 +215,10 @@ async def test_webhook_survives_db_write_failure(client):
     """Jambonz call-status webhook returns 200 even if DB write fails."""
     from unittest.mock import patch
     from app.services import call_event_service
+
     with patch.object(
-        call_event_service, "create_from_webhook",
+        call_event_service,
+        "create_from_webhook",
         AsyncMock(side_effect=Exception("DB connection lost")),
     ):
         resp = await client.post(
@@ -230,15 +236,14 @@ async def test_provider_timeout_returns_502(client):
     """A carrier timeout during DID provision must return 502, not 500."""
     import httpx
     from app.main import app
+
     await client.post(
         "/vsapi/1.0.0/VsCustomer/Create",
         json={"vs_customer_id": 7001, "api_key": "key-7001"},
         headers=AUTH_HEADERS,
     )
     app.state.carrier.search_numbers = AsyncMock(return_value=[{"phone_number": "+17001550001"}])
-    app.state.carrier.provision_number = AsyncMock(
-        side_effect=httpx.TimeoutException("timed out")
-    )
+    app.state.carrier.provision_number = AsyncMock(side_effect=httpx.TimeoutException("timed out"))
     resp = await client.post(
         "/vsapi/1.0.0/PhoneLine/Add",
         json={"vs_customer_id": 7001, "area_code": "700"},
@@ -252,6 +257,7 @@ async def test_provider_timeout_returns_502(client):
 ```python
 async def test_provision_failure_after_search_returns_502(client):
     from app.main import app
+
     await client.post(
         "/vsapi/1.0.0/VsCustomer/Create",
         json={"vs_customer_id": 7002, "api_key": "key-7002"},
@@ -275,6 +281,7 @@ async def test_vanillasoft_writeback_failure_does_not_block_webhook(client):
     """If VanillaSoft POST fails during the webhook handler, the webhook still returns 200."""
     import httpx
     from app.core.config import settings
+
     settings.vanillasoft_webhook_url = "http://vanillasoft.test/callback"
     with patch("app.api.webhooks.call_status.httpx.AsyncClient") as mock_client_cls:
         mock_http = MagicMock()
@@ -285,8 +292,12 @@ async def test_vanillasoft_writeback_failure_does_not_block_webhook(client):
 
         resp = await client.post(
             "/webhooks/jambonz/call-status",
-            json={"call_sid": "CAvsfail001", "call_status": "completed",
-                  "from": "+14155550000", "to": "+14155550001"},
+            json={
+                "call_sid": "CAvsfail001",
+                "call_status": "completed",
+                "from": "+14155550000",
+                "to": "+14155550001",
+            },
         )
     settings.vanillasoft_webhook_url = None
     assert resp.status_code == 200
@@ -300,6 +311,7 @@ This is a lightweight smoke: verify that `WorkerSettings` is importable and has 
 ```python
 def test_worker_settings_cron_jobs_configured():
     from app.services.call_sync import WorkerSettings
+
     assert len(WorkerSettings.cron_jobs) >= 2  # retry_unposted_events + poll_agent_status
 ```
 

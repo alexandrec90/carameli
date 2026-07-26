@@ -107,6 +107,7 @@ For each violation, apply the minimal correct fix:
 
   ```python
   import logging
+
   logger = logging.getLogger(__name__)
   ```
 

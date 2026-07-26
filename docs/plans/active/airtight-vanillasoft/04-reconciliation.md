@@ -34,6 +34,7 @@ class ProviderCallRecord:
     started_at: datetime | None
     status: str | None
 
+
 @dataclass(frozen=True)
 class ProviderMessageRecord:
     message_sid: str
@@ -82,7 +83,11 @@ One cron function, e.g. `reconcile_provider_records(ctx)`:
    ```python
    logger.error(
        "Reconciliation: provider call %s (%s -> %s, started %s, status %s) has no call_events row",
-       rec.call_sid, rec.from_number, rec.to_number, rec.started_at, rec.status,
+       rec.call_sid,
+       rec.from_number,
+       rec.to_number,
+       rec.started_at,
+       rec.status,
    )
    ```
 

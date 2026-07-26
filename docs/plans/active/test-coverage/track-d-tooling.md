@@ -30,6 +30,7 @@ pytestmark = pytest.mark.asyncio(loop_scope="session")
 ```python
 async def test_phone_line_add_logs_entry_and_success(client, caplog):
     from app.main import app
+
     await client.post(
         "/vsapi/1.0.0/VsCustomer/Create",
         json={"vs_customer_id": 6001, "api_key": "key-6001"},
@@ -45,10 +46,10 @@ async def test_phone_line_add_logs_entry_and_success(client, caplog):
             json={"vs_customer_id": 6001, "area_code": "600"},
             headers=AUTH_HEADERS,
         )
-    assert any("6001" in r.message for r in caplog.records), \
-        "Expected vs_customer_id in log output"
-    assert any("PNobs001" in r.message or "+16001550001" in r.message
-               for r in caplog.records), "Expected phone number/SID in success log"
+    assert any("6001" in r.message for r in caplog.records), "Expected vs_customer_id in log output"
+    assert any("PNobs001" in r.message or "+16001550001" in r.message for r in caplog.records), (
+        "Expected phone number/SID in success log"
+    )
 ```
 
 #### 2. Webhook handler logs call_sid and status
@@ -58,8 +59,12 @@ async def test_webhook_logs_call_sid(client, caplog):
     with caplog.at_level(logging.INFO, logger="app.api.webhooks.call_status"):
         await client.post(
             "/webhooks/jambonz/call-status",
-            json={"call_sid": "CAlogtest001", "call_status": "completed",
-                  "from": "+14155550000", "to": "+14155550001"},
+            json={
+                "call_sid": "CAlogtest001",
+                "call_status": "completed",
+                "from": "+14155550000",
+                "to": "+14155550001",
+            },
         )
     messages = " ".join(r.message for r in caplog.records)
     assert "CAlogtest001" in messages
@@ -71,6 +76,7 @@ async def test_webhook_logs_call_sid(client, caplog):
 ```python
 async def test_provider_error_logs_at_error_level(client, caplog):
     from app.main import app
+
     await client.post(
         "/vsapi/1.0.0/VsCustomer/Create",
         json={"vs_customer_id": 6002, "api_key": "key-6002"},
@@ -95,11 +101,13 @@ async def test_provider_error_logs_at_error_level(client, caplog):
 async def test_no_api_key_in_logs(client, caplog):
     """Ensure the API key never appears in log output."""
     from app.core.config import settings
+
     with caplog.at_level(logging.DEBUG):
         await client.get("/vsapi/1.0.0/VsCustomer/Get/1", headers=AUTH_HEADERS)
     for record in caplog.records:
-        assert settings.api_key_secret not in record.message, \
+        assert settings.api_key_secret not in record.message, (
             f"API key leaked in log: {record.message}"
+        )
 ```
 
 #### 5. Key metrics emitted for request paths
@@ -124,8 +132,11 @@ async def test_frontend_logs_written_to_logger(client, caplog):
     with caplog.at_level(logging.ERROR, logger="frontend"):
         await client.post(
             "/vg/1.0.0/frontend-logs",
-            json={"entries": [{"level": "error", "message": "frontend-boom",
-                                "context": {"status": 502}}]},
+            json={
+                "entries": [
+                    {"level": "error", "message": "frontend-boom", "context": {"status": 502}}
+                ]
+            },
             headers=AUTH_HEADERS,
         )
     fe_records = [r for r in caplog.records if "frontend-boom" in r.message]
@@ -169,6 +180,7 @@ For each row in the table above, read the VanillaLand source file listed in
 Each test is annotated with the VanillaLand source file it mirrors.
 Payload shapes are taken directly from the ASMX service contracts.
 """
+
 from __future__ import annotations
 import pytest
 from unittest.mock import AsyncMock
@@ -178,9 +190,11 @@ pytestmark = pytest.mark.asyncio(loop_scope="session")
 
 # ── SMS contract (mirrors SMSWS.asmx SendSMS) ─────────────────────────────
 
+
 async def test_sms_send_vanillaland_payload_shape(client):
     """VanillaLand sends: vs_customer_id, from_number, to_number, message_body."""
     from app.main import app
+
     await client.post(
         "/vsapi/1.0.0/VsCustomer/Create",
         json={"vs_customer_id": 5501, "api_key": "key-5501"},
@@ -196,9 +210,7 @@ async def test_sms_send_vanillaland_payload_shape(client):
         json={"vs_customer_id": 5501, "area_code": "550"},
         headers=AUTH_HEADERS,
     )
-    app.state.carrier.send_sms = AsyncMock(
-        return_value={"sid": "SMvl001", "status": "queued"}
-    )
+    app.state.carrier.send_sms = AsyncMock(return_value={"sid": "SMvl001", "status": "queued"})
     # VanillaLand payload shape
     resp = await client.post(
         "/vsapi/1.0.0/VsMessaging/Sms/Send",
@@ -212,10 +224,13 @@ async def test_sms_send_vanillaland_payload_shape(client):
     )
     assert resp.status_code in (200, 201)
     data = resp.json()
-    assert "sid" in data or "message_sid" in data, \
+    assert "sid" in data or "message_sid" in data, (
         "Response must include a message SID (VanillaLand reads this field)"
+    )
+
 
 # ── Customer provisioning (mirrors CmvCustomer.cs VsCustomer/Add) ─────────
+
 
 async def test_customer_create_vanillaland_required_fields(client):
     """VanillaLand sends: vs_customer_id (int), api_key (str)."""
@@ -229,7 +244,9 @@ async def test_customer_create_vanillaland_required_fields(client):
     assert data["vs_customer_id"] == 5502
     # VanillaLand checks that the returned id is a UUID-shaped string
     import uuid
+
     uuid.UUID(data["id"])  # raises ValueError if not a UUID
+
 
 async def test_customer_create_duplicate_vs_id_returns_409(client):
     """VanillaLand expects a 409 (or equivalent) on duplicate vs_customer_id."""
@@ -245,7 +262,9 @@ async def test_customer_create_duplicate_vs_id_returns_409(client):
     )
     assert resp.status_code == 409
 
+
 # ── Call status webhook (mirrors CMVCallInfo.asmx) ────────────────────────
+
 
 async def test_call_status_webhook_vanillaland_payload(client):
     """VanillaLand's Jambonz equivalent sends: call_sid, call_status, duration, from, to."""
@@ -262,6 +281,7 @@ async def test_call_status_webhook_vanillaland_payload(client):
     assert resp.status_code == 200
     data = resp.json()
     assert data.get("status") == "ok"
+
 
 # Add more parity tests for: PhoneLine/Add, PhoneLine/Deactivate, VsExtension/Add
 # Read the VanillaLand source files in ../VanillaLand/ to get exact field names.
@@ -292,6 +312,7 @@ Locust is a separate tool — it is NOT run with pytest.
 ```python
 from locust import HttpUser, task, between, events
 import random
+
 
 class CarameliUser(HttpUser):
     wait_time = between(0.5, 2.0)
@@ -327,6 +348,7 @@ class CarameliUser(HttpUser):
     @task(1)
     def webhook_call_status(self):
         import uuid
+
         self.client.post(
             "/webhooks/jambonz/call-status",
             json={
@@ -356,11 +378,12 @@ Add these as separate classes or use Locust's `LoadTestShape` for the spike/soak
 ```python
 from locust import LoadTestShape
 
+
 class SpikeShape(LoadTestShape):
     stages = [
-        {"duration": 60,  "users": 10,  "spawn_rate": 10},   # warm-up
-        {"duration": 90,  "users": 500, "spawn_rate": 100},  # spike
-        {"duration": 120, "users": 10,  "spawn_rate": 10},   # recovery
+        {"duration": 60, "users": 10, "spawn_rate": 10},  # warm-up
+        {"duration": 90, "users": 500, "spawn_rate": 100},  # spike
+        {"duration": 120, "users": 10, "spawn_rate": 10},  # recovery
     ]
 
     def tick(self):
