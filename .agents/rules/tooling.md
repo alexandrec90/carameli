@@ -25,6 +25,29 @@ compatibility (local Windows desktop and GitHub Actions).
 - `scripts/hooks/tests/` is excluded from the app test suite automatically because
   `pytest.ini` sets `testpaths = tests`.
 
+#### Capping Bash output (`enforce-capped-bash.py`)
+
+The PreToolUse hook blocks any Bash call whose output isn't byte-capped. Exactly two
+forms pass its `ALLOWED_PATTERNS`, and **they don't run in the same shell** — pick
+deliberately:
+
+| Form | Shell | Exit code |
+| --- | --- | --- |
+| `python3 scripts/hooks/invoke-capped.py --command "…" --max-bytes 4000` | `cmd.exe` (Windows) | preserved |
+| `<command> \| head -c 4000` | Git Bash | **masked** — the pipeline reports `head`'s status |
+
+- `invoke-capped.py` shells out with `subprocess.run(command, shell=True)`, which on
+  Windows is **`cmd.exe`** — not the Git Bash the Bash tool otherwise gives you. Heredocs
+  fail (`<< was unexpected at this time`), and single-quoted paths arrive with the quotes
+  intact (`git commit -F 'C:/…/msg.txt'` → `could not read log file ''C:/…''`). Use
+  unquoted forward-slash paths, and avoid paths containing spaces.
+- `| head -c <N>` runs in Git Bash, so POSIX syntax works — **use it when the command needs
+  a heredoc or quoting `cmd.exe` would mangle**, e.g. `git commit -F - <<'EOF' … EOF | head -c 4000`.
+  Two costs: the pipeline's exit code is `head`'s, not the command's (add `set -o pipefail`
+  when you need to branch on failure), and only stdout is piped, so stderr escapes the cap.
+- Neither form makes a command interactive-safe. Anything that would open an editor or
+  prompt still needs its non-interactive flag (`-F <file>`, `--no-edit`, `--quiet`).
+
 ### Portable agent harness (`.agent-harness.toml` + `scripts/sync-harness.py`)
 
 The hook scripts are designed to be **vendored unchanged across projects**. Anything
