@@ -85,13 +85,34 @@ In the copied `.env`, set the worktree block (template in `.env.example`):
 ```bash
 COMPOSE_PROJECT_NAME=carameli-b   # MUST equal the worktree directory name
 # COMPOSE_PROFILES=telephony      # REMOVE — telephony runs in the primary stack only
-APP_HOST_PORT=8001
-FRONTEND_HOST_PORT=5174
-DB_HOST_PORT=5433
-REDIS_HOST_PORT=6380
+APP_HOST_PORT=8002
+FRONTEND_HOST_PORT=5175
+DB_HOST_PORT=5434
+REDIS_HOST_PORT=6381
 MINIO_HOST_PORT=9002
-MINIO_CONSOLE_HOST_PORT=9003
+MINIO_CONSOLE_HOST_PORT=9042
 ```
+
+> **Do not pick these by hand.** They come from `ports.toml` in
+> [devkit](https://github.com/alexandrec90/devkit) — the machine-wide registry of which
+> checkout owns which host port. Each checkout holds one **slot** (`carameli` = 0,
+> `ibkr_trader` = 1, `carameli-b` = 2) and every port is `conventional_base + slot`.
+> Regenerate the block instead of editing it:
+>
+> ```bash
+> python <devkit>/scripts/devkit_ports.py carameli-b
+> ```
+>
+> This paragraph replaces a hand-maintained list that had already drifted: it used to
+> say `DB_HOST_PORT=5433`, which is the port `ibkr_trader`'s stack publishes, so
+> anyone following it literally would have collided the two stacks. The real `.env`
+> was on 5434 — the prose was what was wrong, and prose is exactly what a registry
+> stops being load-bearing.
+>
+> **An existing `carameli-b/.env` predates the registry** and is on 8001/5174/6380/9003
+> for app/frontend/redis/minio-console (its db and minio already agree). Nothing is
+> broken — those ports collide with nothing today — but they are not slot 2, so
+> re-sync them from the command above the next time that stack is recreated.
 
 Rules that keep the stacks independent:
 

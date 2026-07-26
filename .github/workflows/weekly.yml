@@ -180,7 +180,7 @@ jobs:
                   mutation_score = f"{score_match.group(1)}%"
 
           p95_baseline = "Not found"
-          baseline_doc = "docs/performance-baselines.md"
+          baseline_doc = "docs/evidence/performance-baselines.md"
           if os.path.exists(baseline_doc):
               with open(baseline_doc, "r", encoding="utf-8", errors="ignore") as fh:
                   for line in fh:

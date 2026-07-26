@@ -3,7 +3,7 @@
  * under skins/ or hooks/) so a data hook can return a DataPageProps without
  * importing from the skin layer. The skin contract (skins/types.ts) re-exports
  * these; the shared renderer (components/DataView.tsx) and per-skin views consume
- * them. Mirrors the structure in docs/cloudli/cloudli-functional-spec.md.
+ * them. Mirrors the structure in docs/reference/cloudli/cloudli-functional-spec.md.
  */
 export interface DataColumn {
   key: string

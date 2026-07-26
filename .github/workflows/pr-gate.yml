@@ -191,11 +191,27 @@ jobs:
             exit 1
           fi
       # Cross-repo: verify the vendored shared agent-harness (scripts/hooks/*, see
-      # scripts/sync-harness.py's MANIFEST) matches the shared harness repo. This
-      # no-ops (exit 0) until the shared repo is adopted. To activate it: check the
-      # shared repo out in a prior step (e.g. actions/checkout with `repository:` +
-      # `path: .agent-harness-src`) and set AGENT_HARNESS_DIR to that path.
+      # scripts/sync-harness.py's MANIFEST) matches the shared harness repo — the
+      # same single-source→committed-mirror check as above, lifted cross-repo.
+      #
+      # ORDER MATTERS: this checkout MUST stay *after* the mirror-drift step. It
+      # lands an untracked .agent-harness-src/ inside the workspace, which the
+      # `git status --porcelain` check above would report as drift and fail on.
+      # (The previous comment here suggested checking out in "a prior step" —
+      # that would have broken the mirror check the moment it was activated.)
+      #
+      # Pinned to a tag, never @main: one bad harness commit must not redden
+      # every consuming repo at once. Bump this ref to adopt a new harness
+      # release, in the same commit as the `--pull` it corresponds to.
+      - name: Check out the shared harness repo
+        uses: actions/checkout@v7
+        with:
+          repository: alexandrec90/devkit
+          ref: v0.1.0
+          path: .agent-harness-src
       - name: Vendored agent-harness in sync
+        env:
+          AGENT_HARNESS_DIR: ${{ github.workspace }}/.agent-harness-src
         run: python scripts/sync-harness.py --check
 
   frontend:

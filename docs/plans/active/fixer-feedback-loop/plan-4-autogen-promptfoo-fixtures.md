@@ -1,7 +1,7 @@
 # Plan 4 — Auto-generate promptfoo fixtures from outcome triples
 
 **Depends on:** Plan 1 (merged) + Plan 3 (triage report). **Do last.**
-**Read first:** `plans/fixer-feedback-loop/README.md` (data contract) and an existing
+**Read first:** `docs/plans/active/fixer-feedback-loop/README.md` (data contract) and an existing
 destructive-template task: `evals/tasks/fix-tests-logic-bug/` (test.yaml + setup.cjs +
 verify.cjs) — the output shape this plan produces.
 

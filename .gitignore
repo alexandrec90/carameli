@@ -93,10 +93,12 @@ coverage.xml
 *.lcov
 .nyc_output/
 
-docs/
-
 # Charts folder (generated diagrams)
 charts/
+
+# Local/generated material (durable documentation belongs in docs/)
+artifacts/
+.local/
 
 # Workspace metadata
 /carameli.code-workspace
@@ -113,8 +115,6 @@ VanillaLand/
 /blob-report/
 /playwright/.cache/
 /playwright/.auth/
-
-todo.md
 
 # promptfoo eval cache / outputs (keep the dir, ignore the generated artifacts)
 .promptfoo/

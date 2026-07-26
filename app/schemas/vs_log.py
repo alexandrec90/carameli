@@ -8,7 +8,7 @@ class VsLogEntry(BaseModel):
 
     NLog posts a single JSON object per request. Field names mirror the
     ``<parameter>`` layouts in the staging ``NLog.config`` snippet
-    (``docs/plans/airtight-vanillasoft/nlog-snippet.md``). ``auth`` is a
+    (``docs/plans/active/airtight-vanillasoft/nlog-snippet.md``). ``auth`` is a
     fallback credential carried in the body for NLog builds too old to attach a
     ``<header>`` (see the version caveat in that doc); it is never logged.
     """
