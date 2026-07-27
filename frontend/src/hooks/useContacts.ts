@@ -3,7 +3,7 @@ import type { DataPageProps } from '../lib/dataPage'
 
 /**
  * Contacts (cloudli spec §7). Structural placeholder: contact data is owned by
- * VanillaSoft CRM, not Carameli (see docs/plans/plan-B-feature-verticals.md §B1).
+ * VanillaSoft CRM, not Carameli (see docs/plans/active/frontend-parity/plan-B-feature-verticals.md §B1).
  */
 export function useContacts(): DataPageProps {
   return usePlaceholderPage({
