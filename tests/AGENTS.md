@@ -90,6 +90,7 @@ that accept a `ctx: dict` argument. Test them directly — no ARQ infrastructure
 async def test_poll_no_engine_returns_cleanly():
     await poll_agent_status({})  # ctx has no "engine" key — must not raise
 
+
 async def test_poll_happy_path(client, db_session):
     mock_engine = MagicMock()
     mock_engine.get_active_calls = AsyncMock(return_value=[])

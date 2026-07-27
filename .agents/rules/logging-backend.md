@@ -14,6 +14,7 @@ Configured once at startup in `app/main.py`:
 
 ```python
 from app.core.logging_config import configure_logging
+
 configure_logging(log_level=settings.log_level, log_file=settings.log_file)
 ```
 
@@ -36,6 +37,7 @@ Declare at module scope — never inside a function:
 
 ```python
 import logging
+
 logger = logging.getLogger(__name__)
 ```
 
@@ -50,7 +52,12 @@ logger = logging.getLogger(__name__)
 | Successful mutation | `INFO` | result identifiers (new ID, SID, etc.) |
 
 ```python
-logger.info("Adding phone line vs_customer_id=%s area_code=%s number=%s", body.vs_customer_id, body.area_code, body.phone_number)
+logger.info(
+    "Adding phone line vs_customer_id=%s area_code=%s number=%s",
+    body.vs_customer_id,
+    body.area_code,
+    body.phone_number,
+)
 logger.warning("Customer not found vs_customer_id=%s", body.vs_customer_id)
 logger.error("Provider error purchasing DID vs_customer_id=%s: %s", body.vs_customer_id, exc)
 logger.info("Phone line added number=%s sid=%s", line.phone_number, line.provider_sid)

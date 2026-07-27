@@ -211,10 +211,13 @@ the correct browser engine. See Playwright docs for `async_playwright().start()`
 Runs the same core user journeys on Chromium, Firefox, and WebKit.
 Also validates mobile viewports for layout breakage.
 """
+
 import pytest
+
 pytestmark = pytest.mark.asyncio(loop_scope="session")
 
 # Parameterize over browsers and viewports using the fixtures from conftest.py
+
 
 async def test_home_page_loads(page, base_url):
     """Verify the app shell renders without JS errors on all browsers."""
@@ -224,12 +227,14 @@ async def test_home_page_loads(page, base_url):
     await page.wait_for_load_state("networkidle")
     assert errors == [], f"JS errors on page load: {errors}"
 
+
 async def test_health_endpoint_reachable(page, base_url):
     """Verify /health returns ok via the frontend proxy."""
     resp = await page.request.get(f"{base_url}/health")
     assert resp.ok
     data = await resp.json()
     assert data["status"] == "ok"
+
 
 async def test_no_layout_overflow_on_mobile(page, base_url):
     """Verify no horizontal scrollbar on 375 px viewport."""

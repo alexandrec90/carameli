@@ -160,9 +160,14 @@ of the webhook helper — e.g.:
 
 ```python
 await SmsMessageRepo(db_session).create(
-    customer_id=customer_id, phone_line_id=None, message_sid="SMtest1",
-    direction="outbound", from_number="+14155550000", to_number="+14155550001",
-    body="hi", delivery_status="delivered",
+    customer_id=customer_id,
+    phone_line_id=None,
+    message_sid="SMtest1",
+    direction="outbound",
+    from_number="+14155550000",
+    to_number="+14155550001",
+    body="hi",
+    delivery_status="delivered",
 )
 ```
 

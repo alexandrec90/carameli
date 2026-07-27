@@ -22,9 +22,9 @@ Do not force it onto narrow enum-like inputs.
 ```python
 from hypothesis import given, strategies as st
 
-@given(st.from_regex(r'\+1[2-9]\d{9}', fullmatch=True))
-def test_phone_number_normalization(phone: str):
-    ...
+
+@given(st.from_regex(r"\+1[2-9]\d{9}", fullmatch=True))
+def test_phone_number_normalization(phone: str): ...
 ```
 
 ---
@@ -34,6 +34,7 @@ def test_phone_number_normalization(phone: str):
 ```python
 from alembic.config import Config
 from alembic.command import upgrade, downgrade
+
 
 @pytest.mark.slow
 async def test_migration_001_roundtrip(tmp_alembic_cfg):
@@ -53,6 +54,7 @@ def test_missing_database_url_raises(monkeypatch):
     monkeypatch.delenv("DATABASE_URL", raising=False)
     with pytest.raises((ValidationError, KeyError)):
         from app.core.config import Settings
+
         Settings()
 ```
 
@@ -67,6 +69,7 @@ import json
 from pathlib import Path
 
 SNAPSHOT_PATH = Path("tests/snapshots/openapi.json")
+
 
 async def test_openapi_schema_snapshot(client):
     resp = await client.get("/openapi.json")
@@ -95,6 +98,7 @@ async def test_webhook_ingest_benchmark(client, benchmark):
     async def _call():
         resp = await client.post("/webhooks/jambonz/call-status", json={...})
         assert resp.status_code in (200, 201)
+
     benchmark.pedantic(_call, iterations=50, rounds=5)
 ```
 

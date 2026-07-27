@@ -22,12 +22,12 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 from app.core.database import Base
 
+
 class MyEntity(Base):
     __tablename__ = "my_entities"
 
     id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True,
-        server_default=text("gen_random_uuid()")
+        UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()")
     )
     active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(server_default=text("now()"))
@@ -85,9 +85,7 @@ class MyEntityRepo:
         self.session = session
 
     async def get_by_id(self, entity_id: uuid.UUID) -> MyEntity | None:
-        result = await self.session.execute(
-            select(MyEntity).where(MyEntity.id == entity_id)
-        )
+        result = await self.session.execute(select(MyEntity).where(MyEntity.id == entity_id))
         return result.scalar_one_or_none()
 
     async def create(self, **kwargs) -> MyEntity:

@@ -22,7 +22,9 @@
    ```python
    logger.warning(
        "VanillaSoft notify POST returned %s path=%s body=%s",
-       resp.status_code, path, _truncate(resp.text),
+       resp.status_code,
+       path,
+       _truncate(resp.text),
    )
    ```
 

@@ -34,7 +34,9 @@ Add `logger = logging.getLogger(__name__)` once at module scope (not inside the 
 
 ```python
 import logging
+
 logger = logging.getLogger(__name__)
+
 
 @router.put("/UpdateCallRecording")
 async def update_call_recording(
@@ -43,8 +45,12 @@ async def update_call_recording(
     _: Annotated[None, Depends(verify_api_key)],
 ) -> UpdateCallRecordingResponse:
     """Toggle call recording on a DID."""
-    logger.info("UpdateCallRecording vs_customer_id=%s number=%s enabled=%s",
-                body.vs_customer_id, body.phone_number, body.enabled)
+    logger.info(
+        "UpdateCallRecording vs_customer_id=%s number=%s enabled=%s",
+        body.vs_customer_id,
+        body.phone_number,
+        body.enabled,
+    )
     # log WARNING before any 404/409 raise
     # log ERROR before any 502 raise
     logger.info("Recording updated number=%s", body.phone_number)
