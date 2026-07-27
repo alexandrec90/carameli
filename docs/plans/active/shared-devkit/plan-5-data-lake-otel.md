@@ -1,7 +1,7 @@
 # Plan 5 — Shared data lake and cross-project OTel conventions
 
 **Depends on:** nothing. Fully independent of Plans 1–4.
-**Read first:** `plans/shared-devkit/README.md`.
+**Read first:** `docs/plans/active/shared-devkit/README.md`.
 
 ## Goal
 

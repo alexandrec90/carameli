@@ -3,7 +3,7 @@
 These cloudli pages need new Carameli backends (or a deliberate decision not to build one).
 Each batch below was originally blocked on **open design questions**. As of **2026-06-25**
 those questions are resolved (decisions recorded inline), so every batch is now a mechanical
-handoff against the recipe in `docs/plans/README.md` — including the CRUD-capable `DataPage`
+handoff against the recipe in [README.md](README.md) — including the CRUD-capable `DataPage`
 (create form + per-row actions) demonstrated by the Webhooks vertical.
 
 > **Structural-placeholder fallback** (still available per page): a `DataPage` with the right

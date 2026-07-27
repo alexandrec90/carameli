@@ -1,7 +1,7 @@
 # Plan 2 — Extract `scripts/` into the `devkit` pip package
 
 **Depends on:** Plan 1 (plugin exists; hooks reference script paths this plan relocates).
-**Read first:** `plans/shared-devkit/README.md`.
+**Read first:** `docs/plans/active/shared-devkit/README.md`.
 
 ## Goal
 

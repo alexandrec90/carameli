@@ -1,7 +1,7 @@
 # Plan 3 — Reusable CI workflows and composite actions
 
 **Depends on:** nothing (independent of Plans 1 and 2). **Parallel with:** Plan 1.
-**Read first:** `plans/shared-devkit/README.md`.
+**Read first:** `docs/plans/active/shared-devkit/README.md`.
 
 ## Goal
 

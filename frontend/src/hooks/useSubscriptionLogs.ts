@@ -4,7 +4,7 @@ import type { DataPageProps } from '../lib/dataPage'
 /**
  * Subscription (API) Logs (cloudli spec §3). Structural placeholder: webhook-delivery
  * events have no producer in Carameli yet, so the log has no rows to show until the
- * delivery sender lands (see docs/plans/plan-B-feature-verticals.md §B5).
+ * delivery sender lands (see docs/plans/active/frontend-parity/plan-B-feature-verticals.md §B5).
  */
 export function useSubscriptionLogs(): DataPageProps {
   return usePlaceholderPage({

@@ -3,7 +3,7 @@ import type { DataPageProps } from '../lib/dataPage'
 
 /**
  * Contact Groups (cloudli spec §8). Structural placeholder: owned by VanillaSoft CRM,
- * not Carameli (see docs/plans/plan-B-feature-verticals.md §B1).
+ * not Carameli (see docs/plans/active/frontend-parity/plan-B-feature-verticals.md §B1).
  */
 export function useContactGroups(): DataPageProps {
   return usePlaceholderPage({
