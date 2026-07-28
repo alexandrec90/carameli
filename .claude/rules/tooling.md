@@ -18,6 +18,10 @@ compatibility (local Windows desktop and GitHub Actions).
 - **Write pytest tests** in `scripts/hooks/tests/` using the `load_module()` helper in
   `conftest.py` (handles non-standard filenames via `importlib.util`).
 - Every new script must ship with tests in the same change.
+- **Handle CLI args strictly**: `-h`/`--help` must print usage and exit, and an
+  unrecognized argument must error out (exit 2) — never fall through to the
+  script's default action (`run-tests.py --help` once silently started a full
+  suite run).
 
 ### Hook scripts (`scripts/hooks/`)
 
