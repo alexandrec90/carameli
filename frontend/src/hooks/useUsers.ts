@@ -3,7 +3,7 @@ import type { DataPageProps } from '../lib/dataPage'
 
 /**
  * Users (cloudli spec §1). Structural placeholder: organizational user management is a
- * VanillaSoft identity concern, not Carameli (see docs/plans/plan-B-feature-verticals.md §B5).
+ * VanillaSoft identity concern, not Carameli (see docs/plans/active/frontend-parity/plan-B-feature-verticals.md §B5).
  */
 export function useUsers(): DataPageProps {
   return usePlaceholderPage({

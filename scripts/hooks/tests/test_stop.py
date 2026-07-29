@@ -217,9 +217,36 @@ def test_select_checks_scripts_run_host_tests():
     ]
 
 
-def test_select_checks_reqs_adds_lock_markers():
-    checks = hook.select_checks(["requirements.txt"])
+@pytest.mark.parametrize(
+    "changed",
+    [
+        "requirements.txt",
+        "requirements.in",
+        "requirements-dev.txt",
+        # uv/poetry projects express the same event as one lockfile. Before these,
+        # _REQ_RE matched only `requirements*`, so the tier never fired for them --
+        # an inert check looks exactly like a passing one.
+        "uv.lock",
+        "poetry.lock",
+        "subdir/uv.lock",
+    ],
+)
+def test_select_checks_dependency_change_adds_lock_markers(changed):
+    checks = hook.select_checks([changed])
     assert hook.CHECK_LOCKS in checks and hook.CHECK_TESTS not in checks
+
+
+@pytest.mark.parametrize(
+    "changed",
+    [
+        "my_uv.lock",  # must anchor on a path boundary, not any substring
+        "docs/uv.lock.md",  # ...and on end-of-name
+        "notes/requirements.md",
+        "uv.locked",
+    ],
+)
+def test_select_checks_ignores_lockfile_lookalikes(changed):
+    assert hook.CHECK_LOCKS not in hook.select_checks([changed])
 
 
 @pytest.mark.skipif(not CFG.frontend.enabled, reason="project has no frontend tier")
@@ -424,6 +451,7 @@ def test_run_db_tests_autostarts_and_stops_only_started(monkeypatch):
     assert stopped["svc"] == [CFG.db.db_service]  # only the newly-started service
 
 
+@requires_db
 def test_run_db_tests_up_failure_skips_and_stops_nothing(monkeypatch):
     monkeypatch.setattr(hook, "db_redis_running", lambda *a, **k: False)
     monkeypatch.setattr(hook, "_compose_running_services", lambda *a, **k: set())
@@ -431,7 +459,7 @@ def test_run_db_tests_up_failure_skips_and_stops_nothing(monkeypatch):
     stopped = {}
     monkeypatch.setattr(hook, "_compose_stop", lambda svc, *a, **k: stopped.setdefault("svc", svc))
 
-    assert hook.run_db_tests(["app/main.py"], {"CARAMELI_STOP_TESTS_AUTOSTART": "1"}) == []
+    assert hook.run_db_tests([APP_FILE], {hook.AUTOSTART_ENV: "1"}) == []
     assert "svc" not in stopped  # returns before try/finally -> _compose_stop never called
 
 

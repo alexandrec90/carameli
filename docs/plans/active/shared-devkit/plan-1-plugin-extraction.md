@@ -1,7 +1,7 @@
 # Plan 1 — Create the devkit repo and extract skills/rules as a plugin
 
 **Depends on:** nothing. **Parallel with:** Plan 3, Plan 5.
-**Read first:** `plans/shared-devkit/README.md` (architecture, extraction tiers, sharp edges).
+**Read first:** `docs/plans/active/shared-devkit/README.md` (architecture, extraction tiers, sharp edges).
 
 ## Goal
 

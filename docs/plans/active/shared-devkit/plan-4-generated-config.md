@@ -1,7 +1,7 @@
 # Plan 4 — `devkit sync`: generated config files and a drift gate
 
 **Depends on:** Plan 2 (`devkit sync` is a package console script).
-**Read first:** `plans/shared-devkit/README.md`.
+**Read first:** `docs/plans/active/shared-devkit/README.md`.
 
 ## Goal
 

@@ -66,10 +66,34 @@ def test_session_start_hook_installs_the_locks_with_uv():
     assert "uv pip install" in text, (
         "session-start.sh should install the toolchain via `uv pip install`."
     )
-    # uv's version is single-sourced from the dev lock, not hard-coded.
-    assert "uv==${uv_version" in text, (
-        "session-start.sh should bootstrap the uv version pinned in requirements-dev.txt."
+    # uv's version is still single-sourced from the dev lock, not hard-coded --
+    # but the expansion is now `${uv_pin:+==${uv_pin}}` (substitute-if-set), not
+    # `${uv_version:?...}` (die-if-unset). devkit v0.4.0 made that swap because the
+    # script is vendored into projects with no requirements-dev.txt, and `:?` exits
+    # a non-interactive shell -- so the old form killed provisioning outright there.
+    # Assert the sourcing, not the spelling.
+    assert "requirements-dev.txt" in text, (
+        "session-start.sh should read uv's pin from requirements-dev.txt."
     )
+    assert "uv_pin" in text and "${uv_pin:+" in text, (
+        "session-start.sh should bootstrap the pinned uv version via `:+`, not `:?`."
+    )
+    # The `${var:?}`-anywhere guard is deliberately NOT duplicated here: the
+    # vendored scripts/hooks/tests/test_session_start.py owns it for every project,
+    # and a second copy of the same text scan just means two things to keep right.
     assert (
         "pip install --quiet --disable-pip-version-check \\\n  -r requirements.txt" not in text
     ), "session-start.sh still installs the locks with pip; use uv instead."
+
+
+def test_session_start_hook_still_uses_this_project_s_pip_tools_locks():
+    """The vendored hook detects the dependency model; carameli must land on locks.
+
+    devkit v0.4.0 made provisioning generic (uv.lock -> uv sync, requirements-dev.txt
+    -> pip-tools locks, else plain pyproject). Carameli is the pip-tools case, and
+    that branch is chosen by the presence of the file -- so this asserts both that
+    the branch exists upstream and that this repo still satisfies its condition.
+    """
+    assert (REPO_ROOT / "requirements-dev.txt").exists()
+    text = _read(SESSION_START)
+    assert "-r requirements.txt -r requirements-dev.txt" in text
