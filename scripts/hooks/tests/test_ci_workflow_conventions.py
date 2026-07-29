@@ -15,6 +15,8 @@ parse (no PyYAML), so they run in the hook-tests gate step before the venv is
 guaranteed, alongside test_scheduled_workflows_free.py.
 """
 
+import re
+
 from conftest import REPO_ROOT
 
 WORKFLOWS_DIR = REPO_ROOT / ".github" / "workflows"
@@ -124,6 +126,34 @@ def test_sandbox_workflow_opts_into_the_sandbox_tier_via_environment():
     assert "environment: sandbox" in text
     assert "${{ secrets.TELNYX_API_KEY }}" in text
     assert 'TELNYX_SANDBOX: "1"' in text
+
+
+def test_devkit_checkout_pins_a_release_tag():
+    # The mirror-sync job checks the vendored harness against whatever this ref
+    # resolves to, so `main` (or a branch) would let one upstream commit redden
+    # this repo's gate with no change here. Only an immutable vX.Y.Z tag.
+    text = _read(WORKFLOWS_DIR / "pr-gate.yml")
+    block = re.search(
+        r"repository:\s*alexandrec90/devkit\s*\n\s*ref:\s*(\S+)",
+        text,
+    )
+    assert block, "pr-gate.yml: no `repository: alexandrec90/devkit` + `ref:` pair found."
+    assert re.fullmatch(r"v\d+\.\d+\.\d+", block.group(1)), (
+        f"pr-gate.yml pins the devkit checkout at {block.group(1)!r}; it must be a "
+        "release tag (vX.Y.Z), never a branch. Bump it in the same commit as the "
+        "`sync-harness.py --pull` it corresponds to."
+    )
+
+
+def test_harness_version_records_a_commit():
+    # `--pull` stamps HARNESS_VERSION with the upstream short SHA. An empty or
+    # placeholder value means the vendored copy has no recorded provenance, so
+    # nothing ties the files on disk to the tag the gate above checks them against.
+    stamped = (REPO_ROOT / "HARNESS_VERSION").read_text(encoding="utf-8").strip()
+    assert re.fullmatch(r"[0-9a-f]{7,40}", stamped), (
+        f"HARNESS_VERSION is {stamped!r}; expected the upstream commit SHA written "
+        "by `python scripts/sync-harness.py --pull`."
+    )
 
 
 def test_setup_preamble_is_not_duplicated_inline():
