@@ -4,27 +4,59 @@ Extracts Carameli's project-agnostic tooling into **one shared upstream repo** s
 projects (`ibkr`, `VanillaLand`, future ones) get the same skills, hooks, CI, lint policy,
 and dependency automation — and so a **fresh clone** picks all of it up with no manual steps.
 
-**Channel 5 (vendored hooks) is already built and in production** at
-`alexandrec90/devkit` — devkit absorbs the old `agent-harness` repo rather than replacing
-it, and that repo *is* this one (renamed 2026-07-25, tagged `v0.1.0`). Channels 1–4 are
-not implemented. Each plan file is self-contained (a fresh session starts cold). Read this
-README first for the shared architecture, then the plan you're executing.
+Each plan file is self-contained (a fresh session starts cold). Read this README first for
+the shared architecture, then the plan you're executing.
+
+## Current state — read this before anything else (audited 2026-07-29)
+
+devkit has moved substantially since these plans were written against `v0.2.0`, and **it
+did not move along the five-channel axis**. It grew into a *project generator* plus a much
+wider vendored tier. Two plans were reconciled against that on 2026-07-29; the rest are
+still as-drafted and partly stale.
+
+| Plan | Status | Notes |
+| --- | --- | --- |
+| 0 — rename | Half done | External rename + tags done; **internal names still the old spelling** (`.agent-harness.toml`, `$AGENT_HARNESS_DIR`, `sync-harness.py`). See below. |
+| 1 — plugin | **Not started, and partly overtaken** | No `.claude-plugin/`, no `plugins/`. But 7 of the 15 Tier-A skills + `authoring.md` are already shared upstream **via the vendored MANIFEST**, not a plugin — see the note at the top of Plan 1. |
+| 2 — pip package | **Void as drafted; reconciled** | devkit is a *virtual project* (`package = false`, stdlib-only contract). No pip package will exist. Plan 2 now covers the vendored + rendered tiers instead. |
+| 3 — reusable CI | Not started | devkit has only its own `ci.yml`; no `workflow_call`, no `.github/actions/`. Carameli still has 7 local workflows. Plan 3 is **not** reconciled — re-audit before executing. |
+| 4 — generated config | **Partly shipped upstream; reconciled** | `.pre-commit-hooks.yaml` exists (3 hooks) and is unadopted here. A renderer exists but has *no merge semantics*, so the base+overlay design is dropped. |
+| 5 — data lake | Not started | Step 0 survey still unanswered. Telemetry still exports to `localhost:4318`. |
+
+**Unplanned things devkit now has** that no plan file describes: `scripts/new-project.py`
+(a 33 KB project generator, dry-run by default), `scripts/devkit_render.py` (stdlib
+template renderer), `ports.toml` + `devkit_ports.py` (host-port slot registry),
+`scripts/sweep.py`, and a `tests/test_self_hosting.py` that keeps devkit from shipping a
+utility it does not use on itself.
+
+### The blocking prerequisite for Plans 2 and 4
+
+**devkit's tags stop at `v0.4.1`.** The 32-entry MANIFEST, the shared instruction tier, and
+`.pre-commit-hooks.yaml` are all on **untagged HEAD**. Carameli pins `ref: v0.4.1`, and
+devkit's own README example pins `rev: v0.5.0` — a tag that does not exist. Cut that tag
+first; both Plan 2 Step 1 and Plan 4 Step 1 are blocked on it, and pre-commit fails hard
+(not silently) against a rev that predates the hooks.
 
 ## Dependency order
 
 ```text
-Plan 0 (rename agent-harness → devkit) ─► gates 1–4; see "Relationship to agent-harness"
-Plan 1 (plugin: skills/rules) ─────────► Plan 2 (pip package: scripts/) ──► Plan 4 (generated config + drift gate)
-Plan 3 (reusable CI workflows) ────────► (independent of 1 and 2)
-Plan 5 (data lake + OTel) ─────────────► (independent of everything)
+Plan 0 step 5 (internal rename) ──► do first or skip; see "Relationship to agent-harness"
+devkit tag v0.5.0 ────────────────► gates Plan 2 and Plan 4
+Plan 2 (vendored + rendered tiers) ─► independent of Plan 1
+Plan 4 (pre-commit channel)  ───────► independent of Plan 2
+Plan 1 (plugin: what's left) ───────► do AFTER Plan 2 Step 1, which shrinks its scope
+Plan 3 (reusable CI workflows) ─────► independent of everything
+Plan 5 (data lake + OTel) ──────────► independent of everything
 ```
 
-Plan 0 is a rename, not a build — it has no plan file, only the migration checklist below.
-Do it first or not at all; doing it after Plans 1–4 multiplies the reference sites.
+This ordering changed during the 2026-07-29 reconciliation. Plans 2 and 4 no longer depend
+on each other or on Plan 1 — the couplings that created those edges (a plugin whose hooks
+referenced relocated scripts; `devkit sync` as a package entrypoint) both stopped existing.
+Plan 1 now depends on Plan 2 rather than the reverse, because Plan 2 Step 1 pulls 7 skills
+and 2 rules into Carameli via vendoring and thereby removes them from Plan 1's cargo.
 
-Plans 1 and 3 can run in parallel. Plan 2 depends on Plan 1 only because Plan 1's plugin
-hooks reference script paths that Plan 2 relocates. Plan 4 depends on Plan 2 (`devkit sync`
-is a package entrypoint). Plan 5 is standalone and can be done at any time.
+Plan 0 is a rename, not a build — it has no plan file, only the migration checklist below.
+Do it first or not at all; doing it after the rest multiplies the reference sites.
 
 ---
 
@@ -38,26 +70,33 @@ must ship atomically with that script, under one version tag.
 > being widened.** See "Relationship to agent-harness" below. devkit **absorbs** that repo;
 > it does not replace it, and the vendoring channel it already implements is kept as-is.
 
+The tree below is the **original five-channel design**. Two channels exist; the pip-package
+channel has been **ruled out** upstream and will not be built. Lines marked `✗` are
+aspirational, `✓` are real today:
+
 ```text
-devkit/                                  (= today's agent-harness, renamed)
-├── .claude-plugin/marketplace.json    ← channel 1: agent plugin marketplace
-├── plugins/agent-ops/                 ← the plugin itself
-│   ├── .claude-plugin/plugin.json
-│   ├── skills/                        ← the 25 shareable skills
-│   ├── rules/                         ← the shareable rules
-│   └── hooks/hooks.json               ← hook *wiring* only (matchers → commands)
-├── src/devkit/                        ← channel 2: pip package (today's scripts/)
-│   ├── lint_all.py  diagnostics.py  run_tests.py  docker_common.py  …
-│   └── templates/                     ← files that CANNOT be remote-referenced
-├── .github/workflows/pr-gate.yml      ← channel 3: reusable workflow (on: workflow_call)
-├── .github/actions/setup-{python,node}-env/
-├── .pre-commit-hooks.yaml             ← channel 4: pre-commit hook repo
-├── scripts/                           ← channel 5: VENDORED (exists today)
-│   ├── hooks/*.py                     ← stdlib-only hook bodies + their tests
-│   ├── hooks/harness_config.py        ← the config seam (.devkit.toml reader)
-│   └── sync-harness.py                ← the vendoring tool: --check/--pull/--push
-└── tests/                             ← non-hook tests (the pip package's own)
+devkit/
+├── .claude-plugin/marketplace.json  ✗ channel 1: plugin marketplace — not started
+├── plugins/agent-ops/               ✗ the plugin itself — not started
+├── src/devkit/                      ✗ channel 2: RULED OUT — `[tool.uv] package = false`
+├── .github/workflows/pr-gate.yml    ✗ channel 3: reusable workflow — not started
+├── .pre-commit-hooks.yaml           ✓ channel 4: 3 published hooks (untagged HEAD)
+├── scripts/                         ✓ channel 5: VENDORED — the working core
+│   ├── hooks/*.py                   ✓ stdlib-only hook bodies + their tests
+│   ├── hooks/harness_config.py      ✓ the config seam (.agent-harness.toml reader)
+│   ├── sync-harness.py              ✓ the vendoring tool: --check/--pull/--push/--list
+│   ├── new-project.py               ✓ UNPLANNED: the project generator
+│   ├── devkit_render.py             ✓ UNPLANNED: stdlib template renderer (no merging)
+│   └── devkit_ports.py              ✓ UNPLANNED: host-port slot registry
+├── templates/{core,features}/       ✓ UNPLANNED: what new-project.py renders
+├── ports.toml                       ✓ UNPLANNED: the slot registry itself
+└── tests/                           ✓ generator/renderer tests (devkit-only, not vendored)
 ```
+
+Note the two test trees, and that the distinction is load-bearing: `scripts/hooks/tests/`
+is **vendored** and must be project-agnostic (it runs inside every consumer against that
+repo's `.agent-harness.toml`); `tests/` is devkit-only. That line was violated once and
+every generated project failed 12 tests on its first CI run.
 
 Note what is **not** in the tree: no `plugins/agent-ops/bin/`. Hook bodies are vendored
 (channel 5), so they never need to be on the plugin's PATH — see "Why hooks stay vendored".
@@ -67,26 +106,34 @@ lifecycle, not a repo artifact. Only a thin client + OTel conventions live in `d
 
 ## Which channel carries which asset
 
-| Asset | Channel | Mechanism |
+Updated 2026-07-29. "Actual" is what carries the asset **today**; where that differs from
+the original design, the design column is kept so the change is visible.
+
+| Asset | Original design | **Actual today** |
 | --- | --- | --- |
-| Skills, rules, agent Markdown | Plugin | `extraKnownMarketplaces` + `enabledPlugins` in committed `.claude/settings.json` |
-| Agent hook **wiring** (matchers) | Plugin | `hooks/hooks.json` at plugin root |
-| Agent hook **bodies** (`*.py`) + their tests | **Vendored** | `sync-harness.py` `MANIFEST`; paths stay `${CLAUDE_PROJECT_DIR}/scripts/hooks/*` |
-| Per-project hook config | **Vendored seam** | `.devkit.toml` at the consuming repo root — *not* in the MANIFEST |
-| Pre-commit hooks | pre-commit | `repo: https://github.com/alexandrec90/devkit` + `rev: v1.x` — native, no vendoring |
-| CI pipeline / PR gate | Reusable workflow | `uses: alexandrec90/devkit/.github/workflows/pr-gate.yml@v1` |
-| Python tooling (non-hook `scripts/`) | pip package | pinned in `requirements-dev.in` |
-| Lint *policy* prose | Plugin rule | "always bug-preventing, never superficial" is a rule, not a config |
-| `ruff.toml`, `mypy.ini`, `dependabot.yml`, `tasks.json` | **Generated** | no remote-reference mechanism exists — render + drift-gate |
+| Portable skills + rules | Plugin (`enabledPlugins`) | **Vendored** — 7 skills + `engineering.md`/`authoring.md` in the `MANIFEST`, byte-identical. Plugin still unbuilt. |
+| Agent hook **wiring** (matchers) | Plugin `hooks/hooks.json` | Still per-repo `.claude/settings.json`. Unchanged. |
+| Agent hook **bodies** (`*.py`) + tests | Vendored | **Vendored** — paths stay `${CLAUDE_PROJECT_DIR}/scripts/hooks/*`. As designed. |
+| Per-project hook config | Vendored seam | `.agent-harness.toml` (old spelling) — *not* in the MANIFEST. As designed. |
+| Pre-commit hooks | pre-commit `repo:`/`rev:` | **Shipped upstream** — 3 hooks in `.pre-commit-hooks.yaml`. Unadopted in Carameli. |
+| CI pipeline / PR gate | Reusable workflow | Not started. Each repo owns its own. |
+| Project-agnostic `scripts/` | pip package | **Ruled out.** Split into *vendored* (drift-checked) and *rendered-once* (project-owned) — see Plan 2. |
+| Project-shaped scripts (`lint-all.py`, `run-tests.py`) | pip package + config seam | **Rendered once** from `templates/core/scripts/`, then project-owned. `test_repo_contract.py` asserts they exist, not that they match. |
+| Lint *policy* prose | Plugin rule | Belongs in the vendored `.claude/rules/engineering.md` — see Plan 4 Step 4. |
+| `ruff.toml`, `tasks.json`, `.editorconfig`, … | Generated + drift-gated | **Seeded once** into new projects by `new-project.py`. No drift gate, no merging. |
+| `dependabot.yml` | Generated + drift-gated | **Project-owned.** Plan 4 drops it from scope. |
+| Whole new projects | (not in the original design) | `scripts/new-project.py` + `templates/` — the biggest unplanned addition. |
 
-### Why some files must be generated
+### Why the "generated config" channel shrank
 
-GitHub only reads a literal `.github/dependabot.yml`; ruff/mypy have no remote `extend`;
-VS Code has no `tasks.json` inheritance. These get rendered by `devkit sync` from
-`src/devkit/templates/`, and a CI job fails on drift.
-
-**This pattern already exists in this repo** — the PR Gate `mirror-sync` job verifies
-`scripts/sync-agents-context.py` output is in sync. Plan 4 is the same shape, one level up.
+The original argument still holds: GitHub only reads a literal `.github/dependabot.yml`,
+ruff/mypy have no remote `extend`, VS Code has no `tasks.json` inheritance. What changed is
+the answer. `devkit_render.py` does substitution and whole-line conditionals and
+**deliberately no merging**, and `new-project.py` renders *once, into a new repo*. So there
+is no base+overlay mechanism to retrofit over an existing repo's hand-tuned config, and
+building one means adding three format-specific mergers against the grain of the codebase.
+Plan 4 now treats these as seeded-once and protects the parts that matter with invariant
+tests instead. See Plan 4, "The design conflict this plan has to resolve".
 
 ---
 
@@ -103,12 +150,21 @@ What it already provides, which the remaining channels inherit rather than rebui
 | --- | --- |
 | `sync-harness.py` (`--check/--pull/--push/--list`) | Working, unit-tested |
 | `harness_config.py` + `.agent-harness.toml` seam | Working, unit-tested (`test_harness_config.py`) |
-| 17-file `MANIFEST`, byte-verified against Carameli | In sync as of devkit `67e6863` (= `v0.2.0`) |
-| Isolated CI (ruff + 151 stdlib-only hook tests) | Green |
+| `MANIFEST` — **32 entries at devkit HEAD** | Carameli has vendored only **18** (`v0.4.1`). 14-entry gap; closing it is Plan 2 Step 1. |
+| `test_repo_contract.py` (unvendored deps exist, manifest keys spelled right) | Working, vendored — **not yet in Carameli** |
+| `.pre-commit-hooks.yaml` — 3 published hooks | Working upstream, **untagged**, unadopted in Carameli |
+| `new-project.py` + `templates/` + `ports.toml` | Working; renders a whole project per preset |
+| Isolated CI (ruff + hook tests + a `generated-project` job per preset) | Green |
 
-Its limitation is **scope, not design**: it shares 17 files. Carameli has 43 skills,
-20 rules, 39 scripts, 16 hooks, 58 hook tests, and 7 workflows. Channels 1–4 exist to
-cover that remainder; channel 5 is that repo, unchanged.
+The limitation this README originally described — "its limitation is **scope**: it shares 17
+files" — has substantially closed, but **not in Carameli**. Upstream now shares 32 files
+including skills and rules; Carameli is 14 behind and still carries its own copies. So the
+gap today is *adoption lag*, not upstream scope. That inverts the original framing: the
+first move is a `--pull`, not a new channel.
+
+> **Two `--pull` runs are required.** The tool iterates the `MANIFEST` it was *imported*
+> with, so the first pull installs the new `sync-harness.py` and the second copies the
+> entries that pull added. One run looks successful and moves nothing new.
 
 ### Plan 0 — the rename migration (status: half done)
 
@@ -179,21 +235,24 @@ The gate is only meaningful with all three of these, and each has a failure mode
 
 ## The fresh-clone chain (the portability requirement)
 
-Every link exists in some form today:
+Rewritten 2026-07-29 — the chain got **shorter**, not longer, because vendoring and
+one-shot rendering both put files in the clone instead of fetching them at session time.
 
-0. **Hook bodies and `.devkit.toml` are already in the clone** — vendored, no step at all.
-   This link is the strongest one in the chain precisely because it needs no mechanism.
-1. `.claude/settings.json` (committed) declares the marketplace + `enabledPlugins`
-   → agent config arrives on first session, no manual `/plugin install`
-2. The **existing** `SessionStart` hook (`.claude/hooks/session-start.sh`) installs the venv
-   → add `devkit` to what it installs
-3. `requirements-dev.in` pins `devkit` → all non-hook scripts on PATH
-4. `.pre-commit-config.yaml` references the remote hook repo by `rev`
-5. `pr-gate.yml` shrinks to ~15 lines calling the reusable workflow
-6. `devkit sync` writes the un-referenceable files; CI fails on drift
+| # | Link | Status |
+| --- | --- | --- |
+| 0 | Hook bodies, `.agent-harness.toml`, the vendored rules/skills, and the seeded scripts are **already in the clone** | ✓ Working. No mechanism needed — this is why the vendored tier won. |
+| 1 | `SessionStart` (`.claude/hooks/session-start.sh`) provisions the toolchain and runs `pre-commit install` when a config is present | ✓ Working |
+| 2 | `.pre-commit-config.yaml` pins devkit by `rev` → drift + manifest + stdlib gates | ✗ **Plan 4 Step 1** (blocked on a tag) |
+| 3 | `pr-gate.yml` calls the reusable workflow | ✗ Plan 3, not started |
+| 4 | The remaining `/fix-*` skills arrive by *some* mechanism (plugin or vendoring — undecided) | ✗ **Plan 1, decision pending** |
 
-Fresh clone → `claude` → everything works. Only manual step is trusting the folder
-(Claude Code prompts to install project-declared marketplaces on first trust).
+Fresh clone → `claude` → everything in links 0–1 works today with **zero** manual steps,
+which is more than the original design promised (it still required trusting the folder to
+install the marketplace). Links 2–4 are the remaining work.
+
+**Void links from the original chain:** `enabledPlugins` in committed `.claude/settings.json`
+(no plugin), `requirements-dev.in` pinning `devkit` (no package), and `devkit sync` writing
+un-referenceable files (no such command; see Plan 4).
 
 ---
 
@@ -203,9 +262,17 @@ Grep over `.claude/skills/*/SKILL.md` for `carameli|jambonz|telnyx|voip|alembic|
 
 ### Tier A — 15 skills, zero project references — move as-is
 
-`audit-claude-md`, `audit-dockerignore`, `audit-gitignore`, `fix-all`, `fix-instructions`,
-`fix-pre-commit`, `fix-prs`, `fix-tests`, `gen-fixer-eval`, `optimize-fixers`, `retro`,
-`ship`, `task`, `test-skill`, `triage-fixers`
+**7 of these are already shared upstream via the vendored MANIFEST** (not a plugin), and
+Carameli just has not pulled them yet:
+
+| Already vendored upstream (7) | Still unshared (8) |
+| --- | --- |
+| `audit-claude-md`, `audit-dockerignore`, `audit-gitignore`, `retro`, `ship`, `task`, `test-skill` | `fix-all`, `fix-instructions`, `fix-pre-commit`, `fix-prs`, `fix-tests`, `gen-fixer-eval`, `optimize-fixers`, `triage-fixers` |
+
+The split is not arbitrary: the unshared 8 are the `/fix-*` and fixer-tooling family — the
+ones with mutable state (`known-fixes.md`, `state.json`) and a dependency on
+`scripts/diagnostics.py`. Vendoring took the clean ones first and left the hard cases,
+which are exactly the ones Plan 1 Step 2's state-relocation problem is about.
 
 ### Tier B — 10 skills, 1–2 incidental references — move after de-coupling
 

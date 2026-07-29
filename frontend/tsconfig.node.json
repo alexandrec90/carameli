@@ -6,5 +6,10 @@
     "moduleResolution": "bundler",
     "allowSyntheticDefaultImports": true
   },
-  "include": ["vite.config.ts"]
+  // devWatchPolicy + its test live here rather than under src/ on purpose: a
+  // composite project must list every file it pulls in (TS6307), and a file
+  // can't belong to both this project and the referencing `src` one (TS6305).
+  // Keeping the module, its test, and vite.config.ts in one project satisfies
+  // both. Vitest's default include still picks the test up.
+  "include": ["vite.config.ts", "devWatchPolicy.ts", "devWatchPolicy.test.ts"]
 }

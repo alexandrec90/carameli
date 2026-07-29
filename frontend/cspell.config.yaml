@@ -56,3 +56,20 @@ words:
   - squash
   # Possessives / proper nouns
   - Wonka
+  # Dev tooling / packaging terms (docs/plans, CLAUDE.md, rules)
+  - noqa
+  - pyproject
+  - tomllib
+  - venv
+  - virtualenv
+  # Sibling projects
+  - ibkr
+  # British spellings used deliberately in prose (devkit upstream matches)
+  - behaviour
+  - behaviours
+  # Prefixed/compound forms used in the devkit plans
+  - repoints
+  - unadopted
+  - unbuilt
+  - unparseable
+  - unvendored
