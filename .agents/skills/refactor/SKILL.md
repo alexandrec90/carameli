@@ -23,7 +23,8 @@ touching that file at the time it was refactored.
 ## Step 2 — Discover Source Files
 
 Use the Glob tool to discover the top 50 source files by size. Search these patterns:
-- `app/**/*.py` (exclude `__pycache__`, `alembic/versions`, `tests`, `conftest.py`)
+- the application package's `**/*.py` (`[paths] app` in `.devkit.toml`), excluding
+  `__pycache__`, generated migration versions, `tests`, and `conftest.py`
 - `frontend/src/**/*.{ts,tsx}` (exclude `node_modules`, `dist`, `__tests__`, `*.test.ts`, `*.spec.ts`, `*.d.ts`, `*.config.*`)
 
 For each file, get its last-commit git hash: `git log -1 --format=%H -- <path>`.
@@ -107,7 +108,7 @@ this pass.
 
 ## Hard Rules
 
-1. Never touch `node_modules/`, `venv/`, `alembic/versions/`, test files,
+1. Never touch `node_modules/`, `venv/`, generated migration versions, test files,
    or `.claude/` itself.
 2. Never change public interfaces — this is a structural pass, not an API redesign.
 3. One file at a time; complete all sub-steps before starting the next.

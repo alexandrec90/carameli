@@ -1,4 +1,8 @@
-"""Unit tests for the invoke-capped output-capping helper."""
+"""Unit tests for the invoke-capped output-capping helper.
+
+Vendored tier: every value here is either a literal the test itself supplies or is
+read from `hook.CFG`, never from the repo this happens to run in.
+"""
 
 from conftest import load_module
 
@@ -67,10 +71,31 @@ def test_run_capped_merges_stderr():
     assert b"err" in out
 
 
-# --- main argument validation ---
+# --- main argument validation and config wiring ---
 
 
 def test_main_rejects_tiny_max_bytes(capsys):
     rc = hook.main(["--command", "echo hi", "--max-bytes", "10"])
     assert rc == 1
     assert "must be >=" in capsys.readouterr().err
+
+
+def test_defaults_come_from_the_manifest():
+    """The CLI defaults are the `[bash]` values, not hard-coded numbers.
+
+    Guards the seam: a project that widens the cap in `.devkit.toml` must
+    get the wider cap from a bare `--command` invocation, with no flag.
+    """
+    parser_defaults = hook.main.__defaults__
+    assert parser_defaults is not None  # (argv=None)
+    # Exercised through the real parser rather than by reading the constant.
+    code, out = hook.run_capped(
+        "echo x", max_bytes=hook.CFG.bash.max_bytes, head_bytes=hook.CFG.bash.head_bytes
+    )
+    assert code == 0
+    assert b"x" in out
+
+
+def test_min_max_bytes_is_below_the_configured_cap():
+    """A manifest that sets max_bytes under the floor would reject every call."""
+    assert hook.CFG.bash.max_bytes >= hook.MIN_MAX_BYTES

@@ -35,6 +35,34 @@ def test_rule_requires_description_and_paths():
     assert any("paths" in m for m in checks)
 
 
+def test_a_rule_that_declares_itself_global_may_omit_paths():
+    """`authoring.md` permits omitting `paths` for a truly global rule.
+
+    The check's own message said so while still failing every such file, so the one
+    genuinely global rule in the vendored tier (`engineering.md`) could not satisfy
+    it — and being vendored, it cannot be edited to add paths.
+    """
+    rel = ".claude/rules/engineering.md"
+    declared = (
+        "---\ndescription: baseline policy\n---\n\n# Rule: Baseline\n\n"
+        "Deliberately **unscoped** (no `paths:`) — these hold everywhere.\n"
+    )
+    assert lint.check_frontmatter(rel, declared) == []
+
+
+def test_the_global_escape_hatch_only_applies_near_the_top():
+    """A passing mention far down must not exempt a rule that forgot its paths."""
+    buried = "---\ndescription: x\n---\n" + "filler\n" * 40 + "this rule is unscoped\n"
+    msgs = [f.message for f in lint.check_frontmatter(".claude/rules/foo.md", buried)]
+    assert any("paths" in m for m in msgs)
+
+
+def test_declares_global_scope_unit():
+    assert lint._declares_global_scope("---\nd: x\n---\nDeliberately unscoped.\n") is True
+    assert lint._declares_global_scope("---\nd: x\n---\nA truly global rule.\n") is True
+    assert lint._declares_global_scope("---\nd: x\n---\nOrdinary prose.\n") is False
+
+
 def test_skill_requires_disable_model_invocation():
     rel = ".claude/skills/foo/SKILL.md"
     good = "---\nname: foo\ndescription: d\ndisable-model-invocation: true\n---\n"

@@ -52,10 +52,11 @@ In both modes, you **may** use:
 
 You **may not** use:
 
-- `Edit`, `Write`, `NotebookEdit` on any file under `app/`, `tests/`, `frontend/`,
-  `alembic/`, or any other source path
+- `Edit`, `Write`, `NotebookEdit` on any source path — the application package,
+  `tests/`, a frontend tree, a migrations directory, or anything else the project
+  builds from
 - Any command that mutates state: `git commit`, `docker compose restart`,
-  `alembic upgrade`, package installs, etc.
+  migration upgrades, package installs, etc.
 
 The single allowed write target is the plan file in Step 4.
 

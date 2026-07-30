@@ -1,17 +1,17 @@
 ---
 name: ship
 disable-model-invocation: true
-description: 'Ship the current task: lint pre-flight, commit, push, open a PR to master, and start the autofix loop. Use when a task is complete and the user asks to ship / open a PR for the current change.'
+description: 'Ship the current task: lint pre-flight, commit, push, open a PR to the default branch, and start the autofix loop. Use when a task is complete and the user asks to ship / open a PR for the current change.'
 argument-hint: 'Optional PR title'
 ---
 
 # Skill: Ship the current task
 
 Takes the finished work on the current feature branch all the way to an open PR
-against `master`, then hands the PR to the CI-autofix loop. Explicit-invocation
+against the repo's default branch, then hands the PR to the CI-autofix loop. Explicit-invocation
 only (`/ship`) — it pushes and opens a PR, so it must never fire mid-task. The
 branch was created at the start of the task — by `/task` (worktrees) or the
-branch-per-task hook (primary checkout on `master`).
+branch-per-task hook (primary checkout on the default branch).
 
 Run the steps in order. Stop and report if a step fails — do not open a PR from
 a branch that failed pre-flight.
@@ -22,7 +22,7 @@ a branch that failed pre-flight.
 python scripts/ship.py --preflight
 ```
 
-Exit `3` means you are on `master` or detached HEAD — there is nothing to ship
+Exit `3` means you are on the default branch or detached HEAD — there is nothing to ship
 from. Report that and stop; the work needs to be on a `claude/...` branch first.
 
 ## Step 2 — Confirm tests
@@ -66,10 +66,10 @@ re-running `/ship` on the pushed branch no-ops the push and continues to the PR
 ## Step 5 — Open the PR
 
 Check for a PR template first (`.github/pull_request_template.md` and the other
-standard locations). Create the PR against `master` with the GitHub MCP tool,
+standard locations). Create the PR against the default branch with the GitHub MCP tool,
 filling the template if one exists:
 
-- `mcp__github__create_pull_request` — base `master`, head = current branch,
+- `mcp__github__create_pull_request` — base = the default branch, head = current branch,
   title from the argument or the commit subject, body summarizing the change.
 
 Do **not** create the PR if any earlier step failed.

@@ -129,10 +129,9 @@ This project is vibe-coded. **Every rule below is mandatory.**
 
 ### Instruction-file feedback loop
 
-If an instruction in a skill, rule, or CLAUDE.md sent you into a dead end or a wasted
-operation — or a mistake you made would have been prevented by one — flag it in your
-report with the file, the line, and a proposed edit (authoring conventions:
-`.claude/rules/authoring.md`). Never silently work around a bad instruction.
+See `.claude/rules/engineering.md` ("Guardrail: the instruction-file feedback loop") —
+vendored, and deliberately not restated here. Authoring conventions for the fix itself
+are in `.claude/rules/authoring.md`.
 
 ### Dependencies
 
@@ -170,10 +169,10 @@ lock balloons it ~5x (playwright, mypy, locust alone are ~250MB).
 
 ## Testing
 
-Every code change must include tests in the same commit. Every endpoint and every
-testable unit of logic must have test coverage — gaps are not acceptable. If you
-add or touch something that has no test, write the test in the same commit even if
-the logic itself didn't change.
+**The coverage mandate lives in `.claude/rules/engineering.md`** — vendored from devkit
+and byte-identical in every project, so it is not restated here. Read it first; a
+second copy in this file would be the one nothing drift-checks, which is exactly how
+the policy forked the last time. What follows is only what is specific to Carameli.
 
 - New endpoint/service: cover happy path, error cases, and edge cases
 - Bug fix: write a regression test first

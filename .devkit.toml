@@ -1,7 +1,10 @@
-# Per-project config for the shared agent-harness hook scripts
-# (scripts/hooks/*.py). The scripts are vendored unchanged across projects;
-# everything project-specific lives here. Loaded by scripts/hooks/harness_config.py.
-# Schema + neutral defaults: that module's dataclasses.
+# Per-project config for the vendored devkit hook scripts (scripts/hooks/*.py).
+# The scripts are byte-identical across projects; everything project-specific lives
+# here. Loaded by scripts/hooks/harness_config.py. Schema + neutral defaults: that
+# module's dataclasses.
+#
+# Deliberately NOT in sync-devkit.py's MANIFEST -- this is the per-project seam, so
+# editing it is correct and is never reported as drift.
 
 [project]
 # Prefix for harness control env vars:
@@ -22,6 +25,13 @@ finalize_targets = [
   ["make-frontend-tests", "modules"],
   ["refactor", "files"],
 ]
+
+# The PreToolUse Bash output cap. `enforce-capped-bash.py` blocks an uncapped Bash
+# call and quotes `max_bytes` in the reason; `invoke-capped.py` applies it. One field
+# feeds both, so the number the agent is told to use is the number it gets.
+[bash]
+max_bytes = 4000
+head_bytes = 2000
 
 # Tier 2b: host pytest against db+redis over their published compose ports.
 [db]

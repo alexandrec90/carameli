@@ -1,18 +1,18 @@
-"""Contract test: `.agent-harness.toml` reproduces Carameli's harness constants.
+"""Contract test: `.devkit.toml` reproduces Carameli's harness constants.
 
-**Deliberately NOT in `scripts/sync-harness.py`'s MANIFEST** — this is the
+**Deliberately NOT in `scripts/sync-devkit.py`'s MANIFEST** — this is the
 project-specific half of a test that used to live in the vendored
 `test_harness_config.py`. Upstream (devkit `67e6863`) rewrote that file to assert
 only *invariants*, because pinning carameli's literals there turned the vendored
 suite red in every other consuming repo.
 
 That rewrite is right for the shared file and leaves a real gap here: nothing else
-catches a `.agent-harness.toml` edit that silently changes what the Stop hook does
+catches a `.devkit.toml` edit that silently changes what the Stop hook does
 in *this* repo — points pytest at the wrong directory, drops a finalize target,
 or hands host pytest the wrong DB credentials. This file closes that gap on
 Carameli's side, where project literals belong.
 
-Keep it in sync with `.agent-harness.toml`; a deliberate manifest change should
+Keep it in sync with `.devkit.toml`; a deliberate manifest change should
 update both in the same commit.
 """
 

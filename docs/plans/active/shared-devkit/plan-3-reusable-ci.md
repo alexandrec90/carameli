@@ -3,6 +3,61 @@
 **Depends on:** nothing (independent of Plans 1 and 2). **Parallel with:** Plan 1.
 **Read first:** `docs/plans/active/shared-devkit/README.md`.
 
+> ## ⚠️ Reconciled 2026-07-30 — a competing answer already shipped
+>
+> This plan was never reconciled and the README flagged it "re-audit before executing".
+> Here is that audit.
+>
+> **Confirmed still true:** devkit has exactly one workflow (`.github/workflows/ci.yml`),
+> its own. There is no `workflow_call`, no `.github/actions/`. Carameli still owns 7
+> workflows, 2 composite actions, and 2 `.disabled` files. The inventory table below is
+> accurate.
+>
+> **What the plan did not know:** upstream solved the *same problem* a different way.
+> `templates/core/dot-github/workflows/pr-gate.yml.tmpl` renders a complete four-job PR
+> gate — pre-commit, lint, tests, vendored-harness drift — into every generated project,
+> pinned to a devkit tag. A new project already gets the gate. It gets it by **rendering**,
+> not by calling a reusable workflow.
+>
+> That is not a gap; it is a design fork, and it changes this plan's value proposition:
+>
+> | | Rendered template (shipped) | Reusable `workflow_call` (this plan) |
+> | --- | --- | --- |
+> | New project gets a gate | ✅ already | ✅ |
+> | Existing repo (Carameli) adopts it | ❌ nothing renders into a live repo | ✅ the only mechanism that does |
+> | A gate fix reaches consumers | ❌ never — the render is one-shot and then project-owned | ✅ on the next `uses:` bump |
+> | Consumer can diverge | ✅ freely, it is their file | ⚠️ only through declared inputs |
+> | Dependabot maintains the pin | n/a | ✅ `github-actions` ecosystem bumps `uses:` |
+>
+> **So the honest scope of this plan is now: "let *existing* repos share a gate, and let
+> gate fixes propagate."** Both are real — the rendered template cannot do either — but
+> neither is urgent with one consumer. Its own "Definition of done" already reduces to
+> Carameli, which is the tell.
+>
+> ### Recommended sequencing change
+>
+> **Demote this below Plans 0, 2, 4, and 6.** It is the largest plan in the set (7
+> workflows, ~1000 lines of YAML), it duplicates a shipped capability for the
+> new-project case, and its remaining benefit scales with consumer count — which is
+> currently one. Revisit when a second existing repo adopts devkit, or when a gate fix has
+> had to be hand-applied twice.
+>
+> ### If it is executed anyway, resolve this first
+>
+> A reusable `pr-gate.yml` and `templates/.../pr-gate.yml.tmpl` would be **two sources of
+> truth for the same gate**, and devkit has an explicit rule against exactly that shape
+> (`scripts/notify.py` vs its template copy is enforced byte-identical by a test *because*
+> two copies drift). Pick one:
+>
+> - **(a)** The template becomes a thin caller of the reusable workflow — the generated
+>   gate shrinks to ~15 lines, and every generated project inherits fixes. This is the
+>   coherent option, and it makes the plan *more* valuable, not less.
+> - **(b)** Keep both and accept the drift, with a test comparing job names at minimum.
+>
+> **(a) is the recommendation** — and note it inverts the plan's framing: the primary
+> beneficiary is generated projects, with Carameli as the migration case rather than the
+> point.
+
 ## Goal
 
 Turn Carameli's 7 workflows and 2 composite actions into a reusable CI layer hosted in

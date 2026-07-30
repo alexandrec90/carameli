@@ -1,13 +1,13 @@
 ---
 name: task
 disable-model-invocation: true
-description: 'Start a new task on a fresh claude/<slug> branch cut from latest origin/master. Use at the start of a new piece of work, especially in a worktree where you are never on master and always sit on a stale/merged branch.'
+description: 'Start a new task on a fresh claude/<slug> branch cut from the latest origin default branch. Use at the start of a new piece of work, especially in a worktree where you are never on the default branch and always sit on a stale/merged branch.'
 argument-hint: 'Short description of the task (used for the branch name)'
 ---
 
 # Skill: Start a task on a fresh branch
 
-Cuts a fresh `claude/<slug>-<mmdd>` branch from the latest `origin/master` so
+Cuts a fresh `claude/<slug>-<mmdd>` branch from the latest `origin/<default>` so
 each task is isolated and current.
 
 **Usually you won't need this** — after you `/ship`, the branch-per-task hook
@@ -18,8 +18,8 @@ without shipping. It's explicit because the "I'm starting something new" boundar
 can't be inferred safely — the local signals can't tell a freshly-cut empty
 branch from a stale merged one.
 
-Creating a *new* branch off `origin/master` is allowed in a worktree even while
-`master` is checked out in the primary tree.
+Creating a *new* branch off `origin/<default>` is allowed in a worktree even while
+the default branch is checked out in the primary tree.
 
 ## Step 1 — Start the branch
 
@@ -28,11 +28,11 @@ python scripts/start-task.py "<the task description>"
 ```
 
 Pass the argument through as the description; it becomes the branch slug. The
-script fetches `origin`, verifies `origin/master`, and checks out a fresh branch
+script fetches `origin`, verifies `origin/<default>`, and checks out a fresh branch
 based on it.
 
 Non-zero exits: `4` the tree is dirty (finish the current task with `/ship` or
-stash first — it will not strand or carry your changes), `7` `origin/master`
+stash first — it will not strand or carry your changes), `7` `origin/<default>`
 missing after fetch, `8` checkout failed. Report and stop on any of these.
 
 ## Step 2 — Confirm and proceed

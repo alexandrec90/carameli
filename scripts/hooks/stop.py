@@ -14,13 +14,16 @@ into the session so it is fixed here instead of after a CI round-trip:
   - Tier 1: `lint-all.py --changed` (ruff/mypy/vulture/eslint/... , no infra),
   - Tier 2a: host `pytest scripts/hooks/tests/` when a scripts/ file changed --
     needs no Docker, so it runs even under a stack-down-by-default policy,
-  - Tier 2b: host `pytest` (app/ or tests/ Python changed) against db+redis --
-    no app container, so the footprint is just db+redis. Uses them if up; else,
-    only with `CARAMELI_STOP_TESTS_AUTOSTART=1`, brings db+redis up on demand,
-    runs, then stops what it started. Paid-safe via pytest.ini's `-m "not paid"`,
+  - Tier 2b: host `pytest` (app/ or tests/ Python changed). With `[db] enabled`
+    it runs against db+redis -- no app container, so the footprint is just
+    db+redis. Uses them if up; else, only with `*_STOP_TESTS_AUTOSTART=1`, brings
+    db+redis up on demand, runs, then stops what it started. Paid-safe via
+    pytest.ini's `-m "not paid"`. Without a DB the suite needs no infra and simply
+    runs,
   - Tier 3: `check-lock-markers.py` when a requirements file changed, and vitest
     when frontend/src changed.
-It is loop-guarded (`stop_hook_active`), opt-out-able (`CARAMELI_SKIP_STOP_VERIFY=1`),
+It is loop-guarded (`stop_hook_active`), opt-out-able (`*_SKIP_STOP_VERIFY=1`, prefixed
+per project — see `[project] env_prefix`),
 gated on relevant files changing, and skips cleanly when tooling/infra is absent.
 
 `save_snapshot`, `skin_changed`, `should_normalize`, `archive_targets_present`, and
@@ -31,12 +34,14 @@ independently tested script.
 """
 
 import contextlib
+import functools
 import json
 import os
 import re
 import shutil
 import subprocess
 import sys
+from collections.abc import Mapping
 from pathlib import Path
 
 # scripts/hooks/ on path so the sibling, stdlib-only config helper imports before
@@ -46,7 +51,7 @@ import harness_config
 
 REPO_ROOT = (Path(__file__).parent / "../..").resolve()
 # Everything project-specific below (env prefix, DB creds/ports, frontend layout,
-# source-tree shape, finalize targets) is sourced from .agent-harness.toml so this
+# source-tree shape, finalize targets) is sourced from .devkit.toml so this
 # script can be vendored unchanged across projects. See harness_config.py.
 CFG = harness_config.load(REPO_ROOT)
 
@@ -67,18 +72,51 @@ CHECK_LOCK_MARKERS = REPO_ROOT / "scripts/check-lock-markers.py"
 
 # Interpreter candidates for the verification checks, relative to the repo root.
 VENV_PYTHONS = (".venv/Scripts/python.exe", ".venv/bin/python")
+# PATH interpreters to try when there is no venv and the launcher cannot run the
+# checks. `python3` is deliberately absent -- on Windows it is the Store shim this
+# whole dance exists to escape, and on POSIX it is already `sys.executable`.
+PATH_PYTHONS = ("python", "py")
+# Importing this is the cheapest proof an interpreter can run the checks at all.
+VERIFY_IMPORT = "pytest"
+
+
+@functools.cache
+def _can_verify(executable: str) -> bool:
+    """True when `executable` can import what the verification checks need.
+
+    Cached: `verify_python` is called once per check, and this spawns a process.
+    """
+    try:
+        completed = subprocess.run(
+            [executable, "-c", f"import {VERIFY_IMPORT}"],
+            capture_output=True,
+            timeout=30,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return False  # not executable, or hung -- either way, unusable.
+    return completed.returncode == 0
 
 
 def verify_python(repo_root: Path | None = None) -> str:
-    """Interpreter for the verification checks -- the project venv, not the launcher.
+    """Interpreter for the verification checks -- one that can actually run them.
 
     The hooks are wired as `python3 <script>`, and on Windows `python3` resolves
     to the Microsoft Store shim: an interpreter with none of the project's
     dependencies installed. Running the checks under it fails on tooling rather
     than on the code -- `-m pytest` dies with "No module named pytest" and
     lint-all.py cannot import its linters -- which reads as a real CI failure and
-    is unfixable by editing source. Resolve the venv explicitly; fall back to the
-    launching interpreter only when there is no venv (fresh clone, CI).
+    is unfixable by editing source.
+
+    A venv wins outright: if one exists it is the project's declared environment,
+    and a missing dependency *there* is a real provisioning failure worth
+    surfacing. Without one, `sys.executable` cannot be trusted blindly -- it is
+    the shim. A project with no venv is the normal case for a stdlib-only repo,
+    not just the "fresh clone, CI" edge this once assumed, and on a Windows
+    desktop the launcher is exactly the interpreter to avoid. So probe it, and
+    fall through to PATH when it cannot import the tooling.
+
+    Returns `sys.executable` when nothing can: the checks then fail loudly on
+    tooling rather than silently reporting green having run nothing.
 
     `repo_root` defaults to REPO_ROOT at call time, not import time, so the
     module-level constant stays overridable.
@@ -88,8 +126,17 @@ def verify_python(repo_root: Path | None = None) -> str:
         candidate = root / rel
         if candidate.exists():
             return str(candidate)
+    if _can_verify(sys.executable):
+        return sys.executable
+    for name in PATH_PYTHONS:
+        found = shutil.which(name)
+        if found and found != sys.executable and _can_verify(found):
+            return found
     return sys.executable
 
+
+# pytest's EXIT_NOTESTSCOLLECTED. Not a failure for this hook -- see _pytest_failures.
+PYTEST_NO_TESTS_COLLECTED = 5
 
 CHECK_LINT = "lint"  # Tier 1: lint-all.py --changed (no infra)
 CHECK_SCRIPT_TESTS = "script-tests"  # Tier 2a: host pytest scripts/hooks/tests (no infra)
@@ -134,7 +181,7 @@ def save_snapshot(profile: Path, snapshot: Path) -> int:
     return 0
 
 
-def should_normalize(env: dict[str, str]) -> bool:
+def should_normalize(env: Mapping[str, str]) -> bool:
     """True when known-fixes normalization is explicitly enabled."""
     return env.get(NORMALIZE_ENV) == "1"
 
@@ -208,7 +255,7 @@ def stop_hook_active(raw_stdin: str) -> bool:
     return bool(isinstance(payload, dict) and payload.get("stop_hook_active"))
 
 
-def verify_enabled(env: dict[str, str]) -> bool:
+def verify_enabled(env: Mapping[str, str]) -> bool:
     """False when the operator has opted out of pre-stop verification."""
     return env.get(SKIP_VERIFY_ENV) != "1"
 
@@ -294,7 +341,7 @@ def _git_status_porcelain(repo_root: Path) -> str:
     return result.stdout if result.returncode == 0 else ""
 
 
-def autostart_enabled(env: dict[str, str]) -> bool:
+def autostart_enabled(env: Mapping[str, str]) -> bool:
     """True when the operator opted into on-demand db+redis autostart."""
     return env.get(AUTOSTART_ENV) == "1"
 
@@ -397,15 +444,76 @@ def host_db_env(repo_root: Path = REPO_ROOT) -> dict[str, str] | None:
     return env
 
 
-def run_db_tests(
-    paths: list[str], env: dict[str, str], repo_root: Path = REPO_ROOT
+def _pytest_failures(
+    targets: list[str], repo_root: Path, extra_env: dict[str, str] | None = None
 ) -> list[tuple[str, str | None, str]]:
-    """Tier 2b: host pytest for changed app/tests against db+redis.
+    """Run host pytest over `targets`; [] on pass, one CHECK_TESTS failure otherwise.
+
+    Shared by both shapes of Tier 2b (with and without a DB), so the two differ only
+    in the infra they arrange and the env they inject -- not in how a failure is
+    captured and reported. An OS error is a skip: verification never blocks the agent
+    over a local tooling gap.
+    """
+    argv = [verify_python(), "-m", "pytest", *targets, "-q"]
+    try:
+        result = subprocess.run(
+            argv,
+            cwd=repo_root,
+            capture_output=True,
+            text=True,
+            env={**os.environ, **extra_env} if extra_env else None,
+        )
+    except OSError:
+        return []
+    # 5 is pytest's EXIT_NOTESTSCOLLECTED, and it is not a failure here. Targets come
+    # from `host_test_targets`, which selects *changed files* under tests/ -- so editing
+    # a helper that holds no tests of its own (conftest.py, a support module) hands
+    # pytest a file with nothing to collect. Treating that as a failure blocks the stop
+    # with "no tests ran", which no source edit can resolve.
+    if result.returncode in (0, PYTEST_NO_TESTS_COLLECTED):
+        return []
+    tail = (result.stdout + result.stderr).strip().splitlines()[-20:]
+    return [(CHECK_TESTS, None, "\n".join(tail))]
+
+
+def run_host_tests(
+    paths: list[str], env: Mapping[str, str], repo_root: Path = REPO_ROOT
+) -> list[tuple[str, str | None, str]]:
+    """Tier 2b: host pytest for changed app/tests code, DB or no DB.
+
+    Two shapes, one tier, and the second one is why this wrapper exists. With a DB
+    configured the suite needs db+redis, so it goes through `run_db_tests`'s
+    reachability/autostart/teardown dance. With `[db] enabled = false` the suite needs
+    no infra at all and simply runs.
+
+    Without that second branch a DB-less project ran **no application tests at all**
+    on Stop: this is the only tier that consults `host_test_targets`, and it returned
+    early on `not CFG.db.enabled`. So every `bare`-preset project -- and devkit itself,
+    whose `tests/` tree is the generator's entire safety net -- got lint and the
+    vendored hook tests, silently never its own suite, and only found a broken test in
+    CI. The DB tier's gating is about *infra*; it should never have been the thing that
+    decided whether tests run.
+    """
+    if CFG.db.enabled:
+        return run_db_tests(paths, env, repo_root)
+    targets = host_test_targets(paths)
+    if not targets:
+        return []
+    return _pytest_failures(targets, repo_root)
+
+
+def run_db_tests(
+    paths: list[str], env: Mapping[str, str], repo_root: Path = REPO_ROOT
+) -> list[tuple[str, str | None, str]]:
+    """Tier 2b with a DB: host pytest for changed app/tests against db+redis.
 
     Runs on the host (no app container) so the footprint is just db+redis. Uses
     them if already up; otherwise, only with autostart opted in, brings up db+redis,
     runs, then stops exactly what it started. Any infra gap (daemon down, up
     failure, unresolved ports) is a clean skip -> deferred to CI, never a block.
+
+    Callers should prefer `run_host_tests`, which routes to this only when a DB is
+    actually configured.
     """
     if not CFG.db.enabled:
         return []
@@ -426,31 +534,34 @@ def run_db_tests(
         db_env = host_db_env(repo_root)
         if db_env is None:
             return []
-        argv = [verify_python(), "-m", "pytest", *targets, "-q"]
-        try:
-            result = subprocess.run(
-                argv,
-                cwd=repo_root,
-                capture_output=True,
-                text=True,
-                env={**os.environ, **db_env},
-            )
-        except OSError:
-            return []
-        if result.returncode == 0:
-            return []
-        tail = (result.stdout + result.stderr).strip().splitlines()[-20:]
-        return [(CHECK_TESTS, None, "\n".join(tail))]
+        return _pytest_failures(targets, repo_root, db_env)
     finally:
         _compose_stop(started, repo_root)
 
 
 def _command_for(name: str) -> tuple[list[str], Path, str | None] | None:
-    """(argv, cwd, artifact_path) for a check, or None when its tool is absent."""
+    """(argv, cwd, artifact_path) for a check, or None when its tool is absent.
+
+    "Absent" includes a *script* that this project does not have. Returning an argv
+    for a missing script does not skip the check -- the interpreter exits 2 with
+    "can't open file", which `run_checks` cannot tell apart from a real finding and
+    reports as a failure the agent has no way to fix. That is not hypothetical: no
+    generated project ships `check-lock-markers.py`, so every one of them blocked its
+    own Stop with a bogus `lock-markers` failure the moment a lockfile changed.
+
+    Deciding absence here also makes it a readable state rather than an accident, which
+    is what lets CI hold a project to it: `scripts/hooks/tests/test_repo_contract.py`
+    fails when a script this project's own config makes reachable is missing.
+    """
     if name == CHECK_LINT:
-        # --no-secrets: detect-secrets is the pre-commit hook's job (and already
-        # out of CI_TOOLS); skipping it is the one always-on cost we drop here,
-        # which also stops the Stop hook churning .secrets.baseline.
+        if not LINT_ALL.exists():
+            return None
+        # --no-secrets is part of the contract between this hook and lint-all.py: a
+        # project whose lint runner has a detect-secrets pass skips it here (it is the
+        # pre-commit hook's job, and running it churns .secrets.baseline every turn),
+        # and one without a secrets pass accepts the flag as a documented no-op. Either
+        # way lint-all.py must *parse* it -- argparse rejecting it exits 2, which reads
+        # as a permanent lint failure on every single Stop.
         return (
             [verify_python(), str(LINT_ALL), "--changed", "--no-secrets"],
             REPO_ROOT,
@@ -459,6 +570,10 @@ def _command_for(name: str) -> tuple[list[str], Path, str | None] | None:
     if name == CHECK_SCRIPT_TESTS:
         return ([verify_python(), "-m", "pytest", "scripts/hooks/tests/", "-q"], REPO_ROOT, None)
     if name == CHECK_LOCKS:
+        # Optional tier: the script is project-owned (its sentinels name that
+        # project's lockfiles), so a project without one simply has no tier.
+        if not CHECK_LOCK_MARKERS.exists():
+            return None
         return ([verify_python(), str(CHECK_LOCK_MARKERS)], REPO_ROOT, None)
     if name == CHECK_FRONTEND:
         npm = shutil.which("npm")
@@ -500,21 +615,22 @@ def _print_verify_failures(failures: list[tuple[str, str | None, str]]) -> None:
             if tail:
                 lines.extend(f"      {ln}" for ln in tail.splitlines())
     lines.append(
-        "Re-run locally: python scripts/lint-all.py --changed | python scripts/run-tests.py --fast"
+        "Re-run locally: python scripts/lint-all.py --changed | python scripts/run-tests.py --changed"
     )
     lines.append(f"(Set {SKIP_VERIFY_ENV}=1 to skip this gate.)")
     print("\n".join(lines), file=sys.stderr)
 
 
-def verify(raw_stdin: str, env: dict[str, str]) -> int:
+def verify(raw_stdin: str, env: Mapping[str, str]) -> int:
     """Run pre-stop verification. Returns 2 (block, relay) on failure, else 0."""
     if stop_hook_active(raw_stdin) or not verify_enabled(env):
         return 0
     paths = changed_paths(_git_status_porcelain(REPO_ROOT))
-    # Infra-light tiers (lint, script-tests, locks, frontend) plus the DB tier,
-    # which manages its own db+redis reachability/autostart/teardown internally.
+    # Infra-light tiers (lint, script-tests, locks, frontend) plus the application
+    # test tier, which arranges its own db+redis reachability/autostart/teardown when
+    # this project has a DB and just runs pytest when it does not.
     failures = run_checks(select_checks(paths))
-    failures += run_db_tests(paths, env)
+    failures += run_host_tests(paths, env)
     if failures:
         _print_verify_failures(failures)
         return 2

@@ -1,8 +1,41 @@
+#!/usr/bin/env python3
+"""State engine for `.claude` skill `state.json` workflows.
+
+A skill that accumulates knowledge across sessions (which modules have tests, which
+files were refactored, which files a design audit has cleared) keeps it in a
+`state.json` beside the skill. This engine is the only thing that writes those
+files: the skill emits a small interim artifact, and `scripts/hooks/finalize-state.py`
+calls this on Stop to merge it in. Nothing hand-edits `state.json`.
+
+Three schemas, and the split matters for portability:
+
+| Schema | Shape | Portable? |
+| --- | --- | --- |
+| `modules` | list of {module, test_file, git_hash, gaps_found, last_reviewed} | yes |
+| `files` | map of path -> {git_hash, refactored_at} | yes |
+| `audit` | per-check file statuses, driven by a scan plan | **needs project data** |
+
+`modules` and `files` are pure merges over data the skill supplies -- no path
+assumptions, nothing to configure. `audit` is different: planning a scan means
+knowing *which files each check applies to*, and that is one project's source
+layout. So the check specs are **not** in this file. They are read from
+`.claude/skills/<skill>/check-specs.json`, which the consuming project owns.
+
+Without that file the `audit` schema is simply unavailable, and `plan` says so
+rather than emitting an empty plan that looks like "nothing to scan" -- the two are
+indistinguishable in a state.json, and the silent version once meant an audit skill
+reported everything clean because it had planned nothing.
+
+stdlib only: this runs from a Stop hook, before the virtualenv is guaranteed.
+Unit-tested in `scripts/hooks/tests/test_state_engine.py`.
+"""
+
 from __future__ import annotations
 
 import argparse
 import hashlib
 import json
+import sys
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -12,8 +45,18 @@ SCRIPT_VERSION = "1"
 VALID_AUDIT_STATUS = {"pass", "violation", "fixed", "stale"}
 VALID_SCHEMAS = ("audit", "modules", "files")
 
+CHECK_SPECS_FILENAME = "check-specs.json"
+
+# Directory names that are never source in any project. Unlike the check specs
+# these genuinely are universal -- a vendored dependency tree or a build output is
+# not code anyone audits -- so they stay here rather than in project data.
 EXCLUDED_DIR_NAMES = {"node_modules", ".venv", ".git", "__pycache__", "dist", "build"}
-EXCLUDED_PREFIXES = {"alembic/versions/", ".claude/"}
+
+# `.claude/` is excluded for a subtler reason: the skills' own state files live
+# there, so including it makes an audit's result depend on the audit's own output.
+# Anything beyond this (generated migrations, vendored code) is project-specific and
+# belongs in the spec file's `exclude_prefixes`.
+DEFAULT_EXCLUDED_PREFIXES = (".claude/",)
 
 
 @dataclass(frozen=True)
@@ -23,31 +66,12 @@ class CheckSpec:
     include_globs: tuple[str, ...]
 
 
-CHECK_SPECS: tuple[CheckSpec, ...] = (
-    CheckSpec("A", "local", ("app/**/*.py", "frontend/src/**/*.ts", "frontend/src/**/*.tsx")),
-    CheckSpec("B", "cross", ("app/**/*.py", "frontend/src/**/*.ts", "frontend/src/**/*.tsx")),
-    CheckSpec("C", "cross", ("frontend/src/**/*.ts", "frontend/src/**/*.tsx")),
-    CheckSpec("D", "cross", ("app/**/*.py", "frontend/src/**/*.ts", "frontend/src/**/*.tsx")),
-    CheckSpec("E", "local", ("app/**/*.py", "frontend/src/**/*.ts", "frontend/src/**/*.tsx")),
-    CheckSpec("F", "local", ("frontend/src/**/*.ts", "frontend/src/**/*.tsx")),
-    CheckSpec("G", "local", ("app/**/*.py", "frontend/src/**/*.ts", "frontend/src/**/*.tsx")),
-    CheckSpec("H", "local", ("frontend/src/**/*.ts", "frontend/src/**/*.tsx")),
-    CheckSpec("I", "local", ("tests/**/*.py", "frontend/src/**/*.ts", "frontend/src/**/*.tsx")),
-    CheckSpec("J", "cross", ("tests/test_*.py", "tests/**/test_*.py")),
-    CheckSpec(
-        "K",
-        "cross",
-        (
-            "app/services/**/*.py",
-            "app/repositories/**/*.py",
-            "frontend/src/hooks/**/*.ts",
-            "frontend/src/hooks/**/*.tsx",
-            "frontend/src/lib/**/*.ts",
-            "frontend/src/lib/**/*.tsx",
-        ),
-    ),
-    CheckSpec("L", "local", ("app/**/*.py", "frontend/src/**/*.ts", "frontend/src/**/*.tsx")),
-)
+@dataclass(frozen=True)
+class CheckPlanConfig:
+    """What `audit` planning needs from the project, loaded from check-specs.json."""
+
+    specs: tuple[CheckSpec, ...] = ()
+    exclude_prefixes: tuple[str, ...] = DEFAULT_EXCLUDED_PREFIXES
 
 
 # ---------- shared helpers ----------
@@ -99,10 +123,66 @@ def write_json(path: Path, payload: dict[str, Any]) -> None:
     path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
 
 
+# ---------- check specs (the project-owned half) ----------
+
+
+def parse_check_specs(raw: dict[str, Any]) -> CheckPlanConfig:
+    """Build a CheckPlanConfig from parsed check-specs.json. Pure; never raises.
+
+    A malformed row is dropped rather than fatal: one bad entry must not take the
+    whole audit offline, and the dropped id shows up as an unplanned check.
+    """
+    specs: list[CheckSpec] = []
+    rows = raw.get("checks")
+    if isinstance(rows, list):
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            check_id = row.get("id")
+            kind = row.get("kind")
+            include = row.get("include")
+            if not isinstance(check_id, str) or not check_id:
+                continue
+            if kind not in {"local", "cross"}:
+                continue
+            if not isinstance(include, list) or not all(isinstance(g, str) for g in include):
+                continue
+            specs.append(CheckSpec(check_id, kind, tuple(include)))
+
+    raw_excludes = raw.get("exclude_prefixes")
+    excludes = (
+        tuple(p for p in raw_excludes if isinstance(p, str))
+        if isinstance(raw_excludes, list)
+        else ()
+    )
+    # The universal exclusions are always applied; the project's are additive. A
+    # project cannot opt back into scanning `.claude/`, which would make an audit's
+    # result depend on its own output.
+    merged = tuple(dict.fromkeys(DEFAULT_EXCLUDED_PREFIXES + excludes))
+    return CheckPlanConfig(specs=tuple(specs), exclude_prefixes=merged)
+
+
+def load_check_specs(repo_root: Path, skill: str) -> CheckPlanConfig:
+    """Read `.claude/skills/<skill>/check-specs.json`, or an empty config."""
+    path = repo_root / skill_path(skill, CHECK_SPECS_FILENAME)
+    if not path.exists():
+        return CheckPlanConfig()
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8-sig"))
+    except (OSError, ValueError):
+        return CheckPlanConfig()
+    return parse_check_specs(raw) if isinstance(raw, dict) else CheckPlanConfig()
+
+
 # ---------- audit planning ----------
 
 
 def check_signature(spec: CheckSpec) -> str:
+    """Stable id for a check's *definition*; a change to it forces a full rescan.
+
+    The payload shape is frozen: it is hashed into every state.json, so adding a
+    field here silently invalidates every project's accumulated audit state.
+    """
     payload = {
         "scriptVersion": SCRIPT_VERSION,
         "check": spec.check_id,
@@ -112,27 +192,35 @@ def check_signature(spec: CheckSpec) -> str:
     return sha256_bytes(json.dumps(payload, sort_keys=True).encode("utf-8"))[:16]
 
 
-def is_excluded(rel_path: str) -> bool:
-    if any(rel_path.startswith(prefix) for prefix in EXCLUDED_PREFIXES):
+def is_excluded(
+    rel_path: str, exclude_prefixes: tuple[str, ...] = DEFAULT_EXCLUDED_PREFIXES
+) -> bool:
+    if any(rel_path.startswith(prefix) for prefix in exclude_prefixes):
         return True
     parts = rel_path.split("/")
     return any(part in EXCLUDED_DIR_NAMES for part in parts)
 
 
-def gather_files(repo_root: Path, globs: tuple[str, ...]) -> list[str]:
+def gather_files(
+    repo_root: Path,
+    globs: tuple[str, ...],
+    exclude_prefixes: tuple[str, ...] = DEFAULT_EXCLUDED_PREFIXES,
+) -> list[str]:
     found: set[str] = set()
     for pattern in globs:
         for path in repo_root.glob(pattern):
             if not path.is_file():
                 continue
             rel = to_posix(path.relative_to(repo_root))
-            if is_excluded(rel):
+            if is_excluded(rel, exclude_prefixes):
                 continue
             found.add(rel)
     return sorted(found)
 
 
-def build_audit_plan(repo_root: Path, state: dict[str, Any]) -> dict[str, Any]:
+def build_audit_plan(
+    repo_root: Path, state: dict[str, Any], config: CheckPlanConfig
+) -> dict[str, Any]:
     checks_state = state.get("checks", {}) if isinstance(state.get("checks"), dict) else {}
 
     plan: dict[str, Any] = {
@@ -142,7 +230,7 @@ def build_audit_plan(repo_root: Path, state: dict[str, Any]) -> dict[str, Any]:
         "checks": {},
     }
 
-    for spec in CHECK_SPECS:
+    for spec in config.specs:
         cur_sig = check_signature(spec)
         prev_entry = (
             checks_state.get(spec.check_id, {})
@@ -155,7 +243,7 @@ def build_audit_plan(repo_root: Path, state: dict[str, Any]) -> dict[str, Any]:
         )
 
         signature_changed = prev_sig != cur_sig
-        candidates = gather_files(repo_root, spec.include_globs)
+        candidates = gather_files(repo_root, spec.include_globs, config.exclude_prefixes)
 
         targets: list[str] = []
         skipped: list[str] = []
@@ -431,7 +519,7 @@ def add_common_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--out", default="", help="Override output path")
 
 
-def parse_args() -> argparse.Namespace:
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="State engine for .claude skill state.json workflows."
     )
@@ -452,15 +540,27 @@ def parse_args() -> argparse.Namespace:
     )
     apply_p.add_argument("--today", default="", help="Override date YYYY-MM-DD")
 
-    return parser.parse_args()
+    return parser.parse_args(argv)
 
 
 def cmd_plan(args: argparse.Namespace, repo_root: Path) -> int:
+    config = load_check_specs(repo_root, args.skill)
+    if not config.specs:
+        # Loud, not empty. An empty plan and "this project defines no checks" are
+        # indistinguishable downstream, and the quiet version reads as "all clear".
+        print(
+            f"{args.skill}: no {CHECK_SPECS_FILENAME} with usable checks under "
+            f"{skill_path(args.skill, CHECK_SPECS_FILENAME)} -- "
+            "the audit schema needs the project to declare its checks.",
+            file=sys.stderr,
+        )
+        return 1
+
     state_path = resolve_path(repo_root, args.state_file or skill_path(args.skill, "state.json"))
     out_path = resolve_path(repo_root, args.out or skill_path(args.skill, "scan-plan.json"))
 
     state = load_json(state_path, {"checks": {}})
-    plan = build_audit_plan(repo_root=repo_root, state=state)
+    plan = build_audit_plan(repo_root=repo_root, state=state, config=config)
     write_json(out_path, plan)
     return 0
 
@@ -504,8 +604,8 @@ def cmd_apply(args: argparse.Namespace, repo_root: Path) -> int:
     return 0
 
 
-def main() -> int:
-    args = parse_args()
+def main(argv: list[str] | None = None) -> int:
+    args = parse_args(argv)
     repo_root = Path(args.repo_root).resolve()
     if args.command == "plan":
         return cmd_plan(args, repo_root)
