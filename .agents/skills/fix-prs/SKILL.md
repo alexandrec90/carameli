@@ -64,12 +64,22 @@ determined and need no investigation.
 
 ## Step 2 — Triage each PR: map failing job → reproduction + fixer
 
-Read the failing **PR Gate** job names and map them. **Do not read the raw CI job log** — it
-buries the real error under ~1000 lines of container-boot noise (see `.claude/rules/tooling.md`).
-Pull the filtered artifact **first** — before any local run — to learn the failure *class*
+Read the failing **PR Gate** job names and map them. Do not start with the raw CI job log — it
+usually buries the real error under ~1000 lines of container-boot noise (see
+`.claude/rules/tooling.md`). Pull the filtered artifact **first** — before any local run — to
+learn the failure *class*
 (`gh run download <run-id> -n lint-errors -D logs/` gives the canonical `logs/lint-errors.log`;
 delete any stale `logs/<name>.log` beforehand — `gh run download` refuses to overwrite an
 existing file), then reproduce locally to get the clean artifact the fixer consumes.
+
+**Artifactless infrastructure exception.** A checkout, authentication, runner-bootstrap,
+or setup failure can happen before the job uploads any filtered artifact. For that class
+only, inspect the job's step list to identify the failed step, then read the bounded failed
+step output with `gh run view <run-id> --log-failed --job=<job-id>`. This exception is
+**diagnostic only**: use it to establish infrastructure facts such as a missing ref or denied
+permission.
+Never edit application source from it. If it does not fully determine an infrastructure
+repair, reproduce locally or report the CI-only holdout instead of guessing.
 
 **Skip local reproduction for project-global checks.** Some check results don't depend on
 the diff at all — pip-audit depends on the advisory DB and the installed environment, so a
@@ -137,9 +147,11 @@ evidence and a recommendation.
    carve-out to auto-merge.
 3. **Don't fight the bots.** Skip PRs already `automerge`-labelled-and-passing or mid
    lock-repair; those workflows will merge them.
-4. **Reproduce before fixing.** Never edit source off a raw CI job log — regenerate the clean
-   artifact locally (Step 3) and let the fixer work from it. If reproduction can't surface the
-   failure (CI-only), report it; don't guess-fix.
+4. **Reproduce before fixing.** Never edit application source off CI log output — regenerate
+   the clean artifact locally (Step 3) and let the fixer work from it. The artifactless
+   infrastructure exception in Step 2 may use bounded failed-step output only to repair the
+   checkout/auth/setup layer. If reproduction cannot surface a source failure, report the
+   CI-only holdout; do not guess-fix.
 5. **Don't loop CI.** Verify locally, push once, poll the gate cheaply. Max 2 push→gate rounds
    per PR before reporting a holdout.
 6. **Dispatch, don't re-implement.** All fixing is delegated to the `fix-*` skills. This skill
