@@ -3,13 +3,15 @@
 **This file is vendored into every consuming project.** Every value that varies per
 project — the control-env prefix, `app/`, the DB credentials, whether a frontend
 exists — must come from `hook.CFG` (which the hook itself reads from that project's
-`.agent-harness.toml`), never from a literal. Hard-coding carameli's values here
+`.devkit.toml`), never from a literal. Hard-coding carameli's values here
 made the vendored suite fail in any repo shaped differently, which is what the
 config seam exists to prevent.
 """
 
 import io
 import sys
+from dataclasses import replace
+from pathlib import Path
 
 import pytest
 from conftest import load_module
@@ -196,7 +198,15 @@ def test_host_test_targets_tests_only_runs_changed_files():
 
 
 def test_host_test_targets_no_app_or_tests_is_empty():
-    assert hook.host_test_targets(["scripts/hooks/stop.py", "README.md"]) == []
+    # The paths must fall outside BOTH app_dir and tests_dir, and cannot be hardcoded:
+    # this file is vendored, and the literal `scripts/hooks/stop.py` this test used to
+    # pass *is* application code in a project whose `app_dir` is `scripts/` — devkit's
+    # is, so the assertion inverted there. The precondition is asserted rather than
+    # assumed, so a manifest that ever makes these paths meaningful fails loudly.
+    unrelated = ["docs/notes.md", "third_party/x.py"]
+    for path in unrelated:
+        assert not path.startswith((CFG.app_dir, CFG.tests_dir)), f"{path} is not neutral here"
+    assert hook.host_test_targets(unrelated) == []
 
 
 def test_select_checks_empty_diff_runs_nothing():
@@ -302,6 +312,24 @@ def test_run_checks_oserror_is_skip_not_failure(monkeypatch):
     assert hook.run_checks([hook.CHECK_LINT]) == []
 
 
+def test_command_for_returns_none_when_a_repo_script_is_absent(tmp_path, monkeypatch):
+    """Absence is decided here, not left to the OSError handler in `run_checks`.
+
+    Both skip the check, so this changes no behaviour — it changes what the skip
+    *means*. Resolved to None, "this project has no such tier" is a readable state
+    that `test_repo_contract.py` can then hold the project to; reached as an OSError
+    from spawning a missing file, it is indistinguishable from an installed script
+    that crashed on startup.
+    """
+    missing = tmp_path / "gone.py"
+    monkeypatch.setattr(hook, "LINT_ALL", missing)
+    monkeypatch.setattr(hook, "CHECK_LOCK_MARKERS", missing)
+    assert hook._command_for(hook.CHECK_LINT) is None
+    assert hook._command_for(hook.CHECK_LOCKS) is None
+    # The tier that needs no project-owned script is unaffected.
+    assert hook._command_for(hook.CHECK_SCRIPT_TESTS) is not None
+
+
 def test_verify_skips_when_loop_active(monkeypatch):
     monkeypatch.setattr(hook, "run_checks", lambda names: [("lint", None, "x")])
     assert hook.verify('{"stop_hook_active": true}', {}) == 0
@@ -314,7 +342,7 @@ def test_verify_skips_when_opted_out(monkeypatch):
 
 def test_verify_returns_two_on_failure(monkeypatch):
     monkeypatch.setattr(hook, "_git_status_porcelain", lambda root: " M app/main.py\n")
-    monkeypatch.setattr(hook, "run_db_tests", lambda paths, env: [])
+    monkeypatch.setattr(hook, "run_host_tests", lambda *a, **k: [])
     monkeypatch.setattr(hook, "run_checks", lambda names: [("lint", "logs/lint-errors.log", "")])
     assert hook.verify("{}", {}) == 2
 
@@ -322,14 +350,14 @@ def test_verify_returns_two_on_failure(monkeypatch):
 def test_verify_returns_two_when_db_tests_fail(monkeypatch):
     monkeypatch.setattr(hook, "_git_status_porcelain", lambda root: " M app/main.py\n")
     monkeypatch.setattr(hook, "run_checks", lambda names: [])
-    monkeypatch.setattr(hook, "run_db_tests", lambda paths, env: [("tests", None, "F app/x")])
+    monkeypatch.setattr(hook, "run_host_tests", lambda *a, **k: [("tests", None, "F app/x")])
     assert hook.verify("{}", {}) == 2
 
 
 def test_verify_returns_zero_when_clean(monkeypatch):
     monkeypatch.setattr(hook, "_git_status_porcelain", lambda root: " M app/main.py\n")
     monkeypatch.setattr(hook, "run_checks", lambda names: [])
-    monkeypatch.setattr(hook, "run_db_tests", lambda paths, env: [])
+    monkeypatch.setattr(hook, "run_host_tests", lambda *a, **k: [])
     assert hook.verify("{}", {}) == 0
 
 
@@ -485,8 +513,71 @@ def test_verify_python_prefers_posix_venv(tmp_path):
     assert hook.verify_python(tmp_path) == str(py)
 
 
-def test_verify_python_falls_back_to_launcher_without_venv(tmp_path):
+def test_verify_python_falls_back_to_launcher_without_venv(tmp_path, monkeypatch):
+    monkeypatch.setattr(hook, "_can_verify", lambda exe: True)
     assert hook.verify_python(tmp_path) == sys.executable
+
+
+def test_verify_python_skips_a_launcher_that_cannot_import_the_tooling(tmp_path, monkeypatch):
+    # Regression: with no venv, the fallback returned sys.executable unconditionally
+    # -- which on Windows IS the Store shim the function exists to avoid, so every
+    # check died with "No module named pytest". A stdlib-only project has no venv as
+    # its normal state, so this is not just a fresh-clone edge.
+    usable = str(tmp_path / "real-python")
+    monkeypatch.setattr(hook, "_can_verify", lambda exe: exe != sys.executable)
+    monkeypatch.setattr(hook.shutil, "which", lambda name: usable if name == "python" else None)
+
+    assert hook.verify_python(tmp_path) == usable
+
+
+def test_verify_python_never_probes_python3(tmp_path, monkeypatch):
+    # `python3` is the shim being escaped; probing it could hand back the very
+    # interpreter that has no pytest.
+    assert "python3" not in hook.PATH_PYTHONS
+
+    probed = []
+    monkeypatch.setattr(hook, "_can_verify", lambda exe: False)
+    monkeypatch.setattr(hook.shutil, "which", lambda name: probed.append(name) or None)
+    hook.verify_python(tmp_path)
+
+    assert "python3" not in probed
+
+
+def test_verify_python_tries_py_launcher_when_python_is_absent(tmp_path, monkeypatch):
+    usable = str(tmp_path / "py-launcher")
+    monkeypatch.setattr(hook, "_can_verify", lambda exe: exe == usable)
+    monkeypatch.setattr(hook.shutil, "which", lambda name: usable if name == "py" else None)
+
+    assert hook.verify_python(tmp_path) == usable
+
+
+def test_verify_python_returns_launcher_when_nothing_can_verify(tmp_path, monkeypatch):
+    # Better to fail loudly on tooling than to report green having run nothing.
+    monkeypatch.setattr(hook, "_can_verify", lambda exe: False)
+    monkeypatch.setattr(hook.shutil, "which", lambda name: None)
+
+    assert hook.verify_python(tmp_path) == sys.executable
+
+
+def test_verify_python_prefers_venv_without_probing(tmp_path, monkeypatch):
+    # A venv is the project's declared environment: a missing dep there is a real
+    # provisioning failure to surface, not something to route around via PATH.
+    py = tmp_path / ".venv/bin/python"
+    py.parent.mkdir(parents=True)
+    py.write_text("")
+    monkeypatch.setattr(hook, "_can_verify", lambda exe: pytest.fail("venv must not be probed"))
+
+    assert hook.verify_python(tmp_path) == str(py)
+
+
+def test_can_verify_detects_a_missing_import(tmp_path):
+    # Exercised against real interpreters, so the probe itself is not just a mock.
+    hook._can_verify.cache_clear()
+    try:
+        assert hook._can_verify(sys.executable) is True  # runs pytest right now
+        assert hook._can_verify(str(tmp_path / "does-not-exist")) is False
+    finally:
+        hook._can_verify.cache_clear()
 
 
 def test_verify_python_used_by_lint_and_test_checks(tmp_path, monkeypatch):
@@ -494,7 +585,138 @@ def test_verify_python_used_by_lint_and_test_checks(tmp_path, monkeypatch):
     py.parent.mkdir(parents=True)
     py.write_text("")
     monkeypatch.setattr(hook, "REPO_ROOT", tmp_path)
+    # The script constants resolve at import against the *real* repo root, so moving
+    # REPO_ROOT does not move them, and the script-backed checks now skip when their
+    # script is absent. Point each at a real file in the sandbox -- otherwise this
+    # asserts nothing about two of the three.
+    for attr, rel in (
+        ("LINT_ALL", "scripts/lint-all.py"),
+        ("CHECK_LOCK_MARKERS", "scripts/clm.py"),
+    ):
+        script = tmp_path / rel
+        script.parent.mkdir(parents=True, exist_ok=True)
+        script.write_text("")
+        monkeypatch.setattr(hook, attr, script)
 
     for check in (hook.CHECK_LINT, hook.CHECK_SCRIPT_TESTS, hook.CHECK_LOCKS):
-        argv, _cwd, _artifact = hook._command_for(check)
+        spec = hook._command_for(check)
+        assert spec is not None, f"{check} must be runnable when its script exists"
+        argv, _cwd, _artifact = spec
         assert argv[0] == str(py), f"{check} must run under the venv interpreter"
+
+
+# --- a check whose script this project does not have is a SKIP, not a failure ---
+# Returning an argv for a missing script does not skip it: the interpreter exits 2
+# with "can't open file", which run_checks reports as a failure with a usage message
+# in place of a finding and nothing in the source tree that can fix it. No generated
+# project ships check-lock-markers.py, so this fired on every lockfile change.
+
+
+def test_command_for_skips_checks_whose_script_is_absent(tmp_path, monkeypatch):
+    monkeypatch.setattr(hook, "LINT_ALL", tmp_path / "nope-lint-all.py")
+    monkeypatch.setattr(hook, "CHECK_LOCK_MARKERS", tmp_path / "nope-check-locks.py")
+    assert hook._command_for(hook.CHECK_LINT) is None
+    assert hook._command_for(hook.CHECK_LOCKS) is None
+    # The infra-free pytest tier needs no project script, so it still runs.
+    assert hook._command_for(hook.CHECK_SCRIPT_TESTS) is not None
+
+
+def test_lint_check_passes_no_secrets_to_the_lint_runner(tmp_path, monkeypatch):
+    """`--no-secrets` is contractual: lint-all.py must accept it, so it must be sent.
+
+    A lint runner that does not parse the flag exits 2 from argparse, which is a
+    permanent Tier 1 failure on every stop.
+    """
+    script = tmp_path / "lint-all.py"
+    script.write_text("")
+    monkeypatch.setattr(hook, "LINT_ALL", script)
+    spec = hook._command_for(hook.CHECK_LINT)
+    assert spec is not None
+    argv, _cwd, artifact = spec
+    assert "--changed" in argv and "--no-secrets" in argv
+    assert artifact == "logs/lint-errors.log"
+
+
+def _set_db_enabled(monkeypatch, enabled: bool) -> None:
+    """Swap in a Config whose DB tier is on/off, whatever this project's manifest says.
+
+    `Config`/`DbConfig` are frozen, so the flag cannot be poked in place — and it must
+    not be, since these tests are vendored and run against every project's real
+    manifest. Replacing the whole config keeps them shape-agnostic.
+    """
+    monkeypatch.setattr(hook, "CFG", replace(hook.CFG, db=replace(hook.CFG.db, enabled=enabled)))
+
+
+# --- Tier 2b without a DB: the suite still has to run -------------------------
+# `run_db_tests` returns [] when `[db] enabled = false`, and it is the only tier that
+# consults `host_test_targets`. So a DB-less project used to run lint and the vendored
+# hook tests and silently never its own test suite. `run_host_tests` is the seam that
+# fixes it; these tests pin both branches without asserting any one project's shape.
+
+
+def test_run_host_tests_runs_pytest_without_a_db(monkeypatch, tmp_path):
+    _set_db_enabled(monkeypatch, False)
+    calls: list[list[str]] = []
+
+    def fake_pytest(targets, repo_root, extra_env=None):
+        calls.append(list(targets))
+        assert extra_env is None, "a DB-less run must not inject DB env"
+        return []
+
+    monkeypatch.setattr(hook, "_pytest_failures", fake_pytest)
+    changed = [f"{CFG.tests_dir}test_something.py"]
+    assert hook.run_host_tests(changed, {}, tmp_path) == []
+    assert calls == [changed], "the changed test file should have been run"
+
+
+def test_run_host_tests_reports_a_failure_without_a_db(monkeypatch, tmp_path):
+    _set_db_enabled(monkeypatch, False)
+    monkeypatch.setattr(
+        hook, "_pytest_failures", lambda *a, **k: [(hook.CHECK_TESTS, None, "1 failed")]
+    )
+    failures = hook.run_host_tests([f"{CFG.tests_dir}test_x.py"], {}, tmp_path)
+    assert [name for name, _artifact, _tail in failures] == [hook.CHECK_TESTS]
+
+
+def test_run_host_tests_is_a_no_op_when_no_test_code_changed(monkeypatch, tmp_path):
+    _set_db_enabled(monkeypatch, False)
+    monkeypatch.setattr(hook, "_pytest_failures", lambda *a, **k: pytest.fail("should not run"))
+    assert hook.run_host_tests(["README.md", "docs/x.md"], {}, tmp_path) == []
+
+
+def test_pytest_failures_treats_no_tests_collected_as_a_pass(monkeypatch, tmp_path):
+    """pytest exit 5 must not block the stop.
+
+    Targets are *changed files* under tests/, so editing a helper that holds no tests
+    of its own (conftest.py, a support module) yields "no tests ran" — a failure the
+    agent cannot fix by editing source.
+    """
+
+    class _Result:
+        returncode = hook.PYTEST_NO_TESTS_COLLECTED
+        stdout = "no tests ran in 0.01s"
+        stderr = ""
+
+    monkeypatch.setattr(hook.subprocess, "run", lambda *a, **k: _Result())
+    assert hook._pytest_failures(["tests/support.py"], tmp_path) == []
+
+
+def test_pytest_failures_reports_a_real_failure(monkeypatch, tmp_path):
+    class _Result:
+        returncode = 1
+        stdout = "1 failed"
+        stderr = ""
+
+    monkeypatch.setattr(hook.subprocess, "run", lambda *a, **k: _Result())
+    failures = hook._pytest_failures(["tests/test_x.py"], tmp_path)
+    assert [name for name, _artifact, _tail in failures] == [hook.CHECK_TESTS]
+
+
+def test_run_host_tests_delegates_to_the_db_tier_when_a_db_is_configured(monkeypatch, tmp_path):
+    _set_db_enabled(monkeypatch, True)
+    seen: list[tuple[list[str], Path]] = []
+    monkeypatch.setattr(
+        hook, "run_db_tests", lambda paths, env, repo_root: seen.append((paths, repo_root)) or []
+    )
+    hook.run_host_tests(["app/main.py"], {}, tmp_path)
+    assert seen == [(["app/main.py"], tmp_path)], "the DB tier owns infra gating, not this"

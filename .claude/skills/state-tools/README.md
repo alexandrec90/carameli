@@ -1,137 +1,69 @@
-# State Tools (Unified `state.json` Engine)
+# state-tools
 
-Two scripts, two subcommands, no per-skill configs. State-driven skills follow the same flow:
+`state-engine.py` is the only thing that writes a skill's `state.json`. Skills that
+accumulate knowledge across sessions — which modules have tests, which files were
+refactored, which files a design audit has cleared — keep it there, and never edit it
+by hand.
 
-1. (audit only) Generate a scan plan with `state-engine.py plan`
-2. Generate a per-skill artifact (`scan-results.json` or `state-updates.json`)
-3. The session `Stop` hook fires `finalize-state.py`, which calls `state-engine.py
-   apply` and removes the artifact
+## The flow
 
-## Files
+1. The skill does its work and writes a small **interim artifact** beside itself.
+2. On Stop, `scripts/hooks/finalize-state.py` notices the artifact and calls this
+   engine, which merges it into `state.json` and deletes the artifact on success.
+3. A failed merge leaves the artifact in place, so the next Stop retries.
 
-- `state-engine.py` — `plan` (audit) + `apply` (all schemas) subcommands
-- `finalize-state.py` — `Stop`-hook wrapper (in `scripts/hooks/`): gates on
-  artifact existence,
-  calls `apply`, cleans up artifacts on success
-- `README.md`
+Wiring is `[stop] finalize_targets` in `.devkit.toml` — `[skill, schema]`
+pairs. An entry naming a skill that does not exist makes the Stop hook do useless
+work every turn, so the list starts empty.
 
-## Schemas
+## The three schemas
 
-| Schema | Skills | Tracks |
+| Schema | Interim artifact | State shape |
 | --- | --- | --- |
-| `audit` | `audit-design-flaws` | `checks.<id>.files.<path>` records (per-check, per-file fingerprints + statuses `pass`/`violation`/`fixed`/`stale`) |
-| `modules` | `make-tests`, `make-frontend-tests` | `modules[]` rows keyed by `module` |
-| `files` | `refactor` | `files.{path}` map |
+| `modules` | `state-updates.json` | `{modules: [{module, test_file, git_hash, gaps_found, last_reviewed}]}` |
+| `files` | `state-updates.json` | `{files: {path: {git_hash, refactored_at}}}` |
+| `audit` | `scan-results.json` + `scan-plan.json` | `{checks: {ID: {checkSignature, files: {path: {contentHash, status}}}}}` |
 
-## Conventional paths
+`modules` and `files` are pure merges over data the skill supplies. They are portable
+with nothing to configure.
 
-For skill `<name>`, the engine derives:
+## `audit` needs project data
 
-| File | Used by | Written by |
-| --- | --- | --- |
-| `.claude/skills/<name>/state.json` | all | engine (`apply`) |
-| `.claude/skills/<name>/scan-plan.json` | audit | engine (`plan`) |
-| `.claude/skills/<name>/scan-results.json` | audit | skill agent |
-| `.claude/skills/<name>/state-updates.json` | modules / files | skill agent |
-
-Override any of these with `--state-file`, `--out`, `--scan-plan`, `--results-file`,
-or `--updates-file` if a skill needs something custom.
-
-## Usage
-
-The skill agent only invokes `plan` (audit only); `apply` runs through the hook.
-
-```sh
-# Build incremental scan plan (audit schema only — agent runs this)
-python .claude/skills/state-tools/state-engine.py plan --skill audit-design-flaws
-```
-
-The session `Stop` hook (`scripts/hooks/stop.py`) calls `finalize-state.py`, which
-is the only place `apply` is invoked:
-
-```bash
-python3 scripts/hooks/finalize-state.py --skill <skill-name> --schema <audit|modules|files>
-```
-
-Common flags on `state-engine.py` (both subcommands): `--repo-root`, `--skill`,
-`--state-file`, `--out`. `apply` adds `--schema`, `--today`, plus per-schema
-overrides (`--scan-plan`, `--results-file`, `--updates-file`).
-
-## Hook flow
-
-The session `Stop` hook in `.claude/settings.json` runs `scripts/hooks/stop.py`,
-which finalizes every state-driven skill:
-
-```bash
-python3 scripts/hooks/finalize-state.py --skill <name> --schema <schema>
-```
-
-`finalize-state.py` is idempotent and gated on artifact existence:
-
-1. If `<artifact>.json` doesn't exist → exit 0 (no-op, fires harmlessly on
-   every Stop while the skill is active).
-2. Otherwise → call `state-engine.py apply`, then delete the input artifact(s)
-   on success.
-
-This means the agent can write `scan-results.json` / `state-updates.json` and
-finish its turn — `apply` runs automatically. No agent action can skip it.
-
-## Run artifacts expected
-
-### `audit` schema — `scan-results.json`
+Planning an audit scan means knowing **which files each check applies to**, and that
+is one project's source layout. So the check definitions are not in the engine — they
+are read from `.claude/skills/<skill>/check-specs.json`, which the consuming project
+owns and which is deliberately **not** vendored:
 
 ```json
 {
-  "checks": {
-    "A": {
-      "files": {
-        "frontend/src/example.ts": "violation",
-        "app/example.py": {
-          "status": "fixed",
-          "summary": "split helper into app/core/helpers.py"
-        }
-      }
-    }
-  }
-}
-```
-
-### `modules` schema — `state-updates.json`
-
-```json
-{
-  "last_run": "YYYY-MM-DD",
-  "modules": [
-    {
-      "module": "app/api/vsapi/sms.py",
-      "test_file": "tests/unit/test_sms.py",
-      "last_reviewed": "YYYY-MM-DD",
-      "git_hash": "<sha-or-UNCOMMITTED>",
-      "gaps_found": 0
-    }
+  "exclude_prefixes": ["alembic/versions/"],
+  "checks": [
+    { "id": "A", "kind": "local", "include": ["app/**/*.py", "frontend/src/**/*.ts"] },
+    { "id": "B", "kind": "cross", "include": ["app/**/*.py"] }
   ]
 }
 ```
 
-### `files` schema — `state-updates.json`
+- `kind` is `local` (each file judged alone) or `cross` (the check needs a
+  project-wide fact table, so the plan sets `rebuildFacts`).
+- Without this file the `audit` schema is unavailable and `plan` **exits 1 with a
+  message**. It does not write an empty plan: "no checks defined" and "nothing to
+  scan" are indistinguishable downstream, and the quiet version reads as *all clear*.
+- `.claude/` is always excluded and a project cannot opt back in — an audit that
+  reads its own state files has a result that depends on its own output.
 
-```json
-{
-  "files": {
-    "frontend/src/pages/DashboardPage.tsx": {
-      "git_hash": "<sha-or-UNCOMMITTED>",
-      "refactored_at": "YYYY-MM-DD"
-    }
-  }
-}
-```
+## Incremental scanning
 
-## Notes
+A file is re-scanned when its content hash changed, when it has never been seen, or
+when its last status was `violation`/`stale`. A `pass`/`fixed` file with an unchanged
+hash is skipped. Changing a check's definition changes its `checkSignature`, which
+forces a full rescan of that check.
 
-- `audit-design-flaws` treats `fixed` as final for unchanged files.
-- The audit planner's `CHECK_SPECS` (file globs per check) live in `state-engine.py` —
-  if a second audit-schema skill is added, factor specs into a config rather than
-  forking the script.
-- Keep run artifacts deterministic; the engine merges, it does not infer.
-- If adding a new state-driven skill: pick an existing schema and call `apply
-  --skill <name> --schema <schema>`. No new files needed.
+> The signature payload is frozen. It is hashed into every consumer's `state.json`,
+> so adding a field to `check_signature()` silently invalidates every project's
+> accumulated audit state.
+
+## Testing
+
+`scripts/hooks/tests/test_state_engine.py`, vendored alongside the engine. Everything
+is synthesised under `tmp_path` — it must pass in a repo of any shape.

@@ -141,18 +141,18 @@ def test_devkit_checkout_pins_a_release_tag():
     assert re.fullmatch(r"v\d+\.\d+\.\d+", block.group(1)), (
         f"pr-gate.yml pins the devkit checkout at {block.group(1)!r}; it must be a "
         "release tag (vX.Y.Z), never a branch. Bump it in the same commit as the "
-        "`sync-harness.py --pull` it corresponds to."
+        "`sync-devkit.py --pull` it corresponds to."
     )
 
 
 def test_harness_version_records_a_commit():
-    # `--pull` stamps HARNESS_VERSION with the upstream short SHA. An empty or
+    # `--pull` stamps DEVKIT_VERSION with the upstream short SHA. An empty or
     # placeholder value means the vendored copy has no recorded provenance, so
     # nothing ties the files on disk to the tag the gate above checks them against.
-    stamped = (REPO_ROOT / "HARNESS_VERSION").read_text(encoding="utf-8").strip()
+    stamped = (REPO_ROOT / "DEVKIT_VERSION").read_text(encoding="utf-8").strip()
     assert re.fullmatch(r"[0-9a-f]{7,40}", stamped), (
-        f"HARNESS_VERSION is {stamped!r}; expected the upstream commit SHA written "
-        "by `python scripts/sync-harness.py --pull`."
+        f"DEVKIT_VERSION is {stamped!r}; expected the upstream commit SHA written "
+        "by `python scripts/sync-devkit.py --pull`."
     )
 
 

@@ -22,12 +22,12 @@ pre-commit can already fetch." That instinct was right and upstream executed it:
 
 | Hook | Catches |
 | --- | --- |
-| `agent-harness-manifest` | A `.agent-harness.toml` the harness would silently ignore — unparseable TOML, a path prefix missing its trailing slash, a declared directory that does not exist, a half-filled `[db]`/`[frontend]` block |
-| `harness-hooks-stdlib-only` | A third-party import in `scripts/hooks/`. Cannot be caught by a test suite, because the suite runs *inside* the virtualenv these scripts run before |
-| `harness-drift` | A vendored file differing from the pinned devkit rev |
+| `devkit-manifest` | A `.devkit.toml` the harness would silently ignore — unparseable TOML, a path prefix missing its trailing slash, a declared directory that does not exist, a half-filled `[db]`/`[frontend]` block |
+| `devkit-hooks-stdlib-only` | A third-party import in `scripts/hooks/`. Cannot be caught by a test suite, because the suite runs *inside* the virtualenv these scripts run before |
+| `devkit-drift` | A vendored file differing from the pinned devkit rev |
 
-`harness-drift` is the important one: it **fixes the inert-gate problem for real.**
-`sync-harness.py --check` resolves its source from `$AGENT_HARNESS_DIR` and exits 0 doing
+`devkit-drift` is the important one: it **fixes the inert-gate problem for real.**
+`sync-devkit.py --check` resolves its source from `$DEVKIT_DIR` and exits 0 doing
 nothing when that is unset — indistinguishable from success in a log, which is exactly how
 Carameli's gate passed green for months while checking nothing. Run through pre-commit
 there is nothing to configure: pre-commit has already cloned devkit at the pinned rev, and
@@ -79,10 +79,19 @@ worth three mergers and a CI job.
 
 ## Step 1 — Adopt the pre-commit channel
 
-Blocked on the same devkit tag as Plan 2 Step 1 — devkit's tags stop at `v0.4.1` and
-`.pre-commit-hooks.yaml` is on untagged HEAD. **A rev that predates the channel fails
+> **Verified 2026-07-30.** Carameli's `.pre-commit-config.yaml` still has no devkit `repo:`
+> entry — only two `repo: local` hooks (`sync-agents`, `detect-secrets`). This step is
+> untouched. Note the config's own header says every lint/type check is CI-owned and
+> "nothing here may be slow"; the three devkit hooks fit that (a TOML parse, an import
+> scan, and a byte-compare), but say so in the commit or the next reader will read them as
+> a violation of the file's stated policy.
+
+Blocked on **Plan 0**, now its own file: devkit's tags stop at `v0.4.1` (commit `4fbda17`),
+and `git ls-tree -r --name-only v0.4.1` confirms that tree carries neither
+`.pre-commit-hooks.yaml` nor `scripts/precommit/`. **A rev that predates the channel fails
 hard**: pre-commit resolves hook ids strictly, so against an older tag the first commit
-aborts with "hook not found" rather than skipping.
+aborts with "hook not found" rather than skipping. This is the same defect Plan 0 fixes for
+generated projects — adopting here before the tag exists reproduces it in Carameli by hand.
 
 ```yaml
 # .pre-commit-config.yaml
@@ -90,13 +99,13 @@ repos:
   - repo: https://github.com/alexandrec90/devkit
     rev: v0.5.0 # must be a tag that actually carries .pre-commit-hooks.yaml
     hooks:
-      - id: agent-harness-manifest
-      - id: harness-hooks-stdlib-only
-      - id: harness-drift
+      - id: devkit-manifest
+      - id: devkit-hooks-stdlib-only
+      - id: devkit-drift
 ```
 
-Then decide what happens to the PR gate's `sync-harness.py --check` step. Recommendation:
-**keep both.** They fail differently — `harness-drift` catches it at commit time against
+Then decide what happens to the PR gate's `sync-devkit.py --check` step. Recommendation:
+**keep both.** They fail differently — `devkit-drift` catches it at commit time against
 the pinned rev, `--check` catches it in CI against the checked-out tag — and the CI one is
 what protects against a bypassed local hook, which is the same argument the existing
 `mirror-sync` job rests on.
@@ -139,6 +148,16 @@ file), and needs no shared machinery. Related standing risk: the
 
 ## Step 4 — `lint-policy.md`: superseded, write it upstream
 
+> **Verified 2026-07-30: not started.** `.claude/rules/engineering.md` at devkit HEAD has
+> five sections — Testing, Scripts, Failure artifacts, The vendored agent harness, and the
+> instruction-file feedback loop. **No lint section.** This step is entirely open, and it is
+> the cheapest item in this plan set: one section in one already-vendored file, which
+> reaches every consumer on their next `--pull`.
+>
+> Sequencing note: write it **before** Plan 2 Step 1 if convenient. `engineering.md` is one
+> of the 21 entries Carameli is about to pull, so landing the lint section upstream first
+> means Carameli receives it in the same pull instead of needing a second one.
+
 The original Step 2 called for a `rules/lint-policy.md` in the Plan-1 plugin. **There is no
 plugin, and there is now a better home**: devkit vendors `.claude/rules/engineering.md`
 byte-identical into every consumer, and it already covers testing, scripts, the harness
@@ -160,7 +179,7 @@ worth having in the shared tier so every project inherits it.
 
 - Step 1: a Carameli test asserting `.pre-commit-config.yaml` pins devkit by **tag** (not a
   branch) and lists all three hook ids. Cheap, and catches a silent revert.
-- Step 1: verify `harness-drift` actually fires — hand-edit a MANIFEST file, confirm the
+- Step 1: verify `devkit-drift` actually fires — hand-edit a MANIFEST file, confirm the
   commit aborts, revert. A gate nobody has seen fail is a gate nobody knows works.
 - Step 3: the dependabot invariant test described above.
 - Keep `test_check_lock_markers.py` passing throughout.
@@ -170,8 +189,8 @@ worth having in the shared tier so every project inherits it.
 
 - [ ] devkit tagged with `.pre-commit-hooks.yaml` in it (shared prerequisite with Plan 2)
 - [ ] Carameli's `.pre-commit-config.yaml` pins that tag and enables all three hooks
-- [ ] `harness-drift` observed failing on a deliberate edit, then reverted
-- [ ] PR gate keeps its `sync-harness.py --check` step alongside the pre-commit hook
+- [ ] `devkit-drift` observed failing on a deliberate edit, then reverted
+- [ ] PR gate keeps its `sync-devkit.py --check` step alongside the pre-commit hook
 - [ ] Every Seeded file diffed against its upstream template, verdict recorded in this file
 - [ ] Dependabot invariant test added and green; `dependabot.yml` left project-owned
 - [ ] Lint policy written into devkit's `.claude/rules/engineering.md`, not a Carameli file

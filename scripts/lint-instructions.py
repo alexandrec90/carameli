@@ -101,6 +101,25 @@ def _nonempty_list(val) -> bool:
     return isinstance(val, list) and len(val) > 0
 
 
+def _declares_global_scope(text: str) -> bool:
+    """True when a rule says in its own body that it is deliberately unscoped.
+
+    `.claude/rules/authoring.md` permits omitting `paths` for a truly global rule, and
+    the check's own message said so while still failing every such file — so the one
+    genuinely global rule in the vendored tier (`engineering.md`) could not satisfy it.
+    That rule is byte-identical upstream and drift-checked, so "just add paths" is not
+    available: the fix has to be here.
+
+    The signal is a statement in the opening prose, not a frontmatter key, for the same
+    reason as the orchestration exemption below — it has to be readable by someone
+    looking at the file, and a rule that claims to be global should say why where a
+    human will see it. Checked only near the top so a passing mention of the word
+    "unscoped" further down cannot silently exempt a rule that forgot its paths.
+    """
+    head = "\n".join(text.splitlines()[:20]).lower()
+    return "unscoped" in head or "truly global" in head
+
+
 def _documents_orchestration_exemption(text: str) -> bool:
     """True when a skill's frontmatter justifies omitting `disable-model-invocation`.
 
@@ -144,13 +163,15 @@ def check_frontmatter(rel: str, text: str) -> list[Finding]:
     if is_rule:
         if not _nonempty_str(fm.get("description")):
             out.append(Finding(rel, 1, "frontmatter", "rule missing non-empty 'description'"))
-        if not _nonempty_list(fm.get("paths")):
+        if not _nonempty_list(fm.get("paths")) and not _declares_global_scope(text):
             out.append(
                 Finding(
                     rel,
                     1,
                     "frontmatter",
-                    "rule missing non-empty 'paths' (omit only for a truly global rule)",
+                    "rule missing non-empty 'paths' — scope it, or state near the top "
+                    "that it is deliberately unscoped/global (see "
+                    ".claude/rules/authoring.md)",
                 )
             )
     if is_skill:

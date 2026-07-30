@@ -21,40 +21,34 @@ paths:
   should ignore `.agents/**` and `AGENTS.md` as mirror copies of `.claude/**` and `CLAUDE.md` —
   don't flag them as redundant or try to reconcile the two trees.
 
-## Eval coverage is mandatory for instruction files
+## Instruction files ship with a test, like code
 
-Instruction files are tested like code. The `evals/` promptfoo harness measures whether
-a `CLAUDE.md`, a `.claude/rules/*` file, or a `.claude/skills/*` skill actually changes
-agent behavior (with-instructions vs a leave-one-out ablation). **Treat a new or
-substantially changed instruction file the same way you treat new code: it ships with a
-test in the same change.**
+An instruction file is not documentation — it is input that changes what the agent
+does, so it carries the same obligation as the code in the same change. **Treat a new
+or substantially changed instruction file the way you treat new code: it ships with a
+test in the same change.** This is the instruction-file half of the coverage mandate
+in `.claude/rules/engineering.md`; the two are one policy, not two.
 
-- **New skill, or new/rewritten rule:** add an eval task under
-  `evals/tasks/<name>/test.yaml` whose `metadata.targets` names the file, and whose
-  prompt + asserts only pass when that file's guidance is in effect. This is the
-  instruction-file analogue of the unit/integration-test mandate in the root `CLAUDE.md`.
-- **Pick a discriminating prompt.** The task must measurably fail (or behave worse) when
-  the file is ablated — otherwise it proves nothing. Verify with
-  `npm run eval:ablate -- <path>`: the with-instructions arm should beat the ablated one.
-- **`/skill` tasks need a `baselinePrompt`** (the skill's plain-English equivalent) so the
-  ablated/baseline arm is a fair "skill vs unguided agent" comparison, not an unresolved
-  command. Weight the correctness assert above the efficiency asserts (see any existing
-  `test.yaml`).
-- **Every task MUST declare `providers:`.** promptfoo runs a test against *all* top-level
-  providers unless the test overrides them, so a task with no `providers:` line silently
-  also runs on the Sonnet arms — doubling its cost for nothing. Simple read-only /
-  single-edit tasks use `providers: [with-instructions, baseline-no-instructions]` (Haiku);
-  only genuinely multi-step reasoning tasks opt into Sonnet with
-  `providers: [with-instructions-capable, baseline-capable]`.
-- **Fixer skills** (`fix-*`) follow the destructive-task template: a committed broken
-  fixture under `evals/fixtures/`, a `setup.cjs` that seeds the skill's log artifact, and
-  a `verify.cjs` that confirms the repair. Copy an existing `evals/tasks/fix-*/` as the
-  starting point.
-- **Run `npm run eval:coverage`** to confirm the file is no longer a gap.
-- **Genuinely untestable by the harness?** A few skills can't be evaluated headless — they
-  read live editor diagnostics (`fix-problems`) or are aggregate dispatchers with no
-  behavior of their own (`fix-all`). Document the exclusion and the reason in
-  `evals/README.md` rather than shipping a flaky test.
+The harness that measures it is **project-provided** — devkit does not vendor one, and
+its shape varies (carameli runs a promptfoo suite under `evals/` with a
+with-instructions vs leave-one-out-ablation comparison). Whatever the harness, the
+same three properties decide whether a test is worth having:
+
+- **It must discriminate.** The task has to measurably fail, or behave worse, when the
+  file is ablated. A test that passes either way proves nothing and costs money on
+  every run.
+- **The baseline must be fair.** Compare against the skill's plain-English equivalent,
+  not against an unresolved `/command` — otherwise you are measuring command
+  resolution, not guidance. Weight correctness above efficiency.
+- **Scope the run explicitly.** Eval runners typically fan a test across every
+  configured model arm unless the test narrows them. Put read-only and single-edit
+  tasks on the cheapest arm; reserve the capable arm for genuinely multi-step
+  reasoning.
+
+**Genuinely untestable headless?** Some skills cannot be evaluated — they read live
+editor diagnostics, or they are aggregate dispatchers with no behavior of their own
+(`/fix-all`). Document the exclusion and its reason alongside the harness rather than
+shipping a flaky test.
 
 ## CLAUDE.md files
 
@@ -70,8 +64,8 @@ Every rule file must include YAML frontmatter so Claude can scope when it applie
 ---
 description: One-line summary of what the rule covers
 paths:
-  - app/models/**/*.py
-  - alembic/**/*.py
+  - <source-dir>/models/**/*.py
+  - migrations/**/*.py
 ---
 ```
 
@@ -80,29 +74,17 @@ paths:
   truly global (rare).
 - Keep rules focused on a single domain — don't mix unrelated conventions in one file.
 
-### Skin rule files
+### One rule file per variant
 
-One rule file per skin, named `.claude/rules/skin-<name>.md`.
+When a domain has interchangeable variants (themes, providers, adapters), give each
+its own `.claude/rules/<domain>-<variant>.md` and **scope its paths to that variant's
+directory only** — never to the domain's global tree, or every variant's rule loads on
+every file in it.
 
-- **Scope paths to the skin directory only** — never add global frontend paths:
-
-  ```yaml
-  paths:
-    - frontend/src/skins/<name>/**/*.ts
-    - frontend/src/skins/<name>/**/*.tsx
-  ```
-
-- **Visual properties as spec tables** — no JSX or CSS code blocks for
-  material/animation/layout values. Use markdown tables:
-
-  ```markdown
-  | Property | Value | Notes |
-  | --- | --- | --- |
-  | `roughness` | `0.05` | near-mirror gloss |
-  ```
-
-  Structural code (scene hierarchy trees, very short class-name examples) may remain as
-  code blocks where the structure itself conveys meaning.
+Prefer **spec tables over code blocks** for values: a table of property/value/notes
+survives a refactor that would leave a pasted code sample quietly wrong. Keep code
+blocks for structure that only structure can convey (a hierarchy tree, a two-line
+signature).
 
 ### Security / scoping rules
 
@@ -111,11 +93,11 @@ in `CLAUDE.md`. Scope them tightly:
 
 ```yaml
 paths:
-  - app/api/**/*.py
+  - <source-dir>/api/**/*.py
 ```
 
-Then add a one-line pointer in `CLAUDE.md`'s guardrails cross-reference list.
-See `.claude/rules/security.md` as the canonical example.
+Then add a one-line pointer in `CLAUDE.md`'s guardrails cross-reference list, so the
+constraint is discoverable from the root file without being restated there.
 
 ## Skills (`.claude/skills/`)
 
@@ -123,15 +105,16 @@ See `.claude/rules/security.md` as the canonical example.
   skills that another skill invokes programmatically via the Skill tool** (orchestrated
   sub-skills). The flag blocks *all* Skill-tool invocation — including from a parent
   skill — so an orchestrated sub-skill must omit it or the parent's call fails with
-  `cannot be used with Skill tool due to disable-model-invocation`. Currently `/fix-all`
-  invokes `fix-tests`, `fix-e2e`, `fix-lint`, and `fix-docker`, and both `/fix-tests` and
-  `/fix-e2e` delegate to `/fix-docker` when an `app/` restart breaks the stack — so those four
-  omit the flag (with a comment in their frontmatter explaining why). Skills that are only ever
-  started by the
-  user — or merely *suggested* in another skill's prose ("re-run `/fix-tests`") — keep the
-  flag.
-- If the skill generates scripts, those scripts must follow the conventions
-  in `.claude/rules/tooling.md` (especially `-T` for `docker compose exec`).
+  `cannot be used with Skill tool due to disable-model-invocation`. A dispatcher like
+  `/fix-all` calling its `fix-*` children, or one fixer delegating to another when a
+  restart breaks the stack, means every skill on the receiving end must omit the flag —
+  with a comment in its frontmatter saying why, since the omission otherwise reads as an
+  oversight. Skills that are only ever started by the user — or merely *suggested* in
+  another skill's prose ("re-run `/fix-tests`") — keep the flag.
+- If the skill generates scripts, those scripts follow the same conventions as
+  hand-written ones — see `.claude/rules/engineering.md`, plus whatever tooling rule
+  the project adds (notably `-T` on `docker compose exec`, without which the
+  subprocess handle can outlive the command and hang the caller).
 
 
 ### Environment dependencies
@@ -217,8 +200,8 @@ quality gate" section that blocks on **both** failure modes:
   summaries), or a single non-source file flooding a section. The signal is unfindable.
 
 In either case the skill must **not** touch application code. It edits the producing script
-named on the artifact's `# source:` header (or the shared filter in `scripts/diagnostics.py`)
+named on the artifact's `# source:` header (or the shared output filter it draws on)
 to widen the capture or tighten the noise, updates that script's test in the **same** change
-(`scripts/hooks/tests/test_diagnostics.py` for the lint/test runners), tells the user to
+(every script under `scripts/` ships with its test), tells the user to
 regenerate the artifact, and stops. "Don't waste time on suboptimal logs" is the whole point of
 this gate — state it as a hard rule in the skill.

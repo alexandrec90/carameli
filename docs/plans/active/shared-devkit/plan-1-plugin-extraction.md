@@ -4,37 +4,93 @@
 listed files, leaving 15). **Parallel with:** Plan 3, Plan 5.
 **Read first:** `docs/plans/active/shared-devkit/README.md` (architecture, extraction tiers, sharp edges).
 
-> ## ⚠️ Scope note — read before executing (added 2026-07-29)
+> ## ⛔ Recommendation: close this plan unbuilt (2026-07-30)
 >
-> **This plan has not been reconciled, and part of its job has already been done by another
-> mechanism.** devkit now vendors a *shared instruction tier* through
-> `sync-harness.py`'s `MANIFEST`, byte-identical, drift-checked:
+> **Everything below is preserved for the record. Do not execute it without first taking the
+> decision in this box.** The 2026-07-29 note said part of this plan's job had been done by
+> another mechanism and asked whether a plugin was still worth building. Re-auditing devkit
+> on 2026-07-30 turned that from an open question into a near-answer.
+>
+> ### What vendoring now carries
+>
+> devkit's `MANIFEST` (39 entries at HEAD `2209f61`) ships, byte-identical and
+> drift-checked:
 >
 > - **Rules:** `.claude/rules/authoring.md`, `.claude/rules/engineering.md`
-> - **Skills:** `ship`, `task`, `retro`, `test-skill`, `audit-claude-md`,
->   `audit-gitignore`, `audit-dockerignore`
+> - **Skills (10):** `ship`, `task`, `retro`, `test-skill`, `audit-claude-md`,
+>   `audit-gitignore`, `audit-dockerignore`, **`fix-pre-commit`**, **`plan-handoff`**,
+>   **`refactor`**
 >
-> That is **7 of the 15 Tier-A skills** in Step 2 and **1 of the 8 rules** in Step 3,
-> already shared — without a plugin, a marketplace, or a namespace prefix. Carameli has not
-> pulled them yet (it is 14 MANIFEST entries behind); Plan 2 Step 1 is that pull.
+> That is **10 of the 15 Tier-A skills** in Step 2 and 1 of the 8 rules in Step 3, already
+> shared — without a plugin, a marketplace, or a namespace prefix.
 >
-> **Do Plan 2 Step 1 first**, then re-scope this plan to the remainder:
+> ### The mutable-state problem — Step 2's strongest argument — is solved without a plugin
 >
-> - **Skills (8):** `fix-all`, `fix-instructions`, `fix-pre-commit`, `fix-prs`, `fix-tests`,
->   `gen-fixer-eval`, `optimize-fixers`, `triage-fixers`
+> Step 2 below says state "must not live in the plugin cache — it is wiped on update" and
+> treats relocating it as this plan's hard part. Upstream sidestepped it: **vendor the
+> prose, seed the state empty.** `fix-pre-commit`, `plan-handoff`, and `refactor` ship their
+> `SKILL.md` only; their `known-fixes.md` / `state.json` stay per-project because vendoring
+> them would reset every project's hit counts on each `--pull` — and hit counts are what
+> `normalize-known-fixes.py` prunes against. `new-project.py` seeds them empty.
+>
+> No cache to be wiped, no `${CLAUDE_PLUGIN_ROOT}` redirection, no state migration.
+>
+> ### Most of the remainder will never be vendored *or* plugged — by decision
+>
+> devkit's README now records why (see "The shared instruction tier"):
+>
+> - `fix-all`, `fix-lint` — dispatch to `fix-tests`/`fix-docker`/`fix-e2e`, which are not
+>   portable. "A vendored dispatcher whose children don't ship is a skill that dead-ends."
+>   Putting the dispatcher in a plugin does not ship the children either.
+> - `triage-fixers`, `gen-fixer-eval`, `fix-instructions`, `optimize-fixers` — bound to a
+>   promptfoo `evals/` harness devkit does not ship.
+> - `audit-deps` — written against `requirements.in`/pip-tools; generated projects are
+>   uv-native.
+>
+> ### What is actually left
+>
+> - **Skills (2):** `fix-prs`, `fix-tests`. That is the entire remaining Tier-A cargo.
 > - **Rules (7):** `naming.md`, `python-style.md`, `frontend-style.md`,
->   `logging-frontend.md`, `tooling.md`, `diagnostics.md`, `migrations.md`
+>   `logging-frontend.md`, `tooling.md`, `diagnostics.md`, `migrations.md` — all of which
+>   the vendored tier could carry today by adding seven MANIFEST lines.
 >
-> Note the remaining skills are exactly the `/fix-*` and fixer-tooling family — the ones
-> that carry mutable state (`known-fixes.md`, `state.json`) and shell out to
-> `scripts/diagnostics.py`. That is not a coincidence: they are the hard cases, which is
-> why vendoring took the easy ones first.
+> **Two skills and seven markdown files do not justify a second distribution mechanism**,
+> a marketplace, a `plugin.json` version stream, a permanent `/agent-ops:` namespace
+> prefix, and the cache-location caveats in "Sharp edges". The cost of the plugin channel
+> is fixed and the payload has shrunk by 80% since the plan was written.
 >
-> Then answer the question this plan can no longer dodge: **is a plugin still worth
-> building at all**, given vendoring demonstrably carries skills and rules today? The
-> honest case for the plugin is the mutable-state and namespacing story in Step 2; the case
-> against is a second distribution mechanism for the same asset class. Decide that
-> explicitly before Step 1, and record it here.
+> ### The one thing a plugin still does better
+>
+> Honesty requires stating it: **hook wiring** (Step 4). `hooks.json` in a plugin would
+> share the matcher block that every consumer currently hand-maintains in
+> `.claude/settings.json`, and vendoring cannot carry that file (each project's differs).
+> If a plugin is ever built, that — not skills — is its justification. Note it is also the
+> smallest possible plugin: one `hooks.json`, no skills, no rules.
+>
+> ### Recommended decision
+>
+> 1. **Close Plan 1.** Move `fix-prs` + `fix-tests` and the 7 rules to Plan 6 as ordinary
+>    MANIFEST-extension candidates, evaluated one at a time with the Tier-B caution the
+>    README already prescribes.
+> 2. **Reopen only if** a third consumer appears *and* hook-wiring drift between repos
+>    becomes a real observed problem — then build the `hooks.json`-only plugin.
+>
+> ### DECISION TAKEN — 2026-07-30: **closed unbuilt**
+>
+> No plugin, no marketplace, no `agent-ops` namespace. The payload had shrunk to 2 skills
+> and 7 rules, and the vendored tier demonstrably carries both asset classes today.
+>
+> - `fix-prs` and `fix-tests` move to **Plan 6** as ordinary MANIFEST-extension
+>   candidates, evaluated one at a time.
+> - The 7 rules (`naming`, `python-style`, `frontend-style`, `logging-frontend`,
+>   `tooling`, `diagnostics`, `migrations`) likewise — each is seven MANIFEST lines, not
+>   a distribution channel.
+> - **Reopen only if** a third consumer appears *and* hook-wiring drift between repos
+>   becomes a real observed problem. Then build the `hooks.json`-only plugin described
+>   above — one file, no skills, no rules.
+>
+> Everything below this box is preserved as the record of why. Do not execute it.
+> Step 2's file list, Step 3's rule list, and the "15 skills" in the Goal are all stale.
 
 ## Goal
 
@@ -51,7 +107,7 @@ keep using `${CLAUDE_PROJECT_DIR}` for now.
 1. **Repo name — DONE (2026-07-25).** The repo is the former
    `alexandrec90/agent-harness`, **renamed** to `alexandrec90/devkit` — not a new repo.
    Already executed, along with the `v0.1.0` tag. The *internal* names
-   (`.agent-harness.toml`, `$AGENT_HARNESS_DIR`, `sync-harness.py`) are **still the old
+   (`.devkit.toml`, `$DEVKIT_DIR`, `sync-devkit.py`) are **still the old
    spelling on purpose** — see Plan 0 step 5 in the README. Use the old names in anything
    you write until that migration lands.
 2. **Repo visibility — SETTLED, no decision needed.** The repo is **public**

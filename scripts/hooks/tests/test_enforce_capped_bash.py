@@ -1,4 +1,8 @@
-"""Unit tests for the enforce-capped-bash PreToolUse hook decision logic."""
+"""Unit tests for the enforce-capped-bash PreToolUse hook decision logic.
+
+Vendored tier: `decide` takes an injectable `max_bytes` precisely so these tests do
+not depend on the `[bash]` block of whichever repo they run in.
+"""
 
 import json
 
@@ -45,14 +49,17 @@ def test_capped_with_head_c_allows():
     assert code == 0
 
 
-def test_py_wrapper_allows():
+def test_wrapper_without_explicit_cap_allows():
+    """The wrapper's own default is the cap; a bare invocation is still capped."""
     cmd = 'python3 scripts/hooks/invoke-capped.py --command "ls"'
     code, _ = hook.decide(payload("Bash", cmd))
     assert code == 0
 
 
-def test_removed_ps1_wrapper_no_longer_allowed():
-    # invoke-capped.ps1 was deleted; the .ps1 form must now be blocked.
+def test_an_unrecognised_wrapper_form_blocks():
+    """Only the two documented forms pass. Anything that merely looks like a
+    wrapper -- a different extension, a different interpreter -- must block, or
+    the gate degrades into a substring coincidence."""
     cmd = 'pwsh -File scripts/hooks/invoke-capped.ps1 -Command "ls"'
     code, _ = hook.decide(payload("Bash", cmd))
     assert code == hook.EXIT_BLOCK
@@ -93,6 +100,34 @@ def test_blank_command_blocks():
 def test_alternate_key_shapes_still_block_uncapped(raw):
     code, _ = hook.decide(raw)
     assert code == hook.EXIT_BLOCK
+
+
+# --- the block message ---
+
+
+def test_block_message_quotes_the_configured_cap():
+    """The number in the message must be the number the wrapper will use.
+
+    These drifted apart in the original: the message hard-coded 4000 while the
+    wrapper's default came from elsewhere, so a project that widened the cap was
+    told to pass a value it had deliberately changed.
+    """
+    _, msg = hook.decide(payload("Bash", "ls -la"), max_bytes=9999)
+    assert "9999" in msg
+    assert "4000" not in msg
+
+
+def test_block_message_warns_about_the_shell():
+    """The cmd.exe surprise is the most common way the wrapper bites a caller, so
+    the block message -- not just the rule file -- has to say it."""
+    _, msg = hook.decide(payload("Bash", "ls -la"))
+    assert "cmd.exe" in msg
+    assert "head -c" in msg
+
+
+def test_block_message_defaults_to_the_manifest_value():
+    _, msg = hook.decide(payload("Bash", "ls -la"))
+    assert str(hook.CFG.bash.max_bytes) in msg
 
 
 # --- is_capped / get_value units ---

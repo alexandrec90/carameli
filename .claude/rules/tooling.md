@@ -52,10 +52,10 @@ deliberately:
 - Neither form makes a command interactive-safe. Anything that would open an editor or
   prompt still needs its non-interactive flag (`-F <file>`, `--no-edit`, `--quiet`).
 
-### Portable agent harness (`.agent-harness.toml` + `scripts/sync-harness.py`)
+### Portable agent harness (`.devkit.toml` + `scripts/sync-devkit.py`)
 
 The hook scripts are designed to be **vendored unchanged across projects**. Anything
-project-specific lives in `.agent-harness.toml` at the repo root, read by
+project-specific lives in `.devkit.toml` at the repo root, read by
 `scripts/hooks/harness_config.py` (stdlib `tomllib`, never raises — a missing/bad
 manifest falls back to neutral defaults).
 
@@ -66,19 +66,20 @@ manifest falls back to neutral defaults).
   `if project == …` branch.
 - **The shared harness repo is the source of truth; each project commits a vendored
   copy.** It is [`alexandrec90/devkit`](https://github.com/alexandrec90/devkit) — renamed
-  from `agent-harness` on 2026-07-25. The **internal** names still use the old spelling on
-  purpose (`.agent-harness.toml`, `$AGENT_HARNESS_DIR`, `HARNESS_VERSION`,
-  `sync-harness.py`): `sync-harness.py` is itself in the `MANIFEST`, so renaming it changes
-  the very path list the drift check compares by, and that has to happen atomically across
-  every consuming repo. Use the old names until that migration lands.
-  `scripts/sync-harness.py` manages the copy: `--check` (drift-fails, wired into the
+  from `agent-harness` on 2026-07-25, with the **internal** names migrated to match on
+  2026-07-30: `.devkit.toml`, `$DEVKIT_DIR`, `DEVKIT_VERSION`, `sync-devkit.py`, and the
+  published pre-commit hook ids `devkit-manifest` / `devkit-hooks-stdlib-only` /
+  `devkit-drift`. That had to be one atomic change across devkit and every consumer,
+  because `sync-devkit.py` is itself in the `MANIFEST` and the drift check compares by
+  path. Any surviving `agent-harness` spelling is a miss, not a holdout — fix it.
+  `scripts/sync-devkit.py` manages the copy: `--check` (drift-fails, wired into the
   PR-gate `mirror-sync` job), `--pull` (adopt upstream), `--push` (author a change / seed
-  the shared repo). The shared-repo path comes from `--src` or `$AGENT_HARNESS_DIR`.
-  `HARNESS_VERSION` records which upstream commit the vendored copy corresponds to; it is
+  the shared repo). The shared-repo path comes from `--src` or `$DEVKIT_DIR`.
+  `DEVKIT_VERSION` records which upstream commit the vendored copy corresponds to; it is
   written by `--pull` and must match the tag `pr-gate.yml` pins.
-  The vendored file set is `sync-harness.py`'s `MANIFEST` — extend it as more scripts are
-  decoupled; `.agent-harness.toml` is deliberately **not** in it (it is per-project config).
-- **Every mode no-ops clean (exit 0) when `$AGENT_HARNESS_DIR` is unset.** That is correct
+  The vendored file set is `sync-devkit.py`'s `MANIFEST` — extend it as more scripts are
+  decoupled; `.devkit.toml` is deliberately **not** in it (it is per-project config).
+- **Every mode no-ops clean (exit 0) when `$DEVKIT_DIR` is unset.** That is correct
   pre-adoption behaviour and a trap afterwards: the PR gate called `--check` for months
   without setting the variable, so it passed green while checking nothing, and was hiding
   real drift. The gate now checks the harness out itself (public repo, pinned tag) and sets
@@ -90,7 +91,7 @@ manifest falls back to neutral defaults).
   required here). `--pull` to adopt upstream. Never hand-edit one side to match the other:
   that resolves the symptom and loses the provenance.
 - **The harness checkout must come *after* any `git status --porcelain` step** in the same
-  job. It lands an untracked `.agent-harness-src/` in the workspace, which the `mirror-sync`
+  job. It lands an untracked `.devkit-src/` in the workspace, which the `mirror-sync`
   drift check would otherwise report as stale mirrors.
 - This is the same single-source→committed-mirror pattern as `.claude/` →
   `.agents/`/`.codex/`, lifted from intra-repo to cross-repo.

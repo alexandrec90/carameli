@@ -1,16 +1,45 @@
 #!/usr/bin/env python3
 """Runs a shell command and caps combined stdout+stderr to stay within context limits.
 
-`cap_output` is a pure function unit-tested via pytest
-(`scripts/hooks/tests/test_invoke_capped.py`).
+The companion to `enforce-capped-bash.py`: that hook blocks an uncapped Bash call,
+this is what the agent routes the call through instead. Both windows of the cap are
+kept -- head and tail -- because the two useful parts of a long command's output are
+the first lines (what it was doing) and the last (how it failed).
 
-Usage: python3 scripts/hooks/invoke-capped.py --command "cmd" [--max-bytes 4000] [--head-bytes 2000]
+**The shell is the platform's, not the caller's.** `subprocess.run(shell=True)` uses
+`/bin/sh` on POSIX and **`cmd.exe` on Windows**, regardless of which shell the agent
+harness otherwise provides. On Windows that means heredocs fail, `'single quotes'`
+arrive with the quotes intact, and `\\|` alternation in a grep pattern is not
+understood. That is a property of the platform, not a bug here -- but it is the
+single most common way this wrapper surprises a caller, so it is also stated in the
+block message the hook prints.
+
+Defaults come from `[bash]` in `.devkit.toml` (see `harness_config.py`) so a
+project can widen or tighten the cap without forking this file. Explicit CLI flags
+still win.
+
+`cap_output` is pure and unit-tested in `scripts/hooks/tests/test_invoke_capped.py`.
+
+Usage: python3 scripts/hooks/invoke-capped.py --command "cmd" [--max-bytes N] [--head-bytes N]
 """
+
+from __future__ import annotations
 
 import argparse
 import subprocess
 import sys
+from pathlib import Path
 
+# scripts/hooks/ on path so the sibling, stdlib-only config helper imports before
+# the venv (same pattern as stop.py's harness_config import).
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import harness_config
+
+REPO_ROOT = (Path(__file__).parent / "../..").resolve()
+CFG = harness_config.load(REPO_ROOT)
+
+# Below this a cap costs more than it saves: the truncation marker alone is ~30
+# bytes, and a window too small to hold one error line defeats the purpose.
 MIN_MAX_BYTES = 512
 
 
@@ -36,11 +65,11 @@ def run_capped(command: str, max_bytes: int, head_bytes: int) -> tuple[int, byte
     return result.returncode, cap_output(combined, max_bytes, head_bytes)
 
 
-def main(argv=None) -> int:
+def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--command", required=True)
-    parser.add_argument("--max-bytes", type=int, default=4000)
-    parser.add_argument("--head-bytes", type=int, default=2000)
+    parser.add_argument("--max-bytes", type=int, default=CFG.bash.max_bytes)
+    parser.add_argument("--head-bytes", type=int, default=CFG.bash.head_bytes)
     args = parser.parse_args(argv)
 
     if args.max_bytes < MIN_MAX_BYTES:
