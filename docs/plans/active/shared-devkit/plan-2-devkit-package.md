@@ -1,207 +1,225 @@
-# Plan 2 — Extract `scripts/` into the `devkit` pip package
+# Plan 2 — Share the rest of `scripts/` (vendored + rendered tiers, **not** a pip package)
 
-**Depends on:** Plan 1 (plugin exists; hooks reference script paths this plan relocates).
+**Depends on:** a tagged devkit release carrying the current MANIFEST — see "Prerequisite"
+below. Independent of Plan 1.
 **Read first:** `docs/plans/active/shared-devkit/README.md`.
 
-## Goal
+> **Reconciled 2026-07-29.** This plan was written against devkit `v0.2.0` and proposed a
+> `src/devkit/` pip package with `devkit-lint` / `devkit-test` console scripts. **Upstream
+> decided against that**, deliberately and with reasons that also apply here, so the
+> package half of this plan is void. What follows is the surviving work, restated against
+> what devkit actually is today (HEAD, ahead of `v0.4.1`). Sections that were void are
+> called out rather than deleted, so a fresh session does not re-derive the decision.
 
-Move the project-agnostic half of `scripts/` (45 scripts + 13 hooks + 50 test files) into
-`devkit`'s Python package, install it into consuming projects via a pinned dependency, and
-repoint the plugin hooks at it. This is the biggest single win: `diagnostics.py` and the
-`logs/*.log` artifact contract are what make the `/fix-*` skills work at all, and every
-project wants them.
+## The blocking decision is resolved — against this plan's premise
 
-## Blocking decision: how the pin gets bumped
-
-Dependabot does **not** reliably bump a pip git-ref pin. Pick one before writing code:
-
-| Option | Cost | Notes |
-| --- | --- | --- |
-| **Publish to PyPI** (recommended) | one-time setup + a release workflow | Dependabot's `pip` ecosystem bumps it like any package; works with the existing `minor-and-patch` group |
-| Git ref pin + weekly bump workflow | a ~30-line workflow per repo | Keeps devkit private; more moving parts |
-| Git ref pin, manual bumps | zero | Will rot. Do not choose this |
-
-Whichever wins, **pin a tag** — never `@main` (see README sharp edges).
-
-## Step 1 — Classify every script
-
-Three buckets. Do this as an explicit inventory before moving anything.
-
-### Move to devkit — generic infrastructure
-
-- **Diagnostics contract:** `diagnostics.py`, `extract-log-errors.py` — the format shared
-  by `lint-all.py` and `run-tests.py` and consumed by every `/fix-*` skill
-- **Runners:** `lint-all.py`, `run-tests.py`, `run-ci.py`, `run-e2e.py`, `run-load.py`,
-  `run-mutation.py`
-- **Docker helpers:** `docker_common.py`, `docker_win.py`, `docker-up/down/status/restart-app/prune/fix/migrate.py`
-- **Dependency tooling:** `recompile-locks.py`, `check-lock-markers.py`, `venv-install.py`
-- **Agent-context generators:** `sync-agents-context.py`, `sync-agents-settings.py`, `sync-codex-hooks.py`
-- **Workflow ergonomics:** `notify.py`, `notify-wrap.py`, `ship.py`, `start-task.py`,
-  `task_branch.py`, `archive-done-todos.py`, `install-pre-commit.py`, `pre-commit.py`,
-  `script_common.py`, `lint-instructions.py`
-- **Tests:** the ~45 of 58 files in `scripts/hooks/tests/` covering the above
-
-**Not** the hooks in `scripts/hooks/` — they are generic, but they ship via channel 5
-(vendoring), not the pip package. See Step 3, "The hooks do not move".
-
-### Stays in Carameli — project-specific
-
-`start-ngrok.py`, `sync-sandbox-secrets.py`, `backup_restore_test.py`,
-`compress-comic-book-images.py`, `compress-images.js`, `gen-eval-fixture.py` (verify —
-may be generic), and their tests (`test_start_ngrok.py`, `test_sync_sandbox_secrets.py`,
-`test_backup_restore_test.py`, `test_compose_worktree_isolation.py`).
-
-### Needs a config seam — generic logic, project-specific values
-
-`docker_common.py` and `run-tests.py` assume compose service names (`app`, `worker`,
-`postgres`) and a `tests/` layout. `lint-all.py` hardcodes the tool set and the
-`frontend/` path. These move, but read their per-project values from config (Step 2).
-
-## Step 2 — The config seam — DECIDED: reuse `.devkit.toml`, build nothing
-
-The earlier draft proposed a `[tool.devkit]` table in `pyproject.toml`. **Do not build
-that.** The seam already exists, is unit-tested, and is in production in Carameli:
-`harness_config.py` reading `.agent-harness.toml` (→ `.devkit.toml` after the rename).
-Extend it with the fields this plan needs; do not stand up a second parallel config system.
-
-Why the standalone file wins over `[tool.devkit]` in `pyproject.toml`:
-
-- **Hooks must read it before the venv exists.** Both are `tomllib`-parseable, so this is
-  not a hard blocker — but a project's `pyproject.toml` is a build artifact that a hook has
-  no other reason to touch, and coupling hook config to it invites a build-system change to
-  break the Stop hook.
-- **It is language-neutral.** A consumer with no `pyproject.toml` still gets the harness.
-- **It already exists and is tested.** `test_harness_config.py` covers the loader,
-  including the never-raises contract (a missing or malformed manifest falls back to
-  neutral defaults rather than breaking every hook in the repo).
-
-Fields this plan adds to the existing schema — as a new table, leaving `[stop]`, `[db]`,
-and `[frontend]` untouched:
+The original blocking decision was *how the pip pin gets bumped* (PyPI vs git-ref vs
+manual). It is moot: **there is no pip package and there will not be one.** devkit's
+`pyproject.toml` says so explicitly:
 
 ```toml
-[lint]
-tools = ["ruff", "mypy", "vulture", "pip-audit", "eslint", "tsc", "stylelint"]
-
-[compose]
-app_service = "app"
-db_service = "postgres"
+dependencies = []          # stdlib only, "a contract, not an accident"
+[tool.uv]
+package = false            # "devkit is a virtual project ... not an installable package"
 ```
 
-Follow the existing convention in `harness_config.py`: every field gets a dataclass default,
-so a project with a conventional layout needs no config at all.
+There is no `src/devkit/`, no `[project.scripts]`, and no distribution. The reasoning is
+the same constraint that already forced the hooks to stay vendored: **anything devkit ships
+may need to run before a virtualenv exists**, so a third-party-importable package would
+break provisioning on exactly the sessions the harness exists to set up.
 
-> `.devkit.toml` is deliberately **not** in the `MANIFEST` — it is per-project config, not
-> shared code. Keep it that way; adding it would make every consumer drift on day one.
+Consequences — do not spend time on any of these:
 
-## Step 3 — Package layout and entrypoints
+| Void item from the original plan | Why |
+| --- | --- |
+| PyPI publish / release workflow | No distribution exists |
+| Git-ref pin + weekly bump workflow | Nothing to pin |
+| `devkit` in `requirements-dev.in`; recompile locks | No package to install |
+| `devkit-lint` / `devkit-test` console scripts in `tasks.json` | No entrypoints |
+| `.claude/hooks/session-start.sh` installs devkit | It provisions via `uv sync --all-groups` against the *consuming* repo |
+| "`src/devkit/` contains no `hooks/` and no `config.py`" | There is no `src/devkit/` at all |
+
+## What replaced it: two sharing tiers, both already working
+
+Scripts are shared by one of two mechanisms. Every classification decision in this plan is
+"which tier", not "package or not".
+
+| | **Tier V — vendored** | **Tier R — rendered once** |
+| --- | --- | --- |
+| Source | `sync-harness.py`'s `MANIFEST` | `templates/core/scripts/` |
+| Delivered by | `sync-harness.py --pull` | `new-project.py` (new repos only) |
+| Kept in sync? | **Yes** — byte-compared, drift fails CI | **No** — project owns it after render |
+| Verified by | `sync-harness.py --check`, `harness-drift` pre-commit hook | `test_repo_contract.py` asserts the file *exists*, not that it matches |
+| Members today | 32 entries (see below) | `lint-all.py.tmpl`, `run-tests.py.tmpl`, `notify.py`, `notify-wrap.py` |
+
+Tier R is the answer to a question the original plan did not ask: some scripts are
+*generically shaped but project-owned* — `lint-all.py` has to know this repo's tool set and
+`frontend/` path, `run-tests.py` its compose services. Upstream chose to seed them and let
+them diverge, backed by a contract test that they exist, rather than force every project's
+tool list through a config seam. **Respect that split**; moving a Tier R script into Tier V
+means committing to make it fully config-driven first.
+
+## Prerequisite — devkit must cut a tag (blocks Step 1)
+
+devkit's tags stop at **`v0.4.1`**. The 32-entry MANIFEST, the shared instruction tier, and
+`.pre-commit-hooks.yaml` are all on **untagged HEAD**. Carameli pins `ref: v0.4.1` in
+`pr-gate.yml`, and devkit's own README example pins `rev: v0.5.0` — **a tag that does not
+exist yet**.
+
+So: **cut and push a devkit tag (`v0.5.0`) before starting Step 1**, and bump
+`pr-gate.yml`'s `ref:` in the same Carameli commit as the `--pull`. Never `@main` (README
+sharp edges). This is also Plan 4 Step 1's prerequisite.
+
+## Step 1 — Close the 14-entry vendoring gap (highest value, do this first)
+
+Carameli's vendored `scripts/sync-harness.py` carries **18** MANIFEST entries. devkit HEAD
+carries **32**. Carameli is missing all of these:
 
 ```text
-src/devkit/
-├── __init__.py
-├── diagnostics.py
-├── lint_all.py
-├── run_tests.py
-├── docker/…
-└── templates/           # Plan 4 lives here
-
-scripts/                 # NOT packaged — channel 5, vendored, unchanged
-├── hooks/*.py           # the 16 hook scripts + harness_config.py
-└── sync-harness.py
+scripts/hooks/tests/test_repo_contract.py
+.claude/rules/engineering.md
+.claude/rules/authoring.md
+.claude/skills/ship/SKILL.md
+.claude/skills/task/SKILL.md
+.claude/skills/retro/SKILL.md
+.claude/skills/retro/extract.py
+scripts/hooks/tests/test_retro_extract.py
+.claude/skills/test-skill/SKILL.md
+.claude/skills/test-skill/write-artifacts.py
+scripts/hooks/tests/test_write_artifacts.py
+.claude/skills/audit-claude-md/SKILL.md
+.claude/skills/audit-gitignore/SKILL.md
+.claude/skills/audit-dockerignore/SKILL.md
 ```
 
-Console scripts in `pyproject.toml`: `devkit-lint`, `devkit-test`, `devkit-docker`,
-`devkit-sync` (Plan 4). VS Code tasks and CI call these instead of `python scripts/x.py`.
+Note what that list is: **7 skills and 2 rules — Plan 1's cargo, arriving through channel 5
+instead of a plugin.** See the note added to Plan 1; it changes Plan 1's scope, and this
+step is the reason.
 
-### The hooks do not move — DECIDED
+### How to run it
 
-The earlier draft left this open ("Either keep hooks fully self-contained, or have the
-plugin ship them under `bin/`. Decide this before moving the hooks."). **Resolved: neither.
-The hooks stay vendored** (channel 5) and are not packaged at all.
+**Two `--pull` runs are required.** The tool iterates the `MANIFEST` it was *imported*
+with, so the first pull installs the new `sync-harness.py` and the second copies the
+entries that pull added. A single run looks successful and silently moves nothing new.
 
-The constraint that forces it is already written in `.claude/rules/tooling.md`: hook scripts
-are **stdlib only** because they run before the virtualenv is active. So:
+```bash
+AGENT_HARNESS_DIR=/path/to/devkit python scripts/sync-harness.py --pull   # gets the new tool
+AGENT_HARNESS_DIR=/path/to/devkit python scripts/sync-harness.py --pull   # gets the new entries
+AGENT_HARNESS_DIR=/path/to/devkit python scripts/sync-harness.py --check  # must print 32 in sync
+```
 
-- **Packaging them is impossible**, not merely awkward. A hook importing `devkit.config`
-  fails on any clone where devkit is not yet installed — including the first session on a
-  fresh clone, which is the case the whole portability requirement exists to serve.
-- **Plugin `bin/` would work but regresses two things**: hook bodies land in a cache
-  outside the repo that is wiped on plugin update, and hook behaviour stops appearing in
-  the consuming repo's diff.
+### The three landmines in this step
 
-So `src/devkit/` has **no** `config.py` and **no** `hooks/`. The config seam lives in
-`scripts/hooks/harness_config.py` (Step 2) and is reached by vendoring, not by import.
+1. **`CLAUDE.md` must cite the vendored rules, not restate them.** Once
+   `.claude/rules/engineering.md` lands, `test_repo_contract.py` **fails** on a `CLAUDE.md`
+   that reproduces a vendored clause — it matches on the distinctive middle of each
+   paragraph, so paraphrasing does not evade it. Carameli's CLAUDE.md currently states its
+   own Testing and Tooling sections inline. Rewriting them as citations is real work and
+   belongs in this step, not deferred.
+2. **The 7 incoming skills overwrite Carameli's copies byte-for-byte.** Diff each one
+   *before* the second `--pull` and `--push` anything Carameli should keep (the README's
+   guidance: `--push` if this project authored the change, `--pull` to adopt, never
+   hand-edit one side). Carameli's `ship`/`task` have `master` written through them;
+   upstream's defer to `task_branch.detect_default_branch()` — upstream is correct here,
+   adopt it.
+3. **`.claude/` is a generated-mirror source.** `sync-agents-context.py` emits `.agents/`
+   and `.codex/` from it, and the PR gate's `mirror-sync` job fails on drift. Regenerate
+   the mirrors in the same commit, and remember the ordering constraint: the harness
+   checkout must stay **after** the `git status --porcelain` step.
 
-> Consequence for Step 1's inventory: the line "**All 13 hooks** in `scripts/hooks/`
-> **except** none — all are generic" is right about them being generic and wrong about
-> where they go. They are generic *and* they stay in `scripts/`. Their sharing mechanism is
-> the `MANIFEST`, which already carries 6 of them; widening it is the migration.
+## Step 2 — Classify the remaining scripts (replaces the old three-bucket inventory)
 
-## Step 4 — Widen the MANIFEST (replaces "repoint the plugin hooks")
+Carameli has ~40 scripts in `scripts/`. For each one not already in Tier V or Tier R,
+decide its tier. The decision rule:
 
-The earlier draft had this step flip hook paths to `${CLAUDE_PLUGIN_ROOT}`. That is void —
-hook paths do not change, because the bodies do not move. **Nothing to repoint.**
+- **Tier V** if it can be made fully config-driven via `.agent-harness.toml` *and* it ships
+  a test that passes in a repo with a different shape. Vendoring something that reads this
+  repo's layout is what made every generated project fail 12 tests on its first CI run.
+- **Tier R** if it is generic in shape but must know project specifics that do not reduce
+  to a manifest field (tool sets, service names, lockfile names).
+- **Stays** if it is Carameli-only.
 
-What this step is instead: add the remaining generic hooks to `sync-harness.py`'s
-`MANIFEST`, each with its test, one at a time. The MANIFEST carries 17 entries today; the
-candidates are `enforce-capped-bash.py`, `pretool.py`, `finalize-state.py`,
-`enforce-audit-batch-caps.py`, `invoke-capped.py`, `deps-sync.py`, `archive-session*.py`,
-and the `.claude → .agents/.codex` mirror scripts that `sync-harness.py`'s own docstring
-already flags as "portable but their tests want auditing before vendoring".
+Candidates, from the original inventory, re-bucketed:
 
-For each candidate, in its own commit: read it for project coupling, lift any hardcoded
-project value into a `.devkit.toml` field with a neutral default, add the script **and its
-test** to the MANIFEST, then run `--check` from every consumer. Never add a script without
-its test — a vendored copy has to be verifiable in isolation.
+| Script(s) | Tier | Note |
+| --- | --- | --- |
+| `diagnostics.py`, `extract-log-errors.py` | **V** | The artifact contract every `/fix-*` skill reads. Best remaining V candidate — genuinely shapeless. |
+| `sync-agents-context.py`, `sync-codex-hooks.py` | **V** | `sync-harness.py`'s own docstring flags these as "portable but their tests want auditing before vendoring". That audit is this step. |
+| `script_common.py`, `lint-instructions.py`, `archive-done-todos.py` | **V** | Verify no path assumptions first. |
+| `lint-all.py`, `run-tests.py` | **R** | Already Tier R upstream. Do **not** promote — Carameli's versions know its tool set and compose services. |
+| `docker_common.py`, `docker_win.py`, `docker-*.py` | **R** | Compose service names and the telephony profile are Carameli's. |
+| `run-ci.py`, `run-e2e.py`, `run-load.py`, `run-mutation.py` | **R** | Thin wrappers over project-specific suites. |
+| `recompile-locks.py`, `check-lock-markers.py`, `venv-install.py` | **Stays** | Carameli is `requirements*.in`-based; devkit is uv-native. `test_repo_contract.py` already treats `check-lock-markers.py` as an optional tier for exactly this reason. |
+| `ship.py`, `start-task.py`, `pre-commit.py`, `install-pre-commit.py` | **V** | Pair with the already-vendored `task_branch.py`. |
+| `start-ngrok.py`, `sync-sandbox-secrets.py`, `backup_restore_test.py`, `compress-*`, `gen-eval-fixture.py` | **Stays** | Project-specific, as originally classified. |
 
-`after-model-edit.py` is never a candidate: it belongs to the Tier-C `add-db-model` skill
-that stays in Carameli.
+Work one script + its test per commit, running `--check` from Carameli after each. Never
+add a script to the MANIFEST without its test — a vendored copy has to be verifiable in
+isolation.
 
-## Step 5 — Wire Carameli to consume it
+## Step 3 — The config seam (unchanged, but verify before extending)
 
-1. Add `devkit` to `requirements-dev.in` (host/CI tooling — **not** `requirements-test.in`;
-   the Docker dev image bakes that lock and must stay slim, per CLAUDE.md).
-2. Recompile all three locks in the same commit:
-   `python -m uv pip compile --universal --python-version 3.12 …` — `--universal` is
-   mandatory or Linux-only packages silently vanish from the container lock.
-3. Update `.claude/hooks/session-start.sh` so a fresh clone installs devkit.
-4. Update `.vscode/tasks.json` entries to call the console scripts.
-5. Update `.pre-commit-config.yaml`'s `sync-agents` hook entry to the new path.
-6. **Delete the migrated scripts and their tests from Carameli** — the pip-package ones
-   only. **Do not delete anything in the `MANIFEST`**: those files are *supposed* to exist
-   in both repos, and removing them from Carameli breaks `sync-harness.py --check` on the
-   next PR.
-7. **Narrow, do not remove, the `pytest scripts/hooks/tests/` step in the PR Gate
-   `backend` job.** The earlier draft said to delete it outright. That is wrong for the
-   vendored tier: those tests are the thing that makes a vendored copy verifiable in
-   isolation, which is the entire justification for channel 5. Devkit's CI owning a copy
-   does not verify *this* repo's copy. Keep the step; scope it to the tests whose subjects
-   are still present after the pip migration.
+Still correct and still the answer: `scripts/hooks/harness_config.py` reading
+`.agent-harness.toml`. Do **not** build a `[tool.devkit]` table in `pyproject.toml`.
+
+Two updates since the plan was written:
+
+- The `[lint]` / `[compose]` tables this plan proposed may already exist upstream, and
+  `.agent-harness.toml` has grown `[paths]`, `[db]`, `[frontend]`, and
+  `[stop] finalize_targets`. **Read devkit's `templates/core/dot-agent-harness.toml.tmpl`**
+  — the canonical example — before adding a field.
+<!-- cspell:ignore servce -->
+
+- Unknown keys are now caught. `check_harness_manifest.py` (pre-commit) and
+  `test_repo_contract.py` both reject them, because `from_dict` is all
+  `raw.get(name, default)`, so a typo like `db_servce` reads as "unset" and silently falls
+  back to a default that does not match the compose file. Adding a field means adding it to
+  the validator's known-key set too.
+
+Keep extending `test_harness_config.py`; do not start a second config-seam test module.
+
+## Step 4 — What explicitly does not move
+
+- **Hook bodies** stay in `scripts/hooks/` at `${CLAUDE_PROJECT_DIR}` paths. Settled twice
+  over (README "Why hooks stay vendored"); nothing in this plan repoints them.
+- **`.agent-harness.toml`** is never in the MANIFEST — per-project config.
+- **`pytest scripts/hooks/tests/`** stays in the PR gate `backend` job, narrowed not
+  deleted. Devkit's CI owning a copy does not verify *this* repo's copy, which is the whole
+  justification for the vendored tier. The step gets *larger* after Step 1, not smaller —
+  three new vendored tests arrive with it.
+- **`after-model-edit.py`** belongs to the Tier-C `add-db-model` skill. Never a candidate.
 
 ## Tests
 
-- The ~45 migrated test files must pass **unchanged** in devkit's CI. If one needs editing,
-  that file was project-coupled — reclassify it to the "stays" bucket instead of weakening
-  the test.
-- Extend the existing `test_harness_config.py` for the new `[lint]` / `[compose]` tables:
-  defaults apply with the tables absent, overrides take effect, and a malformed table still
-  falls back rather than raising. Do **not** write a new config-seam test file — the seam
-  is one module and should keep one test module.
-- Carameli: a test asserting no migrated script path is still referenced anywhere
-  (`tasks.json`, workflows, hooks, skills). Grep-based, cheap, catches the classic
-  half-finished-move bug. Scope its allowlist to the `MANIFEST`, which is *expected* to
-  still be referenced.
+- After Step 1: `pytest scripts/hooks/tests/` green with the three new vendored test files,
+  **unmodified**. If one needs editing to pass here, it is project-coupled — report it
+  upstream rather than weakening it locally.
+- `sync-harness.py --check` prints "all 32 vendored files in sync" and **not** "nothing to
+  do (skipping)". That line means the gate is inert — fix the wiring, never ignore it.
+- Extend `test_harness_config.py` for any new manifest table: defaults apply when absent,
+  overrides take effect, malformed falls back rather than raising.
+- A Carameli test asserting no migrated script path is still referenced from `tasks.json`,
+  workflows, hooks, or skills — allowlisting the MANIFEST, which is *expected* to still be
+  referenced. Grep-based; catches the half-finished-move bug.
+- `mirror-sync` green after `.claude/` changes in Step 1.
 
 ## Definition of done
 
-- [ ] Pin-bump mechanism chosen and working (PyPI release or bump workflow) — applies to
-      the pip channel only; the vendored tier is pinned by tag in the consumer's CI instead
-- [ ] Config seam extends `harness_config.py` / `.devkit.toml`; **no** `[tool.devkit]` table
-      and no second config system anywhere
-- [ ] Migrated tests green in devkit CI, unmodified
-- [ ] Carameli's `scripts/` contains project-specific scripts **plus** the MANIFEST files
-- [ ] `src/devkit/` contains no `hooks/` and no `config.py`
+- [ ] devkit tagged (`v0.5.0`); Carameli's `pr-gate.yml` `ref:` bumped to match in the same
+      commit as the `--pull`
+- [ ] MANIFEST gap closed: `--check` reports 32/32 in sync from Carameli
+- [ ] Carameli's `CLAUDE.md` **cites** `.claude/rules/engineering.md` and `authoring.md`
+      instead of restating them; `test_repo_contract.py` green
+- [ ] The 7 incoming skills diffed before adoption; anything Carameli authored `--push`ed
+      upstream rather than hand-merged
+- [ ] `.agents/` and `.codex/` mirrors regenerated; `mirror-sync` green
+- [ ] Every remaining script in `scripts/` has an explicit tier (V / R / stays), recorded in
+      this file
+- [ ] `diagnostics.py` + `extract-log-errors.py` vendored with tests, `--check` green
+- [ ] `pytest scripts/hooks/tests/` step still present in the PR gate, widened for the new
+      vendored tests
+- [ ] No `[tool.devkit]` table and no second config system anywhere
 - [ ] Hook paths still `${CLAUDE_PROJECT_DIR}/scripts/hooks/*.py`, unchanged by this plan
-- [ ] `sync-harness.py --check` green from Carameli after every step of this plan
-- [ ] `pytest scripts/hooks/tests/` step still present in the PR Gate, narrowed not deleted
-- [ ] Locks recompiled with `--universal`; container lock unchanged in size
-- [ ] Fresh clone: session-start installs devkit, `devkit-lint` runs
+
+**Deliberately not in scope any more:** PyPI, a `devkit` pip dependency, console scripts,
+lock recompilation for devkit, `src/devkit/`.

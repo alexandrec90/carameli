@@ -7,6 +7,8 @@ import { defineConfig, loadEnv } from 'vite'
 import type { Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 
+import { resolveDevWatch } from './devWatchPolicy'
+
 const rootDir = dirname(fileURLToPath(import.meta.url))
 
 /**
@@ -74,14 +76,9 @@ export default defineConfig(({ mode }) => {
       // host.docker.internal; Vite's host check blocks it by default.
       allowedHosts: ['host.docker.internal'],
 
-      // On Windows, inotify file-change events don't propagate across the
-      // Docker bind mount, so Vite's native watcher never sees edits and HMR
-      // silently stops working (a restart is the only way changes show up).
-      // Polling fixes it. Gated on CHOKIDAR_USEPOLLING (set only in
-      // docker-compose) so local non-Docker dev keeps fast native watching.
-      watch: process.env.CHOKIDAR_USEPOLLING
-        ? { usePolling: true, interval: 100 }
-        : undefined,
+      // Polling vs. native watching, and why the interval is coarse:
+      // ./devWatchPolicy.ts.
+      watch: resolveDevWatch(process.env),
       proxy: {
         '/auth': backendUrl,
         '/vsapi': backendUrl,

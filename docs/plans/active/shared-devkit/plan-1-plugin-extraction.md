@@ -1,7 +1,40 @@
 # Plan 1 — Create the devkit repo and extract skills/rules as a plugin
 
-**Depends on:** nothing. **Parallel with:** Plan 3, Plan 5.
+**Depends on:** Plan 2 Step 1 (see the scope note below — it removes 8 of this plan's 23
+listed files, leaving 15). **Parallel with:** Plan 3, Plan 5.
 **Read first:** `docs/plans/active/shared-devkit/README.md` (architecture, extraction tiers, sharp edges).
+
+> ## ⚠️ Scope note — read before executing (added 2026-07-29)
+>
+> **This plan has not been reconciled, and part of its job has already been done by another
+> mechanism.** devkit now vendors a *shared instruction tier* through
+> `sync-harness.py`'s `MANIFEST`, byte-identical, drift-checked:
+>
+> - **Rules:** `.claude/rules/authoring.md`, `.claude/rules/engineering.md`
+> - **Skills:** `ship`, `task`, `retro`, `test-skill`, `audit-claude-md`,
+>   `audit-gitignore`, `audit-dockerignore`
+>
+> That is **7 of the 15 Tier-A skills** in Step 2 and **1 of the 8 rules** in Step 3,
+> already shared — without a plugin, a marketplace, or a namespace prefix. Carameli has not
+> pulled them yet (it is 14 MANIFEST entries behind); Plan 2 Step 1 is that pull.
+>
+> **Do Plan 2 Step 1 first**, then re-scope this plan to the remainder:
+>
+> - **Skills (8):** `fix-all`, `fix-instructions`, `fix-pre-commit`, `fix-prs`, `fix-tests`,
+>   `gen-fixer-eval`, `optimize-fixers`, `triage-fixers`
+> - **Rules (7):** `naming.md`, `python-style.md`, `frontend-style.md`,
+>   `logging-frontend.md`, `tooling.md`, `diagnostics.md`, `migrations.md`
+>
+> Note the remaining skills are exactly the `/fix-*` and fixer-tooling family — the ones
+> that carry mutable state (`known-fixes.md`, `state.json`) and shell out to
+> `scripts/diagnostics.py`. That is not a coincidence: they are the hard cases, which is
+> why vendoring took the easy ones first.
+>
+> Then answer the question this plan can no longer dodge: **is a plugin still worth
+> building at all**, given vendoring demonstrably carries skills and rules today? The
+> honest case for the plugin is the mutable-state and namespacing story in Step 2; the case
+> against is a second distribution mechanism for the same asset class. Decide that
+> explicitly before Step 1, and record it here.
 
 ## Goal
 
@@ -126,7 +159,7 @@ Which hooks are shareable:
 Paths stay `${CLAUDE_PROJECT_DIR}/scripts/hooks/*.py` — **permanently**, not just in this
 plan. Per the channel-5 decision, only the wiring moves into the plugin; the bodies stay
 vendored in the consuming repo, so `${CLAUDE_PROJECT_DIR}` is the correct root and Plan 2
-does **not** flip them. Three of the five scriptual hooks above are already in the
+does **not** flip them. Three of the five script-backed hooks above are already in the
 `MANIFEST` today; the other two get added to it, which is the whole of their migration.
 
 > The plugin ships `hooks.json` (matchers → commands). The consuming repo ships the
