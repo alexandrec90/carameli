@@ -1,4 +1,17 @@
-# Plan 0 — Cut devkit `v0.5.0`
+# Plan 0 — Cut devkit `v0.5.0` — ✅ DONE (superseded by v0.5.2)
+
+> **CLOSED 2026-07-31. Do not execute this file.** `v0.5.0`, `v0.5.1` and `v0.5.2` are
+> all tagged and pushed. Carameli vendors **`v0.5.2`** (`4a63441`), pinned identically
+> in `DEVKIT_VERSION`, `pr-gate.yml`'s `ref:`, and `.pre-commit-config.yaml`'s `rev:`.
+> Step 4b (the pre-commit block) is applied and its drift hook has been observed
+> failing on a deliberate edit.
+>
+> Kept for the failure analysis, which is the durable part: the
+> `FALLBACK_DEVKIT_REF` / `latest_devkit_tag()` trap where an untagged feature does not
+> exist as far as a generated project is concerned, and pre-commit's **strict** hook-id
+> resolution, which aborts a commit rather than skipping when the rev predates a hook.
+> Both are recurrence risks at every future release; `devkit/RELEASING.md` is the
+> checklist that encodes them.
 
 **Depends on:** nothing. **Blocks:** Plan 2 Step 1, Plan 4 Step 1, and Plan 6.
 **Read first:** `docs/plans/active/shared-devkit/README.md`.

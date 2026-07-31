@@ -45,30 +45,33 @@ done about it.
   (the MANIFEST grew from 39 to 52 with the devkit additions above; Carameli was at 18).
 - `CLAUDE.md` now **cites** `engineering.md` instead of restating it, which is what
   `test_repo_contract.py` requires.
-- **Plan 4 Step 1 — pre-commit channel: attempted, reverted, blocked on the tag.**
-  Adding the devkit `repo:` block aborts every commit with `error: pathspec 'v0.5.0'
-  did not match any file(s) known to git` — pre-commit clones at the pinned rev before
-  running anything, so a missing tag does not degrade, it stops the repo committing.
-  Forcing it through with `--no-verify` was not an option. The exact block to paste is
-  in `plan-0-cut-the-tag.md` Step 4b; it is a copy-paste once the tag exists.
+- **Plan 4 Step 1 — pre-commit channel: DONE (2026-07-31).** First attempt was reverted
+  because it aborted every commit with `error: pathspec 'v0.5.0' did not match any
+  file(s) known to git` — pre-commit clones at the pinned rev *before* running
+  anything, so a missing tag does not degrade, it stops the repo committing. Once
+  `v0.5.0`–`v0.5.2` were cut, the block landed pinned to **`v0.5.2`** and all three
+  hooks pass. `devkit-drift` was **observed failing** on a deliberate one-line edit to
+  `harness_config.py` and then reverted — the gate names the file and prints the
+  `--pull`/`--push` remedy, so it is known-working rather than merely configured.
+  `scripts/hooks/tests/test_devkit_precommit_channel.py` pins the invariants: pinned by
+  tag not branch, all three ids enabled, and the rev in step with `pr-gate.yml`'s `ref:`.
 - `.claude/skills/audit-design-flaws/check-specs.json` — Carameli's A–L audit checks,
   moved out of the now-vendored engine.
 
-### ⚠️ The one thing left, and it is yours
+### Plan 0 — DONE. The tag exists
 
-**`v0.5.0` is not tagged.** Everything above assumes it. Until `git tag v0.5.0 && git
-push --tags` runs in devkit:
+Cut in a later session, and then some: **`v0.5.0`, `v0.5.1`, and `v0.5.2` are all on
+origin.** `v0.5.2` (`4a63441`) is what Carameli vendors — `DEVKIT_VERSION` records it,
+`pr-gate.yml` pins `ref: v0.5.2`, and `.pre-commit-config.yaml` pins `rev: v0.5.2`.
+The three must move together; `test_devkit_precommit_channel.py` fails if they drift.
 
-- Carameli's `.pre-commit-config.yaml` pins a rev that does not exist, so
-  `pre-commit run` fails with "hook not found" on the three devkit hooks.
-- `FALLBACK_DEVKIT_REF` is deliberately **still `v0.4.1`** — bumping it before the tag
-  exists turns `test_fallback_devkit_ref_tracks_the_newest_tag` red, and committing a
-  red test to encode a TODO is the wrong trade. `RELEASING.md` Step 3 covers the
-  one-commit window where that test is *supposed* to be red.
-- Carameli's `pr-gate.yml` still pins `ref: v0.4.1`, which now under-checks (52 vendored
-  files against an 18-entry tag). Bump it in the same commit as the tag.
+The defect that made Plan 0 urgent is closed: `v0.5.2` carries `.pre-commit-hooks.yaml`
+and `scripts/precommit/`, verified by `git ls-tree`, so a freshly generated project's
+commit gate resolves instead of aborting on "hook not found".
 
-Follow `plan-0-cut-the-tag.md`. It is the whole remaining critical path.
+> **`plan-0-cut-the-tag.md` is now history, not a plan.** Keep it for the failure
+> analysis — the `FALLBACK_DEVKIT_REF` / `latest_devkit_tag()` trap and the strict
+> hook-id resolution are both worth not rediscovering — but do not execute it.
 
 ---
 
