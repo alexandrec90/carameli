@@ -74,7 +74,7 @@ gate → merge lifecycle safely.
    - **Stale:** the latest failure is **older than 14 days** and the workflow hasn't run since →
      don't blind-fix history. Report it and offer a single re-dispatch
      (`gh workflow run <file>` — dispatchable workflows only, and **never** Sandbox Tests, see
-     Hard Rule 7) to learn whether it's still broken.
+     Hard Rule 8) to learn whether it's still broken.
    - **Superseded:** `master` has moved past the failing run's `headSha`. Still a candidate — but
      the local reproduction in Step 3 is the arbiter: if it passes on current `master`, the failure
      is already fixed (or was a flake); report that and stop for this workflow.
@@ -184,7 +184,7 @@ After the merge, confirm the workflow is actually green again:
 
 - **Scheduled workflows** (Nightly, Weekly) verify on their next scheduled run — say so.
 - **Dispatchable workflows** may be re-dispatched **once** (`gh workflow run <file>`) to confirm —
-  except **Sandbox Tests**, which is never auto-dispatched (Hard Rule 7).
+  except **Sandbox Tests**, which is never auto-dispatched (Hard Rule 8).
 
 ## Step 7 — Restore + report
 
@@ -218,20 +218,26 @@ stop. Don't waste cycles on a suboptimal log.
    `continue-on-error` and always exit 0 — surviving mutants are **informational** until the score
    target is met. Never open a PR to "fix" it; report the score and stop. (See `.claude/rules/`
    and the job's `continue-on-error: true`.)
-3. **A Weekly reliability summary failure is plumbing, not a test.** That job downloads artifacts and
-   comments on a pinned issue (`if: always()`); it fails when an upstream job was skipped (missing
-   artifact) or the issue/token setup is off. Fix the **upstream job** (Step 2) or the workflow YAML —
-   never run a code fixer against it.
-4. **Reproduce before fixing.** Never edit source off a raw CI job log — regenerate the clean artifact
+3. **A Weekly reliability summary failure is plumbing, not a test.** That job builds the summary with
+   `scripts/weekly_summary.py` and comments on a pinned issue (`if: always()`). It has three failure
+   modes, all deliberate hard failures: an upstream job was skipped so its **JUnit artifact is
+   missing** (never counted as zero — absent evidence must not render as "0 failed"); **no open issue
+   titled `Weekly Test Reliability Report`** exists, so the summary has nowhere to go; or the token
+   scope is off. Fix the **upstream job** (Step 2), create/pin the issue, or fix the workflow YAML —
+   never run a code fixer against it, and never "fix" it by making the step exit 0.
+4. **Never make a workflow open an issue on failure.** A red run is this repo's alert (README, "Failing
+   checks never open issues"). If a failure is invisible, the fix is to make the check fail louder —
+   not to file an issue that duplicates the run and then has to be closed by hand.
+5. **Reproduce before fixing.** Never edit source off a raw CI job log — regenerate the clean artifact
    locally (Step 3) and let the fixer work from it. If it can't reproduce (already fixed / flake /
    env), report it and offer quarantine; don't guess-fix and don't silently skip.
-5. **Don't loop CI.** Verify locally, push once, poll the gate cheaply. Max 2 push→gate rounds per PR
+6. **Don't loop CI.** Verify locally, push once, poll the gate cheaply. Max 2 push→gate rounds per PR
    before reporting a holdout. At most one confirmation re-dispatch per workflow after a merge.
-6. **Dispatch, don't re-implement.** All fixing is delegated to the `fix-*` skills. This skill only
+7. **Dispatch, don't re-implement.** All fixing is delegated to the `fix-*` skills. This skill only
    finds the broken workflows, reproduces, and manages the PR lifecycle.
-7. **Never auto-dispatch Sandbox Tests.** It is the one workflow allowed to run a **paid tier**
+8. **Never auto-dispatch Sandbox Tests.** It is the one workflow allowed to run a **paid tier**
    against live Telnyx sandbox credentials, deliberately dispatch-only (see the guard tests named in
    `sandbox-tests.yml`). Offer the `gh workflow run sandbox-tests.yml` command to the user instead —
    running it is their call.
-8. **Runs on PR branches belong to `/fix-prs`.** Never fix a `pull_request`-event failure from here;
+9. **Runs on PR branches belong to `/fix-prs`.** Never fix a `pull_request`-event failure from here;
    suggest `/fix-prs` and move on (Scope table).

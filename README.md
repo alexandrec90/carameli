@@ -401,7 +401,22 @@ protection ruleset on `master` requiring the four PR Gate checks:
 - `Lockfile environment markers`
 
 For weekly reporting, create and pin an open GitHub issue titled `Weekly Test Reliability Report`.
-The weekly workflow auto-discovers that issue by title and posts the summary comment there.
+The weekly workflow auto-discovers that issue by title and posts the summary comment there
+(built by `scripts/weekly_summary.py`). **That issue is required**: with no match, the
+`Weekly reliability summary` job fails rather than passing green with the report undelivered.
+
+### Failing checks never open issues
+
+No workflow in this repo files a GitHub issue when something breaks — **a red run is the
+alert**. On a PR the failing check plus the uploaded `logs/lint-errors.log` /
+`logs/test-failures.log` artifacts are the signal, and the author is already watching; on
+the scheduled `Nightly` / `Weekly Hardening` suites, the failed run itself is what needs
+looking at. Auto-filing duplicates a signal that already exists, needs closing by hand, and
+goes stale the moment the branch is fixed. Issues here are for durable trackers a human
+opens: quarantined tests, and the pinned weekly report above.
+
+The corollary is that a check must actually fail when it has nothing useful to say. A step
+that prints a warning and exits 0 is the failure mode this rule exists to prevent.
 
 ---
 
