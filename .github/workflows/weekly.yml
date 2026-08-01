@@ -126,95 +126,35 @@ jobs:
         with:
           name: mutation-report
           path: reports/mutation
+      # The summary builder lives in scripts/weekly_summary.py, not in a heredoc
+      # here: Python inside a YAML block scalar is unlinted, untyped and
+      # untestable, and this one had silently rotted (every backslash doubled, so
+      # the report rendered as one line of literal \n with a permanently-zero
+      # quarantine count). Stdlib-only, so no venv setup is needed in this job.
       - name: Build weekly summary
         run: |
-          python - <<'PY'
-          import glob
-          import os
-          import re
-          import xml.etree.ElementTree as ET
-
-          def parse_junit(path: str) -> tuple[int, int, int]:
-              if not os.path.exists(path):
-                  return (0, 0, 0)
-              root = ET.parse(path).getroot()
-              tests = int(root.attrib.get("tests", 0))
-              failures = int(root.attrib.get("failures", 0))
-              errors = int(root.attrib.get("errors", 0))
-              skipped = int(root.attrib.get("skipped", 0))
-              failed = failures + errors
-              passed = max(tests - failed - skipped, 0)
-              return passed, failed, skipped
-
-          passed = failed = skipped = 0
-          for path in [
-              "reports/migration/junit-migration-weekly.xml",
-              "reports/resilience/junit-resilience-weekly.xml",
-          ]:
-              p, f, s = parse_junit(path)
-              passed += p
-              failed += f
-              skipped += s
-
-          quarantine_tests = 0
-          for qfile in glob.glob("tests/quarantine/**/*.py", recursive=True):
-              if os.path.basename(qfile) == "__init__.py":
-                  continue
-              with open(qfile, "r", encoding="utf-8") as fh:
-                  text = fh.read()
-              quarantine_tests += len(
-                  re.findall(r"(?m)^\\s*(?:async\\s+)?def\\s+test_", text)
-              )
-
-          mutation_score = "N/A"
-          mutation_tail = "N/A"
-          mutation_report = "reports/mutation/mutation-report.txt"
-          if os.path.exists(mutation_report):
-              with open(mutation_report, "r", encoding="utf-8", errors="ignore") as fh:
-                  body = fh.read()
-              lines = [line for line in body.splitlines() if line.strip()]
-              if lines:
-                  mutation_tail = "\\n".join(lines[-5:])
-              score_match = re.search(r"(\\d+)%", body)
-              if score_match:
-                  mutation_score = f"{score_match.group(1)}%"
-
-          p95_baseline = "Not found"
-          baseline_doc = "docs/evidence/performance-baselines.md"
-          if os.path.exists(baseline_doc):
-              with open(baseline_doc, "r", encoding="utf-8", errors="ignore") as fh:
-                  for line in fh:
-                      if "p95" in line.lower():
-                          p95_baseline = line.strip()
-                          break
-
-          os.makedirs("reports", exist_ok=True)
-          with open("reports/weekly-summary.md", "w", encoding="utf-8") as out:
-              out.write("# Weekly Test Reliability Report\\n\\n")
-              out.write(f"- Total tests: {passed} passed / {failed} failed / {skipped} skipped\\n")
-              out.write(f"- Flake rate: {quarantine_tests} tests in `tests/quarantine/`\\n")
-              out.write(f"- Mutation score: {mutation_score}\\n")
-              out.write(f"- P95 latency baseline: {p95_baseline}\\n\\n")
-              out.write("## Mutation report tail\\n\\n")
-              out.write("```text\\n")
-              out.write(f"{mutation_tail}\\n")
-              out.write("```\\n")
-
-          print("Generated reports/weekly-summary.md")
-          PY
-      - name: Resolve pinned weekly report issue
+          python3 scripts/weekly_summary.py \
+            --junit reports/migration/junit-migration-weekly.xml \
+            --junit reports/resilience/junit-resilience-weekly.xml \
+            --quarantine-dir tests/quarantine \
+            --mutation-report reports/mutation/mutation-report.txt \
+            --baseline docs/evidence/performance-baselines.md \
+            --out reports/weekly-summary.md
+      # Fail when the pinned issue is missing. This step is the summary's only
+      # delivery path, and printing a hint into a log nobody reads left the job
+      # green while the report went nowhere. A red weekly run is the signal that
+      # the issue needs creating -- deliberately a failure, not a new issue.
+      - name: Post summary to the pinned reliability issue
         run: |
-          ISSUE_NUMBER=$(gh issue list --state open --search "Weekly Test Reliability Report in:title" --limit 1 --json number --jq '.[0].number')
-          if [ -n "$ISSUE_NUMBER" ] && [ "$ISSUE_NUMBER" != "null" ]; then
-            echo "WEEKLY_RELIABILITY_ISSUE=$ISSUE_NUMBER" >> "$GITHUB_ENV"
+          set -euo pipefail
+          issue=$(gh issue list --state open \
+            --search "Weekly Test Reliability Report in:title" \
+            --limit 1 --json number --jq '.[0].number')
+          if [ -z "$issue" ] || [ "$issue" = "null" ]; then
+            echo "::error::No open issue titled 'Weekly Test Reliability Report' was found. Create and pin one; it is the only delivery path for this summary." >&2
+            exit 1
           fi
-      - name: Post summary to pinned issue
-        run: |
-          if [ -n "$WEEKLY_RELIABILITY_ISSUE" ]; then
-            gh issue comment "$WEEKLY_RELIABILITY_ISSUE" --body-file reports/weekly-summary.md
-          else
-            echo "Create and pin an open issue titled 'Weekly Test Reliability Report' to enable automated comments."
-          fi
+          gh issue comment "$issue" --body-file reports/weekly-summary.md
       - name: Upload weekly summary
         if: always()
         uses: actions/upload-artifact@v7

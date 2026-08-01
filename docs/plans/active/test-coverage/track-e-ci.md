@@ -604,7 +604,20 @@ Example using `gh` CLI:
 gh issue comment <ISSUE_NUMBER> --body "$(cat reports/weekly-summary.md)"
 ```
 
-Create a pinned GitHub issue titled "Weekly Test Reliability Report" and use its number here.
+Create a pinned GitHub issue titled "Weekly Test Reliability Report"; the workflow resolves
+it by title, so no number is hard-coded.
+
+**The report is built by `scripts/weekly_summary.py`, not by an inline heredoc.** Python
+inside a YAML block scalar is unlinted, untyped and untestable, and the heredoc that used
+to live here had rotted unnoticed: a block scalar is literal, so its doubled backslashes
+were real, and the job emitted a one-line report of visible `\n` with a permanently-zero
+flake count and a permanently-"N/A" mutation score.
+
+**Both delivery failures are hard failures, by design.** A missing JUnit artifact is not
+counted as zero, and a missing pinned issue fails the job instead of printing a hint. The
+project's stance is that **a failing scheduled run is the alert** — no workflow here opens
+an issue on failure, because an auto-filed issue duplicates a signal that already exists
+and then has to be closed by hand.
 
 ---
 
