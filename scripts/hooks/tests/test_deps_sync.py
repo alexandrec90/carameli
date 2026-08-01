@@ -3,9 +3,34 @@
 import json
 import subprocess
 
+import pytest
 from conftest import load_module
 
 ds = load_module("scripts/hooks/deps-sync.py")
+
+
+@pytest.fixture(autouse=True)
+def _isolated_git_config(tmp_path, monkeypatch):
+    """Run every git call in this module against an empty global config.
+
+    These tests build scratch repos and then assert on what git reports about them,
+    so any global setting leaks straight into the assertions. Two real breakages came
+    from exactly that, both from a machine-wide `core.hooksPath`:
+
+    * `git commit` in a fresh repo was refused by a global branch-policy hook, so the
+      fixtures could not even reach the code under test;
+    * `git rev-parse --git-path hooks` returned the *global* hooks directory rather
+      than the repo's, because `core.hooksPath` overrides it by design — which made
+      the worktree assertion below fail for a reason that has nothing to do with
+      worktrees.
+
+    Isolating here keeps the tests measuring `deps-sync`'s behaviour instead of the
+    developer's `~/.gitconfig`. It deliberately does **not** paper over the real
+    consequence of a global hooksPath — that project-local hooks stop firing — which
+    is a property of the machine, not of this module.
+    """
+    monkeypatch.setenv("GIT_CONFIG_GLOBAL", str(tmp_path / "empty-gitconfig"))
+    monkeypatch.setenv("GIT_CONFIG_SYSTEM", str(tmp_path / "empty-gitconfig"))
 
 
 def _git(*args, cwd):
