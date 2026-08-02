@@ -1,78 +1,51 @@
 {
-  // Keep this palette small. Shared quality, git, agent-context, Docker-maintenance,
-  // port, and shipping actions live in alex-projects.code-workspace. This file is
-  // only for Carameli workflows where a VS Code picker/composite adds real value.
-  // One-off administration remains available through the documented scripts.
+  // Keep this palette SMALL. Shared quality, git, agent-context, stack start/stop,
+  // Docker-maintenance, harness-drift, port, and shipping actions all live in
+  // alex-projects.code-workspace, defined once and taking the project as an argument.
+  //
+  // THE BAR FOR A TASK IN THIS FILE: a picker or a composite has to add something a
+  // workspace task with `--project` cannot. A one-line invocation of a documented
+  // script does NOT qualify — the script is already the interface. Applying that bar
+  // took this file from eight tasks to two:
+  //
+  //   - "Start: Full Stack" and "Stop: Docker Stack" became the workspace's
+  //     "Docker: Start Stack" / "Docker: Stop Stack", which delegate straight back to
+  //     scripts/docker-up.py and scripts/docker-down.py via devkit's docker-maint.py.
+  //     Nothing was lost, and the label stopped being duplicated in ibkr_trader with
+  //     different behaviour behind it.
+  //   - "Start: ngrok + Sync Webhook URLs" was a bare wrapper around
+  //     `python scripts/start-ngrok.py`. Run the script.
+  //   - The three-task frontend-preview composite ("Start: Frontend Dev Server",
+  //     "Open: Frontend Preview", "Start: Frontend + Preview") is gone, and it was
+  //     BROKEN rather than merely redundant: the Simple Browser opened localhost:5174,
+  //     while ports.toml allocates FRONTEND_HOST_PORT 5173 to carameli and 5175 to
+  //     carameli-b, and vite.config.ts binds 5173 in-container. It had never pointed
+  //     at a running server in either checkout. Run `npm run dev` from frontend/ (it
+  //     is already in VS Code's npm-scripts view) and open the port this checkout was
+  //     actually allocated — the workspace's "Ports: Show A Checkout's Allocation"
+  //     prints it.
+  //   - "Test: Harness Hook Tests" is the workspace's now. It was identical in every
+  //     project, which is why `--target=hook-tests` is no longer in the picker below.
+  //
+  // Both survivors are pickers over Carameli-only test tiers. Neither sets
+  // `isDefault` on the test group: the workspace's "Test: Run Suite" holds that, and
+  // two defaults in one multi-root workspace makes "Run Test Task" ambiguous. That
+  // collision was real here until this change.
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "Start: Full Stack (Docker Compose)",
-      "detail": "Build and start the Carameli stack, then wait for healthchecks. The default build task (Ctrl+Shift+B).",
-      "type": "process",
-      "command": "python",
-      "args": ["scripts/notify-wrap.py", "Start: Full Stack", "--", "python", "scripts/docker-up.py", "--build"],
-      "group": { "kind": "build", "isDefault": true },
-      "presentation": { "reveal": "always", "panel": "new", "showReuseMessage": false, "close": false },
-      "problemMatcher": []
-    },
-    {
-      "label": "Start: Frontend Dev Server",
-      "detail": "Implementation step for 'Start: Frontend + Preview'; hidden from the task picker.",
-      "hide": true,
-      "type": "shell",
-      "command": "npm run dev",
-      "options": { "cwd": "${workspaceFolder}/frontend" },
-      "presentation": { "reveal": "always", "panel": "new", "showReuseMessage": false, "close": false },
-      "problemMatcher": []
-    },
-    {
-      "label": "Open: Frontend Preview",
-      "detail": "Implementation step for 'Start: Frontend + Preview'; hidden from the task picker.",
-      "hide": true,
-      "type": "shell",
-      "command": "echo ${input:openFrontendSimpleBrowser}",
-      "presentation": { "reveal": "silent", "panel": "dedicated", "showReuseMessage": false, "close": false },
-      "problemMatcher": []
-    },
-    {
-      "label": "Start: Frontend + Preview",
-      "detail": "Start Vite with HMR and open localhost:5174 in VS Code's Simple Browser.",
-      "dependsOn": ["Start: Frontend Dev Server", "Open: Frontend Preview"],
-      "dependsOrder": "parallel",
-      "group": "build",
-      "problemMatcher": []
-    },
-    {
-      "label": "Start: ngrok + Sync Webhook URLs",
-      "detail": "Open the tunnel, update webhook environment values, and recreate app/worker so they use the new URL.",
-      "type": "process",
-      "command": "python",
-      "args": ["scripts/notify-wrap.py", "Start: ngrok + Sync URLs", "--", "python", "scripts/start-ngrok.py"],
-      "presentation": { "reveal": "always", "panel": "shared", "showReuseMessage": false, "close": false },
-      "problemMatcher": []
-    },
-    {
-      "label": "Stop: Docker Stack",
-      "detail": "Stop Carameli containers. Named volumes and database data survive.",
-      "type": "process",
-      "command": "python",
-      "args": ["scripts/notify-wrap.py", "Stop: Docker Stack", "--", "python", "scripts/docker-down.py"],
-      "presentation": { "reveal": "always", "panel": "shared", "showReuseMessage": false, "close": false },
-      "problemMatcher": []
-    },
-    {
       "label": "Test: Run Carameli Target — free",
-      "detail": "Run a Carameli-only free target. The ordinary full/changed suite is the workspace-level 'Test: Run Suite' task.",
+      "detail": "A Carameli-only free target. Distinct from the workspace's 'Test: Run Suite' (pytest alone): '--all' merges pytest + hooks + frontend into ONE artifact, which is what keeps the aggregate from fanning out into racing writers. Paid tiers (telnyx-sandbox, live_e2e) are excluded and stay opt-in.",
       "type": "process",
       "command": "python",
       "args": ["scripts/notify-wrap.py", "Test: Run Carameli Target", "--", "python", "scripts/run-tests.py", "${input:testSuite}"],
-      "group": { "kind": "test", "isDefault": true },
+      "group": "test",
       "presentation": { "reveal": "always", "panel": "shared", "showReuseMessage": false, "close": false },
       "problemMatcher": []
     },
     {
       "label": "Test: Run Browser E2E — free",
-      "detail": "Run Playwright headless, headed, or across Chromium/Firefox/WebKit.",
+      "detail": "Run Playwright headless, headed, or across Chromium/Firefox/WebKit. Needs the stack up first — that is the workspace's 'Docker: Start Stack'.",
       "type": "process",
       "command": "python",
       "args": ["scripts/notify-wrap.py", "Test: Run Browser E2E", "--", "python", "scripts/run-e2e.py", "${input:e2eMode}"],
@@ -83,19 +56,16 @@
   ],
   "inputs": [
     {
-      "id": "openFrontendSimpleBrowser",
-      "type": "command",
-      "command": "simpleBrowser.show",
-      "args": "http://localhost:5174/"
-    },
-    {
+      // Both pickers carry an empty branch, which normally reaches argparse as a stray
+      // positional and is rejected. It is survivable here only because run-tests.py
+      // and run-e2e.py use `parse_known_args` — an accident of those two scripts, not
+      // a pattern to copy. Anything new gets one real token in every branch.
       "id": "testSuite",
       "type": "pickString",
       "description": "Which Carameli-only free target to run",
       "options": [
-        { "label": "All free targets (pytest + hooks + frontend)", "value": "--all" },
+        { "label": "All free targets (pytest + hooks + frontend), one merged artifact", "value": "--all" },
         { "label": "Frontend (Vitest)", "value": "--target=frontend-tests" },
-        { "label": "Vendored harness hooks", "value": "--target=hook-tests" },
         { "label": "Public webhook reachability", "value": "--target=webhook-e2e" }
       ],
       "default": "--all"
