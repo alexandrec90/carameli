@@ -36,8 +36,23 @@ def test_parse_cli_args_default():
     assert rt.parse_cli_args([]) == (False, None)
 
 
-def test_parse_cli_args_fast_and_target_separate_args():
-    assert rt.parse_cli_args(["--fast", "--target", "hook-tests"]) == (True, "hook-tests")
+def test_parse_cli_args_changed_and_target_separate_args():
+    assert rt.parse_cli_args(["--changed", "--target", "hook-tests"]) == (True, "hook-tests")
+
+
+def test_parse_cli_args_accepts_the_canonical_changed_flag():
+    """`--changed` is the spelling devkit, the template, and the Stop hook all use.
+
+    Regression test: this repo only accepted `--fast`, so the vendored Stop hook's
+    own remediation line ("Re-run locally: ... python scripts/run-tests.py --changed")
+    hit the strict-unknown-argument path and exited 2 at the moment it was meant to
+    help. The one workspace-level "Test: Run Suite" task depends on it too.
+    """
+    assert rt.parse_cli_args(["--changed"]) == (True, None)
+
+
+def test_parse_cli_args_still_accepts_the_deprecated_fast_alias():
+    assert rt.parse_cli_args(["--fast"]) == (True, None)
 
 
 def test_parse_cli_args_target_equals_form():
@@ -63,7 +78,7 @@ def test_parse_cli_args_dangling_target_raises():
 def test_help_requested():
     assert rt.help_requested(["--help"]) is True
     assert rt.help_requested(["-h"]) is True
-    assert rt.help_requested(["--fast"]) is False
+    assert rt.help_requested(["--changed"]) is False
     assert rt.help_requested([]) is False
 
 

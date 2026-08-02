@@ -147,8 +147,7 @@ never hand-edit them**.
 
 When adding a pip package: add the floor to the right `.in` file (if the
 container suite imports it → `-test`; host/CI tooling only → `-dev`), then
-recompile the locks in the same commit (VS Code task "Deps: Recompile Python
-Lockfiles", or
+recompile the locks in the same commit (`python scripts/recompile-locks.py`, or
 `python -m uv pip compile --universal --python-version 3.12 requirements.in -o requirements.txt`,
 then `-test` with `-c requirements.txt`, then `-dev` with `-c requirements-test.txt`).
 Never leave an import that depends on an unlisted package. `--universal` is

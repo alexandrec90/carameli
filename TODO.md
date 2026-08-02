@@ -24,8 +24,8 @@ and the pointer to it.
 
 - [ ] run ngrok and run associated tests
 - [ ] Set up and test VANILLASOFT_WEBHOOK_URL
-- [ ] Test: Run Load (Locust) (performance)
-- [ ] Test: Run Mutation (mutmut) (mutation score)
+- [ ] Run `python scripts/run-load.py` (performance)
+- [ ] Run `python scripts/run-mutation.py` (mutation score)
 - [x] ~~*re-enable github actions — pre-commit/pre-push hooks and the `ci.yml` / `e2e-smoke.yml` workflows renamed back from `.disabled`*~~ [2026-07-14]
 - [x] ~~*asyncpg.exceptions.InvalidPasswordError: password authentication failed for user "carameli"*~~ [2026-07-16]
 - [x] ~~*Separate paid and free tests*~~ [2026-07-14]

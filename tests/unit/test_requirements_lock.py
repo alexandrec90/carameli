@@ -51,6 +51,5 @@ def test_locks_cover_linux_only_packages() -> None:
     text = (REPO_ROOT / "requirements.txt").read_text(encoding="utf-8")
     assert re.search(r"^uvloop==", text, flags=re.MULTILINE), (
         "uvloop missing from requirements.txt — the lock was likely compiled "
-        "without --universal on Windows; recompile via the "
-        "'Deps: Recompile Python Lockfiles' task"
+        "without --universal on Windows; run python scripts/recompile-locks.py"
     )

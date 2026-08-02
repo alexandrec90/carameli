@@ -4,7 +4,7 @@ for AI-agent consumption. On pass, clears the artifact.
 
 One entrypoint for every environment:
   - **Local desktop:** `python scripts/run-tests.py` runs the full suite inside
-    the app container (xdist). `--fast` runs the changed-only set via testmon,
+    the app container (xdist). `--changed` runs the changed-only set via testmon,
     falling back to a full xdist run (with --testmon-noselect) when testmon
     selects more than half the suite. `--all` runs every FREE target (pytest,
     hook, frontend) in one process and merges them into a single artifact, so
@@ -90,8 +90,8 @@ _CI_WEBHOOK_E2E_ARGV = [
     "--no-header",
     "--color=no",
 ]
-# The telnyx-sandbox target is a PAID tier and opt-in only (the dedicated "Test:
-# Run Telnyx Sandbox" task) -- it is deliberately absent from _ALL_TARGETS so the
+# The telnyx-sandbox target is an explicit opt-in tier -- it is deliberately absent
+# from _ALL_TARGETS so the
 # free "Test: All Suites" aggregate never touches a live provider. The `-m` here
 # is `sandbox and not chargeable`: `sandbox` opts back in over the global
 # `-m "not paid"` default (see _ADDOPTS / pytest.ini), while `not chargeable`
@@ -195,7 +195,7 @@ _VALID_TARGETS = {
 _CRITICAL_TARGETS = {"pytest", "webhook-e2e"}
 # Order is cosmetic only (results are merged into one dict); pytest first so its
 # "Running pytest..." banner leads the interleaved output. Only FREE targets
-# belong here: "Test: All Suites" runs this set, so a paid tier (telnyx-sandbox,
+# belong here: `run-tests.py --all` runs this set, so a paid tier (telnyx-sandbox,
 # a valid opt-in --target) must never be added -- it would hit a live provider on
 # every aggregate run. Paid tiers are opt-in via their own dedicated tasks.
 _ALL_TARGETS = ("pytest", "hook-tests", "frontend-tests")
@@ -265,10 +265,11 @@ def parse_testmon_selection(dual_out: str) -> tuple[int, int]:
     return selected, total
 
 
-USAGE = """usage: python scripts/run-tests.py [--fast] [--all] [--target <name>]
+USAGE = """usage: python scripts/run-tests.py [--changed] [--all] [--target <name>]
 
   (no args)        full backend suite (in-container xdist locally; direct on CI)
-  --fast           changed-only via testmon, xdist fallback (default suite only)
+  --changed        changed-only via testmon, xdist fallback (default suite only)
+                   (--fast is a deprecated alias)
   --all            every FREE target (pytest, hook-tests, frontend-tests)
   --target <name>  one of: pytest, hook-tests, frontend-tests, webhook-e2e,
                    telnyx-sandbox, telnyx-chargeable, live-e2e
@@ -282,19 +283,28 @@ def help_requested(argv: list[str]) -> bool:
 
 
 def parse_cli_args(argv: list[str]) -> tuple[bool, str | None]:
-    """Return (`fast`, `target`) from the CLI args.
+    """Return (`changed`, `target`) from the CLI args.
 
     Raises ValueError on any unrecognized argument — an unknown flag falling
     through must never start the default full-suite run (`.claude/rules/tooling.md`).
+
+    `--changed` is the canonical spelling, shared with devkit and every generated
+    project so the one workspace-level "Test: Run Suite" task works everywhere.
+    It is also what the vendored Stop hook already tells the agent to run
+    ("Re-run locally: ... python scripts/run-tests.py --changed") — this repo spelled
+    it `--fast`, so that advice hit the strict-argument path above and died on
+    "Unknown argument: --changed" at exactly the moment it was meant to help.
+    `--fast` stays as a deprecated alias so existing muscle memory and any prose that
+    still names it keep working.
     """
-    fast = False
+    changed = False
     target: str | None = None
 
     i = 0
     while i < len(argv):
         arg = argv[i]
-        if arg in ("--fast", "-Fast"):
-            fast = True
+        if arg in ("--changed", "--fast", "-Fast"):
+            changed = True
         elif arg == "--all":
             target = "all"
         elif arg.startswith("--target="):
@@ -306,7 +316,7 @@ def parse_cli_args(argv: list[str]) -> tuple[bool, str | None]:
             raise ValueError(f"Unknown argument: {arg}")
         i += 1
 
-    return fast, target
+    return changed, target
 
 
 def pick_fast_command() -> str:
@@ -327,9 +337,9 @@ def pick_fast_command() -> str:
     return _PYTEST_TESTMON
 
 
-def run_local(fast: bool) -> dict[str, tuple[list[str], int]]:
-    pytest_cmd = pick_fast_command() if fast else _PYTEST_FULL
-    mode = "fast (changed-only, testmon)" if fast else "full (parallel, xdist)"
+def run_local(changed: bool) -> dict[str, tuple[list[str], int]]:
+    pytest_cmd = pick_fast_command() if changed else _PYTEST_FULL
+    mode = "changed-only (testmon)" if changed else "full (parallel, xdist)"
     print(f"\nRunning pytest -- {mode} ...")
     lines, code = run_argv(_in_container(pytest_cmd))
     return {"pytest": (lines, code)}
@@ -414,7 +424,7 @@ def main() -> int:
         print(USAGE)
         return 0
     try:
-        fast, target = parse_cli_args(sys.argv[1:])
+        changed, target = parse_cli_args(sys.argv[1:])
     except ValueError as exc:
         print(exc, file=sys.stderr)
         print(USAGE, file=sys.stderr)
@@ -425,9 +435,10 @@ def main() -> int:
             file=sys.stderr,
         )
         return 2
-    if target and fast and target != "pytest":
+    if target and changed and target != "pytest":
         print(
-            "--fast only applies to the default pytest suite or --target pytest.", file=sys.stderr
+            "--changed only applies to the default pytest suite or --target pytest.",
+            file=sys.stderr,
         )
         return 2
 
@@ -442,7 +453,7 @@ def main() -> int:
     elif target:
         results = run_named_target(target)
     else:
-        results = run_ci() if IS_CI else run_local(fast)
+        results = run_ci() if IS_CI else run_local(changed)
 
     if IS_CI:
         # Split frontend (vitest) failures into their own artifact so backend and

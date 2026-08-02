@@ -1,7 +1,6 @@
 """Copilot session archive script.
 
-Run via the "Agent: Archive Copilot Session" VS Code task, or called directly
-by Copilot at the end of a significant work session. Captures git-based
+Run directly by Copilot at the end of a significant work session. Captures git-based
 activity and writes a compact summary JSON to logs/agent/.
 
 Unlike the Claude Code version (archive-session.py) this script cannot parse
