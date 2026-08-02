@@ -36,7 +36,7 @@ def main() -> int:
         dc.write_artifact(
             ARTIFACT,
             dc.format_artifact(
-                "Failed task: DB: Apply Migrations",
+                "Failed command: python scripts/docker-migrate.py",
                 [msg, "", "=== docker ps (project containers) ===", *ps_table],
             ),
         )
@@ -57,7 +57,7 @@ def main() -> int:
     dc.write_artifact(
         ARTIFACT,
         dc.format_artifact(
-            "Failed task: DB: Apply Migrations",
+            "Failed command: python scripts/docker-migrate.py",
             ["=== alembic upgrade head ===", *output],
         ),
     )

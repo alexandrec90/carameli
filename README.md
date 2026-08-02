@@ -9,15 +9,16 @@ Self-hosted VoIP microservice powered by Telnyx + Jambonz. Drop-in replacement f
 - **Docker Desktop** (running)
 - That's it — everything else runs inside containers
 
-If you only run Docker-based tasks (`Start: Full Stack`, `DB: Apply Migrations`, `Test: Run Suite`), Docker is enough.
+If you stay on the Docker-backed development path (`Start: Full Stack`,
+`python scripts/docker-migrate.py`, and the workspace `Test: Run Suite` task), Docker is enough.
 
 If you also want to run all local lint/dev tasks from VS Code, install these host tools once:
 
-| Task(s) | Required tool |
+| Workflow | Required tool |
 | --- | --- |
-| `Start: Frontend Dev Server`, `Lint: JS`, `Lint: TypeScript`, `Lint: CSS`, `Lint: Spelling`, `Lint: Markdown` | Node.js + npm (then run `npm --prefix frontend install`) |
-| `Lint: Python` | Python 3.12 + `pip install -r requirements-dev.txt` |
-| `Lint: Env` | `dotenv-linter` CLI on host machine |
+| `Start: Frontend + Preview` and the workspace lint task's JS/CSS/docs passes | Node.js + npm (then run `npm --prefix frontend install`) |
+| The workspace lint task's Python passes | Python 3.12 + `pip install -r requirements-dev.txt` |
+| The workspace lint task's environment pass | `dotenv-linter` CLI on host machine |
 
 Note: if you plan to work on 3‑D UI components, the `three`/`@react-three` packages are included as dependencies.
 

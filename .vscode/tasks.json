@@ -1,566 +1,88 @@
 {
-  // Label convention: "Domain: Title Case Action". Every task carries a `detail` —
-  // that's the second line in the task quick-pick, and it's the only place a
-  // one-click action can explain its cost or its blast radius.
-  //
-  // Variants of one action are folded into a single task with a `${input:...}`
-  // picker rather than one palette entry each. The exception is anything that
-  // spends money or touches a live provider: those stay separate, unfoldable
-  // entries so a paid tier can never be one mis-click away from a free one.
-  //
-  // Machine-wide Docker recovery (prune / fix stalled Desktop / restart engine)
-  // lives in the USER-level tasks.json, not here — it acts on the daemon, not on
-  // this project. Those user tasks delegate back to scripts/docker-*.py, which
-  // stay in this repo (they're covered by scripts/hooks/tests/ and are what the
-  // fix-docker skill reads artifacts from).
+  // Keep this palette small. Shared quality, git, agent-context, Docker-maintenance,
+  // port, and shipping actions live in alex-projects.code-workspace. This file is
+  // only for Carameli workflows where a VS Code picker/composite adds real value.
+  // One-off administration remains available through the documented scripts.
   "version": "2.0.0",
   "tasks": [
     {
       "label": "Start: Full Stack (Docker Compose)",
-      "detail": "Build and start the whole stack, then wait for healthchecks. The default build task (Ctrl+Shift+B).",
+      "detail": "Build and start the Carameli stack, then wait for healthchecks. The default build task (Ctrl+Shift+B).",
       "type": "process",
       "command": "python",
       "args": ["scripts/notify-wrap.py", "Start: Full Stack", "--", "python", "scripts/docker-up.py", "--build"],
-      "group": {
-        "kind": "build",
-        "isDefault": true
-      },
-      "presentation": {
-        "reveal": "always",
-        "panel": "new",
-        "showReuseMessage": false,
-        "close": false
-      },
+      "group": { "kind": "build", "isDefault": true },
+      "presentation": { "reveal": "always", "panel": "new", "showReuseMessage": false, "close": false },
       "problemMatcher": []
     },
     {
       "label": "Start: Frontend Dev Server",
-      "detail": "`npm run dev` in frontend/. Vite HMR needs CHOKIDAR_USEPOLLING on Windows bind mounts.",
+      "detail": "Implementation step for 'Start: Frontend + Preview'; hidden from the task picker.",
+      "hide": true,
       "type": "shell",
       "command": "npm run dev",
-      "group": "build",
-      "options": {
-        "cwd": "${workspaceFolder}/frontend"
-      },
-      "presentation": {
-        "reveal": "always",
-        "panel": "new",
-        "showReuseMessage": false,
-        "close": false
-      },
+      "options": { "cwd": "${workspaceFolder}/frontend" },
+      "presentation": { "reveal": "always", "panel": "new", "showReuseMessage": false, "close": false },
       "problemMatcher": []
     },
     {
-      "label": "Open: Frontend Preview (Simple Browser)",
-      "detail": "Opens localhost:5174 in VS Code's Simple Browser. Mostly a helper for 'Start: Frontend + Preview'.",
+      "label": "Open: Frontend Preview",
+      "detail": "Implementation step for 'Start: Frontend + Preview'; hidden from the task picker.",
+      "hide": true,
       "type": "shell",
       "command": "echo ${input:openFrontendSimpleBrowser}",
-      "presentation": {
-        "reveal": "silent",
-        "panel": "dedicated",
-        "showReuseMessage": false,
-        "close": false
-      },
+      "presentation": { "reveal": "silent", "panel": "dedicated", "showReuseMessage": false, "close": false },
       "problemMatcher": []
     },
     {
       "label": "Start: Frontend + Preview",
-      "detail": "Dev server and Simple Browser preview together. This is the one to run for frontend work.",
-      "dependsOn": [
-        "Start: Frontend Dev Server",
-        "Open: Frontend Preview (Simple Browser)"
-      ],
+      "detail": "Start Vite with HMR and open localhost:5174 in VS Code's Simple Browser.",
+      "dependsOn": ["Start: Frontend Dev Server", "Open: Frontend Preview"],
       "dependsOrder": "parallel",
-      "group": "build"
+      "group": "build",
+      "problemMatcher": []
     },
     {
-      "label": "Start: ngrok + Sync URLs + Recreate App/Worker",
-      "detail": "Opens the tunnel, writes the public URL into the webhook env vars, and recreates app/worker so they pick it up. Use this rather than a bare `ngrok http 8000` — a raw tunnel leaves the stack pointed at a stale URL.",
+      "label": "Start: ngrok + Sync Webhook URLs",
+      "detail": "Open the tunnel, update webhook environment values, and recreate app/worker so they use the new URL.",
       "type": "process",
       "command": "python",
       "args": ["scripts/notify-wrap.py", "Start: ngrok + Sync URLs", "--", "python", "scripts/start-ngrok.py"],
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared",
-        "showReuseMessage": false,
-        "close": false
-      },
+      "presentation": { "reveal": "always", "panel": "shared", "showReuseMessage": false, "close": false },
       "problemMatcher": []
     },
     {
       "label": "Stop: Docker Stack",
-      "detail": "`compose down` — containers only. Named volumes (and the DB in them) survive.",
+      "detail": "Stop Carameli containers. Named volumes and database data survive.",
       "type": "process",
       "command": "python",
       "args": ["scripts/notify-wrap.py", "Stop: Docker Stack", "--", "python", "scripts/docker-down.py"],
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared",
-        "showReuseMessage": false,
-        "close": false
-      },
+      "presentation": { "reveal": "always", "panel": "shared", "showReuseMessage": false, "close": false },
       "problemMatcher": []
     },
     {
-      "label": "Restart: App Container",
-      "detail": "Restart just the app container — picks up code changes without a full stack cycle. Drops any active session.",
+      "label": "Test: Run Carameli Target — free",
+      "detail": "Run a Carameli-only free target. The ordinary full/changed suite is the workspace-level 'Test: Run Suite' task.",
       "type": "process",
       "command": "python",
-      "args": ["scripts/notify-wrap.py", "Restart: App Container", "--", "python", "scripts/docker-restart-app.py"],
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared",
-        "showReuseMessage": false,
-        "close": false
-      },
+      "args": ["scripts/notify-wrap.py", "Test: Run Carameli Target", "--", "python", "scripts/run-tests.py", "${input:testSuite}"],
+      "group": { "kind": "test", "isDefault": true },
+      "presentation": { "reveal": "always", "panel": "shared", "showReuseMessage": false, "close": false },
       "problemMatcher": []
     },
     {
-      "label": "Docker: Rebuild App",
-      "detail": "`compose build app` — needed after a Dockerfile or requirements lock change.",
+      "label": "Test: Run Browser E2E — free",
+      "detail": "Run Playwright headless, headed, or across Chromium/Firefox/WebKit.",
       "type": "process",
       "command": "python",
-      "args": ["scripts/notify-wrap.py", "Docker: Rebuild App", "--", "docker", "compose", "build", "app"],
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared",
-        "showReuseMessage": false,
-        "close": false
-      },
-      "problemMatcher": []
-    },
-    {
-      "label": "Docker: Stack Status",
-      "detail": "Per-service health summary, and the first hint of which container is unhealthy.",
-      "type": "process",
-      "command": "python",
-      "args": ["scripts/notify-wrap.py", "Docker: Stack Status", "--", "python", "scripts/docker-status.py"],
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared",
-        "showReuseMessage": false,
-        "close": false
-      },
-      "problemMatcher": []
-    },
-    {
-      "label": "DB: Apply Migrations",
-      "detail": "`alembic upgrade head` inside the app container. Run after pulling a branch that adds a migration.",
-      "type": "process",
-      "command": "python",
-      "args": ["scripts/notify-wrap.py", "DB: Apply Migrations", "--", "python", "scripts/docker-migrate.py"],
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared",
-        "showReuseMessage": false,
-        "close": false
-      },
-      "problemMatcher": []
-    },
-    {
-      "label": "Install: Frontend Dependencies",
-      "detail": "`npm install` in frontend/.",
-      "type": "process",
-      "command": "python",
-      "args": ["../scripts/notify-wrap.py", "Install: Frontend Dependencies", "--", "npm", "install"],
-      "options": {
-        "cwd": "${workspaceFolder}/frontend"
-      },
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared",
-        "showReuseMessage": false,
-        "close": false
-      },
-      "problemMatcher": []
-    },
-    {
-      "label": "Install: Dev Dependencies (venv)",
-      "detail": "Create/refresh the host .venv from requirements-dev.txt — the host-only toolchain (ruff, mypy, playwright, locust).",
-      "type": "process",
-      "command": "python",
-      "args": ["scripts/notify-wrap.py", "Install: Dev Dependencies (venv)", "--", "python", "scripts/venv-install.py"],
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared",
-        "showReuseMessage": false,
-        "close": false
-      },
-      "problemMatcher": []
-    },
-    {
-      "label": "Test: Run Suite — free",
-      "detail": "Pick a free suite: backend pytest (default), all free targets in parallel, changed-only via testmon, frontend vitest, or the hook tests. Replaces the six separate per-suite tasks.",
-      "type": "process",
-      "command": "python",
-      "args": ["scripts/notify-wrap.py", "Test: Run Suite", "--", "python", "scripts/run-tests.py", "${input:testSuite}"],
-      "group": {
-        "kind": "test",
-        "isDefault": true
-      },
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared",
-        "showReuseMessage": false,
-        "close": false
-      },
-      "problemMatcher": []
-    },
-    {
-      "label": "Test: Run pytest (slow) — free",
-      "detail": "The `-m slow` subset only. Separate from the picker above because it execs pytest in the container directly rather than going through run-tests.py.",
-      "type": "process",
-      "command": "python",
-      "args": ["scripts/notify-wrap.py", "Test: Run pytest (slow)", "--", "docker", "compose", "exec", "-T", "app", "pytest", "-m", "slow", "-v", "--tb=short"],
+      "args": ["scripts/notify-wrap.py", "Test: Run Browser E2E", "--", "python", "scripts/run-e2e.py", "${input:e2eMode}"],
       "group": "test",
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared",
-        "showReuseMessage": false,
-        "close": false
-      },
-      "problemMatcher": []
-    },
-    {
-      "label": "Test: Run E2E — free",
-      "detail": "Playwright, in headless (default), headed, or cross-browser (chromium + firefox + webkit) mode.",
-      "type": "process",
-      "command": "python",
-      "args": ["scripts/notify-wrap.py", "Test: Run E2E", "--", "python", "scripts/run-e2e.py", "${input:e2eMode}"],
-      "group": "test",
-      "presentation": {
-        "reveal": "always",
-        "panel": "new",
-        "showReuseMessage": false,
-        "close": false
-      },
-      "problemMatcher": []
-    },
-    {
-      "label": "Test: All Checks — free",
-      "detail": "run-tests.py --all, then the headless E2E suite. Sequential, not parallel: on a 16 GB laptop both stacks plus a browser matrix is what OOMs. Lint is NOT run here — /fix-all lints the working-tree diff after /fix-tests edits source, so an upfront full-repo lint would be stale. Use 'Lint: Everything' or 'Lint: Changed Files' standalone.",
-      "type": "process",
-      "command": "python",
-      "args": [
-        "scripts/notify-wrap.py", "Test: All Checks", "--",
-        "pwsh", "-ExecutionPolicy", "Bypass", "-Command",
-        "python scripts/run-tests.py --all; $t = $LASTEXITCODE; python scripts/run-e2e.py; if ($t -ne 0 -or $LASTEXITCODE -ne 0) { exit 1 }; exit 0"
-      ],
-      "group": "test",
-      "presentation": {
-        "reveal": "always",
-        "panel": "new",
-        "showReuseMessage": false,
-        "close": false
-      },
-      "problemMatcher": []
-    },
-    {
-      "label": "Test: Webhook Reachability via ngrok — free",
-      "detail": "Runs only the five public tunnel/API/webhook reachability checks. No real calls, SMS, DID purchases, or live-provider actions.",
-      "type": "process",
-      "command": "python",
-      "args": ["scripts/notify-wrap.py", "Test: Webhook Reachability", "--", "python", "scripts/run-tests.py", "--target", "webhook-e2e"],
-      "group": "test",
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared",
-        "showReuseMessage": false,
-        "close": false
-      },
-      "problemMatcher": []
-    },
-    {
-      "label": "Test: Run Load (Locust) — free (local infra)",
-      "detail": "Locust against the local stack. Free, but it will saturate the machine while it runs.",
-      "type": "process",
-      "command": "python",
-      "args": ["scripts/notify-wrap.py", "Test: Run Load (Locust)", "--", "python", "scripts/run-load.py"],
-      "group": "test",
-      "presentation": {
-        "reveal": "always",
-        "panel": "new",
-        "showReuseMessage": false,
-        "close": false
-      },
-      "problemMatcher": []
-    },
-    {
-      "label": "Test: Run Mutation (mutmut) — free",
-      "detail": "Mutation testing — finds assertions that never actually assert. Slow (re-runs the suite per mutant).",
-      "type": "process",
-      "command": "python",
-      "args": ["scripts/notify-wrap.py", "Test: Run Mutation (mutmut)", "--", "python", "scripts/run-mutation.py"],
-      "group": "test",
-      "presentation": {
-        "reveal": "always",
-        "panel": "new",
-        "showReuseMessage": false,
-        "close": false
-      },
-      "problemMatcher": []
-    },
-    {
-      "label": "Test: Run Telnyx Sandbox Reads (separate opt-in tier 1 — no billable actions)",
-      "detail": "Separate from every free aggregate. Runs live Telnyx reads and expected-error probes only (-m 'sandbox and not chargeable'); excludes SMS sends, DID purchases, delivery callbacks, and tiers 2/3.",
-      "type": "process",
-      "command": "python",
-      "args": ["scripts/notify-wrap.py", "Test: Run Telnyx Sandbox", "--", "python", "scripts/run-tests.py", "--target", "telnyx-sandbox"],
-      "group": "test",
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared",
-        "showReuseMessage": false,
-        "close": false
-      },
-      "problemMatcher": []
-    },
-    {
-      "label": "Test: Run Telnyx Chargeable (paid tier 2 — est. ~US$1/run: buys a DID + SMS)",
-      "detail": "Opt-in paid tier 2 ONLY (-m chargeable): buys a real DID and sends real SMS. Does not re-run tier 1. Needs TELNYX_SANDBOX=1 creds.",
-      "type": "process",
-      "command": "python",
-      "args": ["scripts/notify-wrap.py", "Test: Run Telnyx Chargeable", "--", "python", "scripts/run-tests.py", "--target", "telnyx-chargeable"],
-      "group": "test",
-      "presentation": {
-        "reveal": "always",
-        "panel": "new",
-        "showReuseMessage": false,
-        "close": false
-      },
-      "problemMatcher": []
-    },
-    {
-      "label": "Test: Run Live E2E (paid tier 3 — est. ~US$0.05-0.25/run: live calls/SMS/recordings)",
-      "detail": "Opt-in paid tier 3 ONLY (-m 'live_e2e and not manual'): real calls/SMS/recordings against live infra. Does not re-run tier 1/2. Needs RUN_LIVE_E2E=1 + E2E_* env against a running stack.",
-      "type": "process",
-      "command": "python",
-      "args": ["scripts/notify-wrap.py", "Test: Run Live E2E", "--", "python", "scripts/run-tests.py", "--target", "live-e2e"],
-      "group": "test",
-      "presentation": {
-        "reveal": "always",
-        "panel": "new",
-        "showReuseMessage": false,
-        "close": false
-      },
-      "problemMatcher": []
-    },
-    {
-      "label": "Lint: Everything",
-      "detail": "Full-repo ruff + mypy + eslint + stylelint + dotenv check. The same entrypoint the PR Gate lint job runs — use it as a pre-flight before pushing.",
-      "type": "process",
-      "command": "python",
-      "args": ["scripts/notify-wrap.py", "Lint: Everything", "--", "python", "scripts/lint-all.py"],
-      "group": "build",
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared",
-        "showReuseMessage": false,
-        "close": false
-      },
-      "problemMatcher": []
-    },
-    {
-      "label": "Lint: Changed Files",
-      "detail": "Lint only the working-tree diff (vs HEAD, plus untracked), skipping tools with no relevant change. Same artifact as 'Lint: Everything'. This is what /fix-all runs after /fix-tests.",
-      "type": "process",
-      "command": "python",
-      "args": ["scripts/notify-wrap.py", "Lint: Changed Files", "--", "python", "scripts/lint-all.py", "--changed"],
-      "group": "build",
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared",
-        "showReuseMessage": false,
-        "close": false
-      },
-      "problemMatcher": []
-    },
-    {
-      "label": "Lint: Instruction Files",
-      "detail": "Structural lint over CLAUDE.md, rules, and skills (front-matter, dead links, mirror drift).",
-      "type": "process",
-      "command": "python",
-      "args": ["scripts/notify-wrap.py", "Lint: Instruction Files", "--", "python", "scripts/lint-instructions.py"],
-      "group": "test",
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared",
-        "showReuseMessage": false,
-        "close": false
-      },
-      "problemMatcher": []
-    },
-    {
-      "label": "Log: Extract Errors",
-      "detail": "Filter logs/runtime/carameli.log down to actionable errors, into the artifact the fixer skills read.",
-      "type": "process",
-      "command": "python",
-      "args": ["scripts/notify-wrap.py", "Log: Extract Errors", "--", "python", "scripts/extract-log-errors.py"],
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared",
-        "showReuseMessage": false,
-        "close": false
-      },
-      "problemMatcher": []
-    },
-    {
-      "label": "Deps: Sync Local Environment",
-      "detail": "Reinstall npm/pip deps if a dependency manifest changed since the last sync. The 'Install git hooks' mode wires the same script into post-merge/post-checkout/post-commit so this runs automatically after every pull or branch switch.",
-      "type": "process",
-      "command": "python",
-      "args": ["scripts/notify-wrap.py", "Deps: Sync Local Environment", "--", "python", "scripts/hooks/deps-sync.py", "${input:depsSyncMode}"],
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared",
-        "showReuseMessage": false,
-        "close": false
-      },
-      "problemMatcher": []
-    },
-    {
-      "label": "Deps: Recompile Python Lockfiles",
-      "detail": "Recompile requirements.txt / requirements-test.txt / requirements-dev.txt from the .in floors (uv, universal). Run after editing requirements*.in, and after every Dependabot pip merge — those bumps strip the env markers.",
-      "type": "process",
-      "command": "python",
-      "args": ["scripts/notify-wrap.py", "Deps: Recompile Python Lockfiles", "--", ".venv\\Scripts\\python.exe", "scripts/recompile-locks.py"],
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared",
-        "showReuseMessage": false,
-        "close": false
-      },
-      "problemMatcher": []
-    },
-    {
-      "label": "Pre-Commit: Install + Patch Hook",
-      "detail": "One-time setup: install the pre-commit framework and patch its git hook.",
-      "type": "process",
-      "command": "python",
-      "args": ["scripts/notify-wrap.py", "Pre-Commit: Install + Patch Hook", "--", "python", "scripts/install-pre-commit.py"],
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared",
-        "showReuseMessage": false,
-        "close": false
-      },
-      "problemMatcher": []
-    },
-    {
-      "label": "Pre-Commit: Run All Hooks",
-      "detail": "Run every pre-commit hook across the repo, not just staged files.",
-      "type": "process",
-      "command": "python",
-      "args": ["scripts/notify-wrap.py", "Pre-Commit: Run All Hooks", "--", "python", "scripts/pre-commit.py"],
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared",
-        "showReuseMessage": false,
-        "close": false
-      },
-      "problemMatcher": []
-    },
-    {
-      "label": "Git: Untrack Ignored Files",
-      "detail": "`git rm --cached` every tracked file that .gitignore now covers. Working tree is untouched.",
-      "type": "process",
-      "command": "python",
-      "args": ["scripts/notify-wrap.py", "Git: Untrack Ignored Files", "--", "pwsh", "-ExecutionPolicy", "Bypass", "-Command", "git ls-files -i -c --exclude-standard | ForEach-Object { git rm --cached $_ }"],
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared",
-        "showReuseMessage": false,
-        "close": false
-      },
-      "problemMatcher": []
-    },
-    {
-      "label": "Sandbox: Sync Creds to GitHub (.env → sandbox env)",
-      "detail": "Push the TELNYX_* sandbox creds from .env into the GitHub 'sandbox' environment (secrets + the base-URL variable). Run this whenever you add/update those values in .env. Empty/missing keys are skipped, never blanked. Pass nothing else — .env is the source of truth.",
-      "type": "process",
-      "command": "python",
-      "args": ["scripts/notify-wrap.py", "Sandbox: Sync Creds", "--", "python", "scripts/sync-sandbox-secrets.py"],
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared",
-        "showReuseMessage": false,
-        "close": false
-      },
-      "problemMatcher": []
-    },
-    {
-      "label": "Sandbox: Sync Creds + Run Tests",
-      "detail": "Sync .env → the 'sandbox' environment, then dispatch the separate tier-1 read-only workflow. Successful SMS sends, DID purchases, and delivery callbacks remain excluded as chargeable tests.",
-      "type": "process",
-      "command": "python",
-      "args": ["scripts/notify-wrap.py", "Sandbox: Sync + Run", "--", "python", "scripts/sync-sandbox-secrets.py", "--run"],
-      "presentation": {
-        "reveal": "always",
-        "panel": "new",
-        "showReuseMessage": false,
-        "close": false
-      },
-      "problemMatcher": []
-    },
-    {
-      "label": "Agent: Sync CLAUDE → AGENTS Context",
-      "detail": "Regenerate the .agents/ mirror from .claude/. The PR Gate fails if the mirror is out of sync.",
-      "type": "process",
-      "command": "python",
-      "args": ["scripts/sync-agents-context.py"],
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared",
-        "showReuseMessage": false,
-        "close": false
-      },
-      "problemMatcher": []
-    },
-    {
-      "label": "Agent: Archive Copilot Session",
-      "detail": "Save the current Copilot session transcript to the session archive under a short description.",
-      "type": "process",
-      "command": "python",
-      "args": ["scripts/notify-wrap.py", "Agent: Archive Copilot Session", "--", "python", "scripts/hooks/archive-session-copilot.py", "${input:sessionDescription}"],
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared",
-        "showReuseMessage": false,
-        "close": false
-      },
-      "problemMatcher": []
-    },
-    {
-      "label": "Todo: Archive Done Items",
-      "detail": "Move completed entries out of todo.md into the archive section.",
-      "type": "process",
-      "command": "python",
-      "args": ["scripts/archive-done-todos.py"],
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared",
-        "showReuseMessage": false,
-        "close": false
-      },
-      "problemMatcher": []
-    },
-    {
-      "label": "Images: Compress Comic Book (PNG/JPG → WebP)",
-      "detail": "Re-encode the comic-book panel art to WebP. Run after adding or replacing panels.",
-      "type": "process",
-      "command": "python",
-      "args": ["scripts/notify-wrap.py", "Images: Compress Comic Book", "--", "python", "scripts/compress-comic-book-images.py"],
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared",
-        "showReuseMessage": false,
-        "close": false
-      },
+      "presentation": { "reveal": "always", "panel": "new", "showReuseMessage": false, "close": false },
       "problemMatcher": []
     },
     {
       "label": "Eval: Instruction Files (promptfoo)",
-      "detail": "COSTS CREDITS. Pick the run: full graded sweep, a 3-case sample, repeat-3 for stability, or one of the fix-tests optimization runs (whole-skill ablation, concise-rewrite A/B, or a single-section ablation). Budget caps are set per mode via EVAL_MAX_USD.",
+      "detail": "COSTS CREDITS. Run a capped promptfoo evaluation or a focused fix-tests optimization experiment.",
       "type": "process",
       "command": "python",
       "args": [
@@ -569,25 +91,7 @@
         "$env:EVAL_MAX_USD = '6'; switch ('${input:evalMode}') { 'full' { $env:EVAL_MAX_USD = '8'; npm run eval; $e = $LASTEXITCODE; npm run eval:summary; exit $e } 'quick' { $env:EVAL_MAX_USD = '5'; npm run eval:quick; exit $LASTEXITCODE } 'stable' { npm run eval:stable; $e = $LASTEXITCODE; npm run eval:summary; exit $e } 'ablate' { npm run eval:ablate -- .claude/skills/fix-tests; exit $LASTEXITCODE } 'rewrite' { npm run eval:rewrite -- .claude/skills/fix-tests/SKILL.md evals/rewrites/fix-tests-concise/SKILL.md; exit $LASTEXITCODE } 'section-known-fix' { npm run eval:section -- .claude/skills/fix-tests/SKILL.md 'Known-fix matching'; exit $LASTEXITCODE } 'section-log-quality' { npm run eval:section -- .claude/skills/fix-tests/SKILL.md 'Log quality gate'; exit $LASTEXITCODE } }"
       ],
       "group": "test",
-      "presentation": {
-        "reveal": "always",
-        "panel": "new",
-        "showReuseMessage": false,
-        "close": false
-      },
-      "problemMatcher": []
-    },
-    {
-      "label": "Eval: View Results (promptfoo)",
-      "detail": "Open the promptfoo results viewer for the last run. Free — reads cached results, spends nothing.",
-      "type": "shell",
-      "command": "npm run eval:view",
-      "presentation": {
-        "reveal": "always",
-        "panel": "new",
-        "showReuseMessage": false,
-        "close": false
-      },
+      "presentation": { "reveal": "always", "panel": "new", "showReuseMessage": false, "close": false },
       "problemMatcher": []
     }
   ],
@@ -599,57 +103,40 @@
       "args": "http://localhost:5174/"
     },
     {
-      "id": "sessionDescription",
-      "type": "promptString",
-      "description": "Brief description of work done in this Copilot session",
-      "default": ""
-    },
-    {
       "id": "testSuite",
       "type": "pickString",
-      "description": "Which free suite to run",
+      "description": "Which Carameli-only free target to run",
       "options": [
-        { "label": "Backend pytest (default)", "value": "" },
-        { "label": "All free targets (pytest + hooks + frontend, in parallel)", "value": "--all" },
-        { "label": "Backend pytest — changed only (testmon)", "value": "--fast" },
-        { "label": "Frontend (vitest)", "value": "--target=frontend-tests" },
-        { "label": "Hook tests", "value": "--target=hook-tests" }
+        { "label": "All free targets (pytest + hooks + frontend)", "value": "--all" },
+        { "label": "Frontend (Vitest)", "value": "--target=frontend-tests" },
+        { "label": "Vendored harness hooks", "value": "--target=hook-tests" },
+        { "label": "Public webhook reachability", "value": "--target=webhook-e2e" }
       ],
-      "default": ""
+      "default": "--all"
     },
     {
       "id": "e2eMode",
       "type": "pickString",
-      "description": "Playwright run mode",
+      "description": "Which Playwright mode to run",
       "options": [
-        { "label": "Headless (default)", "value": "" },
-        { "label": "Headed (watch the browser)", "value": "--headed" },
-        { "label": "Cross-browser (chromium + firefox + webkit)", "value": "--cross-browser" }
-      ],
-      "default": ""
-    },
-    {
-      "id": "depsSyncMode",
-      "type": "pickString",
-      "description": "Sync now, or install the git hooks that sync automatically",
-      "options": [
-        { "label": "Sync this environment now", "value": "" },
-        { "label": "Install the post-merge/post-checkout/post-commit hooks", "value": "--install" }
+        { "label": "Headless", "value": "" },
+        { "label": "Headed", "value": "--headed" },
+        { "label": "Cross-browser", "value": "--cross-browser" }
       ],
       "default": ""
     },
     {
       "id": "evalMode",
       "type": "pickString",
-      "description": "Which promptfoo run (all of these cost credits)",
+      "description": "Which promptfoo run (all options cost credits)",
       "options": [
         { "label": "Full graded sweep + summary (cap US$8)", "value": "full" },
-        { "label": "Quick — sample of 3 (cap US$5)", "value": "quick" },
-        { "label": "Stable — repeat 3 + summary", "value": "stable" },
-        { "label": "fix-tests 1. Ablate whole skill — validation floor (cap US$6)", "value": "ablate" },
-        { "label": "fix-tests 2. Rewrite A/B vs concise variant (cap US$6)", "value": "rewrite" },
-        { "label": "fix-tests 3. Section ablate: Known-fix matching (cap US$6)", "value": "section-known-fix" },
-        { "label": "fix-tests 4. Section ablate: Log quality gate (cap US$6)", "value": "section-log-quality" }
+        { "label": "Quick sample (cap US$5)", "value": "quick" },
+        { "label": "Repeat 3 + summary (cap US$6)", "value": "stable" },
+        { "label": "Ablate fix-tests skill", "value": "ablate" },
+        { "label": "Compare concise fix-tests rewrite", "value": "rewrite" },
+        { "label": "Ablate known-fix matching", "value": "section-known-fix" },
+        { "label": "Ablate log quality gate", "value": "section-log-quality" }
       ],
       "default": "quick"
     }

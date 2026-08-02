@@ -71,11 +71,11 @@ live DB, so fall back to static analysis only there. Always also pass `ruff chec
 marker. The global `-m "not paid"` in `addopts` is the single guard that keeps paid
 tests out of every default, `--all`, and CI run. Opt in explicitly:
 
-- `pytest -m sandbox` / the **Test: Run Telnyx Sandbox** task (tier 1, no charges)
+- `python scripts/run-tests.py --target telnyx-sandbox` (tier 1, no charges)
 - `pytest -m chargeable` (tier 2 — knowingly spends)
 - `RUN_LIVE_E2E=1 pytest tests/live_e2e -m paid` (tier 3)
 
-The free **Test: Run Suite** task's "All free targets" mode (`run-tests.py --all`) runs only free targets —
+`python scripts/run-tests.py --all` runs only free targets —
 paid tiers are not in `_ALL_TARGETS`. When adding a paid test, apply `paid` plus the
 tier marker so a cheap sandbox read is never lumped in with a real-money live call.
 

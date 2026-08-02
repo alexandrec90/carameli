@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Reinstall local dependencies when a dependency manifest changes.
 
-Runs as a git post-merge / post-checkout / post-commit hook (installed by
-`--install`) and as the "Deps: Sync Local Environment" VS Code task — pulls,
-branch switches, and local manifest-editing commits all trigger the same
+Runs as a git post-merge / post-checkout / post-commit hook (installed with
+`python scripts/hooks/deps-sync.py --install`) or directly — pulls, branch
+switches, and local manifest-editing commits all trigger the same
 fingerprint check. Compares a SHA-256 fingerprint
 of the dependency manifests against the one recorded in `deps-fingerprint.json`
 inside the checkout's git dir (worktree-aware -- see `state_file`):
@@ -58,12 +58,12 @@ MANIFESTS = {
 
 DOCKER_NOTICE = (
     "[deps-sync] app container is now stale (requirements*.txt / Dockerfile / compose "
-    "changed) -> run the 'Docker: Rebuild App' or 'Start: Full Stack (Docker Compose)' task"
+    "changed) -> run 'docker compose build app' or the 'Start: Full Stack' task"
 )
 
 LOCK_NOTICE = (
     "[deps-sync] requirements*.in changed -- if the matching requirements*.txt lock was "
-    "not recompiled, run the 'Deps: Recompile Python Lockfiles' task"
+    "not recompiled, run 'python scripts/recompile-locks.py'"
 )
 
 SHIM = """#!/bin/sh
