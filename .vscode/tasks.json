@@ -79,20 +79,6 @@
       "group": "test",
       "presentation": { "reveal": "always", "panel": "new", "showReuseMessage": false, "close": false },
       "problemMatcher": []
-    },
-    {
-      "label": "Eval: Instruction Files (promptfoo)",
-      "detail": "COSTS CREDITS. Run a capped promptfoo evaluation or a focused fix-tests optimization experiment.",
-      "type": "process",
-      "command": "python",
-      "args": [
-        "scripts/notify-wrap.py", "Eval: Instruction Files", "--",
-        "pwsh", "-ExecutionPolicy", "Bypass", "-Command",
-        "$env:EVAL_MAX_USD = '6'; switch ('${input:evalMode}') { 'full' { $env:EVAL_MAX_USD = '8'; npm run eval; $e = $LASTEXITCODE; npm run eval:summary; exit $e } 'quick' { $env:EVAL_MAX_USD = '5'; npm run eval:quick; exit $LASTEXITCODE } 'stable' { npm run eval:stable; $e = $LASTEXITCODE; npm run eval:summary; exit $e } 'ablate' { npm run eval:ablate -- .claude/skills/fix-tests; exit $LASTEXITCODE } 'rewrite' { npm run eval:rewrite -- .claude/skills/fix-tests/SKILL.md evals/rewrites/fix-tests-concise/SKILL.md; exit $LASTEXITCODE } 'section-known-fix' { npm run eval:section -- .claude/skills/fix-tests/SKILL.md 'Known-fix matching'; exit $LASTEXITCODE } 'section-log-quality' { npm run eval:section -- .claude/skills/fix-tests/SKILL.md 'Log quality gate'; exit $LASTEXITCODE } }"
-      ],
-      "group": "test",
-      "presentation": { "reveal": "always", "panel": "new", "showReuseMessage": false, "close": false },
-      "problemMatcher": []
     }
   ],
   "inputs": [
@@ -124,21 +110,6 @@
         { "label": "Cross-browser", "value": "--cross-browser" }
       ],
       "default": ""
-    },
-    {
-      "id": "evalMode",
-      "type": "pickString",
-      "description": "Which promptfoo run (all options cost credits)",
-      "options": [
-        { "label": "Full graded sweep + summary (cap US$8)", "value": "full" },
-        { "label": "Quick sample (cap US$5)", "value": "quick" },
-        { "label": "Repeat 3 + summary (cap US$6)", "value": "stable" },
-        { "label": "Ablate fix-tests skill", "value": "ablate" },
-        { "label": "Compare concise fix-tests rewrite", "value": "rewrite" },
-        { "label": "Ablate known-fix matching", "value": "section-known-fix" },
-        { "label": "Ablate log quality gate", "value": "section-log-quality" }
-      ],
-      "default": "quick"
     }
   ]
 }

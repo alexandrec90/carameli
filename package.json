@@ -10,19 +10,6 @@
   "devDependencies": {
     "@playwright/test": "^1.58.2",
     "@types/node": "^25.5.0",
-    "promptfoo": "^0.121.17",
     "sharp": "^0.34.0"
-  },
-  "scripts": {
-    "eval": "promptfoo eval -c evals/promptfooconfig.yaml -o evals/output/latest.json",
-    "eval:quick": "promptfoo eval -c evals/promptfooconfig.yaml -o evals/output/quick.json --filter-sample 3 --filter-sample-seed 1",
-    "eval:stable": "promptfoo eval -c evals/promptfooconfig.yaml -o evals/output/latest.json --repeat 3",
-    "eval:view": "promptfoo view",
-    "eval:summary": "node evals/summarize.cjs",
-    "eval:test": "node --test \"evals/**/*.test.cjs\"",
-    "eval:coverage": "node evals/ablate.cjs --coverage",
-    "eval:ablate": "node evals/ablate.cjs",
-    "eval:rewrite": "node evals/rewrite.cjs",
-    "eval:section": "node evals/section-ablate.cjs"
   }
 }

@@ -41,7 +41,7 @@
 3. **Optional, only if trivial after inspecting the models**: persist the last failure on
    the unposted row (`last_post_error: str | None` column on `call_events` and
    `sms_messages`) so the error is queryable via `mcp__postgres__query`, not just greppable.
-   This requires an Alembic migration + model change (`.claude/rules/database.md`) and
+   This requires an Alembic migration + model change (`app/CLAUDE.md`) and
    plumbing the error string through the callers in `app/api/webhooks/call_status.py`,
    `app/api/webhooks/sms_inbound.py`, `app/services/call_sync.py`, `app/services/sms_sync.py`
    — meaning `post_notification` should return the error detail, not just `bool`

@@ -39,7 +39,7 @@ updates:
           - "minor"
           - "patch"
       # Keep the test-environment stack in lockstep — vitest majors must move
-      # together with happy-dom and testing-library (see known-fixes.md: the
+      # together with happy-dom and testing-library (the
       # vitest 2→4 upgrade left happy-dom six majors behind).
       test-env:
         patterns:

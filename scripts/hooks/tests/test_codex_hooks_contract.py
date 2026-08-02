@@ -46,24 +46,11 @@ EXPECTED_TOPOLOGY = {
                 ),
             ),
         ),
-        (
-            ".*",
-            (
-                (
-                    "scripts/hooks/codex-hook-adapter.py",
-                    "scripts/hooks/pretool.py",
-                ),
-            ),
-        ),
     ),
     "PostToolUse": (
         (
             "^(Edit|Write|MultiEdit|apply_patch|create_file)$",
             (
-                (
-                    "scripts/hooks/codex-hook-adapter.py",
-                    ".claude/skills/add-db-model/after-model-edit.py",
-                ),
                 (
                     "scripts/hooks/codex-hook-adapter.py",
                     "scripts/hooks/lint-fix.py",

@@ -1,191 +1,94 @@
 # Carameli
 
-A self-hosted VoIP microservice. Manages phone lines, extensions, SMS, call recording, and call tracking via a REST API.
+Self-hosted VoIP service for phone lines, extensions, SMS, call control, recordings,
+and VanillaSoft-compatible APIs.
 
-## Tech Stack
-
-| Layer | Choice |
-| --- | --- |
-| Language | Python 3.12 |
-| Framework | FastAPI |
-| Background jobs | ARQ (async, Redis-backed, separate worker process) |
-| Database | PostgreSQL 18 |
-| ORM / Migrations | SQLAlchemy 2 (async) + Alembic |
-| Call engine | Jambonz (self-hosted, on FreeSWITCH) |
-| Carrier / SIP trunk | Telnyx (wholesale) — provider-abstracted |
-| Media storage | S3-compatible blob (local disk in dev) |
-| Container | Docker + Docker Compose |
-| Auth | Bearer API key (`Authorization: Bearer <key>`) |
-| Tests | pytest + pytest-asyncio |
-
-## Environment Variables
-
-All settings are loaded via pydantic-settings in `app/core/config.py`. See `.env.example` for all vars.
-
-## Call Tracking
-
-The active call engine (Jambonz) fires a status webhook when a call ends. Carameli:
-
-1. Validates the webhook signature
-2. Writes the raw event to the `call_events` PostgreSQL table
-3. Matches it to a call record and updates talk time / call attempt counters
-
-APScheduler runs a retry job every 30 seconds for any failed writes.
-
-## VanillaLand Reference
-
-`../VanillaLand/` is the legacy .NET/SQL Server CRM+VoIP monolith that Carameli is designed to
-replace at the telephony layer. Use it to understand existing feature contracts before implementing
-or extending Carameli endpoints. Everything outside the table below is excluded from the context
-window via `.claudeignore`.
-
-### Technology mapping
-
-| VanillaLand (legacy) | Carameli equivalent |
-| --- | --- |
-| ConnectMeVoice (CMV) / CloudLi | Jambonz call engine (`app/services/providers/engine/jambonz.py`) |
-| Telnyx carrier (same) | Telnyx carrier provider (`app/services/providers/carrier/telnyx.py`) |
-| `tblPhoneNumber` / `VoIPEntities` | `phone_lines` + `extensions` DB tables |
-| `tblCallHistory` | `call_events` DB table |
-| `SMSWS.asmx` web service | `/vsapi/1.0.0/VsMessaging/Sms/` routes |
-| `CMVCallInfo.asmx` web service | `/webhooks/jambonz/call-status` webhook |
-| `VoiceMailDropHistory` | voicemail_drop service + `/vsapi/1.0.0/VsMessageDrop` |
-| IntellectiveRouting / CallerRouting | SCI routing (`app/api/vsapi/sci.py`) |
-| DID provisioning (phone number lifecycle) | `app/services/did_manager.py` |
-
-See `.claude/rules/vanillaland-paths.md` for the full mapping including not-yet-implemented features.
-
-## Front-End
-
-The frontend uses a **skin system** that fully decouples data logic from visual layout.
-See `.claude/rules/skin-architecture.md` for the spec and `.claude/rules/skin-carameli.md` for the
-active skin's 3D canvas design constraints. Use the `add-ui-component` skill when building new components.
+## Stack
 
 | Layer | Choice |
 | --- | --- |
-| Component framework | React (TSX) |
-| Build / bundler | Vite (per-skin code splitting via dynamic import) |
-| Active skin | `carameli` (3D canvas, React Three Fiber) |
+| Backend | Python 3.12, FastAPI, Pydantic, SQLAlchemy async |
+| Jobs | ARQ with Redis |
+| Database | PostgreSQL 18, Alembic migrations |
+| Providers | Telnyx carrier, Jambonz call engine |
+| Frontend | React, TypeScript, Vite, per-skin dynamic imports |
+| Runtime | Docker Compose; S3-compatible media storage |
 
-## Logging
+Settings come from `app/core/config.py`; `.env.example` documents the environment.
+Python dependency floors live in `requirements*.in`; compiled `requirements*.txt`
+files are generated locks and must never be hand-edited.
 
-See `.claude/rules/logging-backend.md` and `.claude/rules/logging-frontend.md`. All activity lands in `logs/runtime/carameli.log`. The global
-exception handler in `app/main.py` writes all unhandled 500s to the log — do not remove it.
-When an integration error is hard to place, `docs/operations/diagnostics-error-map.md` maps every failure mode to where its evidence lands.
+## Instruction ownership
 
-## Tooling
+DevKit owns `.claude/rules/engineering.md`, `.claude/rules/authoring.md`, and the
+`ship` skill. Carameli owns this file, nested `CLAUDE.md` files, the `add-skin` skill,
+and its domain rules. `AGENTS.md` and `.agents/**` are generated mirrors; never edit
+them directly.
 
-> Everything in this section needs the local Docker Desktop daemon. If it isn't running,
-> make the code change and defer container/stack verification until it is (or to CI).
+Read the scoped rules when touching their paths:
 
-See `.claude/rules/tooling.md`. Running `docker` / `docker compose` directly is fine — the
-CLI shares Docker Desktop's daemon, so it operates on the same containers without conflict.
-Be deliberate with destructive lifecycle ops on a running stack: `down -v` wipes DB volumes
-and `restart` / `up --build` can drop the user's session — confirm before those. Use `-T`
-with `docker compose exec` (see tooling.md).
+- tenant authentication and customer isolation: `.claude/rules/security.md`
+- skin contracts and visual systems: `.claude/rules/skin-*.md`
+- carrier/call-engine boundaries: `.claude/rules/voip-providers.md`
+- inbound callback authentication: `.claude/rules/webhooks.md`
 
-Two worktrees can run side-by-side stacks for parallel agents (README.md, "Parallel Worktrees").
-The Jambonz/FreeSWITCH services only start with `COMPOSE_PROFILES=telephony` — secondary
-worktree stacks omit it and offset their `*_HOST_PORT` vars.
+## Architecture
 
-### Local dev: Docker resource footprint
+```text
+HTTP handler -> service/workflow -> repository -> PostgreSQL
+      |                |
+      +-> provider Protocol <- Telnyx/Jambonz implementation
+```
 
-This is a ~16 GB laptop and Docker is memory-heavy, so the stack is trimmed to stay usable.
-Before any step that needs a container (stack up, `pytest`, E2E, migrations):
+- `app/api/` owns HTTP/auth concerns and translates domain/provider failures.
+- `app/services/` owns application workflows and ARQ jobs.
+- `app/repositories/` owns ORM persistence and commits.
+- `app/services/providers/base.py` is the external-provider contract.
+- `frontend/src/hooks/` owns data/state; skins own presentation only.
 
-- **Confirm the daemon is up first.** Run `docker ps` — if it errors with an `npipe`/daemon
-  message, Docker Desktop is stopped. Start it, or defer that step to CI and just make the
-  code change (per the blockquote above).
-- **Telephony is opt-in here.** `COMPOSE_PROFILES=telephony` is **commented out in the local
-  (gitignored) `.env`**, so FreeSWITCH/jambonz/rtpengine/influxdb/jambonz-db do NOT auto-start.
-  Bring them up only when testing real calls: `docker compose --profile telephony up -d`.
-  (`.env.example` still ships it enabled for fresh clones.)
-- **Two slim stacks can coexist — memory is the real ceiling, not disk.** The worktree
-  stacks share the git object store, Docker image layers, and the uv cache, so a second
-  *non-telephony* stack costs well under 1 GB (see README, "Parallel Worktrees"). That's
-  fine for parallel test/lint work, which mocks at the provider boundary and never needs
-  telephony. What this ~16 GB laptop can't always hold is **two Claude CLIs on Opus/high
-  plus both full stacks** at once: if something OOMs, stop the other worktree's stack
-  (`docker compose -p <project> down`) before continuing. Telephony is single-instance per
-  machine (primary stack only — rtpengine uses host networking), so live-call/webhook work
-  is never parallel regardless.
-- **Resource caps are in place.** `~/.wslconfig` caps the WSL2 VM (memory/cores + idle
-  reclaim) and `docker-compose.override.yml` sets a per-service `mem_limit` on every container.
-  If something OOMs, check `docker inspect <name> --format '{{.State.OOMKilled}}'` and bump
-  that service's limit.
+All backend and ingested frontend activity goes through the configured logging stack;
+do not create ad-hoc log files or log credentials, API keys, message bodies, or raw
+webhook payloads.
 
-## MCP Tools
+## VanillaSoft compatibility
 
-Configured MCP servers are documented in `README.md` (MCP Tools section). Installation
-gotchas for the VS Code extension are in `.claude/projects/*/memory/mcp-vscode-gotchas.md`.
+`../VanillaLand/` is the legacy contract reference. Inspect it when implementing or
+changing a compatibility endpoint; do not copy its architecture into Carameli.
 
-**Proactive suggestions:** If an MCP server would meaningfully help with the current task,
-suggest it — mention what it enables and the install steps. It's a hassle to set up here,
-so surfacing useful ones saves time.
+| Legacy area | Carameli location |
+| --- | --- |
+| ConnectMeVoice / CloudLi providers | `app/services/providers/` |
+| Phone numbers and extensions | models/repos/services for `phone_line` and `extension` |
+| Call history | `call_events` |
+| SMS ASMX contract | `app/api/vsapi/sms.py` |
+| Call-status callbacks | `app/api/webhooks/call_status.py` |
+| SCI routing | `app/api/vsapi/sci.py` |
 
-## Guardrails
+Useful legacy roots include `VanillaSoft.Backend/ConnectMeVoice`, `CMVClarity`,
+`SMS`, `PhoneNumber`, `Recording`, `VanillaSoft.Model/VoIP`,
+`Vanillasoft.Webservice`, and `VanillaSoft.CloudliApi` under `../VanillaLand/AppCode/`.
 
-This project is vibe-coded. **Every rule below is mandatory.**
+## Local workflow
 
-### Instruction-file feedback loop
+Docker Desktop is required for database-backed tests and stack operations. Check
+`docker ps` first. Telephony services are opt-in with `--profile telephony` and may run
+only in the primary worktree because rtpengine uses host networking.
 
-See `.claude/rules/engineering.md` ("Guardrail: the instruction-file feedback loop") —
-vendored, and deliberately not restated here. Authoring conventions for the fix itself
-are in `.claude/rules/authoring.md`.
+Avoid destructive or disruptive lifecycle commands without confirmation:
 
-### Dependencies
+- `docker compose down -v` deletes database volumes.
+- `restart` and `up --build` can interrupt the user's active session.
+- use `docker compose exec -T` from scripts and automation.
 
-Python dependencies are lockfile-managed. The human-edited floors live in three
-`.in` files; the `requirements*.txt` files are **compiled, fully pinned locks —
-never hand-edit them**.
+Run focused verification for changed behavior. Typical commands:
 
-| Floors file | Scope | Installed where |
-| --- | --- | --- |
-| `requirements.in` | runtime | prod image, container, host venv, CI |
-| `requirements-test.in` (includes `-r requirements.in`) | in-container test toolchain (pytest stack, contract-test deps) | Docker `dev` image target, host venv (via dev), CI |
-| `requirements-dev.in` (includes `-r requirements-test.in`) | host-only tooling (ruff, mypy, playwright, locust, …) | host venv, CI — **never the container image** |
+```text
+python scripts/lint-all.py --changed
+python scripts/run-tests.py --changed
+npm --prefix frontend run test:run
+npm --prefix frontend run typecheck
+```
 
-When adding a pip package: add the floor to the right `.in` file (if the
-container suite imports it → `-test`; host/CI tooling only → `-dev`), then
-recompile the locks in the same commit (`python scripts/recompile-locks.py`, or
-`python -m uv pip compile --universal --python-version 3.12 requirements.in -o requirements.txt`,
-then `-test` with `-c requirements.txt`, then `-dev` with `-c requirements-test.txt`).
-Never leave an import that depends on an unlisted package. `--universal` is
-required — a non-universal compile on Windows silently drops Linux-only packages
-(e.g. `uvloop`) from the container's lock. Keep host-only tooling out of
-`requirements-test.in`: the Docker dev image bakes that lock, and the full dev
-lock balloons it ~5x (playwright, mypy, locust alone are ~250MB).
-
-### Cross-cutting rules (enforced by scoped rule files)
-
-- Auth + customer scoping on every route handler — `.claude/rules/security.md`
-- Model changes require a migration — `.claude/rules/migrations.md`
-- Provider imports only from `base.py` — `.claude/rules/voip-providers.md`
-- Webhook signatures validated before processing — `.claude/rules/webhooks.md`
-- Async-only I/O, Pydantic schemas on every endpoint — `.claude/rules/python-style.md`
-- Layer casing contracts (snake_case/camelCase boundaries) — `.claude/rules/naming.md`
-- Frontend helper/state-derivation conventions — `.claude/rules/frontend-style.md`
-
-## Testing
-
-**The coverage mandate lives in `.claude/rules/engineering.md`** — vendored from devkit
-and byte-identical in every project, so it is not restated here. Read it first; a
-second copy in this file would be the one nothing drift-checks, which is exactly how
-the policy forked the last time. What follows is only what is specific to Carameli.
-
-- New endpoint/service: cover happy path, error cases, and edge cases
-- Bug fix: write a regression test first
-- Mock at the `CarrierProvider` / `CallEngineProvider` boundary — never mock internal SDK details
-- Integration tests use Telnyx sandbox + local Jambonz (no real charges)
-- Use the `make-tests` skill to identify coverage gaps after significant changes
-- DB isolation rules (savepoint fixture, no raw sessions, no teardown cleanup) — `.claude/rules/testing.md`
-
-> Running `pytest` needs the local Postgres/Docker stack; `ruff`, `mypy`, and
-> `py_compile` need the local toolchain. If those aren't available, still write the
-> required tests in the same change — just leave execution to CI.
-
-Run **targeted** tests to verify a change — the specific files or module you touched
-(e.g. `pytest tests/unit/test_<module>.py`), with the local Postgres container up. Do
-**not** run the whole suite on every change: it's slow and a fresh-venv full run can
-surface misleading version-skew failures — leave full runs to CI. Also verify with
-`ruff`, `mypy`, and `py_compile`. See `tests/CLAUDE.md`.
+The default pytest configuration excludes every `paid` test. Sandbox, chargeable,
+and live-provider tiers require explicit opt-in; never broaden a free aggregate to
+include them.

@@ -35,7 +35,6 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 # Every hook script that can block a tool call.
 BLOCKING_HOOKS = [
     "scripts/hooks/enforce-capped-bash.py",
-    "scripts/hooks/enforce-audit-batch-caps.py",
 ]
 
 CONTRACT_BLOCK_CODE = 2

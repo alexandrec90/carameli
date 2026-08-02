@@ -94,8 +94,8 @@ Existing Cloudli/CMV/Clarity code paths keep working unchanged; the DI switch
 - Async-only I/O; Pydantic schemas on every endpoint; new webhook endpoints follow
   `.claude/rules/webhooks.md` (validate shared-secret header before parsing; skip when
   secret unconfigured = dev mode).
-- Model changes require an Alembic migration (`.claude/rules/migrations.md` /
-  `database.md`) — only phase 01 optionally touches a model.
+- Model changes require an Alembic migration (`app/CLAUDE.md`) — only phase 01
+  optionally touches a model.
 - Docker stack needed for pytest; if not running, write the tests anyway and defer
   execution to CI.
 

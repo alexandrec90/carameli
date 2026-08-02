@@ -103,7 +103,7 @@ class SmsMessageListResponse(BaseModel):
 
 Add `import uuid` and `from datetime import datetime` if not already imported.
 
-**Why:** typed response models (no raw dicts) per `.claude/rules/python-style.md`. Mirrors
+**Why:** typed response models (no raw dicts) per `app/CLAUDE.md`. Mirrors
 `app/schemas/call_event.py::CallEventResponse` / `CallEventListResponse`.
 
 **Verify:** `docker compose exec -T app python -m py_compile app/schemas/sms.py`

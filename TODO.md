@@ -9,16 +9,11 @@ and the pointer to it.
 
 - [ ] is license cost included in price chart?
 
-## AI / Agent Workflow
-
-- [ ] Run promptfoo eval JUST on fix tests
-- [ ] Install gemini and codex cli - gemini flash has generous free tier that could be used with promptfoo!
-
 ## Infrastructure & DevOps
 
 - [ ] Github actions after deployment - production environment + CD workflow + OIDC + secret scanning
 - [x] ~~*gh secret/vars + a sandbox environment → one manually-dispatched paid/sandbox test workflow*~~ [2026-07-16]
-- [x] ~~*CI tests temporarily disabled: pr-gate.yml (re-enabled — fires on PR to master), nightly.yml + weekly.yml (re-enabled schedules)*~~ [2026-07-14] → `/fix-workflows` skill (renamed from `/fix-scheduled` 2026-07-16) drives failing workflow runs back to green
+- [x] ~~*CI tests temporarily disabled: pr-gate.yml (re-enabled — fires on PR to master), nightly.yml + weekly.yml (re-enabled schedules)*~~ [2026-07-14]
 
 ## Testing & Integration
 
@@ -67,7 +62,6 @@ Entries before 2026-06 were trimmed on 2026-07-27 — recover them with
 - [x] ~~*run the front-end parity plans A and B*~~ [2026-06-25] → remaining batches tracked in [docs/plans/active/frontend-parity/](docs/plans/active/frontend-parity/)
 - [x] ~~*check cloudli UI against what's implemented*~~ [2026-06-24]
 - [x] ~~*understand why state.json are not all file scoped*~~ [2026-06-24]
-- [x] ~~*Any way to also normalize known-fixes.md with hooks?*~~ [2026-06-24]
 - [x] ~~*run skill to fix vibe coded design flaws*~~ [2026-06-24]
 - [x] ~~*check for mentions of bash - should use powershell*~~ [2026-06-24]
 - [x] ~~*there should be a task that runs all tests? is there already?*~~ [2026-06-24]

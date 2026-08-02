@@ -19,13 +19,12 @@ Two scoping modes:
     files; the frontend tools (eslint / tsc / stylelint / markdownlint) and the
     project-global tools (pip-audit / alembic / yamllint / actionlint / ...) run
     their normal command only when a relevant file changed, else skip cleanly.
-    `/fix-all` uses this to relint after `/fix-tests` edits source, so a lint
-    violation introduced by a test fix is caught before CI.
+    This catches lint violations introduced by a focused source or test edit before CI.
 
 Filtering / artifact format live in `scripts/diagnostics.py` (the single source
 of truth shared with `scripts/run-tests.py`), so local and CI never drift — and
-both scoping modes hand the same `results` dict to `digest_lint`, so the artifact
-`/fix-lint` consumes is byte-identical regardless of scope.
+both scoping modes hand the same `results` dict to `digest_lint`, so the diagnostic
+artifact is byte-identical regardless of scope.
 """
 
 import argparse
@@ -327,12 +326,6 @@ def t_actionlint(changed: list[str] | None = None) -> dict:
     return {"actionlint": run("actionlint")}
 
 
-def t_lint_instructions(changed: list[str] | None = None) -> dict:
-    if changed is not None and not _sel(changed, _is_instruction):
-        return {"lint-instructions": ([], 0)}
-    return {"lint-instructions": run("python scripts/lint-instructions.py")}
-
-
 def t_dotenv(changed: list[str] | None = None) -> dict:
     if changed is not None and not _sel(changed, _is_env):
         return {"dotenv-linter": ([], 0)}
@@ -426,7 +419,6 @@ LOCAL_TOOLS = [
     t_dotenv,
     t_yamllint,
     t_actionlint,
-    t_lint_instructions,
 ]
 CI_TOOLS = [t for t in LOCAL_TOOLS if t is not t_detect_secrets]
 

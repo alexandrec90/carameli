@@ -25,7 +25,7 @@ an ops decision that can wait — the code just takes a DSN.
 
    Guard on empty DSN; call `sentry_sdk.init` with `FastApiIntegration` +
    `ArqIntegration`, `environment`, `traces_sample_rate`. Log one INFO line either way
-   (per `.claude/rules/logging-backend.md`; **never log the DSN itself** — secrets rule).
+   (per `app/CLAUDE.md`; **never log the DSN itself** — secrets rule).
 4. **Wire-up:**
    - `app/main.py`: call `init_error_tracking()` during startup, **before** the app
      handles traffic. **Do not remove or weaken the global exception handler** — root

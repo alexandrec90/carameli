@@ -160,7 +160,7 @@ def main() -> int:
     print(f"  Errors   : {error_count}")
     print(f"  Warnings : {warning_count}")
     print(f"\nWritten to: {ARTIFACT}")
-    print("  ERRORS EXTRACTED -- run /fix-logs")
+    print("  ERRORS EXTRACTED -- inspect the artifact above")
     return 1
 
 

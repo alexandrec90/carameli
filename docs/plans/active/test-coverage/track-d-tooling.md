@@ -167,7 +167,7 @@ The primary contracts to cover:
 ### New file: `tests/integration/test_vanillaland_parity.py`
 
 For each row in the table above, read the VanillaLand source file listed in
-`.claude/rules/vanillaland-paths.md` and write a test that:
+the VanillaLand mapping in root `CLAUDE.md` and write a test that:
 
 1. Sends the exact request shape VanillaLand would send (field names, casing, data types).
 2. Asserts the Carameli response matches the shape VanillaLand expects back.

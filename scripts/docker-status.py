@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Comprehensive Docker stack diagnostic.
 
-Writes three artifacts consumed by the `fix-docker` skill:
+Writes three diagnostic artifacts:
   logs/docker/health.log    -- container status, sick-container logs, healthchecks
   logs/docker/config.log    -- compose config validation, Docker resource usage
   logs/docker/app-logs.log  -- recent app container logs (always collected)
@@ -18,8 +18,7 @@ HEALTH = "health.log"
 CONFIG = "config.log"
 APP_LOGS = "app-logs.log"
 
-# Provenance stamp on every artifact so the fix-docker skill can name the producing
-# script (per .claude/rules/diagnostics.md) instead of guessing how to regenerate it.
+# Provenance stamp on every artifact so its producer and regeneration path are clear.
 SOURCE = "# source: scripts/docker-status.py"
 
 # `Exited (0)` is excluded: one-shot init services exit 0 on success (see
