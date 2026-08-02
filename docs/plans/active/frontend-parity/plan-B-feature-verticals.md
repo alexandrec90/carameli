@@ -59,7 +59,7 @@ conventions in the README (auth scoping, migration-in-same-commit, tests-in-same
 - **Spec sections:** §35–37
 - **New models:** `agents` (customer_id, extension_id FK **unique**, name, status),
   `call_queues` (customer_id, name, strategy), `agent_skills` (agent_id, skill, level).
-  UUID PK + `created_at`/`updated_at` + soft-delete per `.claude/rules/database.md`.
+  UUID PK + `created_at`/`updated_at` + soft-delete, matching existing models.
 - **Decisions:**
   - **Config-only CRUD first.** Do **not** wire the Jambonz queue engine now
     (`cloudli-feature-gaps.md` flags it as high-effort engine work). These pages are CRUD

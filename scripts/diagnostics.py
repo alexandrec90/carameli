@@ -73,8 +73,8 @@ _ENV_ERROR = [
 def source_header(label: str) -> str:
     """Provenance stamp on non-empty artifacts.
 
-    Lets the fix-lint / fix-tests skills name the producing script if a filter
-    swallowed actionable lines, without guessing the environment.
+    Lets a developer or agent identify the producing script if a filter swallowed
+    actionable lines, without guessing the environment.
     """
     return f"# source: {label}"
 
@@ -177,10 +177,6 @@ def _keep_actionlint(l: str) -> bool:
     return bool(re.search(r":\d+:\d+:", l))
 
 
-def _keep_lint_instructions(l: str) -> bool:
-    return bool(re.search(r":\d+: \[", l))
-
-
 # (report name, fix hint, keep filter). alembic-check is handled separately
 # because it synthesises a file locator when the tool emits none.
 LINT_SECTIONS = [
@@ -205,7 +201,6 @@ LINT_SECTIONS = [
     ("dotenv-linter", "# fix ordering / quoting in the reported .env file", _keep_dotenv),
     ("yamllint", "yamllint --strict -f parsable <file>", _keep_yamllint),
     ("actionlint", "actionlint", _keep_actionlint),
-    ("lint-instructions", "python scripts/lint-instructions.py", _keep_lint_instructions),
 ]
 
 
@@ -564,9 +559,8 @@ def digest_tests(
 
 
 # ---------------------------------------------------------------------------
-# E2E helpers -- still emit the dedicated `logs/e2e-failures.log` contract used
-# by the /fix-e2e skill, but the filtering logic lives here so runner scripts do
-# not drift independently.
+# E2E helpers -- emit the dedicated `logs/e2e-failures.log` diagnostic artifact,
+# with filtering centralized here so runner scripts do not drift independently.
 # ---------------------------------------------------------------------------
 
 

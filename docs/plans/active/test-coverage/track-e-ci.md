@@ -50,7 +50,7 @@ Insert these five objects into the `"tasks"` array, after the existing
 > **Superseded:** the JSON below predates the notify-wrap migration. Notifications now
 > use a Python wrapper, not `notify.ps1`. The current convention is a `"type": "process"`
 > task: `python scripts/notify-wrap.py "<Label>" -- <command> [args...]`. See
-> `.claude/rules/tooling.md` and the live `.vscode/tasks.json` for the canonical form.
+> the live `.vscode/tasks.json` for the canonical form.
 
 - `"type": "process"` wrapping the command with `scripts/notify-wrap.py`
 - `"group": "test"` on all five

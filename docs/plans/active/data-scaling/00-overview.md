@@ -14,9 +14,9 @@ settings and compose services introduced by earlier ones only where explicitly n
 | Area | Fact |
 | --- | --- |
 | Growth tables | `call_events` (one row/call, written by Jambonz call-status webhook) and `sms_messages` (full bodies, both directions). Media bytes live in S3/MinIO; DB holds URLs only. |
-| Indexes | `call_events`: only unique `call_sid` (`app/models/call_event.py:26`). `sms_messages`: only unique `message_sid` (`app/models/sms_message.py:29`). No `customer_id`, time, or `posted` indexes — violates `.claude/rules/database.md` (customer_id FK must be `index=True`). |
+| Indexes | `call_events`: only unique `call_sid` (`app/models/call_event.py:26`). `sms_messages`: only unique `message_sid` (`app/models/sms_message.py:29`). No `customer_id`, time, or `posted` indexes; customer-scoped foreign keys need indexes. |
 | Retry scans | ARQ crons every 30 s scan `posted = false AND created_at < now()-1min`: `CallEventRepo.get_unposted` (`app/repositories/call_event_repo.py:224`), SMS equivalent in `app/services/sms_sync.py`. Registered in `app/services/call_sync.py:94` (`WorkerSettings.cron_jobs`). **Note: retries are ARQ crons, not APScheduler — CLAUDE.md's "APScheduler runs a retry job" line is stale.** |
-| Retention | None. `.claude/rules/database.md:33` permits hard-deleting `call_events` past a retention window, but nothing implements one. Both tables grow forever. |
+| Retention | None. The design permits hard-deleting `call_events` past a retention window, but nothing implements one. Both tables grow forever. |
 | Backups | **None anywhere** — no pg_dump, no WAL archiving. Biggest gap. |
 | Monitoring | Prometheus + Grafana **already in compose** behind the `monitoring` profile (`docker-compose.yml:337-361`), scraping `app:8000/metrics` (`prometheus.yml`). Missing: Alertmanager, alert rules, ARQ queue-depth metric, Grafana provisioning. |
 | Error tracking | Global 500 handler in `app/main.py` → rotating `logs/runtime/carameli.log` (10 MB × 5). No Sentry. |
@@ -56,8 +56,7 @@ Record only; each has an explicit trigger:
   (`docker compose exec -T app pytest tests/...`). Full suite belongs to CI.
 - New pip deps: floor in the right `requirements*.in` + recompile all locks
   (`--universal`) in the same commit (see root `CLAUDE.md` → Dependencies).
-- Migrations: review autogenerate output; `customer_id` FKs declare `index=True`
-  (`.claude/rules/database.md`).
+- Migrations: review autogenerate output; `customer_id` FKs declare `index=True`.
 - Compose lifecycle ops on a running stack: confirm with the user before
   `down -v` / `up --build` / `restart`.
 - New settings go in `app/core/config.py` **and** `.env.example`.

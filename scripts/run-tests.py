@@ -286,7 +286,7 @@ def parse_cli_args(argv: list[str]) -> tuple[bool, str | None]:
     """Return (`changed`, `target`) from the CLI args.
 
     Raises ValueError on any unrecognized argument — an unknown flag falling
-    through must never start the default full-suite run (`.claude/rules/tooling.md`).
+    through must never start the default full-suite run.
 
     `--changed` is the canonical spelling, shared with devkit and every generated
     project so the one workspace-level "Test: Run Suite" task works everywhere.
@@ -393,7 +393,7 @@ def run_all() -> dict[str, tuple[list[str], int]]:
 def critical_skip_lines(skips: list[tuple[str, str]]) -> list[str]:
     """Loud terminal lines for skipped targets that invalidate the run. Pure.
 
-    Environment noise stays out of the artifact (.claude/rules/diagnostics.md §3),
+    Environment noise stays out of the artifact,
     but a skipped critical target must still fail the run: the caller treats a
     non-empty return as a failure.
     """
@@ -472,7 +472,7 @@ def main() -> int:
         if fe_failed:
             any_failed = True
             print(f"\nFrontend (vitest) failures written to: {frontend_artifact}")
-            print("  (fix locally with /fix-tests)")
+            print("  (inspect the artifact above and fix locally)")
     else:
         any_failed, text, skips = diagnostics.digest_tests(results, label)
 

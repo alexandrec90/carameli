@@ -23,7 +23,6 @@ def test_core_linters_run_everywhere():
         la.t_vulture,
         la.t_alembic_check,
         la.t_dotenv,
-        la.t_lint_instructions,
     ):
         assert tool in la.LOCAL_TOOLS
         assert tool in la.CI_TOOLS
@@ -107,7 +106,6 @@ def test_gated_tools_skip_when_no_relevant_change():
     assert la.t_alembic_check(py_only) == {"alembic-check": ([], 0)}
     assert la.t_yamllint(py_only) == {"yamllint": ([], 0)}
     assert la.t_actionlint(py_only) == {"actionlint": ([], 0)}
-    assert la.t_lint_instructions(py_only) == {"lint-instructions": ([], 0)}
     assert la.t_dotenv(py_only) == {"dotenv-linter": ([], 0)}
     assert la.t_detect_secrets([".secrets.baseline"]) == {"detect-secrets": ([], 0)}
 
@@ -122,7 +120,7 @@ def test_is_req_matches_lock_and_source_files():
 
 # pip-audit is report-only: it must never `pip install` anything, even when the
 # audit finds vulnerable packages. Unconstrained upgrades from a lint run drift
-# the local venv from requirements/CI (see .claude/rules/diagnostics.md §4).
+# the local venv from requirements/CI.
 def test_pip_audit_reports_without_upgrading(monkeypatch):
     calls: list[str] = []
 

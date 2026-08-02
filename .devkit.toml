@@ -8,23 +8,13 @@
 
 [project]
 # Prefix for harness control env vars:
-#   CARAMELI_SKIP_STOP_VERIFY, CARAMELI_STOP_TESTS_AUTOSTART,
-#   CARAMELI_NORMALIZE_KNOWN_FIXES_ON_STOP
+#   CARAMELI_SKIP_STOP_VERIFY, CARAMELI_STOP_TESTS_AUTOSTART
 env_prefix = "CARAMELI"
 
 [paths]
 app = "app/"
 tests = "tests/"
 unit_tests = "tests/unit"
-
-[stop]
-# State-driven skills finalized on every Stop: [skill, schema] pairs.
-finalize_targets = [
-  ["audit-design-flaws", "audit"],
-  ["make-tests", "modules"],
-  ["make-frontend-tests", "modules"],
-  ["refactor", "files"],
-]
 
 # The PreToolUse Bash output cap. `enforce-capped-bash.py` blocks an uncapped Bash
 # call and quotes `max_bytes` in the reason; `invoke-capped.py` applies it. One field

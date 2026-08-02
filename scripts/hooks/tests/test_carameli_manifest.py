@@ -8,8 +8,8 @@ suite red in every other consuming repo.
 
 That rewrite is right for the shared file and leaves a real gap here: nothing else
 catches a `.devkit.toml` edit that silently changes what the Stop hook does
-in *this* repo — points pytest at the wrong directory, drops a finalize target,
-or hands host pytest the wrong DB credentials. This file closes that gap on
+in *this* repo — points pytest at the wrong directory or hands host pytest the
+wrong DB credentials. This file closes that gap on
 Carameli's side, where project literals belong.
 
 Keep it in sync with `.devkit.toml`; a deliberate manifest change should
@@ -26,12 +26,6 @@ def test_manifest_reproduces_carameli_stop_constants():
 
     assert c.env_prefix == "CARAMELI"
     assert c.app_dir == "app/" and c.tests_dir == "tests/" and c.unit_tests == "tests/unit"
-    assert {skill for skill, _ in c.finalize_targets} == {
-        "audit-design-flaws",
-        "make-tests",
-        "make-frontend-tests",
-        "refactor",
-    }
 
 
 def test_manifest_reproduces_carameli_db_tier():

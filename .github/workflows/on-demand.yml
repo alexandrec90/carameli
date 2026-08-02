@@ -100,15 +100,15 @@ jobs:
 
       # -----------------------------------------------------------------------
       # Upload the filtered fix artifacts (always, for debugging). Logs are never
-      # committed or pushed from CI — all fixing happens locally via /fix-lint and
-      # /fix-tests. Download the fix-artifacts bundle to inspect a remote run.
+      # committed or pushed from CI. Download the diagnostics bundle to inspect a
+      # remote run and fix it locally.
       # -----------------------------------------------------------------------
 
       - name: Upload fix artifacts
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: fix-artifacts
+          name: diagnostic-artifacts
           path: logs/
 
       - name: Report remaining failures
@@ -120,8 +120,8 @@ jobs:
           # failures are split into their own artifact by run-tests.py in CI, so
           # gate on that log too.
           if [ -s logs/lint-errors.log ] || [ -s logs/test-failures.log ] || [ -s logs/frontend-test-failures.log ]; then
-            echo "Actionable failures remain. Download the fix-artifacts bundle,"
-            echo "then run /fix-lint or /fix-tests locally."
+            echo "Actionable failures remain. Download the diagnostic-artifacts bundle"
+            echo "and fix the reported failures locally."
             exit 1
           fi
           echo "All clear."

@@ -25,7 +25,7 @@ repos:
   # from, and a mismatch means the commit-time gate and the CI gate check against
   # different trees.
   - repo: https://github.com/alexandrec90/devkit
-    rev: v0.5.2 # a tag, never a branch — one bad upstream commit must not redden this repo
+    rev: v0.5.3 # a tag, never a branch — one bad upstream commit must not redden this repo
     hooks:
       # Fails on a manifest the harness would otherwise ignore: unparseable TOML (the
       # loader falls back to neutral defaults rather than erroring), a path prefix
@@ -61,4 +61,11 @@ repos:
         name: detect-secrets
         language: system
         entry: detect-secrets-hook --baseline .secrets.baseline
-        exclude: (\.secrets\.baseline|\.env\.example)$
+        # DEVKIT_FILES.json is the vendoring receipt: a machine-generated map of
+        # path -> SHA-256 of each vendored file. Every entry is high-entropy hex by
+        # construction and none of it is a secret, so the scanner flags the whole
+        # file on every `sync-devkit.py --pull`. Excluded rather than baselined
+        # because the hashes change on each pull, which would need a baseline
+        # refresh every upgrade -- training everyone to re-baseline on autopilot,
+        # which is how a real secret gets waved through.
+        exclude: (\.secrets\.baseline|\.env\.example|DEVKIT_FILES\.json)$

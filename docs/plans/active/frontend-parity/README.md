@@ -72,7 +72,7 @@ B2/B3 straight CRUD verticals with no contract work.
 ## Conventions every plan must honour
 
 - Auth + customer scoping on every route (`enforce_customer_scope`) — `.claude/rules/security.md`
-- Model change ⇒ Alembic migration in the same commit — `.claude/rules/migrations.md`
+- Model change ⇒ Alembic migration in the same commit — `app/CLAUDE.md`
 - Tests in the same commit (5-case backend list test + hook test) — root `CLAUDE.md`
 - Hooks never import from `skins/` — descriptor types come from `lib/dataPage.ts`
 - Files: ≤300 lines Py / ≤250 lines TSX

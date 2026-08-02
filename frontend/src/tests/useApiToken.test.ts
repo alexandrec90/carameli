@@ -29,7 +29,7 @@ describe('useApiToken', () => {
   // The block body is load-bearing: `beforeEach(() => listMock.mockReset())` implicitly
   // returns the mock (mockReset() is chainable), and vitest calls a function returned
   // from beforeEach as an after-test cleanup hook — so the rejection-test's mock gets
-  // invoked post-test and its rejected value fails the test. See known-fixes.md.
+  // invoked post-test and its rejected value fails the test.
   beforeEach(() => {
     listMock.mockReset()
   })

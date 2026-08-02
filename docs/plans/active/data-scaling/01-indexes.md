@@ -25,7 +25,7 @@ queried — do not speculatively index the phone-number columns if nothing filte
 
 `app/models/call_event.py`:
 
-- `customer_id`: add `index=True` (mandated by `.claude/rules/database.md:37`).
+- `customer_id`: add `index=True` for customer-scoped query performance.
 - `started_at`: add `index=True`.
 - Add `__table_args__` with the partial index so autogenerate stays drift-free:
 
@@ -64,7 +64,7 @@ index stays a few KB no matter how many hundreds of millions of posted rows accu
 
 - New `tests/integration/test_schema_indexes.py`: after migrations, use
   `sqlalchemy.inspect` via `conn.run_sync` to assert each expected index name exists on
-  the two tables, including the partials. Follow `.claude/rules/testing.md` fixtures
+  the two tables, including the partials. Follow `tests/CLAUDE.md` fixtures
   (savepoint fixture, no raw sessions).
 - Run `docker compose exec -T app alembic upgrade head`, then the new test file, then
   `alembic check` to prove no drift.

@@ -9,8 +9,7 @@ prune = load_module("scripts/docker-prune.py")
 
 
 def test_status_source_header():
-    # fix-docker locates the producer off this stamp (.claude/rules/diagnostics.md),
-    # so the prefix and script path are a contract, not cosmetic.
+    # The prefix and script path identify how to regenerate the artifact.
     assert status.SOURCE == "# source: scripts/docker-status.py"
     assert status.SOURCE.startswith("# source: ")
 

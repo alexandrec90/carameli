@@ -37,8 +37,8 @@ same clock. Phase 01's indexes are assumed (the purge filters on `created_at`).
 
 ## Rule-file update (required, same change)
 
-`.claude/rules/database.md:31-34` allows hard-deleting only `call_events` past the
-retention window — it predates SMS retention. Extend that sentence to cover
+The existing retention design allows hard-deleting only `call_events` past the
+retention window and predates SMS retention. Extend the implementation to cover
 `sms_messages` rows past the window, or the next audit flags this job as a violation.
 
 ## S3 / MinIO lifecycle

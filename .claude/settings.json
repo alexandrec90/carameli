@@ -24,18 +24,6 @@
       "TodoRead(*)",
       "TodoWrite(*)",
       "WebSearch(*)",
-      "Edit(/.claude/skills/audit-design-flaws/**)",
-      "Edit(/.claude/skills/state-tools/**)",
-      "Edit(/.claude/skills/make-tests/**)",
-      "Edit(/.claude/skills/make-frontend-tests/**)",
-      "Edit(/.claude/skills/refactor/**)",
-      "Bash(cp .claude/skills/audit-design-flaws/state.json /tmp/_state-audit.json)",
-      "Bash(cp .claude/skills/make-tests/state.json /tmp/_state-make-tests.json)",
-      "Bash(cp .claude/skills/make-frontend-tests/state.json /tmp/_state-make-frontend-tests.json)",
-      "Bash(cp .claude/skills/refactor/state.json /tmp/_state-refactor.json)",
-      "Edit(/.claude/skills/plan-handoff/**)",
-      "Edit(/.claude/skills/check-boundaries/**)",
-      "Edit(/.claude/skills/check-logging/**)",
       "Bash(npx vitest *)",
       "Bash(npx tsc *)",
       "Bash(npx eslint *)",
@@ -43,8 +31,7 @@
     ],
     "defaultMode": "bypassPermissions",
     "additionalDirectories": [
-      "C:\\Users\\Administrator\\.claude",
-      "c:\\Users\\Administrator\\Desktop\\vs_code\\carameli\\.claude\\skills\\state-tools"
+      "C:\\Users\\Administrator\\.claude"
     ]
   },
   "hooks": {
@@ -77,15 +64,6 @@
             "command": "python3 \"${CLAUDE_PROJECT_DIR:-.}/scripts/hooks/enforce-capped-bash.py\""
           }
         ]
-      },
-      {
-        "matcher": ".*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python3 \"${CLAUDE_PROJECT_DIR:-.}/scripts/hooks/pretool.py\""
-          }
-        ]
       }
     ],
     "PostToolUseFailure": [
@@ -112,10 +90,6 @@
       {
         "matcher": "^(Edit|Write|MultiEdit|apply_patch|create_file)$",
         "hooks": [
-          {
-            "type": "command",
-            "command": "python3 \"${CLAUDE_PROJECT_DIR:-.}/.claude/skills/add-db-model/after-model-edit.py\""
-          },
           {
             "type": "command",
             "command": "python3 \"${CLAUDE_PROJECT_DIR:-.}/scripts/hooks/lint-fix.py\""

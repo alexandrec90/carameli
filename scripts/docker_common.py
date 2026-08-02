@@ -8,8 +8,7 @@ unit-tested. The pure functions here -- `service_from_container`,
 are covered by `scripts/hooks/tests/test_docker_common.py`. The thin subprocess
 wrappers (`run`, `run_with_timeout`) are the only impure surface.
 
-Artifacts land in `logs/docker/*.log` and are consumed by the `fix-docker`
-skill (see `.claude/rules/diagnostics.md`).
+Artifacts land in `logs/docker/*.log` for local and CI diagnosis.
 """
 
 import os

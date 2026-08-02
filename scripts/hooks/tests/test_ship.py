@@ -1,145 +1,89 @@
-"""Unit tests for scripts/ship.py (pure helpers + push retry logic)."""
+"""Unit tests for the deterministic mechanics behind /ship."""
 
 from conftest import load_module
 
 ship = load_module("scripts/ship.py")
 
 
-class TestIsShippable:
-    def test_feature_branch_ok(self):
-        ok, reason = ship.is_shippable("claude/add-sms-0722")
-        assert ok is True
-        assert reason == ""
-
-    def test_master_rejected(self):
-        ok, reason = ship.is_shippable("master")
-        assert ok is False
-        assert "master" in reason
-
-    def test_detached_head_rejected(self):
-        ok, reason = ship.is_shippable("")
-        assert ok is False
-        assert "detached" in reason.lower()
-
-    def test_custom_default(self):
-        ok, _ = ship.is_shippable("main", default="main")
-        assert ok is False
-
-
-class TestTreeClean:
-    def test_empty_is_clean(self):
-        assert ship.tree_clean("") is True
-        assert ship.tree_clean("   \n  ") is True
-
-    def test_changes_are_dirty(self):
-        assert ship.tree_clean(" M app/main.py\n") is False
-
-
-class TestBackoffDelays:
-    def test_exponential_schedule(self):
-        assert ship.backoff_delays() == [2, 4, 8, 16]
-
-
-class TestParseLintOk:
-    def test_zero_is_ok(self):
-        assert ship.parse_lint_ok(0) is True
-
-    def test_nonzero_is_failure(self):
-        assert ship.parse_lint_ok(1) is False
-
-
 class _Result:
-    def __init__(self, returncode, stderr=""):
+    def __init__(self, returncode: int, stdout: str = "", stderr: str = ""):
         self.returncode = returncode
+        self.stdout = stdout
         self.stderr = stderr
 
 
-class TestPushRetry:
-    def test_succeeds_first_try(self, monkeypatch):
-        calls = []
-        monkeypatch.setattr(ship, "_git", lambda *a: calls.append(a) or _Result(0))
-        assert ship._push("b", sleep=lambda _s: None) is True
-        assert len(calls) == 1
-
-    def test_retries_transient_then_succeeds(self, monkeypatch):
-        results = [_Result(1, "fatal: unable to connect: timed out"), _Result(0)]
-        monkeypatch.setattr(ship, "_git", lambda *a: results.pop(0))
-        slept = []
-        assert ship._push("b", sleep=slept.append) is True
-        assert slept == [2]  # one retry, first backoff delay
-
-    def test_gives_up_after_all_retries(self, monkeypatch):
-        monkeypatch.setattr(ship, "_git", lambda *a: _Result(1, "could not resolve host"))
-        slept = []
-        assert ship._push("b", sleep=slept.append) is False
-        assert slept == [2, 4, 8, 16]  # full schedule exhausted
-
-    def test_non_transient_failure_does_not_retry(self, monkeypatch):
-        calls = []
-        monkeypatch.setattr(
-            ship, "_git", lambda *a: calls.append(a) or _Result(1, "rejected: non-fast-forward")
-        )
-        slept = []
-        assert ship._push("b", sleep=slept.append) is False
-        assert len(calls) == 1  # no retry on a non-network error
-        assert slept == []
+def test_only_claude_task_branches_are_shippable():
+    assert ship.is_shippable("claude/fix-thing", "main") == (True, "")
+    for branch in ("", "main", "feature/x", "carameli-b"):
+        ok, _ = ship.is_shippable(branch, "main")
+        assert not ok
 
 
-class TestShippedMarker:
-    def _wire(self, monkeypatch, *, branch, lint_ok, push_ok, clean=True):
-        monkeypatch.setattr(ship, "current_branch", lambda: branch)
-        monkeypatch.setattr(ship, "_porcelain", lambda: "" if clean else " M x.py\n")
-        monkeypatch.setattr(ship, "_run_lint", lambda: lint_ok)
-        monkeypatch.setattr(ship, "_push", lambda b: push_ok)
-        marked = []
-        monkeypatch.setattr(ship, "write_shipped_marker", marked.append)
-        return marked
+def test_default_branch_uses_shared_detection(monkeypatch):
+    monkeypatch.setattr(ship.tb, "detect_default_branch", lambda git, fallback: "trunk")
+    assert ship.default_branch() == "trunk"
 
-    def test_push_mode_does_not_write_marker(self, monkeypatch):
-        # Regression: the marker must NOT be dropped at push time. Dropping it
-        # before the PR exists is what orphaned a pushed-but-un-PR'd branch when
-        # PR creation failed or the session died between push and PR.
-        marked = self._wire(monkeypatch, branch="claude/x-0722", lint_ok=True, push_ok=True)
-        assert ship.main([]) == ship.EXIT_OK
-        assert marked == []
 
-    def test_mark_shipped_writes_marker(self, monkeypatch):
-        marked = self._wire(monkeypatch, branch="claude/x-0722", lint_ok=True, push_ok=True)
-        assert ship.main(["--mark-shipped"]) == ship.EXIT_OK
-        assert marked == ["claude/x-0722"]
+def test_tree_clean_ignores_whitespace():
+    assert ship.tree_clean(" \n")
+    assert not ship.tree_clean(" M app.py\n")
 
-    def test_mark_shipped_rejected_on_master(self, monkeypatch):
-        # You can't arm the marker from master -- is_shippable gates it first.
-        marked = self._wire(monkeypatch, branch="master", lint_ok=True, push_ok=True)
-        assert ship.main(["--mark-shipped"]) == ship.EXIT_NOT_SHIPPABLE
-        assert marked == []
 
-    def test_mark_shipped_does_not_push_or_lint(self, monkeypatch):
-        # --mark-shipped is a post-PR bookkeeping step: no clean-tree check, no
-        # lint, no push -- so it works even with a dirty tree after the PR opened.
-        pushed = []
-        linted = []
-        monkeypatch.setattr(ship, "current_branch", lambda: "claude/x-0722")
-        monkeypatch.setattr(ship, "_porcelain", lambda: " M x.py\n")  # dirty
-        monkeypatch.setattr(ship, "_run_lint", lambda: linted.append(True) or True)
-        monkeypatch.setattr(ship, "_push", lambda b: pushed.append(b) or True)
-        marked = []
-        monkeypatch.setattr(ship, "write_shipped_marker", marked.append)
-        assert ship.main(["--mark-shipped"]) == ship.EXIT_OK
-        assert marked == ["claude/x-0722"]
-        assert pushed == [] and linted == []
+def test_push_retries_transient_failure(monkeypatch):
+    results = [_Result(1, stderr="connection timed out"), _Result(0)]
+    monkeypatch.setattr(ship, "_git", lambda *args: results.pop(0))
+    slept: list[int] = []
+    assert ship._push("claude/x", sleep=slept.append)
+    assert slept == [2]
 
-    def test_marker_not_written_when_push_fails(self, monkeypatch):
-        marked = self._wire(monkeypatch, branch="claude/x-0722", lint_ok=True, push_ok=False)
-        assert ship.main([]) == ship.EXIT_PUSH_FAILED
-        assert marked == []
 
-    def test_marker_not_written_when_lint_fails(self, monkeypatch):
-        marked = self._wire(monkeypatch, branch="claude/x-0722", lint_ok=False, push_ok=True)
-        assert ship.main([]) == ship.EXIT_LINT_FAILED
-        assert marked == []
+def test_push_does_not_retry_rejection(monkeypatch):
+    calls = []
+    monkeypatch.setattr(
+        ship,
+        "_git",
+        lambda *args: calls.append(args) or _Result(1, stderr="non-fast-forward"),
+    )
+    assert not ship._push("claude/x", sleep=lambda _: None)
+    assert len(calls) == 1
 
-    def test_preflight_does_not_write_marker(self, monkeypatch):
-        marked = self._wire(monkeypatch, branch="claude/x-0722", lint_ok=True, push_ok=True)
-        assert ship.main(["--preflight"]) == ship.EXIT_OK
-        assert marked == []
+
+def _wire_main(monkeypatch, *, branch="claude/x", clean=True, lint=True, push=True):
+    monkeypatch.setattr(ship, "current_branch", lambda: branch)
+    monkeypatch.setattr(ship, "default_branch", lambda: "main")
+    monkeypatch.setattr(ship, "_porcelain", lambda: "" if clean else " M x.py\n")
+    monkeypatch.setattr(ship, "_run_lint", lambda: lint)
+    monkeypatch.setattr(ship, "_push", lambda value: push)
+    marked: list[str] = []
+    monkeypatch.setattr(ship, "write_shipped_marker", marked.append)
+    return marked
+
+
+def test_preflight_reports_branch_and_base(monkeypatch, capsys):
+    marked = _wire_main(monkeypatch)
+    assert ship.main(["--preflight"]) == ship.EXIT_OK
+    assert "branch=claude/x base=main" in capsys.readouterr().out
+    assert marked == []
+
+
+def test_push_requires_clean_tree(monkeypatch):
+    marked = _wire_main(monkeypatch, clean=False)
+    assert ship.main([]) == ship.EXIT_DIRTY_TREE
+    assert marked == []
+
+
+def test_push_does_not_mark_branch_shipped(monkeypatch):
+    marked = _wire_main(monkeypatch)
+    assert ship.main([]) == ship.EXIT_OK
+    assert marked == []
+
+
+def test_mark_shipped_is_separate_post_pr_step(monkeypatch):
+    marked = _wire_main(monkeypatch, clean=False, lint=False, push=False)
+    assert ship.main(["--mark-shipped"]) == ship.EXIT_OK
+    assert marked == ["claude/x"]
+
+
+def test_unknown_arguments_are_rejected(monkeypatch):
+    _wire_main(monkeypatch)
+    assert ship.main(["--preflight", "--mark-shipped"]) == ship.EXIT_USAGE

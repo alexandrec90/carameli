@@ -1,126 +1,39 @@
 ---
-description: VoIP provider abstraction — conventions for carrier and call-engine providers
+description: Telnyx carrier and Jambonz call-engine abstraction boundaries
 paths:
   - app/services/providers/**/*.py
-  - app/services/call_control.py
-  - app/services/did_manager.py
+  - app/services/reconciliation.py
+  - app/services/agent_status_sync.py
+  - app/api/vsapi/area_codes.py
+  - app/api/vsapi/callback.py
+  - app/api/vsapi/calls.py
   - app/api/vsapi/phone_lines.py
-  - app/api/vsapi/extensions.py
   - app/api/vsapi/sms.py
   - app/api/vsapi/voicemail_drop.py
-  - app/api/webhooks/**/*.py
   - tests/**/test_*telnyx*.py
   - tests/**/test_*jambonz*.py
-  - tests/**/test_*carrier*.py
   - tests/**/test_*provider*.py
 ---
 
-# Rule: VoIP Provider Abstraction
+# VoIP provider boundaries
 
-Carameli uses a two-layer provider abstraction so the carrier (who owns the
-phone numbers / SIP trunk) and the call engine (what controls the call) can be
-swapped independently via environment variables.
+`CarrierProvider` owns DIDs, SMS, area codes, and carrier records.
+`CallEngineProvider` owns call control, SIP/agent state, and recordings. Both Protocols
+live in `app/services/providers/base.py`; `factory.py` selects the configured Telnyx or
+Jambonz implementation.
 
-## Provider Layers
+- Only `factory.py` may select or import a concrete provider for application use.
+- HTTP handlers use the startup instances on `request.app.state`.
+- ARQ workflows accept Protocol-typed providers or create one instance at worker
+  startup. Never construct a client inside an item-processing loop.
+- Keep provider-specific request fields, error types, and option names inside the
+  concrete implementation. Translate failures at the HTTP or job boundary.
+- Store and compare phone numbers in E.164 form; normalize at ingress.
+- Persist provider identifiers needed for deactivation/reconciliation, but never return
+  credentials or API keys from schemas.
+- Mock the Protocol in service/handler tests. Concrete-provider tests may mock its HTTP
+  boundary; live-provider tests require the explicit paid marker hierarchy.
+- Webhook authentication and acknowledgement rules live in `webhooks.md`.
 
-| Layer | Env var | Active impl |
-|---|---|---|
-| Carrier (DIDs, SMS, SIP trunk) | `CARRIER_PROVIDER` | `telnyx` |
-| Call engine (call control, recording) | `CALL_ENGINE_PROVIDER` | `jambonz` |
-
-## Directory Layout
-
-```text
-app/services/providers/
-  base.py              ← Protocol interfaces (CarrierProvider, CallEngineProvider)
-  factory.py           ← reads env vars, returns provider singletons
-  carrier/
-    telnyx.py          ← active carrier
-  engine/
-    jambonz.py         ← active engine
-```
-
-Business logic in `call_control.py` and `did_manager.py` only imports from
-`services/providers/base.py` — never from a concrete provider directly.
-
-## Provider Interfaces (`base.py`)
-
-```python
-class CarrierProvider(Protocol):
-    async def search_numbers(self, area_code: str, count: int) -> list[PhoneNumber]: ...
-    async def provision_number(self, number: str) -> ProvisionedNumber: ...
-    async def release_number(self, number: str) -> None: ...
-    async def send_sms(self, from_: str, to: str, body: str) -> SmsResult: ...
-
-
-class CallEngineProvider(Protocol):
-    async def initiate_call(self, from_: str, to: str, webhook_url: str, **opts) -> CallResult: ...
-    async def hangup_call(self, call_id: str) -> None: ...
-    async def start_recording(self, call_id: str) -> RecordingResult: ...
-    async def stop_recording(self, call_id: str) -> None: ...
-    async def get_call_status(self, call_id: str) -> CallStatus: ...
-```
-
-## Error Handling
-
-- Wrap every provider SDK call in a `try/except` for that provider's exception type.
-- Log the error code + message before re-raising.
-- Re-raise all provider errors as `HTTPException(502)` so callers get a clean non-2xx.
-- Telnyx: catch `telnyx.error.TelnyxError`
-- Jambonz: catch `httpx.HTTPStatusError` (Jambonz REST API is HTTP-based)
-
-## Client Lifecycle
-
-- Instantiate provider clients once at application startup (via FastAPI `lifespan`),
-  store on `app.state`, inject via a FastAPI dependency.
-- Never instantiate a provider client inside a route handler or per-request.
-- In unit tests, always mock at the provider interface boundary — never make real
-  API calls to Telnyx or Jambonz.
-- In integration tests, use sandbox/test credentials for the active provider.
-
-## Phone Numbers
-
-- Store and compare all phone numbers in **E.164 format** (`+15551234567`).
-- Normalize on ingress (incoming webhooks and API requests alike).
-- When provisioning a DID, always configure the voice webhook URL and SMS webhook
-  URL on the carrier side to point to Carameli's public endpoints.
-
-## Webhooks
-
-- Webhook handlers must return `200 OK` quickly. Push heavy work (DB writes) to an
-  APScheduler job or background task.
-- **Jambonz** fires call status events as JSON POST to `/webhooks/jambonz/call-status`.
-  Respond with a JSON verb array to control the call (analogous to TwiML).
-- **Telnyx** fires SMS inbound events as JSON POST to `/webhooks/telnyx/sms-inbound`.
-- Validate webhook authenticity on every inbound request:
-  - Jambonz: shared secret HMAC header (`JAMBONZ_WEBHOOK_SECRET`)
-  - Telnyx: `telnyx.webhook.Webhook.construct_event(...)` with signing secret
-
-## SIP / Extensions
-
-- Each customer gets one SIP credential set and one SIP domain.
-- Store the provider-internal IDs (e.g. `telnyx_credential_id`, `jambonz_account_sid`)
-  on the `extensions` row so they can be cleaned up on deactivation.
-
-## Voicemail Drop / AMD
-
-- Pass AMD (answering machine detection) option when initiating a call.
-- On machine detection in the status callback, play the drop audio.
-- On human answer, the call proceeds normally; do not auto-play the drop.
-- AMD option names differ per engine — set them in the engine provider impl, not in
-  business logic.
-
-## Recordings
-
-- Store the recording URL/reference in `call_events.recording_url`.
-- After the call ends, copy recordings to S3 and store the signed URL.
-- Delete recordings from the provider after copying to avoid storage charges.
-
-## Adding a New Provider
-
-1. Create `app/services/providers/carrier/<name>.py` or `engine/<name>.py`.
-2. Implement all methods from the corresponding Protocol in `base.py`.
-3. Register it in `factory.py` under a new `CARRIER_PROVIDER` / `CALL_ENGINE_PROVIDER`
-   env var value.
-4. Add unit tests mocking at the HTTP/SDK boundary.
-5. Add the new env vars to `.env.example` and `core/config.py`.
+Adding a provider requires a complete Protocol implementation, factory registration,
+configuration and `.env.example` fields, focused tests, and cleanup/lifecycle coverage.

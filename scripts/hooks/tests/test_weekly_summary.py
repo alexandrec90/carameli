@@ -250,8 +250,7 @@ def test_main_requires_at_least_one_junit_report(tmp_path):
 
 
 def test_help_exits_zero_without_running(tmp_path):
-    # scripts/ CLI contract (.claude/rules/tooling.md): --help prints usage and
-    # exits; it must never fall through to the default action.
+    # --help prints usage and exits; it must never fall through to the default action.
     with pytest.raises(SystemExit) as exc:
         weekly_summary.main(["--help"])
     assert exc.value.code == 0

@@ -48,7 +48,7 @@ Handlers import the counter from `app/core/metrics.py`.
 ## Tests (same commit)
 
 - Unit tests for `app/core/metrics.py`: gauges report seeded counts (DB fixtures per
-  `.claude/rules/testing.md`); counter increments on the webhook failure path (drive the
+  `tests/CLAUDE.md`); counter increments on the webhook failure path (drive the
   handler with an invalid-signature or provider-error case that already has tests —
   extend those).
 - `/metrics` endpoint test: response contains the new metric names.
