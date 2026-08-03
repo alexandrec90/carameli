@@ -6,6 +6,7 @@ migrate = load_module("scripts/docker-migrate.py")
 restart = load_module("scripts/docker-restart-app.py")
 status = load_module("scripts/docker-status.py")
 prune = load_module("scripts/docker-prune.py")
+revision = load_module("scripts/db-revision.py")
 
 
 def test_status_source_header():
@@ -27,6 +28,37 @@ def test_migrate_app_running():
     assert migrate.app_running(["running"]) is True
     assert migrate.app_running(["Exited (1)"]) is False
     assert migrate.app_running([]) is False
+
+
+def test_revision_reuses_the_same_app_probe_as_migrate():
+    # Both need the app container up, and `docker ps --filter` is used rather than
+    # `docker compose ps` because the latter hangs on Compose v2 when a container
+    # is unhealthy — the exact state you are in when you go looking.
+    assert revision.app_running(["Up 3 minutes (healthy)"]) is True
+    assert revision.app_running(["Exited (1)"]) is False
+    assert revision.app_running([]) is False
+
+
+def test_revision_quotes_a_message_that_would_otherwise_reach_the_shell():
+    # The message is free text from a VS Code prompt and is interpolated into an
+    # `sh -c` string inside the container (the PgBouncer bypass needs the shell to
+    # expand $DIRECT_DATABASE_URL). Quoting is what keeps a quote or a `;` inert.
+    assert revision.shell_quote("add index") == "'add index'"
+    assert revision.shell_quote("it's fine") == "'it'\\''s fine'"
+    assert revision.shell_quote("x; rm -rf /") == "'x; rm -rf /'"
+
+
+def test_revision_rewrites_the_container_path_to_a_repo_relative_one():
+    # Alembic prints /app/alembic/versions/..., which does not exist on the host —
+    # and the whole reason to print it is that someone opens it in the editor.
+    out = ["  Generating /app/alembic/versions/9f2_add_call_index.py ...  done"]
+    assert revision.created_paths(out) == ["alembic/versions/9f2_add_call_index.py"]
+
+
+def test_revision_reports_nothing_when_alembic_generated_nothing():
+    # "No changes in schema detected" is a successful run that wrote no file; it must
+    # not be reported as a written revision.
+    assert revision.created_paths(["INFO  [alembic.env] No changes in schema detected."]) == []
 
 
 def test_restart_app_present():
