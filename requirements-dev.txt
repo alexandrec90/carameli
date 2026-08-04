@@ -94,7 +94,7 @@ coverage==7.15.0
     #   -c requirements-test.txt
     #   mutmut
     #   pytest-testmon
-cryptography==49.0.0
+cryptography==50.0.0
     # via
     #   -c requirements-test.txt
     #   -r requirements.in
