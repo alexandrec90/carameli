@@ -27,7 +27,7 @@ ORCHESTRATION_SCRIPTS = [
     "scripts/extract-log-errors.py",
     "scripts/archive-done-todos.py",
     "scripts/compress-comic-book-images.py",
-    "scripts/sync-agents-context.py",
+    "scripts/sync-codex-context.py",
 ]
 
 
