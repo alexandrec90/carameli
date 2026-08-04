@@ -152,7 +152,7 @@ def _is_workflow(f: str) -> bool:
 
 
 def _is_instruction(f: str) -> bool:
-    return f in ("CLAUDE.md", "AGENTS.md") or f.startswith((".claude/", ".agents/"))
+    return f == "CLAUDE.md" or f.startswith(".claude/")
 
 
 # ---------------------------------------------------------------------------

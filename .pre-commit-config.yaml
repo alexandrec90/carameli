@@ -25,7 +25,7 @@ repos:
   # from, and a mismatch means the commit-time gate and the CI gate check against
   # different trees.
   - repo: https://github.com/alexandrec90/devkit
-    rev: v0.5.3 # a tag, never a branch — one bad upstream commit must not redden this repo
+    rev: v0.6.0 # a tag, never a branch — one bad upstream commit must not redden this repo
     hooks:
       # Fails on a manifest the harness would otherwise ignore: unparseable TOML (the
       # loader falls back to neutral defaults rather than erroring), a path prefix
@@ -41,18 +41,18 @@ repos:
 
   - repo: local
     hooks:
-      # A generator: regenerates the AGENTS.md/.agents/.codex/hooks.json mirrors
-      # from CLAUDE.md/.claude. Generation stays LOCAL (CI must not commit derived
+      # A generator: refreshes Codex repository skills and hooks from `.claude/`.
+      # Generation stays LOCAL (CI must not commit derived
       # files back — it would need write access and hide the diff from review); it
       # modifies files, and the patched git hook auto-stages and retries (see
       # scripts/install-pre-commit.py). CI does not run this hook, but the PR Gate
-      # `mirror-sync` job *verifies* its output is in sync, catching a bypassed or
+      # `codex-sync` job *verifies* its output is in sync, catching a bypassed or
       # uninstalled hook.
-      - id: sync-agents
-        name: sync CLAUDE -> AGENTS mirrors
+      - id: sync-codex
+        name: sync Codex skills and hooks
         language: system
-        entry: python scripts/sync-agents-context.py
-        files: (^|/)CLAUDE\.md$|^\.claude/
+        entry: python scripts/sync-codex-context.py
+        files: ^\.claude/(skills/|settings\.json$)
         pass_filenames: false
 
       # The one check that must stay local: a secret that reaches the remote

@@ -22,8 +22,7 @@ files are generated locks and must never be hand-edited.
 
 DevKit owns `.claude/rules/engineering.md`, `.claude/rules/authoring.md`, and the
 `ship` skill. Carameli owns this file, nested `CLAUDE.md` files, the `add-skin` skill,
-and its domain rules. `AGENTS.md` and `.agents/**` are generated mirrors; never edit
-them directly.
+and its domain rules.
 
 Read the scoped rules when touching their paths:
 

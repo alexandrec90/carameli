@@ -196,16 +196,18 @@ only ever type `/ship`** — the start of the next task is automatic:
    `scripts/ship.py` owns the tested mechanics.
 
 Checks stay layered by purpose, not merged into one hook: pre-commit holds only what CI
-*can't* own (secret scanning + the AGENTS mirror generator), the Stop hook is the in-session
+*can't* own (secret scanning + the Codex context generator), the Stop hook is the in-session
 CI mirror, and the PR Gate is the authoritative gate that `dependabot-automerge.yml` waits on.
 
-### Claude/Codex hook synchronization
+### Claude/Codex compatibility synchronization
 
-Treat `.claude/settings.json` as the source of truth for shared hook wiring. The
-`sync-agents` pre-commit hook runs `scripts/sync-agents-context.py`, which regenerates
-`.codex/hooks.json` through `scripts/sync-codex-hooks.py`; the installed Git hook stages
-that generated file on the retry. PR Gate independently reruns the same generator and
-fails on drift.
+Codex reads the repository's `CLAUDE.md` files through the configured project-document
+fallback, so instructions have no duplicate. Repository skills and hooks still require
+Codex-specific paths. The `sync-codex` pre-commit hook runs
+`scripts/sync-codex-context.py`, which mirrors `.claude/skills/` to `.agents/skills/`
+and regenerates `.codex/hooks.json` through `scripts/sync-codex-hooks.py`; the installed
+Git hook stages generated changes on retry. PR Gate independently reruns the same
+generator and fails on drift.
 
 The mandatory hook test suite also loads the real settings, regenerates Codex hooks in
 memory, and checks the committed output, handler paths, adapter wrapping, explicit
@@ -217,7 +219,7 @@ snapshot after checking Codex compatibility.
 Run the deterministic checks locally with:
 
 ```bash
-python scripts/sync-agents-context.py
+python scripts/sync-codex-context.py
 pytest scripts/hooks/tests/test_sync_codex_hooks.py scripts/hooks/tests/test_codex_hooks_contract.py -q
 ```
 
