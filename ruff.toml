@@ -7,23 +7,38 @@ extend-exclude = ["evals/fixtures"]
 [lint]
 select = ["E", "F", "I", "UP", "B", "ASYNC", "S", "SIM", "T20", "N", "RUF"]
 
+# E501 (line-too-long) is off deliberately, and was never chosen in the first place:
+# `"E"` above is a *family prefix* and line-too-long is one of its 19 members, so it
+# arrived with the family and was then suppressed one directory at a time -- never
+# because anyone decided lines should be capped.
+#
+# `.claude/rules/engineering.md` already settles it: lint is for correctness and
+# security, and "anything a formatter can decide" is off. `line-length` above is
+# untouched and still drives `ruff format`, so code is still wrapped -- silently, on
+# every edit, instead of failing a commit. In app code E501 only ever fires where the
+# formatter *cannot* split (long string literals, URLs), which is exactly where the
+# report cannot be acted on.
+#
+# The rest of `E` stays: E711/E712/E722/E902/E999 are real correctness checks. Adding a
+# rule family here means checking its members for more cosmetic riders like this one.
+ignore = ["E501"]
+
 [lint.per-file-ignores]
-"alembic/versions/*.py" = ["E501"]
-"tests/**/*.py" = ["E501", "S101", "S105"]
+"tests/**/*.py" = ["S101", "S105"]
 ".claude/skills/**/*.py" = ["S101", "N803", "B904", "S603", "S607", "T201"]
 ".agents/skills/**/*.py" = ["S101", "N803", "B904", "S603", "S607", "T201"]
 "app/api/**/*.py" = ["N803"]
 "app/core/config.py" = ["S105"]
-# CLI / diagnostic tooling: terminal output (T201), terse single-char loop vars
-# (E741), and long regex/format lines (E501) are idiomatic here. Keep T201 ignored
-# so the on-demand workflow's `ruff --fix` pass does not strip the diagnostic prints.
+# CLI / diagnostic tooling: terminal output (T201) and terse single-char loop vars
+# (E741) are idiomatic here. Keep T201 ignored so the on-demand workflow's
+# `ruff --fix` pass does not strip the diagnostic prints.
 # These scripts orchestrate trusted first-party tools (docker, git, npm, pre-commit,
 # wsl) via subprocess and poll localhost APIs, so the bandit subprocess/url-open
 # warnings (S603 untrusted input, S607 partial path, S310 urlopen) are expected
 # false positives here.
-"scripts/**/*.py" = ["T201", "E741", "E501", "S603", "S607", "S310"]
+"scripts/**/*.py" = ["T201", "E741", "S603", "S607", "S310"]
 # Hook-script tests follow the same relaxed rules as the main test suite.
-"scripts/hooks/tests/**/*.py" = ["E501", "S101", "S105"]
+"scripts/hooks/tests/**/*.py" = ["S101", "S105"]
 
 [format]
 quote-style = "double"
