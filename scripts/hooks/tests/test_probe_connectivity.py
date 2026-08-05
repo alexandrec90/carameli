@@ -156,6 +156,7 @@ def test_build_artifact_has_source_header_and_timestamp():
     text = _artifact([mod.Probe("sql", "h:1433", True, "ok")])
     assert text.startswith("# source: scripts/probe-connectivity.py")
     assert "# generated: 2026-07-31T00:00:00+00:00" in text
+    assert "GETs may appear in remote access logs" in text
 
 
 def test_build_artifact_groups_open_and_blocked_sections():
