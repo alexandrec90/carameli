@@ -3,8 +3,8 @@
 
 Answers one question before any integration work gets designed: which paths
 between this machine and the VanillaSoft host exist. Every probe is **read-only**
--- TCP connects and HTTP GETs, never a POST -- so a run inserts no rows, writes
-no log entries on systems we do not own, and leaves nothing to clean up.
+at the application layer -- TCP connects and HTTP GETs, never a POST -- so a run
+inserts no application rows. HTTP GETs may still appear in remote access logs.
 
 Channels probed (each result carries the design decision it settles):
 
@@ -188,8 +188,8 @@ def build_artifact(probes: list[Probe], now: str) -> str:
     'blocked' lines are the deliverable, not noise to be filtered out."""
     lines = [
         "# source: scripts/probe-connectivity.py",
-        "# Carameli <-> VanillaSoft channel probe. Read-only: TCP connects and HTTP GETs",
-        "# only, so nothing was written to any remote system.",
+        "# Carameli <-> VanillaSoft channel probe. Application-read-only: TCP connects",
+        "# and HTTP GETs only. GETs may appear in remote access logs.",
         f"# generated: {now}",
         "",
     ]

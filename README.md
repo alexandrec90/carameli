@@ -427,6 +427,11 @@ that prints a warning and exits 0 is the failure mode this rule exists to preven
 
 Your `.env` already has provider placeholders. To test live calls and SMS:
 
+Before enabling live traffic, run the two-sided
+[VanillaSoft connectivity preflight](docs/operations/vanillasoft-connectivity-preflight.md)
+to identify which HTTPS, SQL Server, Event Log, and file-log channels are actually
+reachable and readable.
+
 1. Update `.env` with valid Telnyx + Jambonz credentials
 2. For webhooks (call status and SMS inbound), run the VS Code task
    **Start: ngrok + Sync URLs + Recreate App/Worker**. It starts the stable dev
