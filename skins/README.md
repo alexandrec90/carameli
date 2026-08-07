@@ -1,11 +1,8 @@
 # Skin Design Briefs
 
-Each file in this directory is the source-of-truth design brief for a skin.
-The corresponding rule file in `.claude/rules/` is derived from the brief.
+Each file in this directory is the source-of-truth design brief for a skin. The
+corresponding rule file in `.claude/rules/skin-<name>.md` is derived from the brief.
 
-| Brief | Rule file | Status |
-| --- | --- | --- |
-| `barebone.txt` | `.claude/rules/skin-barebone.md` | Ready |
-| `candy-shop.txt` | `.claude/rules/skin-candy-shop.md` | Ready |
-| `carameli.txt` | `.claude/rules/skin-carameli.md` | Ready |
-| `comic-book.txt` | `.claude/rules/skin-comic-book.md` | Ready |
+The workflow, the brief-vs-rule split, and the current list of skins are documented
+once in **[`docs/product/skins/README.md`](../docs/product/skins/README.md)** — this
+file used to repeat that table and the two copies disagreed. Keep it in one place.

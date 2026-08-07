@@ -67,6 +67,10 @@ Useful legacy roots include `VanillaSoft.Backend/ConnectMeVoice`, `CMVClarity`,
 `SMS`, `PhoneNumber`, `Recording`, `VanillaSoft.Model/VoIP`,
 `Vanillasoft.Webservice`, and `VanillaSoft.CloudliApi` under `../VanillaLand/AppCode/`.
 
+`docs/reference/vanillaland-scope.md` maps the whole tree — which subtrees are worth
+reading and which are CRM surface with no VoIP content. Read it before going in; it is
+a large codebase and the relevant slice is thin.
+
 ## Local workflow
 
 Docker Desktop is required for database-backed tests and stack operations. Check
@@ -85,9 +89,23 @@ Run focused verification for changed behavior. Typical commands:
 python scripts/lint-all.py --changed
 python scripts/run-tests.py --changed
 npm --prefix frontend run test:run
-npm --prefix frontend run typecheck
+npm --prefix frontend run lint:types
 ```
+
+The frontend has no `typecheck` script; type checking is `lint:types`
+(`tsc --noEmit`), which `npm --prefix frontend run lint` also runs.
 
 The default pytest configuration excludes every `paid` test. Sandbox, chargeable,
 and live-provider tiers require explicit opt-in; never broaden a free aggregate to
 include them.
+
+The host venv must be **Python 3.12** — the version is coordinated across the
+Dockerfile, the uv-compiled locks, `mypy.ini`, `ruff.toml`, and CI (see the comment at
+the top of `Dockerfile`). Create it with `uv venv --python 3.12`; a bare `uv venv`
+silently takes the machine default and gives you a venv the container does not match.
+
+`logs/` holds per-run failure artifacts, and `scripts/prune-logs.py` bounds its growth
+from the SessionStart hook. The current artifacts (`lint-errors.log`,
+`test-failures.log`, ...) are protected from pruning at any age — the runners read a
+missing artifact as "clean", so deleting one reports green having checked nothing.
+Durable captures belong in `artifacts/`, local-only material in `.local/`.

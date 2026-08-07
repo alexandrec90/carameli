@@ -23,7 +23,6 @@ htmlcov/
 
 # AI / editor config
 .claude/
-.claudeignore
 .vscode
 .idea
 *.code-workspace
@@ -33,7 +32,6 @@ htmlcov/
 
 # Host-only dev scripts and tooling
 scripts/
-playwright.config.ts
 .pre-commit-config.yaml
 .markdownlint.json
 .markdownlintignore
@@ -44,14 +42,12 @@ pytest.ini
 .testmondata*
 tls/
 
-# Root-level Node (Playwright, commitlint, etc.)
+# Node — the repo has no root-level package.json; this catches stray installs only
 node_modules/
-package.json
-package-lock.json
 
 # Docs and notes
 *.md
-charts/
+.local/
 docs/
 todo.md
 

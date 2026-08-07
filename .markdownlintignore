@@ -6,3 +6,4 @@
 # unfixable findings that bury real errors. Ignore the tree rather than relying on
 # the "*transcript*.md" filename glob in scripts/lint-all.py, which a rename breaks.
 artifacts/**
+.local/**

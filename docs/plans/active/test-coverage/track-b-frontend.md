@@ -245,32 +245,25 @@ async def test_no_layout_overflow_on_mobile(page, base_url):
     assert scroll_width <= 375, f"Horizontal overflow detected: scrollWidth={scroll_width}"
 ```
 
-### Step 4 — Playwright config (`playwright.config.ts` or `conftest.py`)
+### Step 4 — Browser matrix (`tests/e2e/conftest.py`)
 
-If a `playwright.config.ts` does not exist in the root, create one:
+**Carameli's E2E tier is Python-side pytest-playwright, not the Node runner.** The tests
+in `tests/e2e/` are `.py`, `scripts/run-e2e.py` drives them through pytest, and
+`nightly.yml` installs browsers with the Python CLI (`playwright install --with-deps`).
+Configure the browser matrix with `conftest.py` fixtures:
 
-```typescript
-import { defineConfig, devices } from '@playwright/test'
-
-export default defineConfig({
-  testDir: 'tests/e2e',
-  timeout: 30_000,
-  projects: [
-    { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
-    { name: 'firefox',  use: { ...devices['Desktop Firefox'] } },
-    { name: 'webkit',   use: { ...devices['Desktop Safari'] } },
-    { name: 'mobile-chrome', use: { ...devices['Pixel 5'] } },
-    { name: 'mobile-safari', use: { ...devices['iPhone 12'] } },
-  ],
-  use: {
-    baseURL: 'http://localhost:5173',
-    trace: 'on-first-retry',
-  },
-})
+```python
+@pytest.fixture(params=["chromium", "firefox", "webkit"])
+def browser_name(request: pytest.FixtureRequest) -> str:
+    return request.param
 ```
 
-If the project uses pytest-playwright (Python-side), parametrize via `conftest.py` fixtures
-using `pytest.fixture(params=["chromium", "firefox", "webkit"])` instead.
+Do **not** add a root `playwright.config.ts`. One existed until 2026-08-07 and was
+dead the whole time: it declared `testDir: './tests/e2e'`, a directory holding only
+Python files, and nothing ever invoked `playwright test`. Its only effect was to pull
+`@playwright/test` into a root `package.json` and a 1.6 GB root `node_modules/` that no
+build, test, or CI job read. The config, the manifest, and the tree were removed
+together — a Node runner config here is a recurrence, not a gap.
 
 ### Step 5 — `pytest.ini` / CI exclusion
 

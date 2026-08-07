@@ -31,7 +31,8 @@
     ],
     "defaultMode": "bypassPermissions",
     "additionalDirectories": [
-      "C:\\Users\\Administrator\\.claude"
+      "C:\\Users\\Administrator\\.claude",
+      "C:\\Users\\Administrator\\Desktop\\vs_code\\VanillaLand"
     ]
   },
   "hooks": {
@@ -41,6 +42,10 @@
           {
             "type": "command",
             "command": "bash \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/session-start.sh\""
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PROJECT_DIR:-.}/scripts/prune-logs.py\" --quiet"
           }
         ]
       }

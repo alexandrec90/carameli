@@ -6,6 +6,10 @@
           {
             "type": "command",
             "command": "python3 \"$(git rev-parse --show-toplevel)/scripts/hooks/codex-hook-adapter.py\" --event SessionStart -- python3 \"$(git rev-parse --show-toplevel)/scripts/hooks/codex-session-start.py\""
+          },
+          {
+            "type": "command",
+            "command": "python3 \"$(git rev-parse --show-toplevel)/scripts/hooks/codex-hook-adapter.py\" --event SessionStart -- python3 \"$(git rev-parse --show-toplevel)/scripts/prune-logs.py\" --quiet"
           }
         ]
       }

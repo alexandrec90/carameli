@@ -33,11 +33,11 @@ def test_parse_testmon_selection_missing_total_defaults_to_one():
 
 
 def test_parse_cli_args_default():
-    assert rt.parse_cli_args([]) == (False, None)
+    assert rt.parse_cli_args([]) == (False, None, [])
 
 
 def test_parse_cli_args_changed_and_target_separate_args():
-    assert rt.parse_cli_args(["--changed", "--target", "hook-tests"]) == (True, "hook-tests")
+    assert rt.parse_cli_args(["--changed", "--target", "hook-tests"]) == (True, "hook-tests", [])
 
 
 def test_parse_cli_args_accepts_the_canonical_changed_flag():
@@ -48,19 +48,19 @@ def test_parse_cli_args_accepts_the_canonical_changed_flag():
     hit the strict-unknown-argument path and exited 2 at the moment it was meant to
     help. The one workspace-level "Test: Run Suite" task depends on it too.
     """
-    assert rt.parse_cli_args(["--changed"]) == (True, None)
+    assert rt.parse_cli_args(["--changed"]) == (True, None, [])
 
 
 def test_parse_cli_args_still_accepts_the_deprecated_fast_alias():
-    assert rt.parse_cli_args(["--fast"]) == (True, None)
+    assert rt.parse_cli_args(["--fast"]) == (True, None, [])
 
 
 def test_parse_cli_args_target_equals_form():
-    assert rt.parse_cli_args(["--target=frontend-tests"]) == (False, "frontend-tests")
+    assert rt.parse_cli_args(["--target=frontend-tests"]) == (False, "frontend-tests", [])
 
 
 def test_parse_cli_args_all_flag():
-    assert rt.parse_cli_args(["--all"]) == (False, "all")
+    assert rt.parse_cli_args(["--all"]) == (False, "all", [])
 
 
 def test_parse_cli_args_unknown_arg_raises():
@@ -73,6 +73,83 @@ def test_parse_cli_args_unknown_arg_raises():
 def test_parse_cli_args_dangling_target_raises():
     with pytest.raises(ValueError, match="--target"):
         rt.parse_cli_args(["--target"])
+
+
+# --- explicit pytest targets (the vendored Stop hook's calling convention) ---
+
+
+def test_parse_cli_args_accepts_bare_test_paths():
+    """Regression: `stop.py`'s `test_runner_argv` invokes `[run-tests.py, *targets]`.
+
+    A path used to hit the strict-unknown-argument branch, so the Stop gate failed
+    with "Unknown argument: tests/integration/test_vanillaland_parity.py" — a
+    complaint about this script's CLI, raised over a perfectly valid test file.
+    Same vendored-hook/project-runner mismatch as the `--changed`/`--fast` case above.
+    """
+    assert rt.parse_cli_args(["tests/unit/test_calls.py"]) == (
+        False,
+        None,
+        ["tests/unit/test_calls.py"],
+    )
+
+
+def test_parse_cli_args_accepts_multiple_paths_and_node_ids():
+    argv = ["tests/unit/test_a.py", "tests/unit/test_b.py::test_thing"]
+    assert rt.parse_cli_args(argv) == (False, None, argv)
+
+
+def test_parse_cli_args_mixes_flags_and_paths():
+    assert rt.parse_cli_args(["--changed", "tests/unit/test_a.py"]) == (
+        True,
+        None,
+        ["tests/unit/test_a.py"],
+    )
+
+
+def test_parse_cli_args_still_rejects_unknown_flags_alongside_paths():
+    """Accepting paths must not weaken the flag check into accepting anything."""
+    with pytest.raises(ValueError, match="--nope"):
+        rt.parse_cli_args(["tests/unit/test_a.py", "--nope"])
+
+
+def test_target_value_is_not_mistaken_for_a_path():
+    assert rt.parse_cli_args(["--target", "pytest"]) == (False, "pytest", [])
+
+
+# --- scoped command construction ---
+
+
+def test_scoped_pytest_command_includes_targets_and_addopts():
+    cmd = rt.scoped_pytest_command(["tests/unit/test_a.py"])
+    assert "tests/unit/test_a.py" in cmd
+    # -o addopts= REPLACES pytest.ini, so the paid-tier exclusion must be repeated
+    # or a scoped run would silently collect paid tests.
+    assert '-m "not paid"' in cmd
+
+
+def test_scoped_pytest_command_normalises_windows_separators():
+    """Paths are handed to pytest inside a Linux container."""
+    cmd = rt.scoped_pytest_command(["tests\\unit\\test_a.py"])
+    assert "tests/unit/test_a.py" in cmd
+    assert "\\" not in cmd
+
+
+def test_scoped_pytest_command_quotes_paths_with_spaces():
+    cmd = rt.scoped_pytest_command(["tests/unit/a b.py"])
+    assert "'tests/unit/a b.py'" in cmd
+
+
+def test_scoped_pytest_command_is_serial():
+    """xdist worker startup costs more than it saves on a handful of files."""
+    assert "-n auto" not in rt.scoped_pytest_command(["tests/unit/test_a.py"])
+
+
+def test_ci_scoped_argv_runs_pytest_directly():
+    """CI runs app code on the runner — it must not go through docker compose."""
+    argv = rt.ci_scoped_argv(["tests/unit/test_a.py"])
+    assert argv[:3] == ["python", "-m", "pytest"]
+    assert "tests/unit/test_a.py" in argv
+    assert "docker" not in argv
 
 
 def test_help_requested():
