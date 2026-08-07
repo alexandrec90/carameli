@@ -18,27 +18,8 @@ pytestmark = [
 ]
 
 
-def _inline_hook_overrides(generated: dict) -> list[str]:
-    """Encode generated lifecycle groups as session-local TOML config overrides."""
-    args: list[str] = []
-    for event, groups in generated["hooks"].items():
-        encoded_groups = []
-        for group in groups:
-            fields = []
-            if "matcher" in group:
-                fields.append(f"matcher={json.dumps(group['matcher'])}")
-            handlers = ",".join(
-                (f"{{type={json.dumps(entry['type'])},command={json.dumps(entry['command'])}}}")
-                for entry in group["hooks"]
-            )
-            fields.append(f"hooks=[{handlers}]")
-            encoded_groups.append("{" + ",".join(fields) + "}")
-        args.extend(["--config", f"hooks.{event}=[{','.join(encoded_groups)}]"])
-    return args
-
-
-def test_generated_lifecycle_hooks_run_in_isolated_codex_exec(tmp_path):
-    """Exercise generation, adapter execution, and lifecycle delivery together."""
+def test_project_hooks_are_discovered_and_block_a_real_tool_call(tmp_path):
+    """Exercise repo discovery, generation, adapter execution, and denial together."""
     codex = shutil.which("codex")
     if codex is None:
         pytest.skip("codex CLI is not installed")
@@ -68,28 +49,70 @@ def test_generated_lifecycle_hooks_run_in_isolated_codex_exec(tmp_path):
             with (Path(__file__).parent / "hook-events.jsonl").open(
                 "a", encoding="utf-8", newline=""
             ) as stream:
-                stream.write(json.dumps({"event": event}) + "\\n")
+                stream.write(
+                    json.dumps(
+                        {
+                            "event": event,
+                            "tool_name": payload.get("tool_name"),
+                            "tool_input": payload.get("tool_input"),
+                        }
+                    )
+                    + "\\n"
+                )
+
+            if event == "PreToolUse":
+                print(
+                    json.dumps(
+                        {
+                            "hookSpecificOutput": {
+                                "hookEventName": "PreToolUse",
+                                "permissionDecision": "deny",
+                                "permissionDecisionReason": (
+                                    "Expected smoke-test denial. Do not retry with another tool."
+                                ),
+                            }
+                        }
+                    )
+                )
+            else:
+                print("{}")
             """
         ),
         encoding="utf-8",
         newline="",
     )
+    handler = {
+        "hooks": [
+            {
+                "type": "command",
+                "command": 'python3 "${CLAUDE_PROJECT_DIR:-.}/hook-recorder.py"',
+            }
+        ]
+    }
     claude_settings = {
         "hooks": {
-            event: [
+            **{event: [handler] for event in ("SessionStart", "UserPromptSubmit", "Stop")},
+            "PreToolUse": [
                 {
+                    "matcher": "Bash",
                     "hooks": [
                         {
                             "type": "command",
-                            "command": ('python3 "${CLAUDE_PROJECT_DIR:-.}/hook-recorder.py"'),
+                            "command": 'python3 "${CLAUDE_PROJECT_DIR:-.}/hook-recorder.py"',
                         }
-                    ]
+                    ],
                 }
-            ]
-            for event in ("SessionStart", "UserPromptSubmit", "Stop")
+            ],
         }
     }
     generated = hook.to_codex_hooks(claude_settings)
+    codex_dir = tmp_path / ".codex"
+    codex_dir.mkdir()
+    (codex_dir / "hooks.json").write_text(
+        json.dumps(generated, indent=2) + "\n",
+        encoding="utf-8",
+        newline="",
+    )
 
     result = subprocess.run(
         [
@@ -101,12 +124,16 @@ def test_generated_lifecycle_hooks_run_in_isolated_codex_exec(tmp_path):
             "--ephemeral",
             "--ignore-user-config",
             "--ignore-rules",
-            *_inline_hook_overrides(generated),
             "--sandbox",
-            "read-only",
+            "workspace-write",
             "--color",
             "never",
-            "Reply with exactly CODEX_HOOK_SMOKE_OK. Do not call tools.",
+            (
+                "Use the shell tool exactly once to run a command that creates a file named "
+                "blocked-sentinel.txt in the current directory. Do not use apply_patch or any "
+                "other tool. The repository hook is expected to deny the shell call. After it "
+                "is denied, do not retry; reply with exactly CODEX_HOOK_BLOCKED_OK."
+            ),
         ],
         cwd=tmp_path,
         capture_output=True,
@@ -118,10 +145,13 @@ def test_generated_lifecycle_hooks_run_in_isolated_codex_exec(tmp_path):
     diagnostic = f"stdout:\n{result.stdout}\n\nstderr:\n{result.stderr}"
 
     assert result.returncode == 0, diagnostic
-    assert "CODEX_HOOK_SMOKE_OK" in result.stdout, diagnostic
+    assert "CODEX_HOOK_BLOCKED_OK" in result.stdout, diagnostic
+    assert not (tmp_path / "blocked-sentinel.txt").exists(), diagnostic
     events_path = tmp_path / "hook-events.jsonl"
     assert events_path.is_file(), diagnostic
-    events = {
-        json.loads(line)["event"] for line in events_path.read_text(encoding="utf-8").splitlines()
-    }
-    assert {"SessionStart", "UserPromptSubmit", "Stop"} <= events
+    records = [json.loads(line) for line in events_path.read_text(encoding="utf-8").splitlines()]
+    events = {record["event"] for record in records}
+    assert {"SessionStart", "UserPromptSubmit", "PreToolUse", "Stop"} <= events, diagnostic
+    assert any(
+        record["event"] == "PreToolUse" and record["tool_name"] == "Bash" for record in records
+    ), diagnostic

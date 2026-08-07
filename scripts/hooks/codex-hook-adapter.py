@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """Run a Claude-style command hook with Codex-compatible failure semantics.
 
-Claude command hooks use non-zero exit codes to block a tool or stop. Codex
-records those exits as hook failures and continues, so generated Codex hook
-wiring routes command handlers through this adapter. Successful stdout is
-preserved verbatim; failures become the structured JSON decision Codex expects.
+Claude command hooks commonly use non-zero exit codes to block a tool or stop.
+Codex supports exit code 2 for several lifecycle events, but not every shared hook
+uses that exact code or event-specific output contract. Generated Codex wiring
+therefore routes shared handlers through this adapter so any failure becomes the
+structured JSON decision for its event.
 
 The adapter also sets ``CLAUDE_PROJECT_DIR`` for shared hook scripts. Codex runs
 hook commands from the session cwd, which may be below the repository root.
