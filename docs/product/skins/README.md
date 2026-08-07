@@ -5,10 +5,15 @@
 Raw design documents for skins — inspiration, mood boards, rough specs.
 These are **your input**, written in whatever format makes sense.
 
+The briefs themselves live in `skins/` at the repo root. This file is the only
+description of the workflow; keep the table below in step with what is actually in
+that directory.
+
 ## Workflow
 
-1. Drop a design brief here: `skins/<name>.txt` or `skins/<name>.md`
-2. Ask the agent to translate it into `.claude/rules/skin-<name>.md`
+1. Drop a design brief in `skins/`: `skins/<name>.txt` or `skins/<name>.md`
+2. Ask the agent to translate it into `.claude/rules/skin-<name>.md` — the `add-skin`
+   skill does this end to end
 3. The agent follows the rule file when writing code in `frontend/src/skins/<name>/`
 
 ## Why two files?
@@ -25,6 +30,7 @@ The brief is source material — keep it for reference when iterating on the des
 
 | Brief | Rule file | Status |
 | --- | --- | --- |
-| `candy-shop.txt` | `.claude/rules/skin-candy-shop.md` | Ready |
-| _(carameli — no brief, rule file authored directly)_ | `.claude/rules/skin-carameli.md` | Ready |
-| _(barebone — no brief, minimal structural reference skin)_ | `.claude/rules/skin-barebone.md` | Ready |
+| `skins/barebone.txt` | `.claude/rules/skin-barebone.md` | Ready |
+| `skins/candy-shop.txt` | `.claude/rules/skin-candy-shop.md` | Ready |
+| `skins/carameli.txt` | `.claude/rules/skin-carameli.md` | Ready |
+| `skins/comic-book.txt` | `.claude/rules/skin-comic-book.md` | Ready |

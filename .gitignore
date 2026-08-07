@@ -48,6 +48,7 @@ env/
 .tox/
 .nox/
 .hypothesis/
+.benchmarks/
 .coverage
 .coverage.*
 htmlcov/
@@ -93,10 +94,9 @@ coverage.xml
 *.lcov
 .nyc_output/
 
-# Charts folder (generated diagrams)
-charts/
-
-# Local/generated material (durable documentation belongs in docs/)
+# Local/generated material (durable documentation belongs in docs/).
+# `.local/` is the single bucket for local-only material — hand-kept diagrams and
+# notes live in `.local/charts/`, so there is no separate root-level `charts/`.
 artifacts/
 .local/
 
@@ -104,10 +104,14 @@ artifacts/
 /carameli.code-workspace
 /carameli-b.code-workspace
 
-# Ensure any references or accidental copies of the VanillaLand tree are ignored
+# Ensure any accidental copies of the VanillaLand tree are ignored.
+# Directory-only (note every trailing slash): an unanchored `**/*VanillaLand*` also
+# matches plain files, and because Windows sets core.ignorecase it silently swallowed
+# `docs/reference/vanillaland-scope.md` — prose *about* the legacy tree is exactly what
+# this repo wants tracked. Ignore copies of the tree, not writing about it.
 VanillaLand/
 **/VanillaLand/
-**/*VanillaLand*
+**/*VanillaLand*/
 
 # Playwright
 /test-results/

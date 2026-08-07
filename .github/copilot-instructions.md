@@ -19,12 +19,10 @@ Rules:
 
 ## Session Archive
 
-At the end of each significant work session, archive a git-based summary by
-running this command in the terminal:
+Removed 2026-08-07. This section used to tell you to run
+`scripts/hooks/archive-session-copilot.py`, but that script and its sibling
+`archive-session.py` had already been deleted, so the command failed and the
+`logs/agent/` directory it wrote to went stale — 127 dumps, nothing reading them.
 
-```bash
-pwsh -ExecutionPolicy Bypass -Command "python scripts/hooks/archive-session-copilot.py 'brief description'"
-```
-
-Or use the **"Agent: Archive Copilot Session"** VS Code task.
-This writes a JSON summary to `logs/agent/` for post-mortem analysis.
+There is no session-archive step. Do not recreate one here without a writer to go
+with it.

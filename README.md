@@ -77,7 +77,8 @@ Setup, from the primary checkout:
 git worktree add ../carameli-b <branch-name>
 cd ../carameli-b
 cp ../carameli/.env .env            # then edit — see below
-uv venv && uv pip sync requirements-dev.txt   # hardlinks from uv's global cache
+uv venv --python 3.12                         # MUST match the Dockerfile + locks
+uv pip sync requirements-dev.txt              # hardlinks from uv's global cache
 docker compose up -d                # slim stack on offset ports
 ```
 

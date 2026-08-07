@@ -22,6 +22,10 @@ EXPECTED_TOPOLOGY = {
                     "scripts/hooks/codex-hook-adapter.py",
                     "scripts/hooks/codex-session-start.py",
                 ),
+                (
+                    "scripts/hooks/codex-hook-adapter.py",
+                    "scripts/prune-logs.py",
+                ),
             ),
         ),
     ),

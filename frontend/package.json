@@ -9,8 +9,6 @@
     "preview": "vite preview",
     "test": "vitest",
     "test:run": "vitest run",
-    "test:e2e": "playwright test",
-    "test:e2e:headed": "playwright test --headed",
     "lint": "npm run lint:eslint && npm run lint:types && npm run lint:css && npm run lint:spelling",
     "lint:eslint": "eslint src --ext .js,.jsx,.ts,.tsx --format stylish",
     "lint:types": "tsc --noEmit --pretty false",

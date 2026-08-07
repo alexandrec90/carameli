@@ -24,6 +24,7 @@ Filtering / artifact format live in `scripts/diagnostics.py` (shared with
 import math
 import os
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -265,7 +266,7 @@ def parse_testmon_selection(dual_out: str) -> tuple[int, int]:
     return selected, total
 
 
-USAGE = """usage: python scripts/run-tests.py [--changed] [--all] [--target <name>]
+USAGE = """usage: python scripts/run-tests.py [--changed] [--all] [--target <name>] [PATH ...]
 
   (no args)        full backend suite (in-container xdist locally; direct on CI)
   --changed        changed-only via testmon, xdist fallback (default suite only)
@@ -273,6 +274,9 @@ USAGE = """usage: python scripts/run-tests.py [--changed] [--all] [--target <nam
   --all            every FREE target (pytest, hook-tests, frontend-tests)
   --target <name>  one of: pytest, hook-tests, frontend-tests, webhook-e2e,
                    telnyx-sandbox, telnyx-chargeable, live-e2e
+  PATH ...         pytest targets (file, dir, or path::node_id); overrides the
+                   suite selection. This is how the vendored Stop hook invokes
+                   the runner.
 
 Failures are written to logs/test-failures.log (frontend split out on CI)."""
 
@@ -282,11 +286,22 @@ def help_requested(argv: list[str]) -> bool:
     return "-h" in argv or "--help" in argv
 
 
-def parse_cli_args(argv: list[str]) -> tuple[bool, str | None]:
-    """Return (`changed`, `target`) from the CLI args.
+def parse_cli_args(argv: list[str]) -> tuple[bool, str | None, list[str]]:
+    """Return (`changed`, `target`, `paths`) from the CLI args.
 
-    Raises ValueError on any unrecognized argument — an unknown flag falling
-    through must never start the default full-suite run.
+    Raises ValueError on any unrecognized *flag* — an unknown flag falling
+    through must never start the default full-suite run. Non-flag arguments are
+    pytest targets (paths or `path::node_id`), not errors: the vendored Stop hook
+    invokes this script as `[run-tests.py, *targets]` (`stop.py`'s
+    `test_runner_argv`), because its fallback path is a bare `-m pytest`, which
+    takes paths. A runner that rejects them makes the Stop gate fail with
+    "Unknown argument: tests/..." — a message about *this script's* CLI, for a
+    test file that is perfectly fine — and the agent then debugs the wrong thing.
+
+    This is the second instance of that same mismatch; see the `--changed`/`--fast`
+    note below for the first. Both come from the vendored hook and the project
+    runner disagreeing about the calling convention, so both fixes belong here, in
+    the project-owned half.
 
     `--changed` is the canonical spelling, shared with devkit and every generated
     project so the one workspace-level "Test: Run Suite" task works everywhere.
@@ -299,6 +314,7 @@ def parse_cli_args(argv: list[str]) -> tuple[bool, str | None]:
     """
     changed = False
     target: str | None = None
+    paths: list[str] = []
 
     i = 0
     while i < len(argv):
@@ -312,11 +328,13 @@ def parse_cli_args(argv: list[str]) -> tuple[bool, str | None]:
         elif arg == "--target" and i + 1 < len(argv):
             target = argv[i + 1]
             i += 1
-        else:
+        elif arg.startswith("-"):
             raise ValueError(f"Unknown argument: {arg}")
+        else:
+            paths.append(arg)
         i += 1
 
-    return changed, target
+    return changed, target, paths
 
 
 def pick_fast_command() -> str:
@@ -335,6 +353,35 @@ def pick_fast_command() -> str:
         return _PYTEST_XDIST_NOSELECT
     print(f"  testmon: {selected}/{total} tests selected")
     return _PYTEST_TESTMON
+
+
+def scoped_pytest_command(paths: list[str]) -> str:
+    """The in-container pytest command for an explicit target list. Pure.
+
+    Serial (no `-n auto`): a handful of named files is slower under xdist's worker
+    startup than without it. `_ADDOPTS` is repeated for the same reason it is in
+    `_PYTEST_TESTMON` — `-o addopts=` REPLACES pytest.ini's value, so omitting it
+    would silently re-admit the paid tiers the global `-m "not paid"` excludes.
+    """
+    quoted = " ".join(shlex.quote(p.replace("\\", "/")) for p in paths)
+    return f"pytest -v --tb=short --no-header --color=no -o addopts='{_ADDOPTS}' {quoted}"
+
+
+def ci_scoped_argv(paths: list[str]) -> list[str]:
+    """Direct (non-container) pytest argv for explicit targets on CI. Pure.
+
+    CI runs the app code on the runner, so it must not go through
+    `docker compose exec` the way `run_local` does.
+    """
+    return ["python", "-m", "pytest", *paths, "-v", "--tb=short", "--no-header", "--color=no"]
+
+
+def run_scoped(paths: list[str]) -> dict[str, tuple[list[str], int]]:
+    """Run pytest against an explicit target list, in-container or direct per env."""
+    print(f"\nRunning pytest -- scoped ({len(paths)} target(s)) ...")
+    if IS_CI:
+        return {"pytest": run_argv(ci_scoped_argv(paths))}
+    return {"pytest": run_argv(_in_container(scoped_pytest_command(paths)))}
 
 
 def run_local(changed: bool) -> dict[str, tuple[list[str], int]]:
@@ -424,7 +471,7 @@ def main() -> int:
         print(USAGE)
         return 0
     try:
-        changed, target = parse_cli_args(sys.argv[1:])
+        changed, target, paths = parse_cli_args(sys.argv[1:])
     except ValueError as exc:
         print(exc, file=sys.stderr)
         print(USAGE, file=sys.stderr)
@@ -441,14 +488,24 @@ def main() -> int:
             file=sys.stderr,
         )
         return 2
+    if paths and target and target != "pytest":
+        print(
+            "Explicit test paths only apply to the default pytest suite or --target pytest.",
+            file=sys.stderr,
+        )
+        return 2
 
     label = "scripts/run-tests.py (CI)" if IS_CI else "scripts/run-tests.py (local)"
 
     artifact = REPO_ROOT / "logs" / "test-failures.log"
     target_line = [f"Target   : {target}"] if target else []
+    if paths:
+        target_line.append(f"Scope    : {len(paths)} explicit target(s)")
     script_common.print_suite_header("Test Suite", artifact, target_line)
 
-    if target == "all":
+    if paths:
+        results = run_scoped(paths)
+    elif target == "all":
         results = run_all()
     elif target:
         results = run_named_target(target)
