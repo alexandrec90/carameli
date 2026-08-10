@@ -14,16 +14,6 @@
         ]
       }
     ],
-    "UserPromptSubmit": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python3 \"$(git rev-parse --show-toplevel)/scripts/hooks/codex-hook-adapter.py\" --event UserPromptSubmit -- python3 \"$(git rev-parse --show-toplevel)/scripts/hooks/branch-per-task.py\""
-          }
-        ]
-      }
-    ],
     "PreToolUse": [
       {
         "matcher": "Bash",

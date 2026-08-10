@@ -1,42 +1,50 @@
 name: Dependabot auto-merge
 
-# Auto-merges Dependabot PRs once the PR Gate passes:
+# Merges Dependabot PRs once the PR Gate has passed on them:
 #   - patch/minor bumps of anything
-#   - major bumps where every updated dependency is a devDependency
-#     (dev tooling can only break CI, and the PR Gate just verified CI)
-# Majors that touch a runtime (production or transitive) dependency are
-# labelled `needs-manual-merge` and stay open for review.
+#   - major bumps where EVERY updated dependency is a development dependency (dev
+#     tooling can only break CI, and the gate is what just passed)
+# Anything else — a major touching a runtime or transitive dependency, or an update
+# type Dependabot did not classify — is labelled `needs-manual-merge` and left open.
 #
-# This repo is on a plan without branch protection, so GitHub's native
-# "auto-merge" (which gates on required checks) is unavailable. Instead we
-# split the work in two:
+# These repos have no branch protection, so GitHub's native auto-merge (which gates on
+# *required* checks) is unavailable. The work is split in two instead:
 #
-#   1. classify (on the PR itself) reads dependabot/fetch-metadata's
-#      per-dependency JSON and labels the PR `automerge` or
-#      `needs-manual-merge` per the policy above.
-#   2. merge (on PR Gate completion) merges the PR — but only if PR Gate
-#      succeeded on the PR's current head AND the PR carries the `automerge`
-#      label.
+#   1. classify runs on the PR itself and labels it from dependabot/fetch-metadata's
+#      per-dependency JSON.
+#   2. merge runs when the PR Gate completes and merges only if the gate succeeded
+#      on the PR's CURRENT head and the PR carries the `automerge` label.
 #
-# Repaired pip branches never reach the merge job here: a PR Gate run
-# dispatched with GITHUB_TOKEN emits no workflow_run event (GitHub's
-# recursion guard), so dependabot-lock-repair.yml watches the run it
-# dispatched and merges the PR itself.
+# Both halves are needed because a `pull_request` job cannot wait for another
+# workflow, and a `workflow_run` job has no Dependabot metadata to read.
 #
-# If an auto-mergeable bump fails PR Gate, it simply stays open with its
-# `automerge` label and no merge happens.
+# If an auto-mergeable bump fails the gate, nothing happens: the PR simply stays
+# open with its `automerge` label.
+#
+# NB: `workflow_run` only ever runs the copy of this file on the default branch. A
+# change here is inert until it lands there — including while its own PR is open.
+#
+# THIS FILE IS VENDORED from devkit (`sync-devkit.py`'s MANIFEST) and is byte-identical
+# in every project. That is only possible because nothing in it is project-specific:
+# `on.pull_request` carries no `branches:` filter (the classify job is already
+# restricted to Dependabot's own PRs, so narrowing by branch would only add a name that
+# differs per repo), and the workflow it waits on is titled `PR Gate` everywhere. Keep
+# it that way — a local edit here is reported as drift by the PR gate rather than
+# quietly becoming one project's private opinion.
 
 on:
   pull_request:
-    branches: [master]
   workflow_run:
     workflows: ["PR Gate"]
     types: [completed]
 
-# Elevated permissions are honoured for Dependabot-triggered runs when set
-# explicitly here (the default token is read-only for Dependabot).
+# Dependabot-triggered runs get a read-only token unless the workflow asks for more
+# explicitly, here. `issues: write` is for the labels, not for issues: labels live on
+# the issues API, and `gh pr edit --add-label` fails outright on a label the repo does
+# not have yet — which is every repo on its first Dependabot PR.
 permissions:
   contents: write
+  issues: write
   pull-requests: write
 
 jobs:
@@ -57,12 +65,24 @@ jobs:
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # This job deliberately does not check out the repo — it needs no files, and
+          # the metadata comes from the event. But `gh` falls back to reading the repo
+          # from `git remote` when it is not told one, so without GH_REPO every call
+          # here dies on "fatal: not a git repository" before it does any work.
+          GH_REPO: ${{ github.repository }}
           UPDATED_DEPS_JSON: ${{ steps.meta.outputs.updated-dependencies-json }}
         run: |
           set -euo pipefail
-          # Automerge only when every updated dependency is a patch/minor, or
-          # a major confined to devDependencies. Unknown update types fall
-          # through to manual review.
+          # `--force` makes this idempotent AND makes the workflow work on a repo
+          # that has never carried these labels. Without it the first Dependabot PR
+          # fails here, on a missing label, not on anything real.
+          gh label create automerge --color 0e8a16 --force \
+            --description "Dependabot bump this workflow may merge once the gate passes"
+          gh label create needs-manual-merge --color d93f0b --force \
+            --description "Dependabot bump that needs a human before it merges"
+          # Every updated dependency must qualify, not just the headline one: a
+          # single PR can carry several. `all` over an empty list is true, so the
+          # length guard is what stops an empty payload from merging itself.
           label=$(jq -r '
             if length > 0 and all(.[];
                 .updateType == "version-update:semver-patch" or
@@ -83,7 +103,7 @@ jobs:
       github.event.workflow_run.actor.login == 'dependabot[bot]'
     runs-on: ubuntu-latest
     steps:
-      - name: Merge auto-mergeable PR for this branch
+      - name: Merge the auto-mergeable PR for this branch
         env:
           HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
           RUN_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
@@ -97,20 +117,22 @@ jobs:
             echo "No open PR for branch '$HEAD_BRANCH'; nothing to merge."
             exit 0
           fi
-          number=$(echo "$pr" | jq -r '.number')
-          author=$(echo "$pr" | jq -r '.author.login')
-          head_sha=$(echo "$pr" | jq -r '.headRefOid')
+          number=$(jq -r '.number' <<<"$pr")
+          author=$(jq -r '.author.login' <<<"$pr")
+          head_sha=$(jq -r '.headRefOid' <<<"$pr")
+          # The workflow_run event carries a branch name, not a PR, so re-derive the
+          # PR and re-check every guard here. Trusting the event alone would let a
+          # human push to a `dependabot/` branch and inherit the merge.
           if [ "$author" != "app/dependabot" ]; then
             echo "PR #$number is not authored by Dependabot; refusing to merge."
             exit 1
           fi
           if [ "$head_sha" != "$RUN_HEAD_SHA" ]; then
-            echo "PR #$number moved past the gated commit $RUN_HEAD_SHA; the newer head's own PR Gate run owns it."
+            echo "PR #$number moved past the gated commit $RUN_HEAD_SHA; the newer head's own gate run owns it."
             exit 0
           fi
-          has_automerge=$(echo "$pr" | jq -r '[.labels[].name] | index("automerge") // empty')
-          if [ -z "$has_automerge" ]; then
-            echo "PR #$number is not labelled 'automerge' (likely a runtime major); leaving for manual review."
+          if [ -z "$(jq -r '[.labels[].name] | index("automerge") // empty' <<<"$pr")" ]; then
+            echo "PR #$number is not labelled 'automerge' (likely a runtime major); leaving it for review."
             exit 0
           fi
           echo "PR Gate passed and PR #$number is auto-mergeable; merging."
