@@ -1,3 +1,11 @@
+# This file is carameli's own. devkit ships a `templates/` copy that syncs the project
+# from a committed `uv.lock`; carameli has no `pyproject.toml` and installs from the
+# compiled `requirements*.txt` locks instead, so the install steps below are rewritten
+# and no devkit fix to them will ever arrive here. That is the supported arrangement —
+# devkit vendored this action in v0.7.0, broke on the first pull that reached a
+# pip-tools consumer, and un-vendored it in v0.8.0 (`MANIFEST` in
+# `scripts/sync-devkit.py` carries the history). Do not replace these steps with
+# `uv sync`: there is nothing for it to sync from.
 name: Set up Python env
 description: >-
   Set up Python 3.12 with pip caching and install the compiled runtime + dev
@@ -16,7 +24,7 @@ inputs:
 runs:
   using: composite
   steps:
-    - uses: actions/setup-python@v6
+    - uses: actions/setup-python@v7
       with:
         python-version: "3.12"
     - name: Install uv (version from the compiled dev lock)
