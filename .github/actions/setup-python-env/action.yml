@@ -1,41 +1,42 @@
-name: Set up the Python toolchain
+# This file is carameli's own. devkit ships a `templates/` copy that syncs the project
+# from a committed `uv.lock`; carameli has no `pyproject.toml` and installs from the
+# compiled `requirements*.txt` locks instead, so the install steps below are rewritten
+# and no devkit fix to them will ever arrive here. That is the supported arrangement —
+# devkit vendored this action in v0.7.0, broke on the first pull that reached a
+# pip-tools consumer, and un-vendored it in v0.8.0 (`MANIFEST` in
+# `scripts/sync-devkit.py` carries the history). Do not replace these steps with
+# `uv sync`: there is nothing for it to sync from.
+name: Set up Python env
 description: >-
-  Install Python and uv, then sync the project from its committed uv.lock. The
-  repository must already be checked out — a local composite action is loaded from
-  the workspace — so callers keep their own actions/checkout step, whose arguments
-  (ref, fetch-depth) differ per job.
+  Set up Python 3.12 with pip caching and install the compiled runtime + dev
+  locks. The repository must already be checked out (a local composite action
+  runs from the workspace), so callers keep their own actions/checkout step —
+  its args (ref, fetch-depth) differ per job.
 
 inputs:
-  python-version:
+  extra-packages:
     description: >-
-      Python version to install. The default is a floor, not this project's version —
-      this file is vendored byte-identical from devkit, so it cannot know one. A
-      generated project's gate passes its own `python_version` explicitly at every
-      call site for exactly that reason; a project that moves off 3.12 and relies on
-      the default here would provision the wrong interpreter without failing.
+      Space-separated extra packages to install after the locks (e.g. "mutmut"
+      for the weekly mutation job). Empty by default.
     required: false
-    default: "3.12"
+    default: ""
 
 runs:
   using: composite
   steps:
     - uses: actions/setup-python@v7
       with:
-        python-version: ${{ inputs.python-version }}
-    - name: Install uv
+        python-version: "3.12"
+    - name: Install uv (version from the compiled dev lock)
       shell: bash
-      run: pip install uv
-    - name: Sync the project from uv.lock
-      # The same command `.claude/hooks/session-start.sh` runs, against the same
-      # committed lock — so a job provisions the way a session does, and a lock that
-      # cannot resolve fails here rather than in someone's sandbox.
-      #
-      # Both flags, always. They are each a no-op in one of the two shapes this
-      # action serves: devkit declares a PEP 735 `dev` dependency-group and no
-      # extras, a generated project declares a `dev` extra and no groups. Passing
-      # both is what lets one action cover them without an input nobody would
-      # remember to set. mypy comes along either way, which matters — devkit's own
-      # `lint-all.py` skips linters it cannot import, so omitting it would silently
-      # drop type-checking rather than fail.
+      run: |
+        set -euo pipefail
+        uv_version=$(sed -nE 's/^uv==([^ ;]+).*/\1/p' requirements-dev.txt | head -n 1)
+        if [[ ! "$uv_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+([a-zA-Z0-9.-]+)?$ ]]; then
+          echo "requirements-dev.txt does not contain a valid uv pin" >&2
+          exit 1
+        fi
+        python -m pip install --disable-pip-version-check "uv==$uv_version"
+    - name: Install Python dependencies with uv
       shell: bash
-      run: uv sync --all-extras --all-groups
+      run: uv pip install --system -r requirements.txt -r requirements-dev.txt ${{ inputs.extra-packages }}

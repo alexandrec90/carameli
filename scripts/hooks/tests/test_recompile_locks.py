@@ -1,5 +1,6 @@
 """Tests for universal lock recompilation and its Dependabot workflow."""
 
+import re
 from types import SimpleNamespace
 
 from conftest import REPO_ROOT, load_module
@@ -185,6 +186,11 @@ def test_automerge_merge_job_only_trusts_dependabot_gate_on_current_head():
     assert "github.event.workflow_run.event == 'pull_request'" in workflow
     assert "github.event.workflow_run.actor.login == 'dependabot[bot]'" in workflow
     assert "RUN_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}" in workflow
-    assert "head_sha=$(echo \"$pr\" | jq -r '.headRefOid')" in workflow
+    # The compared SHA has to be re-derived from the PR's CURRENT head, not taken
+    # from the event. Assert that property, not one shell idiom for it: this file is
+    # vendored from devkit now, and its copy reads `.headRefOid` through a here-string
+    # where carameli's own copy piped `echo "$pr"`. Pinning the spelling made the
+    # guard's arrival from upstream look like the guard going missing.
+    assert re.search(r"head_sha=\$\(.*\.headRefOid.*\)", workflow)
     assert '[ "$author" != "app/dependabot" ]' in workflow
     assert '[ "$head_sha" != "$RUN_HEAD_SHA" ]' in workflow

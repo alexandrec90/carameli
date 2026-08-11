@@ -29,17 +29,10 @@ EXPECTED_TOPOLOGY = {
             ),
         ),
     ),
-    "UserPromptSubmit": (
-        (
-            "",
-            (
-                (
-                    "scripts/hooks/codex-hook-adapter.py",
-                    "scripts/hooks/branch-per-task.py",
-                ),
-            ),
-        ),
-    ),
+    # No `UserPromptSubmit`. It ran `branch-per-task.py`, which devkit retired in
+    # v0.7.0: cutting the task branch *inside* the checkout the session was in is what
+    # let a checkout outlive its task. `worktree-guard.py` routes the same edit into an
+    # ephemeral box instead, so there is no prompt-time handler left to mirror.
     "PreToolUse": (
         (
             "Bash",
