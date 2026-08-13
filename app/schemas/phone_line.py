@@ -5,7 +5,14 @@ import re
 import uuid
 from datetime import UTC, datetime
 
-from pydantic import BaseModel, Field, field_serializer, field_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    field_serializer,
+    field_validator,
+    model_validator,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -86,3 +93,64 @@ class SetAutoAttendantRequest(BaseModel):
     phone_number: str
     enabled: bool
     max_digits: int | None = Field(default=None, ge=1, le=9)
+
+
+# --- Carameli-native REST (/api/v1) -------------------------------------------------
+# One resource, real status codes, no success-in-body envelope. The four legacy verbs
+# (Deactivate, UpdateCallRecording, SetAutoAttendant, VsMessaging/Sms/Enable|Disable)
+# collapse into a single PATCH; `CarameliClient` reconstructs the CMV shapes.
+
+
+class CreatePhoneLineRequest(BaseModel):
+    """Provision a DID, either a named number or the first free one in an area code."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    phone_number: str | None = Field(default=None, min_length=1)
+    area_code: str | None = Field(default=None, min_length=1)
+    country_code: str = Field(default="US", min_length=2, max_length=2, pattern=r"^[A-Za-z]{2}$")
+    vs_customer_id: int | None = Field(default=None, ge=1, le=2147483647)
+
+    @field_validator("country_code")
+    @classmethod
+    def validate_country_code(cls, v: str) -> str:
+        return _validate_country_code(v)
+
+    @model_validator(mode="after")
+    def exactly_one_selector(self) -> CreatePhoneLineRequest:
+        if bool(self.phone_number) == bool(self.area_code):
+            raise ValueError("provide exactly one of phone_number or area_code")
+        return self
+
+
+class UpdatePhoneLineRequest(BaseModel):
+    """PATCH body; every field is optional and only the ones sent are applied.
+
+    ``active`` accepts ``false`` only — releasing a DID at the carrier is not
+    reversible from here, so re-activation is a new provisioning request.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    sms_enabled: bool | None = None
+    recording_enabled: bool | None = None
+    auto_attendant_enabled: bool | None = None
+    auto_attendant_max_digits: int | None = Field(default=None, ge=1, le=9)
+    active: bool | None = None
+
+    @model_validator(mode="after")
+    def validate_transitions(self) -> UpdatePhoneLineRequest:
+        fields = self.model_fields_set
+        if not fields:
+            raise ValueError("at least one field must be provided")
+        if self.active is True:
+            raise ValueError("active cannot be set back to true; provision a new line instead")
+        if self.auto_attendant_enabled is True and self.auto_attendant_max_digits is None:
+            raise ValueError(
+                "auto_attendant_max_digits is required when auto_attendant_enabled is true"
+            )
+        return self
+
+
+class PhoneLineListResponse(BaseModel):
+    phone_lines: list[PhoneLineResponse]

@@ -10,6 +10,7 @@ import pytest
 from app.core.config import settings
 from app.services import call_sync
 from app.services.call_sync import _run_scheduled_job, retry_unposted_events
+from tests.conftest import notify_payload
 
 pytestmark = pytest.mark.asyncio(loop_scope="session")
 
@@ -102,8 +103,11 @@ async def test_retry_posts_incoming_call_contract_and_marks_posted(monkeypatch) 
     mock_http.post.assert_awaited_once()
     call = mock_http.post.call_args
     assert call.args[0] == "http://vs.example.com/cloudliapi/notify/IncomingCall"
-    assert call.kwargs["headers"] == {"X-Cloudli-Auth": "cloudli-secret"}
-    payload = call.kwargs["json"]
+    assert call.kwargs["headers"] == {
+        "Content-Type": "application/json",
+        "X-Cloudli-Auth": "cloudli-secret",
+    }
+    payload = notify_payload(call)
     assert payload["callId"] == "CA001"
     assert payload["eventName"] == "callHungup"
     assert payload["isInbound"] is False
@@ -132,7 +136,7 @@ async def test_retry_posts_all_terminal_statuses(monkeypatch, status: str) -> No
         await retry_unposted_events(_CTX)
 
     mock_http.post.assert_awaited_once()
-    assert mock_http.post.call_args.kwargs["json"]["eventName"] == "callHungup"
+    assert notify_payload(mock_http.post.call_args)["eventName"] == "callHungup"
     mock_repo.mark_posted.assert_awaited_once_with(event.id)
 
 

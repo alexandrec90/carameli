@@ -25,6 +25,18 @@ async def get_used_numbers(session: AsyncSession, customer_id: uuid.UUID) -> set
     return await ExtensionRepo(session).get_used_numbers(customer_id)
 
 
+async def get_all_for_customer(session: AsyncSession, customer_id: uuid.UUID) -> list[Extension]:
+    return await ExtensionRepo(session).get_all_for_customer(customer_id)
+
+
+async def create_many(
+    session: AsyncSession,
+    customer_id: uuid.UUID,
+    extensions: list[tuple[str, str]],
+) -> list[Extension]:
+    return await ExtensionRepo(session).create_many(customer_id, extensions)
+
+
 async def create(
     session: AsyncSession,
     customer_id: uuid.UUID,

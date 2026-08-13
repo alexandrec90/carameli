@@ -35,6 +35,34 @@ class ExtensionRepo:
         await self.session.refresh(ext)
         return ext
 
+    async def create_many(
+        self,
+        customer_id: uuid.UUID,
+        extensions: list[tuple[str, str]],
+    ) -> list[Extension]:
+        """Create every ``(extension_number, sip_username)`` pair in one transaction.
+
+        The legacy client looped a single-create call over a start..end range and
+        returned failure on the first error, leaving extensions 1..k created and
+        reporting total failure. One commit for the whole range makes that partial
+        state impossible.
+        """
+        rows = [
+            Extension(
+                customer_id=customer_id,
+                extension_number=extension_number,
+                sip_username=sip_username,
+                sip_credential_sid=None,
+                sip_domain_sid=None,
+            )
+            for extension_number, sip_username in extensions
+        ]
+        self.session.add_all(rows)
+        await self.session.commit()
+        for row in rows:
+            await self.session.refresh(row)
+        return rows
+
     async def get_by_number(
         self, customer_id: uuid.UUID, extension_number: str
     ) -> Extension | None:

@@ -1,6 +1,10 @@
 from __future__ import annotations
 
+import hashlib
+import hmac
+import json
 import logging
+import time
 from datetime import UTC, datetime
 from typing import Any
 
@@ -122,10 +126,44 @@ def _truncate(text: str, limit: int = 2000) -> str:
     return text[:limit] + "...[truncated]"
 
 
-def _headers() -> dict[str, str]:
-    if not settings.vanillasoft_webhook_secret:
-        return {}
-    return {"X-Cloudli-Auth": settings.vanillasoft_webhook_secret}
+SIGNATURE_HEADER = "X-Carameli-Signature"
+
+# Replay window the receiver should enforce on the `t=` element, stated here because
+# Carameli is the side that picks it. Mirrors the 300 s window Carameli already applies
+# to Telnyx's signed callbacks.
+SIGNATURE_TOLERANCE_SECONDS = 300
+
+
+def sign_payload(body: bytes, timestamp: int, secret: str) -> str:
+    """Build the `X-Carameli-Signature` value for an outbound notification.
+
+    `t=<unix seconds>,v1=<hex HMAC-SHA256 of "<t>." + body>`. The timestamp is inside
+    the MAC, so a captured request cannot be replayed with a fresh one.
+    """
+    mac = hmac.new(secret.encode(), f"{timestamp}.".encode() + body, hashlib.sha256).hexdigest()
+    return f"t={timestamp},v1={mac}"
+
+
+def _headers(body: bytes, timestamp: int | None = None) -> dict[str, str]:
+    """Headers for a notify POST.
+
+    Carameli signs with its **own** secret rather than reusing Cloudli's static
+    `X-Cloudli-Auth` value: one shared secret across two vendors means rotating either
+    rotates both, and a leaked Cloudli secret authenticates as Carameli. The legacy
+    header is still sent while `CloudliController` is the receiver, so staging can adopt
+    signing without a flag day — drop `VANILLASOFT_WEBHOOK_SECRET` once the Carameli
+    controller verifies signatures.
+    """
+    headers = {"Content-Type": "application/json"}
+    if settings.vanillasoft_webhook_secret:
+        headers["X-Cloudli-Auth"] = settings.vanillasoft_webhook_secret
+    if settings.carameli_notify_secret:
+        headers[SIGNATURE_HEADER] = sign_payload(
+            body,
+            int(time.time()) if timestamp is None else timestamp,
+            settings.carameli_notify_secret,
+        )
+    return headers
 
 
 def _notify_url(path: str) -> str:
@@ -140,12 +178,16 @@ async def post_notification(path: str, payload: dict[str, Any]) -> bool:
     if not settings.vanillasoft_webhook_url:
         return False
     url = _notify_url(path)
+    # Serialize once and post the exact bytes that were signed. Handing httpx `json=`
+    # would let it re-serialize, and a signature over a different encoding of the same
+    # object is a signature the receiver cannot reproduce.
+    body = json.dumps(payload, separators=(",", ":")).encode()
     try:
         async with httpx.AsyncClient() as client:
             # 30 s: the honest receiver (phase 02) processes synchronously and the
             # VanillaSoftWS SOAP hop can be slow; slower than that is a
             # VanillaSoft-side bug to fix there, not a reason to shorten this.
-            resp = await client.post(url, json=payload, headers=_headers(), timeout=30.0)
+            resp = await client.post(url, content=body, headers=_headers(body), timeout=30.0)
     except Exception:
         logger.exception("VanillaSoft notify POST failed path=%s", path)
         return False

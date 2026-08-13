@@ -3,7 +3,11 @@ CloudliApi model shapes (IncomingCall.cs, CallRecording.cs, SmsMessage.cs)."""
 
 from __future__ import annotations
 
+import hashlib
+import hmac
+import json
 import logging
+import time
 import uuid
 from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -205,6 +209,7 @@ async def test_post_notification_unconfigured_returns_false(monkeypatch) -> None
 async def test_post_notification_sends_cloudli_auth_header(monkeypatch) -> None:
     monkeypatch.setattr(settings, "vanillasoft_webhook_url", "http://vs.example.com/api/")
     monkeypatch.setattr(settings, "vanillasoft_webhook_secret", "shared-secret")
+    monkeypatch.setattr(settings, "carameli_notify_secret", None)
     http = _mock_http()
     with patch("app.services.vanillasoft_notify.httpx.AsyncClient", return_value=http):
         ok = await vanillasoft_notify.post_notification(
@@ -213,8 +218,107 @@ async def test_post_notification_sends_cloudli_auth_header(monkeypatch) -> None:
     assert ok is True
     call = http.post.call_args
     assert call.args[0] == "http://vs.example.com/api/notify/IncomingCall"
-    assert call.kwargs["headers"] == {"X-Cloudli-Auth": "shared-secret"}
-    assert call.kwargs["json"] == {"a": 1}
+    assert call.kwargs["headers"] == {
+        "Content-Type": "application/json",
+        "X-Cloudli-Auth": "shared-secret",
+    }
+    # The body is pre-serialized so the signed bytes and the sent bytes are the same
+    # object; `json=` would hand httpx the chance to encode it differently.
+    assert json.loads(call.kwargs["content"]) == {"a": 1}
+
+
+# ── outbound signing (phase 06) ────────────────────────────────────────────
+
+
+async def test_sign_payload_is_reproducible_by_a_receiver() -> None:
+    body = b'{"callId":"CA1"}'
+    value = vanillasoft_notify.sign_payload(body, 1_700_000_000, "carameli-secret")
+    assert value.startswith("t=1700000000,v1=")
+    expected = hmac.new(b"carameli-secret", b"1700000000." + body, hashlib.sha256).hexdigest()
+    assert value == f"t=1700000000,v1={expected}"
+
+
+async def test_sign_payload_covers_the_timestamp() -> None:
+    """The timestamp is inside the MAC, so a captured POST cannot be replayed with a
+    fresh `t=`."""
+    body = b'{"callId":"CA1"}'
+    a = vanillasoft_notify.sign_payload(body, 1_700_000_000, "s")
+    b = vanillasoft_notify.sign_payload(body, 1_700_000_001, "s")
+    assert a.split("v1=")[1] != b.split("v1=")[1]
+
+
+async def test_sign_payload_differs_per_secret() -> None:
+    body = b'{"callId":"CA1"}'
+    cloudli = vanillasoft_notify.sign_payload(body, 1_700_000_000, "cloudli-secret")
+    carameli = vanillasoft_notify.sign_payload(body, 1_700_000_000, "carameli-secret")
+    assert cloudli != carameli
+
+
+async def test_post_notification_signs_with_carameli_own_secret(monkeypatch) -> None:
+    monkeypatch.setattr(settings, "vanillasoft_webhook_url", "http://vs.example.com")
+    monkeypatch.setattr(settings, "vanillasoft_webhook_secret", "shared-secret")
+    monkeypatch.setattr(settings, "carameli_notify_secret", "carameli-secret")
+    http = _mock_http()
+    with patch("app.services.vanillasoft_notify.httpx.AsyncClient", return_value=http):
+        await vanillasoft_notify.post_notification(
+            vanillasoft_notify.INCOMING_CALL_PATH, {"callId": "CA1"}
+        )
+    call = http.post.call_args
+    signature = call.kwargs["headers"][vanillasoft_notify.SIGNATURE_HEADER]
+    timestamp, mac = signature.split(",")
+    ts = int(timestamp.removeprefix("t="))
+
+    # Verify exactly as the receiver would: over the bytes that were actually sent.
+    expected = hmac.new(
+        b"carameli-secret", f"{ts}.".encode() + call.kwargs["content"], hashlib.sha256
+    ).hexdigest()
+    assert mac == f"v1={expected}"
+    # Not signed with Cloudli's shared value — that is the whole point of the split.
+    assert (
+        mac
+        != "v1="
+        + hmac.new(
+            b"shared-secret", f"{ts}.".encode() + call.kwargs["content"], hashlib.sha256
+        ).hexdigest()
+    )
+
+
+async def test_post_notification_signature_timestamp_is_current(monkeypatch) -> None:
+    monkeypatch.setattr(settings, "vanillasoft_webhook_url", "http://vs.example.com")
+    monkeypatch.setattr(settings, "vanillasoft_webhook_secret", None)
+    monkeypatch.setattr(settings, "carameli_notify_secret", "carameli-secret")
+    http = _mock_http()
+    before = int(time.time())
+    with patch("app.services.vanillasoft_notify.httpx.AsyncClient", return_value=http):
+        await vanillasoft_notify.post_notification(vanillasoft_notify.INCOMING_CALL_PATH, {})
+    signature = http.post.call_args.kwargs["headers"][vanillasoft_notify.SIGNATURE_HEADER]
+    ts = int(signature.split(",")[0].removeprefix("t="))
+    assert before <= ts <= int(time.time())
+
+
+async def test_post_notification_omits_signature_when_unconfigured(monkeypatch) -> None:
+    """Unset secret must not send an unsigned-but-present header — the receiver would
+    have to decide whether an empty MAC counts."""
+    monkeypatch.setattr(settings, "vanillasoft_webhook_url", "http://vs.example.com")
+    monkeypatch.setattr(settings, "vanillasoft_webhook_secret", "shared-secret")
+    monkeypatch.setattr(settings, "carameli_notify_secret", None)
+    http = _mock_http()
+    with patch("app.services.vanillasoft_notify.httpx.AsyncClient", return_value=http):
+        await vanillasoft_notify.post_notification(vanillasoft_notify.INCOMING_CALL_PATH, {})
+    assert vanillasoft_notify.SIGNATURE_HEADER not in http.post.call_args.kwargs["headers"]
+
+
+async def test_post_notification_signs_without_the_legacy_header(monkeypatch) -> None:
+    """The end state: Carameli's own secret only, once the receiver verifies it."""
+    monkeypatch.setattr(settings, "vanillasoft_webhook_url", "http://vs.example.com")
+    monkeypatch.setattr(settings, "vanillasoft_webhook_secret", None)
+    monkeypatch.setattr(settings, "carameli_notify_secret", "carameli-secret")
+    http = _mock_http()
+    with patch("app.services.vanillasoft_notify.httpx.AsyncClient", return_value=http):
+        await vanillasoft_notify.post_notification(vanillasoft_notify.INCOMING_CALL_PATH, {})
+    headers = http.post.call_args.kwargs["headers"]
+    assert "X-Cloudli-Auth" not in headers
+    assert vanillasoft_notify.SIGNATURE_HEADER in headers
 
 
 async def test_post_notification_timeout_covers_synchronous_receiver(monkeypatch) -> None:

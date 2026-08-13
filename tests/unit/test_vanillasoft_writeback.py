@@ -9,7 +9,7 @@ import pytest
 
 from app.core.config import settings
 from app.repositories.call_event_repo import CallEventRepo
-from tests.conftest import AUTH_HEADERS
+from tests.conftest import AUTH_HEADERS, notify_payload
 
 pytestmark = pytest.mark.asyncio(loop_scope="session")
 
@@ -75,8 +75,11 @@ async def test_terminal_call_posts_incoming_call_contract(client, db_session, mo
     http.post.assert_awaited_once()
     call = http.post.call_args
     assert call.args[0] == "http://vs.example.com/cloudliapi/notify/IncomingCall"
-    assert call.kwargs["headers"] == {"X-Cloudli-Auth": "cloudli-secret"}
-    payload = call.kwargs["json"]
+    assert call.kwargs["headers"] == {
+        "Content-Type": "application/json",
+        "X-Cloudli-Auth": "cloudli-secret",
+    }
+    payload = notify_payload(call)
     assert payload["callId"] == "CAwb001"
     assert payload["eventName"] == "callHungup"
     assert payload["isInbound"] is True
@@ -117,7 +120,7 @@ async def test_terminal_call_with_recording_also_posts_call_recording(client, mo
     assert urls[0].endswith("/notify/IncomingCall")
     assert urls[1].endswith("/notify/CallRecording")
 
-    recording_payload = http.post.call_args_list[1].kwargs["json"]
+    recording_payload = notify_payload(http.post.call_args_list[1])
     assert recording_payload["callId"] == "CAwb002"
     assert recording_payload["CustomerID"] == 8802
     assert recording_payload["length"] == 50
