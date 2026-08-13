@@ -405,6 +405,32 @@ def test_digest_lint_alembic_synthetic_locator():
     assert "alembic/versions/env.py:1:1" in text
 
 
+def test_digest_lint_keeps_npm_error_when_it_is_the_only_output():
+    """npm's own failure must survive `denoise`, which drops `npm error` lines.
+
+    This is the PR #129 path: in an unprovisioned box the markdownlint step exits 1
+    printing nothing but `npm error ...`. Filtered to nothing, the section read "no
+    parseable error lines -- re-run the tool manually", which is advice to repeat the
+    failure rather than to install the toolchain.
+    """
+    npm_only = [
+        "npm error could not determine executable to run",
+        "npm error A complete log of this run can be found in: /tmp/debug-0.log",
+    ]
+    any_failed, text, skips = diag.digest_lint({"markdownlint": (npm_only, 1)}, "src")
+    assert any_failed
+    assert skips == []
+    assert "could not determine executable to run" in text
+    assert "no parseable error lines" not in text
+
+
+def test_digest_lint_placeholder_survives_a_genuinely_silent_tool():
+    """The placeholder still earns its place when the tool really printed nothing."""
+    any_failed, text, _ = diag.digest_lint({"ruff-check": ([], 1)}, "src")
+    assert any_failed
+    assert "no parseable error lines" in text
+
+
 def test_digest_lint_absent_tool_is_pass():
     # A tool not present in results (e.g. not run in this env) is a clean pass.
     any_failed, text, _ = diag.digest_lint({}, "src")
