@@ -16,6 +16,7 @@ context; read it before any phase file. A single-session plan is one file.
 | --- | --- | --- |
 | [airtight-vanillasoft/](active/airtight-vanillasoft/) | Every Carameli ⇄ VanillaSoft integration error lands somewhere a local agent can read, plus a live E2E suite | `00-overview.md` + phases 01–05, in order |
 | [data-scaling/](active/data-scaling/) | Indexes, retention + S3 lifecycle, backups, Sentry, metrics/alerting, ops hardening | `00-overview.md` + phases 01–06, in order |
+| [dual-vendor/](active/dual-vendor/) | Carameli and Cloudli serving different customers at the same time: vendor-neutral seam, per-line routing, capability split | `00-overview.md` + phases 01–07 |
 | [fixer-feedback-loop/](active/fixer-feedback-loop/) | Cost-aware fixer optimization on top of the Stop-hook profile (plan 1 is already merged) | `README.md` + plans 2–4 |
 | [frontend-parity/](active/frontend-parity/) | Front-end parity with Cloudli's 39 pages via the `DataPage` system | `README.md` + plans A and B |
 | [shared-devkit/](active/shared-devkit/) | Carameli's project-agnostic tooling extracted into the shared `alexandrec90/devkit` upstream | `README.md` + plans 1–5 |
