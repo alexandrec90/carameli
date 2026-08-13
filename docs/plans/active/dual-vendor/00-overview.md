@@ -166,19 +166,19 @@ of 06 and 07 are done**; everything else is open.
 | # | Carameli side | VanillaSoft side |
 | --- | --- | --- |
 | 01–05 | n/a | not started |
-| 06 | **done** — outbound notify POSTs carry `X-Carameli-Signature` (HMAC-SHA256 over `"<t>." + body`) keyed by `CARAMELI_NOTIFY_SECRET`, Carameli's own secret | not started — `CarameliNotifyController` still lives in `VanillaSoft.CloudliApi` behind `CloudliHeaderAttribute`, and nothing verifies the signature yet |
-| 07 | **done** — `/api/v1/extensions` and `/api/v1/phone-lines` | not started — `CarameliClient` still calls the `/vsapi` verbs |
+| 06 | **done** — outbound notify POSTs carry only `X-Carameli-Signature` (HMAC-SHA256 over `"<t>." + body`) keyed by `CARAMELI_NOTIFY_SECRET`; Carameli no longer transmits Cloudli's credential | **implemented locally, handoff pending** — the VanillaLand working tree has a fail-closed `CarameliSignatureAttribute`, ±300 s replay protection, constant-time verification, verifier tests, and metadata-only webhook logging; that checkout's rules prohibit committing or pushing |
+| 07 | **done** — `/api/v1/extensions` and `/api/v1/phone-lines` | **implemented locally, handoff pending** — `CarameliClient` uses the native resource routes for extension and phone-line operations, including one atomic bulk extension request; legacy-only SMS send, customer, callback, and area-code calls remain on `/vsapi` |
 
 Notes for whoever picks up the VanillaSoft side:
 
 - **`/vsapi/1.0.0/` is unchanged and stays published.** The native tree is additive, so
   `CarameliClient` can move one call at a time.
-- **The signature is additive too.** `X-Cloudli-Auth` is still sent whenever
-  `VANILLASOFT_WEBHOOK_SECRET` is set, so staging can adopt verification before the legacy
-  header is dropped. To verify: split the header on `,`, recompute
-  `HMAC-SHA256(secret, f"{t}." + raw_body)` over the **raw bytes** (Carameli posts a
-  pre-serialized body precisely so the two sides hash the same thing), compare with
-  `constant-time equals`, and reject a `t` outside ±300 s.
+- **The signature is the only Carameli notify credential.** `VANILLASOFT_WEBHOOK_SECRET`
+  remains for Carameli's legacy `/vs-log` receiver but is never sent on notify POSTs. The
+  VanillaSoft verifier splits the signature header on `,`, recomputes
+  `HMAC-SHA256(secret, f"{t}." + raw_body)` over the **raw bytes**, compares in constant
+  time, and rejects a `t` outside ±300 s. Deployment must set matching
+  `CARAMELI_NOTIFY_SECRET` / `CarameliNotifySecret` values before these working trees ship.
 - **Improvement 4 is fixed on this side**: `POST /api/v1/extensions/bulk` creates a range in
   one transaction, so a conflict creates nothing. The `CarameliClient` loop that left
   extensions `1..k` behind can be replaced by one call.

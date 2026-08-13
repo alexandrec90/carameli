@@ -9,6 +9,7 @@ import pytest
 
 from app.core.config import settings
 from app.repositories.call_event_repo import CallEventRepo
+from app.services import vanillasoft_notify
 from tests.conftest import AUTH_HEADERS, notify_payload
 
 pytestmark = pytest.mark.asyncio(loop_scope="session")
@@ -51,9 +52,10 @@ async def _create_customer_with_line(client, vs_id: int, phone: str) -> None:
 
 
 async def test_terminal_call_posts_incoming_call_contract(client, db_session, monkeypatch) -> None:
-    """Completed call → notify/IncomingCall with IncomingCall.cs shape + X-Cloudli-Auth."""
+    """Completed call → notify/IncomingCall with IncomingCall.cs shape + Carameli HMAC."""
     monkeypatch.setattr(settings, "vanillasoft_webhook_url", "http://vs.example.com/cloudliapi")
     monkeypatch.setattr(settings, "vanillasoft_webhook_secret", "cloudli-secret")
+    monkeypatch.setattr(settings, "carameli_notify_secret", "carameli-secret")
     phone = "+18605550100"
     await _create_customer_with_line(client, 8801, phone)
 
@@ -75,10 +77,9 @@ async def test_terminal_call_posts_incoming_call_contract(client, db_session, mo
     http.post.assert_awaited_once()
     call = http.post.call_args
     assert call.args[0] == "http://vs.example.com/cloudliapi/notify/IncomingCall"
-    assert call.kwargs["headers"] == {
-        "Content-Type": "application/json",
-        "X-Cloudli-Auth": "cloudli-secret",
-    }
+    assert call.kwargs["headers"]["Content-Type"] == "application/json"
+    assert "X-Cloudli-Auth" not in call.kwargs["headers"]
+    assert vanillasoft_notify.SIGNATURE_HEADER in call.kwargs["headers"]
     payload = notify_payload(call)
     assert payload["callId"] == "CAwb001"
     assert payload["eventName"] == "callHungup"
