@@ -105,6 +105,20 @@ def denoise(lines: list[str]) -> list[str]:
     ]
 
 
+def last_resort(lines: list[str]) -> list[str]:
+    """Whatever the tool printed, when every filter above discarded all of it.
+
+    `denoise` drops `npm error` lines because they are normally the wrapper around a
+    real finding. When npm *itself* is what failed they are the entire output, and
+    dropping them leaves a red gate reporting "no parseable error lines" -- which sends
+    the agent to re-run a command that will fail again identically, rather than to the
+    cause. That is how the one MD040 in PR #129 reached CI: in an unprovisioned box the
+    markdownlint step died with `npm error could not determine executable to run`, and
+    every word of that was filtered away before the agent saw it.
+    """
+    return [l for l in lines if l.strip()]
+
+
 def _section(sections: list[str], name: str, fix_hint: str, errs: list[str]) -> None:
     sections.append(f"# {name}")
     if fix_hint:
@@ -224,7 +238,7 @@ def digest_lint(results: dict[str, tuple[list[str], int]], source_label: str):
             skips.append((name, skip))
             continue
         any_failed = True
-        errs = [l for l in lines if keep(l)] or denoise(lines)
+        errs = [l for l in lines if keep(l)] or denoise(lines) or last_resort(lines)
         _section(sections, name, fix_hint, errs)
 
     # alembic-check: synthesise a file locator when none is present so the agent
