@@ -158,8 +158,38 @@ Beyond dual-vendor, these are places where 1:1 replication of Cloudli is activel
 Phases 01–03 are the minimum for two vendors serving customers at the same time. 04–07 are
 the architecture payback and can follow.
 
-## Open decision
+## Status
 
-Per-line routing (phase 03 as written) supports gradual number porting. If migrations will
-always be big-bang per customer, `tblVoipLineVendor` can be dropped and the customer-level
-column alone is enough — simpler, but it forecloses partial ports.
+Every phase has a VanillaSoft half and, for 06–07, a Carameli half. **The Carameli halves
+of 06 and 07 are done**; everything else is open.
+
+| # | Carameli side | VanillaSoft side |
+| --- | --- | --- |
+| 01–05 | n/a | not started |
+| 06 | **done** — outbound notify POSTs carry `X-Carameli-Signature` (HMAC-SHA256 over `"<t>." + body`) keyed by `CARAMELI_NOTIFY_SECRET`, Carameli's own secret | not started — `CarameliNotifyController` still lives in `VanillaSoft.CloudliApi` behind `CloudliHeaderAttribute`, and nothing verifies the signature yet |
+| 07 | **done** — `/api/v1/extensions` and `/api/v1/phone-lines` | not started — `CarameliClient` still calls the `/vsapi` verbs |
+
+Notes for whoever picks up the VanillaSoft side:
+
+- **`/vsapi/1.0.0/` is unchanged and stays published.** The native tree is additive, so
+  `CarameliClient` can move one call at a time.
+- **The signature is additive too.** `X-Cloudli-Auth` is still sent whenever
+  `VANILLASOFT_WEBHOOK_SECRET` is set, so staging can adopt verification before the legacy
+  header is dropped. To verify: split the header on `,`, recompute
+  `HMAC-SHA256(secret, f"{t}." + raw_body)` over the **raw bytes** (Carameli posts a
+  pre-serialized body precisely so the two sides hash the same thing), compare with
+  `constant-time equals`, and reject a `t` outside ±300 s.
+- **Improvement 4 is fixed on this side**: `POST /api/v1/extensions/bulk` creates a range in
+  one transaction, so a conflict creates nothing. The `CarameliClient` loop that left
+  extensions `1..k` behind can be replaced by one call.
+- **Improvement 5 is fixed on this side**: `PATCH /api/v1/phone-lines/{id}` replaces
+  `Deactivate`, `UpdateCallRecording`, `SetAutoAttendant` and `VsMessaging/Sms/Enable|Disable`.
+  There is one deactivate operation and no hard delete — Carameli never hard-deletes a line
+  or extension, so the second `DeletePhoneOrExtension` overload has nothing to map onto.
+
+## Resolved decision: route per line
+
+Per-line routing stands as written — `tblVoipLineVendor` plus the `tblCustomer.VoipVendor`
+fallback. Migrations are expected to port numbers in batches, so a customer is genuinely
+split across two vendors for the duration, and a customer-level column alone would force a
+big-bang cutover per customer.

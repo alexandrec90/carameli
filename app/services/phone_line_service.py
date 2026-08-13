@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import logging
 import uuid
+from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.phone_line import PhoneLine
 from app.repositories.phone_line_repo import PhoneLineRepo
+from app.services.providers.base import CarrierProvider
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +25,29 @@ async def get_all_for_customer(session: AsyncSession, customer_id: uuid.UUID) ->
 
 async def count_for_customer(session: AsyncSession, customer_id: uuid.UUID) -> int:
     return await PhoneLineRepo(session).count_for_customer(customer_id)
+
+
+async def acquire_did(
+    carrier: CarrierProvider,
+    *,
+    phone_number: str | None,
+    area_code: str | None,
+    country_code: str,
+) -> dict[str, Any]:
+    """Provision a DID at the carrier, either a named number or one from an area code.
+
+    Raises ``ValueError`` for a request the carrier cannot satisfy (no numbers in the
+    area code, unusable number); the caller translates that to a 400. Any other
+    exception is a provider failure and belongs on the 502 path.
+    """
+    if phone_number:
+        return await carrier.provision_number(phone_number, country_code=country_code)
+    if not area_code:
+        raise ValueError("either phone_number or area_code is required")
+    numbers = await carrier.search_numbers(area_code, 1, country_code=country_code)
+    if not numbers:
+        raise ValueError(f"No numbers available in area code {area_code}")
+    return await carrier.provision_number(numbers[0]["phone_number"], country_code=country_code)
 
 
 async def create(

@@ -13,7 +13,7 @@ from sqlalchemy import select
 from app.core.config import settings
 from app.models.sms_message import SmsMessage
 from app.services.sms_sync import retry_unposted_sms_messages
-from tests.conftest import AUTH_HEADERS
+from tests.conftest import AUTH_HEADERS, notify_payload
 
 pytestmark = pytest.mark.asyncio(loop_scope="session")
 
@@ -170,8 +170,11 @@ async def test_inbound_sms_forwarded_to_vanillasoft_and_marked_posted(
     http.post.assert_awaited_once()
     call = http.post.call_args
     assert call.args[0] == "http://vs.example.com/cloudliapi/notify/IncomingSmsMessage"
-    assert call.kwargs["headers"] == {"X-Cloudli-Auth": "cloudli-secret"}
-    payload = call.kwargs["json"]
+    assert call.kwargs["headers"] == {
+        "Content-Type": "application/json",
+        "X-Cloudli-Auth": "cloudli-secret",
+    }
+    payload = notify_payload(call)
     assert payload["referenceId"] == sid
     assert payload["isOutbound"] is False
     assert payload["to"] == [phone]
@@ -241,7 +244,7 @@ async def test_delivery_receipt_forwarded_to_vanillasoft(client, db_session, mon
     assert call.args[0] == (
         "http://vs.example.com/cloudliapi/notify/IncomingSmsMessageDeliveryReceipt"
     )
-    payload = call.kwargs["json"]
+    payload = notify_payload(call)
     assert payload["referenceId"] == sid
     assert payload["status"] == "delivered"
     assert payload["customerId"] == "8604"

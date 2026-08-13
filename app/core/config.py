@@ -79,6 +79,16 @@ class Settings(BaseSettings):
         ),
     )
     vanillasoft_webhook_secret: str | None = None
+    carameli_notify_secret: str | None = Field(
+        default=None,
+        description=(
+            "Carameli's own HMAC-SHA256 signing key for outbound notify POSTs, sent as "
+            "X-Carameli-Signature. Deliberately separate from "
+            "VANILLASOFT_WEBHOOK_SECRET: that value is Cloudli's static shared header, "
+            "so reusing it would mean rotating one vendor rotates both. Unset = no "
+            "signature header (the pre-signing behaviour)"
+        ),
+    )
 
     # Reconciliation cron (phase 04): diffs provider records against local tables to
     # catch webhooks that never arrived. Default-off — needs live provider credentials.

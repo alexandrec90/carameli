@@ -55,17 +55,18 @@ async def add_phone_line(
     carrier = request.app.state.carrier
     try:
         if isinstance(body, AddPhoneLineByNumber):
-            result = await carrier.provision_number(
-                body.phone_number, country_code=body.country_code
+            result = await phone_line_service.acquire_did(
+                carrier,
+                phone_number=body.phone_number,
+                area_code=None,
+                country_code=body.country_code,
             )
         else:
-            numbers = await carrier.search_numbers(
-                body.area_code, 1, country_code=body.country_code
-            )
-            if not numbers:
-                raise ValueError(f"No numbers available in area code {body.area_code}")
-            result = await carrier.provision_number(
-                numbers[0]["phone_number"], country_code=body.country_code
+            result = await phone_line_service.acquire_did(
+                carrier,
+                phone_number=None,
+                area_code=body.area_code,
+                country_code=body.country_code,
             )
     except ValueError as exc:
         logger.warning("Invalid DID request vs_customer_id=%s: %s", body.vs_customer_id, exc)
