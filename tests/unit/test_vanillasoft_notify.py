@@ -206,7 +206,7 @@ async def test_post_notification_unconfigured_returns_false(monkeypatch) -> None
         mock_cls.assert_not_called()
 
 
-async def test_post_notification_sends_cloudli_auth_header(monkeypatch) -> None:
+async def test_post_notification_never_sends_cloudli_auth_header(monkeypatch) -> None:
     monkeypatch.setattr(settings, "vanillasoft_webhook_url", "http://vs.example.com/api/")
     monkeypatch.setattr(settings, "vanillasoft_webhook_secret", "shared-secret")
     monkeypatch.setattr(settings, "carameli_notify_secret", None)
@@ -220,7 +220,6 @@ async def test_post_notification_sends_cloudli_auth_header(monkeypatch) -> None:
     assert call.args[0] == "http://vs.example.com/api/notify/IncomingCall"
     assert call.kwargs["headers"] == {
         "Content-Type": "application/json",
-        "X-Cloudli-Auth": "shared-secret",
     }
     # The body is pre-serialized so the signed bytes and the sent bytes are the same
     # object; `json=` would hand httpx the chance to encode it differently.
@@ -265,6 +264,7 @@ async def test_post_notification_signs_with_carameli_own_secret(monkeypatch) -> 
         )
     call = http.post.call_args
     signature = call.kwargs["headers"][vanillasoft_notify.SIGNATURE_HEADER]
+    assert "X-Cloudli-Auth" not in call.kwargs["headers"]
     timestamp, mac = signature.split(",")
     ts = int(timestamp.removeprefix("t="))
 

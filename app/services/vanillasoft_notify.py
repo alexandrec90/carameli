@@ -149,14 +149,10 @@ def _headers(body: bytes, timestamp: int | None = None) -> dict[str, str]:
 
     Carameli signs with its **own** secret rather than reusing Cloudli's static
     `X-Cloudli-Auth` value: one shared secret across two vendors means rotating either
-    rotates both, and a leaked Cloudli secret authenticates as Carameli. The legacy
-    header is still sent while `CloudliController` is the receiver, so staging can adopt
-    signing without a flag day — drop `VANILLASOFT_WEBHOOK_SECRET` once the Carameli
-    controller verifies signatures.
+    rotates both, and a leaked Cloudli secret authenticates as Carameli. The receiver
+    now verifies this signature, so Carameli never sends Cloudli's credential.
     """
     headers = {"Content-Type": "application/json"}
-    if settings.vanillasoft_webhook_secret:
-        headers["X-Cloudli-Auth"] = settings.vanillasoft_webhook_secret
     if settings.carameli_notify_secret:
         headers[SIGNATURE_HEADER] = sign_payload(
             body,

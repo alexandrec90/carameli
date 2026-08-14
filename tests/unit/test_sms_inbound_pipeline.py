@@ -12,6 +12,7 @@ from sqlalchemy import select
 
 from app.core.config import settings
 from app.models.sms_message import SmsMessage
+from app.services import vanillasoft_notify
 from app.services.sms_sync import retry_unposted_sms_messages
 from tests.conftest import AUTH_HEADERS, notify_payload
 
@@ -153,6 +154,7 @@ async def test_inbound_sms_forwarded_to_vanillasoft_and_marked_posted(
 ) -> None:
     monkeypatch.setattr(settings, "vanillasoft_webhook_url", "http://vs.example.com/cloudliapi")
     monkeypatch.setattr(settings, "vanillasoft_webhook_secret", "cloudli-secret")
+    monkeypatch.setattr(settings, "carameli_notify_secret", "carameli-secret")
     phone = "+18205550100"
     await _create_customer_with_line(client, 8602, phone)
 
@@ -170,10 +172,9 @@ async def test_inbound_sms_forwarded_to_vanillasoft_and_marked_posted(
     http.post.assert_awaited_once()
     call = http.post.call_args
     assert call.args[0] == "http://vs.example.com/cloudliapi/notify/IncomingSmsMessage"
-    assert call.kwargs["headers"] == {
-        "Content-Type": "application/json",
-        "X-Cloudli-Auth": "cloudli-secret",
-    }
+    assert call.kwargs["headers"]["Content-Type"] == "application/json"
+    assert "X-Cloudli-Auth" not in call.kwargs["headers"]
+    assert vanillasoft_notify.SIGNATURE_HEADER in call.kwargs["headers"]
     payload = notify_payload(call)
     assert payload["referenceId"] == sid
     assert payload["isOutbound"] is False

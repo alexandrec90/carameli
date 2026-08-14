@@ -8,7 +8,7 @@ import httpx
 import pytest
 
 from app.core.config import settings
-from app.services import call_sync
+from app.services import call_sync, vanillasoft_notify
 from app.services.call_sync import _run_scheduled_job, retry_unposted_events
 from tests.conftest import notify_payload
 
@@ -81,9 +81,10 @@ async def test_retry_skips_when_no_unposted_events(monkeypatch) -> None:
 
 
 async def test_retry_posts_incoming_call_contract_and_marks_posted(monkeypatch) -> None:
-    """A completed event is POSTed as the IncomingCall shape with X-Cloudli-Auth."""
+    """A completed event is POSTed as the IncomingCall shape with Carameli HMAC auth."""
     monkeypatch.setattr(settings, "vanillasoft_webhook_url", "http://vs.example.com/cloudliapi")
     monkeypatch.setattr(settings, "vanillasoft_webhook_secret", "cloudli-secret")
+    monkeypatch.setattr(settings, "carameli_notify_secret", "carameli-secret")
     event = _make_event(status="completed")
 
     mock_repo = AsyncMock()
@@ -103,10 +104,9 @@ async def test_retry_posts_incoming_call_contract_and_marks_posted(monkeypatch) 
     mock_http.post.assert_awaited_once()
     call = mock_http.post.call_args
     assert call.args[0] == "http://vs.example.com/cloudliapi/notify/IncomingCall"
-    assert call.kwargs["headers"] == {
-        "Content-Type": "application/json",
-        "X-Cloudli-Auth": "cloudli-secret",
-    }
+    assert call.kwargs["headers"]["Content-Type"] == "application/json"
+    assert "X-Cloudli-Auth" not in call.kwargs["headers"]
+    assert vanillasoft_notify.SIGNATURE_HEADER in call.kwargs["headers"]
     payload = notify_payload(call)
     assert payload["callId"] == "CA001"
     assert payload["eventName"] == "callHungup"
