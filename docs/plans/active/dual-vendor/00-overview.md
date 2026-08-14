@@ -204,7 +204,7 @@ to the VanillaLand working tree alongside the rest of this track:
 - calls `SetDefault`, which runs the capability gate and keeps the legacy `CloudliEnabled`
   bit consistent with the new column, and turns a `VoipCapabilityException` into a 400 —
   the configuration-time refusal the capability split exists to produce;
-- is covered by `UnitTesting/Voip/VoipVendorAdminTests.cs` (9 tests). `IVoipVendorRouter` is
+- is covered by `UnitTesting/Voip/VoipVendorAdminTests.cs` (10 tests). `IVoipVendorRouter` is
   now registered in `VanillaSoft.CloudliApi`'s container, matching `Vanillasoft.Webservice`.
 
 Two things remain before a customer can actually be moved in production:
