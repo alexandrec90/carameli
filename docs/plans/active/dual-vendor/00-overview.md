@@ -160,14 +160,63 @@ the architecture payback and can follow.
 
 ## Status
 
-Every phase has a VanillaSoft half and, for 06–07, a Carameli half. **The Carameli halves
-of 06 and 07 are done**; everything else is open.
+Audited 2026-08-13 against carameli `master` (a46aa97) and the VanillaLand working tree.
 
-| # | Carameli side | VanillaSoft side |
+Every phase has a VanillaSoft half and, for 06–07, a Carameli half. **The Carameli halves
+of 06 and 07 are merged.** Every VanillaSoft half — 01 through 07 — is implemented in the
+VanillaLand working tree and **uncommitted**: 146 modified/added/deleted files on
+`feature/alex-testing-cloudli`, which that checkout's rules prohibit committing or pushing.
+The whole VanillaSoft side of this track exists only as working-tree state.
+
+| # | Carameli side | VanillaSoft side (working tree only) |
 | --- | --- | --- |
-| 01–05 | n/a | not started |
-| 06 | **done** — outbound notify POSTs carry only `X-Carameli-Signature` (HMAC-SHA256 over `"<t>." + body`) keyed by `CARAMELI_NOTIFY_SECRET`; Carameli no longer transmits Cloudli's credential | **implemented locally, handoff pending** — the VanillaLand working tree has a fail-closed `CarameliSignatureAttribute`, ±300 s replay protection, constant-time verification, verifier tests, and metadata-only webhook logging; that checkout's rules prohibit committing or pushing |
-| 07 | **done** — `/api/v1/extensions` and `/api/v1/phone-lines` | **implemented locally, handoff pending** — `CarameliClient` uses the native resource routes for extension and phone-line operations, including one atomic bulk extension request; legacy-only SMS send, customer, callback, and area-code calls remain on `/vsapi` |
+| 01 | n/a | **done** — `Cloudli/Interfaces/IVoipService.cs` + `Utils/VoipServiceFactory.cs`; `ICloudliService.cs` and `CloudliServiceFactory.cs` deleted |
+| 02 | n/a | **done** — `Enums/Voip.cs` deleted in favour of `Voip/VoipVendorDescriptor.cs` (voicemail access number + help URI per vendor); `CloudliExt` → `VendorExtension` through `sp_UserDialingInformation*`; `IsCloudliEnabled` gone from `CmvLineMinVm`/`UserFullVm` |
+| 03 | n/a | **done, but unreachable** — `tblCustomer.VoipVendor` (TINYINT + `CK_tblCustomer_VoipVendor`), `tblVoipLineVendor`, `IVoipVendorRouter`/`VoipVendorRouter`/`VoipRoutingRepository`, `RoutedVoipService`; the global appSetting is retired. See *Open gap* below |
+| 04 | n/a | **done** — `Cloudli/Interfaces/IVoipCapabilities.cs` splits the god-interface six ways; `[Flags] VoipCapability` + `IVoipCapabilityProvider`; `AssignLine`/`SetDefault` throw `VoipCapabilityException` on a missing capability. Carameli declares CoreProvisioning, Messaging, Callback, RecordingConfiguration, AccountProvisioning |
+| 05 | n/a | **done** — `tblVoipAccountMapping.sql`; `GetVendorAccountId` replaces the `CloudliID` call and the UUID `GetCustomerId` gap |
+| 06 | **merged** — outbound notify POSTs carry only `X-Carameli-Signature` (HMAC-SHA256 over `"<t>." + body`) keyed by `CARAMELI_NOTIFY_SECRET`; Carameli no longer transmits Cloudli's credential | **done** — fail-closed `CarameliSignatureAttribute` on `CarameliNotifyController`, ±300 s replay window, constant-time compare, `CarameliSignatureVerifierTests`, `CarameliNotifySecret` in `Web.config` |
+| 07 | **merged** — `/api/v1/extensions` (incl. `/bulk`) and `/api/v1/phone-lines`; `/vsapi/1.0.0/` still published | **done** — `CarameliClient` uses the native resource routes for extension and phone-line operations, including one atomic bulk extension request; legacy-only SMS send, customer, callback, and area-code calls remain on `/vsapi` |
+
+Every added file is registered in its project (`VanillaSoft.Backend.csproj`,
+`VanillaSoft.CloudliApi.csproj`, `UnitTesting.csproj`, `VanillaSoft.sqlproj`), so the tree
+is compile-complete as far as static inspection can tell. Neither side has been built or
+run against a live VanillaSoft; the Carameli halves are covered by 91 passing unit tests
+(`test_rest_extensions`, `test_rest_phone_lines`, `test_vanillasoft_notify`).
+
+### Open gap: nothing can route a customer to Carameli
+
+Phase 03 retired the global `CarameliEnabled` appSetting without delivering a replacement
+write path, so `tblCustomer.VoipVendor` can never hold `2`:
+
+- `VoipVendorRouter.SetDefault` — the capability-gated writer — has **no caller outside
+  `VoipVendorRouterTests`**.
+- The only production writer is `sp_CustomerCloudliEnabledUpdate`, which derives
+  `VoipVendor = CASE WHEN @CloudliEnabled = 1 THEN 1 ELSE 0 END` from a bit. Two values,
+  neither of them Carameli.
+- `VoipVendorRouter.DefaultFor` falls back to `Cmv`, and `RoutedVoipService.AssignLine`
+  only records the vendor a line already resolved to.
+
+So every customer resolves to Cmv or Cloudli and `tblVoipLineVendor` only ever accumulates
+those two. The routing machinery is correct and tested; it has no admin surface. Closing
+this needs an admin/ASMX call onto `SetDefault(customerId, vendor, requiredCapabilities)`
+and a UI that offers three vendors instead of a checkbox — that is the last thing standing
+between this track and two vendors serving customers at the same time.
+
+### Smaller gaps
+
+- **Improvement 3 (sync-over-async) not taken.** `IVoipService` has no `Task`-returning
+  member and `CarameliService`/`CmvVoipService`/`CloudliService` still
+  `.GetAwaiter().GetResult()` throughout. The interface changed for the rename, which was
+  the cheap moment to do this; it is now a separate change.
+- **Improvement 5 half-taken.** Carameli collapsed to one `PATCH` and never hard-deletes,
+  but `IVoipProvisioningService` still carries both `DeletePhoneOrExtension` overloads.
+- **The HUD stack is still a boolean.** `VanillaSoft.HudApi` has its own `ICloudliService`
+  whose every member takes `bool isCloudliEnabled`, and `cloudliHud.js` /
+  `vanillaSoftWSCloudliHud.js` / the classic-ASP pages pass `is-cloudli-enabled` on the
+  query string. Carameli not declaring `HudDirectory` keeps the router from assigning a
+  HUD-using line to it, but the HUD path never consults the router — it reads
+  `Session("CloudliEnabled")`. It is outside the phase table's scope and needs to be in it.
 
 Notes for whoever picks up the VanillaSoft side:
 
