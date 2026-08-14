@@ -172,7 +172,7 @@ The whole VanillaSoft side of this track exists only as working-tree state.
 | --- | --- | --- |
 | 01 | n/a | **done** — `Cloudli/Interfaces/IVoipService.cs` + `Utils/VoipServiceFactory.cs`; `ICloudliService.cs` and `CloudliServiceFactory.cs` deleted |
 | 02 | n/a | **done** — `Enums/Voip.cs` deleted in favour of `Voip/VoipVendorDescriptor.cs` (voicemail access number + help URI per vendor); `CloudliExt` → `VendorExtension` through `sp_UserDialingInformation*`; `IsCloudliEnabled` gone from `CmvLineMinVm`/`UserFullVm` |
-| 03 | n/a | **done, but unreachable** — `tblCustomer.VoipVendor` (TINYINT + `CK_tblCustomer_VoipVendor`), `tblVoipLineVendor`, `IVoipVendorRouter`/`VoipVendorRouter`/`VoipRoutingRepository`, `RoutedVoipService`; the global appSetting is retired. See *Open gap* below |
+| 03 | n/a | **done** — `tblCustomer.VoipVendor` (TINYINT + `CK_tblCustomer_VoipVendor`), `tblVoipLineVendor`, `IVoipVendorRouter`/`VoipVendorRouter`/`VoipRoutingRepository`, `RoutedVoipService`; the global appSetting is retired and `POST customer/voip-vendor` replaces it as the write path. See *Closed in the working tree* below for what still needs a UI |
 | 04 | n/a | **done** — `Cloudli/Interfaces/IVoipCapabilities.cs` splits the god-interface six ways; `[Flags] VoipCapability` + `IVoipCapabilityProvider`; `AssignLine`/`SetDefault` throw `VoipCapabilityException` on a missing capability. Carameli declares CoreProvisioning, Messaging, Callback, RecordingConfiguration, AccountProvisioning |
 | 05 | n/a | **done** — `tblVoipAccountMapping.sql`; `GetVendorAccountId` replaces the `CloudliID` call and the UUID `GetCustomerId` gap |
 | 06 | **merged** — outbound notify POSTs carry only `X-Carameli-Signature` (HMAC-SHA256 over `"<t>." + body`) keyed by `CARAMELI_NOTIFY_SECRET`; Carameli no longer transmits Cloudli's credential | **done** — fail-closed `CarameliSignatureAttribute` on `CarameliNotifyController`, ±300 s replay window, constant-time compare, `CarameliSignatureVerifierTests`, `CarameliNotifySecret` in `Web.config` |
@@ -184,24 +184,36 @@ is compile-complete as far as static inspection can tell. Neither side has been 
 run against a live VanillaSoft; the Carameli halves are covered by 91 passing unit tests
 (`test_rest_extensions`, `test_rest_phone_lines`, `test_vanillasoft_notify`).
 
-### Open gap: nothing can route a customer to Carameli
+### Closed in the working tree: routing a customer to Carameli
 
 Phase 03 retired the global `CarameliEnabled` appSetting without delivering a replacement
-write path, so `tblCustomer.VoipVendor` can never hold `2`:
+write path, so `tblCustomer.VoipVendor` could never hold `2`. `VoipVendorRouter.SetDefault`
+— the capability-gated writer — had no caller outside `VoipVendorRouterTests`, and the only
+production writer was `sp_CustomerCloudliEnabledUpdate`, which derives
+`VoipVendor = CASE WHEN @CloudliEnabled = 1 THEN 1 ELSE 0 END` from a bit. Two values,
+neither of them Carameli. Every customer resolved to Cmv or Cloudli and `tblVoipLineVendor`
+could only ever accumulate those two.
 
-- `VoipVendorRouter.SetDefault` — the capability-gated writer — has **no caller outside
-  `VoipVendorRouterTests`**.
-- The only production writer is `sp_CustomerCloudliEnabledUpdate`, which derives
-  `VoipVendor = CASE WHEN @CloudliEnabled = 1 THEN 1 ELSE 0 END` from a bit. Two values,
-  neither of them Carameli.
-- `VoipVendorRouter.DefaultFor` falls back to `Cmv`, and `RoutedVoipService.AssignLine`
-  only records the vendor a line already resolved to.
+`POST customer/voip-vendor` on `CloudliController` is the three-valued replacement, added
+to the VanillaLand working tree alongside the rest of this track:
 
-So every customer resolves to Cmv or Cloudli and `tblVoipLineVendor` only ever accumulates
-those two. The routing machinery is correct and tested; it has no admin surface. Closing
-this needs an admin/ASMX call onto `SetDefault(customerId, vendor, requiredCapabilities)`
-and a UI that offers three vendors instead of a checkbox — that is the last thing standing
-between this track and two vendors serving customers at the same time.
+- takes `{ CustomerId, Vendor, RequiredCapabilities, CloudliId }` and parses the vendor name
+  case-insensitively, rejecting both unknown names and numeric values outside the enum;
+- moves Cloudli's third-party account state **before** the local write when Cloudli is at
+  either end of the change, so a failure there writes nothing locally;
+- calls `SetDefault`, which runs the capability gate and keeps the legacy `CloudliEnabled`
+  bit consistent with the new column, and turns a `VoipCapabilityException` into a 400 —
+  the configuration-time refusal the capability split exists to produce;
+- is covered by `UnitTesting/Voip/VoipVendorAdminTests.cs` (10 tests). `IVoipVendorRouter` is
+  now registered in `VanillaSoft.CloudliApi`'s container, matching `Vanillasoft.Webservice`.
+
+Two things remain before a customer can actually be moved in production:
+
+1. **An admin UI.** The classic-ASP customer page still renders a `CloudliEnabled` checkbox;
+   it needs a three-vendor control posting to this endpoint.
+2. **The endpoint's credential.** It sits on `CloudliController`, so it inherits Cloudli's
+   static `X-Cloudli-Auth` header — the wrong credential for a vendor-neutral admin call.
+   It should move when the admin surface gets an auth scheme of its own.
 
 ### Smaller gaps
 
