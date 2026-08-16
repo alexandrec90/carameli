@@ -29,15 +29,30 @@ Environment contract (see also ``.env.example`` and ``docs/operations/diagnostic
 | ``E2E_RECORDING``        | optional ``1``: run the recording flow (roadmap A6 must be live) |
 
 ``E2E_VS_CHECK`` is the belt-and-suspenders check: rather than trusting Carameli's own
-``posted`` flag, ``test_live_call.py`` reads VanillaSoft's ``GetCallHistory`` PubApi
-endpoint and asserts the call landed there too. It carries a **staging precondition**,
-because VanillaSoft files a Carameli call notification only against a call-history
-record it can match: the E2E customer's VanillaSoft project must hold a contact whose
-phone number is ``E2E_DID_A``. (The "CMV Call Data Service" matches notifications to
-contacts by number — see ``../VanillaLand/AppCode/CMV Call Data Service/CMVCallData.cs``,
-``FindCallAttemptCallHistory``.) Without that contact there is nothing on the
-VanillaSoft side to read back and the check fails; leave the flag unset unless staging
-is set up that way, and let ``posted=True`` be the VanillaSoft assertion.
+``posted`` flag, read the call back out of VanillaSoft's ``GetCallHistory`` PubApi
+endpoint. **It only applies to the attended click-to-call test**, and the reason is
+worth stating because it is not what the phase-05 plan assumed:
+
+*Nothing on the VanillaSoft side creates a call-history record from a Carameli
+notification.* ``CarameliNotifyController`` calls ``sp_CMVCallNotificationInsert``,
+which writes a CMV *notification* row. The CMV Call Data Service later calls
+``sp_CallHistoryCallAttemptInsert`` (``../VanillaLand/AppCode/CMV Call Data
+Service/CMVCallData.cs``, ``FindCallAttemptCallHistory``) — and that attaches the
+attempt to a call-history record it *found* via
+``sp_CMVCallAttemptMatchCallHistoryFetch``. Call-history rows come from the CRM, when
+an agent works a contact.
+
+So for the unattended inbound flow — a call originated straight through Telnyx, that no
+agent placed from inside VanillaSoft — ``GetCallHistory`` has nothing to return no
+matter how staging is seeded, and ``posted=True`` is the only honest VanillaSoft
+assertion. For the attended flow the agent *did* dial a contact from the CRM, so the
+record exists and the read-back is meaningful.
+
+Its precondition, then, is the ordinary one for that flow: the dialed contact exists in
+the E2E project, and PubApi has access to that project. One wrinkle if you seed a
+contact by hand — ``FindCallAttemptCallHistory`` strips a leading ``+`` and a leading
+``1`` from the *incoming* number only, so store the contact's number in 10-digit form
+(``5145550001``, not ``+15145550001``) or the lookup misses.
 """
 
 from __future__ import annotations

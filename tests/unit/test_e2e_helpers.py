@@ -366,8 +366,8 @@ def test_call_histories_since_accepts_naive_boundary() -> None:
     assert len(kept) == 1
 
 
-def test_live_call_test_consumes_the_vs_check() -> None:
-    """The live call test must request ``pubapi_client``, or ``vs_check`` is a no-op.
+def test_attended_call_test_consumes_the_vs_check() -> None:
+    """The attended test must request ``pubapi_client``, or ``vs_check`` is a no-op.
 
     ``E2E_VS_CHECK`` spent its first life parsed into ``E2EConfig`` and read by nothing,
     so setting it bought silent no-op coverage. Everything else here tests the machinery
@@ -376,8 +376,22 @@ def test_live_call_test_consumes_the_vs_check() -> None:
     """
     from tests.live_e2e import test_live_call
 
-    params = inspect.signature(test_live_call.test_inbound_call_posts).parameters
+    params = inspect.signature(test_live_call.test_click_to_call_attended).parameters
     assert "pubapi_client" in params
+
+
+def test_unattended_call_test_does_not_read_pubapi() -> None:
+    """The unattended flow must NOT assert on PubApi — there is nothing there to read.
+
+    Nothing creates a VanillaSoft call-history record for a call no agent placed from
+    the CRM (CMVCallData.cs attaches attempts to records it *finds*), so a read-back
+    here would fail on a healthy system. Pinning it keeps a well-meaning "apply the
+    check to both flows" change from reintroducing that.
+    """
+    from tests.live_e2e import test_live_call
+
+    params = inspect.signature(test_live_call.test_inbound_call_posts).parameters
+    assert "pubapi_client" not in params
 
 
 async def test_pubapi_client_sets_apikey_header_and_closes() -> None:
