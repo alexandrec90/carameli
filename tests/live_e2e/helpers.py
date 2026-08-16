@@ -22,8 +22,22 @@ Environment contract (see also ``.env.example`` and ``docs/operations/diagnostic
 | ``E2E_DID_A``            | Owned Canadian test DID — the "from" number                  |
 | ``E2E_DID_B``            | Owned Canadian test DID — the "inbound" target               |
 | ``E2E_VS_CHECK``         | optional ``1``: also assert VanillaSoft-side via PubApi       |
+| ``E2E_PUBAPI_BASE_URL``  | required when ``E2E_VS_CHECK=1``: VanillaSoft PubApi root     |
+| ``E2E_PUBAPI_KEY``       | required when ``E2E_VS_CHECK=1``: key for ``Authorization: APIKey=`` |
+| ``E2E_PUBAPI_PROJECT_ID`` | optional: restrict the PubApi call-history read to one project |
 | ``E2E_TELNYX_CONNECTION_ID`` | optional: Telnyx Call Control connection for unattended call origination |
 | ``E2E_RECORDING``        | optional ``1``: run the recording flow (roadmap A6 must be live) |
+
+``E2E_VS_CHECK`` is the belt-and-suspenders check: rather than trusting Carameli's own
+``posted`` flag, ``test_live_call.py`` reads VanillaSoft's ``GetCallHistory`` PubApi
+endpoint and asserts the call landed there too. It carries a **staging precondition**,
+because VanillaSoft files a Carameli call notification only against a call-history
+record it can match: the E2E customer's VanillaSoft project must hold a contact whose
+phone number is ``E2E_DID_A``. (The "CMV Call Data Service" matches notifications to
+contacts by number — see ``../VanillaLand/AppCode/CMV Call Data Service/CMVCallData.cs``,
+``FindCallAttemptCallHistory``.) Without that contact there is nothing on the
+VanillaSoft side to read back and the check fails; leave the flag unset unless staging
+is set up that way, and let ``posted=True`` be the VanillaSoft assertion.
 """
 
 from __future__ import annotations
@@ -33,8 +47,10 @@ import os
 import time
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+from urllib.parse import quote, urlencode
 
 import httpx
 
@@ -43,18 +59,28 @@ VSAPI_PREFIX = "/vsapi/1.0.0"
 # Env vars required for the live suite to run (in addition to RUN_LIVE_E2E=1).
 REQUIRED_ENV = ("E2E_BASE_URL", "E2E_API_KEY", "E2E_CUSTOMER_ID", "E2E_DID_A", "E2E_DID_B")
 
+# Required *additionally* when E2E_VS_CHECK=1. Without them the flag would parse into
+# config and assert nothing — a silent no-op is the one outcome an opt-in check must
+# never have, so a half-configured VS check skips the suite with these names in it.
+VS_CHECK_ENV = ("E2E_PUBAPI_BASE_URL", "E2E_PUBAPI_KEY")
+
 
 def live_e2e_skip_reason() -> str | None:
     """Return a human-readable skip reason if the live suite can't run, else ``None``.
 
     The suite is opt-in and needs live infrastructure and real money, so it stays
-    skipped unless ``RUN_LIVE_E2E=1`` *and* every required env var is set.
+    skipped unless ``RUN_LIVE_E2E=1`` *and* every required env var is set. Opting into
+    ``E2E_VS_CHECK`` adds the PubApi credentials to that required set.
     """
     if os.getenv("RUN_LIVE_E2E") != "1":
         return "Set RUN_LIVE_E2E=1 to run the live E2E suite (costs real money)"
     missing = [name for name in REQUIRED_ENV if not os.getenv(name)]
     if missing:
         return "Live E2E requires env vars: " + ", ".join(missing)
+    if os.getenv("E2E_VS_CHECK") == "1":
+        missing_vs = [name for name in VS_CHECK_ENV if not os.getenv(name)]
+        if missing_vs:
+            return "E2E_VS_CHECK=1 requires env vars: " + ", ".join(missing_vs)
     return None
 
 
@@ -68,26 +94,33 @@ class E2EConfig:
     did_a: str
     did_b: str
     vs_check: bool
+    pubapi_base_url: str | None
+    pubapi_key: str | None
+    pubapi_project_id: int | None
     telnyx_connection_id: str | None
 
     @classmethod
     def from_env(cls) -> E2EConfig | None:
         """Build config from ``E2E_*`` env vars; ``None`` if a required one is missing.
 
-        ``E2E_CUSTOMER_ID`` must be a valid integer — a malformed value returns ``None``
-        rather than raising, so collection never explodes on a typo.
+        ``E2E_CUSTOMER_ID`` and ``E2E_PUBAPI_PROJECT_ID`` must be valid integers — a
+        malformed value returns ``None`` rather than raising, so collection never
+        explodes on a typo.
         """
         base_url = os.getenv("E2E_BASE_URL")
         api_key = os.getenv("E2E_API_KEY")
         raw_customer_id = os.getenv("E2E_CUSTOMER_ID")
         did_a = os.getenv("E2E_DID_A")
         did_b = os.getenv("E2E_DID_B")
+        raw_project_id = os.getenv("E2E_PUBAPI_PROJECT_ID")
         if not (base_url and api_key and raw_customer_id and did_a and did_b):
             return None
         try:
             customer_id = int(raw_customer_id)
+            project_id = int(raw_project_id) if raw_project_id else None
         except ValueError:
             return None
+        pubapi_base_url = os.getenv("E2E_PUBAPI_BASE_URL")
         return cls(
             base_url=base_url.rstrip("/"),
             api_key=api_key,
@@ -95,6 +128,9 @@ class E2EConfig:
             did_a=did_a,
             did_b=did_b,
             vs_check=os.getenv("E2E_VS_CHECK") == "1",
+            pubapi_base_url=pubapi_base_url.rstrip("/") if pubapi_base_url else None,
+            pubapi_key=os.getenv("E2E_PUBAPI_KEY") or None,
+            pubapi_project_id=project_id,
             telnyx_connection_id=os.getenv("E2E_TELNYX_CONNECTION_ID") or None,
         )
 
@@ -280,3 +316,107 @@ class CarameliClient:
     async def post(self, url: str, **kwargs: Any) -> httpx.Response:
         """Passthrough POST for anything the typed helpers don't cover (e.g. Callback)."""
         return await self._client.post(url, **kwargs)
+
+
+# ---------------------------------------------------------------------------
+# VanillaSoft PubApi — the E2E_VS_CHECK read-back (see the module docstring).
+# ---------------------------------------------------------------------------
+
+# PubApi's DateRangeValidation caps GetCallHistory at a 7-day span; the E2E window is
+# minutes wide, so the cap never binds. The margin absorbs clock skew between this
+# machine and the VanillaSoft staging server.
+PUBAPI_CLOCK_SKEW_MINUTES = 5
+
+
+def pubapi_datetime(value: datetime) -> str:
+    """Format a datetime as PubApi's ``yyyy-MM-ddTHH:mm:ss`` UTC string.
+
+    PubApi binds the value as a naive ``DateTime`` and only converts it when the string
+    carries a zone, so an aware value is converted to UTC and the zone dropped here —
+    sending ``+00:00`` would round-trip through local time on the server.
+    """
+    if value.tzinfo is not None:
+        value = value.astimezone(UTC).replace(tzinfo=None)
+    return value.strftime("%Y-%m-%dT%H:%M:%S")
+
+
+def pubapi_call_history_query(
+    start: datetime,
+    end: datetime,
+    *,
+    limit: int = 1000,
+    project_id: int | None = None,
+) -> str:
+    """Build the ``GetCallHistory`` query string.
+
+    The colons in the timestamps are percent-encoded (``%3A``) as PubApi's own
+    documentation requires; ``urlencode``'s default quoting would leave them bare.
+    """
+    params = {
+        "start": pubapi_datetime(start),
+        "end": pubapi_datetime(end),
+        "limit": str(limit),
+    }
+    if project_id is not None:
+        params["project_id"] = str(project_id)
+    return urlencode(params, quote_via=quote)
+
+
+def call_histories_since(rows: list[dict[str, Any]], since: datetime) -> list[dict[str, Any]]:
+    """Return the call-history rows whose ``call_date_time_utc`` is at or after ``since``.
+
+    ``GetCallHistory`` filters on *modified* time, so a record touched during the window
+    but placed long before it comes back too. This narrows to calls actually made in the
+    window. Rows with an absent or unparseable timestamp are dropped rather than kept —
+    a record we cannot date is not evidence that *this* call reached VanillaSoft.
+    """
+    if since.tzinfo is None:
+        since = since.replace(tzinfo=UTC)
+    kept = []
+    for row in rows:
+        raw = row.get("call_date_time_utc")
+        if not isinstance(raw, str):
+            continue
+        try:
+            when = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+        except ValueError:
+            continue
+        if when.tzinfo is None:
+            when = when.replace(tzinfo=UTC)
+        if when >= since:
+            kept.append(row)
+    return kept
+
+
+class PubApiClient:
+    """A minimal authed client for VanillaSoft's PubApi read endpoints.
+
+    PubApi authenticates with ``Authorization: APIKey=<key>`` — not ``Bearer`` — per
+    ``ApiKeyUtil.GetApiKeyFromHeaders`` in the VanillaLand repo.
+    """
+
+    def __init__(self, base_url: str, api_key: str, *, timeout: float = 30) -> None:
+        self._client = httpx.AsyncClient(
+            base_url=base_url,
+            headers={"Authorization": f"APIKey={api_key}"},
+            timeout=timeout,
+        )
+
+    async def aclose(self) -> None:
+        await self._client.aclose()
+
+    async def get_call_history(
+        self,
+        start: datetime,
+        end: datetime,
+        *,
+        limit: int = 1000,
+        project_id: int | None = None,
+    ) -> list[dict[str, Any]]:
+        """Return the ``call_histories`` array for calls modified in ``[start, end]``."""
+        resp = await self._client.get(
+            f"/GetCallHistory?{pubapi_call_history_query(start, end, limit=limit, project_id=project_id)}"
+        )
+        resp.raise_for_status()
+        histories: list[dict[str, Any]] | None = resp.json().get("call_histories")
+        return histories or []

@@ -8,19 +8,28 @@ are pure and must not regress. No live env, no DB — runs in the default suite.
 
 from __future__ import annotations
 
+import inspect
+from datetime import UTC, datetime
+from typing import Any
+
 import pytest
 
 from tests.live_e2e.helpers import (
     REQUIRED_ENV,
+    VS_CHECK_ENV,
     CarameliClient,
     E2EConfig,
     LogCapture,
     LogTail,
+    PubApiClient,
+    call_histories_since,
     error_lines,
     lines_containing,
     live_e2e_skip_reason,
     parse_level,
     poll_until,
+    pubapi_call_history_query,
+    pubapi_datetime,
 )
 
 # asyncio_mode=auto (pytest.ini) auto-collects the coroutine tests; no module mark
@@ -181,6 +190,8 @@ def test_from_env_builds_config(monkeypatch) -> None:
     monkeypatch.setenv("E2E_DID_B", "+15145550002")
     monkeypatch.setenv("E2E_VS_CHECK", "1")
     monkeypatch.delenv("E2E_TELNYX_CONNECTION_ID", raising=False)
+    for name in (*VS_CHECK_ENV, "E2E_PUBAPI_PROJECT_ID"):
+        monkeypatch.delenv(name, raising=False)
 
     cfg = E2EConfig.from_env()
     assert cfg is not None
@@ -188,6 +199,9 @@ def test_from_env_builds_config(monkeypatch) -> None:
     assert cfg.customer_id == 4242
     assert cfg.vs_check is True
     assert cfg.telnyx_connection_id is None
+    assert cfg.pubapi_base_url is None
+    assert cfg.pubapi_key is None
+    assert cfg.pubapi_project_id is None
 
 
 def test_from_env_none_on_bad_customer_id(monkeypatch) -> None:
@@ -216,13 +230,173 @@ def test_skip_reason_lists_missing_vars(monkeypatch) -> None:
 
 
 def test_skip_reason_none_when_fully_configured(monkeypatch) -> None:
+    _set_required_env(monkeypatch)
+    monkeypatch.delenv("E2E_VS_CHECK", raising=False)
+    assert live_e2e_skip_reason() is None
+
+
+# ---------------------------------------------------------------------------
+# E2E_VS_CHECK — the flag must never resolve to "configured but asserts nothing"
+# ---------------------------------------------------------------------------
+
+
+def test_skip_reason_names_missing_pubapi_vars_when_vs_check_on(monkeypatch) -> None:
+    """E2E_VS_CHECK=1 without PubApi creds skips loudly instead of no-op'ing."""
+    _set_required_env(monkeypatch)
+    monkeypatch.setenv("E2E_VS_CHECK", "1")
+    for name in VS_CHECK_ENV:
+        monkeypatch.delenv(name, raising=False)
+
+    reason = live_e2e_skip_reason()
+    assert reason is not None
+    assert "E2E_VS_CHECK" in reason
+    assert "E2E_PUBAPI_BASE_URL" in reason
+    assert "E2E_PUBAPI_KEY" in reason
+
+
+def test_skip_reason_lists_only_the_missing_pubapi_var(monkeypatch) -> None:
+    _set_required_env(monkeypatch)
+    monkeypatch.setenv("E2E_VS_CHECK", "1")
+    monkeypatch.setenv("E2E_PUBAPI_BASE_URL", "https://pubapi.example.com")
+    monkeypatch.delenv("E2E_PUBAPI_KEY", raising=False)
+
+    reason = live_e2e_skip_reason()
+    assert reason is not None
+    assert "E2E_PUBAPI_KEY" in reason
+    assert "E2E_PUBAPI_BASE_URL" not in reason
+
+
+def test_skip_reason_none_when_vs_check_fully_configured(monkeypatch) -> None:
+    _set_required_env(monkeypatch)
+    monkeypatch.setenv("E2E_VS_CHECK", "1")
+    monkeypatch.setenv("E2E_PUBAPI_BASE_URL", "https://pubapi.example.com")
+    monkeypatch.setenv("E2E_PUBAPI_KEY", "pub-secret")
+    assert live_e2e_skip_reason() is None
+
+
+def test_skip_reason_ignores_pubapi_vars_when_vs_check_off(monkeypatch) -> None:
+    """The PubApi creds are required only by the opt-in; the default suite ignores them."""
+    _set_required_env(monkeypatch)
+    monkeypatch.setenv("E2E_VS_CHECK", "0")
+    for name in VS_CHECK_ENV:
+        monkeypatch.delenv(name, raising=False)
+    assert live_e2e_skip_reason() is None
+
+
+def test_from_env_reads_pubapi_settings(monkeypatch) -> None:
+    _set_required_env(monkeypatch)
+    monkeypatch.setenv("E2E_VS_CHECK", "1")
+    monkeypatch.setenv("E2E_PUBAPI_BASE_URL", "https://pubapi.example.com/")
+    monkeypatch.setenv("E2E_PUBAPI_KEY", "pub-secret")
+    monkeypatch.setenv("E2E_PUBAPI_PROJECT_ID", "77")
+
+    cfg = E2EConfig.from_env()
+    assert cfg is not None
+    assert cfg.vs_check is True
+    assert cfg.pubapi_base_url == "https://pubapi.example.com"  # trailing slash stripped
+    assert cfg.pubapi_key == "pub-secret"  # pragma: allowlist secret - test fixture value
+    assert cfg.pubapi_project_id == 77
+
+
+def test_from_env_none_on_bad_project_id(monkeypatch) -> None:
+    _set_required_env(monkeypatch)
+    monkeypatch.setenv("E2E_PUBAPI_PROJECT_ID", "not-an-int")
+    assert E2EConfig.from_env() is None
+
+
+# ---------------------------------------------------------------------------
+# PubApi query building and call-history filtering
+# ---------------------------------------------------------------------------
+
+
+def test_pubapi_datetime_converts_aware_value_to_naive_utc() -> None:
+    """An aware value is normalised to UTC and stripped of its zone."""
+    aware = datetime(2026, 3, 4, 5, 6, 7, tzinfo=UTC)
+    assert pubapi_datetime(aware) == "2026-03-04T05:06:07"
+
+
+def test_pubapi_datetime_leaves_naive_value_alone() -> None:
+    assert pubapi_datetime(datetime(2026, 3, 4, 5, 6, 7)) == "2026-03-04T05:06:07"
+
+
+def test_pubapi_query_percent_encodes_colons() -> None:
+    """PubApi documents the timestamps as URL-encoded (``%3A``), not bare colons."""
+    query = pubapi_call_history_query(
+        datetime(2026, 3, 4, 5, 6, 7, tzinfo=UTC),
+        datetime(2026, 3, 4, 5, 16, 7, tzinfo=UTC),
+        limit=50,
+    )
+    assert "start=2026-03-04T05%3A06%3A07" in query
+    assert "end=2026-03-04T05%3A16%3A07" in query
+    assert "limit=50" in query
+    assert ":" not in query
+
+
+def test_pubapi_query_omits_project_id_unless_given() -> None:
+    start = datetime(2026, 3, 4, 5, 6, 7, tzinfo=UTC)
+    end = datetime(2026, 3, 4, 5, 16, 7, tzinfo=UTC)
+    assert "project_id" not in pubapi_call_history_query(start, end)
+    assert "project_id=77" in pubapi_call_history_query(start, end, project_id=77)
+
+
+def test_call_histories_since_keeps_only_calls_in_the_window() -> None:
+    """GetCallHistory filters on *modified* time, so old calls come back too."""
+    rows = [
+        {"call_history_id": 1, "call_date_time_utc": "2026-03-04T05:10:00Z"},
+        {"call_history_id": 2, "call_date_time_utc": "2026-01-01T00:00:00Z"},
+    ]
+    kept = call_histories_since(rows, datetime(2026, 3, 4, 5, 0, 0, tzinfo=UTC))
+    assert [r["call_history_id"] for r in kept] == [1]
+
+
+def test_call_histories_since_drops_undatable_rows() -> None:
+    """A row we cannot date is not evidence that this call reached VanillaSoft."""
+    rows: list[dict[str, Any]] = [
+        {"call_history_id": 1},
+        {"call_history_id": 2, "call_date_time_utc": None},
+        {"call_history_id": 3, "call_date_time_utc": "not a timestamp"},
+    ]
+    assert call_histories_since(rows, datetime(2026, 3, 4, 5, 0, 0, tzinfo=UTC)) == []
+
+
+def test_call_histories_since_accepts_naive_boundary() -> None:
+    """A naive ``since`` is read as UTC rather than raising on the comparison."""
+    rows = [{"call_history_id": 1, "call_date_time_utc": "2026-03-04T05:10:00"}]
+    kept = call_histories_since(rows, datetime(2026, 3, 4, 5, 0, 0))
+    assert len(kept) == 1
+
+
+def test_live_call_test_consumes_the_vs_check() -> None:
+    """The live call test must request ``pubapi_client``, or ``vs_check`` is a no-op.
+
+    ``E2E_VS_CHECK`` spent its first life parsed into ``E2EConfig`` and read by nothing,
+    so setting it bought silent no-op coverage. Everything else here tests the machinery
+    the flag *would* drive; this asserts the flag is actually plugged into a test. It is
+    the check that fails if the wiring is reverted while the helpers survive.
+    """
+    from tests.live_e2e import test_live_call
+
+    params = inspect.signature(test_live_call.test_inbound_call_posts).parameters
+    assert "pubapi_client" in params
+
+
+async def test_pubapi_client_sets_apikey_header_and_closes() -> None:
+    """PubApi authenticates with ``APIKey=<key>``, not ``Bearer`` (ApiKeyUtil regex)."""
+    client = PubApiClient("https://pubapi.example.com", "pub-secret")
+    try:
+        assert client._client.headers["authorization"] == "APIKey=pub-secret"
+    finally:
+        await client.aclose()
+
+
+def _set_required_env(monkeypatch) -> None:
+    """Set every var the live suite requires, so a test can vary one thing at a time."""
     monkeypatch.setenv("RUN_LIVE_E2E", "1")
     monkeypatch.setenv("E2E_BASE_URL", "http://localhost:8000")
     monkeypatch.setenv("E2E_API_KEY", "secret")
     monkeypatch.setenv("E2E_CUSTOMER_ID", "1")
     monkeypatch.setenv("E2E_DID_A", "+15145550001")
     monkeypatch.setenv("E2E_DID_B", "+15145550002")
-    assert live_e2e_skip_reason() is None
 
 
 # ---------------------------------------------------------------------------
