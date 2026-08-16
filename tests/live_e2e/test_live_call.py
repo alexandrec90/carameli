@@ -9,10 +9,10 @@ which, with the honest receiver, means VanillaSoft durably processed it.
 The true click-to-call path (``Callback/ByExtension``) needs a human to answer, so it
 lives here behind ``@pytest.mark.manual`` for attended runs.
 
-With ``E2E_VS_CHECK=1`` the test adds a second, independent proof: it reads the call
-back out of VanillaSoft's own PubApi call history instead of taking Carameli's
-``posted`` flag at its word. See ``helpers.py`` for the staging precondition that check
-requires.
+``E2E_VS_CHECK=1`` adds a second, independent proof — reading the call back out of
+VanillaSoft's own PubApi call history rather than taking Carameli's ``posted`` flag at
+its word. It hangs off the **attended** test only, because that is the only flow whose
+evidence reaches ``GetCallHistory``; see ``helpers.py`` for why.
 """
 
 from __future__ import annotations
@@ -92,10 +92,12 @@ async def _assert_vs_call_history(
 ) -> None:
     """Assert the call is visible in VanillaSoft's own PubApi call history.
 
-    This is deliberately independent of Carameli's ``posted`` flag: ``posted`` says the
-    notify POST was accepted, this says VanillaSoft filed the call against a contact.
-    The window is widened by ``PUBAPI_CLOCK_SKEW_MINUTES`` on both ends because the two
+    Deliberately independent of Carameli's ``posted`` flag: ``posted`` says the notify
+    POST was accepted, this says VanillaSoft's own read surface can see the call. The
+    window is widened by ``PUBAPI_CLOCK_SKEW_MINUTES`` on both ends because the two
     machines' clocks are not the same clock.
+
+    Only valid for the attended flow — see the module docstring and ``helpers.py``.
     """
     skew = timedelta(minutes=PUBAPI_CLOCK_SKEW_MINUTES)
 
@@ -117,10 +119,13 @@ async def _assert_vs_call_history(
     assert histories, "no VanillaSoft call-history record for the E2E call"
 
 
-async def test_inbound_call_posts(
-    live_client: CarameliClient, live_config: E2EConfig, pubapi_client: PubApiClient | None
-) -> None:
-    """Originate A→B via Telnyx; the inbound call_events row lands and posts to VS."""
+async def test_inbound_call_posts(live_client: CarameliClient, live_config: E2EConfig) -> None:
+    """Originate A→B via Telnyx; the inbound call_events row lands and posts to VS.
+
+    No PubApi read-back here even under ``E2E_VS_CHECK``: nothing creates a VanillaSoft
+    *call-history* record for a call no agent placed through the CRM, so there would be
+    nothing to read. ``posted=True`` is the VanillaSoft assertion for this flow.
+    """
     if not live_config.telnyx_connection_id:
         pytest.skip("Set E2E_TELNYX_CONNECTION_ID to originate calls unattended")
     if not settings.telnyx_api_key:
@@ -160,13 +165,17 @@ async def test_inbound_call_posts(
     assert row["status"] in _TERMINAL_STATUSES
     assert row["posted"] is True
 
-    if pubapi_client is not None:
-        await _assert_vs_call_history(pubapi_client, live_config, started_after)
-
 
 @pytest.mark.manual
-async def test_click_to_call_attended(live_client: CarameliClient, live_config: E2EConfig) -> None:
-    """Attended click-to-call via Callback/ByExtension — a human must answer the agent leg."""
+async def test_click_to_call_attended(
+    live_client: CarameliClient, live_config: E2EConfig, pubapi_client: PubApiClient | None
+) -> None:
+    """Attended click-to-call via Callback/ByExtension — a human must answer the agent leg.
+
+    This is where ``E2E_VS_CHECK`` belongs: the agent clicked to call a contact from
+    inside VanillaSoft, so a call-history record exists for the CMV Call Data Service to
+    attach the Carameli call attempt to, and PubApi can therefore see it.
+    """
     extension = os.getenv("E2E_EXTENSION")
     if not extension:
         pytest.skip("Set E2E_EXTENSION (and answer the phone) to run the attended variant")
@@ -198,3 +207,6 @@ async def test_click_to_call_attended(live_client: CarameliClient, live_config: 
         description="attended callback call posted",
     )
     assert row is not None
+
+    if pubapi_client is not None:
+        await _assert_vs_call_history(pubapi_client, live_config, started_after)

@@ -167,16 +167,38 @@ processed and persisted the event.
 ### The `E2E_VS_CHECK` opt-in
 
 `posted=True` is Carameli's own account of what happened. `E2E_VS_CHECK=1` adds an
-independent one: `test_live_call.py` reads the call back out of VanillaSoft's
-`GET /GetCallHistory` PubApi endpoint (auth header `Authorization: APIKey=<key>`) and
-asserts a call-history record dated inside the test's window exists.
+independent one: read the call back out of VanillaSoft's `GET /GetCallHistory` PubApi
+endpoint (auth header `Authorization: APIKey=<key>`, *not* `Bearer`) and assert a
+call-history record dated inside the test's window exists.
 
-It has a staging precondition, so it is off by default: VanillaSoft's *CMV Call Data
-Service* matches a Carameli call notification to a **contact, by phone number**
-(`../VanillaLand/AppCode/CMV Call Data Service/CMVCallData.cs`,
-`FindCallAttemptCallHistory`). Unless the E2E customer's VanillaSoft project holds a
-contact whose number is `E2E_DID_A`, no call-history record is ever written and the
-check fails on a healthy system.
+**It applies to the attended click-to-call test only** (`-m manual`), and the reason
+matters more than the flag does — it says where VanillaSoft-side evidence for a Carameli
+call actually lands:
+
+| What | Where it lands | Readable via |
+| --- | --- | --- |
+| The Carameli notification | `sp_CMVCallNotificationInsert` → CMV notification row | not exposed by PubApi |
+| The call attempt, once matched | `sp_CallHistoryCallAttemptInsert`, attached to an **existing** `CallHistoryID` | — |
+| The call-history record itself | created by the CRM when an agent works a contact | `GET /GetCallHistory` |
+
+Nothing in that chain *creates* a call-history record from a notification —
+`FindCallAttemptCallHistory` (`../VanillaLand/AppCode/CMV Call Data Service/CMVCallData.cs`)
+attaches the attempt to a record it found with `sp_CMVCallAttemptMatchCallHistoryFetch`.
+So for the **unattended** inbound flow, where the call was originated straight through
+Telnyx and no agent dialed from the CRM, `GetCallHistory` returns nothing however
+staging is seeded, and `posted=True` is the only honest assertion. Seeding a contact
+does not change this; the missing row is the call history, not the contact.
+
+For the attended flow the agent did dial a contact from inside VanillaSoft, so the
+record exists and the read-back is real evidence. Its precondition is just that flow's
+normal setup: the dialed contact exists in the E2E project and the PubApi key can reach
+that project. If you seed a contact by hand (PubApi `POST /contacts` with `project_id`
+and `phone_numbers: [{"name": "<the project's phone field>", "number": "5145550001"}]`),
+store the number **in 10-digit form** — `FindCallAttemptCallHistory` strips a leading
+`+` and a leading `1` from the incoming number only, so `+15145550001` will not match.
+
+> Seeding a contact is fixture setup. Seeding the *call-history record* — e.g. via
+> PubApi `AddCallHistory` — would fake the exact thing under test. Don't.
 
 Setting the flag without `E2E_PUBAPI_BASE_URL` and `E2E_PUBAPI_KEY` **skips the whole
 suite** with those names in the reason. That is deliberate: an opt-in assertion that
