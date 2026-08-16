@@ -222,9 +222,20 @@ async def test_get_phone_lines_filters_inactive(client, db_session) -> None:
 # ---------------------------------------------------------------------------
 
 
-async def test_webhook_then_query_call_event(client, db_session) -> None:
-    """POST a call-status webhook, then verify the DB row has correct fields."""
+async def test_webhook_then_query_call_event(client, db_session, monkeypatch) -> None:
+    """POST a call-status webhook, then verify the DB row has correct fields.
+
+    The blank secret is the documented local/CI signature bypass
+    (`.claude/rules/webhooks.md`). Without it this test reads whatever
+    `JAMBONZ_WEBHOOK_SECRET` the developer's own `.env` carries — green on a blank
+    checkout, 403 on any machine configured against a real Jambonz account. Every
+    other unsigned-webhook test pins it the same way; `tests/unit/conftest.py` does
+    it tree-wide for the unit suite.
+    """
+    from app.core.config import settings
     from app.repositories.call_event_repo import CallEventRepo
+
+    monkeypatch.setattr(settings, "jambonz_webhook_secret", "")
 
     payload = {
         "call_sid": "CAintegration9005",

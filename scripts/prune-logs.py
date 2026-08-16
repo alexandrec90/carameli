@@ -65,6 +65,7 @@ PROTECTED = frozenset(
         "test-failures.log",
         "frontend-test-failures.log",
         "e2e-failures.log",
+        "local-e2e-failures.log",
         "ci-failures.log",
         "stop-verify.log",
         "pre-commit-errors.log",

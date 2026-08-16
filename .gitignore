@@ -1,6 +1,8 @@
 .env
 .env.*
 !.env.example
+# Template for tests/local_e2e/; the real .env.local-e2e stays ignored by the rule above.
+!.env.local-e2e.example
 
 # Secrets / certificates
 *.pem
