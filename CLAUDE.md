@@ -71,6 +71,10 @@ Useful legacy roots include `VanillaSoft.Backend/ConnectMeVoice`, `CMVClarity`,
 reading and which are CRM surface with no VoIP content. Read it before going in; it is
 a large codebase and the relevant slice is thin.
 
+When Carameli is remote and VanillaLand runs locally in IIS, the log locations and the
+usable test suite both change: `docs/operations/local-integration-testing.md` and the free
+`tests/local_e2e/` suite, not `tests/live_e2e/`.
+
 ## Local workflow
 
 Docker Desktop is required for database-backed tests and stack operations. Check
