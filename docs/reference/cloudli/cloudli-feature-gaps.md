@@ -1,7 +1,10 @@
 # Cloudli Feature Gap Analysis
 
 Comparison of Cloudli's advertised features against Carameli's current implementation.
-Use this as a backlog reference — features are grouped by effort, not priority.
+Use this as a backlog reference — features are grouped by effort, not priority. Endpoint-level
+contract details live in [the VanillaLand VoIP endpoint audit](../vanillaland-voip-endpoint-audit.md).
+
+Last audited: 2026-08-16.
 
 ---
 
@@ -12,6 +15,7 @@ Use this as a backlog reference — features are grouped by effort, not priority
 | ✅ | Implemented |
 | ⚠️ | Partial |
 | ❌ | Missing |
+| n/a | Belongs to VanillaSoft's CRM rather than Carameli's VoIP boundary |
 
 ---
 
@@ -24,8 +28,8 @@ Use this as a backlog reference — features are grouped by effort, not priority
 | Hosted IP Telephony | ✅ | Jambonz + FreeSWITCH |
 | Admin Portal (Web) | ⚠️ | 3D UI exists for Lines/Extensions only |
 | HD Voice Quality | ✅ | FreeSWITCH handles codec negotiation |
-| IVR (press 1 for Sales…) | ❌ | |
-| Customer Account Provisioning | ❌ | CMV `VsCustomer/Add` creates a VoIP sub-account per VanillaSoft customer; Carameli has customer-scoped auth but no account lifecycle endpoint |
+| IVR (press 1 for Sales…) | ⚠️ | Simple DTMF auto-attendant routing exists; multi-level menus and prompts do not |
+| Customer Account Provisioning | ✅ | `VsCustomer/Create` creates the Carameli tenant/auth boundary; Telnyx and Jambonz are not partitioned into per-customer sub-accounts |
 | Branch / Sub-group Assignment | ❌ | CMV `Branch/Assign` links extensions to organizational branches; no equivalent in Carameli |
 | REST API | ✅ | FastAPI |
 
@@ -34,20 +38,20 @@ Use this as a backlog reference — features are grouped by effort, not priority
 | Feature | Status | Notes |
 |---|---|---|
 | Call Routing / Forwarding | ⚠️ | DID→extension pointers exist; no time-based/conditional routing |
-| Callback / Click-to-Call | ❌ | CMV exposed `Callback/ByExtension/{cid}/{ext}/{dst}`; Jambonz `dial` verb can bridge the two legs — needs a `POST /calls/callback` endpoint |
+| Callback / Click-to-Call | ✅ | `POST /Callback/ByExtension` bridges the two Jambonz legs |
 | Enhanced Voicemail | ❌ | No mailbox, greetings, or email/SMS delivery |
 | Call Queues + Hold Music | ❌ | |
 | Call Parking | ❌ | |
-| Presence / BLF | ⚠️ | VanillaLand polls `clarityucaas.com` HUD Phones + Device Status endpoints every 30 s via `CMVAgentStatus` Windows service and caches per-agent call state; Carameli has no equivalent poller or agent-status endpoint |
+| Presence / BLF | ⚠️ | ARQ polls Jambonz calls and SIP registrations; `GET /AgentStatus/{customerId}` exposes call/registration state, but not user-set presence or SIP BLF subscriptions |
 | Call Screening / Blacklist | ❌ | SCI zip-code filter exists but is not the same thing |
 
 ### Mobile & Desktop Apps
 
 | Feature | Status | Notes |
 |---|---|---|
-| Softphone (iOS/Android/Desktop) | ❌ | SIP creds exist — compatible softphones (Zoiper, Linphone) could use them today |
+| Softphone (iOS/Android/Desktop) | ❌ | Extension identifiers exist, but Jambonz SIP credential provisioning and one-time secret delivery do not |
 | Business SMS | ✅ | Send/receive via Telnyx |
-| SMS Delivery Receipts | ❌ | Cloudli pushes delivery receipt webhooks (`notify/IncomingSmsMessageDeliveryReceipt`); Carameli has no handler and no per-message delivery-status field |
+| SMS Delivery Receipts | ✅ | Telnyx `message.finalized` updates delivery state and forwards `notify/IncomingSmsMessageDeliveryReceipt` to VanillaSoft |
 | MMS | ❌ | Telnyx supports it; Carameli doesn't yet |
 | Team Messaging (internal chat) | ❌ | Different product category entirely |
 | Contact Sync (Microsoft 365) | ❌ | |
@@ -60,7 +64,7 @@ Use this as a backlog reference — features are grouped by effort, not priority
 | Skills-based / Smart Queuing | ❌ | |
 | Monitor / Whisper / Barge-in | ❌ | FreeSWITCH supports all three natively |
 | Call Analytics / CDR Reporting | ⚠️ | `call_events` table exists; no aggregations or UI |
-| IR Filter Management (Clarity API) | ❌ | Clarity API (`VanillaSoft.PubApi`) exposes CRUD for Intellective Routing filters (get, copy, assign, update); no Carameli equivalent |
+| IR Filter Management (VanillaSoft PubApi) | n/a | CRM lead-distribution filters over projects/users/contact fields; not a VoIP or SCI provider capability |
 
 ### IP Fax
 
@@ -77,8 +81,8 @@ Use this as a backlog reference — features are grouped by effort, not priority
 | SIP Trunking | ✅ | Telnyx |
 | Business Internet / SD-WAN | ❌ | Physical ISP product — out of scope |
 | Mass Notifications | ⚠️ | Voicemail drop exists; no bulk SMS templating |
-| Local + Toll-Free Numbers | ⚠️ | Local works; toll-free not wired up |
-| International Numbers | ⚠️ | Telnyx covers 180+ countries; area code lookup doesn't expose them |
+| Local + Toll-Free Numbers | ✅ | Telnyx search handles the seven NANP toll-free prefixes and local area codes |
+| International Numbers | ✅ | DID search/provisioning accepts ISO country codes; availability still depends on the carrier/account |
 | Number Porting | ❌ | Telnyx supports LOA porting via API |
 
 ---
@@ -90,8 +94,6 @@ Use this as a backlog reference — features are grouped by effort, not priority
 Thin API wrappers over capabilities already in the stack.
 
 - **Call Screening / Blacklist** — `blocked_numbers` table + webhook intercept in the Jambonz call hook. Evaluates before the call connects, so zero marginal cost.
-- **International Numbers** — Telnyx already handles them. Extend `get_available_area_codes` to accept non-US country codes.
-- **Toll-Free Numbers** — Telnyx search filter change (`number_type=toll-free`). One extra parameter.
 - **MMS** — Telnyx accepts `media_urls` on the SMS send call. One extra schema field.
 - **CDR Reporting Endpoints** — Aggregate queries on the existing `call_events` table (total calls, avg duration, success rate). PostgreSQL window functions, no new infra.
 - **Call Transfer (blind/attended)** — Jambonz has a `redirect` verb. New endpoint + minor Jambonz provider method.
@@ -118,7 +120,7 @@ New architectural components or significant protocol work required.
 
 ### Very high effort / separate product — 6+ weeks
 
-- **Softphone App (iOS/Android)** — SIP credentials Carameli generates today are compatible with any standard SIP client. Pointing users at Zoiper/Linphone/Bria is free and immediate. A branded native app is a separate project.
+- **Softphone App (iOS/Android)** — First provision real Jambonz SIP credentials and deliver each secret once; those standard credentials can then work with Zoiper/Linphone/Bria. A branded native app is a separate project.
 - **Team Messaging** — Entirely different product. Most practical path: self-hosted Matrix/Element bridged to Carameli's customer identity.
 - **Contact Sync (Microsoft 365)** — OAuth app registration, Microsoft Graph API, contact mapping, Microsoft partner/app certification required.
 
