@@ -151,6 +151,9 @@ pytest tests/live_e2e -m live_e2e --collect-only
 | `E2E_CUSTOMER_ID` | That customer's `vs_customer_id` (for `/List/{id}` reads) |
 | `E2E_DID_A`, `E2E_DID_B` | Two owned Canadian test DIDs; B is the inbound target |
 | `E2E_VS_CHECK` | optional `1`: also assert VanillaSoft-side via PubApi |
+| `E2E_PUBAPI_BASE_URL` | required when `E2E_VS_CHECK=1`: VanillaSoft PubApi root |
+| `E2E_PUBAPI_KEY` | required when `E2E_VS_CHECK=1`: key for `Authorization: APIKey=` |
+| `E2E_PUBAPI_PROJECT_ID` | optional: restrict the PubApi call-history read to one project |
 | `E2E_TELNYX_CONNECTION_ID` | optional: Telnyx Call Control connection for unattended calls |
 | `E2E_EXTENSION` | optional: extension for the attended `manual` variant |
 | `E2E_RECORDING` | optional `1`: run the recording flow (roadmap A6 must be live) |
@@ -160,3 +163,21 @@ airtight part — the event reaches VanillaSoft durably. For calls that is `post
 on the row; for SMS (where `posted` is not exposed on the API) it is the
 `notify POST ok` log line. With the honest receiver, both **mean** VanillaSoft
 processed and persisted the event.
+
+### The `E2E_VS_CHECK` opt-in
+
+`posted=True` is Carameli's own account of what happened. `E2E_VS_CHECK=1` adds an
+independent one: `test_live_call.py` reads the call back out of VanillaSoft's
+`GET /GetCallHistory` PubApi endpoint (auth header `Authorization: APIKey=<key>`) and
+asserts a call-history record dated inside the test's window exists.
+
+It has a staging precondition, so it is off by default: VanillaSoft's *CMV Call Data
+Service* matches a Carameli call notification to a **contact, by phone number**
+(`../VanillaLand/AppCode/CMV Call Data Service/CMVCallData.cs`,
+`FindCallAttemptCallHistory`). Unless the E2E customer's VanillaSoft project holds a
+contact whose number is `E2E_DID_A`, no call-history record is ever written and the
+check fails on a healthy system.
+
+Setting the flag without `E2E_PUBAPI_BASE_URL` and `E2E_PUBAPI_KEY` **skips the whole
+suite** with those names in the reason. That is deliberate: an opt-in assertion that
+silently asserts nothing is worse than one that refuses to run.

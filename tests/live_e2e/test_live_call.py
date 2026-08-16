@@ -8,20 +8,33 @@ which, with the honest receiver, means VanillaSoft durably processed it.
 
 The true click-to-call path (``Callback/ByExtension``) needs a human to answer, so it
 lives here behind ``@pytest.mark.manual`` for attended runs.
+
+With ``E2E_VS_CHECK=1`` the test adds a second, independent proof: it reads the call
+back out of VanillaSoft's own PubApi call history instead of taking Carameli's
+``posted`` flag at its word. See ``helpers.py`` for the staging precondition that check
+requires.
 """
 
 from __future__ import annotations
 
 import asyncio
 import os
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import httpx
 import pytest
 
 from app.core.config import settings
 from app.core.constants import TELNYX_API_BASE_URL
-from tests.live_e2e.helpers import CarameliClient, E2EConfig, live_e2e_skip_reason, poll_until
+from tests.live_e2e.helpers import (
+    PUBAPI_CLOCK_SKEW_MINUTES,
+    CarameliClient,
+    E2EConfig,
+    PubApiClient,
+    call_histories_since,
+    live_e2e_skip_reason,
+    poll_until,
+)
 
 _SKIP = live_e2e_skip_reason()
 pytestmark = [
@@ -58,7 +71,8 @@ async def _telnyx_originate(connection_id: str, from_: str, to: str) -> str:
             json={"connection_id": connection_id, "to": to, "from": from_},
         )
         resp.raise_for_status()
-        return resp.json()["data"]["call_control_id"]
+        call_control_id: str = resp.json()["data"]["call_control_id"]
+        return call_control_id
 
 
 async def _telnyx_hangup(call_control_id: str) -> None:
@@ -73,7 +87,39 @@ async def _telnyx_hangup(call_control_id: str) -> None:
             resp.raise_for_status()
 
 
-async def test_inbound_call_posts(live_client: CarameliClient, live_config: E2EConfig) -> None:
+async def _assert_vs_call_history(
+    pubapi: PubApiClient, cfg: E2EConfig, started_after: datetime
+) -> None:
+    """Assert the call is visible in VanillaSoft's own PubApi call history.
+
+    This is deliberately independent of Carameli's ``posted`` flag: ``posted`` says the
+    notify POST was accepted, this says VanillaSoft filed the call against a contact.
+    The window is widened by ``PUBAPI_CLOCK_SKEW_MINUTES`` on both ends because the two
+    machines' clocks are not the same clock.
+    """
+    skew = timedelta(minutes=PUBAPI_CLOCK_SKEW_MINUTES)
+
+    async def recent_histories() -> list[dict]:
+        rows = await pubapi.get_call_history(
+            started_after - skew,
+            datetime.now(UTC) + skew,
+            project_id=cfg.pubapi_project_id,
+        )
+        return call_histories_since(rows, started_after - skew)
+
+    histories = await poll_until(
+        recent_histories,
+        bool,
+        timeout_s=120,
+        interval_s=10,
+        description=f"VanillaSoft PubApi call history since {started_after.isoformat()}",
+    )
+    assert histories, "no VanillaSoft call-history record for the E2E call"
+
+
+async def test_inbound_call_posts(
+    live_client: CarameliClient, live_config: E2EConfig, pubapi_client: PubApiClient | None
+) -> None:
     """Originate A→B via Telnyx; the inbound call_events row lands and posts to VS."""
     if not live_config.telnyx_connection_id:
         pytest.skip("Set E2E_TELNYX_CONNECTION_ID to originate calls unattended")
@@ -113,6 +159,9 @@ async def test_inbound_call_posts(live_client: CarameliClient, live_config: E2EC
     assert row is not None
     assert row["status"] in _TERMINAL_STATUSES
     assert row["posted"] is True
+
+    if pubapi_client is not None:
+        await _assert_vs_call_history(pubapi_client, live_config, started_after)
 
 
 @pytest.mark.manual
