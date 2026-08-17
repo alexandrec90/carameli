@@ -192,7 +192,12 @@ services:
   influxdb:
     image: influxdb:1.8
     restart: unless-stopped
-    profiles: ["telephony"]
+    # In "monitoring" as well as "telephony": grafana depends_on influxdb and
+    # provisions a jambonz-influxdb datasource against it, so with telephony
+    # alone `--profile monitoring` left the service undefined and compose
+    # rejected the entire project at parse time. See
+    # tests/unit/test_compose_profiles.py.
+    profiles: ["telephony", "monitoring"]
     volumes:
       - influxdata:/var/lib/influxdb
     healthcheck:
