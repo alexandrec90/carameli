@@ -1,15 +1,18 @@
 import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import type { LayoutProps } from '../types'
-import { BUBBLE_TYPES } from './editor/bubbleTypes'
+import { isBubbleRevealed } from './bubbleTube'
+import BubbleTubes from './BubbleTubes'
+import PanelBubble from './PanelBubble'
 import { PANEL_IMG_TRANSFORMS, PANEL_BUBBLE_TRANSFORMS } from './editor/layoutConfig'
-import { imgTransformStyle, fullImgStyle, imgClipStyle, bubbleStyle } from './editor/transforms'
+import { imgTransformStyle, fullImgStyle, imgClipStyle } from './editor/transforms'
 import { shouldRevealImg, useEditorMode } from './editor/useEditorMode'
 import {
     drawLoadingRipple, drawWash, parseCssColor, washPhaseAt,
     WASH_COVER_MS, WASH_HOLD_MS,
 } from './benDayWash'
 import './comic-book.css'
+import './bubbles.css'
 
 // ─── Ben-Day dot renderer ────────────────────────────────────────────────────
 
@@ -680,9 +683,10 @@ const PANEL_IMAGES: PanelImage[] = [
 ]
 
 // ─── Panel speech bubbles ───────────────────────────────────────────────────
-// Bubble content (type + text) and placement come from PANEL_BUBBLE_TRANSFORMS in
-// editor/layoutConfig.ts (the source of truth). The bubble's artwork + font are
-// resolved from its `type` via BUBBLE_TYPES (editor/bubbleTypes.ts).
+// Content (type + text), placement, event morph targets and links all come from
+// PANEL_BUBBLE_TRANSFORMS in editor/layoutConfig.ts (the source of truth). The
+// outline is generated vector geometry (bubbleShape.ts) drawn by PanelBubble.tsx;
+// connector tubes between linked bubbles are drawn by BubbleTubes.tsx.
 
 // ─── Dev-only editor overlay (lazy) ────────────────────────────────────────────
 // Gated on import.meta.env.DEV at module scope: in a production build this static
@@ -736,6 +740,13 @@ export function Layout({ navItems }: LayoutProps) {
     const [loadingLeaving, setLoadingLeaving] = useState(false)
     // Dev editor: force-show the loading screen so it can be previewed/tuned.
     const [previewLoading, setPreviewLoading] = useState(false)
+
+    // Which panel the pointer is over, or null. Bubble reveal moved off CSS :hover
+    // and into state because a link reveals its partner's bubble too, and CSS cannot
+    // reach a sibling panel's descendant; the tube layer needs the same answer.
+    const [hovered, setHovered] = useState<number | null>(null)
+    const bubbleVisible = (i: number): boolean =>
+        isBubbleRevealed(bubbleT, hovered, editor.active, i)
 
     const markSettled = useCallback(() => {
         settledCountRef.current += 1
@@ -919,6 +930,10 @@ export function Layout({ navItems }: LayoutProps) {
                                 info.isLogo ? 'logo' : '',
                                 info.path ? 'clickable' : '',
                                 revealFull ? 'cb-panel-reveal' : '',
+                                // Lift the panel over the ink-line SVG while its
+                                // bubble shows — including when a link, not the
+                                // pointer, is what revealed it.
+                                !editor.active && bubbleVisible(i) ? 'cb-panel-lift' : '',
                             ].filter(Boolean).join(' ')}
                             role={info.path ? 'button' : undefined}
                             tabIndex={info.path ? 0 : undefined}
@@ -930,6 +945,8 @@ export function Layout({ navItems }: LayoutProps) {
                                 height: bounds.h,
                                 overflow: 'visible',
                             }}
+                            onMouseEnter={() => setHovered(i)}
+                            onMouseLeave={() => setHovered(prev => (prev === i ? null : prev))}
                             onClick={() => info.path && navigate(info.path)}
                             onKeyDown={e => {
                                 if ((e.key === 'Enter' || e.key === ' ') && info.path) {
@@ -992,34 +1009,19 @@ export function Layout({ navItems }: LayoutProps) {
                                     }}
                                 />
                             </div>
-                            {/* Speech bubble — content/type from PANEL_BUBBLE_TRANSFORMS, artwork +
-                                font resolved via BUBBLE_TYPES. Revealed on hover (always shown in
-                                edit mode). When spill is off, a clip wrapper hides any overflow
-                                behind the panel edge; when on, the bubble floats into the gutter. */}
+                            {/* Speech bubble — generated vector outline (PanelBubble). Revealed on
+                                hover, by a link partner's hover, or always in edit mode. When spill
+                                is off, a clip wrapper hides any overflow behind the panel edge;
+                                when on, the bubble floats into the gutter. */}
                             {(() => {
-                                const bubble = bubbleT[i]
-                                const def = BUBBLE_TYPES[bubble.type]
                                 const bubbleEl = (
-                                    <div
-                                        className="cb-panel-bubble"
-                                        aria-hidden="true"
-                                        style={bubbleStyle(bubble)}
-                                    >
-                                        <img
-                                            src={def.src}
-                                            alt=""
-                                            className="cb-panel-bubble-img"
-                                            draggable={false}
-                                        />
-                                        <span
-                                            className="cb-panel-bubble-text"
-                                            style={{ fontFamily: `'${def.font}', cursive` }}
-                                        >
-                                            {bubble.text}
-                                        </span>
-                                    </div>
+                                    <PanelBubble
+                                        bubble={bubbleT[i]}
+                                        visible={bubbleVisible(i)}
+                                        interactive={!editor.active}
+                                    />
                                 )
-                                return bubble.spill ? (
+                                return bubbleT[i].spill ? (
                                     bubbleEl
                                 ) : (
                                     <div className="cb-bubble-clip" style={{ clipPath: dotClip }}>
@@ -1030,6 +1032,11 @@ export function Layout({ navItems }: LayoutProps) {
                         </div>
                     )
                 })}
+
+                {/* Connector tubes between linked bubbles — one viewport-level layer, because
+                    a link joins two panels and the corridor belongs to the gutter between
+                    them. Painted above the bubbles so each tube welds into both mouths. */}
+                <BubbleTubes polys={panelPolys} bubbles={bubbleT} isVisible={bubbleVisible} />
 
                 {/* Layer 2 — Panel outline SVG (sits above images, below the wash) */}
                 <svg

@@ -1,5 +1,7 @@
 import type { CSSProperties } from 'react'
 
+import { BUBBLE_ASPECT } from '../bubbleShape'
+import type { BubbleType } from './bubbleTypes'
 import type { ImgTransform, BubbleTransform, EditorConfig } from './types'
 
 // ─── Interaction bounds (Phase 3) ───────────────────────────────────────────────
@@ -152,6 +154,29 @@ export function imgClipStyle(spill: boolean, reveal: boolean, clip: string): CSS
     : { clipPath: clip, overflow: 'hidden' }
 }
 
+/**
+ * On-screen box of a panel's bubble. `top`/`right`/`width` are percentages of the
+ * panel box, and the height follows the bubble's fixed aspect ratio — which is what
+ * the DOM's `height: auto` resolves to, since the outline SVG carries a viewBox.
+ *
+ * Shared deliberately: the renderer needs it to aim connector tubes and the editor
+ * needs it for the hit target and selection outline. When those two disagreed, a
+ * bubble you could click was not the bubble a tube pointed at.
+ */
+export function bubbleRect(
+  bounds: { x: number; y: number; w: number; h: number },
+  t: Pick<BubbleTransform, 'top' | 'right' | 'width'>,
+): { x: number; y: number; w: number; h: number } {
+  const w = (t.width / 100) * bounds.w
+  const rightX = bounds.x + bounds.w - (t.right / 100) * bounds.w
+  return {
+    x: rightX - w,
+    y: bounds.y + (t.top / 100) * bounds.h,
+    w,
+    h: w * BUBBLE_ASPECT,
+  }
+}
+
 /** Inline style for the .cb-panel-bubble wrapper (overrides the CSS defaults). */
 export function bubbleStyle(b: BubbleTransform): CSSProperties {
   return {
@@ -170,6 +195,11 @@ export function bubbleStyle(b: BubbleTransform): CSSProperties {
 function round(n: number, decimals: number): number {
   const f = 10 ** decimals
   return Math.round(n * f) / f
+}
+
+/** A nullable bubble type as a TS literal — `null` unquoted, a type quoted. */
+function typeLiteral(t: BubbleType | null): string {
+  return t === null ? 'null' : `'${t}'`
 }
 
 /**
@@ -192,7 +222,9 @@ export function serializeConfig(c: EditorConfig): string {
       b =>
         `  { top: ${Math.round(b.top)}, right: ${Math.round(b.right)}, ` +
         `width: ${Math.round(b.width)}, rotate: ${round(b.rotate, 1)}, ` +
-        `spill: ${b.spill}, type: '${b.type}', text: ${JSON.stringify(b.text)} },`,
+        `spill: ${b.spill}, type: '${b.type}', text: ${JSON.stringify(b.text)}, ` +
+        `linkTo: ${b.linkTo}, hoverType: ${typeLiteral(b.hoverType)}, ` +
+        `clickType: ${typeLiteral(b.clickType)} },`,
     )
     .join('\n')
   return (

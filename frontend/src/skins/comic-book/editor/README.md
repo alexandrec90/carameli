@@ -9,10 +9,18 @@ numbers back into source.
 [`layoutConfig.ts`](./layoutConfig.ts) holds `PANEL_IMG_TRANSFORMS` and
 `PANEL_BUBBLE_TRANSFORMS` — the per-panel image framing (scale / offset / anchor /
 spill) and bubble placement **and content** (top / right / width / rotate / spill /
-type / text). The bubble `type` resolves to artwork + font via
-[`bubbleTypes.ts`](./bubbleTypes.ts) (`BUBBLE_TYPES`). The renderer in `Layout.tsx`
-reads everything from these modules — there are no more magic framing numbers, and
-no bubble text/art lives in `Layout.tsx`.
+type / text), plus each bubble's event morph targets (`hoverType`, `clickType`) and
+its connector-tube partner (`linkTo`). The bubble `type` resolves to a lettering font
+via [`bubbleTypes.ts`](./bubbleTypes.ts) (`BUBBLE_TYPES`); the outline itself is
+generated vector geometry in [`../bubbleShape.ts`](../bubbleShape.ts). The renderer
+reads everything from these modules — there are no more magic framing numbers, and no
+bubble text lives in `Layout.tsx`.
+
+**Bubbles are drawn, not imported.** Every shape is one closed ring of the same 64
+vertices sampled from a shared ellipse, so a shape change interpolates vertex-for-
+vertex and reads as a morph. That is why there is no bubble artwork any more: two
+different images can only crossfade. A new bubble type belongs in `bubbleShape.ts`'s
+`SHAPES` table as another radial modulation, and must keep the shared ring count.
 
 ## Quick start
 
@@ -36,8 +44,12 @@ no bubble text/art lives in `Layout.tsx`.
    - **Allow spill outside panel** checkbox — off (default for images) clips the
      element to the panel polygon (overflow hidden behind the panel edge); on lets it
      bleed into the gutter (default for bubbles).
-   - For bubbles: pick a **type** from the dropdown (sets artwork + font) and edit the
-     **text** inline.
+   - For bubbles: pick a resting **type** from the dropdown (sets shape + lettering
+     font), edit the **text** inline, choose the shapes to morph to **on hover** and
+     **on click** (`— no change —` keeps the resting shape), and pick a **link to**
+     partner to join with a connector tube. The tube redraws live as you drag either
+     end; two bubbles that overlap draw no tube at all, so drag them apart if one
+     doesn't appear. Links are symmetric — declare it at one end only.
    - The toolbar is **draggable by its COMIC EDITOR title bar** — move it off any
      panel it covers. The position is clamped to the viewport and persists in
      `localStorage` across reloads.
@@ -64,7 +76,12 @@ in a prod build.
 
 ```text
 types.ts            ImgTransform, BubbleTransform, EditorConfig
-bubbleTypes.ts      BubbleType + BUBBLE_TYPES (artwork/font per type) — ships in prod
+bubbleTypes.ts      BubbleType + BUBBLE_TYPES (lettering font per type) — ships in prod
+../bubbleShape.ts   PURE outline geometry: the shared vertex ring, morph lerp, tail
+../bubbleTube.ts    PURE connector-tube geometry + link/reveal semantics
+../useBubbleMorph.ts  rAF morph driver — writes `d` to the DOM, not through React
+../PanelBubble.tsx  one bubble: outline SVG + text + hover/press morph state
+../BubbleTubes.tsx  viewport-level tube layer for every linked pair
 layoutConfig.ts     PANEL_IMG_TRANSFORMS, PANEL_BUBBLE_TRANSFORMS — source of truth
 transforms.ts       PURE helpers: CSS builders, drag/scale math, clamp, serializeConfig(File)
 useEditorMode.ts    hook: flag detection, working copy, persistence, selection
@@ -79,4 +96,4 @@ editor.css          overlay chrome styles
 
 All math/serialization is pure and unit-tested under
 `frontend/src/tests/skins/` (`editorTransformsMath`, `editorMode`, `editorSerialize`,
-`pageSelection`, `editorToolbarDrag`).
+`pageSelection`, `editorToolbarDrag`, `bubbleShape`, `bubbleTube`).

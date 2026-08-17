@@ -225,128 +225,15 @@
   transform: none;
 }
 
-/* ─── Speech bubble ─────────────────────────────────────────────────────────── */
-.cb-bubble {
-  position: relative;
-  display: inline-block;
-  background: var(--cb-white);
-  border: var(--cb-ink);
-  border-radius: 50%;
-  padding: 12px 20px;
-  font-family: Bangers, cursive;
-  font-size: 18px;
-  letter-spacing: 1px;
-  text-transform: uppercase;
-  color: var(--cb-black);
-  text-align: center;
-}
+/* ─── Panel stacking while a bubble shows ─────────────────────────────────────
+   The bubbles and their tubes live in bubbles.css; this is the panel-side half. */
 
-/* tail */
-.cb-bubble::after {
-  content: '';
-  position: absolute;
-  bottom: -18px;
-  left: 24px;
-  width: 0;
-  height: 0;
-  border-left: 10px solid transparent;
-  border-right: 6px solid transparent;
-  border-top: 18px solid var(--cb-black);
-}
-
-.cb-bubble::before {
-  content: '';
-  position: absolute;
-  bottom: -14px;
-  left: 25px;
-  width: 0;
-  height: 0;
-  border-left: 9px solid transparent;
-  border-right: 5px solid transparent;
-  border-top: 17px solid var(--cb-white);
-  z-index: 1;
-}
-
-.cb-bubble.error {
-  background: var(--cb-red);
-  color: var(--cb-white);
-}
-
-.cb-bubble.shout {
-  border-radius: 0;
-  clip-path: polygon(8% 0%,92% 0%,100% 50%,92% 100%,8% 100%,0% 50%);
-}
-
-/* ─── Panel speech bubbles (hover reveal) ─────────────────────────────────── */
-
-/* Elevate the hovered panel above the SVG outline layer (z:3) so the
-   bubble, which lives inside the panel div, paints on top of the ink lines. */
-.cb-panel:hover {
+/* Elevate a panel whose bubble is showing above the SVG outline layer (z:3) so the
+   bubble, which lives inside the panel div, paints on top of the ink lines. Driven by
+   a class rather than :hover because a link reveals its partner's bubble too, and that
+   partner is never the element under the pointer. */
+.cb-panel-lift {
   z-index: 8;
-}
-
-/* top/right/width come from BubbleTransform via inline style; the literals here
-   are fallbacks (inline style wins). The per-panel rotation is driven by the
-   --cb-bubble-rot custom property so the hover scale animation stays intact. */
-.cb-panel-bubble {
-  position: absolute;
-  top: -35%;
-  right: -12%;
-  width: 55%;
-  pointer-events: none;
-  z-index: 5;
-  opacity: 0;
-  transform: scale(0.7) rotate(var(--cb-bubble-rot, -5deg));
-  transform-origin: center center;
-
-  /* cubic-bezier gives a light spring-overshoot on appear */
-  transition: opacity 180ms ease-out, transform 200ms cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-
-/* Dev editor: keep every bubble visible without hover so they can be selected
-   and reframed (the overlay sits above the panels and blocks :hover). The class
-   is only ever applied in dev edit mode — harmless and unused in prod. */
-.cb-edit-active .cb-panel-bubble {
-  opacity: 1;
-  transform: scale(1) rotate(var(--cb-bubble-rot, -5deg));
-}
-
-.cb-panel:hover .cb-panel-bubble {
-  opacity: 1;
-  transform: scale(1) rotate(var(--cb-bubble-rot, -5deg));
-}
-
-/* Optional clip wrapper around a bubble (spill off) — mirrors .cb-img-clip so the
-   bubble is clipped to the panel polygon (supplied inline) instead of floating.
-   z-index 1 creates a stacking context that traps the bubble's z-5 below the
-   panel-outline SVG (z-3): a clipped bubble sits behind the frame lines, while a
-   spilling bubble (no wrapper) escapes above them. */
-.cb-bubble-clip {
-  position: absolute;
-  inset: 0;
-  overflow: hidden;
-  pointer-events: none;
-  z-index: 1;
-}
-
-.cb-panel-bubble-img {
-  width: 100%;
-  height: auto;
-  display: block;
-}
-
-/* Text floats over the bubble image, centered in the main content area.
-   Bottom inset is larger to keep text clear of tails / lightning appendages. */
-.cb-panel-bubble-text {
-  position: absolute;
-  inset: 22% 18% 38%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  font-size: clamp(0.75rem, 2vw, 1.125rem);
-  color: #111;
-  line-height: 1.2;
 }
 
 /* ─── Asset images (Gemini-generated, desaturated → colorized on hover) ─────── */

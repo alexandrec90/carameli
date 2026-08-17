@@ -26,10 +26,20 @@ export interface BubbleTransform {
   rotate: number
   /** When true (default), the bubble floats into the gutter; when false it's clipped to the panel polygon. */
   spill: boolean
-  /** Bubble artwork + font style (see BUBBLE_TYPES). */
+  /** Resting shape + lettering font (see BUBBLE_TYPES and bubbleShape.ts). */
   type: BubbleType
   /** Bubble caption text. */
   text: string
+  /**
+   * Bubble to join with a connector tube, by panel index; null when unlinked. The
+   * link is symmetric — declaring it on either end draws one tube and reveals both
+   * bubbles together.
+   */
+  linkTo: number | null
+  /** Shape to morph to while the pointer is over the bubble; null = stay put. */
+  hoverType: BubbleType | null
+  /** Shape to pulse to when the bubble is pressed; null = stay put. */
+  clickType: BubbleType | null
 }
 
 export interface EditorConfig {

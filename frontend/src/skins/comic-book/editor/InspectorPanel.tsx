@@ -6,11 +6,18 @@ interface InspectorPanelProps {
   api: EditorModeApi
   /** Human-readable name of the selected panel. */
   label: string
+  /** Every panel's name, indexed like the config — for the link picker. */
+  labels: string[]
 }
 
 /** Trim drag-produced floats to 2 decimals for the read-out (drops trailing zeros). */
 function fmt(n: number): number {
   return Math.round(n * 100) / 100
+}
+
+/** Read a shape `<select>` back, mapping the empty "no change" option to null. */
+function asType(value: string): BubbleType | null {
+  return value === '' ? null : (value as BubbleType)
 }
 
 /**
@@ -19,7 +26,7 @@ function fmt(n: number): number {
  * text), and a per-element reset. Rendered inside the toolbar by EditorOverlay only
  * when something is selected.
  */
-export default function InspectorPanel({ api, label }: InspectorPanelProps) {
+export default function InspectorPanel({ api, label, labels }: InspectorPanelProps) {
   const { selected, config } = api
   if (!selected) return null
 
@@ -76,6 +83,62 @@ export default function InspectorPanel({ api, label }: InspectorPanelProps) {
               value={selBubble.text}
               onChange={e => api.setBubble(selected.index, { text: e.target.value })}
             />
+          </label>
+
+          {/* Event morph targets. "no change" (null) means the bubble keeps its
+              resting shape for that event, which is not the same as picking the
+              resting shape here — that would still swap the lettering font. */}
+          <label className="cb-ed-field">
+            <span>on hover</span>
+            <select
+              className="cb-ed-select"
+              value={selBubble.hoverType ?? ''}
+              onChange={e =>
+                api.setBubble(selected.index, { hoverType: asType(e.target.value) })
+              }
+            >
+              <option value="">— no change —</option>
+              {BUBBLE_TYPE_KEYS.map(key => (
+                <option key={key} value={key}>{BUBBLE_TYPES[key].label}</option>
+              ))}
+            </select>
+          </label>
+          <label className="cb-ed-field">
+            <span>on click</span>
+            <select
+              className="cb-ed-select"
+              value={selBubble.clickType ?? ''}
+              onChange={e =>
+                api.setBubble(selected.index, { clickType: asType(e.target.value) })
+              }
+            >
+              <option value="">— no change —</option>
+              {BUBBLE_TYPE_KEYS.map(key => (
+                <option key={key} value={key}>{BUBBLE_TYPES[key].label}</option>
+              ))}
+            </select>
+          </label>
+
+          {/* Connector tube. Symmetric, so it only needs declaring at one end; the
+              tube redraws live as either bubble is dragged. */}
+          <label className="cb-ed-field">
+            <span>link to</span>
+            <select
+              className="cb-ed-select"
+              value={selBubble.linkTo ?? ''}
+              onChange={e =>
+                api.setBubble(selected.index, {
+                  linkTo: e.target.value === '' ? null : Number(e.target.value),
+                })
+              }
+            >
+              <option value="">— none —</option>
+              {labels.map((name, i) =>
+                i === selected.index ? null : (
+                  <option key={name} value={i}>{name}</option>
+                ),
+              )}
+            </select>
           </label>
         </>
       )}
