@@ -29,7 +29,6 @@
       "Bash(npx eslint *)",
       "PowerShell(& \"frontend\\\\node_modules\\\\.bin\\\\cspell.cmd\" --config frontend\\\\cspell.config.yaml --no-progress --relative \"docs/prototype-roadmap.md\" \"README.md\" \"todo.md\")"
     ],
-    "defaultMode": "bypassPermissions",
     "additionalDirectories": [
       "C:\\Users\\Administrator\\.claude",
       "C:\\Users\\Administrator\\Desktop\\vs_code\\VanillaLand"
@@ -102,7 +101,5 @@
         ]
       }
     ]
-  },
-  "effortLevel": "high",
-  "model": "opus"
+  }
 }
