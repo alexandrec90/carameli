@@ -528,3 +528,52 @@ async def jambonz_callback_answered_webhook(
         }
     )
     return JSONResponse(verbs)
+
+
+@jambonz_router.post(
+    "/voicemail-hook",
+    responses={
+        400: {"description": "Bad request (non-JSON body)"},
+        403: {"description": "Forbidden (invalid signature)"},
+    },
+    openapi_extra={
+        "requestBody": {
+            "required": True,
+            "content": {"application/json": {"schema": {"type": "object"}}},
+        }
+    },
+)
+async def jambonz_voicemail_hook_webhook(
+    request: Request,
+) -> Response:
+    """Play the drop audio carried in the call tag, then hang up."""
+    raw_body = await request.body()
+    signature = request.headers.get("X-Jambonz-Signature", "")
+    _validate_jambonz_signature(raw_body, signature)
+
+    try:
+        data: dict[str, Any] = await request.json()
+    except Exception:
+        WEBHOOK_FAILURES_TOTAL.inc()
+        logger.warning("Jambonz voicemail-hook webhook received non-JSON body")
+        return Response(status_code=400)
+
+    if not isinstance(data, dict):
+        WEBHOOK_FAILURES_TOTAL.inc()
+        logger.warning(
+            "Jambonz voicemail-hook webhook received non-dict payload type: %s",
+            type(data).__name__,
+        )
+        return Response(status_code=400)
+
+    call_sid: str = data.get("call_sid", "") or ""
+    tag = data.get("tag")
+    audio_url = tag.get("audio_url") if isinstance(tag, dict) else None
+    logger.info("Jambonz voicemail-hook webhook: call_sid=%s", call_sid)
+
+    if not audio_url:
+        logger.warning("voicemail-hook: missing audio_url call_sid=%s", call_sid)
+        return JSONResponse([{"verb": "hangup"}])
+
+    logger.info("Playing voicemail drop audio call_sid=%s", call_sid)
+    return JSONResponse([{"verb": "play", "url": audio_url}, {"verb": "hangup"}])

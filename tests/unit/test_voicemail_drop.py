@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
+from app.core.config import settings
 from app.main import app
 from app.services import (
     audio_asset_service,
@@ -18,6 +19,7 @@ pytestmark = pytest.mark.asyncio(loop_scope="session")
 
 _CUST_BASE = "/vsapi/1.0.0/VsCustomer"
 _DROP_URL = "/vsapi/1.0.0/VsMessageDrop"
+_VOICEMAIL_HOOK = "/webhooks/jambonz/voicemail-hook"
 
 _VALID_PAYLOAD = {
     "vs_customer_id": 8200,
@@ -176,3 +178,51 @@ async def test_legacy_voicemail_code_requires_configured_asset(client, db_sessio
     )
     assert response.status_code == 404
     assert response.json()["detail"] == "Voicemail drop code not found"
+
+
+# ---------------------------------------------------------------------------
+# POST /webhooks/jambonz/voicemail-hook
+# ---------------------------------------------------------------------------
+
+
+async def test_voicemail_hook_plays_tagged_audio(client) -> None:
+    """On answer, the hook plays the audio URL carried in the call tag, then hangs up."""
+    resp = await client.post(
+        _VOICEMAIL_HOOK,
+        json={
+            "call_sid": "CS-vm-answered",
+            "tag": {"audio_url": "https://cdn.example.com/drop.mp3"},
+        },
+    )
+    assert resp.status_code == 200
+    assert resp.json() == [
+        {"verb": "play", "url": "https://cdn.example.com/drop.mp3"},
+        {"verb": "hangup"},
+    ]
+
+
+async def test_voicemail_hook_missing_audio_url_hangs_up(client) -> None:
+    """No audio URL in the tag: end the call rather than leaving it open and billing."""
+    resp = await client.post(_VOICEMAIL_HOOK, json={"call_sid": "CS-vm-no-tag"})
+    assert resp.status_code == 200
+    assert resp.json() == [{"verb": "hangup"}]
+
+
+async def test_voicemail_hook_invalid_json_returns_400(client) -> None:
+    resp = await client.post(
+        _VOICEMAIL_HOOK,
+        content=b"not-json",
+        headers={"Content-Type": "application/json"},
+    )
+    assert resp.status_code == 400
+
+
+async def test_voicemail_hook_bad_signature_returns_403(client, monkeypatch) -> None:
+    """A wrong X-Jambonz-Signature is rejected before the body is processed."""
+    monkeypatch.setattr(settings, "jambonz_webhook_secret", "webhook-key")
+    resp = await client.post(
+        _VOICEMAIL_HOOK,
+        content=b'{"call_sid":"CS-vm-badsig"}',
+        headers={"Content-Type": "application/json", "X-Jambonz-Signature": "bad"},
+    )
+    assert resp.status_code == 403
