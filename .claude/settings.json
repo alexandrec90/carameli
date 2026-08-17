@@ -9,32 +9,6 @@
     "OTEL_LOGS_EXPORT_INTERVAL": "5000",
     "OTEL_RESOURCE_ATTRIBUTES": "service.name=carameli,service.instance.id=carameli,deployment.environment=local"
   },
-  "permissions": {
-    "allow": [
-      "Bash(*)",
-      "Read(*)",
-      "Edit(*)",
-      "Write(*)",
-      "WebFetch(*)",
-      "Grep(*)",
-      "Glob(*)",
-      "LS(*)",
-      "MultiEdit(*)",
-      "NotebookRead(*)",
-      "NotebookEdit(*)",
-      "TodoRead(*)",
-      "TodoWrite(*)",
-      "WebSearch(*)",
-      "Bash(npx vitest *)",
-      "Bash(npx tsc *)",
-      "Bash(npx eslint *)",
-      "PowerShell(& \"frontend\\\\node_modules\\\\.bin\\\\cspell.cmd\" --config frontend\\\\cspell.config.yaml --no-progress --relative \"docs/prototype-roadmap.md\" \"README.md\" \"todo.md\")"
-    ],
-    "additionalDirectories": [
-      "C:\\Users\\Administrator\\.claude",
-      "C:\\Users\\Administrator\\Desktop\\vs_code\\VanillaLand"
-    ]
-  },
   "hooks": {
     "SessionStart": [
       {
