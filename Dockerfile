@@ -1,7 +1,9 @@
 ### Build stage — compile C extensions, then discard the compiler toolchain
-# Python version is coordinated with the uv-compiled locks
-# (--python-version 3.12), CI's setup-python, and CLAUDE.md — bump all
-# together, deliberately (dependabot.yml ignores bot bumps of this tag).
+# This tag is the project's Python version of record: the instruction files point
+# here rather than restating a number. It is coordinated with the uv-compiled locks
+# (scripts/recompile-locks.py --python-version), CI's setup-python,
+# .github/actions/setup-python-env, mypy.ini and ruff.toml — bump all together,
+# deliberately (dependabot.yml ignores bot bumps of this tag).
 FROM python:3.12-slim AS builder
 
 # uv is the installer for every dependency layer here: the same resolver that

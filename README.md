@@ -17,7 +17,7 @@ If you also want to run all local lint/dev tasks from VS Code, install these hos
 | Workflow | Required tool |
 | --- | --- |
 | `Start: Frontend + Preview` and the workspace lint task's JS/CSS/docs passes | Node.js + npm (then run `npm --prefix frontend install`) |
-| The workspace lint task's Python passes | Python 3.12 + `pip install -r requirements-dev.txt` |
+| The workspace lint task's Python passes | Python (the `FROM python:` tag in `Dockerfile`) + `pip install -r requirements-dev.txt` |
 | The workspace lint task's environment pass | `dotenv-linter` CLI on host machine |
 
 Note: if you plan to work on 3‑D UI components, the `three`/`@react-three` packages are included as dependencies.
@@ -77,7 +77,7 @@ Setup, from the primary checkout:
 git worktree add ../carameli-b <branch-name>
 cd ../carameli-b
 cp ../carameli/.env .env            # then edit — see below
-uv venv --python 3.12                         # MUST match the Dockerfile + locks
+uv venv --python <the FROM python: tag in Dockerfile>   # MUST match the image + locks
 uv pip sync requirements-dev.txt              # hardlinks from uv's global cache
 docker compose up -d                # slim stack on offset ports
 ```

@@ -1,6 +1,6 @@
 # Backend
 
-Use Python 3.12, async I/O, typed function signatures, and Pydantic request/response
+Use async I/O, typed function signatures, and Pydantic request/response
 models. Route handlers own HTTP concerns; services own workflows; repositories own ORM
 operations and commits. Use `AsyncSession` from `get_session` in requests and
 `async_session_factory` in ARQ jobs.
