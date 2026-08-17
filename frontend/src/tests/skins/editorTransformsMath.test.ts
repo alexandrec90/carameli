@@ -31,6 +31,9 @@ const bubble = (over: Partial<BubbleTransform> = {}): BubbleTransform => ({
   spill: true,
   type: 'soft',
   text: 'hi',
+  linkTo: null,
+  hoverType: null,
+  clickType: null,
   ...over,
 })
 

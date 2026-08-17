@@ -6,7 +6,7 @@ import type { PanelPoly } from '../Layout'
 import InspectorPanel from './InspectorPanel'
 import PageSelect from './PageSelect'
 import type { PageSelectProps } from './PageSelect'
-import { serializeConfig, serializeConfigFile } from './transforms'
+import { bubbleRect, serializeConfig, serializeConfigFile } from './transforms'
 import { useOverlayInteraction } from './useOverlayInteraction'
 import { useToolbarDrag } from './useToolbarDrag'
 import type { EditorModeApi } from './useEditorMode'
@@ -38,21 +38,6 @@ const PANEL_LABELS = [
 
 /** Dev-only endpoint (Vite middleware) that overwrites editor/layoutConfig.ts. */
 const SAVE_ENDPOINT = '/__comic-editor/save'
-
-/**
- * Approximate the on-screen bubble box from a panel's bounds and the bubble
- * transform (top/right/width are % of the panel box; height ≈ width).
- */
-function bubbleRect(bounds: Rect, t: { top: number; right: number; width: number }): Rect {
-  const w = (t.width / 100) * bounds.w
-  const rightX = bounds.x + bounds.w - (t.right / 100) * bounds.w
-  return {
-    x: rightX - w,
-    y: bounds.y + (t.top / 100) * bounds.h,
-    w,
-    h: w,
-  }
-}
 
 function rectStyle(r: Rect): CSSProperties {
   return { left: r.x, top: r.y, width: r.w, height: r.h }
@@ -209,7 +194,7 @@ export default function EditorOverlay({ api, panelPolys, pageSelect }: EditorOve
         <div className="cb-ed-title cb-ed-grip" title="Drag to move" {...toolbarDrag.gripProps}>COMIC EDITOR</div>
         <PageSelect {...pageSelect} />
         {selected ? (
-          <InspectorPanel api={api} label={PANEL_LABELS[selected.index]} />
+          <InspectorPanel api={api} label={PANEL_LABELS[selected.index]} labels={PANEL_LABELS} />
         ) : (
           <div className="cb-ed-hint">Click a panel image or bubble to select it.</div>
         )}

@@ -26,8 +26,20 @@ describe('serializeConfig', () => {
     expect(ts).toContain("{ scale: 1, offsetX: 0, offsetY: 0, anchor: 'center center', spill: false },")
     expect(ts).toContain("{ scale: 1, offsetX: 0, offsetY: 0, anchor: 'center bottom', spill: false },")
     expect(ts).toContain(
-      '{ top: -35, right: -12, width: 55, rotate: -5, spill: true, type: \'soft\', text: "It\'s Carameli!" },',
+      '{ top: -35, right: -12, width: 55, rotate: -5, spill: true, type: \'soft\', ' +
+        'text: "It\'s Carameli!", linkTo: 1, hoverType: \'cloud\', clickType: \'lightning\' },',
     )
+  })
+
+  it('emits an absent link or event shape as a bare null, not a quoted one', () => {
+    const cfg = patchBubble(seedConfig(), 0, {
+      linkTo: null,
+      hoverType: null,
+      clickType: null,
+    })
+    const ts = serializeConfig(cfg)
+    expect(ts).toContain('linkTo: null, hoverType: null, clickType: null },')
+    expect(ts).not.toContain("'null'")
   })
 
   it('rounds float noise out of the output', () => {
@@ -82,6 +94,9 @@ describe('serializeConfig', () => {
       spill: true,
       type: 'soft',
       text: "It's Carameli!",
+      linkTo: 1,
+      hoverType: 'cloud',
+      clickType: 'lightning',
     })
   })
 })

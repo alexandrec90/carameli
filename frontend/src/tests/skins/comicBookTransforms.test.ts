@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
+import { BUBBLE_ASPECT } from '../../skins/comic-book/bubbleShape'
+import { linkedPairs } from '../../skins/comic-book/bubbleTube'
 import { BUBBLE_TYPES, BUBBLE_TYPE_KEYS } from '../../skins/comic-book/editor/bubbleTypes'
 import {
   PANEL_IMG_TRANSFORMS,
@@ -10,6 +12,7 @@ import {
   fullImgStyle,
   imgClipStyle,
   anchorToFractions,
+  bubbleRect,
   bubbleStyle,
 } from '../../skins/comic-book/editor/transforms'
 
@@ -130,6 +133,9 @@ describe('bubbleStyle', () => {
       spill: true,
       type: 'soft',
       text: 'hi',
+      linkTo: null,
+      hoverType: null,
+      clickType: null,
     }) as Record<string, string>
     expect(style.top).toBe('-35%')
     expect(style.right).toBe('-12%')
@@ -138,13 +144,55 @@ describe('bubbleStyle', () => {
   })
 })
 
+describe('bubbleRect', () => {
+  const bounds = { x: 100, y: 200, w: 400, h: 300 }
+  const at = (top: number, right: number, width: number) =>
+    bubbleRect(bounds, { top, right, width })
+
+  it('sizes the box from width % of the panel and the fixed bubble aspect', () => {
+    const r = at(0, 0, 50)
+    expect(r.w).toBe(200)
+    expect(r.h).toBeCloseTo(200 * BUBBLE_ASPECT, 10)
+  })
+
+  it('anchors by the right edge, not the left', () => {
+    // right: 0 puts the bubble's right edge flush with the panel's.
+    expect(at(0, 0, 50).x).toBe(bounds.x + bounds.w - 200)
+  })
+
+  it('reads top as a percentage of panel height', () => {
+    expect(at(10, 0, 50).y).toBe(bounds.y + 30)
+  })
+
+  it('lets negative offsets float the bubble outside the panel', () => {
+    const r = at(-35, -12, 55)
+    expect(r.y).toBeLessThan(bounds.y)
+    expect(r.x + r.w).toBeGreaterThan(bounds.x + bounds.w)
+  })
+
+  it('matches the default config placement for a known panel box', () => {
+    const r = bubbleRect(bounds, PANEL_BUBBLE_TRANSFORMS[2])
+    expect(r.w).toBeCloseTo(400 * 0.55, 10)
+    expect(r.y).toBeCloseTo(200 - 300 * 0.35, 10)
+  })
+})
+
 describe('BUBBLE_TYPES', () => {
-  it('resolves a src + font for every type used by the default config', () => {
-    PANEL_BUBBLE_TRANSFORMS.forEach(b => {
-      const def = BUBBLE_TYPES[b.type]
+  // Outlines are generated (bubbleShape.ts), so the registry only carries lettering
+  // and a label now — a `src` here would mean a bubble had gone back to artwork and
+  // could no longer morph.
+  it('resolves a font + label for every shape the default config references', () => {
+    const referenced = PANEL_BUBBLE_TRANSFORMS.flatMap(b =>
+      [b.type, b.hoverType, b.clickType].filter(t => t !== null),
+    )
+    expect(referenced.length).toBeGreaterThan(0)
+    referenced.forEach(type => {
+      const def = BUBBLE_TYPES[type]
       expect(def).toBeDefined()
-      expect(def.src).toMatch(/^\/comic-book\/.+\.webp$/)
       expect(typeof def.font).toBe('string')
+      expect(def.font.length).toBeGreaterThan(0)
+      expect(typeof def.label).toBe('string')
+      expect(def).not.toHaveProperty('src')
     })
   })
 
@@ -170,14 +218,37 @@ describe('default config parity', () => {
     })
   })
 
-  it('defaults every bubble to today\'s CSS geometry and floating spill', () => {
+  it('floats every bubble into the gutter with a caption and a rotation', () => {
     PANEL_BUBBLE_TRANSFORMS.forEach(b => {
+      expect(b.spill).toBe(true)
+      expect(b.rotate).toBe(-5)
+      expect(b.text.length).toBeGreaterThan(0)
+      expect(b.width).toBeGreaterThan(0)
+    })
+  })
+
+  it('keeps the unlinked bubbles on the shared default placement', () => {
+    // The two linked pairs are deliberately nudged off it so a tube has a gap to
+    // span; everything else should still sit where the CSS fallback puts it.
+    const nudged = new Set([0, 1, 3, 4])
+    PANEL_BUBBLE_TRANSFORMS.forEach((b, i) => {
+      if (nudged.has(i)) return
       expect(b.top).toBe(-35)
       expect(b.right).toBe(-12)
       expect(b.width).toBe(55)
-      expect(b.rotate).toBe(-5)
-      expect(b.spill).toBe(true)
-      expect(b.text.length).toBeGreaterThan(0)
+    })
+  })
+
+  it('links two pairs, each declared from exactly one end', () => {
+    expect(linkedPairs(PANEL_BUBBLE_TRANSFORMS)).toEqual([[0, 1], [3, 4]])
+  })
+
+  it('gives every bubble a hover and a click shape distinct from its resting one', () => {
+    PANEL_BUBBLE_TRANSFORMS.forEach(b => {
+      expect(b.hoverType).not.toBeNull()
+      expect(b.clickType).not.toBeNull()
+      expect(b.hoverType).not.toBe(b.type)
+      expect(b.clickType).not.toBe(b.type)
     })
   })
 
