@@ -1,11 +1,14 @@
 version: 2
+# `assignees` is per-entry, not global: without it a bot PR is authored by nobody a
+# dashboard is keyed to, so it appears under no tab on github.com/pulls and is found
+# only by opening this repository. Every `updates:` entry below carries one.
 updates:
   - package-ecosystem: npm
     directory: /frontend
-    schedule:
-      interval: weekly
     assignees:
       - alexandrec90
+    schedule:
+      interval: weekly
     # Give fast-moving frontend ecosystems time to add peer support for a new
     # major. This delays version updates only; it never freezes them and does
     # not delay Dependabot security updates.
@@ -56,10 +59,10 @@ updates:
 
   - package-ecosystem: pip
     directory: /
-    schedule:
-      interval: weekly
     assignees:
       - alexandrec90
+    schedule:
+      interval: weekly
     groups:
       minor-and-patch:
         update-types:
@@ -70,10 +73,10 @@ updates:
   # PRs and are gated for manual review by the auto-merge classifier.
   - package-ecosystem: github-actions
     directory: /
-    schedule:
-      interval: weekly
     assignees:
       - alexandrec90
+    schedule:
+      interval: weekly
     groups:
       minor-and-patch:
         update-types:
@@ -85,10 +88,10 @@ updates:
   # bumped deliberately, not by bot.
   - package-ecosystem: docker
     directory: /
-    schedule:
-      interval: weekly
     assignees:
       - alexandrec90
+    schedule:
+      interval: weekly
     ignore:
       # 3.12→3.14 counts as semver-minor, so it auto-merged (PR #43) while the
       # locks are compiled --python-version 3.12 and CI runs 3.12 — and no CI

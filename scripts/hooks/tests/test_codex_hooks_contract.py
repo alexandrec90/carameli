@@ -11,29 +11,23 @@ hook = load_module("scripts/sync-codex-hooks.py")
 REPO_ROOT = Path(__file__).resolve().parents[3]
 CLAUDE_SETTINGS = REPO_ROOT / ".claude/settings.json"
 CODEX_HOOKS = REPO_ROOT / ".codex/hooks.json"
+ADAPTER = "scripts/hooks/codex-hook-adapter.py"
 EXPECTED_DROPPED_EVENTS = frozenset({"PostToolUseFailure"})
 EXPECTED_DROPPED_MATCHERS = frozenset({("PostToolUse", "^Skill$")})
-# Supported by Codex, but emptied of handlers rather than unsupported -- kept apart from
-# the two sets above because they answer different questions, and collapsing them would
-# let a genuinely unsupported event hide as "emptied". devkit v0.9.0 classifies the
-# Claude Bash cap as redundant on Codex (it has a native one, and porting ours caused
-# retries), and it is this project's *only* PreToolUse handler, so the group and then the
-# event disappear. Re-add a non-Bash PreToolUse hook and this expectation must shrink.
+EXPECTED_REDUNDANT_HANDLERS = frozenset({("PreToolUse", "scripts/hooks/enforce-capped-bash.py")})
+# `PreToolUse` survives classification and is then emptied: its only handler is the
+# Bash output cap, and devkit v0.9.0 classified that as redundant because Codex caps
+# command output itself. An event with no handlers left is omitted entirely, so it
+# leaves by a different door than `PostToolUseFailure` and is asserted separately.
+# Re-add a non-Bash PreToolUse hook and this expectation must shrink.
 EXPECTED_EMPTIED_EVENTS = frozenset({"PreToolUse"})
-EXPECTED_REDUNDANT_MATCHERS = frozenset({("PreToolUse", "Bash")})
 EXPECTED_TOPOLOGY = {
     "SessionStart": (
         (
             "",
             (
-                (
-                    "scripts/hooks/codex-hook-adapter.py",
-                    "scripts/hooks/codex-session-start.py",
-                ),
-                (
-                    "scripts/hooks/codex-hook-adapter.py",
-                    "scripts/prune-logs.py",
-                ),
+                ("scripts/hooks/codex-session-start.py",),
+                ("scripts/prune-logs.py",),
             ),
         ),
     ),
@@ -47,23 +41,13 @@ EXPECTED_TOPOLOGY = {
     "PostToolUse": (
         (
             "^(Edit|Write|MultiEdit|apply_patch|create_file)$",
-            (
-                (
-                    "scripts/hooks/codex-hook-adapter.py",
-                    "scripts/hooks/lint-fix.py",
-                ),
-            ),
+            (("scripts/hooks/lint-fix.py",),),
         ),
     ),
     "Stop": (
         (
             "",
-            (
-                (
-                    "scripts/hooks/codex-hook-adapter.py",
-                    "scripts/hooks/stop.py",
-                ),
-            ),
+            (("scripts/hooks/stop.py",),),
         ),
     ),
 }
@@ -74,18 +58,16 @@ def _load_json(path: Path) -> dict:
 
 
 def _repo_paths(command: str) -> tuple[str, ...]:
-    """Repo-relative paths a generated command resolves, adapter first then handler.
+    """Repo-relative paths the command names through the project-root placeholder.
 
-    devkit v0.9.0 dropped `$(git rev-parse --show-toplevel)/` -- bash command
-    substitution, which is not a thing on Windows, where Codex now runs these through
-    PowerShell. The launcher walks up to the `.git` dir itself and hands the handler a
-    `__CODEX_PROJECT_ROOT__` placeholder it substitutes at run time, so there are two
-    spellings to read and neither is the old one. Matching only the retired form made
-    this return `()` for every command, and `assert paths` was the assertion that caught
-    it -- keep that assertion, it is the only thing standing between a typo'd pattern
-    here and a test that silently checks nothing.
+    devkit v0.9.0 replaced the `$(git rev-parse --show-toplevel)` substitution with an
+    inline Python launcher that discovers the root itself and expands
+    `__CODEX_PROJECT_ROOT__` in its own arguments -- because command substitution is a
+    POSIX-shell feature and Codex on Windows does not run one. The adapter's own path
+    is inside that launcher rather than in a placeholder, so it is checked separately
+    by `test_generated_handlers_exist_and_use_the_codex_adapter`.
     """
-    return tuple(re.findall(r"(?:r/'|__CODEX_PROJECT_ROOT__/)([^'\"]+)", command))
+    return tuple(re.findall(rf"{re.escape(hook.CODEX_ROOT_EXPR)}/([^\"]+)", command))
 
 
 def _topology(payload: dict) -> dict:
@@ -128,10 +110,11 @@ def test_real_hook_drops_are_explicitly_allowlisted():
 
     assert hook.UNSUPPORTED_EVENTS == EXPECTED_DROPPED_EVENTS
     assert hook.UNSUPPORTED_MATCHERS == EXPECTED_DROPPED_MATCHERS
+    assert {(event, path) for event, path in hook.REDUNDANT_HANDLERS} == EXPECTED_REDUNDANT_HANDLERS
     assert dropped_events == EXPECTED_DROPPED_EVENTS | EXPECTED_EMPTIED_EVENTS
-    assert source_matchers - generated_matchers == (
-        EXPECTED_DROPPED_MATCHERS | EXPECTED_REDUNDANT_MATCHERS
-    )
+    assert source_matchers - generated_matchers == EXPECTED_DROPPED_MATCHERS | {
+        ("PreToolUse", "Bash")
+    }
 
 
 def test_current_hook_topology_requires_compatibility_review():
@@ -152,6 +135,8 @@ def test_generated_handlers_exist_and_use_the_codex_adapter():
                 paths = _repo_paths(command)
 
                 assert command.startswith(hook.CODEX_ADAPTER)
+                assert ADAPTER in command
+                assert (REPO_ROOT / ADAPTER).is_file()
                 assert f"--event {event} --" in command
                 assert hook.CLAUDE_PROJECT_DIR_PREFIX not in command
                 assert paths
