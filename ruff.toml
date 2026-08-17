@@ -37,13 +37,28 @@ select = ["E", "F", "B", "ASYNC", "S", "RUF"]
 # Still on: E402, E711/E712/E713/E714 (comparison bugs), E721, E722 (bare except),
 # E902, E999. Those catch real defects.
 #
-# E731 is deliberately absent from this list, and rejoins it on the next devkit pull.
-# The vendored `scripts/hooks/tests/test_repo_contract.py` carries a `# noqa: E731`;
-# ignoring E731 here would make that directive dead and RUF100 would flag it -- in a
-# file this repo is not allowed to edit (the `devkit-drift` gate enforces that, and it
-# compares against the pinned devkit rev, not a local checkout). devkit has already
-# dropped the directive upstream, so `sync-devkit.py --pull` is what unblocks this.
-ignore = ["E101", "E401", "E501", "E701", "E702", "E703", "E741", "E742", "E743"]
+# E731 (lambda-assignment) rejoined this list with the devkit v0.9.0 pull, which is the
+# event the previous note here was waiting for: upstream dropped the `# noqa: E731` from
+# `scripts/hooks/tests/test_repo_contract.py`, so ignoring the rule no longer strands a
+# dead directive for RUF100 to flag in a file this repo may not edit.
+#
+# Leaving it enforced was not neutral while it lasted. E731 is *fixable*, so every
+# `ruff check --fix` -- the lint-fix PostToolUse hook, pre-commit, `lint-all.py` -- would
+# silently rewrite that lambda into a `def` inside the vendored file, and the
+# `devkit-drift` gate then refused the commit. The auto-fixer and the drift gate were
+# fighting over a file neither side is meant to touch, on every pull PR.
+ignore = [
+    "E101",
+    "E401",
+    "E501",
+    "E701",
+    "E702",
+    "E703",
+    "E731",
+    "E741",
+    "E742",
+    "E743",
+]
 
 [lint.per-file-ignores]
 "tests/**/*.py" = ["S101", "S105"]

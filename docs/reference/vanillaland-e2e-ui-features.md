@@ -1,7 +1,7 @@
 # UI features needed for an end-to-end VanillaLand experience
 
 _Compiled 2026-08-16 from `cloudli-functional-spec.md`, `vanillaland-voip-endpoint-audit.md`,
-the current frontend (`frontend/src/routes.ts`, 27 routes), and the vsapi/webhook surface.
+the current frontend (`frontend/src/routes.ts`), and the vsapi/webhook surface.
 This is the gap list only — spec, not implementation. Supersedes the stale
 `cloudli/carameli-frontend-gaps.md` for VanillaLand scope._
 
@@ -85,13 +85,12 @@ Phone line list/add/deactivate, extension create + available range, SMS log with
 export, call event log with CSV export, aggregate CDR summary, webhook subscription
 CRUD, audio asset upload/playback (music, hold, ads, prompts, greetings, broadcast),
 voicemail-drop history, agents/queues/skills CRUD, speed dials, exemption codes,
-expansion modules. Orphans worth wiring for free: `useGroupExtensions`,
-`useIntercomGroups`, `useMulticastGroups` hooks and the `VsConference`/`VsParking`
-API clients all exist with no route/page.
+expansion modules, group extensions, intercom, multicast intercom, telephone
+conferences, call parking configuration.
 
 ## Deliberately out of scope for VanillaLand e2e
 
 Cloudli surfaces with no bearing on the VanillaSoft integration: IVR/menu builder,
-music-on-hold assignment, intercom/multicast, call parking live state, device (MAC)
-provisioning, contacts/users directories (owned by the VanillaSoft CRM), permanent
-conferences, call screening/blacklists.
+music-on-hold assignment, device (MAC) provisioning, contacts/users directories
+(owned by the VanillaSoft CRM), call screening/blacklists, call parking live slot
+state.

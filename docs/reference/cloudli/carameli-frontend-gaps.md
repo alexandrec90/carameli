@@ -5,7 +5,7 @@ front-end. **This file is about the UI only** — backend/API status is tracked 
 in `cloudli-feature-gaps.md`. A page can have a working API but no UI.
 
 > **Superseded for VanillaLand scope by `../vanillaland-e2e-ui-features.md`.** The route
-> inventory below is stale — it predates the current `routes.ts` (6 routes then, 27 now).
+> inventory below is stale — it predates the current `routes.ts` (6 routes then, 32 now).
 > Use this file for the full Cloudli page-by-page comparison; use the newer doc for the
 > gap list an end-to-end VanillaLand experience actually needs.
 
