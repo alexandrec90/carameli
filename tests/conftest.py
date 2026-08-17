@@ -5,7 +5,7 @@ import json
 import os
 from collections.abc import AsyncGenerator
 from pathlib import Path
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 import pytest_asyncio
@@ -29,6 +29,7 @@ from app.core.config import settings
 from app.core.database import Base, get_session
 from app.core.limiter import limiter as rate_limiter
 from app.main import app
+from app.services.providers.base import ProvisionedSipClient
 
 # Alembic project layout, resolved relative to the repo root (tests/../alembic)
 # so the schema build works regardless of the pytest invocation directory.
@@ -91,6 +92,19 @@ def _schema_fingerprint() -> str:
         for path in sorted(_VERSIONS_DIR.glob("*.py"))
     ]
     return hashlib.sha256(repr((parts, migrations)).encode()).hexdigest()[:16]
+
+
+def _mock_call_engine() -> MagicMock:
+    engine = MagicMock()
+    engine.provision_sip_client = AsyncMock(
+        side_effect=lambda username, _password: ProvisionedSipClient(
+            client_sid=f"client-{username}", sip_realm="sip.test"
+        )
+    )
+    engine.deprovision_sip_client = AsyncMock()
+    engine.play_audio_to_call = AsyncMock(return_value={"status": "playing"})
+    engine.get_active_calls = AsyncMock(return_value=[])
+    return engine
 
 
 @pytest_asyncio.fixture(scope="session")
@@ -209,7 +223,7 @@ async def client(db_session: AsyncSession):
     # Pre-populate state so the lifespan override lands on top; individual tests
     # replace specific methods with AsyncMock as needed.
     app.state.carrier = MagicMock()
-    app.state.engine = MagicMock()
+    app.state.engine = _mock_call_engine()
 
     # Swap rate-limiter storage to in-memory so unit tests don't need Redis.
     _real_storage = rate_limiter._storage
@@ -250,7 +264,7 @@ async def concurrent_client(test_engine):
     vs_customer_ids (8000-range) to avoid collisions with other tests.
     """
     app.state.carrier = MagicMock()
-    app.state.engine = MagicMock()
+    app.state.engine = _mock_call_engine()
 
     _real_storage = rate_limiter._storage
     _real_rl = rate_limiter._limiter

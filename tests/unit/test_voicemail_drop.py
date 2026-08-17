@@ -1,9 +1,17 @@
 from __future__ import annotations
 
-from unittest.mock import AsyncMock
+import uuid
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
+from app.main import app
+from app.services import (
+    audio_asset_service,
+    call_event_service,
+    extension_service,
+    voicemail_drop_event_service,
+)
 from tests.conftest import AUTH_HEADERS
 
 pytestmark = pytest.mark.asyncio(loop_scope="session")
@@ -94,3 +102,77 @@ async def test_voicemail_drop_cross_customer_returns_403(client) -> None:
         headers={"Authorization": "Bearer key-8202"},
     )
     assert resp.status_code == 403
+
+
+async def test_legacy_voicemail_code_plays_on_tenant_tracked_active_call(
+    client, db_session
+) -> None:
+    customer = await _create_customer(client, 8204)
+    customer_id = uuid.UUID(customer["id"])
+    await extension_service.create(
+        db_session,
+        customer_id,
+        "204",
+        "ext204_8204",
+        "client-8204",
+        "sip.test",
+    )
+    asset = await audio_asset_service.create(
+        db_session,
+        customer_id=customer_id,
+        kind="voicemail-drop",
+        name="Intro",
+        s3_key=f"audio/{customer_id}/intro.mp3",
+        voicemail_drop_code=1,
+    )
+    await call_event_service.create_from_webhook(
+        db_session,
+        customer_id,
+        {
+            "CallSid": "call-active-8204",
+            "CallStatus": "in-progress",
+            "Direction": "outbound",
+            "Extension": "204",
+        },
+    )
+    app.state.engine.get_active_calls = AsyncMock(
+        return_value=[{"call_sid": "call-active-8204", "call_status": "in-progress"}]
+    )
+    app.state.engine.play_audio_to_call = AsyncMock(
+        return_value={"call_id": "call-active-8204", "status": "playing"}
+    )
+
+    with patch(
+        "app.services.s3_service.get_presigned_download_url",
+        return_value="https://s3.example.test/signed-intro",
+    ):
+        response = await client.post(
+            f"{_DROP_URL}?vscustomerId=8204&extension=204&msgDropNumber=1",
+            headers=AUTH_HEADERS,
+        )
+    assert response.status_code == 200, response.text
+    assert response.json() == {"call_sid": "call-active-8204", "status": "playing"}
+    app.state.engine.play_audio_to_call.assert_awaited_once_with(
+        "call-active-8204", "https://s3.example.test/signed-intro"
+    )
+    events = await voicemail_drop_event_service.list_for_customer(db_session, customer_id)
+    assert events[0].audio_asset_id == asset.id
+
+
+async def test_legacy_voicemail_code_requires_configured_asset(client, db_session) -> None:
+    customer = await _create_customer(client, 8205)
+    customer_id = uuid.UUID(customer["id"])
+    await extension_service.create(
+        db_session,
+        customer_id,
+        "205",
+        "ext205_8205",
+        "client-8205",
+        "sip.test",
+    )
+    response = await client.post(
+        f"{_DROP_URL}?vscustomerId=8205&extension=205&msgDropNumber=9",
+        headers=AUTH_HEADERS,
+    )
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Voicemail drop code not found"

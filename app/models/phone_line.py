@@ -27,6 +27,7 @@ class PhoneLine(Base):
     provider_sid: Mapped[str] = mapped_column(String(64), nullable=False)
     sms_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
     recording_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    branch_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), onupdate=func.now())
     active: Mapped[bool] = mapped_column(Boolean, default=True)

@@ -7,7 +7,7 @@ from typing import Any, cast
 import httpx
 
 from app.services import callback_state
-from app.services.providers.base import ProviderCallRecord
+from app.services.providers.base import ProviderCallRecord, ProvisionedSipClient
 
 logger = logging.getLogger(__name__)
 
@@ -52,6 +52,9 @@ class JambonzEngine:
     def _calls_url(self, call_id: str | None = None) -> str:
         base = f"/Accounts/{self._account_sid}/Calls"
         return f"{base}/{call_id}" if call_id else base
+
+    def _account_url(self) -> str:
+        return f"/Accounts/{self._account_sid}"
 
     async def aclose(self) -> None:
         await self._client.aclose()
@@ -174,6 +177,72 @@ class JambonzEngine:
         call_sid = data.get("sid", data.get("call_sid", ""))
         logger.info("Jambonz voicemail drop initiated: call_id=%s to=%s", call_sid, to)
         return {"call_id": call_sid, "status": "queued"}
+
+    async def play_audio_to_call(self, call_id: str, audio_url: str) -> dict:
+        """Whisper one audio asset onto an already-active call leg."""
+        resp = await self._client.put(
+            self._calls_url(call_id),
+            json={"whisper": {"verb": "play", "url": audio_url}},
+        )
+        if resp.is_error:
+            logger.error(
+                "Jambonz play_audio_to_call failed: call_id=%s status=%s body=%s",
+                call_id,
+                resp.status_code,
+                resp.text,
+            )
+            resp.raise_for_status()
+        logger.info("Jambonz voicemail audio injected: call_id=%s", call_id)
+        return {"call_id": call_id, "status": "playing"}
+
+    async def provision_sip_client(self, username: str, password: str) -> ProvisionedSipClient:
+        """Create a static SIP client and return its id plus the account realm."""
+        account_resp = await self._client.get(self._account_url())
+        if account_resp.is_error:
+            logger.error(
+                "Jambonz account lookup failed: status=%s body=%s",
+                account_resp.status_code,
+                account_resp.text,
+            )
+            account_resp.raise_for_status()
+        sip_realm = str(account_resp.json().get("sip_realm") or "")
+        if not sip_realm:
+            raise RuntimeError("Jambonz account has no SIP realm configured")
+
+        resp = await self._client.post(
+            "/Clients",
+            json={
+                "account_sid": self._account_sid,
+                "username": username,
+                "password": password,
+                "is_active": 1,
+            },
+        )
+        if resp.is_error:
+            logger.error(
+                "Jambonz SIP client create failed: username=%s status=%s body=%s",
+                username,
+                resp.status_code,
+                resp.text,
+            )
+            resp.raise_for_status()
+        client_sid = str(resp.json().get("sid") or "")
+        if not client_sid:
+            raise RuntimeError("Jambonz SIP client response did not include sid")
+        logger.info("Jambonz SIP client created: client_sid=%s username=%s", client_sid, username)
+        return ProvisionedSipClient(client_sid=client_sid, sip_realm=sip_realm)
+
+    async def deprovision_sip_client(self, client_sid: str) -> None:
+        resp = await self._client.delete(f"/Clients/{client_sid}")
+        if resp.is_error and resp.status_code != 404:
+            logger.error(
+                "Jambonz SIP client delete failed: client_sid=%s status=%s body=%s",
+                client_sid,
+                resp.status_code,
+                resp.text,
+            )
+            resp.raise_for_status()
+        logger.info("Jambonz SIP client deleted: client_sid=%s", client_sid)
 
     async def get_active_calls(self) -> list[dict]:
         """Return all active calls for this Jambonz account.

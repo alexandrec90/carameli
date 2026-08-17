@@ -190,6 +190,58 @@ async def test_initiate_voicemail_drop_passes_audio_url_in_tag() -> None:
     assert posted_json["tag"]["audio_url"] == "https://s3.example.com/vm.mp3"
 
 
+async def test_play_audio_to_active_call_uses_whisper() -> None:
+    engine = _make_engine()
+    engine._client.put = AsyncMock(return_value=_mock_response(200, {}))
+
+    result = await engine.play_audio_to_call("JC_active", "https://s3.example.com/drop.mp3")
+
+    assert result == {"call_id": "JC_active", "status": "playing"}
+    engine._client.put.assert_awaited_once_with(
+        "/Accounts/ACC123/Calls/JC_active",
+        json={"whisper": {"verb": "play", "url": "https://s3.example.com/drop.mp3"}},
+    )
+
+
+async def test_provision_and_deprovision_sip_client() -> None:
+    engine = _make_engine()
+    engine._client.get = AsyncMock(return_value=_mock_response(200, {"sip_realm": "sip.test"}))
+    engine._client.post = AsyncMock(return_value=_mock_response(201, {"sid": "client-1"}))
+    engine._client.delete = AsyncMock(return_value=_mock_response(204, {}))
+
+    provisioned = await engine.provision_sip_client(
+        "agent1",
+        "secret-password",  # pragma: allowlist secret
+    )
+    assert provisioned.client_sid == "client-1"
+    assert provisioned.sip_realm == "sip.test"
+    engine._client.post.assert_awaited_once_with(
+        "/Clients",
+        json={
+            "account_sid": "ACC123",
+            "username": "agent1",
+            "password": "secret-password",  # pragma: allowlist secret
+            "is_active": 1,
+        },
+    )
+
+    await engine.deprovision_sip_client("client-1")
+    engine._client.delete.assert_awaited_once_with("/Clients/client-1")
+
+
+async def test_provision_sip_client_requires_account_realm() -> None:
+    engine = _make_engine()
+    engine._client.get = AsyncMock(return_value=_mock_response(200, {"sip_realm": None}))
+    engine._client.post = AsyncMock()
+
+    with pytest.raises(RuntimeError, match="no SIP realm"):
+        await engine.provision_sip_client(
+            "agent1",
+            "secret-password",  # pragma: allowlist secret
+        )
+    engine._client.post.assert_not_awaited()
+
+
 # ---------------------------------------------------------------------------
 # list_recent_calls (reconciliation)
 # ---------------------------------------------------------------------------

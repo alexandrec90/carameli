@@ -25,6 +25,7 @@ from app.services import (
     extension_service,
     phone_line_service,
     recording_links,
+    sci_service,
 )
 
 logger = logging.getLogger(__name__)
@@ -60,15 +61,6 @@ async def initiate_outbound_call(
         logger.warning("Customer not found vs_customer_id=%s", body.vs_customer_id)
         raise HTTPException(status_code=404, detail="Customer not found")
 
-    line = await phone_line_service.get_by_number(session, customer.id, body.from_number)
-    if not line:
-        logger.warning(
-            "Phone line not found vs_customer_id=%s from=%s",
-            body.vs_customer_id,
-            body.from_number,
-        )
-        raise HTTPException(status_code=404, detail="Phone line not found")
-
     ext = await extension_service.get_by_number(session, customer.id, body.extension)
     if not ext:
         logger.warning(
@@ -78,17 +70,61 @@ async def initiate_outbound_call(
         )
         raise HTTPException(status_code=404, detail="Extension not found")
 
+    from_number = body.from_number
+    preparation = None
+    if body.contact_id is not None:
+        preparation = await sci_service.consume_prepared_call(
+            session,
+            customer_id=customer.id,
+            extension=ext,
+            contact_id=body.contact_id,
+            destination_number=body.destination_number,
+        )
+        if not preparation:
+            raise HTTPException(status_code=409, detail="SCI preparation missing or expired")
+        from_number = preparation.selected_caller_id
+
+    line = await phone_line_service.get_by_number(session, customer.id, from_number)
+    if not line:
+        logger.warning(
+            "Phone line not found vs_customer_id=%s from=%s",
+            body.vs_customer_id,
+            from_number,
+        )
+        raise HTTPException(status_code=404, detail="Phone line not found")
+
     webhook_url = f"{settings.jambonz_webhook_base_url}/webhooks/jambonz/outbound-answered"
 
     engine = request.app.state.engine
+    result: dict | None = None
     try:
         result = await engine.initiate_call(
-            from_=body.from_number,
+            from_=from_number,
             to=body.destination_number,
             webhook_url=webhook_url,
             tag={"agent_sip_uri": agent_sip_uri(ext.sip_username, ext.sip_domain_sid)},
         )
+        if preparation is not None:
+            await sci_service.mark_prepared_call_consumed(session, preparation)
+        await call_event_service.create_from_webhook(
+            session,
+            customer.id,
+            {
+                "CallSid": result["call_id"],
+                "CallStatus": result["status"],
+                "Direction": "outbound",
+                "From": from_number,
+                "To": body.destination_number,
+                "Extension": body.extension,
+            },
+        )
     except Exception as exc:
+        await session.rollback()
+        if result and result.get("call_id"):
+            try:
+                await engine.hangup_call(result["call_id"])
+            except Exception:
+                logger.exception("Failed to compensate untracked outbound call")
         logger.error(
             "Call engine error initiating outbound call vs_customer_id=%s destination=%s: %s",
             body.vs_customer_id,

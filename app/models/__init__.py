@@ -15,6 +15,8 @@ from app.models.intercom_group import IntercomGroup
 from app.models.multicast_group import MulticastGroup
 from app.models.parking_lot import ParkingLot
 from app.models.phone_line import PhoneLine
+from app.models.recording_archive import RecordingArchive, RecordingArchiveItem
+from app.models.sci_preparation import SciPreparation
 from app.models.sci_rule import SciRule
 from app.models.sms_message import SmsMessage
 from app.models.speed_dial import SpeedDial
@@ -39,6 +41,9 @@ __all__ = [
     "MulticastGroup",
     "ParkingLot",
     "PhoneLine",
+    "RecordingArchive",
+    "RecordingArchiveItem",
+    "SciPreparation",
     "SciRule",
     "SmsMessage",
     "SpeedDial",

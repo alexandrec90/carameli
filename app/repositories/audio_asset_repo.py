@@ -19,6 +19,7 @@ class AudioAssetRepo:
         name: str,
         s3_key: str,
         duration_seconds: int | None = None,
+        voicemail_drop_code: int | None = None,
     ) -> AudioAsset:
         asset = AudioAsset(
             customer_id=customer_id,
@@ -26,6 +27,7 @@ class AudioAssetRepo:
             name=name,
             s3_key=s3_key,
             duration_seconds=duration_seconds,
+            voicemail_drop_code=voicemail_drop_code,
         )
         self.session.add(asset)
         await self.session.commit()
@@ -62,3 +64,15 @@ class AudioAssetRepo:
         await self.session.commit()
         await self.session.refresh(asset)
         return asset
+
+    async def get_by_voicemail_drop_code(
+        self, customer_id: uuid.UUID, code: int
+    ) -> AudioAsset | None:
+        result = await self.session.execute(
+            select(AudioAsset).where(
+                AudioAsset.customer_id == customer_id,
+                AudioAsset.voicemail_drop_code == code,
+                AudioAsset.active.is_(True),
+            )
+        )
+        return result.scalar_one_or_none()

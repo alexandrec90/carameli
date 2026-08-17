@@ -28,6 +28,7 @@ class ConfirmAudioAssetRequest(BaseModel):
     kind: str = Field(min_length=1, max_length=32)
     s3_key: str = Field(min_length=1, max_length=512)
     duration_seconds: int | None = None
+    voicemail_drop_code: int | None = Field(default=None, ge=1, le=9)
 
 
 class AudioAssetResponse(BaseModel):
@@ -38,6 +39,7 @@ class AudioAssetResponse(BaseModel):
     s3_key: str
     playback_url: str | None = None
     duration_seconds: int | None = None
+    voicemail_drop_code: int | None = None
     active: bool
     created_at: datetime
 

@@ -10,14 +10,57 @@ from app.core.auth import AuthContext, enforce_customer_scope, get_auth_context
 from app.core.database import get_session
 from app.schemas.sci import (
     PostSciByZipCodeRequest,
+    PrecallRequest,
+    PrecallResponse,
     SciResponse,
     UpdateSciUserOptionRequest,
 )
-from app.services import customer_service, extension_service, sci_service
+from app.services import customer_service, extension_service, phone_line_service, sci_service
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["sci"])
+
+
+@router.post(
+    "/Precall/Add",
+    response_model=PrecallResponse,
+    responses={
+        404: {"description": "Customer or extension not found"},
+        409: {"description": "No matching customer caller ID"},
+    },
+)
+async def prepare_sci_call(
+    body: PrecallRequest,
+    session: Annotated[AsyncSession, Depends(get_session)],
+    auth: Annotated[AuthContext, Depends(get_auth_context)],
+) -> PrecallResponse:
+    """Select and persist the caller ID for one imminent VanillaSoft call."""
+    enforce_customer_scope(auth, body.vs_customer_id)
+    customer = await customer_service.get_by_vs_id(session, body.vs_customer_id)
+    if not customer:
+        raise HTTPException(status_code=404, detail="Customer not found")
+    extension = await extension_service.get_by_number(session, customer.id, body.from_extension)
+    if not extension:
+        raise HTTPException(status_code=404, detail="Extension not found")
+    lines = await phone_line_service.get_all_for_customer(session, customer.id)
+    try:
+        preparation = await sci_service.prepare_call(
+            session,
+            customer_id=customer.id,
+            extension=extension,
+            contact_id=body.contact_id,
+            destination_number=body.destination_number,
+            candidate_area_codes=body.area_codes,
+            lines=lines,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from None
+    return PrecallResponse(
+        success=True,
+        selected_caller_id=preparation.selected_caller_id,
+        expires_at=preparation.expires_at.isoformat(),
+    )
 
 
 @router.post(

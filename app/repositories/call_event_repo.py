@@ -222,6 +222,20 @@ class CallEventRepo:
         )
         return result.scalar_one_or_none()
 
+    async def get_active_for_extension(
+        self, customer_id: uuid.UUID, extension: str
+    ) -> list[CallEvent]:
+        result = await self.session.execute(
+            select(CallEvent)
+            .where(
+                CallEvent.customer_id == customer_id,
+                CallEvent.extension == extension,
+                func.lower(func.coalesce(CallEvent.status, "")).not_in(_TERMINAL_CALL_STATUSES),
+            )
+            .order_by(CallEvent.created_at.desc())
+        )
+        return list(result.scalars().all())
+
     async def get_unposted(self) -> list[CallEvent]:
         """Return events not yet posted to VanillaSoft, created more than 1 minute ago."""
         cutoff = _utcnow_naive() - timedelta(minutes=1)

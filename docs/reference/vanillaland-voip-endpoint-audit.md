@@ -10,12 +10,21 @@ contains 28 members across provisioning, messaging, call control, directory/HUD,
 recordings, and account management. Counting the duplicate
 `DeletePhoneOrExtension` overload as one behavior leaves 27 operations.
 
-Carameli already has most of the HTTP surface. The remaining work is not a list of
-missing route names:
+Carameli now has the five workflows that were missing when this audit was written:
 
-- **Two provider workflows are absent:** branch assignment and bulk recording archives.
-- **Three legacy contracts need new behavior or data:** per-call SCI preparation,
-  voicemail-drop code resolution, and SIP account-extension credentials.
+- **Branch assignment** persists tenant-scoped CRM metadata on extensions and DIDs.
+- **Bulk recording archives** are bounded ARQ jobs over authenticated Carameli recording
+  links and configured-bucket S3 objects; arbitrary caller-supplied fetches are rejected.
+- **Per-call SCI preparation** selects a customer-owned caller ID and atomically consumes
+  the short-lived selection when the corresponding outbound call is created.
+- **Voicemail-drop codes** resolve tenant-owned audio assets and inject audio into the
+  tenant/extension's tracked active Jambonz call.
+- **AccountData** follows real Jambonz SIP-client provisioning and delivers the encrypted
+  pending password exactly once. Ordinary extension reads never expose it.
+
+The remaining compatibility work is adapter-side in VanillaLand, not missing Carameli
+server behavior:
+
 - **Several routes exist but the VanillaLand `CarameliService` still throws:** customer
   and line reads, pointers, auto-attendant, SCI, voicemail drop, and HUD/account data.
 - **Clarity agent state is partially replaced:** Carameli polls Jambonz calls and SIP
@@ -59,20 +68,19 @@ already exist at `POST /AddPointerToExtension`. Cloudli's delete accepts only a 
 number; Carameli's `DELETE /DeletePointerToExtension` also requires the extension. The
 adapter therefore needs orchestration plus a lookup, not a direct route rename.
 
-### Missing behavior or data
+### Implemented compatibility workflows
 
-| Gap | Legacy contract | Why the current Carameli route/model is not equivalent |
+| Workflow | Legacy contract | Carameli implementation |
 | --- | --- | --- |
-| Branch assignment | `PUT Branch/Assign` with provider account id, branch id, and number/extension | No branch model or provider operation exists. VanillaSoft calls it immediately after provisioning for departments mapped to a CMV/Cloudli branch. |
-| Bulk recording archive | `POST VsArchive` with export id, archive name, and URL/filename entries | Carameli exports one recording URL at a time. There is no archive job, ZIP artifact, completion state, or safe policy for fetching caller-supplied URLs. |
-| Per-call SCI preparation | `POST Precall/Add` with `fromExtension`, destination, contact id, and candidate area codes | Carameli's `/PostSCIbyZipCode` stores a standing extension rule for one 3/5-digit ZIP. It does not hold per-call context or select the outbound caller ID. |
-| Voicemail-drop code resolution | `POST VsMessageDrop?vscustomerId=...&extension=...&msgDropNumber={voiceDropCode}` | Carameli requires destination E.164 plus a resolved `audio_url`. It has no mapping from VanillaSoft's integer drop code to an audio asset. |
-| Account extensions / SIP credentials | `POST AccessCheck/AccountData` returns name, extension, SIP username, password, and domain | Carameli lists extensions and SIP usernames, but does not store a retrievable SIP password, user name, or usable SIP domain. Returning blank values would break the softphone setup flow. |
+| Branch assignment | `PUT Branch/Assign` with customer id, nullable branch id, and number/extension | `PUT /vsapi/1.0.0/Branch/Assign`; branch ids remain opaque CRM metadata rather than leaking into the carrier contract. |
+| Bulk recording archive | `POST VsArchive` with export id, archive name, and URL/filename entries | `POST /vsapi/1.0.0/VsArchive` plus status `GET`; PostgreSQL state, ARQ/Redis execution, bounded ZIP creation, and S3 output. |
+| Per-call SCI preparation | `POST Precall/Add` with `fromExtension`, destination, contact id, and candidate area codes | `POST /vsapi/1.0.0/Precall/Add`; a short-lived row selects an active customer DID and `/VsCall/Initiate` consumes it once after provider success. |
+| Voicemail-drop code resolution | `POST VsMessageDrop?vscustomerId=...&extension=...&msgDropNumber={voiceDropCode}` | Audio assets may carry a unique per-customer code from 1–9; the endpoint resolves it and uses Jambonz mid-call audio control on the tracked active call. |
+| Account extensions / SIP credentials | `POST AccessCheck/AccountData` returns name, extension, SIP username, password, and domain | Extension creation provisions a Jambonz client. `POST /vsapi/1.0.0/AccessCheck/AccountData` atomically returns and erases encrypted pending passwords. |
 
-The last gap is larger than an endpoint. `POST /api/v1/extensions` currently creates a
-database row without provisioning a Jambonz SIP credential. A compatible AccountData
-response must follow actual SIP credential provisioning and a one-time secret-delivery
-design; passwords must not be added to ordinary list responses.
+SIP provisioning requires `SIP_CREDENTIAL_ENCRYPTION_SECRET` and a Jambonz account with a
+configured SIP realm. Recording archives require the existing Redis worker and configured
+S3-compatible storage. No additional production dependency is required.
 
 ## Clarity and public API findings
 
@@ -109,7 +117,7 @@ also found these independent integrations:
 - Gryphon DNC/compliance services;
 - MaxMind geolocation/database downloads.
 
-This distinction matters most in `VanillaSoft.CloudliApi`: the project is a VanillaSoft web
+This distinction matters most in `VanillaSoft.VoipApi`: the project is a VanillaSoft web
 application with a generated client back into VanillaSoft's broad CRM service. Those calls
 are not Cloudli carrier operations. The actual provider contract is concentrated in
 `VanillaSoft.Backend/Cloudli/CloudliClient.cs`, the `IVoipService` capability interfaces,

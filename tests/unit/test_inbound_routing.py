@@ -21,6 +21,11 @@ _INCOMING = "/webhooks/jambonz/incoming-call"
 _DTMF = "/webhooks/jambonz/dtmf-result"
 
 
+def _expected_sip_uri(ext: dict) -> str:
+    """The dial target for a provisioned extension is a realm-qualified SIP URI."""
+    return f"sip:{ext['sip_username']}@{ext['sip_domain_sid']}"
+
+
 async def _setup_customer_line_extension(
     client, db_session, vs_id: int, phone: str, ext_number: str, with_pointer: bool = True
 ) -> dict:
@@ -74,7 +79,7 @@ async def test_incoming_call_with_pointer_returns_dial_verb(client, db_session) 
     assert len(verbs) == 1
     assert verbs[0]["verb"] == "dial"
     assert verbs[0]["callerId"] == "+12125550001"
-    assert verbs[0]["target"] == [{"type": "sip", "sipUri": data["ext"]["sip_username"]}]
+    assert verbs[0]["target"] == [{"type": "sip", "sipUri": _expected_sip_uri(data["ext"])}]
 
 
 async def test_incoming_call_without_pointer_returns_empty(client, db_session) -> None:
@@ -178,7 +183,7 @@ async def test_dtmf_result_routes_to_matching_extension(client, db_session) -> N
     assert resp.status_code == 200
     verbs = resp.json()
     assert verbs[-1]["verb"] == "dial"
-    assert verbs[-1]["target"] == [{"type": "sip", "sipUri": data["ext"]["sip_username"]}]
+    assert verbs[-1]["target"] == [{"type": "sip", "sipUri": _expected_sip_uri(data["ext"])}]
 
 
 async def test_dtmf_result_unknown_extension_says_goodbye(client, db_session) -> None:

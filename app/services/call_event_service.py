@@ -43,6 +43,12 @@ async def get_by_call_sid_for_customer(
     return await CallEventRepo(session).get_by_call_sid_for_customer(call_sid, customer_id)
 
 
+async def get_active_for_extension(
+    session: AsyncSession, customer_id: uuid.UUID, extension: str
+) -> list[CallEvent]:
+    return await CallEventRepo(session).get_active_for_extension(customer_id, extension)
+
+
 async def create_from_webhook(
     session: AsyncSession,
     customer_id: uuid.UUID | None,

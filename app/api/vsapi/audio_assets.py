@@ -5,6 +5,7 @@ import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth import AuthContext, enforce_customer_scope, get_auth_context
@@ -33,6 +34,7 @@ def _to_response(asset: AudioAsset, playback_url: str | None) -> AudioAssetRespo
         s3_key=asset.s3_key,
         playback_url=playback_url,
         duration_seconds=asset.duration_seconds,
+        voicemail_drop_code=asset.voicemail_drop_code,
         active=asset.active,
         created_at=asset.created_at,
     )
@@ -122,14 +124,28 @@ async def confirm_upload(
     if not customer:
         logger.warning("Customer not found vs_customer_id=%s", body.vs_customer_id)
         raise HTTPException(status_code=404, detail="Customer not found")
-    asset = await audio_asset_service.create(
-        session,
-        customer_id=customer.id,
-        kind=body.kind,
-        name=body.name,
-        s3_key=body.s3_key,
-        duration_seconds=body.duration_seconds,
-    )
+    expected_prefix = f"audio/{customer.id}/"
+    if not body.s3_key.startswith(expected_prefix) or ".." in body.s3_key.split("/"):
+        raise HTTPException(status_code=422, detail="S3 key is outside this customer's audio area")
+    if body.voicemail_drop_code is not None:
+        existing = await audio_asset_service.get_by_voicemail_drop_code(
+            session, customer.id, body.voicemail_drop_code
+        )
+        if existing:
+            raise HTTPException(status_code=409, detail="Voicemail drop code already exists")
+    try:
+        asset = await audio_asset_service.create(
+            session,
+            customer_id=customer.id,
+            kind=body.kind,
+            name=body.name,
+            s3_key=body.s3_key,
+            duration_seconds=body.duration_seconds,
+            voicemail_drop_code=body.voicemail_drop_code,
+        )
+    except IntegrityError:
+        await session.rollback()
+        raise HTTPException(status_code=409, detail="Voicemail drop code already exists") from None
     logger.info(
         "Audio asset created id=%s vs_customer_id=%s kind=%s",
         asset.id,

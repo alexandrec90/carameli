@@ -23,12 +23,12 @@ async def _create_customer(client, vs_id: int) -> uuid.UUID:
     return uuid.UUID(resp.json()["id"])
 
 
-async def _confirm_asset(client, vs_id: int, **over) -> dict:
+async def _confirm_asset(client, vs_id: int, customer_id: uuid.UUID, **over) -> dict:
     body = {
         "vs_customer_id": vs_id,
         "name": "Test Track",
         "kind": "music",
-        "s3_key": f"audio/{uuid.uuid4()}",
+        "s3_key": f"audio/{customer_id}/{uuid.uuid4()}",
         **over,
     }
     resp = await client.post(f"{_AUDIO_BASE}/ConfirmUpload", json=body, headers=AUTH_HEADERS)
@@ -37,12 +37,55 @@ async def _confirm_asset(client, vs_id: int, **over) -> dict:
 
 
 async def test_confirm_upload_success(client) -> None:
-    await _create_customer(client, 9001)
-    body = await _confirm_asset(client, 9001, name="My Music", kind="music")
+    customer_id = await _create_customer(client, 9001)
+    body = await _confirm_asset(client, 9001, customer_id, name="My Music", kind="music")
     assert body["name"] == "My Music"
     assert body["kind"] == "music"
     assert body["active"] is True
     assert body["playback_url"] is None  # S3 not configured in tests
+
+
+async def test_confirm_upload_assigns_unique_voicemail_drop_code(client) -> None:
+    customer_id = await _create_customer(client, 9012)
+    body = await _confirm_asset(
+        client,
+        9012,
+        customer_id,
+        name="Drop one",
+        kind="voicemail-drop",
+        voicemail_drop_code=1,
+    )
+    assert body["voicemail_drop_code"] == 1
+
+    duplicate = await client.post(
+        f"{_AUDIO_BASE}/ConfirmUpload",
+        json={
+            "vs_customer_id": 9012,
+            "name": "Duplicate",
+            "kind": "voicemail-drop",
+            "s3_key": f"audio/{customer_id}/{uuid.uuid4()}",
+            "voicemail_drop_code": 1,
+        },
+        headers=AUTH_HEADERS,
+    )
+    assert duplicate.status_code == 409
+
+
+async def test_confirm_upload_rejects_another_customers_s3_key(client) -> None:
+    customer_id = await _create_customer(client, 9013)
+    response = await client.post(
+        f"{_AUDIO_BASE}/ConfirmUpload",
+        json={
+            "vs_customer_id": 9013,
+            "name": "Foreign object",
+            "kind": "voicemail-drop",
+            "s3_key": f"audio/{uuid.uuid4()}/private.mp3",
+            "voicemail_drop_code": 2,
+        },
+        headers=AUTH_HEADERS,
+    )
+    assert response.status_code == 422
+    assert str(customer_id) not in response.text
 
 
 async def test_confirm_upload_customer_not_found(client) -> None:
@@ -70,9 +113,9 @@ async def test_confirm_upload_missing_name_returns_422(client) -> None:
 
 
 async def test_list_audio_assets_filters_by_kind(client) -> None:
-    await _create_customer(client, 9003)
-    await _confirm_asset(client, 9003, kind="music", name="Track A")
-    await _confirm_asset(client, 9003, kind="hold", name="Hold B")
+    customer_id = await _create_customer(client, 9003)
+    await _confirm_asset(client, 9003, customer_id, kind="music", name="Track A")
+    await _confirm_asset(client, 9003, customer_id, kind="hold", name="Hold B")
 
     resp = await client.get(f"{_AUDIO_BASE}/List/9003?kind=music", headers=AUTH_HEADERS)
     assert resp.status_code == 200
@@ -83,9 +126,9 @@ async def test_list_audio_assets_filters_by_kind(client) -> None:
 
 
 async def test_list_audio_assets_all_kinds(client) -> None:
-    await _create_customer(client, 9004)
-    await _confirm_asset(client, 9004, kind="music")
-    await _confirm_asset(client, 9004, kind="hold")
+    customer_id = await _create_customer(client, 9004)
+    await _confirm_asset(client, 9004, customer_id, kind="music")
+    await _confirm_asset(client, 9004, customer_id, kind="hold")
 
     resp = await client.get(f"{_AUDIO_BASE}/List/9004", headers=AUTH_HEADERS)
     assert resp.status_code == 200
@@ -100,9 +143,9 @@ async def test_list_audio_assets_empty(client) -> None:
 
 
 async def test_list_audio_assets_isolated_per_customer(client) -> None:
-    await _create_customer(client, 9006)
+    customer_id = await _create_customer(client, 9006)
     await _create_customer(client, 9007)
-    await _confirm_asset(client, 9006, name="Private Track")
+    await _confirm_asset(client, 9006, customer_id, name="Private Track")
 
     resp = await client.get(f"{_AUDIO_BASE}/List/9007", headers=AUTH_HEADERS)
     assert resp.status_code == 200
@@ -115,8 +158,8 @@ async def test_list_audio_assets_customer_not_found(client) -> None:
 
 
 async def test_deactivate_audio_asset_success(client) -> None:
-    await _create_customer(client, 9008)
-    created = await _confirm_asset(client, 9008, name="To Remove")
+    customer_id = await _create_customer(client, 9008)
+    created = await _confirm_asset(client, 9008, customer_id, name="To Remove")
 
     resp = await client.put(f"{_AUDIO_BASE}/Deactivate/9008/{created['id']}", headers=AUTH_HEADERS)
     assert resp.status_code == 200
