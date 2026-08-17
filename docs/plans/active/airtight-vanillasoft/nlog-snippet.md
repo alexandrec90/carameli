@@ -1,7 +1,7 @@
 # NLog config snippet — ship `Carameli.*` logs to Carameli (`/webhooks/vs-log`)
 
 Human deliverable for **phase 03**. Apply this to the staging `NLog.config` of
-`VanillaSoft.CloudliApi` (and any other host whose Carameli client traffic you want to
+`VanillaSoft.VoipApi` (and any other host whose Carameli client traffic you want to
 capture — see "Which hosts" below). It is **additive**: the new rule uses `final="false"`
 so all existing local file/console targets keep logging unchanged.
 
@@ -36,7 +36,7 @@ volume stays trivial.
 <logger name="Carameli.*" minlevel="Warn" writeTo="carameliShip" final="false" />
 ```
 
-## Caveats (verify against CloudliApi's `packages.config` before applying)
+## Caveats (verify against VoipApi's `packages.config` before applying)
 
 - **NLog version.** `<header>` on a `WebService` target needs **NLog ≥ 4.6.5**; the
   `${appsetting}` layout renderer needs **NLog ≥ 4.6** (or the `NLog.AppSettings` package on
@@ -53,10 +53,10 @@ volume stays trivial.
 
 ## Which hosts
 
-The receiver path runs in `VanillaSoft.CloudliApi` (which owns `NLog.config`); the client
+The receiver path runs in `VanillaSoft.VoipApi` (which owns `NLog.config`); the client
 path (`CarameliClient` / `CarameliService`) runs in whichever host resolved
 `ICloudliService` via `CloudliServiceFactory` — PubApi, Webservice, NotificationService,
-Task Service, SMSDripService, VoipLineCountUpdate, CloudliApi. Shipping from CloudliApi
+Task Service, SMSDripService, VoipLineCountUpdate, VoipApi. Shipping from VoipApi
 alone covers the receiver plus its own client calls. Apply the same snippet to another
 host's NLog config only when that host's Carameli traffic actually matters.
 

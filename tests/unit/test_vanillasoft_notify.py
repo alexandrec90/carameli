@@ -1,5 +1,5 @@
 """Schema tests pinning Carameli's webhook-out payloads to the VanillaSoft
-CloudliApi model shapes (IncomingCall.cs, CallRecording.cs, SmsMessage.cs)."""
+VoipApi model shapes (IncomingCall.cs, CallRecording.cs, SmsMessage.cs)."""
 
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ from app.services import vanillasoft_notify
 
 pytestmark = pytest.mark.asyncio(loop_scope="session")
 
-# Field sets copied from ../VanillaLand/AppCode/VanillaSoft.CloudliApi/Models/.
+# Field sets copied from ../VanillaLand/AppCode/VanillaSoft.VoipApi/Models/.
 _INCOMING_CALL_FIELDS = {
     "callId",
     "callIdUuid",

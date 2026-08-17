@@ -53,7 +53,7 @@ async def _create_customer_with_line(client, vs_id: int, phone: str) -> None:
 
 async def test_terminal_call_posts_incoming_call_contract(client, db_session, monkeypatch) -> None:
     """Completed call → notify/IncomingCall with IncomingCall.cs shape + Carameli HMAC."""
-    monkeypatch.setattr(settings, "vanillasoft_webhook_url", "http://vs.example.com/cloudliapi")
+    monkeypatch.setattr(settings, "vanillasoft_webhook_url", "http://vs.example.com/voip")
     monkeypatch.setattr(settings, "vanillasoft_webhook_secret", "cloudli-secret")
     monkeypatch.setattr(settings, "carameli_notify_secret", "carameli-secret")
     phone = "+18605550100"
@@ -76,7 +76,7 @@ async def test_terminal_call_posts_incoming_call_contract(client, db_session, mo
 
     http.post.assert_awaited_once()
     call = http.post.call_args
-    assert call.args[0] == "http://vs.example.com/cloudliapi/notify/IncomingCall"
+    assert call.args[0] == "http://vs.example.com/voip/notify/IncomingCall"
     assert call.kwargs["headers"]["Content-Type"] == "application/json"
     assert "X-Cloudli-Auth" not in call.kwargs["headers"]
     assert vanillasoft_notify.SIGNATURE_HEADER in call.kwargs["headers"]
@@ -95,7 +95,7 @@ async def test_terminal_call_posts_incoming_call_contract(client, db_session, mo
 
 async def test_terminal_call_with_recording_also_posts_call_recording(client, monkeypatch) -> None:
     """When a recording URL lands, notify/CallRecording fires with the Carameli URL."""
-    monkeypatch.setattr(settings, "vanillasoft_webhook_url", "http://vs.example.com/cloudliapi")
+    monkeypatch.setattr(settings, "vanillasoft_webhook_url", "http://vs.example.com/voip")
     monkeypatch.setattr(settings, "vanillasoft_webhook_secret", None)
     phone = "+18615550100"
     await _create_customer_with_line(client, 8802, phone)
@@ -131,7 +131,7 @@ async def test_terminal_call_with_recording_also_posts_call_recording(client, mo
 
 
 async def test_non_terminal_call_does_not_post(client, monkeypatch) -> None:
-    monkeypatch.setattr(settings, "vanillasoft_webhook_url", "http://vs.example.com/cloudliapi")
+    monkeypatch.setattr(settings, "vanillasoft_webhook_url", "http://vs.example.com/voip")
     http = _mock_http()
     with patch("app.services.vanillasoft_notify.httpx.AsyncClient", return_value=http):
         resp = await client.post(
@@ -144,7 +144,7 @@ async def test_non_terminal_call_does_not_post(client, monkeypatch) -> None:
 
 async def test_vanillasoft_failure_leaves_event_unposted(client, db_session, monkeypatch) -> None:
     """A VanillaSoft outage must not break webhook acknowledgement; retry job picks it up."""
-    monkeypatch.setattr(settings, "vanillasoft_webhook_url", "http://vs.example.com/cloudliapi")
+    monkeypatch.setattr(settings, "vanillasoft_webhook_url", "http://vs.example.com/voip")
     http = _mock_http()
     http.post = AsyncMock(side_effect=ConnectionError("vs down"))
     with patch("app.services.vanillasoft_notify.httpx.AsyncClient", return_value=http):

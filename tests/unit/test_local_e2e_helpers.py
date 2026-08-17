@@ -109,7 +109,7 @@ class TestConfig:
         "CARAMELI_BASE_URL": "https://example.ngrok-free.dev/",
         "CARAMELI_API_KEY": "key",
         "CARAMELI_VS_CUSTOMER_ID": "77",
-        "VS_LOCAL_BASE_URL": "http://localhost:8021/cloudli/",
+        "VS_LOCAL_BASE_URL": "http://localhost:8021/voip/",
         "VS_CARAMELI_NOTIFY_SECRET": "shh",
     }
 
@@ -133,7 +133,7 @@ class TestConfig:
         config = helpers.LocalE2EConfig.from_env()
         assert config is not None
         assert config.carameli_base_url == "https://example.ngrok-free.dev"
-        assert config.vs_local_base_url == "http://localhost:8021/cloudli"
+        assert config.vs_local_base_url == "http://localhost:8021/voip"
 
     def test_from_env_applies_elasticsearch_defaults(self, monkeypatch: pytest.MonkeyPatch) -> None:
         self._apply(monkeypatch)

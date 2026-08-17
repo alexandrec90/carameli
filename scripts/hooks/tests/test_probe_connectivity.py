@@ -76,11 +76,11 @@ def test_host_port_from_url_handles_unparseable_input():
 # ------------------------------------------------------------- notify_probe_url
 
 
-@pytest.mark.parametrize("base", ["https://h/cloudliapi", "https://h/cloudliapi/"])
+@pytest.mark.parametrize("base", ["https://h/voip", "https://h/voip/"])
 def test_notify_probe_url_normalizes_slashes(base):
     assert (
         mod.notify_probe_url(base, "carameli/notify")
-        == "https://h/cloudliapi/carameli/notify/IncomingCall"
+        == "https://h/voip/carameli/notify/IncomingCall"
     )
 
 

@@ -65,7 +65,7 @@ changing a compatibility endpoint; do not copy its architecture into Carameli.
 
 Useful legacy roots include `VanillaSoft.Backend/ConnectMeVoice`, `CMVClarity`,
 `SMS`, `PhoneNumber`, `Recording`, `VanillaSoft.Model/VoIP`,
-`Vanillasoft.Webservice`, and `VanillaSoft.CloudliApi` under `../VanillaLand/AppCode/`.
+`Vanillasoft.Webservice`, and `VanillaSoft.VoipApi` under `../VanillaLand/AppCode/`.
 
 `docs/reference/vanillaland-scope.md` maps the whole tree — which subtrees are worth
 reading and which are CRM surface with no VoIP content. Read it before going in; it is

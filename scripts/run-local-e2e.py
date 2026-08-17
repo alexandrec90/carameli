@@ -51,7 +51,7 @@ _FIX_HINTS: tuple[tuple[str, str], ...] = (
     ),
     (
         r"VS_CARAMELI_NOTIFY_SECRET does not match|CarameliNotifySecret",
-        "Set CarameliNotifySecret in AppCode/VanillaSoft.CloudliApi/Web.config to the "
+        "Set CarameliNotifySecret in AppCode/VanillaSoft.VoipApi/Web.config to the "
         "same value as the remote's CARAMELI_NOTIFY_SECRET, then recycle the IIS app "
         "pool. An empty appSetting rejects every notify with 401. If the secret IS set, "
         "suspect a stale build: a binary predating CarameliSignatureAttribute still "
@@ -70,8 +70,8 @@ _FIX_HINTS: tuple[tuple[str, str], ...] = (
         "the 'ngrok-skip-browser-warning' header — see helpers.NGROK_SKIP_HEADER.",
     ),
     (
-        r"is not deployed on the local CloudliApi",
-        "Rebuild AppCode/VanillaSoft.CloudliApi into the IIS application; the branch's "
+        r"is not deployed on the local VoipApi",
+        "Rebuild AppCode/VanillaSoft.VoipApi into the IIS application; the branch's "
         "CarameliNotifyController is not being served.",
     ),
     (
@@ -82,11 +82,11 @@ _FIX_HINTS: tuple[tuple[str, str], ...] = (
     (
         r"not reaching local Elasticsearch",
         "The VanillaSoft log channel is down: confirm NLog.Targets.ElasticSearch is in "
-        "the CloudliApi bin directory, NLog.config points at the local ES, and the IIS "
+        "the VoipApi bin directory, NLog.config points at the local ES, and the IIS "
         "app pool has recycled since the config changed.",
     ),
     (
-        r"does not reach the local CloudliApi|fault is in the tunnel",
+        r"does not reach the local VoipApi|fault is in the tunnel",
         "The tunnel exposing local IIS points somewhere else. Re-check its target port "
         "and that VS_PUBLIC_BASE_URL includes the /voip application path.",
     ),

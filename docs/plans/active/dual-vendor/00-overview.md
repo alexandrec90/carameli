@@ -2,7 +2,7 @@
 
 Carameli today is wired into VanillaSoft as a **drop-in replacement** for Cloudli: it
 implements `ICloudliService`, it is selected by a global `VoipProvider` appSetting, and its
-inbound webhooks are hosted in the `VanillaSoft.CloudliApi` project behind Cloudli's
+inbound webhooks are hosted in the `VanillaSoft.VoipApi` project behind Cloudli's
 `X-Cloudli-Auth` header. That shape makes "some customers on Cloudli, some on Carameli"
 impossible, and it bakes a vendor name into an abstraction that now has three
 implementations (CMV, Cloudli, Carameli).
@@ -101,7 +101,7 @@ customer holding accounts at two vendors during a port — which the current bit
 
 ### Give Carameli its own inbound identity
 
-`CarameliNotifyController` moves out of `VanillaSoft.CloudliApi` into its own project (or at
+`CarameliNotifyController` moves out of `VanillaSoft.VoipApi` into its own project (or at
 minimum its own auth filter), with its own secret. Prefer HMAC request signing over a static
 shared header — Carameli already signs its own inbound webhooks
 (`.claude/rules/webhooks.md`), so this makes the two directions consistent.
@@ -179,7 +179,7 @@ The whole VanillaSoft side of this track exists only as working-tree state.
 | 07 | **merged** — `/api/v1/extensions` (incl. `/bulk`) and `/api/v1/phone-lines`; `/vsapi/1.0.0/` still published | **done** — `CarameliClient` uses the native resource routes for extension and phone-line operations, including one atomic bulk extension request; legacy-only SMS send, customer, callback, and area-code calls remain on `/vsapi` |
 
 Every added file is registered in its project (`VanillaSoft.Backend.csproj`,
-`VanillaSoft.CloudliApi.csproj`, `UnitTesting.csproj`, `VanillaSoft.sqlproj`), so the tree
+`VanillaSoft.VoipApi.csproj`, `UnitTesting.csproj`, `VanillaSoft.sqlproj`), so the tree
 is compile-complete as far as static inspection can tell. Neither side has been built or
 run against a live VanillaSoft; the Carameli halves are covered by 91 passing unit tests
 (`test_rest_extensions`, `test_rest_phone_lines`, `test_vanillasoft_notify`).
@@ -205,7 +205,7 @@ to the VanillaLand working tree alongside the rest of this track:
   bit consistent with the new column, and turns a `VoipCapabilityException` into a 400 —
   the configuration-time refusal the capability split exists to produce;
 - is covered by `UnitTesting/Voip/VoipVendorAdminTests.cs` (10 tests). `IVoipVendorRouter` is
-  now registered in `VanillaSoft.CloudliApi`'s container, matching `Vanillasoft.Webservice`.
+  now registered in `VanillaSoft.VoipApi`'s container, matching `Vanillasoft.Webservice`.
 
 Two things remain before a customer can actually be moved in production:
 

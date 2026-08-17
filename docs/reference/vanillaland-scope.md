@@ -30,7 +30,7 @@ expect a tool to keep you out.
 | `Vanillasoft.Webservice/` | ASMX contracts that Carameli's REST API replaces |
 | `ConnectMeVoice/` | CMV client — call + message-drop API surface |
 | `CMV*/` | Agent status, call data, recordings services |
-| `VanillaSoft.CloudliApi/` | CloudLi API — call + SMS surface owned by CloudLi |
+| `VanillaSoft.VoipApi/` | VoIP receiver — call + SMS surface, vendor-neutral since the Cloudli/Carameli split; hosts `CloudliController` and `CarameliNotifyController` |
 | `VanillaSoft.PubApi/` | Clarity API — call history, IR filters; CloudLi-owned |
 | `InBoundMessaging*/` | Inbound SMS webhook patterns |
 | `SMSService/` | SMS processing queue |
