@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Annotated
 
 from fastapi import APIRouter, Body, Depends, HTTPException
+from pydantic import Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth import AuthContext, enforce_customer_scope, get_auth_context
@@ -21,7 +22,10 @@ router = APIRouter(prefix="/AccessCheck", tags=["account-data"])
     responses={404: {"description": "Customer not found"}, 503: {"description": "Vault error"}},
 )
 async def get_account_data(
-    customer_ids: Annotated[list[int], Body(min_length=1, max_length=100)],
+    customer_ids: Annotated[
+        list[Annotated[int, Field(ge=1, le=2147483647)]],
+        Body(min_length=1, max_length=100),
+    ],
     session: Annotated[AsyncSession, Depends(get_session)],
     auth: Annotated[AuthContext, Depends(get_auth_context)],
 ) -> list[AccountDataResponse]:

@@ -82,6 +82,16 @@ async def test_account_data_enforces_customer_scope(client) -> None:
     assert response.status_code == 403
 
 
+async def test_account_data_rejects_out_of_range_customer_id(client) -> None:
+    """An id past int32 must be refused at the edge, not handed to PostgreSQL."""
+    response = await client.post(
+        "/vsapi/1.0.0/AccessCheck/AccountData",
+        json=[2147483648],
+        headers=AUTH_HEADERS,
+    )
+    assert response.status_code == 422
+
+
 async def test_extension_provisioning_failure_does_not_create_row(client) -> None:
     await _create_customer(client, 9413, "account-key-9413")
     app.state.engine.provision_sip_client = AsyncMock(side_effect=RuntimeError("unavailable"))
