@@ -4,6 +4,7 @@ import logging
 from collections.abc import AsyncGenerator
 
 import redis.asyncio as aioredis
+from arq.connections import ArqRedis, RedisSettings, create_pool
 
 from app.core.config import settings
 
@@ -30,6 +31,15 @@ def get_redis_client() -> aioredis.Redis:
 async def get_redis() -> AsyncGenerator[aioredis.Redis, None]:
     """FastAPI dependency that yields a Redis client."""
     client = get_redis_client()
+    try:
+        yield client
+    finally:
+        await client.aclose()
+
+
+async def get_arq_redis() -> AsyncGenerator[ArqRedis, None]:
+    """Yield an ARQ-capable client using ARQ's binary-safe serializer settings."""
+    client = await create_pool(RedisSettings.from_dsn(settings.redis_url))
     try:
         yield client
     finally:

@@ -27,6 +27,7 @@ async def create(
     name: str,
     s3_key: str,
     duration_seconds: int | None = None,
+    voicemail_drop_code: int | None = None,
 ) -> AudioAsset:
     return await AudioAssetRepo(session).create(
         customer_id=customer_id,
@@ -34,8 +35,15 @@ async def create(
         name=name,
         s3_key=s3_key,
         duration_seconds=duration_seconds,
+        voicemail_drop_code=voicemail_drop_code,
     )
 
 
 async def deactivate(session: AsyncSession, asset: AudioAsset) -> AudioAsset:
     return await AudioAssetRepo(session).deactivate(asset)
+
+
+async def get_by_voicemail_drop_code(
+    session: AsyncSession, customer_id: uuid.UUID, code: int
+) -> AudioAsset | None:
+    return await AudioAssetRepo(session).get_by_voicemail_drop_code(customer_id, code)

@@ -6,8 +6,8 @@
 
 ## Part A — VanillaLand: `CarameliNotifyController`
 
-New file `AppCode/VanillaSoft.CloudliApi/Controllers/CarameliNotifyController.cs`
-(namespace it distinctly, e.g. `VanillaSoft.CloudliApi.Controllers.Carameli` if that helps
+New file `AppCode/VanillaSoft.VoipApi/Controllers/CarameliNotifyController.cs`
+(namespace it distinctly, e.g. `VanillaSoft.VoipApi.Controllers.Carameli` if that helps
 scoping; the existing `CloudliController.cs` in the same folder is the reference for
 attribute routing, `CloudliHeaderAttribute` usage, and model binding — read it first).
 
@@ -15,7 +15,7 @@ attribute routing, `CloudliHeaderAttribute` usage, and model binding — read it
 
 Same four endpoints and the **same request models** the existing controller uses
 (`IncomingCall`, `CallRecording`, `SmsMessage` from
-`AppCode/VanillaSoft.CloudliApi/Models/`) — Carameli's payload builders in
+`AppCode/VanillaSoft.VoipApi/Models/`) — Carameli's payload builders in
 `app/services/vanillasoft_notify.py` stay untouched. Only the route prefix changes:
 
 | Route | Replaces |

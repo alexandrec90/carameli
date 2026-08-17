@@ -66,7 +66,7 @@ async def test_retry_skips_when_no_webhook_url(monkeypatch) -> None:
 
 async def test_retry_skips_when_no_unposted_events(monkeypatch) -> None:
     """No HTTP calls made when get_unposted returns empty list."""
-    monkeypatch.setattr(settings, "vanillasoft_webhook_url", "http://vs.example.com/cloudliapi")
+    monkeypatch.setattr(settings, "vanillasoft_webhook_url", "http://vs.example.com/voip")
     mock_repo = AsyncMock()
     mock_repo.get_unposted.return_value = []
 
@@ -82,7 +82,7 @@ async def test_retry_skips_when_no_unposted_events(monkeypatch) -> None:
 
 async def test_retry_posts_incoming_call_contract_and_marks_posted(monkeypatch) -> None:
     """A completed event is POSTed as the IncomingCall shape with Carameli HMAC auth."""
-    monkeypatch.setattr(settings, "vanillasoft_webhook_url", "http://vs.example.com/cloudliapi")
+    monkeypatch.setattr(settings, "vanillasoft_webhook_url", "http://vs.example.com/voip")
     monkeypatch.setattr(settings, "vanillasoft_webhook_secret", "cloudli-secret")
     monkeypatch.setattr(settings, "carameli_notify_secret", "carameli-secret")
     event = _make_event(status="completed")
@@ -103,7 +103,7 @@ async def test_retry_posts_incoming_call_contract_and_marks_posted(monkeypatch) 
 
     mock_http.post.assert_awaited_once()
     call = mock_http.post.call_args
-    assert call.args[0] == "http://vs.example.com/cloudliapi/notify/IncomingCall"
+    assert call.args[0] == "http://vs.example.com/voip/notify/IncomingCall"
     assert call.kwargs["headers"]["Content-Type"] == "application/json"
     assert "X-Cloudli-Auth" not in call.kwargs["headers"]
     assert vanillasoft_notify.SIGNATURE_HEADER in call.kwargs["headers"]
@@ -117,7 +117,7 @@ async def test_retry_posts_incoming_call_contract_and_marks_posted(monkeypatch) 
 @pytest.mark.parametrize("status", ["no-answer", "busy", "failed", "canceled"])
 async def test_retry_posts_all_terminal_statuses(monkeypatch, status: str) -> None:
     """All terminal statuses trigger a VanillaSoft POST (mapped to callHungup)."""
-    monkeypatch.setattr(settings, "vanillasoft_webhook_url", "http://vs.example.com/cloudliapi")
+    monkeypatch.setattr(settings, "vanillasoft_webhook_url", "http://vs.example.com/voip")
     monkeypatch.setattr(settings, "vanillasoft_webhook_secret", None)
     event = _make_event(status=status)
 
@@ -142,7 +142,7 @@ async def test_retry_posts_all_terminal_statuses(monkeypatch, status: str) -> No
 
 async def test_retry_skips_non_terminal_status(monkeypatch) -> None:
     """Events with non-terminal status (e.g. 'in-progress') are not POSTed."""
-    monkeypatch.setattr(settings, "vanillasoft_webhook_url", "http://vs.example.com/cloudliapi")
+    monkeypatch.setattr(settings, "vanillasoft_webhook_url", "http://vs.example.com/voip")
     event = _make_event(status="in-progress")
 
     mock_repo = AsyncMock()
@@ -192,7 +192,7 @@ async def test_worker_shutdown_closes_both_providers() -> None:
 
 async def test_retry_warns_on_non_2xx_and_does_not_mark_posted(monkeypatch) -> None:
     """A non-2xx response does not mark the event as posted."""
-    monkeypatch.setattr(settings, "vanillasoft_webhook_url", "http://vs.example.com/cloudliapi")
+    monkeypatch.setattr(settings, "vanillasoft_webhook_url", "http://vs.example.com/voip")
     monkeypatch.setattr(settings, "vanillasoft_webhook_secret", None)
     event = _make_event(status="completed")
 

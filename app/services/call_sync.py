@@ -15,6 +15,7 @@ from app.core.heartbeat import ping
 from app.repositories.call_event_repo import CallEventRepo
 from app.repositories.customer_repo import CustomerRepo
 from app.services import retention, vanillasoft_notify
+from app.services.recording_archive_service import build_recording_archive
 from app.services.agent_status_sync import (
     poll_agent_status,
 )
@@ -121,7 +122,7 @@ async def purge_expired_cron(ctx: dict) -> None:
 
 
 class WorkerSettings:
-    functions: ClassVar[list] = []
+    functions: ClassVar[list] = [build_recording_archive]
     cron_jobs: ClassVar[list] = [
         cron(retry_unposted_events_cron, second={0, 30}),
         cron(retry_unposted_sms_messages_cron, second={0, 30}),

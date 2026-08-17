@@ -88,6 +88,12 @@ class PhoneLineRepo:
         await self.session.refresh(line)
         return line
 
+    async def assign_branch(self, line: PhoneLine, branch_id: int | None) -> PhoneLine:
+        line.branch_id = branch_id
+        await self.session.commit()
+        await self.session.refresh(line)
+        return line
+
     async def get_by_phone_number_global(self, phone_number: str) -> PhoneLine | None:
         """Look up an active phone line by number without knowing the customer."""
         result = await self.session.execute(

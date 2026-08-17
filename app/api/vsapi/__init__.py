@@ -1,12 +1,14 @@
 from fastapi import APIRouter
 
 from app.api.vsapi import (
+    account_data,
     agent_skills,
     agent_status,
     agents,
     api_tokens,
     area_codes,
     audio_assets,
+    branches,
     call_queues,
     callback,
     calls,
@@ -22,6 +24,7 @@ from app.api.vsapi import (
     phone_lines,
     pointers,
     recordings,
+    recording_archives,
     sci,
     sms,
     speed_dials,
@@ -32,6 +35,7 @@ from app.api.vsapi import (
 
 vsapi_router = APIRouter(prefix="/vsapi/1.0.0")
 
+vsapi_router.include_router(account_data.router)
 vsapi_router.include_router(agent_status.router)
 vsapi_router.include_router(agents.router)
 vsapi_router.include_router(call_queues.router)
@@ -52,6 +56,7 @@ vsapi_router.include_router(area_codes.router)
 vsapi_router.include_router(calls.router)
 vsapi_router.include_router(callback.router)
 vsapi_router.include_router(recordings.router)
+vsapi_router.include_router(recording_archives.router)
 vsapi_router.include_router(webhooks.router)
 vsapi_router.include_router(group_extensions.router)
 vsapi_router.include_router(intercom_groups.router)
@@ -59,3 +64,4 @@ vsapi_router.include_router(multicast_groups.router)
 vsapi_router.include_router(conferences.router)
 vsapi_router.include_router(parking_lots.router)
 vsapi_router.include_router(audio_assets.router)
+vsapi_router.include_router(branches.router)

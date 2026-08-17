@@ -42,6 +42,12 @@ class ProviderMessageRecord:
     status: str | None
 
 
+@dataclass(frozen=True)
+class ProvisionedSipClient:
+    client_sid: str
+    sip_realm: str
+
+
 @runtime_checkable
 class CarrierProvider(Protocol):
     async def search_numbers(
@@ -52,8 +58,22 @@ class CarrierProvider(Protocol):
     async def send_sms(self, from_: str, to: str, body: str) -> dict: ...
     async def enable_sms(self, provider_sid: str) -> None: ...
     async def disable_sms(self, provider_sid: str) -> None: ...
-    async def set_webhook_url(self, base_url: str | None = None, confirm: bool = True) -> str: ...
-    async def get_available_area_codes(self, country: str, state: str | None) -> list[dict]: ...
+    async def set_webhook_url(
+        self,
+        base_url: str | None = None,
+        confirm: bool = True,
+    ) -> str:
+        del base_url, confirm
+        raise NotImplementedError
+
+    async def get_available_area_codes(
+        self,
+        country: str,
+        state: str | None,
+    ) -> list[dict]:
+        del country, state
+        raise NotImplementedError
+
     async def list_recent_messages(self, since: datetime) -> list[ProviderMessageRecord]: ...
 
 
@@ -65,6 +85,9 @@ class CallEngineProvider(Protocol):
     async def stop_recording(self, call_id: str) -> None: ...
     async def get_call_status(self, call_id: str) -> dict: ...
     async def initiate_voicemail_drop(self, to: str, from_: str, audio_url: str) -> dict: ...
+    async def play_audio_to_call(self, call_id: str, audio_url: str) -> dict: ...
+    async def provision_sip_client(self, username: str, password: str) -> ProvisionedSipClient: ...
+    async def deprovision_sip_client(self, client_sid: str) -> None: ...
     async def initiate_callback(
         self, agent_sip_uri: str, contact_number: str, webhook_url: str
     ) -> dict: ...

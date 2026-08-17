@@ -68,7 +68,7 @@ async def test_ngrok_interstitial_is_bypassed(config: LocalE2EConfig) -> None:
 
 
 async def test_local_vanillaland_notify_route_is_deployed(config: LocalE2EConfig) -> None:
-    """The local CloudliApi serves ``carameli/notify/*`` and its auth filter is active.
+    """The local VoipApi serves ``carameli/notify/*`` and its auth filter is active.
 
     An *unsigned* POST must be rejected with 401. Two failure modes this separates:
     404 means the branch's ``CarameliNotifyController`` is not built/deployed into the
@@ -88,8 +88,8 @@ async def test_local_vanillaland_notify_route_is_deployed(config: LocalE2EConfig
         )
 
     assert response.status_code != 404, (
-        "carameli/notify/IncomingCall is not deployed on the local CloudliApi — "
-        f"rebuild the VanillaSoft.CloudliApi project into the IIS app. {describe(response)}"
+        "carameli/notify/IncomingCall is not deployed on the local VoipApi — "
+        f"rebuild the VanillaSoft.VoipApi project into the IIS app. {describe(response)}"
     )
     assert response.status_code == 401, (
         "an unsigned notify must be rejected with 401 by CarameliSignatureAttribute; "
@@ -119,13 +119,13 @@ async def test_notify_secret_is_configured_on_the_receiver(config: LocalE2EConfi
     assert response.status_code != 401, (
         "a correctly signed notify was rejected — VS_CARAMELI_NOTIFY_SECRET does not "
         "match the CarameliNotifySecret appSetting in "
-        "AppCode/VanillaSoft.CloudliApi/Web.config (an empty appSetting rejects "
+        "AppCode/VanillaSoft.VoipApi/Web.config (an empty appSetting rejects "
         f"everything). {describe(response)}"
     )
 
 
 async def test_public_tunnel_reaches_the_same_local_receiver(public_vs_base_url: str) -> None:
-    """The public tunnel URL resolves to the local CloudliApi, not something else.
+    """The public tunnel URL resolves to the local VoipApi, not something else.
 
     Skips when no tunnel is configured. An unsigned POST through the tunnel must produce
     the same 401 the direct local call produces; anything else means the tunnel points at
@@ -140,7 +140,7 @@ async def test_public_tunnel_reaches_the_same_local_receiver(public_vs_base_url:
         )
 
     assert response.status_code == 401, (
-        "the public tunnel does not reach the local CloudliApi's Carameli routes; "
+        "the public tunnel does not reach the local VoipApi's Carameli routes; "
         f"check the tunnel target port and path. {describe(response)}"
     )
 

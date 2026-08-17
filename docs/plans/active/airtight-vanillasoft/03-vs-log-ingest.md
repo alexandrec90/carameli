@@ -72,10 +72,10 @@ Decoupling requirement: NLog routing must be able to select **only Carameli traf
    Moq can't reach gets covered by the staging smoke in Part D. No local .NET build —
    CI verifies compilation.
 
-Which hosts matter: the receiver path runs in `VanillaSoft.CloudliApi` (has `NLog.config`);
+Which hosts matter: the receiver path runs in `VanillaSoft.VoipApi` (has `NLog.config`);
 the client path runs in the hosts that resolve `ICloudliService` via `CloudliServiceFactory`
 (PubApi, Webservice, NotificationService, Task Service, SMSDripService, VoipLineCountUpdate,
-CloudliApi). Shipping from CloudliApi alone covers the receiver + its own client calls;
+VoipApi). Shipping from VoipApi alone covers the receiver + its own client calls;
 apply the same config snippet to other hosts' NLog configs only if/when their Carameli
 traffic matters (note this in the PR body rather than boiling the ocean).
 
@@ -107,7 +107,7 @@ Produce this as a fenced block in the PR/commit body and in a short
 <logger name="Carameli.*" minlevel="Warn" writeTo="carameliShip" final="false" />
 ```
 
-Caveats to verify while writing the snippet (check `packages.config` in CloudliApi):
+Caveats to verify while writing the snippet (check `packages.config` in VoipApi):
 
 - `<header>` on the WebService target needs **NLog ≥ 4.6.5**; `${appsetting}` needs NLog ≥
   4.6 (or `NLog.AppSettings` package on older). That's why the `auth` **body parameter**

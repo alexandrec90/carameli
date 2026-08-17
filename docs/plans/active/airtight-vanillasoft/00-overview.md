@@ -29,7 +29,7 @@ Existing integration (all already implemented and tested):
 - **VanillaSoft → Carameli**: `AppCode/VanillaSoft.Backend/Carameli/` (`CarameliClient`,
   `CarameliService : ICloudliService`) calls Carameli's REST API with a static Bearer key,
   selected by the `VoipProvider=Carameli` appSetting via `CloudliServiceFactory`.
-- **VanillaSoft receiver today**: `AppCode/VanillaSoft.CloudliApi/Controllers/CloudliController.cs`
+- **VanillaSoft receiver today**: `AppCode/VanillaSoft.VoipApi/Controllers/CloudliController.cs`
   — auth via `CloudliHeaderAttribute` (compares `X-Cloudli-Auth` to appSetting `CloudliAuthValue`).
 
 ## The core architectural decision: the honest receiver
@@ -72,7 +72,7 @@ change is a deliverable (exact XML) that a human applies on staging.
 
 All new VanillaLand code lives in Carameli-scoped locations and touches nothing shared:
 
-- Controller: `AppCode/VanillaSoft.CloudliApi/Controllers/CarameliNotifyController.cs`
+- Controller: `AppCode/VanillaSoft.VoipApi/Controllers/CarameliNotifyController.cs`
   (own routes `carameli/notify/...`; reuses `CloudliHeaderAttribute` + existing models).
 - Client-side code already lives in `AppCode/VanillaSoft.Backend/Carameli/`.
 - NLog loggers: every Carameli class logs under a `Carameli.*` logger name (phase 03), so

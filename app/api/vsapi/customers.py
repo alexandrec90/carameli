@@ -29,6 +29,15 @@ router = APIRouter(prefix="/VsCustomer", tags=["customers"])
 
 
 @router.post(
+    "/Add",
+    status_code=201,
+    response_model=CustomerCreateResponse,
+    responses={
+        400: {"description": "Invalid request body"},
+        409: {"description": "Customer already exists"},
+    },
+)
+@router.post(
     "/Create",
     status_code=201,
     response_model=CustomerCreateResponse,
@@ -47,8 +56,9 @@ async def create_customer(
     No carrier or engine resources are provisioned here.
 
     Investigation (CmvCustomer.cs -> CreateAccount): VanillaLand's CMVClient.CreateAccount()
-    simply POSTs a ContactInfoVS payload to the legacy CloudLi VsCustomer/Add endpoint,
-    which is exactly this handler. The .cs file is a thin HTTP client wrapper — it does not
+    POSTs a ContactInfoVS payload to the legacy CloudLi VsCustomer/Add endpoint. ``/Add``
+    and Carameli's clearer ``/Create`` route therefore share this handler. The .cs file is
+    a thin HTTP client wrapper — it does not
     call Telnyx, Jambonz, or any other provider directly. There are no durable carrier
     resources (SIP credentials, sub-accounts) created per-customer in the VanillaLand flow,
     so no provider calls are needed here beyond the DB insert.

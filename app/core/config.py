@@ -36,6 +36,11 @@ class Settings(BaseSettings):
     jambonz_webhook_base_url: str = "http://localhost:8000"
     jambonz_webhook_secret: str = ""
     jambonz_record_all_calls: bool = False
+    sip_credential_encryption_secret: str = ""
+
+    # Per-call SCI context is intentionally short-lived. VanillaSoft posts it
+    # immediately before originating the corresponding call.
+    sci_preparation_ttl_seconds: int = Field(default=300, ge=30, le=3600)
 
     # S3-compatible media / recording storage (Track F)
     s3_bucket: str = ""
@@ -50,6 +55,15 @@ class Settings(BaseSettings):
     # Shared retention window for posted call/SMS history and recording objects.
     # Zero (or a negative value) leaves retention disabled.
     retention_days: int = 0
+
+    # Archive limits bound worker memory, S3 reads, and ZIP fan-out.
+    recording_archive_max_files: int = Field(default=500, ge=1, le=5000)
+    recording_archive_max_file_bytes: int = Field(
+        default=100 * 1024 * 1024, ge=1, le=1024 * 1024 * 1024
+    )
+    recording_archive_max_total_bytes: int = Field(
+        default=1024 * 1024 * 1024, ge=1, le=10 * 1024 * 1024 * 1024
+    )
 
     rate_limit_sms: str = "60/minute"
     rate_limit_calls: str = "30/minute"
@@ -72,7 +86,7 @@ class Settings(BaseSettings):
     vanillasoft_webhook_url: str | None = Field(
         default=None,
         description=(
-            "Base URL of the VanillaSoft.CloudliApi staging site; Carameli POSTs "
+            "Base URL of the VanillaSoft.VoipApi staging site; Carameli POSTs "
             "IncomingCall, CallRecording, IncomingSmsMessage and "
             "IncomingSmsMessageDeliveryReceipt under it, behind "
             "VANILLASOFT_NOTIFY_PREFIX"
@@ -84,8 +98,9 @@ class Settings(BaseSettings):
         description=(
             "Carameli's own HMAC-SHA256 signing key for outbound notify POSTs, sent as "
             "X-Carameli-Signature. Deliberately separate from "
-            "VANILLASOFT_WEBHOOK_SECRET: that value is Cloudli's static shared header, "
-            "so reusing it would mean rotating one vendor rotates both. Unset = no "
+            "VANILLASOFT_WEBHOOK_SECRET: that value is the legacy vendor's static "
+            "shared header (the CloudliAuthValue appSetting), so reusing it would mean "
+            "rotating one vendor rotates both. Unset = no "
             "signature header (the pre-signing behaviour)"
         ),
     )

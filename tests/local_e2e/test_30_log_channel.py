@@ -152,14 +152,14 @@ async def test_vanillasoft_logs_reach_local_elasticsearch(config: LocalE2EConfig
         pytest.fail(
             "VanillaSoft log lines are not reaching local Elasticsearch, so an agent on "
             "this machine is blind to VanillaSoft-side errors. Check that "
-            "NLog.Targets.ElasticSearch is present in the CloudliApi bin directory, that "
+            "NLog.Targets.ElasticSearch is present in the VoipApi bin directory, that "
             "NLog.config points at the local ES, and that the IIS app pool has recycled "
             f"since the config changed. {exc}"
         )
 
     assert hits, f"no document matched {marker}"
     document = hits[0]
-    assert document.get("app") == "CloudliApi", (
+    assert document.get("app") == "VoipApi", (
         "the log document is missing the 'app' field the NLog config adds, so log "
         f"records cannot be attributed to a source application: {document}"
     )

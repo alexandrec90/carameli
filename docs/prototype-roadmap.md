@@ -84,9 +84,9 @@ get schema tests pinned to the VanillaSoft model shapes below.
 
 ### VanillaSoft webhook contracts Carameli must emit
 
-All POSTs to `{VANILLASOFT_WEBHOOK_URL}` (the staging `VanillaSoft.CloudliApi` base), with
+All POSTs to `{VANILLASOFT_WEBHOOK_URL}` (the staging `VanillaSoft.VoipApi` base), with
 header `X-Cloudli-Auth: {VANILLASOFT_WEBHOOK_SECRET}` matching the staging appSettings
-`CloudliAuthValue`. Source models live in `../VanillaLand/AppCode/VanillaSoft.CloudliApi/Models/`.
+`CloudliAuthValue`. Source models live in `../VanillaLand/AppCode/VanillaSoft.VoipApi/Models/`.
 
 | Endpoint | Model | Fields |
 | --- | --- | --- |
@@ -106,7 +106,7 @@ header `X-Cloudli-Auth: {VANILLASOFT_WEBHOOK_SECRET}` matching the staging appSe
 > `GetPhoneLineInfo`) throw `NotImplementedException` with a feature-naming message.
 > The DI switch reads the `VoipProvider` appSetting (`Cloudli` default | `Carameli`) via
 > `CloudliServiceFactory` (`IsCarameliEnabled`/`ResolveCloudliService`), which covers the
-> PubApi Unity resolver and every non-DI caller; the 6 MS-DI hosts (CloudliApi, Webservice,
+> PubApi Unity resolver and every non-DI caller; the 6 MS-DI hosts (VoipApi, Webservice,
 > NotificationService, Task Service, SMSDripService, VoipLineCountUpdate) now resolve
 > `ICloudliService` through it. Config keys `VoipProvider`/`CarameliApiBaseUrl`/`CarameliApiKey`
 > added to the 8 configs that carry `CloudliApiBaseUrl` (defaulting to Cloudli → no behavior
@@ -146,7 +146,7 @@ header `X-Cloudli-Auth: {VANILLASOFT_WEBHOOK_SECRET}` matching the staging appSe
 | 2 | ~~**A2P 10DLC registration** (brand + campaign) in the Telnyx portal~~ | ~$4 brand one-time; ~$2–15/mo campaign + carrier pass-through fees | **SKIPPED for Canada prototype.** 10DLC is a **US-only** regime (The Campaign Registry, US long codes); Canadian local long-code SMS is not part of it. Revisit only if/when US SMS is in scope. Caveats for Canadian SMS: **CASL** consent still applies, and Canadian carriers may filter unregistered A2P traffic at volume (fine for low-volume test-to-own-phone). |
 | 3 | **jambonz.cloud account**: register Telnyx as a carrier (SIP trunk both directions), create an application pointing call/status hooks at Carameli's public URL; collect `JAMBONZ_ACCOUNT_SID` / `JAMBONZ_API_KEY`; set `JAMBONZ_BASE_URL` | Free trial, then usage-based — verify current pricing at signup | **Required.** Replaces the local jambonz/freeswitch/rtpengine compose services for the prototype. |
 | 4 | **Public URL for Carameli** — ngrok with a static domain (free tier includes one) | Free | **Required.** Set `JAMBONZ_WEBHOOK_BASE_URL` + `TELNYX_WEBHOOK_BASE_URL`. Webhooks only — call media flows Telnyx ↔ jambonz.cloud and never touches ngrok. |
-| 5 | **Staging reachability** — confirm the staging `CloudliApi` URL + `CloudliAuthValue`; set `VANILLASOFT_WEBHOOK_URL` / `VANILLASOFT_WEBHOOK_SECRET` to match | — | **Deferred** — only needed for the VanillaSoft integration path (M3/M5), not for standalone send/receive prototyping. Staging firewall must allow Carameli's egress IP. |
+| 5 | **Staging reachability** — confirm the staging `VoipApi` URL + `CloudliAuthValue`; set `VANILLASOFT_WEBHOOK_URL` / `VANILLASOFT_WEBHOOK_SECRET` to match | — | **Deferred** — only needed for the VanillaSoft integration path (M3/M5), not for standalone send/receive prototyping. Staging firewall must allow Carameli's egress IP. |
 | 6 | Buy 1–2 test **Canadian** DIDs through the fixed `/PhoneLine/Add` flow (after A1) | ~$1–2/mo | **Required.** Point inbound voice at the jambonz.cloud application; SMS webhook at Carameli. |
 | 7 | Later (post-prototype): VPS for Carameli + self-hosted Jambonz migration, E911, CNAM, number porting | ~$6–20/mo VPS | Explicitly out of prototype scope. |
 

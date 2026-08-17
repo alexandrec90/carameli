@@ -152,7 +152,7 @@ async def test_inbound_sms_missing_numbers_is_noop(client, db_session, monkeypat
 async def test_inbound_sms_forwarded_to_vanillasoft_and_marked_posted(
     client, db_session, monkeypatch
 ) -> None:
-    monkeypatch.setattr(settings, "vanillasoft_webhook_url", "http://vs.example.com/cloudliapi")
+    monkeypatch.setattr(settings, "vanillasoft_webhook_url", "http://vs.example.com/voip")
     monkeypatch.setattr(settings, "vanillasoft_webhook_secret", "cloudli-secret")
     monkeypatch.setattr(settings, "carameli_notify_secret", "carameli-secret")
     phone = "+18205550100"
@@ -171,7 +171,7 @@ async def test_inbound_sms_forwarded_to_vanillasoft_and_marked_posted(
 
     http.post.assert_awaited_once()
     call = http.post.call_args
-    assert call.args[0] == "http://vs.example.com/cloudliapi/notify/IncomingSmsMessage"
+    assert call.args[0] == "http://vs.example.com/voip/notify/IncomingSmsMessage"
     assert call.kwargs["headers"]["Content-Type"] == "application/json"
     assert "X-Cloudli-Auth" not in call.kwargs["headers"]
     assert vanillasoft_notify.SIGNATURE_HEADER in call.kwargs["headers"]
@@ -189,7 +189,7 @@ async def test_inbound_sms_forwarded_to_vanillasoft_and_marked_posted(
 
 async def test_inbound_sms_forward_failure_leaves_unposted(client, db_session, monkeypatch) -> None:
     """A VanillaSoft outage must not block the ack; the row stays unposted for retry."""
-    monkeypatch.setattr(settings, "vanillasoft_webhook_url", "http://vs.example.com/cloudliapi")
+    monkeypatch.setattr(settings, "vanillasoft_webhook_url", "http://vs.example.com/voip")
     phone = "+18305550100"
     await _create_customer_with_line(client, 8603, phone)
 
@@ -209,7 +209,7 @@ async def test_inbound_sms_forward_failure_leaves_unposted(client, db_session, m
 
 
 async def test_delivery_receipt_forwarded_to_vanillasoft(client, db_session, monkeypatch) -> None:
-    monkeypatch.setattr(settings, "vanillasoft_webhook_url", "http://vs.example.com/cloudliapi")
+    monkeypatch.setattr(settings, "vanillasoft_webhook_url", "http://vs.example.com/voip")
     monkeypatch.setattr(settings, "vanillasoft_webhook_secret", "cloudli-secret")
     phone = "+18405550100"
     await _create_customer_with_line(client, 8604, phone)
@@ -242,9 +242,7 @@ async def test_delivery_receipt_forwarded_to_vanillasoft(client, db_session, mon
 
     http.post.assert_awaited_once()
     call = http.post.call_args
-    assert call.args[0] == (
-        "http://vs.example.com/cloudliapi/notify/IncomingSmsMessageDeliveryReceipt"
-    )
+    assert call.args[0] == ("http://vs.example.com/voip/notify/IncomingSmsMessageDeliveryReceipt")
     payload = notify_payload(call)
     assert payload["referenceId"] == sid
     assert payload["status"] == "delivered"
@@ -253,7 +251,7 @@ async def test_delivery_receipt_forwarded_to_vanillasoft(client, db_session, mon
 
 
 async def test_delivery_receipt_unknown_sid_does_not_forward(client, monkeypatch) -> None:
-    monkeypatch.setattr(settings, "vanillasoft_webhook_url", "http://vs.example.com/cloudliapi")
+    monkeypatch.setattr(settings, "vanillasoft_webhook_url", "http://vs.example.com/voip")
     receipt = {
         "data": {
             "event_type": "message.finalized",
@@ -304,7 +302,7 @@ async def test_sms_retry_skips_when_no_webhook_url(monkeypatch) -> None:
 
 
 async def test_sms_retry_forwards_and_marks_posted(monkeypatch) -> None:
-    monkeypatch.setattr(settings, "vanillasoft_webhook_url", "http://vs.example.com/cloudliapi")
+    monkeypatch.setattr(settings, "vanillasoft_webhook_url", "http://vs.example.com/voip")
     monkeypatch.setattr(settings, "vanillasoft_webhook_secret", None)
     message = _make_unposted_message()
 
@@ -325,7 +323,7 @@ async def test_sms_retry_forwards_and_marks_posted(monkeypatch) -> None:
 
 
 async def test_sms_retry_failure_does_not_mark_posted(monkeypatch) -> None:
-    monkeypatch.setattr(settings, "vanillasoft_webhook_url", "http://vs.example.com/cloudliapi")
+    monkeypatch.setattr(settings, "vanillasoft_webhook_url", "http://vs.example.com/voip")
     monkeypatch.setattr(settings, "vanillasoft_webhook_secret", None)
     message = _make_unposted_message()
 

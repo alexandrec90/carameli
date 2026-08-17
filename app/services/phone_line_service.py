@@ -83,5 +83,9 @@ async def update_auto_attendant(
     return await PhoneLineRepo(session).update_auto_attendant(line, enabled, max_digits)
 
 
+async def assign_branch(session: AsyncSession, line: PhoneLine, branch_id: int | None) -> PhoneLine:
+    return await PhoneLineRepo(session).assign_branch(line, branch_id)
+
+
 async def get_by_phone_number_global(session: AsyncSession, phone_number: str) -> PhoneLine | None:
     return await PhoneLineRepo(session).get_by_phone_number_global(phone_number)

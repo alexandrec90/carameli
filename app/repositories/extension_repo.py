@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import logging
 import uuid
+from dataclasses import dataclass
+from datetime import UTC, datetime
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -9,6 +11,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.extension import Extension
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class ExtensionCreate:
+    extension_number: str
+    sip_username: str
+    sip_credential_sid: str
+    sip_domain_sid: str
+    sip_password_encrypted: str
+    first_name: str | None = None
+    last_name: str | None = None
 
 
 class ExtensionRepo:
@@ -22,6 +35,9 @@ class ExtensionRepo:
         sip_username: str,
         sip_credential_sid: str | None = None,
         sip_domain_sid: str | None = None,
+        sip_password_encrypted: str | None = None,
+        first_name: str | None = None,
+        last_name: str | None = None,
     ) -> Extension:
         ext = Extension(
             customer_id=customer_id,
@@ -29,6 +45,9 @@ class ExtensionRepo:
             sip_username=sip_username,
             sip_credential_sid=sip_credential_sid,
             sip_domain_sid=sip_domain_sid,
+            sip_password_encrypted=sip_password_encrypted,
+            first_name=first_name,
+            last_name=last_name,
         )
         self.session.add(ext)
         await self.session.commit()
@@ -38,7 +57,7 @@ class ExtensionRepo:
     async def create_many(
         self,
         customer_id: uuid.UUID,
-        extensions: list[tuple[str, str]],
+        extensions: list[ExtensionCreate],
     ) -> list[Extension]:
         """Create every ``(extension_number, sip_username)`` pair in one transaction.
 
@@ -50,12 +69,15 @@ class ExtensionRepo:
         rows = [
             Extension(
                 customer_id=customer_id,
-                extension_number=extension_number,
-                sip_username=sip_username,
-                sip_credential_sid=None,
-                sip_domain_sid=None,
+                extension_number=item.extension_number,
+                sip_username=item.sip_username,
+                sip_credential_sid=item.sip_credential_sid,
+                sip_domain_sid=item.sip_domain_sid,
+                sip_password_encrypted=item.sip_password_encrypted,
+                first_name=item.first_name,
+                last_name=item.last_name,
             )
-            for extension_number, sip_username in extensions
+            for item in extensions
         ]
         self.session.add_all(rows)
         await self.session.commit()
@@ -112,3 +134,29 @@ class ExtensionRepo:
         await self.session.commit()
         await self.session.refresh(ext)
         return ext
+
+    async def assign_branch(self, ext: Extension, branch_id: int | None) -> Extension:
+        ext.branch_id = branch_id
+        await self.session.commit()
+        await self.session.refresh(ext)
+        return ext
+
+    async def get_undelivered_credentials(self, customer_id: uuid.UUID) -> list[Extension]:
+        result = await self.session.execute(
+            select(Extension)
+            .where(
+                Extension.customer_id == customer_id,
+                Extension.active.is_(True),
+                Extension.sip_password_encrypted.is_not(None),
+                Extension.sip_secret_delivered_at.is_(None),
+            )
+            .order_by(Extension.extension_number)
+            .with_for_update()
+        )
+        return list(result.scalars().all())
+
+    async def mark_credentials_delivered(self, extensions: list[Extension]) -> None:
+        delivered_at = datetime.now(UTC).replace(tzinfo=None)
+        for ext in extensions:
+            ext.sip_secret_delivered_at = delivered_at
+            ext.sip_password_encrypted = None

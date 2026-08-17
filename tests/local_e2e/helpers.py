@@ -32,7 +32,7 @@ Environment contract (see ``.env.local-e2e.example`` and
 | ``CARAMELI_VS_CUSTOMER_ID`` | yes | That customer's ``vs_customer_id`` (an integer) |
 | ``VS_LOCAL_BASE_URL`` | yes | Local VoIP-receiver base, e.g. ``http://localhost:8021/voip`` |
 | ``VS_CARAMELI_NOTIFY_SECRET`` | yes | Must equal the remote's ``CARAMELI_NOTIFY_SECRET`` |
-| ``VS_PUBLIC_BASE_URL`` | no | Public tunnel to the *same* local CloudliApi; reverse-direction tests skip without it |
+| ``VS_PUBLIC_BASE_URL`` | no | Public tunnel to the *same* local VoipApi; reverse-direction tests skip without it |
 | ``VS_WEBHOOK_SECRET`` | no | The remote's ``VANILLASOFT_WEBHOOK_SECRET``; enables the ``/webhooks/vs-log`` test |
 | ``ES_URL`` | no | Local Elasticsearch (default ``http://localhost:9200``) |
 | ``ES_INDEX`` | no | NLog index (default ``vanillasoft_dev.events``) |
@@ -364,9 +364,9 @@ async def post_notify(
     timestamp: int | None = None,
     signature_override: str | None = None,
 ) -> httpx.Response:
-    """POST a signed notify to a VanillaSoft CloudliApi base, exactly as Carameli does.
+    """POST a signed notify to a VanillaSoft VoipApi base, exactly as Carameli does.
 
-    *base_url* is the CloudliApi application root (local or tunnelled);
+    *base_url* is the VoipApi application root (local or tunnelled);
     ``carameli/notify/`` and *path* are appended. ``signature_override`` replaces the
     computed header so negative tests can send a wrong or malformed signature over an
     otherwise-valid request.

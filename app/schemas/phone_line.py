@@ -58,6 +58,7 @@ class PhoneLineResponse(BaseModel):
     provider_sid: str
     sms_enabled: bool
     recording_enabled: bool
+    branch_id: int | None
     active: bool
     auto_attendant_enabled: bool
     auto_attendant_max_digits: int | None

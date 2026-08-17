@@ -26,6 +26,17 @@ async def test_create_customer(client) -> None:
     assert data["active"] is True
 
 
+async def test_legacy_add_customer_alias(client) -> None:
+    """VanillaSoft's CloudliClient still POSTs to VsCustomer/Add."""
+    payload = {
+        "vs_customer_id": 4006,
+        "api_key": "key-4006",
+    }
+    resp = await client.post(f"{_BASE}/Add", json=payload, headers=AUTH_HEADERS)
+    assert resp.status_code == 201
+    assert resp.json()["vs_customer_id"] == 4006
+
+
 async def test_get_customer(client) -> None:
     await _create(client, 4002)
     resp = await client.get(f"{_BASE}/Get/4002", headers=AUTH_HEADERS)

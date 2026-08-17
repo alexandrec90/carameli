@@ -3,7 +3,7 @@
 notifies back to it, then write the resulting URL into `.env.local-e2e`.
 
 This is the *reverse* tunnel. `scripts/start-ngrok.py` publishes Carameli's own API for
-provider webhooks; this one publishes VanillaSoft's CloudliApi for the inverted topology
+provider webhooks; this one publishes VanillaSoft's VoipApi for the inverted topology
 described in docs/operations/local-integration-testing.md. They are never both needed on
 the same machine.
 
@@ -125,7 +125,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--app-path",
         default=DEFAULT_APP_PATH,
-        help="IIS application path for CloudliApi (appended to the public URL)",
+        help="IIS application path for VoipApi (appended to the public URL)",
     )
     args = parser.parse_args(argv)
 

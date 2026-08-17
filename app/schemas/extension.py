@@ -21,7 +21,9 @@ class AddExtensionRequest(BaseModel):
 
     vs_customer_id: int = Field(ge=1, le=2147483647)
     extension_number: str = Field(max_length=20, pattern=r"^[^\x00]*$")
-    password: str | None = None
+    password: str | None = Field(default=None, min_length=12, max_length=255)
+    first_name: str | None = Field(default=None, max_length=100)
+    last_name: str | None = Field(default=None, max_length=100)
 
     @field_validator("extension_number", mode="before")
     @classmethod
@@ -35,6 +37,9 @@ class ExtensionResponse(BaseModel):
     id: uuid.UUID
     customer_id: uuid.UUID
     extension_number: str
+    first_name: str | None
+    last_name: str | None
+    branch_id: int | None
     sip_username: str
     sip_credential_sid: str | None
     sip_domain_sid: str | None
@@ -70,6 +75,9 @@ class CreateExtensionRequest(BaseModel):
 
     extension_number: str = Field(max_length=20, pattern=r"^[^\x00]*$")
     vs_customer_id: int | None = Field(default=None, ge=1, le=2147483647)
+    password: str | None = Field(default=None, min_length=12, max_length=255)
+    first_name: str | None = Field(default=None, max_length=100)
+    last_name: str | None = Field(default=None, max_length=100)
 
     @field_validator("extension_number", mode="before")
     @classmethod
@@ -87,6 +95,8 @@ class CreateExtensionRangeRequest(BaseModel):
     start_extension: int = Field(ge=0)
     end_extension: int = Field(ge=0)
     vs_customer_id: int | None = Field(default=None, ge=1, le=2147483647)
+    first_name: str | None = Field(default=None, max_length=100)
+    last_name: str | None = Field(default=None, max_length=100)
 
     @model_validator(mode="after")
     def validate_range(self) -> CreateExtensionRangeRequest:

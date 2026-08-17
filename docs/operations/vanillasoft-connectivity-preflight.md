@@ -16,7 +16,7 @@ traffic and may cost money.
 On the Carameli development machine, set these values in `.env`:
 
 ```dotenv
-VANILLASOFT_WEBHOOK_URL=https://vs-staging.example.com/cloudliapi
+VANILLASOFT_WEBHOOK_URL=https://vs-staging.example.com/voip
 VS_PROBE_HOST=vs-staging.example.com
 VS_PROBE_DB_HOST=sql-staging.example.com
 NGROK_URL=https://your-domain.ngrok.app
@@ -71,7 +71,7 @@ Run under the exact Windows identity that will perform diagnostics:
 ```powershell
 .\carameli-preflight.ps1 `
   -CarameliUrl 'https://your-domain.ngrok.app' `
-  -VanillaSoftNotifyUrl 'https://localhost/cloudliapi/carameli/notify/IncomingCall' `
+  -VanillaSoftNotifyUrl 'https://localhost/voip/carameli/notify/IncomingCall' `
   -EventLogName 'Application' `
   -LogPath 'C:\path\to\vanillasoft.log' `
   -SqlHost 'sql-staging.example.com' `

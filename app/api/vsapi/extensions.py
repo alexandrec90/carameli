@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 import logging
-import secrets
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Path
+from fastapi import APIRouter, Depends, HTTPException, Path, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth import AuthContext, enforce_customer_scope, get_auth_context
+from app.core.credential_vault import CredentialVaultError
 from app.core.database import get_session
 from app.schemas.extension import (
     AddExtensionRequest,
@@ -33,6 +33,7 @@ router = APIRouter(prefix="/VsExtension", tags=["extensions"])
 )
 async def add_extension(
     body: AddExtensionRequest,
+    request: Request,
     session: Annotated[AsyncSession, Depends(get_session)],
     auth: Annotated[AuthContext, Depends(get_auth_context)],
 ) -> ExtensionResponse:
@@ -58,16 +59,27 @@ async def add_extension(
         raise HTTPException(status_code=409, detail="Extension already exists")
 
     sip_username = f"ext{body.extension_number}_{str(customer.id)[:8]}"
-    _ = body.password or secrets.token_urlsafe(24)  # password stored by caller; not persisted here
-
-    ext = await extension_service.create(
-        session,
-        customer_id=customer.id,
-        extension_number=body.extension_number,
-        sip_username=sip_username,
-        sip_credential_sid=None,
-        sip_domain_sid=None,
-    )
+    try:
+        ext = await extension_service.provision(
+            session,
+            request.app.state.engine,
+            customer_id=customer.id,
+            extension_number=body.extension_number,
+            sip_username=sip_username,
+            password=body.password,
+            first_name=body.first_name,
+            last_name=body.last_name,
+        )
+    except CredentialVaultError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from None
+    except Exception as exc:
+        logger.error(
+            "SIP client provisioning failed vs_customer_id=%s ext=%s: %s",
+            body.vs_customer_id,
+            body.extension_number,
+            exc,
+        )
+        raise HTTPException(status_code=502, detail="Call engine provisioning failed") from None
     logger.info("Extension created id=%s sip_username=%s", ext.id, sip_username)
     return ExtensionResponse.model_validate(ext)
 
@@ -101,6 +113,7 @@ async def get_available_extensions(
     responses={404: {"description": "Not found"}},
 )
 async def deactivate_extension(
+    request: Request,
     session: Annotated[AsyncSession, Depends(get_session)],
     auth: Annotated[AuthContext, Depends(get_auth_context)],
     customerId: int = Path(ge=1, le=2147483647),
@@ -116,5 +129,14 @@ async def deactivate_extension(
     if not ext:
         raise HTTPException(status_code=404, detail="Extension not found")
 
-    ext = await extension_service.deactivate(session, ext)
+    try:
+        ext = await extension_service.deactivate_provisioned(session, request.app.state.engine, ext)
+    except Exception as exc:
+        logger.error(
+            "SIP client deprovisioning failed vs_customer_id=%s ext=%s: %s",
+            customerId,
+            extension,
+            exc,
+        )
+        raise HTTPException(status_code=502, detail="Call engine deprovisioning failed") from None
     return ExtensionResponse.model_validate(ext)

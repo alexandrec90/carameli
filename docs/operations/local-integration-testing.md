@@ -76,7 +76,7 @@ Docker Desktop's memory limit.
 
 IIS serves the site from the working tree, so there is nothing to deploy. The
 `VanillaLand` site maps two aliases to the same VoIP receiver application
-(`AppCode/VanillaSoft.CloudliApi`):
+(`AppCode/VanillaSoft.VoipApi`):
 
 | Alias | Use |
 | --- | --- |
@@ -86,7 +86,7 @@ IIS serves the site from the working tree, so there is nothing to deploy. The
 Both serve identical routes; they are separate IIS applications over one physical path.
 The alias exists because Carameli is not a sub-part of Cloudli — the two vendors sit
 side by side, and the URL should not imply otherwise. The receiver still lives inside the
-`VanillaSoft.CloudliApi` *project*, which shares its payload models
+`VanillaSoft.VoipApi` *project*, which shares its payload models
 (`IncomingCall`/`SmsMessage`/`CallRecording`) and insert logic with `CloudliController`;
 splitting the project would mean extracting those into a class library first, because Web
 API discovers controllers in referenced assemblies and the two would collide on routes.
@@ -117,8 +117,8 @@ curl.exe -s -o NUL -w "%{http_code}`n" -X POST -H "Content-Type: application/jso
 ```
 
 Anything other than 401 means the legacy filter is still in charge and the application is
-running a build that predates the signature work — rebuild `VanillaSoft.CloudliApi` and
-recycle the app pool. Compare `bin/VanillaSoft.CloudliApi.dll`'s timestamp against the
+running a build that predates the signature work — rebuild `VanillaSoft.VoipApi` and
+recycle the app pool. Compare `bin/VanillaSoft.VoipApi.dll`'s timestamp against the
 commit that added `BusinessLogic/Carameli/CarameliSignatureAttribute.cs` when in doubt.
 
 ### 2. Database schema
@@ -175,7 +175,7 @@ indistinguishable from a wrong secret.
 
 | Value | Remote Carameli (`.env`) | Local VanillaLand |
 | --- | --- | --- |
-| notify signing secret | `CARAMELI_NOTIFY_SECRET` | `CarameliNotifySecret` in `AppCode/VanillaSoft.CloudliApi/Web.config` |
+| notify signing secret | `CARAMELI_NOTIFY_SECRET` | `CarameliNotifySecret` in `AppCode/VanillaSoft.VoipApi/Web.config` |
 | Carameli API base | — | `CarameliApiBaseUrl` in `AppCode/Vanillasoft.Web/Web.config`, e.g. `https://<remote>.ngrok-free.dev/vsapi/1.0.0/` (**trailing slash required**) |
 | Carameli API key | key of the E2E customer | `CarameliApiKey` in the same file |
 
