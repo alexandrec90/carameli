@@ -49,10 +49,12 @@ environment), applies the `--confcutdir` that keeps `tests/conftest.py` from bei
 imported, and writes failures to `logs/local-e2e-failures.log` with a fix hint per
 failure. On a clean run it clears that artifact.
 
-If you have no Python on PATH at all:
+If you have no Python on PATH at all, let `uv` supply the bootstrap interpreter — any
+version does, because the runner is stdlib-only and re-invokes `uv` with its own pinned
+interpreter for pytest:
 
 ```powershell
-uv run --python 3.12 --no-project scripts/run-local-e2e.py
+uv run --no-project scripts/run-local-e2e.py
 ```
 
 Pass anything else straight through, e.g. `python scripts/run-local-e2e.py -k preflight`.
