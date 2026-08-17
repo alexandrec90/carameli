@@ -28,6 +28,13 @@ COLLECTOR_CONFIG = REPO_ROOT / "otel-collector-config.yaml"
 
 COLLECTOR_SERVICE = "otel-collector"
 
+# The collector in this repo's `monitoring` profile is the workspace's ONLY OTLP
+# receiver: devkit's ports.toml pins 4318 under `[shared]` (a singleton, not offset by
+# slot), and sports_betting and apt-finder hardcode it in their own settings files.
+# Moving it here would break their telemetry with no error anywhere -- which is why the
+# number is asserted rather than merely derived from this repo's own compose file.
+SHARED_OTLP_PORT = "4318"
+
 
 def _env() -> dict[str, str]:
     return json.loads(SETTINGS_FILE.read_text(encoding="utf-8")).get("env") or {}
@@ -93,6 +100,22 @@ def test_exporter_protocol_matches_the_receiver_on_that_port() -> None:
         f"the endpoint port does not reach the collector's HTTP receiver "
         f"({http_endpoint}); {sorted(forwarded)} do"
     )
+
+
+def test_the_collector_stays_on_the_workspace_shared_port() -> None:
+    """Other repos point at this port; it cannot move without breaking them silently.
+
+    The other assertions in this file keep `.claude/settings.json` and
+    `docker-compose.yml` consistent *with each other*, which a coordinated rename would
+    satisfy while every other project in the workspace kept exporting into a closed
+    socket. This one pins the actual number.
+    """
+    assert SHARED_OTLP_PORT in _published_host_ports(), (
+        f"{COLLECTOR_SERVICE} no longer publishes {SHARED_OTLP_PORT}; sports_betting "
+        f"and apt-finder export there and would fail without an error of any kind. "
+        f"Moving it means updating [shared] in devkit's ports.toml and every consumer."
+    )
+    assert _endpoint_port() == SHARED_OTLP_PORT
 
 
 def test_collector_runs_only_under_the_monitoring_profile() -> None:
