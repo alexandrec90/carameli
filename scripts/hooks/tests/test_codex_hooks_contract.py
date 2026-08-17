@@ -19,6 +19,7 @@ EXPECTED_REDUNDANT_HANDLERS = frozenset({("PreToolUse", "scripts/hooks/enforce-c
 # Bash output cap, and devkit v0.9.0 classified that as redundant because Codex caps
 # command output itself. An event with no handlers left is omitted entirely, so it
 # leaves by a different door than `PostToolUseFailure` and is asserted separately.
+# Re-add a non-Bash PreToolUse hook and this expectation must shrink.
 EXPECTED_EMPTIED_EVENTS = frozenset({"PreToolUse"})
 EXPECTED_TOPOLOGY = {
     "SessionStart": (
@@ -34,6 +35,9 @@ EXPECTED_TOPOLOGY = {
     # v0.7.0: cutting the task branch *inside* the checkout the session was in is what
     # let a checkout outlive its task. `worktree-guard.py` routes the same edit into an
     # ephemeral box instead, so there is no prompt-time handler left to mirror.
+    # No `PreToolUse` either, for a different reason than the retirement above: the event
+    # is supported and the hook still runs under Claude. Codex just does not receive it --
+    # see EXPECTED_EMPTIED_EVENTS.
     "PostToolUse": (
         (
             "^(Edit|Write|MultiEdit|apply_patch|create_file)$",

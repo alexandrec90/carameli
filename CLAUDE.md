@@ -7,9 +7,9 @@ and VanillaSoft-compatible APIs.
 
 | Layer | Choice |
 | --- | --- |
-| Backend | Python 3.12, FastAPI, Pydantic, SQLAlchemy async |
+| Backend | Python, FastAPI, Pydantic, SQLAlchemy async |
 | Jobs | ARQ with Redis |
-| Database | PostgreSQL 18, Alembic migrations |
+| Database | PostgreSQL, Alembic migrations |
 | Providers | Telnyx carrier, Jambonz call engine |
 | Frontend | React, TypeScript, Vite, per-skin dynamic imports |
 | Runtime | Docker Compose; S3-compatible media storage |
@@ -17,6 +17,13 @@ and VanillaSoft-compatible APIs.
 Settings come from `app/core/config.py`; `.env.example` documents the environment.
 Python dependency floors live in `requirements*.in`; compiled `requirements*.txt`
 files are generated locks and must never be hand-edited.
+
+**No version numbers in prose.** The table above names technologies, not releases, and
+so should every other instruction file here. Each pin lives in the file that enforces
+it — `Dockerfile`, `docker-compose.yml`, `requirements*.in`, `frontend/package.json` —
+so point at that file instead of restating the number. A version copied into Markdown
+is unenforced: nothing fails when it drifts, and the stale copy then reads as policy
+and gets defended as one.
 
 ## Instruction ownership
 
@@ -103,10 +110,11 @@ The default pytest configuration excludes every `paid` test. Sandbox, chargeable
 and live-provider tiers require explicit opt-in; never broaden a free aggregate to
 include them.
 
-The host venv must be **Python 3.12** — the version is coordinated across the
-Dockerfile, the uv-compiled locks, `mypy.ini`, `ruff.toml`, and CI (see the comment at
-the top of `Dockerfile`). Create it with `uv venv --python 3.12`; a bare `uv venv`
-silently takes the machine default and gives you a venv the container does not match.
+The host venv must run **the same Python the image runs** — that version is coordinated
+across the `FROM python:` tag in `Dockerfile`, the uv-compiled locks, `mypy.ini`,
+`ruff.toml`, and CI. Read the tag, then create the venv with
+`uv venv --python <that version>`; a bare `uv venv` silently takes the machine default
+and gives you a venv the container does not match.
 
 `logs/` holds per-run failure artifacts, and `scripts/prune-logs.py` bounds its growth
 from the SessionStart hook. The current artifacts (`lint-errors.log`,
