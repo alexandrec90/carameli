@@ -3,6 +3,9 @@
 from conftest import load_module
 
 start_task = load_module("scripts/start-task.py")
+# Assert the prefix through the vendored constant rather than a literal: devkit renamed
+# it `claude/` -> `agent/`, and a literal here re-breaks on the next rename.
+task_branch = load_module("scripts/task_branch.py")
 
 
 class TestBlockedReason:
@@ -59,7 +62,7 @@ class TestMain:
         # branch name is slugified from the description and based on origin/master
         assert checkout["argv"][0] == "checkout"
         assert checkout["argv"][1] == "-b"
-        assert checkout["argv"][2].startswith("claude/add-sms-retry-")
+        assert checkout["argv"][2].startswith(f"{task_branch.BRANCH_PREFIX}add-sms-retry-")
         assert checkout["argv"][3] == "origin/master"
 
     def test_checkout_failure_propagates(self, monkeypatch):
