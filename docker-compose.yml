@@ -381,6 +381,19 @@ services:
   # scrape; events land in logs/telemetry/events.jsonl. Config in
   # otel-collector-config.yaml. Host ports let Claude Code (running on the host)
   # reach it at http://localhost:4318.
+  #
+  # THIS IS A WORKSPACE SINGLETON, not a carameli service that happens to be here.
+  # Every project in the workspace exports its agent telemetry to 4318, and devkit's
+  # ports.toml pins that number under `[shared]` rather than `[services]` precisely so
+  # it is NOT offset per checkout (alexandrec90/devkit#118). Two consequences:
+  #
+  #   - 4318 is load-bearing for other repos. sports_betting and apt-finder hardcode
+  #     it in their own `.claude/settings.json`; moving it here kills their telemetry
+  #     silently, because an OTLP exporter that cannot connect just retries forever.
+  #     tests/unit/test_claude_telemetry_settings.py holds the number for that reason.
+  #   - a second stack must not start this service. An ephemeral box running
+  #     `--profile monitoring` will fail to bind 4318, and that failure is correct:
+  #     one collector, or two halves of the workspace's telemetry in two places.
   otel-collector:
     image: otel/opentelemetry-collector-contrib:0.103.1
     restart: unless-stopped
