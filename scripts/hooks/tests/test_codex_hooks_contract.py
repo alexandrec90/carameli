@@ -13,6 +13,14 @@ CLAUDE_SETTINGS = REPO_ROOT / ".claude/settings.json"
 CODEX_HOOKS = REPO_ROOT / ".codex/hooks.json"
 EXPECTED_DROPPED_EVENTS = frozenset({"PostToolUseFailure"})
 EXPECTED_DROPPED_MATCHERS = frozenset({("PostToolUse", "^Skill$")})
+# Supported by Codex, but emptied of handlers rather than unsupported -- kept apart from
+# the two sets above because they answer different questions, and collapsing them would
+# let a genuinely unsupported event hide as "emptied". devkit v0.9.0 classifies the
+# Claude Bash cap as redundant on Codex (it has a native one, and porting ours caused
+# retries), and it is this project's *only* PreToolUse handler, so the group and then the
+# event disappear. Re-add a non-Bash PreToolUse hook and this expectation must shrink.
+EXPECTED_EMPTIED_EVENTS = frozenset({"PreToolUse"})
+EXPECTED_REDUNDANT_MATCHERS = frozenset({("PreToolUse", "Bash")})
 EXPECTED_TOPOLOGY = {
     "SessionStart": (
         (
@@ -33,17 +41,9 @@ EXPECTED_TOPOLOGY = {
     # v0.7.0: cutting the task branch *inside* the checkout the session was in is what
     # let a checkout outlive its task. `worktree-guard.py` routes the same edit into an
     # ephemeral box instead, so there is no prompt-time handler left to mirror.
-    "PreToolUse": (
-        (
-            "Bash",
-            (
-                (
-                    "scripts/hooks/codex-hook-adapter.py",
-                    "scripts/hooks/enforce-capped-bash.py",
-                ),
-            ),
-        ),
-    ),
+    # No `PreToolUse` either, for a different reason than the retirement above: the event
+    # is supported and the hook still runs under Claude. Codex just does not receive it --
+    # see EXPECTED_EMPTIED_EVENTS.
     "PostToolUse": (
         (
             "^(Edit|Write|MultiEdit|apply_patch|create_file)$",
@@ -74,7 +74,18 @@ def _load_json(path: Path) -> dict:
 
 
 def _repo_paths(command: str) -> tuple[str, ...]:
-    return tuple(re.findall(r"\$\(git rev-parse --show-toplevel\)/([^\"]+)", command))
+    """Repo-relative paths a generated command resolves, adapter first then handler.
+
+    devkit v0.9.0 dropped `$(git rev-parse --show-toplevel)/` -- bash command
+    substitution, which is not a thing on Windows, where Codex now runs these through
+    PowerShell. The launcher walks up to the `.git` dir itself and hands the handler a
+    `__CODEX_PROJECT_ROOT__` placeholder it substitutes at run time, so there are two
+    spellings to read and neither is the old one. Matching only the retired form made
+    this return `()` for every command, and `assert paths` was the assertion that caught
+    it -- keep that assertion, it is the only thing standing between a typo'd pattern
+    here and a test that silently checks nothing.
+    """
+    return tuple(re.findall(r"(?:r/'|__CODEX_PROJECT_ROOT__/)([^'\"]+)", command))
 
 
 def _topology(payload: dict) -> dict:
@@ -117,8 +128,10 @@ def test_real_hook_drops_are_explicitly_allowlisted():
 
     assert hook.UNSUPPORTED_EVENTS == EXPECTED_DROPPED_EVENTS
     assert hook.UNSUPPORTED_MATCHERS == EXPECTED_DROPPED_MATCHERS
-    assert dropped_events == EXPECTED_DROPPED_EVENTS
-    assert source_matchers - generated_matchers == EXPECTED_DROPPED_MATCHERS
+    assert dropped_events == EXPECTED_DROPPED_EVENTS | EXPECTED_EMPTIED_EVENTS
+    assert source_matchers - generated_matchers == (
+        EXPECTED_DROPPED_MATCHERS | EXPECTED_REDUNDANT_MATCHERS
+    )
 
 
 def test_current_hook_topology_requires_compatibility_review():
