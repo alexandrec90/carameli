@@ -59,7 +59,9 @@ class TestMain:
         # branch name is slugified from the description and based on origin/master
         assert checkout["argv"][0] == "checkout"
         assert checkout["argv"][1] == "-b"
-        assert checkout["argv"][2].startswith("claude/add-sms-retry-")
+        # `tb.BRANCH_PREFIX`, not a literal: devkit renamed it `claude/` -> `agent/` in
+        # v0.9.0, and a hard-coded copy here fails the upgrade rather than tracking it.
+        assert checkout["argv"][2].startswith(f"{start_task.tb.BRANCH_PREFIX}add-sms-retry-")
         assert checkout["argv"][3] == "origin/master"
 
     def test_checkout_failure_propagates(self, monkeypatch):
