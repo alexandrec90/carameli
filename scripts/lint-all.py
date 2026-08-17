@@ -326,10 +326,41 @@ def t_actionlint(changed: list[str] | None = None) -> dict:
     return {"actionlint": run("actionlint")}
 
 
+def tracked_dotenv_files(root: Path, tracked: set[str]) -> list[str]:
+    """Root-level ``.env*`` files that git tracks, sorted.
+
+    Git-ignored dotenv files are excluded on purpose. ``.env`` and ``.env.local-e2e``
+    are per-machine config a human fills in by hand; CI never sees them, so
+    dotenv-linter's ordering opinions about them are unenforceable — and they turned
+    lint **red on exactly the machines set up to run the local integration suite**,
+    which is the population most likely to read a red lint run as their own doing. Only
+    the committed templates (``.env.example``, ``.env.local-e2e.example``) are shared
+    artifacts whose ordering anyone else can be asked to keep.
+    """
+    return sorted(p.name for p in root.glob(".env*") if p.is_file() and p.name in tracked)
+
+
+def _git_tracked_root_files() -> set[str]:
+    """Names of the repo-root files git tracks; empty when git is unavailable."""
+    try:
+        proc = subprocess.run(
+            ["git", "ls-files", "-z", "--", ":(top)*"],
+            cwd=str(REPO_ROOT),
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except OSError:
+        return set()
+    if proc.returncode != 0:
+        return set()
+    return {name for name in proc.stdout.split("\0") if name and "/" not in name}
+
+
 def t_dotenv(changed: list[str] | None = None) -> dict:
     if changed is not None and not _sel(changed, _is_env):
         return {"dotenv-linter": ([], 0)}
-    envs = [p.name for p in sorted(REPO_ROOT.glob(".env*")) if p.is_file()]
+    envs = tracked_dotenv_files(REPO_ROOT, _git_tracked_root_files())
     if not envs:
         return {"dotenv-linter": ([], 0)}
     return {"dotenv-linter": run("dotenv-linter check " + " ".join(envs))}
