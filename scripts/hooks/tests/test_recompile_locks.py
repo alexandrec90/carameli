@@ -1,6 +1,5 @@
 """Tests for universal lock recompilation and its Dependabot workflow."""
 
-import re
 from types import SimpleNamespace
 
 from conftest import REPO_ROOT, load_module
@@ -175,22 +174,28 @@ def test_automerge_classifies_dev_only_majors_as_automergeable():
 
 
 def test_automerge_merge_job_only_trusts_dependabot_gate_on_current_head():
-    # The workflow_dispatch acceptance path is gone: repaired pip branches are
-    # merged by dependabot-lock-repair.yml itself, because GITHUB_TOKEN-
-    # dispatched runs never emit the workflow_run event this job listens for.
+    # Since devkit v0.10.0 the guards live in the vendored
+    # scripts/merge-dependabot-prs.py rather than inline bash, and the workflow
+    # legitimately carries `workflow_dispatch` as a trigger for its scheduled retry
+    # sweep. The properties this test exists for are unchanged and asserted where
+    # they now live -- the last rewrite of this test already recorded the lesson:
+    # pinning one spelling makes a guard's arrival from upstream look like the
+    # guard going missing.
     workflow = (REPO_ROOT / ".github/workflows/dependabot-automerge.yml").read_text(
         encoding="utf-8"
     )
+    script = (REPO_ROOT / "scripts/merge-dependabot-prs.py").read_text(encoding="utf-8")
 
-    assert "workflow_dispatch" not in workflow
+    # The event-driven merge still fires only for a real pull_request gate run...
     assert "github.event.workflow_run.event == 'pull_request'" in workflow
-    assert "github.event.workflow_run.actor.login == 'dependabot[bot]'" in workflow
+    # ...and hands the script the gated commit, so a head that moved cannot inherit
+    # the merge. Both jobs delegate to the script, which re-derives every guard from
+    # the PR's current state (pinned upstream by test_merge_dependabot_prs.py).
     assert "RUN_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}" in workflow
-    # The compared SHA has to be re-derived from the PR's CURRENT head, not taken
-    # from the event. Assert that property, not one shell idiom for it: this file is
-    # vendored from devkit now, and its copy reads `.headRefOid` through a here-string
-    # where carameli's own copy piped `echo "$pr"`. Pinning the spelling made the
-    # guard's arrival from upstream look like the guard going missing.
-    assert re.search(r"head_sha=\$\(.*\.headRefOid.*\)", workflow)
-    assert '[ "$author" != "app/dependabot" ]' in workflow
-    assert '[ "$head_sha" != "$RUN_HEAD_SHA" ]' in workflow
+    assert "scripts/merge-dependabot-prs.py" in workflow
+    # A hand-dispatched gate run still mints no evidence: the script accepts only a
+    # successful pull_request-event run of the gate on the exact head SHA.
+    assert '"pull_request"' in script and "gate_passed" in script
+    # There is deliberately no author guard any more -- the automerge label, which
+    # only write access can apply, is the whole authorization.
+    assert "workflow_run.actor" not in workflow
