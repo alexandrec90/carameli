@@ -9,8 +9,6 @@ updates:
       - alexandrec90
     schedule:
       interval: weekly
-    assignees:
-      - alexandrec90
     # Give fast-moving frontend ecosystems time to add peer support for a new
     # major. This delays version updates only; it never freezes them and does
     # not delay Dependabot security updates.
@@ -65,8 +63,6 @@ updates:
       - alexandrec90
     schedule:
       interval: weekly
-    assignees:
-      - alexandrec90
     groups:
       minor-and-patch:
         update-types:
@@ -81,8 +77,6 @@ updates:
       - alexandrec90
     schedule:
       interval: weekly
-    assignees:
-      - alexandrec90
     groups:
       minor-and-patch:
         update-types:
@@ -98,8 +92,6 @@ updates:
       - alexandrec90
     schedule:
       interval: weekly
-    assignees:
-      - alexandrec90
     ignore:
       # 3.12→3.14 counts as semver-minor, so it auto-merged (PR #43) while the
       # locks are compiled --python-version 3.12 and CI runs 3.12 — and no CI
