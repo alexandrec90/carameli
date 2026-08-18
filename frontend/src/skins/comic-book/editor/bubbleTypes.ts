@@ -6,7 +6,11 @@
 // one shared vertex ring per type. Nothing here points at artwork any more, which
 // is precisely what makes a shape change a morph instead of an image swap.
 
-export type BubbleType = 'soft' | 'cloud' | 'lightning' | 'jagged'
+// There is deliberately no separate "shout" type. A spiky shout balloon and the
+// action burst are the same drawing at different amplitudes, so two of them meant
+// two entries nobody could tell apart in the editor dropdown; `lightning` is the
+// one jagged shape, and loud lettering is what distinguishes a shout.
+export type BubbleType = 'soft' | 'cloud' | 'lightning'
 
 interface BubbleTypeDef {
   /** Canonical font for this bubble type — applied automatically on shape change. */
@@ -19,7 +23,6 @@ export const BUBBLE_TYPES: Record<BubbleType, BubbleTypeDef> = {
   soft: { font: 'Boogaloo', label: 'Speech (soft)' },
   cloud: { font: 'Permanent Marker', label: 'Thought (cloud)' },
   lightning: { font: 'Bangers', label: 'Action (lightning)' },
-  jagged: { font: 'Fugaz One', label: 'Shout (jagged)' },
 }
 
 /** All bubble types in display order — for the editor dropdown. */
