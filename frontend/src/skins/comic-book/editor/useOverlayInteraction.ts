@@ -44,6 +44,20 @@ export interface OverlayInteraction {
 }
 
 /**
+ * Panel box the current selection is measured against: its own box for an image, and
+ * for a bubble the box of the panel it belongs to — which is not `panelPolys[index]`,
+ * since a panel may own several bubbles and the two arrays no longer line up. Getting
+ * this wrong scales a drag by another panel's dimensions, so it is resolved in one
+ * place for every input path.
+ */
+function selectionBounds(api: EditorModeApi, panelPolys: PanelPoly[]): PanelPoly['bounds'] | null {
+  const sel = api.selected
+  if (!sel) return null
+  const panel = sel.kind === 'img' ? sel.index : api.config.bubbles[sel.index]?.panel
+  return panel === undefined ? null : (panelPolys[panel]?.bounds ?? null)
+}
+
+/**
  * Wires pointer + keyboard input for the dev editor overlay to the pure transform
  * helpers and `useEditorMode` mutators. The handler bodies stay thin: they read the
  * drag's *starting* transform, hand a px delta to a pure helper, and commit the
@@ -75,7 +89,7 @@ export function useOverlayInteraction(
     const d = drag.current
     const sel = api.selected
     if (!d || d.id !== e.pointerId || !sel) return
-    const bounds = panelPolys[sel.index]?.bounds
+    const bounds = selectionBounds(api, panelPolys)
     if (!bounds) return
     const dx = e.clientX - d.startX
     const dy = e.clientY - d.startY
@@ -109,9 +123,11 @@ export function useOverlayInteraction(
     const sel = api.selected
     if (!sel) return
     if (sel.kind === 'img') {
-      api.setImg(sel.index, scaleImg(api.config.images[sel.index], -e.deltaY * WHEEL_SCALE))
+      const cur = api.config.images[sel.index]
+      if (cur) api.setImg(sel.index, scaleImg(cur, -e.deltaY * WHEEL_SCALE))
     } else {
-      api.setBubble(sel.index, scaleBubble(api.config.bubbles[sel.index], -e.deltaY * WHEEL_BUBBLE_W))
+      const cur = api.config.bubbles[sel.index]
+      if (cur) api.setBubble(sel.index, scaleBubble(cur, -e.deltaY * WHEEL_BUBBLE_W))
     }
   }
 
@@ -138,8 +154,8 @@ export function useOverlayInteraction(
         }
       } else {
         const cur = api.config.bubbles[sel.index]
-        const bounds = panelPolys[sel.index]?.bounds
-        if (!bounds) return
+        const bounds = selectionBounds(api, panelPolys)
+        if (!cur || !bounds) return
         switch (e.key) {
           case 'ArrowLeft': api.setBubble(sel.index, dragBubble(cur, -step, 0, bounds.w, bounds.h)); break
           case 'ArrowRight': api.setBubble(sel.index, dragBubble(cur, step, 0, bounds.w, bounds.h)); break

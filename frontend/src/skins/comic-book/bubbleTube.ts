@@ -8,7 +8,7 @@
 // stroked. There is no path union anywhere — the weld is purely paint order, which
 // is also why the tube layer's z-index in comic-book.css is load-bearing.
 
-import { BUBBLE_ELLIPSE_N } from './bubbleShape'
+import { BUBBLE_ELLIPSE_N } from './bubbleBox'
 
 export interface Rect {
   x: number
@@ -121,13 +121,23 @@ export function tubeBetween(a: Rect, b: Rect): TubeGeometry | null {
  * declaring it on either end draws one tube, and a mutual A→B / B→A declaration
  * still draws one — otherwise every rail would be stroked twice, which shows up as
  * a subtly heavier line. Self-links and out-of-range indices are dropped.
+ *
+ * **So is a link between two panels.** A tube means one speaker's line continuing
+ * across two balloons, and the two halves only appear together while their panel is
+ * hovered — a cross-panel tube would spend most of its life anchored to a bubble that
+ * is not on screen. The editor never offers one, so a link that gets here is stale
+ * config (a bubble moved panels by hand), and dropping it beats drawing a rail into
+ * empty space.
  */
-export function linkedPairs(bubbles: { linkTo: number | null }[]): [number, number][] {
+export function linkedPairs(
+  bubbles: { panel: number; linkTo: number | null }[],
+): [number, number][] {
   const seen = new Set<string>()
   const pairs: [number, number][] = []
   bubbles.forEach((b, i) => {
     const j = b.linkTo
     if (j == null || j === i || j < 0 || j >= bubbles.length) return
+    if (bubbles[j].panel !== b.panel) return
     const lo = Math.min(i, j)
     const hi = Math.max(i, j)
     const key = `${lo}-${hi}`
@@ -139,19 +149,18 @@ export function linkedPairs(bubbles: { linkTo: number | null }[]): [number, numb
 }
 
 /**
- * Whether panel `index`'s bubble is revealed. A bubble shows when its own panel is
- * hovered, when its link partner's panel is — a linked pair reads as one utterance,
- * so revealing half of it would strand the tube with nothing at one end — or
- * whenever the editor is up and every bubble has to be selectable.
+ * Whether bubble `index` is revealed, given the panel under the pointer. A bubble
+ * shows when its own panel is hovered — every bubble on that panel does, so a linked
+ * pair arrives and leaves together and no tube is ever left anchored to a hidden end —
+ * or whenever the editor is up and every bubble has to be selectable.
  */
 export function isBubbleRevealed(
-  bubbles: { linkTo: number | null }[],
+  bubbles: { panel: number }[],
   hovered: number | null,
   editorActive: boolean,
   index: number,
 ): boolean {
   if (editorActive) return true
   if (hovered === null) return false
-  if (hovered === index) return true
-  return bubbles[hovered]?.linkTo === index || bubbles[index]?.linkTo === hovered
+  return bubbles[index]?.panel === hovered
 }
