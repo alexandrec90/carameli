@@ -344,6 +344,136 @@ def ensure_carameli_up(base_url: str, env: dict[str, str]) -> StepResult:
     )
 
 
+def seed_sql() -> str:
+    """Idempotent SQL giving the e2e customer one extension and one phone line.
+
+    Two of the suite's field-level contract tests — the ones that check that
+    ``GET /api/v1/extensions`` and ``GET /api/v1/phone-lines`` return the fields
+    ``CarameliExtensionResponse`` and ``CarameliPhoneLineResponse`` bind — can only assert
+    against a row that exists, and skip when the list comes back empty. The obvious way to
+    create those rows is the API, and it is the wrong way: ``POST /VsExtension/Add``
+    provisions a SIP endpoint on the real call engine and ``POST /PhoneLine/Add`` buys a
+    real DID from the carrier, both against the live provider credentials in ``.env``. So
+    the rows go in directly, and they are inert by construction — the extension has no
+    ``sip_credential_sid`` and the line's ``provider_sid`` names itself, so nothing
+    downstream can mistake either for a provisioned object.
+
+    The numbers come from the fictional ``555-0100`` block, which is not routable.
+    ``WHERE NOT EXISTS`` rather than ``ON CONFLICT`` because neither column pair carries a
+    unique constraint; re-running is a no-op either way.
+
+    The customer id is **not** interpolated: it arrives as psql's ``:vsid``, set by
+    :func:`seed_command` on the command line. That keeps this a constant string, which is
+    both what makes it reviewable and why it does not need an ``S608`` suppression.
+    """
+    return """
+BEGIN;
+WITH c AS (SELECT id FROM customers WHERE vs_customer_id = :vsid)
+INSERT INTO extensions (customer_id, extension_number, sip_username, active)
+SELECT c.id, '9001', 'local-e2e-9001', true FROM c
+WHERE NOT EXISTS (
+    SELECT 1 FROM extensions e WHERE e.customer_id = c.id AND e.extension_number = '9001'
+);
+WITH c AS (SELECT id FROM customers WHERE vs_customer_id = :vsid)
+INSERT INTO phone_lines (customer_id, phone_number, provider_sid, active)
+SELECT c.id, '+15555550100', 'local-e2e-synthetic', true FROM c
+WHERE NOT EXISTS (
+    SELECT 1 FROM phone_lines p WHERE p.customer_id = c.id AND p.phone_number = '+15555550100'
+);
+COMMIT;
+"""
+
+
+def seed_command(vs_customer_id: int, project: str | None = None) -> list[str]:
+    """``docker compose exec`` piping the seed into the db service's own ``psql``.
+
+    The credentials are read from the container's environment rather than from any file
+    here: ``POSTGRES_USER``/``POSTGRES_DB`` are already set for that service, and copying
+    them into this script would be a second place for them to drift.
+
+    ``vs_customer_id`` is typed ``int`` so the only value that can reach the shell is a
+    number — the caller does the coercion, and a non-numeric setting fails there with a
+    readable error rather than becoming shell text.
+
+    ``project`` exists because *this checkout is not always the one running the stack*. An
+    ephemeral worktree gets its own ``COMPOSE_PROJECT_NAME`` so its containers cannot
+    collide with the static checkout's, which means a bare ``docker compose exec db`` run
+    from a box resolves to the box's own project and reports ``service "db" is not
+    running`` — while the ``CARAMELI_BASE_URL`` the suite is testing is served by a
+    different project entirely. ``CARAMELI_COMPOSE_PROJECT`` names the one that owns the
+    database the suite will read back through.
+    """
+    project_args = ["-p", project] if project else []
+    return [
+        "docker",
+        "compose",
+        *project_args,
+        "exec",
+        "-T",
+        "db",
+        "sh",
+        "-c",
+        'psql -v ON_ERROR_STOP=1 -v vsid=%d -U "$POSTGRES_USER" -d "$POSTGRES_DB"' % vs_customer_id,
+    ]
+
+
+def seed_fixture_rows(vs_customer_id: str | None, env: dict[str, str]) -> StepResult:
+    """Step 3b: ensure the two field-contract tests have a row to assert against.
+
+    A missing db container is a **skip that says so**, not a failure: the suite is
+    designed to run against a Carameli that may be somewhere else entirely (see
+    ``tests/local_e2e/conftest.py``), and in that configuration there is no local database
+    to seed. The two tests then skip with their own message, which is the honest outcome.
+    """
+    name = "seed fixture rows"
+    if not vs_customer_id:
+        return StepResult(
+            name, SKIPPED, detail=f"CARAMELI_VS_CUSTOMER_ID is not set in {ENV_FILE.name}"
+        )
+    try:
+        customer = int(vs_customer_id)
+    except ValueError:
+        return StepResult(
+            name,
+            FAILED,
+            detail=f"CARAMELI_VS_CUSTOMER_ID is not a number: {vs_customer_id!r}",
+        )
+    command = seed_command(customer, env.get("CARAMELI_COMPOSE_PROJECT"))
+    print(f"[{name}] {' '.join(command)}", flush=True)
+    try:
+        proc = subprocess.run(
+            command,
+            cwd=str(REPO_ROOT),
+            env={**os.environ, **env, "PYTHONIOENCODING": "utf-8"},
+            input=seed_sql(),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+        )
+    except OSError as exc:
+        return StepResult(name, SKIPPED, detail=f"could not launch docker compose: {exc}")
+    if proc.returncode != 0:
+        return StepResult(
+            name,
+            SKIPPED,
+            detail=(
+                "the local `db` service did not accept the seed, so the two field-contract "
+                "tests will skip. Expected when Carameli is remote. When it is local but "
+                "this checkout is an ephemeral box, `docker compose` resolves to the box's "
+                f"own project — set CARAMELI_COMPOSE_PROJECT in {ENV_FILE.name} to the "
+                "project that is actually serving CARAMELI_BASE_URL"
+            ),
+            exit_code=proc.returncode,
+            output=proc.stdout or "",
+            command=command,
+        )
+    return StepResult(
+        name, OK, detail=f"customer {vs_customer_id} has an extension and a phone line"
+    )
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
@@ -382,6 +512,9 @@ def main(argv: list[str] | None = None) -> int:
 
     # 3. Carameli side.
     results.append(ensure_carameli_up(env.get("CARAMELI_BASE_URL", ""), child_env))
+
+    # 3b. Fixture rows the suite cannot create for itself without calling a real provider.
+    results.append(seed_fixture_rows(env.get("CARAMELI_VS_CUSTOMER_ID"), child_env))
 
     # 4. The suite — run even when a boot step failed, because its assertion messages name
     #    the specific service at fault far better than a boot script's stderr does.

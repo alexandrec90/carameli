@@ -244,3 +244,114 @@ class TestExitCode:
     def test_unconfigured_is_distinct_from_failed(self) -> None:
         """2 means 'go write .env.local-e2e'; 1 means 'go read the artifact'."""
         assert script.EXIT_UNCONFIGURED == 2
+
+
+class TestSeed:
+    """The step that gives the two field-contract tests a row to assert against."""
+
+    def test_sql_never_interpolates_the_customer_id(self) -> None:
+        """It is psql's ``:vsid``, which is what keeps the statement a constant.
+
+        Interpolating it would be safe today — the caller coerces to ``int`` — and would
+        still be the wrong shape: a query built by string concatenation is the pattern
+        ``S608`` exists to stop, and suppressing the rule per-line teaches the next reader
+        that this file is a place where that is fine.
+        """
+        sql = script.seed_sql()
+        assert ":vsid" in sql
+        assert "vs_customer_id = :vsid" in sql
+
+    def test_sql_is_idempotent(self) -> None:
+        """Re-running a green suite must not stack up duplicate rows."""
+        sql = script.seed_sql()
+        assert sql.count("WHERE NOT EXISTS") == 2
+
+    def test_sql_touches_only_the_two_tables_it_claims(self) -> None:
+        """A seed that grew a third insert would be doing something this name does not say."""
+        inserts = [
+            line for line in script.seed_sql().splitlines() if line.startswith("INSERT INTO")
+        ]
+        assert inserts == [
+            "INSERT INTO extensions (customer_id, extension_number, sip_username, active)",
+            "INSERT INTO phone_lines (customer_id, phone_number, provider_sid, active)",
+        ]
+
+    def test_seeded_rows_cannot_be_mistaken_for_provisioned_ones(self) -> None:
+        """No ``sip_credential_sid``, and a ``provider_sid`` that names itself.
+
+        The whole reason these rows are inserted directly is that the API routes that
+        would create them buy a DID and provision a SIP endpoint against live provider
+        credentials. A row that looked provisioned would invite someone to "clean it up"
+        at the provider, where it does not exist.
+        """
+        sql = script.seed_sql()
+        assert "sip_credential_sid" not in sql
+        assert "local-e2e-synthetic" in sql
+        assert "+15555550100" in sql  # the fictional 555-0100 block, not routable
+
+    def test_command_binds_the_id_as_a_psql_variable(self) -> None:
+        assert "-v vsid=7" in script.seed_command(7)[-1]
+
+    def test_command_targets_no_project_by_default(self) -> None:
+        """The static checkout's own compose project is the right answer there."""
+        assert "-p" not in script.seed_command(1)
+
+    def test_command_targets_a_named_project_when_given_one(self) -> None:
+        """An ephemeral box has its own COMPOSE_PROJECT_NAME, so a bare `exec` misses.
+
+        Without this the seed reports ``service "db" is not running`` from a box whose
+        suite is happily testing the static checkout's stack over HTTP — the database it
+        needs to seed belongs to a project this checkout has no default claim on.
+        """
+        command = script.seed_command(1, "carameli")
+        assert command[:4] == ["docker", "compose", "-p", "carameli"]
+
+    def test_skip_detail_names_the_knob_that_fixes_it(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A skip whose message does not say what to set is a silent coverage gap.
+
+        This is the exact failure the step hit on its first real run from an ephemeral
+        box: ``service "db" is not running``, two tests quietly skipped, and nothing in
+        the artifact pointing at the setting that resolves it.
+        """
+
+        class _Proc:
+            returncode = 1
+            stdout = 'service "db" is not running\n'
+
+        monkeypatch.setattr(script.subprocess, "run", lambda *a, **k: _Proc())
+        result = script.seed_fixture_rows("1", {})
+        assert result.status == script.SKIPPED
+        assert "CARAMELI_COMPOSE_PROJECT" in result.detail
+        assert 'service "db" is not running' in result.output
+
+    def test_command_reads_credentials_from_the_container(self) -> None:
+        """Never from a file here — that would be a second place for them to drift."""
+        shell = script.seed_command(1)[-1]
+        assert '-U "$POSTGRES_USER"' in shell
+        assert '-d "$POSTGRES_DB"' in shell
+
+    def test_unset_customer_id_skips_and_names_the_key(self) -> None:
+        result = script.seed_fixture_rows(None, {})
+        assert result.status == script.SKIPPED
+        assert "CARAMELI_VS_CUSTOMER_ID" in result.detail
+
+    def test_non_numeric_customer_id_fails_rather_than_reaching_the_shell(self) -> None:
+        """A skip here would hide a typo in ``.env.local-e2e`` behind two skipped tests."""
+        result = script.seed_fixture_rows("one; rm -rf /", {})
+        assert result.status == script.FAILED
+        assert "not a number" in result.detail
+
+    def test_a_missing_db_service_is_a_skip_not_a_failure(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Carameli may be remote, in which case there is no local database to seed."""
+
+        def explode(*_args: Any, **_kwargs: Any) -> None:
+            raise OSError("docker not found")
+
+        monkeypatch.setattr(script.subprocess, "run", explode)
+        result = script.seed_fixture_rows("1", {})
+        assert result.status == script.SKIPPED
+        assert "docker" in result.detail
