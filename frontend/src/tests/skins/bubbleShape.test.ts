@@ -4,8 +4,15 @@ import {
   BUBBLE_ASPECT,
   BUBBLE_ELLIPSE_N,
   BUBBLE_VIEW,
-  CLOUD_PUFFS,
+  ELLIPSE,
   RING_POINTS,
+  TAIL_DIRS,
+  TAIL_DIR_KEYS,
+  cloudPuffs,
+  tailRingIndex,
+} from '../../skins/comic-book/bubbleBox'
+import type { TailDir } from '../../skins/comic-book/bubbleBox'
+import {
   easeOutCubic,
   lerpPoints,
   pathD,
@@ -28,6 +35,19 @@ function commands(d: string): string[] {
   return d.match(/[A-Za-z]/g) ?? []
 }
 
+/** How far a point sits from the base ellipse: 1 is on it, > 1 outside. */
+function ellipseRadius([x, y]: [number, number]): number {
+  return ((x - ELLIPSE.cx) / ELLIPSE.rx) ** 2 + ((y - ELLIPSE.cy) / ELLIPSE.ry) ** 2
+}
+
+/** The vertices of `type` that leave the base ellipse for tail `tail`. */
+function offEllipse(type: BubbleType, tail: TailDir): [number, number][] {
+  return pairs(ringPoints(type, tail)).filter(p => Math.abs(ellipseRadius(p) - 1) > 1e-6)
+}
+
+/** Every tail direction that actually draws one. */
+const REAL_TAILS = TAIL_DIR_KEYS.filter(k => k !== 'none')
+
 describe('ringPoints', () => {
   it('emits RING_POINTS vertices for every type', () => {
     BUBBLE_TYPE_KEYS.forEach(type => {
@@ -37,19 +57,26 @@ describe('ringPoints', () => {
 
   // The morph invariant: a differing vertex count between two types would leave
   // lerpPoints with nothing to interpolate and every morph into that type broken.
-  it('gives every type the identical vertex count so any pair can interpolate', () => {
-    const lengths = new Set(BUBBLE_TYPE_KEYS.map(t => ringPoints(t).length))
+  // It spans tail directions too, which is what lets the editor's tail dropdown
+  // animate — turning a tail is the same interpolation as changing shape.
+  it('gives every type and tail the identical vertex count so any pair can interpolate', () => {
+    const lengths = new Set(
+      BUBBLE_TYPE_KEYS.flatMap(t => TAIL_DIR_KEYS.map(dir => ringPoints(t, dir).length)),
+    )
     expect(lengths.size).toBe(1)
   })
 
   it('produces only finite coordinates', () => {
     BUBBLE_TYPE_KEYS.forEach(type => {
-      ringPoints(type).forEach(n => expect(Number.isFinite(n)).toBe(true))
+      TAIL_DIR_KEYS.forEach(dir => {
+        ringPoints(type, dir).forEach(n => expect(Number.isFinite(n)).toBe(true))
+      })
     })
   })
 
-  it('keeps every vertex inside the viewBox, spikes and tail included', () => {
+  it('defaults to no tail, which leaves the whole ring inside the viewBox', () => {
     BUBBLE_TYPE_KEYS.forEach(type => {
+      expect(ringPoints(type)).toEqual(ringPoints(type, 'none'))
       pairs(ringPoints(type)).forEach(([x, y]) => {
         expect(x).toBeGreaterThanOrEqual(0)
         expect(x).toBeLessThanOrEqual(BUBBLE_VIEW.w)
@@ -59,55 +86,135 @@ describe('ringPoints', () => {
     })
   })
 
+  // Only the tail vertex is allowed out of the box (the SVG sets overflow: visible
+  // for it). If a spike escaped too, the ink would extend somewhere no one chose.
+  it('keeps every non-tail vertex inside the viewBox for every tail direction', () => {
+    BUBBLE_TYPE_KEYS.forEach(type => {
+      REAL_TAILS.forEach(dir => {
+        pairs(ringPoints(type, dir)).forEach(([x, y], i) => {
+          if (i === tailRingIndex(dir)) return
+          expect(x).toBeGreaterThanOrEqual(0)
+          expect(x).toBeLessThanOrEqual(BUBBLE_VIEW.w)
+          expect(y).toBeGreaterThanOrEqual(0)
+          expect(y).toBeLessThanOrEqual(BUBBLE_VIEW.h)
+        })
+      })
+    })
+  })
+
   it('starts at the top of the ellipse and runs clockwise', () => {
     const [top, next] = pairs(ringPoints('soft'))
-    expect(top[0]).toBeCloseTo(BUBBLE_VIEW.w * BUBBLE_ELLIPSE_N.cx, 6)
-    expect(top[1]).toBeLessThan(BUBBLE_VIEW.h * BUBBLE_ELLIPSE_N.cy)
+    expect(top[0]).toBeCloseTo(ELLIPSE.cx, 6)
+    expect(top[1]).toBeLessThan(ELLIPSE.cy)
     // Clockwise in screen coords: the next vertex is to the right and lower.
     expect(next[0]).toBeGreaterThan(top[0])
     expect(next[1]).toBeGreaterThan(top[1])
   })
 
+  it('leaves the ring whole when the tail is none', () => {
+    expect(offEllipse('soft', 'none')).toHaveLength(0)
+  })
+
   it('puts every soft vertex on the base ellipse except the tail', () => {
-    const cx = BUBBLE_VIEW.w * BUBBLE_ELLIPSE_N.cx
-    const cy = BUBBLE_VIEW.h * BUBBLE_ELLIPSE_N.cy
-    const rx = BUBBLE_VIEW.w * BUBBLE_ELLIPSE_N.rx
-    const ry = BUBBLE_VIEW.h * BUBBLE_ELLIPSE_N.ry
-    const offEllipse = pairs(ringPoints('soft')).filter(([x, y]) => {
-      const r = ((x - cx) / rx) ** 2 + ((y - cy) / ry) ** 2
-      return Math.abs(r - 1) > 1e-6
-    })
-    expect(offEllipse).toHaveLength(1)
+    const off = offEllipse('soft', 'down-left')
+    expect(off).toHaveLength(1)
     // …and that one is the tail, hanging below and left of centre.
-    expect(offEllipse[0][1]).toBeGreaterThan(cy + ry)
-    expect(offEllipse[0][0]).toBeLessThan(cx)
+    expect(off[0][1]).toBeGreaterThan(ELLIPSE.cy + ELLIPSE.ry)
+    expect(off[0][0]).toBeLessThan(ELLIPSE.cx)
+  })
+
+  // The dropdown's whole promise: pick a direction, the tail goes there.
+  it('points the tail the way the direction says, for all of them', () => {
+    REAL_TAILS.forEach(dir => {
+      const off = offEllipse('soft', dir)
+      expect(off).toHaveLength(1)
+      const { ux, uy } = TAIL_DIRS[dir]
+      const dx = off[0][0] - ELLIPSE.cx
+      const dy = off[0][1] - ELLIPSE.cy
+      // Same half-plane as the requested direction on each axis it commits to.
+      if (ux !== 0) expect(Math.sign(dx)).toBe(Math.sign(ux))
+      if (uy !== 0) expect(Math.sign(dy)).toBe(Math.sign(uy))
+      // And it reaches well outside the balloon rather than nudging the edge.
+      expect(ellipseRadius(off[0])).toBeGreaterThan(2)
+    })
   })
 
   it('grows a tail for soft/jagged/lightning and none for cloud', () => {
-    const cy = BUBBLE_VIEW.h * BUBBLE_ELLIPSE_N.cy
-    const ry = BUBBLE_VIEW.h * BUBBLE_ELLIPSE_N.ry
-    const lowest = (type: BubbleType): number =>
-      Math.max(...pairs(ringPoints(type)).map(([, y]) => y))
-    expect(lowest('soft')).toBeGreaterThan(cy + ry * 1.5)
-    expect(lowest('jagged')).toBeGreaterThan(cy + ry * 1.5)
-    expect(lowest('lightning')).toBeGreaterThan(cy + ry * 1.5)
-    // A thought bubble trails puffs instead, so its ring stops near the ellipse.
-    expect(lowest('cloud')).toBeLessThan(cy + ry * 1.3)
+    REAL_TAILS.forEach(dir => {
+      expect(offEllipse('soft', dir)).toHaveLength(1)
+      expect(offEllipse('jagged', dir).length).toBeGreaterThan(0)
+      expect(offEllipse('lightning', dir).length).toBeGreaterThan(0)
+    })
+    // A thought bubble trails puffs instead, so its ring never sprouts one: every
+    // cloud vertex stays within the modulation's own bulge.
+    REAL_TAILS.forEach(dir => {
+      pairs(ringPoints('cloud', dir)).forEach(p => {
+        expect(ellipseRadius(p)).toBeLessThan(1.3)
+      })
+    })
   })
 
   it('bulges cloud outward only, never pinching inside the base ellipse', () => {
-    const cx = BUBBLE_VIEW.w * BUBBLE_ELLIPSE_N.cx
-    const cy = BUBBLE_VIEW.h * BUBBLE_ELLIPSE_N.cy
-    const rx = BUBBLE_VIEW.w * BUBBLE_ELLIPSE_N.rx
-    const ry = BUBBLE_VIEW.h * BUBBLE_ELLIPSE_N.ry
-    pairs(ringPoints('cloud')).forEach(([x, y]) => {
-      const r = ((x - cx) / rx) ** 2 + ((y - cy) / ry) ** 2
-      expect(r).toBeGreaterThanOrEqual(1 - 1e-9)
+    pairs(ringPoints('cloud')).forEach(p => {
+      expect(ellipseRadius(p)).toBeGreaterThanOrEqual(1 - 1e-9)
     })
   })
 
   it('is deterministic, jittered lightning included', () => {
-    expect(ringPoints('lightning')).toEqual(ringPoints('lightning'))
+    expect(ringPoints('lightning', 'up')).toEqual(ringPoints('lightning', 'up'))
+  })
+})
+
+describe('tailRingIndex', () => {
+  it('has no vertex to pull out when there is no tail', () => {
+    expect(tailRingIndex('none')).toBe(-1)
+  })
+
+  it('lands on the ring vertex facing each direction', () => {
+    // Index 0 is the top of the ellipse and the ring runs clockwise.
+    expect(tailRingIndex('up')).toBe(0)
+    expect(tailRingIndex('right')).toBe(RING_POINTS / 4)
+    expect(tailRingIndex('down')).toBe(RING_POINTS / 2)
+    expect(tailRingIndex('left')).toBe((RING_POINTS * 3) / 4)
+  })
+
+  it('gives every direction its own vertex', () => {
+    expect(new Set(REAL_TAILS.map(tailRingIndex)).size).toBe(REAL_TAILS.length)
+  })
+
+  it('stays in range', () => {
+    REAL_TAILS.forEach(dir => {
+      expect(tailRingIndex(dir)).toBeGreaterThanOrEqual(0)
+      expect(tailRingIndex(dir)).toBeLessThan(RING_POINTS)
+    })
+  })
+})
+
+describe('cloudPuffs', () => {
+  it('trails nothing when there is no tail', () => {
+    expect(cloudPuffs('none')).toEqual([])
+  })
+
+  it('tapers away from the balloon along the tail direction', () => {
+    REAL_TAILS.forEach(dir => {
+      const puffs = cloudPuffs(dir)
+      expect(puffs.length).toBeGreaterThan(1)
+      const radii = puffs.map(p => p.r)
+      expect(radii).toEqual([...radii].sort((a, b) => b - a))
+      const { ux, uy } = TAIL_DIRS[dir]
+      puffs.forEach(p => {
+        expect(ellipseRadius([p.cx, p.cy])).toBeGreaterThan(1)
+        if (ux !== 0) expect(Math.sign(p.cx - ELLIPSE.cx)).toBe(Math.sign(ux))
+        if (uy !== 0) expect(Math.sign(p.cy - ELLIPSE.cy)).toBe(Math.sign(uy))
+      })
+    })
+  })
+
+  it('keeps each puff further out than the last', () => {
+    const dists = cloudPuffs('down-left').map(p =>
+      Math.hypot(p.cx - ELLIPSE.cx, p.cy - ELLIPSE.cy),
+    )
+    expect(dists).toEqual([...dists].sort((a, b) => a - b))
   })
 })
 
@@ -121,14 +228,16 @@ describe('pathD', () => {
   })
 
   // Morphing rewrites `d` mid-flight, so the command sequence has to be identical
-  // across types — only the numbers may differ.
-  it('uses the same command sequence for every type', () => {
-    const shapes = BUBBLE_TYPE_KEYS.map(t => commands(pathD(ringPoints(t))).join(''))
+  // across types and tails — only the numbers may differ.
+  it('uses the same command sequence for every type and tail', () => {
+    const shapes = BUBBLE_TYPE_KEYS.flatMap(t =>
+      TAIL_DIR_KEYS.map(dir => commands(pathD(ringPoints(t, dir))).join('')),
+    )
     expect(new Set(shapes).size).toBe(1)
   })
 
   it('rounds coordinates to at most 2 decimals', () => {
-    expect(pathD(ringPoints('lightning'))).not.toMatch(/\d\.\d{3,}/)
+    expect(pathD(ringPoints('lightning', 'down-left'))).not.toMatch(/\d\.\d{3,}/)
   })
 
   it('round-trips an empty point list to a bare close', () => {
@@ -153,6 +262,19 @@ describe('lerpPoints', () => {
     expect(mid).toHaveLength(RING_POINTS * 2)
     mid.forEach(n => expect(Number.isFinite(n)).toBe(true))
   })
+
+  it('travels the tail across the ring rather than cutting it', () => {
+    const from = ringPoints('soft', 'down-left')
+    const to = ringPoints('soft', 'right')
+    const mid = lerpPoints(from, to, 0.5)
+    expect(mid).toHaveLength(RING_POINTS * 2)
+    // Both tails are half-retracted at the midpoint: neither vertex is at either
+    // endpoint's position, which is what makes it a morph and not a cut.
+    const oldTail = tailRingIndex('down-left') * 2
+    const newTail = tailRingIndex('right') * 2
+    expect(mid[oldTail]).not.toBeCloseTo(from[oldTail], 3)
+    expect(mid[newTail]).not.toBeCloseTo(to[newTail], 3)
+  })
 })
 
 describe('easeOutCubic', () => {
@@ -173,15 +295,6 @@ describe('puffOpacity', () => {
     expect(puffOpacity('soft')).toBe(0)
     expect(puffOpacity('jagged')).toBe(0)
     expect(puffOpacity('lightning')).toBe(0)
-  })
-
-  it('trails the puffs below and left of the ellipse, tapering away', () => {
-    const radii = CLOUD_PUFFS.map(p => p.r)
-    expect(radii).toEqual([...radii].sort((a, b) => b - a))
-    CLOUD_PUFFS.forEach(p => {
-      expect(p.cy).toBeGreaterThan(BUBBLE_VIEW.h * BUBBLE_ELLIPSE_N.cy)
-      expect(p.cx).toBeLessThan(BUBBLE_VIEW.w * BUBBLE_ELLIPSE_N.cx)
-    })
   })
 })
 
@@ -224,5 +337,12 @@ describe('BUBBLE_ASPECT', () => {
   it('keeps the base ellipse inside the box in both axes', () => {
     expect(BUBBLE_ELLIPSE_N.cx + BUBBLE_ELLIPSE_N.rx).toBeLessThanOrEqual(1)
     expect(BUBBLE_ELLIPSE_N.cy + BUBBLE_ELLIPSE_N.ry).toBeLessThanOrEqual(1)
+  })
+
+  it('describes the same ellipse as ELLIPSE, in box fractions', () => {
+    expect(BUBBLE_ELLIPSE_N.cx * BUBBLE_VIEW.w).toBeCloseTo(ELLIPSE.cx, 10)
+    expect(BUBBLE_ELLIPSE_N.cy * BUBBLE_VIEW.h).toBeCloseTo(ELLIPSE.cy, 10)
+    expect(BUBBLE_ELLIPSE_N.rx * BUBBLE_VIEW.w).toBeCloseTo(ELLIPSE.rx, 10)
+    expect(BUBBLE_ELLIPSE_N.ry * BUBBLE_VIEW.h).toBeCloseTo(ELLIPSE.ry, 10)
   })
 })

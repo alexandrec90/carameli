@@ -1,8 +1,7 @@
 import type { CSSProperties } from 'react'
 
-import { BUBBLE_ASPECT } from '../bubbleShape'
-import type { BubbleType } from './bubbleTypes'
-import type { ImgTransform, BubbleTransform, EditorConfig } from './types'
+import { BUBBLE_ASPECT } from '../bubbleBox'
+import type { ImgTransform, BubbleTransform } from './types'
 
 // ─── Interaction bounds (Phase 3) ───────────────────────────────────────────────
 
@@ -155,8 +154,9 @@ export function imgClipStyle(spill: boolean, reveal: boolean, clip: string): CSS
 }
 
 /**
- * On-screen box of a panel's bubble. `top`/`right`/`width` are percentages of the
- * panel box, and the height follows the bubble's fixed aspect ratio — which is what
+ * On-screen box of a bubble, given the bounds of the panel it belongs to.
+ * `top`/`right`/`width` are percentages of that panel box, and the height follows the
+ * bubble's fixed aspect ratio — which is what
  * the DOM's `height: auto` resolves to, since the outline SVG carries a viewBox.
  *
  * Shared deliberately: the renderer needs it to aim connector tubes and the editor
@@ -189,55 +189,4 @@ export function bubbleStyle(b: BubbleTransform): CSSProperties {
   } as CSSProperties
 }
 
-// ─── Export (Phase 4) ──────────────────────────────────────────────────────────
-
-/** Round to `decimals` places, dropping float noise (e.g. 1.0000000002 → 1). */
-function round(n: number, decimals: number): number {
-  const f = 10 ** decimals
-  return Math.round(n * f) / f
-}
-
-/** A nullable bubble type as a TS literal — `null` unquoted, a type quoted. */
-function typeLiteral(t: BubbleType | null): string {
-  return t === null ? 'null' : `'${t}'`
-}
-
-/**
- * Serialize a working {@link EditorConfig} into paste-ready TS matching
- * `layoutConfig.ts` (the two `export const` blocks only). Numbers are rounded for
- * clean output: image `scale` to 2 decimals, pixel offsets and bubble percentages to
- * integers, `rotate` to 1 decimal. Bubble `text` is JSON-escaped so quotes/newlines/
- * backslashes stay valid TS.
- */
-export function serializeConfig(c: EditorConfig): string {
-  const imgLines = c.images
-    .map(
-      t =>
-        `  { scale: ${round(t.scale, 2)}, offsetX: ${Math.round(t.offsetX)}, ` +
-        `offsetY: ${Math.round(t.offsetY)}, anchor: '${t.anchor}', spill: ${t.spill} },`,
-    )
-    .join('\n')
-  const bubbleLines = c.bubbles
-    .map(
-      b =>
-        `  { top: ${Math.round(b.top)}, right: ${Math.round(b.right)}, ` +
-        `width: ${Math.round(b.width)}, rotate: ${round(b.rotate, 1)}, ` +
-        `spill: ${b.spill}, type: '${b.type}', text: ${JSON.stringify(b.text)}, ` +
-        `linkTo: ${b.linkTo}, hoverType: ${typeLiteral(b.hoverType)}, ` +
-        `clickType: ${typeLiteral(b.clickType)} },`,
-    )
-    .join('\n')
-  return (
-    `export const PANEL_IMG_TRANSFORMS: ImgTransform[] = [\n${imgLines}\n]\n\n` +
-    `export const PANEL_BUBBLE_TRANSFORMS: BubbleTransform[] = [\n${bubbleLines}\n]\n`
-  )
-}
-
-/**
- * Serialize a full, ready-to-write `editor/layoutConfig.ts` file: the type import
- * header plus the two `export const` blocks from {@link serializeConfig}. Used by the
- * editor's Save button, which POSTs this verbatim to the dev-only write endpoint.
- */
-export function serializeConfigFile(c: EditorConfig): string {
-  return `import type { ImgTransform, BubbleTransform } from './types'\n\n${serializeConfig(c)}`
-}
+// Serialization back to layoutConfig.ts lives in ./serialize.ts.
