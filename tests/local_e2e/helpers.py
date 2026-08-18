@@ -318,6 +318,45 @@ def _now_iso() -> str:
     return time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime())
 
 
+def nlog_longdate() -> str:
+    """Render ``now`` the way NLog's ``${longdate}`` layout does.
+
+    ``yyyy-MM-dd HH:mm:ss.ffff`` — space-separated, four fractional digits, local time.
+    Not ISO-8601, and that is the point: ``VsLogEntry.time`` is a plain ``str`` fed
+    straight from the layout, so a test that invents an ISO timestamp would still pass
+    while proving nothing about the shape NLog actually posts.
+    """
+    return f"{time.strftime('%Y-%m-%d %H:%M:%S')}.{int(time.time() % 1 * 10000):04d}"
+
+
+def nlog_record(
+    *,
+    message: str,
+    level: str = "INFO",
+    logger: str = "Carameli.LocalE2E",
+    machine: str = "local-e2e",
+    exception: str | None = None,
+) -> dict[str, Any]:
+    """Build the JSON object NLog's ``WebService`` target posts to ``/webhooks/vs-log``.
+
+    Every ``<parameter>`` in the shipped snippet
+    (``docs/plans/active/airtight-vanillasoft/nlog-snippet.md``) is present, because
+    ``app/schemas/vs_log.py::VsLogEntry`` requires ``time``/``level``/``logger``/
+    ``message`` and a payload missing any of them is a 422 that says nothing about the
+    channel. ``auth`` is deliberately absent: the suite authenticates with the
+    ``X-Cloudli-Auth`` header, which is what an NLog build new enough for ``<header>``
+    does, and the body fallback is a separate concern.
+    """
+    return {
+        "time": nlog_longdate(),
+        "level": level,
+        "logger": logger,
+        "message": message,
+        "exception": exception,
+        "machine": machine,
+    }
+
+
 # --------------------------------------------------------------------------------------
 # HTTP wrappers
 # --------------------------------------------------------------------------------------
