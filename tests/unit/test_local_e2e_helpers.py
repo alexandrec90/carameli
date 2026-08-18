@@ -104,6 +104,42 @@ class TestSyntheticCallId:
         assert len({helpers.synthetic_call_id() for _ in range(100)}) == 100
 
 
+class TestNlogRecord:
+    """The ``/webhooks/vs-log`` probe body must bind to ``VsLogEntry``.
+
+    Regression guard: the probe used to be a hand-written dict with no ``time`` key, so
+    ``test_vs_log_webhook_accepts_a_valid_record`` failed with 422 on a healthy channel
+    and read as a broken log bridge. Validating the builder against the *real* schema —
+    rather than against another literal — is what makes that impossible to reintroduce.
+    """
+
+    def test_binds_to_the_shipped_schema(self) -> None:
+        from app.schemas.vs_log import VsLogEntry
+
+        entry = VsLogEntry(**helpers.nlog_record(message="probe"))
+        assert entry.message == "probe"
+        assert entry.time
+
+    def test_carries_every_nlog_parameter_the_schema_requires(self) -> None:
+        """A missing required field is a 422 that says nothing about the channel."""
+        from app.schemas.vs_log import VsLogEntry
+
+        required = {name for name, field in VsLogEntry.model_fields.items() if field.is_required()}
+        assert required <= set(helpers.nlog_record(message="probe"))
+
+    def test_longdate_matches_nlogs_layout(self) -> None:
+        """``${longdate}`` is ``yyyy-MM-dd HH:mm:ss.ffff`` — a space, not a ``T``."""
+        import re
+
+        assert re.fullmatch(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{4}", helpers.nlog_longdate())
+
+    def test_overrides_reach_the_payload(self) -> None:
+        record = helpers.nlog_record(message="m", level="ERROR", logger="L", machine="host")
+        assert record["level"] == "ERROR"
+        assert record["logger"] == "L"
+        assert record["machine"] == "host"
+
+
 class TestConfig:
     ENV: ClassVar[dict[str, str]] = {
         "CARAMELI_BASE_URL": "https://example.ngrok-free.dev/",

@@ -29,6 +29,7 @@ from tests.local_e2e.helpers import (
     es_search,
     hits_of,
     incoming_call_payload,
+    nlog_record,
     poll_until,
     post_notify,
     synthetic_call_id,
@@ -59,7 +60,7 @@ async def test_vs_log_webhook_rejects_a_wrong_secret(config: LocalE2EConfig) -> 
     async with httpx.AsyncClient(timeout=30.0) as client:
         response = await client.post(
             f"{config.carameli_base_url}/webhooks/vs-log",
-            json={"level": "ERROR", "message": "local-e2e auth probe"},
+            json=nlog_record(level="ERROR", message="local-e2e auth probe"),
             headers={"X-Cloudli-Auth": "definitely-not-the-secret", **NGROK_SKIP_HEADER},
         )
 
@@ -76,6 +77,11 @@ async def test_vs_log_webhook_accepts_a_valid_record(config: LocalE2EConfig) -> 
     This is the escape hatch for VanillaSoft-side errors that never surface as an HTTP
     response Carameli sees — exceptions inside ``CarameliClient``/``CarameliService``.
     Skips when the secret is not configured locally; without it there is nothing to test.
+
+    The body goes through :func:`nlog_record` rather than being hand-written here. A
+    hand-written one omitted ``time`` and this test failed with 422 for months against a
+    perfectly healthy channel — ``VsLogEntry.time`` is required and ``${longdate}`` is
+    always present in a real record, so the defect was in the probe, never the schema.
     """
     if not config.vs_webhook_secret:
         pytest.skip("VS_WEBHOOK_SECRET not set — cannot exercise /webhooks/vs-log ingestion")
@@ -84,12 +90,7 @@ async def test_vs_log_webhook_accepts_a_valid_record(config: LocalE2EConfig) -> 
     async with httpx.AsyncClient(timeout=30.0) as client:
         response = await client.post(
             f"{config.carameli_base_url}/webhooks/vs-log",
-            json={
-                "level": "INFO",
-                "logger": "Carameli.LocalE2E",
-                "message": marker,
-                "machine": "local-e2e",
-            },
+            json=nlog_record(message=marker),
             headers={"X-Cloudli-Auth": config.vs_webhook_secret, **NGROK_SKIP_HEADER},
         )
 

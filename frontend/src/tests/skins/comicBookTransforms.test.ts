@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { BUBBLE_ASPECT } from '../../skins/comic-book/bubbleShape'
+import { BUBBLE_ASPECT, TAIL_DIR_KEYS } from '../../skins/comic-book/bubbleBox'
 import { linkedPairs } from '../../skins/comic-book/bubbleTube'
 import { BUBBLE_TYPES, BUBBLE_TYPE_KEYS } from '../../skins/comic-book/editor/bubbleTypes'
 import {
@@ -126,12 +126,14 @@ describe('imgClipStyle', () => {
 describe('bubbleStyle', () => {
   it('maps the bubble transform to percentages and the rotation custom property', () => {
     const style = bubbleStyle({
+      panel: 0,
       top: -35,
       right: -12,
       width: 55,
       rotate: -5,
       spill: true,
       type: 'soft',
+      tail: 'down-left',
       text: 'hi',
       linkTo: null,
       hoverType: null,
@@ -229,10 +231,13 @@ describe('default config parity', () => {
     })
   })
 
-  it('keeps the unlinked bubbles on the shared default placement', () => {
+  it('keeps the bubbles that are alone on their panel on the shared placement', () => {
     // The two linked pairs are deliberately nudged off it so a tube has a gap to
     // span; everything else should still sit where the CSS fallback puts it.
-    const nudged = new Set([0, 1, 3, 4])
+    // Panel 4's bubble is nudged too — it is the one panel whose art reaches the
+    // top-right corner the default placement floats into.
+    const second = linkedPairs(PANEL_BUBBLE_TRANSFORMS).map(([, j]) => j)
+    const nudged = new Set([...second, 6])
     PANEL_BUBBLE_TRANSFORMS.forEach((b, i) => {
       if (nudged.has(i)) return
       expect(b.top).toBe(-35)
@@ -242,7 +247,26 @@ describe('default config parity', () => {
   })
 
   it('links two pairs, each declared from exactly one end', () => {
-    expect(linkedPairs(PANEL_BUBBLE_TRANSFORMS)).toEqual([[0, 1], [3, 4]])
+    expect(linkedPairs(PANEL_BUBBLE_TRANSFORMS)).toEqual([[0, 1], [4, 5]])
+  })
+
+  // Both halves of a linked pair are one speaker's line continuing, so only the first
+  // carries a tail; the tube is what joins the second to it.
+  it('gives each linked pair one tail between the two of them', () => {
+    linkedPairs(PANEL_BUBBLE_TRANSFORMS).forEach(([i, j]) => {
+      expect(PANEL_BUBBLE_TRANSFORMS[i].panel).toBe(PANEL_BUBBLE_TRANSFORMS[j].panel)
+      expect(PANEL_BUBBLE_TRANSFORMS[i].tail).not.toBe('none')
+      expect(PANEL_BUBBLE_TRANSFORMS[j].tail).toBe('none')
+    })
+  })
+
+  it('points every other bubble’s tail somewhere', () => {
+    const linked = new Set(linkedPairs(PANEL_BUBBLE_TRANSFORMS).map(([, j]) => j))
+    PANEL_BUBBLE_TRANSFORMS.forEach((b, i) => {
+      if (linked.has(i)) return
+      expect(TAIL_DIR_KEYS).toContain(b.tail)
+      expect(b.tail).not.toBe('none')
+    })
   })
 
   it('gives every bubble a hover and a click shape distinct from its resting one', () => {
@@ -254,8 +278,19 @@ describe('default config parity', () => {
     })
   })
 
-  it('has one transform per panel (length 8)', () => {
+  it('has one image transform per panel', () => {
     expect(PANEL_IMG_TRANSFORMS).toHaveLength(8)
-    expect(PANEL_BUBBLE_TRANSFORMS).toHaveLength(8)
+  })
+
+  // The bubble array stopped being parallel to the panels when a panel could own
+  // several: its length is the author's, and only the panel it names has to be real.
+  it('puts every bubble on a real panel, and every panel speaks at least once', () => {
+    const panels = PANEL_BUBBLE_TRANSFORMS.map(b => b.panel)
+    panels.forEach(p => {
+      expect(p).toBeGreaterThanOrEqual(0)
+      expect(p).toBeLessThan(PANEL_IMG_TRANSFORMS.length)
+    })
+    expect(new Set(panels).size).toBe(PANEL_IMG_TRANSFORMS.length)
+    expect(PANEL_BUBBLE_TRANSFORMS.length).toBeGreaterThan(PANEL_IMG_TRANSFORMS.length)
   })
 })

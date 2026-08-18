@@ -240,3 +240,26 @@
 .cb-ed-btn:active {
   background: #262630;
 }
+
+/* Destructive action (Delete bubble) — red enough to give pause, muted enough not to
+   compete with Save for the eye. */
+.cb-ed-btn-danger {
+  border-color: #a03a3a;
+  color: #ff9a9a;
+}
+
+.cb-ed-btn-danger:hover {
+  background: #4a2626;
+  border-color: #c04a4a;
+}
+
+/* "+ Bubble" with nothing selected: there is no panel to add it to. */
+.cb-ed-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.cb-ed-btn:disabled:hover {
+  background: #2e2e36;
+  border-color: #4a4a54;
+}

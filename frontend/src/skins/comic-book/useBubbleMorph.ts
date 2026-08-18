@@ -1,6 +1,7 @@
 import { useLayoutEffect, useRef } from 'react'
 import type { RefObject } from 'react'
 
+import type { TailDir } from './bubbleBox'
 import { easeOutCubic, lerpPoints, pathD, ringPoints } from './bubbleShape'
 import type { BubbleType } from './editor/bubbleTypes'
 
@@ -16,8 +17,12 @@ function prefersReducedMotion(): boolean {
 }
 
 /**
- * Drive one `<path>` through the shape morph for `target`, returning the ref to
- * attach to it.
+ * Drive one `<path>` through the shape morph for `target`, with its tail on the `tail`
+ * side, returning the ref to attach to it.
+ *
+ * The tail is a morph target like the shape is: it lives on the same ring, so turning
+ * a tail from `down-left` to `right` — or removing it — travels the vertices instead
+ * of cutting. That matters in the editor, where the tail dropdown is a live control.
  *
  * `d` is written straight to the DOM from a rAF loop rather than rendered from
  * React state: 64 vertices × 60 fps × one bubble per panel is a re-render storm
@@ -30,9 +35,12 @@ function prefersReducedMotion(): boolean {
  * frame and the next run starts from whatever vertices were last written, so a
  * shape change part-way through a morph continues from there instead of jumping.
  */
-export function useBubbleMorph(target: BubbleType): RefObject<SVGPathElement | null> {
+export function useBubbleMorph(
+  target: BubbleType,
+  tail: TailDir,
+): RefObject<SVGPathElement | null> {
   const pathRef = useRef<SVGPathElement | null>(null)
-  const currentRef = useRef<number[]>(ringPoints(target))
+  const currentRef = useRef<number[]>(ringPoints(target, tail))
   const rafRef = useRef(0)
   const firstRef = useRef(true)
 
@@ -41,7 +49,7 @@ export function useBubbleMorph(target: BubbleType): RefObject<SVGPathElement | n
     if (!path) return
 
     const from = currentRef.current
-    const to = ringPoints(target)
+    const to = ringPoints(target, tail)
     const settle = (pts: number[]): void => {
       currentRef.current = pts
       path.setAttribute('d', pathD(pts))
@@ -63,7 +71,7 @@ export function useBubbleMorph(target: BubbleType): RefObject<SVGPathElement | n
     }
     rafRef.current = requestAnimationFrame(step)
     return () => cancelAnimationFrame(rafRef.current)
-  }, [target])
+  }, [target, tail])
 
   return pathRef
 }

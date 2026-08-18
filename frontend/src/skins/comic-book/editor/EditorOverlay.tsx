@@ -6,7 +6,8 @@ import type { PanelPoly } from '../Layout'
 import InspectorPanel from './InspectorPanel'
 import PageSelect from './PageSelect'
 import type { PageSelectProps } from './PageSelect'
-import { bubbleRect, serializeConfig, serializeConfigFile } from './transforms'
+import { serializeConfig, serializeConfigFile } from './serialize'
+import { bubbleRect } from './transforms'
 import { useOverlayInteraction } from './useOverlayInteraction'
 import { useToolbarDrag } from './useToolbarDrag'
 import type { EditorModeApi } from './useEditorMode'
@@ -74,12 +75,22 @@ export default function EditorOverlay({ api, panelPolys, pageSelect }: EditorOve
   const [copied, setCopied] = useState(false)
   const [saved, setSaved] = useState(false)
 
-  const selectedRect: Rect | null =
-    selected && panelPolys[selected.index]
-      ? selected.kind === 'img'
-        ? panelPolys[selected.index].bounds
-        : bubbleRect(panelPolys[selected.index].bounds, config.bubbles[selected.index])
-      : null
+  // A bubble is placed against the panel it belongs to, not against a panel that
+  // shares its index — those parted company once a panel could own several bubbles.
+  const selBubble = selected?.kind === 'bubble' ? config.bubbles[selected.index] : null
+  const selPanel =
+    selected === null
+      ? null
+      : selected.kind === 'img'
+        ? selected.index
+        : (selBubble?.panel ?? null)
+  const selPoly = selPanel === null ? null : panelPolys[selPanel]
+
+  const selectedRect: Rect | null = !selPoly
+    ? null
+    : selBubble
+      ? bubbleRect(selPoly.bounds, selBubble)
+      : selPoly.bounds
 
   const onSave = () => {
     const content = serializeConfigFile(config)
@@ -136,26 +147,33 @@ export default function EditorOverlay({ api, panelPolys, pageSelect }: EditorOve
         onClick={api.clear}
       />
 
-      {/* Per-panel image + bubble click targets */}
-      {panelPolys.map((poly, i) => {
-        const br = bubbleRect(poly.bounds, config.bubbles[i])
+      {/* Per-panel image click targets */}
+      {panelPolys.map((poly, i) => (
+        <button
+          key={i}
+          type="button"
+          className="cb-ed-target"
+          style={rectStyle(poly.bounds)}
+          aria-label={`Select ${PANEL_LABELS[i]} image`}
+          onClick={() => api.select('img', i)}
+        />
+      ))}
+
+      {/* One click target per bubble, placed against the panel it belongs to. They
+          paint after the image targets so a bubble stays clickable where it overlaps
+          its own panel — or a neighbour's, once it spills into the gutter. */}
+      {config.bubbles.map((bubble, i) => {
+        const poly = panelPolys[bubble.panel]
+        if (!poly) return null
         return (
-          <div key={i}>
-            <button
-              type="button"
-              className="cb-ed-target"
-              style={rectStyle(poly.bounds)}
-              aria-label={`Select ${PANEL_LABELS[i]} image`}
-              onClick={() => api.select('img', i)}
-            />
-            <button
-              type="button"
-              className="cb-ed-target cb-ed-target-bubble"
-              style={rectStyle(br)}
-              aria-label={`Select ${PANEL_LABELS[i]} bubble`}
-              onClick={() => api.select('bubble', i)}
-            />
-          </div>
+          <button
+            key={i}
+            type="button"
+            className="cb-ed-target cb-ed-target-bubble"
+            style={rectStyle(bubbleRect(poly.bounds, bubble))}
+            aria-label={`Select ${PANEL_LABELS[bubble.panel]} bubble ${i}`}
+            onClick={() => api.select('bubble', i)}
+          />
         )
       })}
 
@@ -193,11 +211,28 @@ export default function EditorOverlay({ api, panelPolys, pageSelect }: EditorOve
       <div className="cb-ed-toolbar" role="region" aria-label="Comic-book editor" {...toolbarDrag.rootProps}>
         <div className="cb-ed-title cb-ed-grip" title="Drag to move" {...toolbarDrag.gripProps}>COMIC EDITOR</div>
         <PageSelect {...pageSelect} />
-        {selected ? (
-          <InspectorPanel api={api} label={PANEL_LABELS[selected.index]} labels={PANEL_LABELS} />
+        {selected && selPanel !== null ? (
+          <InspectorPanel api={api} label={PANEL_LABELS[selPanel]} labels={PANEL_LABELS} />
         ) : (
           <div className="cb-ed-hint">Click a panel image or bubble to select it.</div>
         )}
+        <div className="cb-ed-actions">
+          {/* New bubbles land on the selected panel, because there is no other
+              answer to "which panel" that does not need a second click. */}
+          <button
+            type="button"
+            className="cb-ed-btn"
+            disabled={selPanel === null}
+            title={
+              selPanel === null
+                ? 'Select a panel or bubble first'
+                : `Add a bubble to ${PANEL_LABELS[selPanel]}`
+            }
+            onClick={() => selPanel !== null && api.addBubbleOn(selPanel)}
+          >
+            + Bubble
+          </button>
+        </div>
         <div className="cb-ed-actions">
           <button type="button" className="cb-ed-btn cb-ed-btn-primary" onClick={onSave}>
             {saved ? 'Saved!' : 'Save'}

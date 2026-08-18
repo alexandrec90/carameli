@@ -24,12 +24,14 @@ const img = (over: Partial<ImgTransform> = {}): ImgTransform => ({
 })
 
 const bubble = (over: Partial<BubbleTransform> = {}): BubbleTransform => ({
+  panel: 0,
   top: -35,
   right: -12,
   width: 55,
   rotate: -5,
   spill: true,
   type: 'soft',
+  tail: 'down-left',
   text: 'hi',
   linkTo: null,
   hoverType: null,

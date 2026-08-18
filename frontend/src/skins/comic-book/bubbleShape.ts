@@ -1,66 +1,28 @@
 // Vector speech-bubble geometry — pure, no DOM, ships in prod.
 //
-// Every bubble type is one closed ring of RING_POINTS vertices sampled from the
-// same base ellipse and differing only in a radial modulation. That is the whole
-// design constraint: because all types agree on the vertex count *and* the path
+// Every bubble type is one closed ring of RING_POINTS vertices sampled from the same
+// base ellipse (bubbleBox.ts) and differing only in a radial modulation. That is the
+// whole design constraint: because all types agree on the vertex count *and* the path
 // command sequence, any two of them interpolate vertex-for-vertex, so changing a
 // bubble's shape is a true morph rather than the crossfade raster artwork forced.
-// Adding a type with a different point count silently breaks every morph into and
-// out of it, so keep the ring shared.
+// Adding a type with a different point count silently breaks every morph into and out
+// of it, so keep the ring shared.
+//
+// The tail is part of that same ring — one vertex pulled out toward a tip — and which
+// vertex that is comes from the bubble's own `tail` direction, not from its type. A
+// type only says how far the tail reaches (a thought bubble reaches nowhere and trails
+// puffs instead); the direction, including having none at all, is the author's.
 
+import { RING_POINTS, ELLIPSE, tailRingIndex, tailTip } from './bubbleBox'
+import type { TailDir } from './bubbleBox'
 import type { BubbleType } from './editor/bubbleTypes'
-
-/** SVG user-space box every bubble path is authored in. */
-export const BUBBLE_VIEW = { w: 200, h: 150 } as const
-
-/** Vertices in the outline ring — shared by every type (see the module note). */
-export const RING_POINTS = 64
-
-/** Base ellipse, in BUBBLE_VIEW units. Sized to leave room for the tail below it. */
-const ELLIPSE = { cx: 100, cy: 58, rx: 84, ry: 44 } as const
-
-/**
- * Ring index pulled out to form the tail — bottom-left of the ellipse. Its two
- * neighbors stay put and become the tail's roots, so the tail is a slender
- * triangle rather than a separate shape, and "grow a tail" morphs like anything
- * else: the vertex simply travels back onto the ring.
- */
-const TAIL_INDEX = 39
-/** Where the tail vertex reaches when fully extended, in BUBBLE_VIEW units. */
-const TAIL_TIP = { x: 34, y: 138 } as const
-
-/**
- * Trailing puffs of a thought bubble. Detached, so they cannot be part of the
- * morph ring — they fade instead (see `puffOpacity`), which reads fine because
- * they are small and the ring is doing the visible work.
- */
-export const CLOUD_PUFFS = [
-  { cx: 44, cy: 116, r: 7 },
-  { cx: 36, cy: 129, r: 4.4 },
-  { cx: 30, cy: 139, r: 2.8 },
-] as const
-
-/** Rendered bubble height as a fraction of its width — fixed by BUBBLE_VIEW. */
-export const BUBBLE_ASPECT = BUBBLE_VIEW.h / BUBBLE_VIEW.w
-
-/**
- * The base ellipse as fractions of the rendered bubble box. A connector tube aims
- * at this rather than at the box: the box corners are empty, so a tube pointed at
- * them would visibly miss the bubble.
- */
-export const BUBBLE_ELLIPSE_N = {
-  cx: ELLIPSE.cx / BUBBLE_VIEW.w,
-  cy: ELLIPSE.cy / BUBBLE_VIEW.h,
-  rx: ELLIPSE.rx / BUBBLE_VIEW.w,
-  ry: ELLIPSE.ry / BUBBLE_VIEW.h,
-} as const
 
 const TAU = Math.PI * 2
 
 interface ShapeDef {
   /** Radial modulation at ring index `i`; 1 sits exactly on the base ellipse. */
   mod(i: number): number
-  /** How far the tail vertex reaches toward TAIL_TIP — 0 = no tail, 1 = full. */
+  /** How far the tail vertex reaches toward the tip — 0 = never a tail, 1 = full. */
   tail: number
   /** Opacity of the trailing thought puffs. */
   puffs: number
@@ -183,19 +145,26 @@ function r2(n: number): number {
 /**
  * Sample one bubble outline as a flat `[x0, y0, x1, y1, …]` list in BUBBLE_VIEW
  * units. Index 0 is the top of the ellipse and the ring runs clockwise.
+ *
+ * `tail` moves the tail to that side of the bubble (`'none'` leaves the ring whole).
+ * It is a parameter rather than a property of the type because the two change
+ * independently: a bubble keeps pointing at its speaker while its shape morphs from
+ * speech to shout, which only works if every shape puts the tail on the same vertex.
  */
-export function ringPoints(type: BubbleType): number[] {
-  const { mod, tail } = SHAPES[type]
+export function ringPoints(type: BubbleType, tail: TailDir = 'none'): number[] {
+  const { mod, tail: reach } = SHAPES[type]
   const { cx, cy, rx, ry } = ELLIPSE
+  const tailIdx = tailRingIndex(tail)
+  const [tipX, tipY] = tailTip(tail)
   const out: number[] = []
   for (let i = 0; i < RING_POINTS; i++) {
     const theta = ringTheta(i)
     const m = mod(i)
     let x = cx + rx * m * Math.cos(theta)
     let y = cy + ry * m * Math.sin(theta)
-    if (i === TAIL_INDEX && tail > 0) {
-      x += (TAIL_TIP.x - x) * tail
-      y += (TAIL_TIP.y - y) * tail
+    if (i === tailIdx && reach > 0) {
+      x += (tipX - x) * reach
+      y += (tipY - y) * reach
     }
     out.push(x, y)
   }
@@ -203,9 +172,9 @@ export function ringPoints(type: BubbleType): number[] {
 }
 
 /**
- * Flat point list → a closed SVG path. The command sequence is `M`, `L`×(N−1),
- * `Z` for every type, which is what lets a morph swap `d` mid-flight without the
- * renderer having to reconcile two different path structures.
+ * Flat point list → a closed SVG path. The command sequence is `M`, `L`×(N−1), `Z`
+ * for every type, which is what lets a morph swap `d` mid-flight without the renderer
+ * having to reconcile two different path structures.
  */
 export function pathD(pts: number[]): string {
   const parts: string[] = []
@@ -235,9 +204,9 @@ export function puffOpacity(type: BubbleType): number {
 }
 
 /**
- * Which shape a bubble should currently be. A click pulse outranks a hover, and
- * either falls back to the resting `type` when that event has no shape configured
- * — so an unset `hoverType`/`clickType` means "stay as you are", not "become soft".
+ * Which shape a bubble should currently be. A click pulse outranks a hover, and either
+ * falls back to the resting `type` when that event has no shape configured — so an
+ * unset `hoverType`/`clickType` means "stay as you are", not "become soft".
  */
 export function resolveBubbleShape(
   b: { type: BubbleType; hoverType: BubbleType | null; clickType: BubbleType | null },
