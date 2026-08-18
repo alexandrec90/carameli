@@ -1,13 +1,14 @@
-import { BUBBLE_TYPES, BUBBLE_TYPE_KEYS } from './bubbleTypes'
-import type { BubbleType } from './bubbleTypes'
+import { PANELS } from '../panels'
+import { assetLabel } from './assets'
+import BubbleInspector from './BubbleInspector'
+import ImageInspector from './ImageInspector'
+import { indicesOnPanel } from './configOps'
 import type { EditorModeApi } from './useEditorMode'
 
 interface InspectorPanelProps {
   api: EditorModeApi
-  /** Human-readable name of the selected panel. */
-  label: string
-  /** Every panel's name, indexed like the config — for the link picker. */
-  labels: string[]
+  /** Index of the panel the selection sits on, into PANELS. */
+  panel: number
 }
 
 /** Trim drag-produced floats to 2 decimals for the read-out (drops trailing zeros). */
@@ -15,37 +16,56 @@ function fmt(n: number): number {
   return Math.round(n * 100) / 100
 }
 
-/** Read a shape `<select>` back, mapping the empty "no change" option to null. */
-function asType(value: string): BubbleType | null {
-  return value === '' ? null : (value as BubbleType)
-}
-
 /**
- * Selection inspector: live numeric read-outs plus editable controls for the
- * currently selected image or bubble (spill toggle, and — for bubbles — type and
- * text), and a per-element reset. Rendered inside the toolbar by EditorOverlay only
- * when something is selected.
+ * Selection inspector: live numeric read-outs plus editable controls for the currently
+ * selected panel, picture or bubble, and a per-element reset. The kind-specific
+ * controls live in ImageInspector and BubbleInspector. Rendered inside the toolbar by
+ * EditorOverlay only when something is selected.
  */
-export default function InspectorPanel({ api, label, labels }: InspectorPanelProps) {
+export default function InspectorPanel({ api, panel }: InspectorPanelProps) {
   const { selected, config } = api
   if (!selected) return null
 
+  const panelName = PANELS[panel]?.label ?? `Panel ${panel}`
   const selImg = selected.kind === 'img' ? config.images[selected.index] : null
   const selBubble = selected.kind === 'bubble' ? config.bubbles[selected.index] : null
+
+  // A selected panel is a slot, not a drawn thing: it has no transform to read out and
+  // nothing to reset. It exists so "+ Image" / "+ Bubble" have somewhere to add to.
+  if (selected.kind === 'panel') {
+    const imgs = indicesOnPanel(config.images, panel).length
+    const bubbles = indicesOnPanel(config.bubbles, panel).length
+    return (
+      <>
+        <div className="cb-ed-label">{panelName} panel</div>
+        <div className="cb-ed-hint">
+          {imgs} picture{imgs === 1 ? '' : 's'} · {bubbles} bubble{bubbles === 1 ? '' : 's'}.
+          Click one to edit it, or add another below.
+        </div>
+      </>
+    )
+  }
+
+  if (!selImg && !selBubble) return null
 
   return (
     <>
       <div className="cb-ed-label">
-        {label} {selected.kind === 'img' ? 'image' : 'bubble'}
+        {selImg ? `${assetLabel(selImg.src)} on ${panelName}` : `${panelName} bubble`}
       </div>
 
       <dl className="cb-ed-values">
         {selImg && (
           <>
+            {/* The frame — the picture's own window over the panel box. */}
+            <div><dt>left</dt><dd>{fmt(selImg.left)}%</dd></div>
+            <div><dt>top</dt><dd>{fmt(selImg.top)}%</dd></div>
+            <div><dt>width</dt><dd>{fmt(selImg.width)}%</dd></div>
+            <div><dt>height</dt><dd>{fmt(selImg.height)}%</dd></div>
+            {/* The picture's framing inside that window. */}
             <div><dt>scale</dt><dd>{fmt(selImg.scale)}</dd></div>
             <div><dt>offsetX</dt><dd>{fmt(selImg.offsetX)}</dd></div>
             <div><dt>offsetY</dt><dd>{fmt(selImg.offsetY)}</dd></div>
-            <div><dt>anchor</dt><dd>{selImg.anchor}</dd></div>
           </>
         )}
         {selBubble && (
@@ -58,92 +78,10 @@ export default function InspectorPanel({ api, label, labels }: InspectorPanelPro
         )}
       </dl>
 
-      {/* Bubble content controls */}
-      {selBubble && (
-        <>
-          <label className="cb-ed-field">
-            <span>type</span>
-            <select
-              className="cb-ed-select"
-              value={selBubble.type}
-              onChange={e =>
-                api.setBubble(selected.index, { type: e.target.value as BubbleType })
-              }
-            >
-              {BUBBLE_TYPE_KEYS.map(key => (
-                <option key={key} value={key}>{BUBBLE_TYPES[key].label}</option>
-              ))}
-            </select>
-          </label>
-          <label className="cb-ed-field">
-            <span>text</span>
-            <textarea
-              className="cb-ed-textarea"
-              rows={2}
-              value={selBubble.text}
-              onChange={e => api.setBubble(selected.index, { text: e.target.value })}
-            />
-          </label>
+      {selImg && <ImageInspector api={api} index={selected.index} image={selImg} />}
+      {selBubble && <BubbleInspector api={api} index={selected.index} bubble={selBubble} />}
 
-          {/* Event morph targets. "no change" (null) means the bubble keeps its
-              resting shape for that event, which is not the same as picking the
-              resting shape here — that would still swap the lettering font. */}
-          <label className="cb-ed-field">
-            <span>on hover</span>
-            <select
-              className="cb-ed-select"
-              value={selBubble.hoverType ?? ''}
-              onChange={e =>
-                api.setBubble(selected.index, { hoverType: asType(e.target.value) })
-              }
-            >
-              <option value="">— no change —</option>
-              {BUBBLE_TYPE_KEYS.map(key => (
-                <option key={key} value={key}>{BUBBLE_TYPES[key].label}</option>
-              ))}
-            </select>
-          </label>
-          <label className="cb-ed-field">
-            <span>on click</span>
-            <select
-              className="cb-ed-select"
-              value={selBubble.clickType ?? ''}
-              onChange={e =>
-                api.setBubble(selected.index, { clickType: asType(e.target.value) })
-              }
-            >
-              <option value="">— no change —</option>
-              {BUBBLE_TYPE_KEYS.map(key => (
-                <option key={key} value={key}>{BUBBLE_TYPES[key].label}</option>
-              ))}
-            </select>
-          </label>
-
-          {/* Connector tube. Symmetric, so it only needs declaring at one end; the
-              tube redraws live as either bubble is dragged. */}
-          <label className="cb-ed-field">
-            <span>link to</span>
-            <select
-              className="cb-ed-select"
-              value={selBubble.linkTo ?? ''}
-              onChange={e =>
-                api.setBubble(selected.index, {
-                  linkTo: e.target.value === '' ? null : Number(e.target.value),
-                })
-              }
-            >
-              <option value="">— none —</option>
-              {labels.map((name, i) =>
-                i === selected.index ? null : (
-                  <option key={name} value={i}>{name}</option>
-                ),
-              )}
-            </select>
-          </label>
-        </>
-      )}
-
-      {/* Spill toggle — shared by images and bubbles */}
+      {/* Spill toggle — shared by pictures and bubbles */}
       <label className="cb-ed-check">
         <input
           type="checkbox"
@@ -154,21 +92,33 @@ export default function InspectorPanel({ api, label, labels }: InspectorPanelPro
               : api.setBubble(selected.index, { spill: e.target.checked })
           }
         />
-        <span>Allow spill outside panel</span>
+        <span>Allow spill outside {selImg ? 'frame' : 'panel'}</span>
       </label>
 
-      <button
-        type="button"
-        className="cb-ed-btn"
-        onClick={() => api.resetOne(selected.kind, selected.index)}
-      >
-        Reset
-      </button>
+      <div className="cb-ed-actions">
+        <button
+          type="button"
+          className="cb-ed-btn"
+          onClick={() => api.resetOne(selected.kind === 'img' ? 'img' : 'bubble', selected.index)}
+        >
+          Reset
+        </button>
+        <button
+          type="button"
+          className="cb-ed-btn cb-ed-btn-danger"
+          title={selImg ? 'Delete this picture' : 'Delete this bubble'}
+          onClick={() =>
+            selImg ? api.deleteImg(selected.index) : api.deleteBubble(selected.index)
+          }
+        >
+          {selImg ? 'Delete image' : 'Delete bubble'}
+        </button>
+      </div>
 
       <div className="cb-ed-hint">
-        Drag to move · handle to {selected.kind === 'img' ? 'zoom' : 'resize/rotate'} ·
-        {selected.kind === 'img' ? ' wheel zooms ·' : ''} arrows nudge (⇧×10) · +/− ·
-        Esc deselects
+        {selImg
+          ? 'Drag to move the frame · corner handle resizes it · the round grip pans the picture inside · wheel zooms · arrows nudge (⇧×10, ⌥ pans) · +/− · Del · Esc'
+          : 'Drag to move · handle to resize/rotate · arrows nudge (⇧×10) · +/− · Del · Esc'}
       </div>
     </>
   )

@@ -7,7 +7,7 @@ import type { PanelPoly } from './Layout'
 interface BubbleTubesProps {
   polys: PanelPoly[]
   bubbles: BubbleTransform[]
-  /** Whether panel `index`'s bubble is currently revealed. */
+  /** Whether bubble `index` is currently revealed. */
   isVisible(index: number): boolean
 }
 
@@ -20,10 +20,10 @@ interface Tube {
 /**
  * Connector tubes between linked bubbles, on a single viewport-level SVG.
  *
- * It has to be viewport-level: a link joins bubbles in two different panels, so the
- * corridor lives in the gutter between them and belongs to neither. And it has to
- * paint above the bubbles — that is what welds each corridor into both mouths (see
- * bubbleTube.ts).
+ * It has to be viewport-level: bubbles spill past their panel's edge, so a corridor
+ * joining two of them routinely crosses into the gutter and cannot be clipped to
+ * either. And it has to paint above the bubbles — that is what welds each corridor
+ * into both mouths (see bubbleTube.ts).
  *
  * Every tube is rendered whenever its pair is linked and only faded by `visible`,
  * rather than mounted and unmounted, so a tube appears and disappears on the same
@@ -31,10 +31,13 @@ interface Tube {
  */
 export default function BubbleTubes({ polys, bubbles, isVisible }: BubbleTubesProps) {
   const tubes = linkedPairs(bubbles).reduce<Tube[]>((acc, [i, j]) => {
-    if (!polys[i] || !polys[j]) return acc
+    // Both ends sit on the same panel — linkedPairs drops any pair that doesn't —
+    // so one poly decides whether the tube can be placed at all.
+    const poly = polys[bubbles[i].panel]
+    if (!poly) return acc
     const geo = tubeBetween(
-      bubbleRect(polys[i].bounds, bubbles[i]),
-      bubbleRect(polys[j].bounds, bubbles[j]),
+      bubbleRect(poly.bounds, bubbles[i]),
+      bubbleRect(poly.bounds, bubbles[j]),
     )
     if (geo) acc.push({ key: `${i}-${j}`, geo, visible: isVisible(i) && isVisible(j) })
     return acc

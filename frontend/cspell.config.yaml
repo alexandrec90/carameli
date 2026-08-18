@@ -48,6 +48,8 @@ words:
   # Font names
   - Pacifico
   - Lobster
+  - Boogaloo
+  - Fugaz
   # Design / motion terms
   - maximalism
   - maximalist
@@ -67,6 +69,24 @@ words:
   # British spellings used deliberately in prose (devkit upstream matches)
   - behaviour
   - behaviours
+  - neighbour
+  - neighbours
+  - normalised
+  - normalises
+  - parameterised
+  # Test-fixture shorthand (customer ids, vitest's unstubAllGlobals, distances)
+  - cust
+  - dists
+  - unstub
+  # Prefixed/compound forms used in the comic-book skin and its editor
+  - grabbable
+  - uncrop
+  - unclickable
+  - unclipped
+  - unclipping
+  - unclips
+  - unreviewed
+  - unrotated
   # Prefixed/compound forms used in the devkit plans
   - repoints
   - unadopted

@@ -40,6 +40,11 @@
   border-color: rgb(40 120 255 / 55%);
 }
 
+.cb-ed-target-img:hover {
+  background: rgb(40 200 160 / 12%);
+  border-color: rgb(40 200 160 / 60%);
+}
+
 .cb-ed-target-bubble:hover {
   background: rgb(255 140 0 / 10%);
   border-color: rgb(255 140 0 / 60%);
@@ -68,7 +73,7 @@
   touch-action: none;
 }
 
-/* Bottom-right corner: resize (bubble) / zoom (image). */
+/* Bottom-right corner: resize the bubble, or the picture's frame. */
 .cb-ed-handle-br {
   right: -8px;
   bottom: -8px;
@@ -82,6 +87,25 @@
   background: #ff8c00;
   border-radius: 50%;
   cursor: grab;
+}
+
+/* Top-left corner: pan the picture inside its frame (image only). Round, like the
+   rotate grip, because both move content rather than resize a box — and a colour of
+   its own, so a picture's two framings are never mistaken for each other. */
+.cb-ed-handle-pan {
+  left: -8px;
+  top: -8px;
+  background: #28c8a0;
+  border-radius: 50%;
+  cursor: grab;
+}
+
+/* A selected panel is only outlined — there is nothing about a grid slot to drag, so
+   it takes no pointer events and carries no handles. */
+.cb-ed-outline-panel {
+  border-style: dashed;
+  cursor: default;
+  pointer-events: none;
 }
 
 /* Toolbar pinned bottom-right. */
@@ -163,6 +187,7 @@
 }
 
 .cb-ed-select,
+.cb-ed-input,
 .cb-ed-textarea {
   width: 100%;
   box-sizing: border-box;
@@ -239,4 +264,27 @@
 
 .cb-ed-btn:active {
   background: #262630;
+}
+
+/* Destructive action (Delete bubble) — red enough to give pause, muted enough not to
+   compete with Save for the eye. */
+.cb-ed-btn-danger {
+  border-color: #a03a3a;
+  color: #ff9a9a;
+}
+
+.cb-ed-btn-danger:hover {
+  background: #4a2626;
+  border-color: #c04a4a;
+}
+
+/* "+ Bubble" with nothing selected: there is no panel to add it to. */
+.cb-ed-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.cb-ed-btn:disabled:hover {
+  background: #2e2e36;
+  border-color: #4a4a54;
 }

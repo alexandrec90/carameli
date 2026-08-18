@@ -4,22 +4,30 @@ import type { PointerEvent as ReactPointerEvent, WheelEvent as ReactWheelEvent }
 import type { PanelPoly } from '../Layout'
 import {
   BUBBLE_W,
+  IMG_FRAME,
   IMG_SCALE,
   dragBubble,
   dragImg,
+  dragImgFrame,
   resizeBubble,
+  resizeImgFrame,
   rotateBubble,
   scaleBubble,
   scaleImg,
+  sizeImgFrame,
 } from './transforms'
 import type { BubbleTransform, ImgTransform } from './types'
 import type { EditorModeApi } from './useEditorMode'
 
-/** What a pointer drag is doing to the selected target. */
-export type DragMode = 'move' | 'resize' | 'rotate'
+/**
+ * What a pointer drag is doing to the selected target.
+ *
+ * `move` and `pan` are two different gestures on a picture and used to be one: `move`
+ * slides the frame across the panel, `pan` slides the picture behind the frame. They
+ * were indistinguishable while a picture's frame *was* its panel and could not move.
+ */
+export type DragMode = 'move' | 'resize' | 'rotate' | 'pan'
 
-/** px-delta → scale-delta factor for the image corner resize handle. */
-const IMG_HANDLE_SCALE = 0.005
 /** px-delta → degree factor for the bubble rotate handle. */
 const BUBBLE_ROTATE_DEG = 0.5
 /** Wheel `deltaY` → scale-delta factor for image zoom. */
@@ -41,6 +49,37 @@ export interface OverlayInteraction {
   onPointerMove(e: ReactPointerEvent): void
   onPointerUp(e: ReactPointerEvent): void
   onWheel(e: ReactWheelEvent): void
+}
+
+/**
+ * Panel box the current selection is measured against: the box of the panel the
+ * selected entry *names*, never `panelPolys[selection.index]` — neither array lines up
+ * with the panels any more, since a panel may own several pictures and several
+ * bubbles. Getting this wrong scales a drag by another panel's dimensions, so it is
+ * resolved in one place for every input path.
+ */
+function selectionBounds(api: EditorModeApi, panelPolys: PanelPoly[]): PanelPoly['bounds'] | null {
+  const sel = api.selected
+  if (!sel) return null
+  const panel =
+    sel.kind === 'panel'
+      ? sel.index
+      : sel.kind === 'img'
+        ? api.config.images[sel.index]?.panel
+        : api.config.bubbles[sel.index]?.panel
+  return panel === undefined ? null : (panelPolys[panel]?.bounds ?? null)
+}
+
+/**
+ * True when a key event is the author typing into a field — the bubble text area, a
+ * number input, a dropdown. The shortcuts below are on `window`, so without this an
+ * arrow key meant to move the caret nudges the selection instead, and a typed `-`
+ * shrinks it.
+ */
+function isTypingTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false
+  if (target.isContentEditable) return true
+  return ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)
 }
 
 /**
@@ -75,16 +114,18 @@ export function useOverlayInteraction(
     const d = drag.current
     const sel = api.selected
     if (!d || d.id !== e.pointerId || !sel) return
-    const bounds = panelPolys[sel.index]?.bounds
+    const bounds = selectionBounds(api, panelPolys)
     if (!bounds) return
     const dx = e.clientX - d.startX
     const dy = e.clientY - d.startY
 
     if (sel.kind === 'img' && d.startImg) {
       const next =
-        d.mode === 'move'
+        d.mode === 'pan'
           ? dragImg(d.startImg, dx, dy)
-          : scaleImg(d.startImg, (dx + dy) * IMG_HANDLE_SCALE)
+          : d.mode === 'resize'
+            ? resizeImgFrame(d.startImg, dx, dy, bounds.w, bounds.h)
+            : dragImgFrame(d.startImg, dx, dy, bounds.w, bounds.h)
       api.setImg(sel.index, next)
     } else if (sel.kind === 'bubble' && d.startBubble) {
       const next =
@@ -107,39 +148,61 @@ export function useOverlayInteraction(
 
   const onWheel = (e: ReactWheelEvent) => {
     const sel = api.selected
-    if (!sel) return
-    if (sel.kind === 'img') {
-      api.setImg(sel.index, scaleImg(api.config.images[sel.index], -e.deltaY * WHEEL_SCALE))
-    } else {
-      api.setBubble(sel.index, scaleBubble(api.config.bubbles[sel.index], -e.deltaY * WHEEL_BUBBLE_W))
+    if (sel?.kind === 'img') {
+      const cur = api.config.images[sel.index]
+      if (cur) api.setImg(sel.index, scaleImg(cur, -e.deltaY * WHEEL_SCALE))
+    } else if (sel?.kind === 'bubble') {
+      const cur = api.config.bubbles[sel.index]
+      if (cur) api.setBubble(sel.index, scaleBubble(cur, -e.deltaY * WHEEL_BUBBLE_W))
     }
   }
 
-  // Keyboard: arrows nudge (Shift = 10px), +/- zoom/resize, Esc deselects.
+  // Keyboard: arrows nudge (Shift = 10px, Alt on a picture pans it inside its frame),
+  // +/- zoom or resize, Delete removes the selection, Esc deselects.
   useEffect(() => {
     const sel = api.selected
     if (!sel) return
 
     const onKey = (e: KeyboardEvent) => {
+      // The author typing into the inspector is not a shortcut. Without this an arrow
+      // key meant for the caret in the bubble text area moves the bubble instead.
+      if (isTypingTarget(e.target)) return
+
       const step = e.shiftKey ? 10 : 1
+      const bounds = selectionBounds(api, panelPolys)
       let handled = true
 
       if (sel.kind === 'img') {
         const cur = api.config.images[sel.index]
+        if (!cur || !bounds) return
+        // Alt pans the picture behind its frame; without it the frame itself moves.
+        const nudge = (dx: number, dy: number): ImgTransform =>
+          e.altKey ? dragImg(cur, dx, dy) : dragImgFrame(cur, dx, dy, bounds.w, bounds.h)
         switch (e.key) {
-          case 'ArrowLeft': api.setImg(sel.index, dragImg(cur, -step, 0)); break
-          case 'ArrowRight': api.setImg(sel.index, dragImg(cur, step, 0)); break
-          case 'ArrowUp': api.setImg(sel.index, dragImg(cur, 0, -step)); break
-          case 'ArrowDown': api.setImg(sel.index, dragImg(cur, 0, step)); break
-          case '+': case '=': api.setImg(sel.index, scaleImg(cur, IMG_SCALE.step)); break
-          case '-': case '_': api.setImg(sel.index, scaleImg(cur, -IMG_SCALE.step)); break
+          case 'ArrowLeft': api.setImg(sel.index, nudge(-step, 0)); break
+          case 'ArrowRight': api.setImg(sel.index, nudge(step, 0)); break
+          case 'ArrowUp': api.setImg(sel.index, nudge(0, -step)); break
+          case 'ArrowDown': api.setImg(sel.index, nudge(0, step)); break
+          // Alt sizes the frame; plain +/- zooms the picture inside it.
+          case '+': case '=':
+            api.setImg(
+              sel.index,
+              e.altKey ? sizeImgFrame(cur, IMG_FRAME.step) : scaleImg(cur, IMG_SCALE.step),
+            )
+            break
+          case '-': case '_':
+            api.setImg(
+              sel.index,
+              e.altKey ? sizeImgFrame(cur, -IMG_FRAME.step) : scaleImg(cur, -IMG_SCALE.step),
+            )
+            break
+          case 'Delete': case 'Backspace': api.deleteImg(sel.index); break
           case 'Escape': api.clear(); break
           default: handled = false
         }
-      } else {
+      } else if (sel.kind === 'bubble') {
         const cur = api.config.bubbles[sel.index]
-        const bounds = panelPolys[sel.index]?.bounds
-        if (!bounds) return
+        if (!cur || !bounds) return
         switch (e.key) {
           case 'ArrowLeft': api.setBubble(sel.index, dragBubble(cur, -step, 0, bounds.w, bounds.h)); break
           case 'ArrowRight': api.setBubble(sel.index, dragBubble(cur, step, 0, bounds.w, bounds.h)); break
@@ -147,9 +210,14 @@ export function useOverlayInteraction(
           case 'ArrowDown': api.setBubble(sel.index, dragBubble(cur, 0, step, bounds.w, bounds.h)); break
           case '+': case '=': api.setBubble(sel.index, scaleBubble(cur, BUBBLE_W.step)); break
           case '-': case '_': api.setBubble(sel.index, scaleBubble(cur, -BUBBLE_W.step)); break
+          case 'Delete': case 'Backspace': api.deleteBubble(sel.index); break
           case 'Escape': api.clear(); break
           default: handled = false
         }
+      } else {
+        // A selected panel has nothing to nudge — it is a slot, not a drawn thing.
+        if (e.key === 'Escape') api.clear()
+        else handled = false
       }
 
       if (handled) e.preventDefault()

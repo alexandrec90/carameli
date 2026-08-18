@@ -1,8 +1,7 @@
 import type { CSSProperties } from 'react'
 
-import { BUBBLE_ASPECT } from '../bubbleShape'
-import type { BubbleType } from './bubbleTypes'
-import type { ImgTransform, BubbleTransform, EditorConfig } from './types'
+import { BUBBLE_ASPECT } from '../bubbleBox'
+import type { ImgTransform, BubbleTransform } from './types'
 
 // ─── Interaction bounds (Phase 3) ───────────────────────────────────────────────
 
@@ -22,7 +21,11 @@ export function clamp(v: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, v))
 }
 
-/** Apply a pointer drag (px delta in viewport space) to an image transform. */
+/**
+ * Pan the picture *inside* its frame by a px drag. This is the second of an image's
+ * two framings: {@link dragImgFrame} moves the window, this slides the picture behind
+ * it. They were the same gesture back when the window was the panel and could not move.
+ */
 export function dragImg(t: ImgTransform, dxPx: number, dyPx: number): ImgTransform {
   return { ...t, offsetX: t.offsetX + dxPx, offsetY: t.offsetY + dyPx }
 }
@@ -92,11 +95,14 @@ export function anchorToFractions(anchor: string): [number, number] {
 /**
  * Full-source framing style: render the *entire* source image (no cover cropping),
  * scaled and positioned so that at identity (scale 1 / offset 0) it is pixel-identical
- * to {@link imgTransformStyle}'s `object-fit: cover` box. This is the panel image's
- * real geometry once its natural size is known: the panel polygon clip supplies the
- * comic-panel crop, so panning slides the picture under the panel window (re-framing
- * it) instead of moving a pre-cropped box — no source pixels are ever discarded. In
- * edit mode the selected image simply drops the clip, revealing the same geometry.
+ * to {@link imgTransformStyle}'s `object-fit: cover` box. This is the picture's real
+ * geometry once its natural size is known: the frame's polygon clip supplies the
+ * comic-panel crop, so panning slides the picture under the frame (re-framing it)
+ * instead of moving a pre-cropped box — no source pixels are ever discarded. In edit
+ * mode the selected image simply drops the clip, revealing the same geometry.
+ *
+ * `bounds` is the *frame* box, not the panel box: an inset picture covers its own
+ * frame, which is the whole point of the frame being the picture's own.
  *
  * Geometry: the cover box (`bounds`) renders the natural image (`nat`) at
  * `coverScale = max(bw/nw, bh/nh)`; this draws the natural image at that same
@@ -140,9 +146,10 @@ export function fullImgStyle(
 }
 
 /**
- * Style for the .cb-img-clip wrapper around a panel image. The panel polygon
- * clip-path is what crops the full-source image ({@link fullImgStyle}) into the
- * comic panel. `spill: true` drops the clip so the image pops out of its frame —
+ * Style for the .cb-img-clip wrapper around a panel image. The frame's polygon
+ * clip-path ({@link imgFramePoly}) is what crops the full-source image
+ * ({@link fullImgStyle}) into a comic panel. `spill: true` drops the clip so the
+ * image pops out of its frame —
  * z-index 4 lifts it above the panel-outline SVG (z-index 3) so the frame lines
  * don't cross it (panels themselves are z-index:auto, so children escape into the
  * root stacking context). The editor's full-reveal does the same unclipping while
@@ -155,8 +162,9 @@ export function imgClipStyle(spill: boolean, reveal: boolean, clip: string): CSS
 }
 
 /**
- * On-screen box of a panel's bubble. `top`/`right`/`width` are percentages of the
- * panel box, and the height follows the bubble's fixed aspect ratio — which is what
+ * On-screen box of a bubble, given the bounds of the panel it belongs to.
+ * `top`/`right`/`width` are percentages of that panel box, and the height follows the
+ * bubble's fixed aspect ratio — which is what
  * the DOM's `height: auto` resolves to, since the outline SVG carries a viewBox.
  *
  * Shared deliberately: the renderer needs it to aim connector tubes and the editor
@@ -189,55 +197,158 @@ export function bubbleStyle(b: BubbleTransform): CSSProperties {
   } as CSSProperties
 }
 
-// ─── Export (Phase 4) ──────────────────────────────────────────────────────────
+// Serialization back to layoutConfig.ts lives in ./serialize.ts.
 
-/** Round to `decimals` places, dropping float noise (e.g. 1.0000000002 → 1). */
-function round(n: number, decimals: number): number {
-  const f = 10 ** decimals
-  return Math.round(n * f) / f
-}
+// ─── Image frames ────────────────────────────────────────────────────────────────
+// A picture's frame is its own rectangle over the panel box, in % — not the panel
+// polygon it used to borrow. That is what lets a panel hold two pictures, and what
+// makes dragging one move its window instead of sliding the picture under a window
+// that never moved.
 
-/** A nullable bubble type as a TS literal — `null` unquoted, a type quoted. */
-function typeLiteral(t: BubbleType | null): string {
-  return t === null ? 'null' : `'${t}'`
+/** Frame size limits, in % of the panel box. */
+export const IMG_FRAME = { min: 5, max: 400, step: 1 }
+
+/** Convert a viewport-coord polygon to a CSS `polygon()`, relative to an origin. */
+export function toClipPath(pts: [number, number][], ox: number, oy: number): string {
+  return `polygon(${pts.map(([x, y]) => `${x - ox}px ${y - oy}px`).join(', ')})`
 }
 
 /**
- * Serialize a working {@link EditorConfig} into paste-ready TS matching
- * `layoutConfig.ts` (the two `export const` blocks only). Numbers are rounded for
- * clean output: image `scale` to 2 decimals, pixel offsets and bubble percentages to
- * integers, `rotate` to 1 decimal. Bubble `text` is JSON-escaped so quotes/newlines/
- * backslashes stay valid TS.
+ * A picture's frame in coordinates relative to its panel element — which is what the
+ * absolutely-positioned clip wrapper needs, since the panel element is itself placed at
+ * the panel's bounds.
  */
-export function serializeConfig(c: EditorConfig): string {
-  const imgLines = c.images
-    .map(
-      t =>
-        `  { scale: ${round(t.scale, 2)}, offsetX: ${Math.round(t.offsetX)}, ` +
-        `offsetY: ${Math.round(t.offsetY)}, anchor: '${t.anchor}', spill: ${t.spill} },`,
-    )
-    .join('\n')
-  const bubbleLines = c.bubbles
-    .map(
-      b =>
-        `  { top: ${Math.round(b.top)}, right: ${Math.round(b.right)}, ` +
-        `width: ${Math.round(b.width)}, rotate: ${round(b.rotate, 1)}, ` +
-        `spill: ${b.spill}, type: '${b.type}', text: ${JSON.stringify(b.text)}, ` +
-        `linkTo: ${b.linkTo}, hoverType: ${typeLiteral(b.hoverType)}, ` +
-        `clickType: ${typeLiteral(b.clickType)} },`,
-    )
-    .join('\n')
-  return (
-    `export const PANEL_IMG_TRANSFORMS: ImgTransform[] = [\n${imgLines}\n]\n\n` +
-    `export const PANEL_BUBBLE_TRANSFORMS: BubbleTransform[] = [\n${bubbleLines}\n]\n`
+export function imgFrameBox(
+  bounds: { w: number; h: number },
+  t: Pick<ImgTransform, 'left' | 'top' | 'width' | 'height'>,
+): { x: number; y: number; w: number; h: number } {
+  return {
+    x: (t.left / 100) * bounds.w,
+    y: (t.top / 100) * bounds.h,
+    w: (t.width / 100) * bounds.w,
+    h: (t.height / 100) * bounds.h,
+  }
+}
+
+/**
+ * The same frame in viewport coordinates — the editor's hit target and selection
+ * outline. Shared with {@link imgFrameBox} on purpose: when the box you can drag and
+ * the box that gets drawn disagree, the picture moves somewhere you did not click.
+ */
+export function imgRect(
+  bounds: { x: number; y: number; w: number; h: number },
+  t: Pick<ImgTransform, 'left' | 'top' | 'width' | 'height'>,
+): { x: number; y: number; w: number; h: number } {
+  const box = imgFrameBox(bounds, t)
+  return { x: bounds.x + box.x, y: bounds.y + box.y, w: box.w, h: box.h }
+}
+
+/**
+ * The frame's crop shape in viewport coordinates: the panel's own polygon, normalised
+ * against the panel box and scaled into the frame rect.
+ *
+ * Taking the panel's shape rather than a plain rectangle is what keeps this a comic.
+ * At the default full-panel frame it is the panel polygon exactly — a picture that has
+ * not been moved crops as it always did — and an inset picture reads as a small panel
+ * of its own, with the same slanted gutters as the grid around it.
+ *
+ * A zero-size panel box (first paint, before layout) has no shape to scale, so this
+ * returns no points rather than dividing by zero.
+ */
+export function imgFramePoints(
+  vp: [number, number][],
+  bounds: { x: number; y: number; w: number; h: number },
+  t: Pick<ImgTransform, 'left' | 'top' | 'width' | 'height'>,
+): [number, number][] {
+  if (bounds.w <= 0 || bounds.h <= 0) return []
+  const rect = imgRect(bounds, t)
+  return vp.map(
+    ([x, y]) =>
+      [
+        rect.x + ((x - bounds.x) / bounds.w) * rect.w,
+        rect.y + ((y - bounds.y) / bounds.h) * rect.h,
+      ] as [number, number],
   )
 }
 
 /**
- * Serialize a full, ready-to-write `editor/layoutConfig.ts` file: the type import
- * header plus the two `export const` blocks from {@link serializeConfig}. Used by the
- * editor's Save button, which POSTs this verbatim to the dev-only write endpoint.
+ * {@link imgFramePoints} as a `clip-path` relative to the frame wrapper — which is where
+ * the wrapper is placed, so the shape lands on the picture rather than beside it.
  */
-export function serializeConfigFile(c: EditorConfig): string {
-  return `import type { ImgTransform, BubbleTransform } from './types'\n\n${serializeConfig(c)}`
+export function imgFramePoly(
+  vp: [number, number][],
+  bounds: { x: number; y: number; w: number; h: number },
+  t: Pick<ImgTransform, 'left' | 'top' | 'width' | 'height'>,
+): string {
+  const pts = imgFramePoints(vp, bounds, t)
+  if (pts.length === 0) return 'none'
+  const rect = imgRect(bounds, t)
+  return toClipPath(pts, rect.x, rect.y)
+}
+
+/** Move a picture's frame by a px drag → % of the panel box. */
+export function dragImgFrame(
+  t: ImgTransform,
+  dxPx: number,
+  dyPx: number,
+  panelW: number,
+  panelH: number,
+): ImgTransform {
+  if (panelW <= 0 || panelH <= 0) return t
+  return {
+    ...t,
+    left: t.left + (dxPx / panelW) * 100,
+    top: t.top + (dyPx / panelH) * 100,
+  }
+}
+
+/**
+ * Grow/shrink a picture's frame by a delta in % of the panel box, both axes at once —
+ * the keyboard's `+`/`-`, where there is no drag direction to take two deltas from.
+ */
+export function sizeImgFrame(t: ImgTransform, deltaPct: number): ImgTransform {
+  return {
+    ...t,
+    width: clamp(t.width + deltaPct, IMG_FRAME.min, IMG_FRAME.max),
+    height: clamp(t.height + deltaPct, IMG_FRAME.min, IMG_FRAME.max),
+  }
+}
+
+/**
+ * Resize a picture's frame from its bottom-right corner by a px handle drag. The top
+ * left stays put, so the handle tracks the pointer.
+ */
+export function resizeImgFrame(
+  t: ImgTransform,
+  dWidthPx: number,
+  dHeightPx: number,
+  panelW: number,
+  panelH: number,
+): ImgTransform {
+  if (panelW <= 0 || panelH <= 0) return t
+  return {
+    ...t,
+    width: clamp(t.width + (dWidthPx / panelW) * 100, IMG_FRAME.min, IMG_FRAME.max),
+    height: clamp(t.height + (dHeightPx / panelH) * 100, IMG_FRAME.min, IMG_FRAME.max),
+  }
+}
+
+/** Inline style placing the .cb-img-clip wrapper on its frame within the panel. */
+export function imgFrameStyle(
+  bounds: { w: number; h: number },
+  t: Pick<ImgTransform, 'left' | 'top' | 'width' | 'height'>,
+): CSSProperties {
+  const box = imgFrameBox(bounds, t)
+  return { position: 'absolute', left: box.x, top: box.y, width: box.w, height: box.h }
+}
+
+/**
+ * True when a picture's frame is exactly its panel — the shipped default. The editor
+ * draws frame ink only around the ones that are not, since a full-panel frame would
+ * stroke the panel outline a second time along the identical path.
+ */
+export function isFullPanelFrame(
+  t: Pick<ImgTransform, 'left' | 'top' | 'width' | 'height'>,
+): boolean {
+  return t.left === 0 && t.top === 0 && t.width === 100 && t.height === 100
 }

@@ -1,79 +1,65 @@
 import { useCallback, useMemo, useState } from 'react'
 
 import { logger } from '../../../lib/logger'
-import { PANEL_IMG_TRANSFORMS, PANEL_BUBBLE_TRANSFORMS } from './layoutConfig'
+import {
+  CONFIG_KEY,
+  addBubble,
+  addImg,
+  hydrateConfig,
+  patchBubble,
+  patchImg,
+  removeBubble,
+  removeImg,
+  resetOneIn,
+  seedConfig,
+} from './configOps'
 import type { BubbleTransform, EditorConfig, ImgTransform } from './types'
 
-// ─── localStorage keys ─────────────────────────────────────────────────────────
+// The pure operations on a config live in ./configOps.ts; this module is the React
+// state around them — the edit flag, the working copy, the selection, persistence.
 
 const FLAG_KEY = 'comic-book:edit'
-const CONFIG_KEY = 'comic-book:editConfig'
+
+/**
+ * What a selection can be. `'panel'` is a slot in the grid and indexes PANELS; the
+ * other two index their own array in the config and are what the inspector edits.
+ *
+ * A panel is selectable at all because a picture no longer *is* its panel: adding one
+ * needs a panel to add it to, and an empty panel would otherwise be unclickable.
+ */
+export type SelectionKind = 'panel' | 'img' | 'bubble'
+
+/** A selectable thing: which array, and which entry of it. */
+export interface Selection {
+  kind: SelectionKind
+  index: number
+}
 
 export interface EditorModeApi {
   active: boolean
   config: EditorConfig
-  selected: { kind: 'img' | 'bubble'; index: number } | null
-  select(kind: 'img' | 'bubble', index: number): void
+  selected: Selection | null
+  select(kind: SelectionKind, index: number): void
   clear(): void
   setImg(index: number, patch: Partial<ImgTransform>): void
   setBubble(index: number, patch: Partial<BubbleTransform>): void
+  /** Append a picture on `panel` and select it. */
+  addImgOn(panel: number): void
+  /** Delete picture `index`, clearing the selection it leaves behind. */
+  deleteImg(index: number): void
+  /** Append a bubble on `panel` and select it. */
+  addBubbleOn(panel: number): void
+  /** Delete bubble `index`, clearing the selection it leaves behind. */
+  deleteBubble(index: number): void
   resetOne(kind: 'img' | 'bubble', index: number): void
   resetAll(): void
 }
 
-// ─── Pure helpers (unit-testable without React) ─────────────────────────────────
-
-/** Deep clone of the on-disk constants — the canonical "default" config. */
-export function seedConfig(): EditorConfig {
-  return {
-    images: PANEL_IMG_TRANSFORMS.map(t => ({ ...t })),
-    bubbles: PANEL_BUBBLE_TRANSFORMS.map(b => ({ ...b })),
-  }
-}
-
-/** Deep clone of an arbitrary config (no shared references with the input). */
-export function cloneConfig(c: EditorConfig): EditorConfig {
-  return {
-    images: c.images.map(t => ({ ...t })),
-    bubbles: c.bubbles.map(b => ({ ...b })),
-  }
-}
-
 /**
- * Build a config from a persisted JSON string. Falls back to {@link seedConfig}
- * for null, malformed JSON, or a structurally invalid payload — never throws.
- */
-export function hydrateConfig(raw: string | null): EditorConfig {
-  if (raw == null) return seedConfig()
-  try {
-    const parsed = JSON.parse(raw) as Partial<EditorConfig>
-    if (
-      !parsed ||
-      !Array.isArray(parsed.images) ||
-      !Array.isArray(parsed.bubbles) ||
-      parsed.images.length !== PANEL_IMG_TRANSFORMS.length ||
-      parsed.bubbles.length !== PANEL_BUBBLE_TRANSFORMS.length
-    ) {
-      return seedConfig()
-    }
-    // Backfill any fields missing from older payloads (pre-spill/type/text) by
-    // merging each entry over its seed default, so an upgrade never leaves undefined.
-    const seed = seedConfig()
-    return {
-      images: parsed.images.map((t, i) => ({ ...seed.images[i], ...t })),
-      bubbles: parsed.bubbles.map((b, i) => ({ ...seed.bubbles[i], ...b })),
-    }
-  } catch (err) {
-    logger.warn('Discarding malformed comic-book editor config', { key: CONFIG_KEY, err: String(err) })
-    return seedConfig()
-  }
-}
-
-/**
- * True when panel `index`'s image should render unclipped (a "full reveal") for
- * framing: the editor is active and that image is the current selection. Layout uses
- * this to drop the panel clip on the selected image so the whole picture stays visible
- * while you drag/zoom it — the panel outline still marks where the crop lands.
+ * True when picture `index` should render unclipped (a "full reveal") for framing: the
+ * editor is active and that picture is the current selection. PanelImages uses this to
+ * drop the frame clip on the selected picture so the whole of it stays visible while
+ * you drag/zoom it — the outline SVG still marks where the crop lands.
  */
 export function shouldRevealImg(
   active: boolean,
@@ -81,41 +67,6 @@ export function shouldRevealImg(
   index: number,
 ): boolean {
   return active && selected?.kind === 'img' && selected.index === index
-}
-
-/** Patch-merge a single image entry, returning a new config. */
-export function patchImg(
-  config: EditorConfig,
-  index: number,
-  patch: Partial<ImgTransform>,
-): EditorConfig {
-  const next = cloneConfig(config)
-  if (next.images[index]) next.images[index] = { ...next.images[index], ...patch }
-  return next
-}
-
-/** Patch-merge a single bubble entry, returning a new config. */
-export function patchBubble(
-  config: EditorConfig,
-  index: number,
-  patch: Partial<BubbleTransform>,
-): EditorConfig {
-  const next = cloneConfig(config)
-  if (next.bubbles[index]) next.bubbles[index] = { ...next.bubbles[index], ...patch }
-  return next
-}
-
-/** Restore a single entry to its constant default, returning a new config. */
-export function resetOneIn(
-  config: EditorConfig,
-  kind: 'img' | 'bubble',
-  index: number,
-): EditorConfig {
-  const next = cloneConfig(config)
-  const seed = seedConfig()
-  if (kind === 'img' && seed.images[index]) next.images[index] = seed.images[index]
-  if (kind === 'bubble' && seed.bubbles[index]) next.bubbles[index] = seed.bubbles[index]
-  return next
 }
 
 /**
@@ -160,8 +111,6 @@ function persist(config: EditorConfig): void {
   }
 }
 
-// ─── Hook ───────────────────────────────────────────────────────────────────────
-
 /**
  * Dev-only editor state for the comic-book skin. Holds a working copy of the panel
  * transforms (seeded from constants, persisted to localStorage), a current selection,
@@ -176,40 +125,85 @@ export function useEditorMode(): EditorModeApi {
   )
   const [selected, setSelected] = useState<EditorModeApi['selected']>(null)
 
-  const select = useCallback((kind: 'img' | 'bubble', index: number) => {
+  const select = useCallback((kind: SelectionKind, index: number) => {
     setSelected({ kind, index })
   }, [])
 
   const clear = useCallback(() => setSelected(null), [])
 
+  /** Apply a pure config operation, persisting whatever comes back. */
+  const apply = useCallback((op: (prev: EditorConfig) => EditorConfig) => {
+    setConfig(prev => {
+      const next = op(prev)
+      persist(next)
+      return next
+    })
+  }, [])
+
   const setImg = useCallback(
-    (index: number, patch: Partial<ImgTransform>) =>
-      setConfig(prev => {
-        const next = patchImg(prev, index, patch)
-        persist(next)
-        return next
-      }),
-    [],
+    (index: number, patch: Partial<ImgTransform>) => apply(prev => patchImg(prev, index, patch)),
+    [apply],
   )
 
   const setBubble = useCallback(
     (index: number, patch: Partial<BubbleTransform>) =>
-      setConfig(prev => {
-        const next = patchBubble(prev, index, patch)
-        persist(next)
+      apply(prev => patchBubble(prev, index, patch)),
+    [apply],
+  )
+
+  const addImgOn = useCallback(
+    (panel: number) => {
+      let added = -1
+      apply(prev => {
+        const { config: next, index } = addImg(prev, panel)
+        added = index
         return next
-      }),
-    [],
+      })
+      // The append is to the end, so the index is known without waiting for the state
+      // to commit — selecting it here is what puts the new picture in the inspector.
+      if (added >= 0) setSelected({ kind: 'img', index: added })
+    },
+    [apply],
+  )
+
+  const deleteImg = useCallback(
+    (index: number) => {
+      apply(prev => removeImg(prev, index))
+      // Every later picture shifts down one, so any surviving selection would now point
+      // at a different picture than the author was looking at. Drop it.
+      setSelected(null)
+    },
+    [apply],
+  )
+
+  const addBubbleOn = useCallback(
+    (panel: number) => {
+      let added = -1
+      apply(prev => {
+        const { config: next, index } = addBubble(prev, panel)
+        added = index
+        return next
+      })
+      // The append is to the end, so the index is known without waiting for the state
+      // to commit — selecting it here is what puts the new bubble in the inspector.
+      if (added >= 0) setSelected({ kind: 'bubble', index: added })
+    },
+    [apply],
+  )
+
+  const deleteBubble = useCallback(
+    (index: number) => {
+      apply(prev => removeBubble(prev, index))
+      // Every later bubble shifts down one, so any surviving selection would now point
+      // at a different bubble than the author was looking at. Drop it.
+      setSelected(null)
+    },
+    [apply],
   )
 
   const resetOne = useCallback(
-    (kind: 'img' | 'bubble', index: number) =>
-      setConfig(prev => {
-        const next = resetOneIn(prev, kind, index)
-        persist(next)
-        return next
-      }),
-    [],
+    (kind: 'img' | 'bubble', index: number) => apply(prev => resetOneIn(prev, kind, index)),
+    [apply],
   )
 
   const resetAll = useCallback(() => {
@@ -221,6 +215,7 @@ export function useEditorMode(): EditorModeApi {
       logger.warn('Could not clear comic-book editor config', { key: CONFIG_KEY, err: String(err) })
     }
     setConfig(seedConfig())
+    setSelected(null)
   }, [])
 
   return useMemo(
@@ -232,9 +227,27 @@ export function useEditorMode(): EditorModeApi {
       clear,
       setImg,
       setBubble,
+      addImgOn,
+      deleteImg,
+      addBubbleOn,
+      deleteBubble,
       resetOne,
       resetAll,
     }),
-    [active, config, selected, select, clear, setImg, setBubble, resetOne, resetAll],
+    [
+      active,
+      config,
+      selected,
+      select,
+      clear,
+      setImg,
+      setBubble,
+      addImgOn,
+      deleteImg,
+      addBubbleOn,
+      deleteBubble,
+      resetOne,
+      resetAll,
+    ],
   )
 }

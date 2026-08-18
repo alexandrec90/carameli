@@ -2,19 +2,32 @@ import { describe, expect, it } from 'vitest'
 
 import {
   BUBBLE_W,
+  IMG_FRAME,
   IMG_SCALE,
   ROTATE,
   clamp,
   dragBubble,
   dragImg,
+  dragImgFrame,
+  isFullPanelFrame,
   resizeBubble,
+  resizeImgFrame,
   rotateBubble,
   scaleBubble,
   scaleImg,
+  sizeImgFrame,
 } from '../../skins/comic-book/editor/transforms'
 import type { BubbleTransform, ImgTransform } from '../../skins/comic-book/editor/types'
 
+/** A picture at the shipped default: full-panel frame, identity framing inside it. */
 const img = (over: Partial<ImgTransform> = {}): ImgTransform => ({
+  panel: 0,
+  src: '/comic-book/logo.webp',
+  alt: 'Carameli',
+  left: 0,
+  top: 0,
+  width: 100,
+  height: 100,
   scale: 1,
   offsetX: 0,
   offsetY: 0,
@@ -24,12 +37,14 @@ const img = (over: Partial<ImgTransform> = {}): ImgTransform => ({
 })
 
 const bubble = (over: Partial<BubbleTransform> = {}): BubbleTransform => ({
+  panel: 0,
   top: -35,
   right: -12,
   width: 55,
   rotate: -5,
   spill: true,
   type: 'soft',
+  tail: 'down-left',
   text: 'hi',
   linkTo: null,
   hoverType: null,
@@ -60,6 +75,123 @@ describe('dragImg', () => {
     const base = img()
     dragImg(base, 5, 5)
     expect(base.offsetX).toBe(0)
+  })
+
+  // A picture has two independent framings now. This one slides the picture behind a
+  // window that stays put; dragImgFrame moves the window. Before the frame existed
+  // they were the same gesture, and that was the bug.
+  it('leaves the frame exactly where it was', () => {
+    const next = dragImg(img({ left: 20, top: 20, width: 55, height: 55 }), 40, 40)
+    expect([next.left, next.top, next.width, next.height]).toEqual([20, 20, 55, 55])
+  })
+})
+
+describe('dragImgFrame', () => {
+  it('converts a px drag to % of the panel box on each axis', () => {
+    const next = dragImgFrame(img({ left: 10, top: 10 }), 40, -15, 200, 100)
+    expect(next.left).toBe(30) // 10 + 40/200*100
+    expect(next.top).toBe(-5) // 10 + -15/100*100
+  })
+
+  it('leaves the frame size and the picture inside it alone', () => {
+    const next = dragImgFrame(img({ width: 55, height: 40, offsetX: 7, scale: 2 }), 20, 20, 200, 100)
+    expect(next.width).toBe(55)
+    expect(next.height).toBe(40)
+    expect(next.offsetX).toBe(7)
+    expect(next.scale).toBe(2)
+  })
+
+  // Deliberately unclamped: hanging a frame off an edge is how a picture bleeds into
+  // the gutter, and clamping to the panel would make that placement unreachable.
+  it('lets the frame travel off the panel in both directions', () => {
+    expect(dragImgFrame(img(), -300, -300, 200, 200).left).toBe(-150)
+    expect(dragImgFrame(img(), 600, 600, 200, 200).top).toBe(300)
+  })
+
+  it('is a no-op against a zero-size panel box rather than dividing by zero', () => {
+    const base = img({ left: 10, top: 10 })
+    expect(dragImgFrame(base, 40, 40, 0, 100)).toBe(base)
+    expect(dragImgFrame(base, 40, 40, 100, 0)).toBe(base)
+  })
+
+  it('does not mutate the input', () => {
+    const base = img({ left: 10 })
+    dragImgFrame(base, 40, 40, 200, 100)
+    expect(base.left).toBe(10)
+  })
+})
+
+describe('resizeImgFrame', () => {
+  it('converts a corner px drag to a width/height % on each axis separately', () => {
+    const next = resizeImgFrame(img({ width: 50, height: 50 }), 40, -25, 200, 100)
+    expect(next.width).toBe(70) // 50 + 40/200*100
+    expect(next.height).toBe(25) // 50 + -25/100*100
+  })
+
+  it('anchors the top-left, so the handle tracks the pointer', () => {
+    const next = resizeImgFrame(img({ left: 20, top: 30 }), 40, 40, 200, 200)
+    expect(next.left).toBe(20)
+    expect(next.top).toBe(30)
+  })
+
+  it('clamps to IMG_FRAME on both axes', () => {
+    expect(resizeImgFrame(img({ width: 50 }), 9999, 0, 200, 200).width).toBe(IMG_FRAME.max)
+    expect(resizeImgFrame(img({ height: 50 }), 0, -9999, 200, 200).height).toBe(IMG_FRAME.min)
+  })
+
+  it('is a no-op against a zero-size panel box', () => {
+    const base = img()
+    expect(resizeImgFrame(base, 40, 40, 0, 0)).toBe(base)
+  })
+})
+
+describe('sizeImgFrame', () => {
+  it('grows both axes by the same % — the keyboard has no drag direction', () => {
+    const next = sizeImgFrame(img({ width: 40, height: 60 }), 5)
+    expect(next.width).toBe(45)
+    expect(next.height).toBe(65)
+  })
+
+  it('shrinks on a negative delta and clamps at the floor', () => {
+    expect(sizeImgFrame(img({ width: 40, height: 40 }), -5).width).toBe(35)
+    expect(sizeImgFrame(img({ width: 6, height: 6 }), -50)).toMatchObject({
+      width: IMG_FRAME.min,
+      height: IMG_FRAME.min,
+    })
+  })
+
+  it('clamps at the ceiling', () => {
+    expect(sizeImgFrame(img({ width: 390, height: 390 }), 50).width).toBe(IMG_FRAME.max)
+  })
+
+  it('leaves the frame position and the picture inside it alone', () => {
+    const next = sizeImgFrame(img({ left: 12, top: -4, scale: 1.5, offsetX: 9 }), IMG_FRAME.step)
+    expect(next.left).toBe(12)
+    expect(next.top).toBe(-4)
+    expect(next.scale).toBe(1.5)
+    expect(next.offsetX).toBe(9)
+  })
+
+  it('accumulates repeated step deltas', () => {
+    let t = img({ width: 50, height: 50 })
+    for (let i = 0; i < 4; i++) t = sizeImgFrame(t, IMG_FRAME.step)
+    expect(t.width).toBeCloseTo(50 + IMG_FRAME.step * 4, 10)
+  })
+})
+
+describe('isFullPanelFrame', () => {
+  // The editor inks only the frames that are not full-panel: a full-panel one would
+  // stroke the panel outline a second time along the identical path.
+  it('is true for the shipped default and false once the frame moves or resizes', () => {
+    expect(isFullPanelFrame(img())).toBe(true)
+    expect(isFullPanelFrame(img({ left: 0.5 }))).toBe(false)
+    expect(isFullPanelFrame(img({ top: -1 }))).toBe(false)
+    expect(isFullPanelFrame(img({ width: 99 }))).toBe(false)
+    expect(isFullPanelFrame(img({ height: 101 }))).toBe(false)
+  })
+
+  it('ignores the framing inside the frame, which does not change the outline', () => {
+    expect(isFullPanelFrame(img({ scale: 2, offsetX: 40, anchor: 'left top' }))).toBe(true)
   })
 })
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { BUBBLE_ELLIPSE_N } from '../../skins/comic-book/bubbleShape'
+import { BUBBLE_ELLIPSE_N } from '../../skins/comic-book/bubbleBox'
 import {
   isBubbleRevealed,
   linkedPairs,
@@ -23,7 +23,8 @@ function firstPoint(d: string): [number, number] {
   return [Number(m[0]), Number(m[1])]
 }
 
-const link = (linkTo: number | null) => ({ linkTo })
+/** A bubble as the link/reveal helpers see it: which panel it is on, and its link. */
+const b = (panel: number, linkTo: number | null = null) => ({ panel, linkTo })
 
 describe('tubeBetween', () => {
   it('returns a fill and exactly two rails for a clear span', () => {
@@ -59,8 +60,8 @@ describe('tubeBetween', () => {
 
   it('sinks each mouth inside its bubble so the fill can cover the outline', () => {
     const a = box(0, 0)
-    const b = box(400, 0)
-    const { rails } = tubeBetween(a, b)!
+    const target = box(400, 0)
+    const { rails } = tubeBetween(a, target)!
     const [ax] = centre(a)
     const edge = a.w * BUBBLE_ELLIPSE_N.rx
     // The rail starts short of A's own edge — that overlap is what welds the joint.
@@ -70,8 +71,8 @@ describe('tubeBetween', () => {
 
   it('offsets the two rails to opposite sides of the run', () => {
     const a = box(0, 0)
-    const b = box(400, 0)
-    const { rails } = tubeBetween(a, b)!
+    const target = box(400, 0)
+    const { rails } = tubeBetween(a, target)!
     const [, ay] = centre(a)
     const y0 = firstPoint(rails[0])[1]
     const y1 = firstPoint(rails[1])[1]
@@ -102,27 +103,37 @@ describe('tubeBetween', () => {
 
 describe('linkedPairs', () => {
   it('finds one pair per declared link', () => {
-    expect(linkedPairs([link(1), link(null), link(null)])).toEqual([[0, 1]])
+    expect(linkedPairs([b(0, 1), b(0), b(0)])).toEqual([[0, 1]])
   })
 
   it('normalises a pair to ascending order regardless of which end declared it', () => {
-    expect(linkedPairs([link(null), link(null), link(0)])).toEqual([[0, 2]])
+    expect(linkedPairs([b(0), b(0), b(0, 0)])).toEqual([[0, 2]])
   })
 
   // Both rails would otherwise be stroked twice, which reads as a heavier line.
   it('collapses a mutual A→B / B→A declaration into one pair', () => {
-    expect(linkedPairs([link(1), link(0)])).toEqual([[0, 1]])
+    expect(linkedPairs([b(0, 1), b(0, 0)])).toEqual([[0, 1]])
   })
 
   it('ignores unlinked bubbles, self-links, and out-of-range indices', () => {
-    expect(linkedPairs([link(null), link(1), link(9), link(-1)])).toEqual([])
+    expect(linkedPairs([b(0), b(0, 1), b(0, 9), b(0, -1)])).toEqual([])
   })
 
   it('keeps several distinct links', () => {
-    expect(linkedPairs([link(1), link(null), link(3), link(null)])).toEqual([
+    expect(linkedPairs([b(0, 1), b(0), b(1, 3), b(1)])).toEqual([
       [0, 1],
       [2, 3],
     ])
+  })
+
+  // A tube between two panels would have to cross the gutter, and both ends are only
+  // ever on screen together by accident — hovering reveals one panel's bubbles.
+  it('drops a link whose ends sit on different panels', () => {
+    expect(linkedPairs([b(0, 1), b(1)])).toEqual([])
+  })
+
+  it('keeps the same-panel links when a cross-panel one is mixed in', () => {
+    expect(linkedPairs([b(0, 1), b(0), b(2, 3), b(5)])).toEqual([[0, 1]])
   })
 
   it('returns nothing for an empty config', () => {
@@ -131,26 +142,29 @@ describe('linkedPairs', () => {
 })
 
 describe('isBubbleRevealed', () => {
-  const bubbles = [link(1), link(null), link(null), link(null)]
+  // Two bubbles on panel 0, one on panel 1, one on panel 3.
+  const bubbles = [b(0), b(0), b(1), b(3)]
 
   it('reveals nothing when no panel is hovered', () => {
     expect(isBubbleRevealed(bubbles, null, false, 0)).toBe(false)
   })
 
-  it('reveals the hovered panel’s own bubble', () => {
+  it('reveals a bubble when its own panel is hovered', () => {
     expect(isBubbleRevealed(bubbles, 0, false, 0)).toBe(true)
   })
 
-  it('reveals the link partner too, so the tube is never left dangling', () => {
+  it('reveals every bubble the hovered panel owns, not just the first', () => {
     expect(isBubbleRevealed(bubbles, 0, false, 1)).toBe(true)
   })
 
-  it('reveals symmetrically — hovering the end that declared nothing still works', () => {
-    expect(isBubbleRevealed(bubbles, 1, false, 0)).toBe(true)
+  it('leaves the other panels’ bubbles hidden', () => {
+    expect(isBubbleRevealed(bubbles, 0, false, 2)).toBe(false)
+    expect(isBubbleRevealed(bubbles, 1, false, 0)).toBe(false)
   })
 
-  it('leaves unrelated bubbles hidden', () => {
-    expect(isBubbleRevealed(bubbles, 0, false, 2)).toBe(false)
+  it('reveals nothing for a panel that owns no bubble', () => {
+    expect(isBubbleRevealed(bubbles, 2, false, 0)).toBe(false)
+    expect(isBubbleRevealed(bubbles, 2, false, 3)).toBe(false)
   })
 
   it('reveals everything in edit mode so every bubble is selectable', () => {
@@ -158,6 +172,6 @@ describe('isBubbleRevealed', () => {
   })
 
   it('tolerates an index with no bubble', () => {
-    expect(isBubbleRevealed(bubbles, 9, false, 0)).toBe(false)
+    expect(isBubbleRevealed(bubbles, 0, false, 9)).toBe(false)
   })
 })
