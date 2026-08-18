@@ -114,8 +114,22 @@ and differing only in a radial modulation. That shared ring is the load-bearing
 constraint — it is what lets any shape interpolate vertex-for-vertex into any other,
 so a hover or click **morphs** rather than crossfades.
 
+There are **three** types, and each one earns its place by being unmistakable at a
+glance:
+
+| Type | Outline | Why it is shaped that way |
+| --- | --- | --- |
+| `soft` | the bare ellipse | speech; 64 straight segments read as smooth |
+| `cloud` | union of 8 overlapping lobes | a thought bubble is *meshed ellipses*, so its lobe junctions cut back **inside** the base ellipse. A modulation that only bulged outward read as a scalloped balloon |
+| `lightning` | 8 triangular spikes | action; valley → straight climb → straight fall, so every turn is a corner. Crown height, valley depth and the crown's offset within its period are each jittered, because evenly spaced identical spikes read as a **sun** |
+
+A fourth "shout" type used to sit beside `lightning` and was removed: it was the same
+spiky drawing at a lower amplitude, so nothing in the panel or the editor dropdown
+distinguished them. Loud lettering, not a fourth outline, is what makes a shout.
+
 - **A new bubble type is a new entry in `SHAPES`**, not new artwork. Two images can
-  only crossfade, which is exactly what this replaced.
+  only crossfade, which is exactly what this replaced. Before adding one, say what it
+  reads as that the three above do not.
 - **Never change the ring's vertex count for one type.** A type with a different
   count silently breaks every morph into and out of it.
 - `bubbleTypes.ts` carries only the lettering font and label per type. **No `src`

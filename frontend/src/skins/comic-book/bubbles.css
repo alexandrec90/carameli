@@ -108,7 +108,7 @@
 
 /* The outline SVG carries a viewBox, so height:auto resolves to the fixed bubble
    aspect ratio (also set inline from BUBBLE_VIEW, the one source of truth for it).
-   overflow:visible lets a jagged spike cross the viewBox edge without being cut. */
+   overflow:visible lets an action spike cross the viewBox edge without being cut. */
 .cb-panel-bubble-svg {
   display: block;
   width: 100%;

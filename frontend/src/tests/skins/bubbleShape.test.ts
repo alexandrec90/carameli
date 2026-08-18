@@ -28,6 +28,50 @@ function commands(d: string): string[] {
   return d.match(/[A-Za-z]/g) ?? []
 }
 
+/** The base ellipse in BUBBLE_VIEW units — the yardstick every radius is read against. */
+const BASE = {
+  cx: BUBBLE_VIEW.w * BUBBLE_ELLIPSE_N.cx,
+  cy: BUBBLE_VIEW.h * BUBBLE_ELLIPSE_N.cy,
+  rx: BUBBLE_VIEW.w * BUBBLE_ELLIPSE_N.rx,
+  ry: BUBBLE_VIEW.h * BUBBLE_ELLIPSE_N.ry,
+} as const
+
+/**
+ * Each vertex's radius in units of the base ellipse: 1 sits exactly on it, above 1
+ * bulges out, below 1 cuts in. Reading shapes this way makes "meshed" and "spiky"
+ * assertable without exporting the private modulation functions.
+ */
+function radii(type: BubbleType): number[] {
+  return pairs(ringPoints(type)).map(([x, y]) =>
+    Math.hypot((x - BASE.cx) / BASE.rx, (y - BASE.cy) / BASE.ry),
+  )
+}
+
+/**
+ * The tail vertex is yanked far off the ring (radius ≈ 1.8), so it would read as a
+ * spike in any outline analysis. Replace it with the mean of its neighbors, which
+ * is where it sits on a tailless type anyway.
+ */
+function withoutTail(r: number[]): number[] {
+  const i = r.indexOf(Math.max(...r))
+  if (r[i] < 1.5) return r
+  const out = [...r]
+  out[i] = (r[(i + r.length - 1) % r.length] + r[(i + 1) % r.length]) / 2
+  return out
+}
+
+/** Indices of the cyclic local maxima of `r` — one per lobe crown or spike tip. */
+function crests(r: number[]): number[] {
+  return r
+    .map((_, i) => i)
+    .filter(i => r[i] > r[(i + r.length - 1) % r.length] && r[i] >= r[(i + 1) % r.length])
+}
+
+/** Largest step between adjacent vertices — how abruptly the outline turns. */
+function steepestStep(r: number[]): number {
+  return Math.max(...r.map((v, i) => Math.abs(r[(i + 1) % r.length] - v)))
+}
+
 describe('ringPoints', () => {
   it('emits RING_POINTS vertices for every type', () => {
     BUBBLE_TYPE_KEYS.forEach(type => {
@@ -69,41 +113,71 @@ describe('ringPoints', () => {
   })
 
   it('puts every soft vertex on the base ellipse except the tail', () => {
-    const cx = BUBBLE_VIEW.w * BUBBLE_ELLIPSE_N.cx
-    const cy = BUBBLE_VIEW.h * BUBBLE_ELLIPSE_N.cy
-    const rx = BUBBLE_VIEW.w * BUBBLE_ELLIPSE_N.rx
-    const ry = BUBBLE_VIEW.h * BUBBLE_ELLIPSE_N.ry
     const offEllipse = pairs(ringPoints('soft')).filter(([x, y]) => {
-      const r = ((x - cx) / rx) ** 2 + ((y - cy) / ry) ** 2
+      const r = ((x - BASE.cx) / BASE.rx) ** 2 + ((y - BASE.cy) / BASE.ry) ** 2
       return Math.abs(r - 1) > 1e-6
     })
     expect(offEllipse).toHaveLength(1)
     // …and that one is the tail, hanging below and left of centre.
-    expect(offEllipse[0][1]).toBeGreaterThan(cy + ry)
-    expect(offEllipse[0][0]).toBeLessThan(cx)
+    expect(offEllipse[0][1]).toBeGreaterThan(BASE.cy + BASE.ry)
+    expect(offEllipse[0][0]).toBeLessThan(BASE.cx)
   })
 
-  it('grows a tail for soft/jagged/lightning and none for cloud', () => {
-    const cy = BUBBLE_VIEW.h * BUBBLE_ELLIPSE_N.cy
-    const ry = BUBBLE_VIEW.h * BUBBLE_ELLIPSE_N.ry
+  it('grows a tail for soft and lightning and none for cloud', () => {
     const lowest = (type: BubbleType): number =>
       Math.max(...pairs(ringPoints(type)).map(([, y]) => y))
-    expect(lowest('soft')).toBeGreaterThan(cy + ry * 1.5)
-    expect(lowest('jagged')).toBeGreaterThan(cy + ry * 1.5)
-    expect(lowest('lightning')).toBeGreaterThan(cy + ry * 1.5)
+    expect(lowest('soft')).toBeGreaterThan(BASE.cy + BASE.ry * 1.5)
+    expect(lowest('lightning')).toBeGreaterThan(BASE.cy + BASE.ry * 1.5)
     // A thought bubble trails puffs instead, so its ring stops near the ellipse.
-    expect(lowest('cloud')).toBeLessThan(cy + ry * 1.3)
+    expect(lowest('cloud')).toBeLessThan(BASE.cy + BASE.ry * 1.3)
   })
 
-  it('bulges cloud outward only, never pinching inside the base ellipse', () => {
-    const cx = BUBBLE_VIEW.w * BUBBLE_ELLIPSE_N.cx
-    const cy = BUBBLE_VIEW.h * BUBBLE_ELLIPSE_N.cy
-    const rx = BUBBLE_VIEW.w * BUBBLE_ELLIPSE_N.rx
-    const ry = BUBBLE_VIEW.h * BUBBLE_ELLIPSE_N.ry
-    pairs(ringPoints('cloud')).forEach(([x, y]) => {
-      const r = ((x - cx) / rx) ** 2 + ((y - cy) / ry) ** 2
-      expect(r).toBeGreaterThanOrEqual(1 - 1e-9)
-    })
+  // A cloud is a union of overlapping ellipses, so its junctions are *concave* and
+  // cut inside the base ellipse. The scalloped balloon this replaced bulged outward
+  // only, and that is exactly why it read as soft rather than as a cloud.
+  it('meshes the cloud lobes: crowns bulge out, junctions cut back inside', () => {
+    const r = radii('cloud')
+    expect(Math.max(...r)).toBeGreaterThan(1.1)
+    expect(Math.min(...r)).toBeLessThan(0.97)
+  })
+
+  it('spaces the cloud crowns evenly, one lobe per eight vertices', () => {
+    const found = crests(radii('cloud'))
+    expect(found).toHaveLength(8)
+    found.forEach(i => expect(i % (RING_POINTS / 8)).toBe(0))
+  })
+
+  // Spikes are triangles, so the outline can climb from a valley to a crown in a
+  // single segment. A cosine of the same amplitude cannot: it spreads that climb
+  // over a quarter period, which is what made the old burst look soft.
+  it('turns lightning corners abruptly rather than cresting a cosine', () => {
+    const r = withoutTail(radii('lightning'))
+    expect(steepestStep(r)).toBeGreaterThan(0.25)
+    expect(steepestStep(radii('cloud'))).toBeLessThan(0.1)
+  })
+
+  it('gives lightning eight spikes of differing height', () => {
+    const r = withoutTail(radii('lightning'))
+    const heights = crests(r).map(i => r[i])
+    expect(heights).toHaveLength(8)
+    // Uneven: the crowns span a visible range rather than all reaching one radius.
+    expect(Math.max(...heights) - Math.min(...heights)).toBeGreaterThan(0.05)
+    expect(new Set(heights.map(h => h.toFixed(2))).size).toBeGreaterThan(3)
+    // …and the tail really was masked out, or this would be ≈ 1.8.
+    expect(Math.max(...heights)).toBeLessThan(1.3)
+  })
+
+  // A sun is the failure mode to avoid: evenly spaced, identical, symmetric rays.
+  // Both properties below hold for a sun and must not hold here.
+  it('leans lightning spikes unevenly so it cannot read as a sun', () => {
+    const r = withoutTail(radii('lightning'))
+    const period = RING_POINTS / 8
+    // Not periodic: rotating by one spike does not map the outline onto itself.
+    const drift = Math.max(...r.map((v, i) => Math.abs(v - r[(i + period) % r.length])))
+    expect(drift).toBeGreaterThan(0.05)
+    // Not symmetric within a spike: crowns sit at different offsets in their period.
+    const offsets = new Set(crests(r).map(i => i % period))
+    expect(offsets.size).toBeGreaterThan(1)
   })
 
   it('is deterministic, jittered lightning included', () => {
@@ -149,7 +223,7 @@ describe('lerpPoints', () => {
   })
 
   it('preserves length when morphing between two real shapes', () => {
-    const mid = lerpPoints(ringPoints('soft'), ringPoints('jagged'), 0.5)
+    const mid = lerpPoints(ringPoints('soft'), ringPoints('lightning'), 0.5)
     expect(mid).toHaveLength(RING_POINTS * 2)
     mid.forEach(n => expect(Number.isFinite(n)).toBe(true))
   })
@@ -171,16 +245,15 @@ describe('puffOpacity', () => {
   it('shows the trailing puffs for cloud only', () => {
     expect(puffOpacity('cloud')).toBe(1)
     expect(puffOpacity('soft')).toBe(0)
-    expect(puffOpacity('jagged')).toBe(0)
     expect(puffOpacity('lightning')).toBe(0)
   })
 
   it('trails the puffs below and left of the ellipse, tapering away', () => {
-    const radii = CLOUD_PUFFS.map(p => p.r)
-    expect(radii).toEqual([...radii].sort((a, b) => b - a))
+    const radiiOf = CLOUD_PUFFS.map(p => p.r)
+    expect(radiiOf).toEqual([...radiiOf].sort((a, b) => b - a))
     CLOUD_PUFFS.forEach(p => {
-      expect(p.cy).toBeGreaterThan(BUBBLE_VIEW.h * BUBBLE_ELLIPSE_N.cy)
-      expect(p.cx).toBeLessThan(BUBBLE_VIEW.w * BUBBLE_ELLIPSE_N.cx)
+      expect(p.cy).toBeGreaterThan(BASE.cy)
+      expect(p.cx).toBeLessThan(BASE.cx)
     })
   })
 })
@@ -205,9 +278,9 @@ describe('resolveBubbleShape', () => {
   })
 
   it('falls back to the resting shape when that event has none configured', () => {
-    const plain = { type: 'jagged' as BubbleType, hoverType: null, clickType: null }
-    expect(resolveBubbleShape(plain, { hover: true, pulsing: false })).toBe('jagged')
-    expect(resolveBubbleShape(plain, { hover: true, pulsing: true })).toBe('jagged')
+    const plain = { type: 'lightning' as BubbleType, hoverType: null, clickType: null }
+    expect(resolveBubbleShape(plain, { hover: true, pulsing: false })).toBe('lightning')
+    expect(resolveBubbleShape(plain, { hover: true, pulsing: true })).toBe('lightning')
   })
 
   it('falls through a missing click shape to the hover shape', () => {
