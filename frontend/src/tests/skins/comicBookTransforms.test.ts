@@ -314,7 +314,9 @@ describe('BUBBLE_TYPES', () => {
   })
 
   it('lists every registry key in display order', () => {
-    expect(BUBBLE_TYPE_KEYS).toEqual(['soft', 'cloud', 'lightning', 'jagged'])
+    // Three shapes, not four: a "shout" balloon was the action burst redrawn a
+    // shade smaller, indistinguishable in the dropdown and in the panel.
+    expect(BUBBLE_TYPE_KEYS).toEqual(['soft', 'cloud', 'lightning'])
     expect(BUBBLE_TYPE_KEYS).toHaveLength(Object.keys(BUBBLE_TYPES).length)
   })
 })

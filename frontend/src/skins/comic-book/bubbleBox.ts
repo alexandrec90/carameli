@@ -7,7 +7,7 @@
 // sideways runs past the viewBox edge: the box is padded below the ellipse and barely
 // anywhere else, because it was drawn when the tail could only hang bottom-left.
 // Ink outside the viewBox still renders — `.cb-panel-bubble-svg` sets
-// `overflow: visible`, which is what already lets a `jagged` spike cross the edge —
+// `overflow: visible`, which is what already lets a `lightning` spike cross the edge —
 // so the reach below is honoured in every direction rather than clamped to a box that
 // happens to be tight on three sides. Growing the box instead would move every bubble
 // on the page, since placement is measured against the box, not the balloon.
