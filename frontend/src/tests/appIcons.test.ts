@@ -42,7 +42,7 @@ describe('manifest.json icons', () => {
     }
   })
 
-  test('ships a maskable icon so Android does not crop the wordmark', () => {
+  test('ships a maskable icon so Android does not crop the letters', () => {
     const maskable = manifest.icons.filter(
       (icon) => ('purpose' in icon ? icon.purpose : undefined)?.split(' ').includes('maskable'),
     )

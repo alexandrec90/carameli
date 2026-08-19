@@ -100,11 +100,13 @@ Run focused verification for changed behavior. Typical commands:
 python scripts/lint-all.py --changed
 python scripts/run-tests.py --changed
 npm --prefix frontend run test:run
-npm --prefix frontend run lint:types
+npm --prefix frontend run lint
 ```
 
 The frontend has no `typecheck` script; type checking is `lint:types`
-(`tsc --noEmit`), which `npm --prefix frontend run lint` also runs.
+(`tsc --noEmit`). Run the whole `lint` rather than that one part: it also chains
+`lint:eslint`, `lint:css` and `lint:spelling`, and cspell rejects unknown words in
+`.ts`/`.tsx` too, so an ordinary identifier fails CI having passed `lint:types`.
 
 The default pytest configuration excludes every `paid` test. Sandbox, chargeable,
 and live-provider tiers require explicit opt-in; never broaden a free aggregate to
