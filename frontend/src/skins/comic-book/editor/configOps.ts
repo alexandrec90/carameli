@@ -1,6 +1,8 @@
 import { logger } from '../../../lib/logger'
+import { isTailDir } from '../bubbleBox'
 import { PANELS } from '../panels'
 import { PANEL_ASSETS } from './assets'
+import { isBubbleType } from './bubbleTypes'
 import { PANEL_IMG_TRANSFORMS, PANEL_BUBBLE_TRANSFORMS } from './layoutConfig'
 import type { BubbleTransform, EditorConfig, ImgTransform } from './types'
 
@@ -84,6 +86,46 @@ export function sanitizeLinks(bubbles: BubbleTransform[]): BubbleTransform[] {
 }
 
 /**
+ * Replace every shape or tail name a bubble carries that no longer exists.
+ *
+ * A working copy is written against the registries of the day it was saved, and both
+ * shrink: `jagged` was a fourth bubble type once, and a config still naming it came
+ * back through {@link hydrateConfig} untouched — the payload is cast into
+ * `BubbleTransform`, never checked against it. Every consumer then indexes a
+ * `Record` with that dead name, and `SHAPES[type]` being `undefined` takes down the
+ * whole page from a destructure in `ringPoints`, not just the one balloon.
+ *
+ * A retired resting `type` becomes `soft` — a bubble must be *some* shape, and the
+ * plain ellipse is the one that asserts least about what the author meant. A retired
+ * `hoverType`/`clickType` becomes `null`, which those fields already spell as "stay as
+ * you are", so the bubble simply stops morphing on that event. A retired `tail` becomes
+ * `'none'`, its own no-op. In each case the words, the placement and every other
+ * property survive: the author loses the one attribute that no longer has a meaning.
+ */
+function coerceBubbleEnums(b: BubbleTransform): BubbleTransform {
+  const dropped: Record<string, unknown> = {}
+  const next = { ...b }
+  if (!isBubbleType(next.type)) {
+    dropped.type = next.type
+    next.type = 'soft'
+  }
+  for (const field of ['hoverType', 'clickType'] as const) {
+    if (next[field] !== null && !isBubbleType(next[field])) {
+      dropped[field] = next[field]
+      next[field] = null
+    }
+  }
+  if (!isTailDir(next.tail)) {
+    dropped.tail = next.tail
+    next.tail = 'none'
+  }
+  if (Object.keys(dropped).length > 0) {
+    logger.warn('Dropped retired comic-book bubble attributes', { key: CONFIG_KEY, dropped })
+  }
+  return next
+}
+
+/**
  * Pull an entry's `panel` back into the panel list. A panel index from an older
  * payload — or from a config hand-edited against a different grid — can outrun it, and
  * clamping beats an entry that renders nowhere and so cannot be selected to be fixed.
@@ -135,8 +177,13 @@ export function hydrateConfig(raw: string | null): EditorConfig {
       bubbles: sanitizeLinks(
         parsed.bubbles.map(b =>
           // Cast because a persisted payload predates whatever fields were added since,
-          // whatever the declared type says it holds.
-          clampPanel({ panel: 0, ...NEW_BUBBLE, ...(b as Partial<BubbleTransform>) }),
+          // whatever the declared type says it holds. `coerceBubbleEnums` is the other
+          // half of that: the payload also *outlives* names that have since been
+          // retired, and merging over NEW_BUBBLE cannot catch one because the field is
+          // present, just no longer meaningful.
+          coerceBubbleEnums(
+            clampPanel({ panel: 0, ...NEW_BUBBLE, ...(b as Partial<BubbleTransform>) }),
+          ),
         ),
       ),
     }
