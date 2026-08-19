@@ -71,6 +71,7 @@ words:
   - behaviours
   - neighbour
   - neighbours
+  - normalised
   - normalises
   - parameterised
   # Test-fixture shorthand (customer ids, vitest's unstubAllGlobals, distances)
@@ -80,9 +81,11 @@ words:
   # Prefixed/compound forms used in the comic-book skin and its editor
   - grabbable
   - uncrop
+  - unclickable
   - unclipped
   - unclipping
   - unclips
+  - unreviewed
   - unrotated
   # Prefixed/compound forms used in the devkit plans
   - repoints

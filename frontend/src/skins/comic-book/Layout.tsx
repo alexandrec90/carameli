@@ -4,8 +4,10 @@ import type { LayoutProps } from '../types'
 import { isBubbleRevealed } from './bubbleTube'
 import BubbleTubes from './BubbleTubes'
 import PanelBubbles from './PanelBubbles'
+import PanelImages from './PanelImages'
+import { PANELS } from './panels'
 import { PANEL_IMG_TRANSFORMS, PANEL_BUBBLE_TRANSFORMS } from './editor/layoutConfig'
-import { imgTransformStyle, fullImgStyle, imgClipStyle } from './editor/transforms'
+import { imgFramePoints, isFullPanelFrame, toClipPath } from './editor/transforms'
 import { shouldRevealImg, useEditorMode } from './editor/useEditorMode'
 import {
     drawLoadingRipple, drawWash, parseCssColor, washPhaseAt,
@@ -643,13 +645,6 @@ function computeLayout(w: number, h: number): PanelPoly[] {
     return computeSquareLayout(w, h)
 }
 
-// ─── Clip-path string builder ─────────────────────────────────────────────────
-
-/** Convert viewport-coord polygon to a CSS clip-path polygon(), offset by origin. */
-function toClipPath(pts: [number, number][], ox: number, oy: number): string {
-    return `polygon(${pts.map(([x, y]) => `${x - ox}px ${y - oy}px`).join(', ')})`
-}
-
 // ─── Page-accent map ─────────────────────────────────────────────────────────
 
 const PAGE_ACCENT: Record<string, string> = {
@@ -662,33 +657,19 @@ function accentForPath(path: string): string {
     return PAGE_ACCENT[path] ?? '#00AEEF'
 }
 
-// ─── Panel image manifest ─────────────────────────────────────────────────────
-
-interface PanelImage {
-    src: string
-    alt: string
-    isLogo: boolean
-    path: string | null
-}
-
-const PANEL_IMAGES: PanelImage[] = [
-    { src: '/comic-book/logo.webp', alt: 'Carameli', isLogo: true, path: '/' },          // 0
-    { src: '/comic-book/switchboard.webp', alt: 'Switchboard', isLogo: false, path: '/phone-lines' }, // 1
-    { src: '/comic-book/mailman1.webp', alt: 'Mail carrier', isLogo: false, path: '/' },           // 2
-    { src: '/comic-book/mechanic.webp', alt: 'Mechanic', isLogo: false, path: '/extensions' }, // 3
-    { src: '/comic-book/receptionist.webp', alt: 'Receptionist', isLogo: false, path: '/phone-lines' }, // 4
-    { src: '/comic-book/rolodex.webp', alt: 'Rolodex', isLogo: false, path: '/extensions' }, // 5
-    { src: '/comic-book/rotary%20phone.webp', alt: 'Rotary phone', isLogo: false, path: '/phone-lines' }, // 6
-    { src: '/comic-book/mailman2.webp', alt: 'Post office', isLogo: false, path: '/' },           // 7
-]
-
-// ─── Panel speech bubbles ───────────────────────────────────────────────────
-// Content (type + text), placement, tail direction, event morph targets and links
-// all come from PANEL_BUBBLE_TRANSFORMS in editor/layoutConfig.ts (the source of
-// truth). That array is NOT parallel to PANEL_IMAGES: each bubble names its own
-// `panel`, so a panel may own several or none, and PanelBubbles.tsx filters. The
-// outline is generated vector geometry (bubbleShape.ts) drawn by PanelBubble.tsx;
-// connector tubes between linked bubbles are drawn by BubbleTubes.tsx.
+// ─── Panel contents ─────────────────────────────────────────────────────────
+// A panel is a slot in the grid and nothing more: its label, whether it is the logo
+// and where it navigates live in PANELS (./panels.ts), index-parallel to the polygons
+// computeLayout returns.
+//
+// What is *drawn* in a panel is not parallel to anything. Pictures come from
+// PANEL_IMG_TRANSFORMS and bubbles from PANEL_BUBBLE_TRANSFORMS (both in
+// editor/layoutConfig.ts, the source of truth); each entry names the `panel` it sits
+// on, so a panel may own several or none, and PanelImages.tsx / PanelBubbles.tsx
+// filter. A picture carries its own frame over the panel box, which is what lets two
+// of them share a panel. A bubble's outline is generated vector geometry
+// (bubbleShape.ts) drawn by PanelBubble.tsx; connector tubes between linked bubbles
+// are drawn by BubbleTubes.tsx.
 
 // ─── Dev-only editor overlay (lazy) ────────────────────────────────────────────
 // Gated on import.meta.env.DEV at module scope: in a production build this static
@@ -722,12 +703,12 @@ export function Layout({ navItems }: LayoutProps) {
             ? []
             : computeLayout(window.innerWidth, window.innerHeight)
     )
-    // Natural (intrinsic) pixel size of each loaded panel image, captured on load.
-    // Drives fullImgStyle (the real panel framing); null until the img loads, during
-    // which the equivalent object-fit:cover fallback renders.
-    const [natSizes, setNatSizes] = useState<({ w: number; h: number } | null)[]>(
-        () => PANEL_IMAGES.map(() => null),
-    )
+    // Natural (intrinsic) pixel size of each loaded source, captured on load and keyed
+    // by `src`. Drives fullImgStyle (the real framing); absent until the img loads,
+    // during which the equivalent object-fit:cover fallback renders. Keyed by source
+    // rather than by index because two pictures may be the same file, and the second
+    // should not have to wait for its own load to learn a size already known.
+    const [natSizes, setNatSizes] = useState<Record<string, { w: number; h: number }>>({})
     // True once every panel image has loaded or errored.
     const [ready, setReady] = useState(false)
     // 0 on first visit (no cache), 400 on return visits (assets likely cached).
@@ -750,9 +731,18 @@ export function Layout({ navItems }: LayoutProps) {
     const bubbleVisible = (i: number): boolean =>
         isBubbleRevealed(bubbleT, hovered, editor.active, i)
 
+    // One tick per picture element that has loaded or failed. Counted against the
+    // number of pictures actually on the page, which the author can now change — a
+    // fixed 8 would leave the page hidden behind the loader the moment one was deleted.
+    const imgCount = imgT.length
     const markSettled = useCallback(() => {
         settledCountRef.current += 1
-        if (settledCountRef.current >= PANEL_IMAGES.length) setReady(true)
+        if (settledCountRef.current >= imgCount) setReady(true)
+    }, [imgCount])
+
+    /** Remember a source's natural size the first time it loads. */
+    const recordNatSize = useCallback((src: string, size: { w: number; h: number }) => {
+        setNatSizes(prev => (prev[src] ? prev : { ...prev, [src]: size }))
     }, [])
 
     const accent = accentForPath(location.pathname)
@@ -911,18 +901,24 @@ export function Layout({ navItems }: LayoutProps) {
             >
                 {/* Layer 1 — Image panels (overflow: visible allows spill into gutters) */}
                 {panelPolys.map((poly, i) => {
-                    const info = PANEL_IMAGES[i]
+                    const info = PANELS[i]
                     if (!info) return null
 
                     const { bounds, vp } = poly
 
-                    // Both dots and images clip tightly to the panel polygon (element-relative px coords)
+                    // The dots clip tightly to the panel polygon (element-relative px
+                    // coords). A picture clips to its own frame instead — the same shape
+                    // scaled into it — which PanelImages works out per picture.
                     const dotClip = toClipPath(vp, bounds.x, bounds.y)
 
-                    // While editing, the selected image reveals its full self (clip off) so
-                    // the whole picture stays visible for framing; the panel outline SVG still
-                    // draws the crop shape on top. Unselected panels stay clipped.
-                    const revealFull = shouldRevealImg(editor.active, editor.selected, i)
+                    // While editing, the selected picture reveals its full self (clip off)
+                    // so the whole of it stays visible for framing; the outline SVG still
+                    // draws the crop shape on top. The panel is lifted whenever any of its
+                    // pictures is the revealed one.
+                    const revealFull = imgT.some(
+                        (img, k) =>
+                            img.panel === i && shouldRevealImg(editor.active, editor.selected, k),
+                    )
 
                     return (
                         <div
@@ -962,54 +958,20 @@ export function Layout({ navItems }: LayoutProps) {
                                 className="cb-dots-panel-canvas"
                                 style={{ clipPath: dotClip }}
                             />
-                            {/* Image clip wrapper — the panel polygon clip IS the comic crop:
-                                the full source renders underneath (fullImgStyle) and this clip
-                                frames it. `spill` (and the editor's full-reveal selection) drops
-                                the clip so the image pops out over the frame lines. */}
-                            <div
-                                className="cb-img-clip"
-                                style={imgClipStyle(imgT[i].spill, revealFull, dotClip)}
-                            >
-                                {/* Panel image — framed via PANEL_IMG_TRANSFORMS. Full-source
-                                    geometry once the natural size is known (so pan/zoom re-frames
-                                    the picture under the clip instead of moving a pre-cropped box);
-                                    identical cover-fit fallback until then. */}
-                                <img
-                                    src={info.src}
-                                    alt={info.alt}
-                                    className="cb-panel-img"
-                                    loading="eager"
-                                    draggable={false}
-                                    style={{
-                                        ...(natSizes[i]
-                                            ? fullImgStyle(bounds, natSizes[i]!, imgT[i])
-                                            : {
-                                                position: 'absolute',
-                                                left: 0,
-                                                top: 0,
-                                                width: bounds.w,
-                                                height: bounds.h,
-                                                ...imgTransformStyle(imgT[i]),
-                                            }),
-                                    }}
-                                    onLoad={e => {
-                                        const im = e.currentTarget
-                                        setNatSizes(prev => {
-                                            if (prev[i]) return prev
-                                            const next = prev.slice()
-                                            next[i] = { w: im.naturalWidth, h: im.naturalHeight }
-                                            return next
-                                        })
-                                        markSettled()
-                                    }}
-                                    onError={e => {
-                                        const t = e.currentTarget
-                                        console.warn('[comic-book] Failed to load panel image:', t.src)
-                                        t.style.display = 'none'
-                                        markSettled()
-                                    }}
-                                />
-                            </div>
+                            {/* Pictures — however many name this panel, each on its own frame
+                                over the panel box, each cut to the panel's shape scaled into
+                                that frame. `spill` (and the editor's full-reveal selection)
+                                drops the clip so a picture pops out over the frame lines. */}
+                            <PanelImages
+                                images={imgT}
+                                panel={i}
+                                bounds={bounds}
+                                vp={vp}
+                                natSizes={natSizes}
+                                isRevealed={k => shouldRevealImg(editor.active, editor.selected, k)}
+                                onSettled={markSettled}
+                                onNatSize={recordNatSize}
+                            />
                             {/* Speech bubbles — generated vector outlines (PanelBubble), however
                                 many name this panel. Revealed while this panel is hovered, or
                                 always in edit mode. */}
@@ -1045,6 +1007,28 @@ export function Layout({ navItems }: LayoutProps) {
                             strokeLinejoin="miter"
                         />
                     ))}
+                    {/* A picture that has been given its own frame is inked like the panel
+                        it sits in — that border is what makes an inset picture read as a
+                        panel-within-a-panel rather than as a pasted cut-out. A full-panel
+                        frame is skipped: its ink would land on the panel outline already
+                        drawn above, doubling the stroke along an identical path. */}
+                    {imgT.map((img, k) => {
+                        if (isFullPanelFrame(img)) return null
+                        const poly = panelPolys[img.panel]
+                        if (!poly) return null
+                        const pts = imgFramePoints(poly.vp, poly.bounds, img)
+                        if (pts.length === 0) return null
+                        return (
+                            <polygon
+                                key={`img-${k}`}
+                                points={pts.map(([x, y]) => `${x},${y}`).join(' ')}
+                                fill="none"
+                                stroke="#111111"
+                                strokeWidth="5"
+                                strokeLinejoin="miter"
+                            />
+                        )
+                    })}
                 </svg>
 
                 {/* Layer 3 — Ben-Day wash canvas (page transitions; blank when idle) */}

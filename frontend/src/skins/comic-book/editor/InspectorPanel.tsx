@@ -1,12 +1,14 @@
+import { PANELS } from '../panels'
+import { assetLabel } from './assets'
 import BubbleInspector from './BubbleInspector'
+import ImageInspector from './ImageInspector'
+import { indicesOnPanel } from './configOps'
 import type { EditorModeApi } from './useEditorMode'
 
 interface InspectorPanelProps {
   api: EditorModeApi
-  /** Human-readable name of the panel the selection belongs to. */
-  label: string
-  /** Every panel's name, indexed like PANEL_IMAGES — for the panel/link pickers. */
-  labels: string[]
+  /** Index of the panel the selection sits on, into PANELS. */
+  panel: number
 }
 
 /** Trim drag-produced floats to 2 decimals for the read-out (drops trailing zeros). */
@@ -15,32 +17,55 @@ function fmt(n: number): number {
 }
 
 /**
- * Selection inspector: live numeric read-outs plus editable controls for the
- * currently selected image or bubble, and a per-element reset. The bubble-only
- * controls live in BubbleInspector. Rendered inside the toolbar by EditorOverlay
- * only when something is selected.
+ * Selection inspector: live numeric read-outs plus editable controls for the currently
+ * selected panel, picture or bubble, and a per-element reset. The kind-specific
+ * controls live in ImageInspector and BubbleInspector. Rendered inside the toolbar by
+ * EditorOverlay only when something is selected.
  */
-export default function InspectorPanel({ api, label, labels }: InspectorPanelProps) {
+export default function InspectorPanel({ api, panel }: InspectorPanelProps) {
   const { selected, config } = api
   if (!selected) return null
 
+  const panelName = PANELS[panel]?.label ?? `Panel ${panel}`
   const selImg = selected.kind === 'img' ? config.images[selected.index] : null
   const selBubble = selected.kind === 'bubble' ? config.bubbles[selected.index] : null
+
+  // A selected panel is a slot, not a drawn thing: it has no transform to read out and
+  // nothing to reset. It exists so "+ Image" / "+ Bubble" have somewhere to add to.
+  if (selected.kind === 'panel') {
+    const imgs = indicesOnPanel(config.images, panel).length
+    const bubbles = indicesOnPanel(config.bubbles, panel).length
+    return (
+      <>
+        <div className="cb-ed-label">{panelName} panel</div>
+        <div className="cb-ed-hint">
+          {imgs} picture{imgs === 1 ? '' : 's'} · {bubbles} bubble{bubbles === 1 ? '' : 's'}.
+          Click one to edit it, or add another below.
+        </div>
+      </>
+    )
+  }
+
   if (!selImg && !selBubble) return null
 
   return (
     <>
       <div className="cb-ed-label">
-        {label} {selected.kind === 'img' ? 'image' : 'bubble'}
+        {selImg ? `${assetLabel(selImg.src)} on ${panelName}` : `${panelName} bubble`}
       </div>
 
       <dl className="cb-ed-values">
         {selImg && (
           <>
+            {/* The frame — the picture's own window over the panel box. */}
+            <div><dt>left</dt><dd>{fmt(selImg.left)}%</dd></div>
+            <div><dt>top</dt><dd>{fmt(selImg.top)}%</dd></div>
+            <div><dt>width</dt><dd>{fmt(selImg.width)}%</dd></div>
+            <div><dt>height</dt><dd>{fmt(selImg.height)}%</dd></div>
+            {/* The picture's framing inside that window. */}
             <div><dt>scale</dt><dd>{fmt(selImg.scale)}</dd></div>
             <div><dt>offsetX</dt><dd>{fmt(selImg.offsetX)}</dd></div>
             <div><dt>offsetY</dt><dd>{fmt(selImg.offsetY)}</dd></div>
-            <div><dt>anchor</dt><dd>{selImg.anchor}</dd></div>
           </>
         )}
         {selBubble && (
@@ -53,16 +78,10 @@ export default function InspectorPanel({ api, label, labels }: InspectorPanelPro
         )}
       </dl>
 
-      {selBubble && (
-        <BubbleInspector
-          api={api}
-          index={selected.index}
-          bubble={selBubble}
-          labels={labels}
-        />
-      )}
+      {selImg && <ImageInspector api={api} index={selected.index} image={selImg} />}
+      {selBubble && <BubbleInspector api={api} index={selected.index} bubble={selBubble} />}
 
-      {/* Spill toggle — shared by images and bubbles */}
+      {/* Spill toggle — shared by pictures and bubbles */}
       <label className="cb-ed-check">
         <input
           type="checkbox"
@@ -73,33 +92,33 @@ export default function InspectorPanel({ api, label, labels }: InspectorPanelPro
               : api.setBubble(selected.index, { spill: e.target.checked })
           }
         />
-        <span>Allow spill outside panel</span>
+        <span>Allow spill outside {selImg ? 'frame' : 'panel'}</span>
       </label>
 
       <div className="cb-ed-actions">
         <button
           type="button"
           className="cb-ed-btn"
-          onClick={() => api.resetOne(selected.kind, selected.index)}
+          onClick={() => api.resetOne(selected.kind === 'img' ? 'img' : 'bubble', selected.index)}
         >
           Reset
         </button>
-        {selBubble && (
-          <button
-            type="button"
-            className="cb-ed-btn cb-ed-btn-danger"
-            title="Delete this bubble"
-            onClick={() => api.deleteBubble(selected.index)}
-          >
-            Delete bubble
-          </button>
-        )}
+        <button
+          type="button"
+          className="cb-ed-btn cb-ed-btn-danger"
+          title={selImg ? 'Delete this picture' : 'Delete this bubble'}
+          onClick={() =>
+            selImg ? api.deleteImg(selected.index) : api.deleteBubble(selected.index)
+          }
+        >
+          {selImg ? 'Delete image' : 'Delete bubble'}
+        </button>
       </div>
 
       <div className="cb-ed-hint">
-        Drag to move · handle to {selected.kind === 'img' ? 'zoom' : 'resize/rotate'} ·
-        {selected.kind === 'img' ? ' wheel zooms ·' : ''} arrows nudge (⇧×10) · +/− ·
-        Esc deselects
+        {selImg
+          ? 'Drag to move the frame · corner handle resizes it · the round grip pans the picture inside · wheel zooms · arrows nudge (⇧×10, ⌥ pans) · +/− · Del · Esc'
+          : 'Drag to move · handle to resize/rotate · arrows nudge (⇧×10) · +/− · Del · Esc'}
       </div>
     </>
   )

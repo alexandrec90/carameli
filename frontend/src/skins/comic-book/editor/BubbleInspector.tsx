@@ -1,5 +1,6 @@
 import { TAIL_DIRS, TAIL_DIR_KEYS } from '../bubbleBox'
 import type { TailDir } from '../bubbleBox'
+import { PANELS } from '../panels'
 import { BUBBLE_TYPES, BUBBLE_TYPE_KEYS } from './bubbleTypes'
 import type { BubbleType } from './bubbleTypes'
 import { linkCandidates } from './configOps'
@@ -12,8 +13,6 @@ interface BubbleInspectorProps {
   index: number
   /** The selected bubble itself. */
   bubble: BubbleTransform
-  /** Every panel's name, indexed like PANEL_IMAGES — for the panel picker. */
-  labels: string[]
 }
 
 /** Read a shape `<select>` back, mapping the empty "no change" option to null. */
@@ -37,7 +36,7 @@ function bubbleLabel(b: BubbleTransform, i: number): string {
  * the panel therefore clears a link that no longer makes sense, which `patchBubble`
  * does rather than this component.
  */
-export default function BubbleInspector({ api, index, bubble, labels }: BubbleInspectorProps) {
+export default function BubbleInspector({ api, index, bubble }: BubbleInspectorProps) {
   const candidates = linkCandidates(api.config.bubbles, index)
 
   return (
@@ -49,8 +48,8 @@ export default function BubbleInspector({ api, index, bubble, labels }: BubbleIn
           value={bubble.panel}
           onChange={e => api.setBubble(index, { panel: Number(e.target.value) })}
         >
-          {labels.map((name, i) => (
-            <option key={name} value={i}>{name}</option>
+          {PANELS.map((p, i) => (
+            <option key={p.label} value={i}>{p.label}</option>
           ))}
         </select>
       </label>
@@ -140,8 +139,8 @@ export default function BubbleInspector({ api, index, bubble, labels }: BubbleIn
       </label>
       {candidates.length === 0 && (
         <div className="cb-ed-hint">
-          Add a second bubble to {labels[bubble.panel]} to link this one — a tube joins
-          two bubbles on the same panel.
+          Add a second bubble to {PANELS[bubble.panel]?.label ?? `panel ${bubble.panel}`} to
+          link this one — a tube joins two bubbles on the same panel.
         </div>
       )}
     </>

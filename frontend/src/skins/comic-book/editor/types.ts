@@ -2,20 +2,45 @@ import type { TailDir } from '../bubbleBox'
 import type { BubbleType } from './bubbleTypes'
 
 /**
- * Per-panel image framing, relative to the panel box. Layout-independent, and index
- * parallel to the panels: a panel shows exactly one picture, which is why this one
- * kept the parallel array that {@link BubbleTransform} gave up.
+ * One picture on the page: which panel it belongs to, which file it shows, the frame
+ * it is cropped to, and how the picture is framed *inside* that crop.
+ *
+ * A panel may own any number of pictures, or none. The frame — `left`/`top`/`width`/
+ * `height`, in % of the panel box — is the picture's own, exactly as a bubble's
+ * placement is. It used to be the panel polygon itself, which meant dragging an image
+ * only slid the picture under a window that stayed put, and a second picture on the
+ * same panel had nowhere to be. The frame takes the panel's shape scaled into it (see
+ * `imgFramePoly`), so a picture left at the default 0/0/100/100 crops exactly as the
+ * panel always did, and an inset one reads as a small comic panel rather than as a
+ * rectangle pasted on top.
+ *
+ * `scale`/`offsetX`/`offsetY`/`anchor` are the second, independent framing: they move
+ * the picture *within* its frame, which is what dragging used to do to the whole image.
  */
 export interface ImgTransform {
-  /** Zoom factor applied via CSS transform: scale(). 1 = fill (objectFit cover); < 1 shrinks. */
+  /** Index into PANELS of the panel this picture belongs to. */
+  panel: number
+  /** Public URL of the picture (see PANEL_ASSETS in assets.ts). */
+  src: string
+  /** Alt text; '' marks the picture decorative. */
+  alt: string
+  /** Frame left edge, in % of the panel box. May be negative. */
+  left: number
+  /** Frame top edge, in % of the panel box. May be negative. */
+  top: number
+  /** Frame width, in % of the panel box. */
+  width: number
+  /** Frame height, in % of the panel box. */
+  height: number
+  /** Zoom factor for the picture inside the frame (CSS transform: scale). */
   scale: number
-  /** Horizontal pan in px (CSS transform: translateX). */
+  /** Horizontal pan of the picture inside the frame, in px. */
   offsetX: number
-  /** Vertical pan in px (CSS transform: translateY). */
+  /** Vertical pan of the picture inside the frame, in px. */
   offsetY: number
-  /** CSS object-position base anchor, e.g. 'center bottom'. */
+  /** CSS object-position anchor the framing starts from, e.g. 'center bottom'. */
   anchor: string
-  /** When true, the image may bleed past the panel edge; when false it's clipped to the panel polygon. */
+  /** When true the picture may bleed past its frame; when false it is clipped to it. */
   spill: boolean
 }
 
@@ -63,9 +88,9 @@ export interface BubbleTransform {
 }
 
 /**
- * The editor's working document. `images` is index-parallel to the panels; `bubbles`
- * is not — each bubble names its own panel, so the array is free-length and adding one
- * is an append that has to line up with nothing.
+ * The editor's working document. Neither array is parallel to PANELS: each entry names
+ * its own panel, so both are free-length and adding one is an append that has to line
+ * up with nothing.
  */
 export interface EditorConfig {
   images: ImgTransform[]

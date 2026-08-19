@@ -147,15 +147,25 @@ Turning or removing a tail is therefore an ordinary morph, not a second shape sy
 `overflow: visible` instead of padding the box, because padding it would rescale
 every bubble already placed.
 
-### A bubble belongs to a panel
+### A bubble — and a picture — belongs to a panel
 
-`PANEL_BUBBLE_TRANSFORMS` is **not** index-parallel to the panels; each entry names
-its own `panel`. A panel may own several balloons or none, and the array's length is
-the author's. `panel` is the whole association: placement is measured against that
-panel's box, and hovering that panel is what reveals the bubble
-(`isBubbleRevealed` in `bubbleTube.ts` is exactly that comparison).
+Neither `PANEL_BUBBLE_TRANSFORMS` nor `PANEL_IMG_TRANSFORMS` is index-parallel to the
+panels; each entry names its own `panel`. A panel may own several balloons and several
+pictures, or none of either, and each array's length is the author's. `panel` is the
+whole association: placement is measured against that panel's box, and hovering that
+panel is what reveals its bubbles (`isBubbleRevealed` in `bubbleTube.ts` is exactly
+that comparison).
 
-`PANEL_IMG_TRANSFORMS` is still index-parallel — a panel shows one picture.
+`PANELS` (`panels.ts`) is the one parallelism that survives — a panel is a fixed slot
+in the grid, so there are exactly as many of those as there are polygons, whatever ends
+up drawn on each.
+
+A picture carries **two independent framings**, and conflating them is the mistake to
+avoid: `left`/`top`/`width`/`height` are its frame over the panel box (in % of that
+box, cut to the panel's polygon scaled into it by `imgFramePoly`), while
+`scale`/`offsetX`/`offsetY`/`anchor` move the picture *within* that frame. The frame
+used to be the panel polygon itself, so dragging a picture could only slide it under a
+window that stayed put; a frame left at `0/0/100/100` still crops exactly as it did.
 
 ### Connector tubes
 
@@ -244,8 +254,10 @@ Drawn on a static `<canvas>` that sits behind content panels. Lines are redrawn 
 
 ## Per-Panel Image & Bubble Framing
 
-`editor/layoutConfig.ts` is the **source of truth** for per-panel image framing
-(`PANEL_IMG_TRANSFORMS`: scale / offsetX / offsetY / anchor / spill) and speech-bubble
+`editor/layoutConfig.ts` is the **source of truth** for picture placement and framing
+(`PANEL_IMG_TRANSFORMS`: panel / src / alt / left / top / width / height / scale /
+offsetX / offsetY / anchor / spill, with `src` drawn from the `PANEL_ASSETS` manifest
+in `editor/assets.ts`) and speech-bubble
 placement and behaviour (`PANEL_BUBBLE_TRANSFORMS`: panel / top / right / width /
 rotate / spill / type / tail / text, plus `hoverType` / `clickType` event morph
 targets and the `linkTo` tube partner). The renderer in `Layout.tsx` reads from these
@@ -256,9 +268,9 @@ hand-editing scattered values.
 **Save overwrites `layoutConfig.ts` verbatim** with what `serialize.ts` emits, so
 anything that module does not write is deleted on the first save. That is why the
 file's explanatory comments are emitted as headers by `serialize.ts`, and why nothing
-else — a `NEW_BUBBLE` default, a helper — may live in `layoutConfig.ts`. Config
-edits themselves live in `configOps.ts` (React-free: seed/hydrate/patch, add/remove
-bubble, link sanitation).
+else — a `NEW_IMAGE` or `NEW_BUBBLE` default, a helper — may live in `layoutConfig.ts`.
+Config edits themselves live in `configOps.ts` (React-free: seed/hydrate/patch,
+add/remove picture or bubble, link sanitation).
 
 The bubble box's on-screen geometry comes from `bubbleRect` in `transforms.ts`, used
 by **both** the renderer (to aim tubes) and the editor (hit target and selection
@@ -271,8 +283,10 @@ not the bubble a tube pointed at.
 | --- | --- | --- |
 | Enable / disable | `?edit=1` / `?edit=0` in dev | Flag persists in `localStorage['comic-book:edit']`; `?edit=0` clears it |
 | Gate | `import.meta.env.DEV && (?edit=1 \|\| flag)` | Never ships — `?edit=1` is inert in prod |
-| Adjust | drag / wheel / handles / arrows | Move, zoom/resize, rotate (bubble), nudge (⇧×10) |
-| Add / remove | **+ Bubble** toolbar button, **Delete bubble** in the inspector | Adds to the selected panel; delete clears any link naming it |
+| Select | click a **panel**, a **picture** or a **bubble** | A picture wins over the panel under it, a bubble over both; a panel is only outlined — it is the slot the **+** buttons add to |
+| Adjust | drag / wheel / handles / arrows | Move the frame or bubble, resize (bottom-right grip), pan the picture inside its frame (top-left grip, picture only), rotate (top-right grip, bubble only), nudge (⇧×10); for a picture **Alt** swaps the two framings |
+| Add / remove | **+ Image** / **+ Bubble** toolbar buttons, **Delete image** / **Delete bubble** in the inspector | Adds to the selected panel; deleting a bubble clears any link naming it |
+| Picture fields | inspector selects | panel, picture (`PANEL_ASSETS`), alt (empty = decorative), anchor, spill |
 | Bubble fields | inspector selects | panel, type, **tail** (nine options incl. **No tail**), text, hover/click morph, link |
 | Pages | **Page** dropdown in toolbar | Switch route in edit mode (replays the wash); "Loading screen" entry previews the loading overlay + its exit wash |
 | Save | **Save** button | `POST /__comic-editor/save` writes `layoutConfig.ts` (dev server only); **Copy config** / **.ts** are the fallbacks |

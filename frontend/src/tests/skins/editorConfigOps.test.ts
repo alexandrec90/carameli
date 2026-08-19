@@ -2,14 +2,17 @@ import { describe, expect, it } from 'vitest'
 
 import {
   NEW_BUBBLE,
+  NEW_IMAGE,
   addBubble,
-  bubblesOnPanel,
+  addImg,
   cloneConfig,
   hydrateConfig,
+  indicesOnPanel,
   linkCandidates,
   patchBubble,
   patchImg,
   removeBubble,
+  removeImg,
   resetOneIn,
   sanitizeLinks,
   seedConfig,
@@ -18,17 +21,33 @@ import {
   PANEL_IMG_TRANSFORMS,
   PANEL_BUBBLE_TRANSFORMS,
 } from '../../skins/comic-book/editor/layoutConfig'
+import { PANELS } from '../../skins/comic-book/panels'
 
 /** Index of the first shipped bubble that declares a link, with its partner. */
 const LINKED = PANEL_BUBBLE_TRANSFORMS.findIndex(b => b.linkTo !== null)
 const LINKED_TO = PANEL_BUBBLE_TRANSFORMS[LINKED].linkTo as number
 
 describe('seedConfig', () => {
-  it('returns the constants: one image per panel, bubbles as authored', () => {
+  it('returns the constants verbatim, both arrays as authored', () => {
     const cfg = seedConfig()
-    expect(cfg.images).toHaveLength(PANEL_IMG_TRANSFORMS.length)
     expect(cfg.images).toEqual(PANEL_IMG_TRANSFORMS)
     expect(cfg.bubbles).toEqual(PANEL_BUBBLE_TRANSFORMS)
+  })
+
+  // Pictures stopped being parallel to the panels at the same time bubbles did; the
+  // shipped config happens to hold one each, and that is data, not a constraint.
+  it('ships every picture on a real panel', () => {
+    seedConfig().images.forEach(t => {
+      expect(t.panel).toBeGreaterThanOrEqual(0)
+      expect(t.panel).toBeLessThan(PANELS.length)
+      expect(t.src.length).toBeGreaterThan(0)
+    })
+  })
+
+  it('ships every picture on the default full-panel frame', () => {
+    seedConfig().images.forEach(t => {
+      expect([t.left, t.top, t.width, t.height]).toEqual([0, 0, 100, 100])
+    })
   })
 
   // The two arrays parted company when a panel could own several balloons; asserting
@@ -41,7 +60,7 @@ describe('seedConfig', () => {
   it('ships every bubble on a real panel', () => {
     seedConfig().bubbles.forEach(b => {
       expect(b.panel).toBeGreaterThanOrEqual(0)
-      expect(b.panel).toBeLessThan(PANEL_IMG_TRANSFORMS.length)
+      expect(b.panel).toBeLessThan(PANELS.length)
     })
   })
 
@@ -114,8 +133,18 @@ describe('hydrateConfig', () => {
 
   it('falls back to seed on structurally invalid payloads', () => {
     expect(hydrateConfig('{}')).toEqual(seedConfig())
-    expect(hydrateConfig(JSON.stringify({ images: [], bubbles: [] }))).toEqual(seedConfig())
     expect(hydrateConfig(JSON.stringify({ images: [1, 2, 3] }))).toEqual(seedConfig())
+    expect(hydrateConfig(JSON.stringify({ bubbles: [] }))).toEqual(seedConfig())
+  })
+
+  // An author who deleted everything gets an empty page back, not the shipped one:
+  // two arrays that are both present and both arrays is a valid document, and
+  // re-seeding here would make "delete all" impossible to persist.
+  it('keeps a payload that deliberately holds nothing', () => {
+    expect(hydrateConfig(JSON.stringify({ images: [], bubbles: [] }))).toEqual({
+      images: [],
+      bubbles: [],
+    })
   })
 
   // The author's bubble count is data now, so a payload with more or fewer than the
@@ -126,6 +155,10 @@ describe('hydrateConfig', () => {
     expect(hydrateConfig(JSON.stringify({ ...cfg, bubbles: [] })).bubbles).toEqual([])
   })
 
+  // The pre-entity payload: pictures were parallel to the panels and carried only their
+  // framing, so `panel`, `src`, `alt` and the whole frame have to come back from the
+  // seed entry at the same index. Recovering them from NEW_IMAGE instead would turn
+  // every picture on the page into the logo.
   it('backfills fields missing from an older payload (pre-panel/tail)', () => {
     const legacy = {
       images: PANEL_IMG_TRANSFORMS.map(({ scale, offsetX, offsetY, anchor }) => ({
@@ -141,6 +174,42 @@ describe('hydrateConfig', () => {
     expect(cfg.bubbles).toEqual([
       { ...NEW_BUBBLE, panel: 0, top: 10, right: 20, width: 30, rotate: 0 },
     ])
+  })
+
+  it('keeps whatever framing the older payload had already changed', () => {
+    const legacy = {
+      images: [{ scale: 2, offsetX: 30, offsetY: -10, anchor: 'left top' }],
+      bubbles: [],
+    }
+    expect(hydrateConfig(JSON.stringify(legacy)).images).toEqual([
+      { ...PANEL_IMG_TRANSFORMS[0], scale: 2, offsetX: 30, offsetY: -10, anchor: 'left top' },
+    ])
+  })
+
+  // Past the seed's length there is no shipped identity to recover, so the template is
+  // the whole answer — a ninth picture must not read back as undefined fields.
+  it('falls back to the new-picture template beyond the shipped entries', () => {
+    const cfg = seedConfig()
+    const raw = JSON.stringify({
+      images: [...cfg.images, { panel: 3, left: 10, top: 10 }],
+      bubbles: cfg.bubbles,
+    })
+    const ninth = hydrateConfig(raw).images[cfg.images.length]
+    expect(ninth).toEqual({ ...NEW_IMAGE, panel: 3, left: 10, top: 10 })
+  })
+
+  it('keeps an image array of any length', () => {
+    const cfg = addImg(seedConfig(), 2).config
+    expect(hydrateConfig(JSON.stringify(cfg)).images).toHaveLength(cfg.images.length)
+    expect(hydrateConfig(JSON.stringify({ ...cfg, images: [] })).images).toEqual([])
+  })
+
+  it('clamps a picture’s panel index the same way it clamps a bubble’s', () => {
+    const raw = JSON.stringify({
+      images: [{ ...NEW_IMAGE, panel: 99 }, { ...NEW_IMAGE, panel: -4 }],
+      bubbles: [],
+    })
+    expect(hydrateConfig(raw).images.map(t => t.panel)).toEqual([PANELS.length - 1, 0])
   })
 
   it('clamps a panel index that outruns the panel list', () => {
@@ -176,6 +245,14 @@ describe('patchImg / patchBubble', () => {
     expect(next.bubbles[0]).toEqual(PANEL_BUBBLE_TRANSFORMS[0])
   })
 
+  it('moves a picture to another panel, and swaps which file it draws', () => {
+    const moved = patchImg(seedConfig(), 2, { panel: 5, src: '/comic-book/rolodex.webp' })
+    expect(moved.images[2].panel).toBe(5)
+    expect(moved.images[2].src).toBe('/comic-book/rolodex.webp')
+    // The other picture on panel 5 is untouched: two may share one now.
+    expect(moved.images[5]).toEqual(PANEL_IMG_TRANSFORMS[5])
+  })
+
   it('changes which panel a bubble belongs to', () => {
     expect(patchBubble(seedConfig(), 2, { panel: 6 }).bubbles[2].panel).toBe(6)
   })
@@ -203,6 +280,70 @@ describe('patchImg / patchBubble', () => {
     const base = seedConfig()
     expect(patchImg(base, 99, { scale: 5 })).toEqual(base)
     expect(patchBubble(base, 99, { rotate: 5 })).toEqual(base)
+  })
+})
+
+describe('addImg', () => {
+  it('appends a default picture on the requested panel and reports its index', () => {
+    const before = seedConfig()
+    const { config, index } = addImg(before, 6)
+    expect(index).toBe(before.images.length)
+    expect(config.images).toHaveLength(before.images.length + 1)
+    expect(config.images[index]).toEqual({ ...NEW_IMAGE, panel: 6 })
+  })
+
+  // A second picture added at the full-panel frame would land exactly on the one
+  // already there, and adding it would read as nothing having happened.
+  it('starts the new picture inset, not covering the panel', () => {
+    const { config, index } = addImg(seedConfig(), 0)
+    const t = config.images[index]
+    expect([t.left, t.top]).not.toEqual([0, 0])
+    expect(t.width).toBeLessThan(100)
+    expect(t.height).toBeLessThan(100)
+  })
+
+  it('leaves the existing pictures alone', () => {
+    const before = seedConfig()
+    const { config } = addImg(before, 3)
+    expect(config.images.slice(0, before.images.length)).toEqual(before.images)
+  })
+
+  it('does not mutate the input config', () => {
+    const before = seedConfig()
+    addImg(before, 2)
+    expect(before.images).toHaveLength(PANEL_IMG_TRANSFORMS.length)
+  })
+
+  it('lets one panel own several pictures', () => {
+    const { config } = addImg(addImg(seedConfig(), 6).config, 6)
+    expect(indicesOnPanel(config.images, 6).length).toBeGreaterThanOrEqual(3)
+  })
+})
+
+describe('removeImg', () => {
+  it('drops the picture and shortens the array', () => {
+    const before = seedConfig()
+    const after = removeImg(before, 2)
+    expect(after.images).toHaveLength(before.images.length - 1)
+    expect(after.images[2]).toEqual(before.images[3])
+  })
+
+  // Nothing points at a picture by index the way a bubble's `linkTo` points at a
+  // bubble, so deleting one must not disturb the bubbles at all.
+  it('leaves the bubbles and their links untouched', () => {
+    const before = seedConfig()
+    expect(removeImg(before, 0).bubbles).toEqual(before.bubbles)
+  })
+
+  it('is a no-op for an out-of-range index', () => {
+    const base = seedConfig()
+    expect(removeImg(base, 99)).toEqual(base)
+  })
+
+  it('does not mutate the input config', () => {
+    const base = seedConfig()
+    removeImg(base, 0)
+    expect(base.images).toHaveLength(PANEL_IMG_TRANSFORMS.length)
   })
 })
 
@@ -234,7 +375,7 @@ describe('addBubble', () => {
 
   it('lets one panel own several bubbles', () => {
     const { config } = addBubble(addBubble(seedConfig(), 6).config, 6)
-    expect(bubblesOnPanel(config.bubbles, 6).length).toBeGreaterThanOrEqual(2)
+    expect(indicesOnPanel(config.bubbles, 6).length).toBeGreaterThanOrEqual(2)
   })
 })
 
@@ -309,18 +450,38 @@ describe('resetOneIn', () => {
     const edited = patchBubble(config, index, { rotate: 40 })
     expect(resetOneIn(edited, 'bubble', index).bubbles[index].rotate).toBe(40)
   })
+
+  it('leaves a picture the author added in place', () => {
+    const { config, index } = addImg(seedConfig(), 4)
+    const edited = patchImg(config, index, { width: 12 })
+    expect(resetOneIn(edited, 'img', index).images[index].width).toBe(12)
+  })
+
+  // Reset is what undoes a frame drag, which is the gesture the whole change is about.
+  it('restores a dragged frame, not just the framing inside it', () => {
+    const edited = patchImg(seedConfig(), 2, { left: 40, top: -15, width: 30, height: 30 })
+    expect(resetOneIn(edited, 'img', 2).images[2]).toEqual(PANEL_IMG_TRANSFORMS[2])
+  })
 })
 
-describe('bubblesOnPanel / linkCandidates', () => {
+describe('indicesOnPanel / linkCandidates', () => {
   it('lists a panel’s bubbles in array order', () => {
     const cfg = seedConfig()
-    const own = bubblesOnPanel(cfg.bubbles, cfg.bubbles[LINKED].panel)
+    const own = indicesOnPanel(cfg.bubbles, cfg.bubbles[LINKED].panel)
     expect(own).toContain(LINKED)
     expect(own).toEqual([...own].sort((a, b) => a - b))
   })
 
-  it('is empty for a panel with no bubbles', () => {
-    expect(bubblesOnPanel([], 0)).toEqual([])
+  it('is empty for a panel with nothing on it', () => {
+    expect(indicesOnPanel([], 0)).toEqual([])
+    expect(indicesOnPanel(seedConfig().bubbles, 99)).toEqual([])
+  })
+
+  // `panel` is the only field it reads, which is what lets one function answer the
+  // question for both arrays — the inspector's per-panel counts use it on each.
+  it('reads the picture array on the same terms as the bubble array', () => {
+    const cfg = addImg(seedConfig(), 6).config
+    expect(indicesOnPanel(cfg.images, 6)).toEqual([6, cfg.images.length - 1])
   })
 
   // The same-panel rule is enforced by never offering the invalid choice.

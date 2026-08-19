@@ -43,7 +43,9 @@ describe('resolveEditFlag', () => {
 })
 
 describe('shouldRevealImg', () => {
-  it('reveals only the selected image panel', () => {
+  // The index is into the picture array, not the panel grid: two pictures may share a
+  // panel, and only the one being dragged drops its frame clip.
+  it('reveals only the selected picture', () => {
     const selected = { kind: 'img', index: 3 } as const
     expect(shouldRevealImg(true, selected, 3)).toBe(true)
     expect(shouldRevealImg(true, selected, 2)).toBe(false)
@@ -57,9 +59,10 @@ describe('shouldRevealImg', () => {
     expect(shouldRevealImg(true, null, 0)).toBe(false)
   })
 
-  // A bubble selection index is an index into the bubble array, which no longer has
-  // anything to do with a panel index — reading it as one would uncrop a random panel.
-  it('does not reveal when a bubble (not the image) is selected', () => {
+  // Each kind indexes its own array now, so an index means nothing without the kind —
+  // reading a bubble's or a panel's as a picture's would uncrop an unrelated picture.
+  it('does not reveal for a selection of another kind at the same index', () => {
     expect(shouldRevealImg(true, { kind: 'bubble', index: 3 }, 3)).toBe(false)
+    expect(shouldRevealImg(true, { kind: 'panel', index: 3 }, 3)).toBe(false)
   })
 })

@@ -3,11 +3,13 @@ import type { CSSProperties } from 'react'
 
 import { logger } from '../../../lib/logger'
 import type { PanelPoly } from '../Layout'
+import { PANELS } from '../panels'
+import { assetLabel } from './assets'
 import InspectorPanel from './InspectorPanel'
 import PageSelect from './PageSelect'
 import type { PageSelectProps } from './PageSelect'
 import { serializeConfig, serializeConfigFile } from './serialize'
-import { bubbleRect } from './transforms'
+import { bubbleRect, imgRect } from './transforms'
 import { useOverlayInteraction } from './useOverlayInteraction'
 import { useToolbarDrag } from './useToolbarDrag'
 import type { EditorModeApi } from './useEditorMode'
@@ -25,17 +27,6 @@ interface EditorOverlayProps {
   panelPolys: PanelPoly[]
   pageSelect: PageSelectProps
 }
-
-const PANEL_LABELS = [
-  'Logo',
-  'Switchboard',
-  'Mailman 1',
-  'Mechanic',
-  'Receptionist',
-  'Rolodex',
-  'Rotary phone',
-  'Mailman 2',
-]
 
 /** Dev-only endpoint (Vite middleware) that overwrites editor/layoutConfig.ts. */
 const SAVE_ENDPOINT = '/__comic-editor/save'
@@ -75,22 +66,27 @@ export default function EditorOverlay({ api, panelPolys, pageSelect }: EditorOve
   const [copied, setCopied] = useState(false)
   const [saved, setSaved] = useState(false)
 
-  // A bubble is placed against the panel it belongs to, not against a panel that
-  // shares its index — those parted company once a panel could own several bubbles.
+  // Everything drawn is placed against the panel it *names*, never against a panel
+  // that shares its index — those parted company once a panel could own several of
+  // each. A `panel` selection is the panel itself, and is how "which panel does a new
+  // picture or bubble go on" gets an answer without a second click.
+  const selImg = selected?.kind === 'img' ? config.images[selected.index] : null
   const selBubble = selected?.kind === 'bubble' ? config.bubbles[selected.index] : null
   const selPanel =
     selected === null
       ? null
-      : selected.kind === 'img'
+      : selected.kind === 'panel'
         ? selected.index
-        : (selBubble?.panel ?? null)
+        : (selImg?.panel ?? selBubble?.panel ?? null)
   const selPoly = selPanel === null ? null : panelPolys[selPanel]
 
   const selectedRect: Rect | null = !selPoly
     ? null
-    : selBubble
-      ? bubbleRect(selPoly.bounds, selBubble)
-      : selPoly.bounds
+    : selImg
+      ? imgRect(selPoly.bounds, selImg)
+      : selBubble
+        ? bubbleRect(selPoly.bounds, selBubble)
+        : selPoly.bounds
 
   const onSave = () => {
     const content = serializeConfigFile(config)
@@ -147,21 +143,41 @@ export default function EditorOverlay({ api, panelPolys, pageSelect }: EditorOve
         onClick={api.clear}
       />
 
-      {/* Per-panel image click targets */}
+      {/* Per-panel click targets — the backdrop for everything drawn on a panel.
+          Selecting a panel is what "+ Image" and "+ Bubble" act on, and it is the only
+          way to reach a panel that has nothing on it yet. */}
       {panelPolys.map((poly, i) => (
         <button
           key={i}
           type="button"
           className="cb-ed-target"
           style={rectStyle(poly.bounds)}
-          aria-label={`Select ${PANEL_LABELS[i]} image`}
-          onClick={() => api.select('img', i)}
+          aria-label={`Select ${PANELS[i]?.label ?? `panel ${i}`}`}
+          onClick={() => api.select('panel', i)}
         />
       ))}
 
+      {/* One click target per picture, on its own frame. They paint after the panel
+          targets so a picture wins the click where the two overlap — which is always,
+          since a frame lives on a panel. */}
+      {config.images.map((img, i) => {
+        const poly = panelPolys[img.panel]
+        if (!poly) return null
+        return (
+          <button
+            key={i}
+            type="button"
+            className="cb-ed-target cb-ed-target-img"
+            style={rectStyle(imgRect(poly.bounds, img))}
+            aria-label={`Select ${assetLabel(img.src)} on ${PANELS[img.panel]?.label ?? `panel ${img.panel}`}`}
+            onClick={() => api.select('img', i)}
+          />
+        )
+      })}
+
       {/* One click target per bubble, placed against the panel it belongs to. They
-          paint after the image targets so a bubble stays clickable where it overlaps
-          its own panel — or a neighbour's, once it spills into the gutter. */}
+          paint last so a bubble stays clickable where it overlaps a picture, its own
+          panel — or a neighbour's, once it spills into the gutter. */}
       {config.bubbles.map((bubble, i) => {
         const poly = panelPolys[bubble.panel]
         if (!poly) return null
@@ -171,14 +187,19 @@ export default function EditorOverlay({ api, panelPolys, pageSelect }: EditorOve
             type="button"
             className="cb-ed-target cb-ed-target-bubble"
             style={rectStyle(bubbleRect(poly.bounds, bubble))}
-            aria-label={`Select ${PANEL_LABELS[bubble.panel]} bubble ${i}`}
+            aria-label={`Select ${PANELS[bubble.panel]?.label ?? `panel ${bubble.panel}`} bubble ${i}`}
             onClick={() => api.select('bubble', i)}
           />
         )
       })}
 
-      {/* Selection outline — draggable body + resize/rotate handles */}
-      {selected && selectedRect && (
+      {/* Selection outline. A picture or a bubble gets a draggable body plus handles;
+          a selected *panel* is only ever outlined, because a panel is a slot in the
+          grid and there is nothing about it to drag. */}
+      {selected?.kind === 'panel' && selectedRect && (
+        <div className="cb-ed-outline cb-ed-outline-panel" style={rectStyle(selectedRect)} aria-hidden="true" />
+      )}
+      {selected && selected.kind !== 'panel' && selectedRect && (
         <div
           className="cb-ed-outline"
           style={rectStyle(selectedRect)}
@@ -190,11 +211,23 @@ export default function EditorOverlay({ api, panelPolys, pageSelect }: EditorOve
         >
           <div
             className="cb-ed-handle cb-ed-handle-br"
-            title={selected.kind === 'img' ? 'Drag to zoom' : 'Drag to resize'}
+            title={selected.kind === 'img' ? 'Drag to resize the frame' : 'Drag to resize'}
             onPointerDown={e => interaction.beginDrag(e, 'resize')}
             onPointerMove={interaction.onPointerMove}
             onPointerUp={interaction.onPointerUp}
           />
+          {/* A picture has two framings, so it needs two grips: the body moves the
+              frame across the panel, this one slides the picture behind it. Dragging
+              the body used to do the second thing, which is the whole complaint. */}
+          {selected.kind === 'img' && (
+            <div
+              className="cb-ed-handle cb-ed-handle-pan"
+              title="Drag to pan the picture inside its frame"
+              onPointerDown={e => interaction.beginDrag(e, 'pan')}
+              onPointerMove={interaction.onPointerMove}
+              onPointerUp={interaction.onPointerUp}
+            />
+          )}
           {selected.kind === 'bubble' && (
             <div
               className="cb-ed-handle cb-ed-handle-rot"
@@ -212,21 +245,34 @@ export default function EditorOverlay({ api, panelPolys, pageSelect }: EditorOve
         <div className="cb-ed-title cb-ed-grip" title="Drag to move" {...toolbarDrag.gripProps}>COMIC EDITOR</div>
         <PageSelect {...pageSelect} />
         {selected && selPanel !== null ? (
-          <InspectorPanel api={api} label={PANEL_LABELS[selPanel]} labels={PANEL_LABELS} />
+          <InspectorPanel api={api} panel={selPanel} />
         ) : (
-          <div className="cb-ed-hint">Click a panel image or bubble to select it.</div>
+          <div className="cb-ed-hint">Click a panel, a picture or a bubble to select it.</div>
         )}
         <div className="cb-ed-actions">
-          {/* New bubbles land on the selected panel, because there is no other
-              answer to "which panel" that does not need a second click. */}
+          {/* New pictures and bubbles land on the selected panel, because there is no
+              other answer to "which panel" that does not need a second click. */}
           <button
             type="button"
             className="cb-ed-btn"
             disabled={selPanel === null}
             title={
               selPanel === null
-                ? 'Select a panel or bubble first'
-                : `Add a bubble to ${PANEL_LABELS[selPanel]}`
+                ? 'Select a panel first'
+                : `Add a picture to ${PANELS[selPanel]?.label ?? `panel ${selPanel}`}`
+            }
+            onClick={() => selPanel !== null && api.addImgOn(selPanel)}
+          >
+            + Image
+          </button>
+          <button
+            type="button"
+            className="cb-ed-btn"
+            disabled={selPanel === null}
+            title={
+              selPanel === null
+                ? 'Select a panel first'
+                : `Add a bubble to ${PANELS[selPanel]?.label ?? `panel ${selPanel}`}`
             }
             onClick={() => selPanel !== null && api.addBubbleOn(selPanel)}
           >

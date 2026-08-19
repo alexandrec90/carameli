@@ -11,20 +11,39 @@ import {
   imgTransformStyle,
   fullImgStyle,
   imgClipStyle,
+  imgFrameBox,
+  imgFramePoints,
+  imgFramePoly,
+  imgFrameStyle,
+  imgRect,
   anchorToFractions,
   bubbleRect,
   bubbleStyle,
+  toClipPath,
 } from '../../skins/comic-book/editor/transforms'
+import type { ImgTransform } from '../../skins/comic-book/editor/types'
+import { PANELS } from '../../skins/comic-book/panels'
+
+/** A picture at the shipped default: full-panel frame, identity framing inside it. */
+const img = (over: Partial<ImgTransform> = {}): ImgTransform => ({
+  panel: 0,
+  src: '/comic-book/logo.webp',
+  alt: 'Carameli',
+  left: 0,
+  top: 0,
+  width: 100,
+  height: 100,
+  scale: 1,
+  offsetX: 0,
+  offsetY: 0,
+  anchor: 'center bottom',
+  spill: false,
+  ...over,
+})
 
 describe('imgTransformStyle', () => {
   it('builds the expected CSS for a sample transform', () => {
-    const style = imgTransformStyle({
-      scale: 1.5,
-      offsetX: 10,
-      offsetY: -20,
-      anchor: 'center bottom',
-      spill: false,
-    })
+    const style = imgTransformStyle(img({ scale: 1.5, offsetX: 10, offsetY: -20 }))
     expect(style.objectFit).toBe('cover')
     expect(style.objectPosition).toBe('center bottom')
     expect(style.transform).toBe('translate(10px, -20px) scale(1.5)')
@@ -32,13 +51,7 @@ describe('imgTransformStyle', () => {
   })
 
   it('reproduces the identity framing at scale 1 / offset 0', () => {
-    const style = imgTransformStyle({
-      scale: 1,
-      offsetX: 0,
-      offsetY: 0,
-      anchor: 'center center',
-      spill: false,
-    })
+    const style = imgTransformStyle(img({ anchor: 'center center' }))
     expect(style.transform).toBe('translate(0px, 0px) scale(1)')
     expect(style.objectPosition).toBe('center center')
   })
@@ -59,14 +72,9 @@ describe('anchorToFractions', () => {
 })
 
 describe('fullImgStyle', () => {
-  const t = (over: Partial<Parameters<typeof fullImgStyle>[2]> = {}) => ({
-    scale: 1,
-    offsetX: 0,
-    offsetY: 0,
-    anchor: 'center bottom',
-    spill: false,
-    ...over,
-  })
+  // `bounds` here is the *frame* box, not the panel box — an inset picture covers its
+  // own frame, which is the whole point of the frame being the picture's.
+  const t = img
 
   it('bottom-anchors a portrait image so the cover crop still shows the bottom', () => {
     // 100×100 box, 100×200 source: cover scale 1, so the box shows the bottom 100px.
@@ -96,6 +104,113 @@ describe('fullImgStyle', () => {
     expect(s.left).toBe(0)
     expect(s.top).toBe(-150)
     expect(s.transform).toBe('scale(2)')
+  })
+})
+
+// ─── The picture's own frame ─────────────────────────────────────────────────────
+// A picture used to borrow its panel's polygon as its window, so dragging one could
+// only slide the picture underneath a window that never moved. These four functions
+// are the frame that replaced that, and they all have to agree: when the box you can
+// drag and the box that gets drawn disagree, the picture moves somewhere you didn't
+// click.
+
+describe('imgFrameBox / imgRect / imgFrameStyle', () => {
+  const bounds = { x: 100, y: 200, w: 400, h: 300 }
+
+  it('reads the frame as percentages of the panel box', () => {
+    expect(imgFrameBox(bounds, { left: 25, top: 10, width: 50, height: 40 })).toEqual({
+      x: 100,
+      y: 30,
+      w: 200,
+      h: 120,
+    })
+  })
+
+  it('is the whole panel box at the shipped default', () => {
+    expect(imgFrameBox(bounds, img())).toEqual({ x: 0, y: 0, w: 400, h: 300 })
+    expect(imgRect(bounds, img())).toEqual(bounds)
+  })
+
+  // Negative and past-100 are how a picture hangs off an edge into the gutter, so
+  // neither function may clamp — the frame is allowed to leave the panel.
+  it('lets the frame hang off the panel in either direction', () => {
+    const box = imgFrameBox(bounds, { left: -25, top: -10, width: 150, height: 120 })
+    expect(box).toEqual({ x: -100, y: -30, w: 600, h: 360 })
+  })
+
+  it('imgRect is imgFrameBox offset into viewport coordinates', () => {
+    const t = { left: 25, top: 10, width: 50, height: 40 }
+    const box = imgFrameBox(bounds, t)
+    expect(imgRect(bounds, t)).toEqual({
+      x: bounds.x + box.x,
+      y: bounds.y + box.y,
+      w: box.w,
+      h: box.h,
+    })
+  })
+
+  // The wrapper is absolutely positioned inside the panel element, which already sits
+  // at the panel's bounds — so it takes the panel-relative box, not the viewport one.
+  it('imgFrameStyle places the wrapper on the panel-relative box', () => {
+    const t = { left: 25, top: 10, width: 50, height: 40 }
+    expect(imgFrameStyle(bounds, t)).toEqual({
+      position: 'absolute',
+      left: 100,
+      top: 30,
+      width: 200,
+      height: 120,
+    })
+  })
+})
+
+describe('imgFramePoints / imgFramePoly', () => {
+  const bounds = { x: 100, y: 200, w: 400, h: 300 }
+  // A slanted quad, like the real panel polygons — the gutters are not square.
+  const vp: [number, number][] = [
+    [100, 200],
+    [500, 220],
+    [480, 500],
+    [120, 480],
+  ]
+
+  // This is what keeps an unmoved picture cropping exactly as it always did: the
+  // default frame is the panel, so the frame's shape is the panel's shape.
+  it('is the panel polygon itself at the shipped full-panel frame', () => {
+    expect(imgFramePoints(vp, bounds, img())).toEqual(vp)
+    expect(imgFramePoly(vp, bounds, img())).toBe(toClipPath(vp, bounds.x, bounds.y))
+  })
+
+  // Taking the panel's shape rather than a plain rectangle is what keeps this a comic:
+  // an inset picture reads as a smaller panel, with the same slant as the grid around it.
+  it('scales that same shape into an inset frame', () => {
+    const t = { left: 50, top: 0, width: 50, height: 50 }
+    expect(imgFramePoints(vp, bounds, t)).toEqual([
+      [300, 200],
+      [500, 210],
+      [490, 350],
+      [310, 340],
+    ])
+  })
+
+  it('keeps the slant when a frame is inset — it is not squared off to a rectangle', () => {
+    const pts = imgFramePoints(vp, bounds, { left: 20, top: 20, width: 55, height: 55 })
+    expect(pts[0][1]).not.toBe(pts[1][1]) // top edge still slopes
+    expect(pts[0][0]).not.toBe(pts[3][0]) // left edge still leans
+  })
+
+  it('emits the clip relative to the frame, so the shape lands on the picture', () => {
+    const t = { left: 50, top: 0, width: 50, height: 50 }
+    expect(imgFramePoly(vp, bounds, t)).toBe(
+      'polygon(0px 0px, 200px 10px, 190px 150px, 10px 140px)',
+    )
+  })
+
+  // First paint, before layout has measured anything. Scaling a shape into a zero-size
+  // box is a division by zero, and a NaN in a clip-path hides the picture outright.
+  it('has no shape to scale against a zero-size panel box', () => {
+    expect(imgFramePoints(vp, { x: 0, y: 0, w: 0, h: 300 }, img())).toEqual([])
+    expect(imgFramePoints(vp, { x: 0, y: 0, w: 400, h: 0 }, img())).toEqual([])
+    expect(imgFramePoly(vp, { x: 0, y: 0, w: 0, h: 0 }, img())).toBe('none')
   })
 })
 
@@ -278,19 +393,43 @@ describe('default config parity', () => {
     })
   })
 
-  it('has one image transform per panel', () => {
-    expect(PANEL_IMG_TRANSFORMS).toHaveLength(8)
+  // Neither array is parallel to the panels any more: each entry names its own panel,
+  // so only the panel it names has to be real. The shipped page happens to draw one
+  // picture per panel, and that is data — asserting the two lengths match would
+  // re-impose the constraint this change removed.
+  it('puts every picture on a real panel, and draws every panel once', () => {
+    const panels = PANEL_IMG_TRANSFORMS.map(t => t.panel)
+    panels.forEach(p => {
+      expect(p).toBeGreaterThanOrEqual(0)
+      expect(p).toBeLessThan(PANELS.length)
+    })
+    expect(new Set(panels).size).toBe(PANELS.length)
   })
 
-  // The bubble array stopped being parallel to the panels when a panel could own
-  // several: its length is the author's, and only the panel it names has to be real.
+  it('gives every picture a file of its own and alt text', () => {
+    const files = PANEL_IMG_TRANSFORMS.map(t => t.src)
+    expect(new Set(files).size).toBe(files.length)
+    PANEL_IMG_TRANSFORMS.forEach(t => {
+      expect(t.src.startsWith('/comic-book/')).toBe(true)
+      expect(t.alt.length).toBeGreaterThan(0)
+    })
+  })
+
+  // The frame is new, so the shipped values are the compatibility guarantee: every
+  // picture starts on its whole panel and crops exactly as it did before it had one.
+  it('starts every picture on the full-panel frame', () => {
+    PANEL_IMG_TRANSFORMS.forEach(t => {
+      expect([t.left, t.top, t.width, t.height]).toEqual([0, 0, 100, 100])
+    })
+  })
+
   it('puts every bubble on a real panel, and every panel speaks at least once', () => {
     const panels = PANEL_BUBBLE_TRANSFORMS.map(b => b.panel)
     panels.forEach(p => {
       expect(p).toBeGreaterThanOrEqual(0)
-      expect(p).toBeLessThan(PANEL_IMG_TRANSFORMS.length)
+      expect(p).toBeLessThan(PANELS.length)
     })
-    expect(new Set(panels).size).toBe(PANEL_IMG_TRANSFORMS.length)
-    expect(PANEL_BUBBLE_TRANSFORMS.length).toBeGreaterThan(PANEL_IMG_TRANSFORMS.length)
+    expect(new Set(panels).size).toBe(PANELS.length)
+    expect(PANEL_BUBBLE_TRANSFORMS.length).toBeGreaterThan(PANELS.length)
   })
 })

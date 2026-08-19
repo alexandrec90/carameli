@@ -6,7 +6,7 @@ import type { BubbleTransform } from './editor/types'
 interface PanelBubblesProps {
   /** Every bubble on the page — `panel` decides which ones this panel draws. */
   bubbles: BubbleTransform[]
-  /** Index of the panel being drawn, into PANEL_IMAGES. */
+  /** Index of the panel being drawn, into PANELS. */
   panel: number
   /** CSS clip-path of the panel polygon, for bubbles that don't spill. */
   clip: string

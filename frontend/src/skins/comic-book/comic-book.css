@@ -153,11 +153,12 @@
   z-index: 3;
 }
 
-/* Clip wrapper around the panel image — holds overflow:hidden and the panel
-   polygon clip-path (supplied inline) so zoom/pan stays inside the panel shape. */
+/* Clip wrapper around one picture — holds overflow:hidden and the frame's polygon
+   clip-path (supplied inline) so zoom/pan stays inside the frame shape. Its box comes
+   from the inline style too: a picture's frame is its own rectangle over the panel,
+   not the panel itself, so there is no `inset: 0` to fall back on. */
 .cb-img-clip {
   position: absolute;
-  inset: 0;
   overflow: hidden;
 }
 
