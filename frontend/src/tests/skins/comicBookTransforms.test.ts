@@ -44,7 +44,7 @@ const img = (over: Partial<ImgTransform> = {}): ImgTransform => ({
 describe('imgTransformStyle', () => {
   it('builds the expected CSS for a sample transform', () => {
     const style = imgTransformStyle(img({ scale: 1.5, offsetX: 10, offsetY: -20 }))
-    expect(style.objectFit).toBe('cover')
+    expect(style.objectFit).toBe('contain')
     expect(style.objectPosition).toBe('center bottom')
     expect(style.transform).toBe('translate(10px, -20px) scale(1.5)')
     expect(style.transformOrigin).toBe('center center')
@@ -72,38 +72,79 @@ describe('anchorToFractions', () => {
 })
 
 describe('fullImgStyle', () => {
-  // `bounds` here is the *frame* box, not the panel box — an inset picture covers its
+  // `bounds` here is the *frame* box, not the panel box — an inset picture fits its
   // own frame, which is the whole point of the frame being the picture's.
   const t = img
 
-  it('bottom-anchors a portrait image so the cover crop still shows the bottom', () => {
-    // 100×100 box, 100×200 source: cover scale 1, so the box shows the bottom 100px.
-    // The full 200px-tall image is revealed above the box (top: -100).
+  /** The box the image actually occupies once the transform's scale is applied. */
+  const renderedRect = (s: ReturnType<typeof fullImgStyle>, nw: number, nh: number) => {
+    const m = /scale\(([^)]+)\)/.exec(String(s.transform))
+    const k = m ? Number(m[1]) : NaN
+    const cx = Number(s.left) + nw / 2
+    const cy = Number(s.top) + nh / 2
+    return {
+      left: cx - (nw * k) / 2,
+      top: cy - (nh * k) / 2,
+      right: cx + (nw * k) / 2,
+      bottom: cy + (nh * k) / 2,
+    }
+  }
+
+  it('contains a portrait image whole, resting on the frame floor when bottom-anchored', () => {
+    // 100×100 box, 100×200 source: contain scale 0.5, so the full image renders
+    // 50×100 on the bottom edge. left/top place the natural-size img so the scaled
+    // box lands there (top: -50 because the 200px img shrinks about its centre).
     const s = fullImgStyle({ w: 100, h: 100 }, { w: 100, h: 200 }, t())
     expect(s.left).toBe(0)
-    expect(s.top).toBe(-100)
+    expect(s.top).toBe(-50)
     expect(s.width).toBe(100)
     expect(s.height).toBe(200)
-    expect(s.transform).toBe('scale(1)')
+    expect(s.transform).toBe('scale(0.5)')
     expect(s.objectFit).toBe('fill')
     // Must opt out of a global `img { max-width: 100% }` reset, else the natural
     // width collapses to the wrapper and the reveal geometry breaks.
     expect(s.maxWidth).toBe('none')
     expect(s.maxHeight).toBe('none')
+    expect(renderedRect(s, 100, 200)).toEqual({ left: 25, top: 0, right: 75, bottom: 100 })
   })
 
-  it('center-anchors a wide image so it reveals symmetrically left/right', () => {
+  it('centers a wide image with symmetric margins left and right', () => {
     const s = fullImgStyle({ w: 100, h: 100 }, { w: 200, h: 100 }, t({ anchor: 'center center' }))
     expect(s.left).toBe(-50)
     expect(s.top).toBe(0)
-    expect(s.transform).toBe('scale(1)')
+    expect(s.transform).toBe('scale(0.5)')
+    expect(renderedRect(s, 200, 100)).toEqual({ left: 0, top: 25, right: 100, bottom: 75 })
   })
 
   it('folds the transform zoom into the reveal scale and re-centres the pan', () => {
+    // scale 2 on the 0.5 contain fit is scale(1) — a deliberate zoom past the frame
+    // is still exactly what the editor's slider promises.
     const s = fullImgStyle({ w: 100, h: 100 }, { w: 100, h: 200 }, t({ scale: 2 }))
     expect(s.left).toBe(0)
-    expect(s.top).toBe(-150)
-    expect(s.transform).toBe('scale(2)')
+    expect(s.top).toBe(-50)
+    expect(s.transform).toBe('scale(1)')
+  })
+
+  // Regression for the beheaded receptionist: her 1671×1487 art, cover-fitted into
+  // a ~714×281 panel, rendered 354px above the frame, so the panel's ink line cut
+  // across her face. At scale 1 nothing may leave the frame — the artwork's own
+  // edges are the borders the reader sees, whatever the two aspect ratios are.
+  it('keeps the whole image inside the frame at scale 1, whatever the aspects', () => {
+    const boxes = [
+      { w: 714, h: 281, nw: 1671, nh: 1487 }, // wide panel, tall art (the receptionist)
+      { w: 281, h: 714, nw: 2816, nh: 1536 }, // tall panel, wide art
+    ]
+    const anchors = ['center bottom', 'center center', 'left top']
+    boxes.forEach(({ w, h, nw, nh }) => {
+      anchors.forEach(anchor => {
+        const s = fullImgStyle({ w, h }, { w: nw, h: nh }, t({ anchor }))
+        const r = renderedRect(s, nw, nh)
+        expect(r.left).toBeGreaterThanOrEqual(-1e-6)
+        expect(r.top).toBeGreaterThanOrEqual(-1e-6)
+        expect(r.right).toBeLessThanOrEqual(w + 1e-6)
+        expect(r.bottom).toBeLessThanOrEqual(h + 1e-6)
+      })
+    })
   })
 })
 

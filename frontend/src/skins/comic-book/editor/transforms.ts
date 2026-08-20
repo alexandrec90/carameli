@@ -6,9 +6,9 @@ import type { ImgTransform, BubbleTransform } from './types'
 // ─── Interaction bounds (Phase 3) ───────────────────────────────────────────────
 
 /**
- * Image zoom limits. Below 1 the image no longer fills the panel (objectFit:cover
- * leaves the Ben-Day dot background showing through) — intentional, so a panel image
- * can be shrunk as well as enlarged.
+ * Image zoom limits. At 1 the whole image fits inside its frame (contain), with the
+ * Ben-Day dot background showing through around it; above 1 it zooms toward a crop.
+ * Both directions are intentional — shrink as well as enlarge.
  */
 export const IMG_SCALE = { min: 0.2, max: 4, step: 0.05 }
 /** Bubble width limits, in % of the panel box. */
@@ -73,7 +73,7 @@ export function rotateBubble(b: BubbleTransform, deltaDeg: number): BubbleTransf
 /** CSS for the <img> inside the clip wrapper. */
 export function imgTransformStyle(t: ImgTransform): CSSProperties {
   return {
-    objectFit: 'cover',
+    objectFit: 'contain',
     objectPosition: t.anchor,
     transform: `translate(${t.offsetX}px, ${t.offsetY}px) scale(${t.scale})`,
     transformOrigin: 'center center',
@@ -93,21 +93,26 @@ export function anchorToFractions(anchor: string): [number, number] {
 }
 
 /**
- * Full-source framing style: render the *entire* source image (no cover cropping),
- * scaled and positioned so that at identity (scale 1 / offset 0) it is pixel-identical
- * to {@link imgTransformStyle}'s `object-fit: cover` box. This is the picture's real
- * geometry once its natural size is known: the frame's polygon clip supplies the
- * comic-panel crop, so panning slides the picture under the frame (re-framing it)
- * instead of moving a pre-cropped box — no source pixels are ever discarded. In edit
- * mode the selected image simply drops the clip, revealing the same geometry.
+ * Full-source framing style: render the *entire* source image, scaled and positioned
+ * so that at identity (scale 1 / offset 0) it is pixel-identical to
+ * {@link imgTransformStyle}'s `object-fit: contain` box. This is the picture's real
+ * geometry once its natural size is known: the image keeps its own edges — the
+ * "original borders" of the artwork — and the frame's polygon clip only ever cuts in
+ * when a zoom or pan pushes the picture past its frame. In edit mode the selected
+ * image simply drops the clip, revealing the same geometry.
  *
- * `bounds` is the *frame* box, not the panel box: an inset picture covers its own
+ * `bounds` is the *frame* box, not the panel box: an inset picture fits its own
  * frame, which is the whole point of the frame being the picture's own.
  *
- * Geometry: the cover box (`bounds`) renders the natural image (`nat`) at
- * `coverScale = max(bw/nw, bh/nh)`; this draws the natural image at that same
- * scale (× the transform's zoom) and positions its centre where the cover content's
- * centre lands after `translate(offset) scale(t.scale)` about the box centre.
+ * Geometry: the contain box (`bounds`) renders the natural image (`nat`) at
+ * `fit = min(bw/nw, bh/nh)` — the whole image visible, anchored inside the box;
+ * this draws the natural image at that same scale (× the transform's zoom) and
+ * positions its centre where the contained content's centre lands after
+ * `translate(offset) scale(t.scale)` about the box centre.
+ *
+ * `min`, not `max`: the cover fit this replaces filled the frame by cropping
+ * whichever image dimension overshot it — a wide panel beheaded a tall picture, and
+ * the panel's ink border then cut across the artwork instead of framing it.
  */
 export function fullImgStyle(
   bounds: { w: number; h: number },
@@ -116,11 +121,11 @@ export function fullImgStyle(
 ): CSSProperties {
   const { w: bw, h: bh } = bounds
   const { w: nw, h: nh } = nat
-  const cover = Math.max(bw / nw, bh / nh)
-  const fw = nw * cover
-  const fh = nh * cover
+  const fit = Math.min(bw / nw, bh / nh)
+  const fw = nw * fit
+  const fh = nh * fit
   const [ax, ay] = anchorToFractions(t.anchor)
-  // Cover content centre in box coords (before the panel transform).
+  // Contained content centre in box coords (before the panel transform).
   const cx = ax * (bw - fw) + fw / 2
   const cy = ay * (bh - fh) + fh / 2
   const ox = bw / 2
@@ -140,7 +145,7 @@ export function fullImgStyle(
     maxWidth: 'none',
     maxHeight: 'none',
     objectFit: 'fill',
-    transform: `scale(${cover * t.scale})`,
+    transform: `scale(${fit * t.scale})`,
     transformOrigin: 'center center',
   }
 }
