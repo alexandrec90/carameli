@@ -34,7 +34,12 @@ redis_port = 6379
 # Mirror docker-compose.yml's POSTGRES_* and CI's env block.
 user = "carameli"
 password = "carameli_local_dev" # pragma: allowlist secret
-name = "carameli"
+# NOT "carameli": the test session TRUNCATEs every table in whatever it is pointed at,
+# and the compose `carameli` database is the one holding the provisioned customer,
+# extension and DID rows this laptop's stack runs on. `tests/conftest.py` now refuses
+# a target nobody marked disposable; this makes the disposable one the default rather
+# than something each caller has to remember.
+name = "carameli_test"
 url_scheme = "postgresql+asyncpg"
 url_env = ["DATABASE_URL", "DIRECT_DATABASE_URL"]
 redis_env = "REDIS_URL"

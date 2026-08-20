@@ -16,6 +16,7 @@ Keep it in sync with `.devkit.toml`; a deliberate manifest change should
 update both in the same commit.
 """
 
+
 from conftest import REPO_ROOT, load_module
 
 cfg = load_module("scripts/hooks/harness_config.py")
@@ -33,7 +34,9 @@ def test_manifest_reproduces_carameli_db_tier():
 
     assert c.db.enabled is True
     assert c.db.services == ("db", "redis")
-    assert c.db.user == "carameli" and c.db.name == "carameli"
+    assert c.db.user == "carameli"
+    # Never the `carameli` database: the session fixture empties every table in it.
+    assert c.db.name == "carameli_test"
     assert c.db.password == "carameli_local_dev"  # pragma: allowlist secret
     assert c.db.url_scheme == "postgresql+asyncpg"
     # Both aliases matter: app code reads DATABASE_URL, alembic DIRECT_DATABASE_URL.

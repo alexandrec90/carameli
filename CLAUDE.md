@@ -97,10 +97,18 @@ Avoid destructive or disruptive lifecycle commands without confirmation:
 - use `docker compose exec -T` from scripts and automation.
 
 DB-backed tests read `DATABASE_URL` from `.env` and TRUNCATE every table before each
-run. A worktree gets its own compose stack on its own host ports, but a `.env` copied
-from the primary checkout still names the primary's port -- so running those tests in a
-worktree wipes the main stack's data. Point a worktree `.env` at its own `DB_HOST_PORT`
-before running anything DB-backed.
+run, so the database they are pointed at is destroyed. **`tests/conftest.py` refuses to
+run unless something marks that database disposable**: `CI` is set, the name ends in
+`_test`, or `CARAMELI_ALLOW_DB_TRUNCATE=1` is exported. `carameli_test` exists for this
+and `.devkit.toml` names it, so the harness path is safe by default; a bare `pytest`
+with a populated `.env` now stops with the target named instead of emptying it.
+
+The paragraph this replaces said the same thing as advice -- point a worktree's `.env`
+at its own `DB_HOST_PORT` -- and advice is what failed: on 2026-08-20 a bare `pytest`
+inside a box emptied the primary stack's `carameli` database anyway, because a box
+seeds its `.env` from the source checkout and so names the primary's port, and nothing
+in the run said otherwise. The guidance is still right and still worth following; the
+guard is what makes it hold when nobody does.
 
 Run focused verification for changed behavior. Typical commands:
 
