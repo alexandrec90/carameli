@@ -16,5 +16,10 @@ an API key or provider credential in the bundle.
 - Follow `.claude/rules/skin-architecture.md` and the active skin's scoped rule for skin
   work. Use the `add-skin` skill only when creating an entirely new skin.
 
-Verify frontend changes with `npm run test:run` and `npm run lint:types` from this
-directory.
+Verify frontend changes with `npm run test:run` and `npm run lint` from this directory.
+
+Run the whole of `lint`, not one of its parts. It chains four checks —
+`lint:eslint`, `lint:types`, `lint:css`, `lint:spelling` — and `lint:spelling`
+(cspell) rejects unknown words in `.ts`/`.tsx` as readily as in prose, so an
+ordinary identifier can fail CI having passed `lint:types` locally. There is no
+`typecheck` script; type checking is `lint:types` (`tsc --noEmit`).
