@@ -13,7 +13,8 @@
 // type only says how far the tail reaches (a thought bubble reaches nowhere and trails
 // puffs instead); the direction, including having none at all, is the author's.
 
-import { RING_POINTS, ELLIPSE, tailRingIndex, tailTip } from './bubbleBox'
+import { boltMod } from './boltShape'
+import { RING_POINTS, ELLIPSE, ringTheta, tailRingIndex, tailTip } from './bubbleBox'
 import type { TailDir } from './bubbleBox'
 import type { BubbleType } from './editor/bubbleTypes'
 
@@ -26,21 +27,6 @@ interface ShapeDef {
   tail: number
   /** Opacity of the trailing thought puffs. */
   puffs: number
-}
-
-/**
- * Deterministic [0, 1) jitter. `lightning` needs uneven spikes, and a seeded hash
- * gives them without `Math.random` — so the geometry is stable across renders and
- * assertable in a test.
- */
-function jitter(i: number): number {
-  const s = Math.sin(i * 12.9898) * 43758.5453
-  return s - Math.floor(s)
-}
-
-/** Polar angle of ring index `i`. Index 0 is the top and the ring runs clockwise. */
-function ringTheta(i: number): number {
-  return -Math.PI / 2 + (TAU * i) / RING_POINTS
 }
 
 /**
@@ -84,57 +70,13 @@ function cloudMod(i: number): number {
   return far || 1
 }
 
-/**
- * Action-bubble spikes. Each spike owns BOLT_PERIOD vertices and is a *triangle* —
- * valley, straight climb to a crown, straight fall into the next valley — so every
- * turn is a corner instead of the crest of a cosine. Soft edges were the whole
- * complaint about the cosine burst this replaced.
- *
- * Three things are jittered per spike so it cannot read as a sun: crown height,
- * valley depth, and *where in the period the crown sits*. An off-centre crown makes
- * a spike lean, and no two lean alike; the evenly spaced symmetric spikes of a pure
- * radial multiple are exactly the sun look to avoid.
- */
-const BOLT_SPIKES = 8
-const BOLT_PERIOD = RING_POINTS / BOLT_SPIKES
-
-/** Crown height above the base ellipse. Capped so no spike escapes the viewBox. */
-function boltCrown(k: number): number {
-  return 0.1 + 0.09 * jitter(3 * k + 1)
-}
-
-/** Valley depth below it — deep valleys are what make the crowns read as spikes. */
-function boltValley(k: number): number {
-  return -0.17 + 0.1 * jitter(3 * k + 2)
-}
-
-/**
- * Which vertex of the period carries the crown — 1..6 of 8, so spikes lean hard.
- * A crown at 1 is a shark fin: one steep segment up, six shallow ones back down.
- */
-function boltCrownAt(k: number): number {
-  return 1 + Math.floor(6 * jitter(5 * k + 2))
-}
-
-function lightningMod(i: number): number {
-  const k = Math.floor(i / BOLT_PERIOD)
-  const j = i % BOLT_PERIOD
-  const crownAt = boltCrownAt(k)
-  const climbing = j <= crownAt
-  const from = climbing ? boltValley(k) : boltCrown(k)
-  // The falling edge aims at the *next* spike's valley, so the ring closes seamlessly.
-  const to = climbing ? boltCrown(k) : boltValley((k + 1) % BOLT_SPIKES)
-  const span = climbing ? crownAt : BOLT_PERIOD - crownAt
-  const t = climbing ? j / crownAt : (j - crownAt) / span
-  // Per-vertex roughness: the straight edges stay straight-ish, but hand-drawn.
-  return 1 + from + (to - from) * t + 0.03 * (jitter(7 * i + 5) - 0.5)
-}
-
 const SHAPES: Record<BubbleType, ShapeDef> = {
   // A plain ellipse — 64 straight segments read as smooth at any rendered size.
   soft: { mod: () => 1, tail: 1, puffs: 0 },
   cloud: { mod: cloudMod, tail: 0, puffs: 1 },
-  lightning: { mod: lightningMod, tail: 0.85, puffs: 0 },
+  // The impact burst lives in its own module — it is an authored spike table rather
+  // than a modulation of the ellipse, and it is longer than the other two together.
+  lightning: { mod: boltMod, tail: 0.85, puffs: 0 },
 }
 
 /** Round to 2 decimals — path strings are rebuilt every frame during a morph. */

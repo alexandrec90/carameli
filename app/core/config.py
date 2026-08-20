@@ -36,6 +36,9 @@ class Settings(BaseSettings):
     jambonz_webhook_base_url: str = "http://localhost:8000"
     jambonz_webhook_secret: str = ""
     jambonz_record_all_calls: bool = False
+    # Carrier trunk name to pin device-originated PSTN calls to. Blank lets Jambonz
+    # pick, which is correct while the account has exactly one carrier configured.
+    jambonz_outbound_trunk: str = ""
     sip_credential_encryption_secret: str = ""
 
     # Per-call SCI context is intentionally short-lived. VanillaSoft posts it
