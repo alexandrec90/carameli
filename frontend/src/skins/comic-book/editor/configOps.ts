@@ -16,9 +16,9 @@ import type { BubbleTransform, EditorConfig, ImgTransform } from './types'
 export const CONFIG_KEY = 'comic-book:editConfig'
 
 /**
- * A brand-new picture, before {@link addImg} drops it on a panel. Inset rather than
- * full-panel on purpose: a second picture added at 0/0/100/100 would land exactly on
- * top of the one already there and read as nothing having happened.
+ * A brand-new picture, before {@link addImg} drops it on a panel. Inset on purpose: a
+ * second picture added on the panel box itself would land underneath the one already
+ * there and read as nothing having happened.
  */
 export const NEW_IMAGE: Omit<ImgTransform, 'panel'> = {
   src: PANEL_ASSETS[0].src,

@@ -146,14 +146,17 @@ export function fullImgStyle(
 }
 
 /**
- * Style for the .cb-img-clip wrapper around a panel image. The frame's polygon
- * clip-path ({@link imgFramePoly}) is what crops the full-source image
+ * Style for the .cb-img-clip wrapper around a panel image. The panel's polygon
+ * clip-path ({@link imgPanelClip}) is what crops the full-source image
  * ({@link fullImgStyle}) into a comic panel. `spill: true` drops the clip so the
- * image pops out of its frame —
+ * picture pops out past the panel edge —
  * z-index 4 lifts it above the panel-outline SVG (z-index 3) so the frame lines
  * don't cross it (panels themselves are z-index:auto, so children escape into the
  * root stacking context). The editor's full-reveal does the same unclipping while
  * an image is selected.
+ *
+ * Deliberately the same rule a bubble gets from PanelBubbles: `spill` asks whether
+ * this entity's ink may cross the *panel* edge, and means the same thing for both.
  */
 export function imgClipStyle(spill: boolean, reveal: boolean, clip: string): CSSProperties {
   return spill || reveal
@@ -204,6 +207,11 @@ export function bubbleStyle(b: BubbleTransform): CSSProperties {
 // polygon it used to borrow. That is what lets a panel hold two pictures, and what
 // makes dragging one move its window instead of sliding the picture under a window
 // that never moved.
+//
+// The frame is geometry and nothing else: where the picture sits and how big it
+// renders, exactly as `top`/`right`/`width` are for a bubble. It is not a shape, it
+// draws no ink, and it does no cropping — the panel does the cropping, or nothing
+// does when `spill` is on.
 
 /** Frame size limits, in % of the panel box. */
 export const IMG_FRAME = { min: 5, max: 400, step: 1 }
@@ -244,46 +252,29 @@ export function imgRect(
 }
 
 /**
- * The frame's crop shape in viewport coordinates: the panel's own polygon, normalised
- * against the panel box and scaled into the frame rect.
+ * The crop a picture gets while `spill` is off: the panel's own polygon, as a
+ * `clip-path` relative to the picture's frame — which is where the clip wrapper is
+ * placed, so the shape lands on the picture rather than beside it.
  *
- * Taking the panel's shape rather than a plain rectangle is what keeps this a comic.
- * At the default full-panel frame it is the panel polygon exactly — a picture that has
- * not been moved crops as it always did — and an inset picture reads as a small panel
- * of its own, with the same slanted gutters as the grid around it.
+ * The *panel's* polygon, at its true size. Not a copy of it scaled into the frame,
+ * which is what shipped and is the whole of the reported bug: a frame wider than its
+ * panel carried the crop out into the gutter with it, so a picture with "allow spill"
+ * unchecked still spilled, and the wider the author dragged the frame the further it
+ * escaped. Cropping to the panel makes the checkbox mean what it says, and makes it
+ * mean for a picture exactly what it already meant for a bubble — may this entity's
+ * ink cross the panel edge?
  *
- * A zero-size panel box (first paint, before layout) has no shape to scale, so this
- * returns no points rather than dividing by zero.
+ * A panel with no polygon (first paint, before layout) has no shape to cut to, so this
+ * returns `none` rather than an empty `polygon()` that would hide the picture entirely.
  */
-export function imgFramePoints(
-  vp: [number, number][],
-  bounds: { x: number; y: number; w: number; h: number },
-  t: Pick<ImgTransform, 'left' | 'top' | 'width' | 'height'>,
-): [number, number][] {
-  if (bounds.w <= 0 || bounds.h <= 0) return []
-  const rect = imgRect(bounds, t)
-  return vp.map(
-    ([x, y]) =>
-      [
-        rect.x + ((x - bounds.x) / bounds.w) * rect.w,
-        rect.y + ((y - bounds.y) / bounds.h) * rect.h,
-      ] as [number, number],
-  )
-}
-
-/**
- * {@link imgFramePoints} as a `clip-path` relative to the frame wrapper — which is where
- * the wrapper is placed, so the shape lands on the picture rather than beside it.
- */
-export function imgFramePoly(
+export function imgPanelClip(
   vp: [number, number][],
   bounds: { x: number; y: number; w: number; h: number },
   t: Pick<ImgTransform, 'left' | 'top' | 'width' | 'height'>,
 ): string {
-  const pts = imgFramePoints(vp, bounds, t)
-  if (pts.length === 0) return 'none'
+  if (vp.length === 0) return 'none'
   const rect = imgRect(bounds, t)
-  return toClipPath(pts, rect.x, rect.y)
+  return toClipPath(vp, rect.x, rect.y)
 }
 
 /** Move a picture's frame by a px drag → % of the panel box. */
@@ -340,15 +331,4 @@ export function imgFrameStyle(
 ): CSSProperties {
   const box = imgFrameBox(bounds, t)
   return { position: 'absolute', left: box.x, top: box.y, width: box.w, height: box.h }
-}
-
-/**
- * True when a picture's frame is exactly its panel — the shipped default. The editor
- * draws frame ink only around the ones that are not, since a full-panel frame would
- * stroke the panel outline a second time along the identical path.
- */
-export function isFullPanelFrame(
-  t: Pick<ImgTransform, 'left' | 'top' | 'width' | 'height'>,
-): boolean {
-  return t.left === 0 && t.top === 0 && t.width === 100 && t.height === 100
 }

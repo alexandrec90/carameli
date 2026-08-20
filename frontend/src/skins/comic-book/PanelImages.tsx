@@ -2,8 +2,8 @@ import {
   fullImgStyle,
   imgClipStyle,
   imgFrameBox,
-  imgFramePoly,
   imgFrameStyle,
+  imgPanelClip,
   imgTransformStyle,
 } from './editor/transforms'
 import type { ImgTransform } from './editor/types'
@@ -15,7 +15,7 @@ interface PanelImagesProps {
   panel: number
   /** Box of the panel being drawn, in viewport coords. */
   bounds: { x: number; y: number; w: number; h: number }
-  /** The panel's polygon in viewport coords — the shape each frame is cut to. */
+  /** The panel's polygon in viewport coords — the shape a non-spilling picture is cut to. */
   vp: [number, number][]
   /** Natural pixel size of each loaded source, keyed by `src`; missing until it loads. */
   natSizes: Record<string, { w: number; h: number }>
@@ -32,11 +32,11 @@ interface PanelImagesProps {
  * filtered by `panel` rather than indexed by it, so adding a picture in the editor is
  * an append and never has to line up with anything.
  *
- * Each picture has its own frame over the panel box ({@link imgFrameStyle}), cut to the
- * panel's polygon scaled into that frame ({@link imgFramePoly}). At the shipped
- * full-panel frame the two are the same shape, which is why the page looks unchanged;
- * moving a frame now moves the window rather than sliding the picture under a window
- * pinned to the panel.
+ * Each picture has its own frame over the panel box ({@link imgFrameStyle}) — where it
+ * sits and how big it renders, and nothing more. The frame draws no ink and cuts no
+ * shape: while `spill` is off the *panel* crops the picture ({@link imgPanelClip}), and
+ * while it is on nothing does. That is a bubble's rule, unchanged, which is the point —
+ * a picture is an entity that lives on a panel, not a second copy of one.
  *
  * Natural sizes are keyed by `src` rather than by index: two pictures on the same panel
  * may well be the same file, and keying by index would make the second one wait for its
@@ -65,7 +65,7 @@ export default function PanelImages({
             className="cb-img-clip"
             style={{
               ...imgFrameStyle(bounds, img),
-              ...imgClipStyle(img.spill, reveal, imgFramePoly(vp, bounds, img)),
+              ...imgClipStyle(img.spill, reveal, imgPanelClip(vp, bounds, img)),
             }}
           >
             {/* Full-source geometry once the natural size is known, so pan/zoom

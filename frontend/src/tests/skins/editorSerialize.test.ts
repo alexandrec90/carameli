@@ -42,7 +42,7 @@ describe('serializeConfig', () => {
   it('carries the explanatory headers, the same-panel link rule included', () => {
     const ts = serializeConfig(seedConfig())
     expect(ts).toContain('Not parallel to PANELS: each picture names its `panel`')
-    expect(ts).toContain("the panel's own polygon scaled into it")
+    expect(ts).toContain("the same question, and the same answer, as a bubble's `spill`")
     expect(ts).toContain('must name a bubble on the same panel')
     expect(ts).toContain("`tail` which way the tail points ('none'")
     expect(ts).toContain('Two pairs ship linked')
@@ -52,12 +52,12 @@ describe('serializeConfig', () => {
     const ts = serializeConfig(seedConfig())
     expect(ts).toContain(
       "{ panel: 0, src: '/comic-book/logo.webp', alt: 'Carameli', " +
-        'left: 0, top: 0, width: 100, height: 100, scale: 1, offsetX: 0, offsetY: 0, ' +
+        'left: -5, top: -5, width: 110, height: 110, scale: 1, offsetX: 0, offsetY: 0, ' +
         "anchor: 'center center', spill: false },",
     )
     expect(ts).toContain(
       "{ panel: 1, src: '/comic-book/switchboard.webp', alt: 'Switchboard', " +
-        'left: 0, top: 0, width: 100, height: 100, scale: 1, offsetX: 0, offsetY: 0, ' +
+        'left: -5, top: -5, width: 110, height: 110, scale: 1, offsetX: 0, offsetY: 0, ' +
         "anchor: 'center bottom', spill: false },",
     )
     expect(ts).toContain(

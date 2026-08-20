@@ -6,13 +6,15 @@ import type { BubbleType } from './bubbleTypes'
  * it is cropped to, and how the picture is framed *inside* that crop.
  *
  * A panel may own any number of pictures, or none. The frame — `left`/`top`/`width`/
- * `height`, in % of the panel box — is the picture's own, exactly as a bubble's
- * placement is. It used to be the panel polygon itself, which meant dragging an image
- * only slid the picture under a window that stayed put, and a second picture on the
- * same panel had nowhere to be. The frame takes the panel's shape scaled into it (see
- * `imgFramePoly`), so a picture left at the default 0/0/100/100 crops exactly as the
- * panel always did, and an inset one reads as a small comic panel rather than as a
- * rectangle pasted on top.
+ * `height`, in % of the panel box — is the picture's own placement, exactly as a
+ * bubble's `top`/`right`/`width` is. It used to be the panel polygon itself, which
+ * meant dragging an image only slid the picture under a window that stayed put, and a
+ * second picture on the same panel had nowhere to be.
+ *
+ * The frame is geometry alone. It is not a shape and not a border: it draws no ink,
+ * and the crop comes from the *panel* (see `imgPanelClip`) or, with `spill` on, from
+ * nothing. A frame that also cropped meant a picture whose frame was wider than its
+ * panel escaped the panel with `spill` unchecked.
  *
  * `scale`/`offsetX`/`offsetY`/`anchor` are the second, independent framing: they move
  * the picture *within* its frame, which is what dragging used to do to the whole image.
@@ -40,7 +42,7 @@ export interface ImgTransform {
   offsetY: number
   /** CSS object-position anchor the framing starts from, e.g. 'center bottom'. */
   anchor: string
-  /** When true the picture may bleed past its frame; when false it is clipped to it. */
+  /** When true the picture may bleed past the panel edge; when false it is clipped to it. */
   spill: boolean
 }
 

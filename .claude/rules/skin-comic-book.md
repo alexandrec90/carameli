@@ -162,10 +162,17 @@ up drawn on each.
 
 A picture carries **two independent framings**, and conflating them is the mistake to
 avoid: `left`/`top`/`width`/`height` are its frame over the panel box (in % of that
-box, cut to the panel's polygon scaled into it by `imgFramePoly`), while
-`scale`/`offsetX`/`offsetY`/`anchor` move the picture *within* that frame. The frame
-used to be the panel polygon itself, so dragging a picture could only slide it under a
-window that stayed put; a frame left at `0/0/100/100` still crops exactly as it did.
+box), while `scale`/`offsetX`/`offsetY`/`anchor` move the picture *within* that frame.
+The frame used to be the panel polygon itself, so dragging a picture could only slide
+it under a window that stayed put.
+
+**A frame is geometry, not a shape and not a border.** It draws no ink at any time —
+the only outline a picture ever shows is the editor overlay's own selection chrome —
+and it does no cropping: the *panel* crops (`imgPanelClip`) while `spill` is off, and
+nothing crops while it is on. That is a bubble's rule verbatim, and pictures are meant
+to be read as the same kind of entity. A frame that also cropped was how a picture with
+`spill` unchecked still escaped its panel: the crop was the panel's shape *scaled into
+the frame*, so a frame wider than its panel took the crop out into the gutter with it.
 
 ### Connector tubes
 

@@ -41,11 +41,19 @@ function strLiteral(s: string): string {
 const IMG_HEADER = `// Not parallel to PANELS: each picture names its \`panel\`, so a panel may own several or
 // none, and the array is ordered by panel only for readability. \`src\`/\`alt\` are the
 // picture itself; \`left\`/\`top\`/\`width\`/\`height\` are its frame, in % of the panel box,
-// and may go negative or past 100 to hang the frame off an edge. That frame is cut to
-// the panel's own polygon scaled into it, so an inset picture reads as a smaller comic
-// panel rather than as a bare rectangle. \`scale\`/\`offsetX\`/\`offsetY\`/\`anchor\` then
-// frame the picture *inside* its frame; \`spill: false\` clips it there, \`spill: true\`
-// lets it bleed past.`
+// and may go negative or past 100 to hang the frame off an edge.
+// \`scale\`/\`offsetX\`/\`offsetY\`/\`anchor\` then frame the picture *inside* its frame;
+// \`spill: false\` clips it to the panel, \`spill: true\` lets it bleed into the gutter —
+// the same question, and the same answer, as a bubble's \`spill\`.
+//
+// The eight ship on a -5/-5/110/110 frame rather than on 0/0/100/100, and the
+// difference is the point rather than a tweak. A frame of exactly 0/0/100/100 *is* the
+// panel box: the editor draws its selection outline in the same place it draws the
+// panel's, so there is no picture to grab that is distinguishable from the slot it sits
+// in — which was the original complaint. Art that overhangs the window it is read
+// through is also the ordinary comic relationship, and it is the one framing that keeps
+// covering when the grid reflows (\`computeLayout\` reshapes every panel between the
+// landscape, portrait and square layouts). Retune any of them in the editor and Save.`
 
 const BUBBLE_HEADER = `// Not parallel to PANELS either: each bubble names its \`panel\`, a panel may own any
 // number of them, and the array is ordered by panel only for readability. \`type\`/\`text\`

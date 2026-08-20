@@ -7,7 +7,7 @@ import PanelBubbles from './PanelBubbles'
 import PanelImages from './PanelImages'
 import { PANELS } from './panels'
 import { PANEL_IMG_TRANSFORMS, PANEL_BUBBLE_TRANSFORMS } from './editor/layoutConfig'
-import { imgFramePoints, isFullPanelFrame, toClipPath } from './editor/transforms'
+import { toClipPath } from './editor/transforms'
 import { shouldRevealImg, useEditorMode } from './editor/useEditorMode'
 import {
     drawLoadingRipple, drawWash, parseCssColor, washPhaseAt,
@@ -907,8 +907,9 @@ export function Layout({ navItems }: LayoutProps) {
                     const { bounds, vp } = poly
 
                     // The dots clip tightly to the panel polygon (element-relative px
-                    // coords). A picture clips to its own frame instead — the same shape
-                    // scaled into it — which PanelImages works out per picture.
+                    // coords). Pictures and bubbles clip to the same polygon when they
+                    // may not spill, but each is offset by its own box, so PanelImages
+                    // rebuilds it per picture rather than reusing this one.
                     const dotClip = toClipPath(vp, bounds.x, bounds.y)
 
                     // While editing, the selected picture reveals its full self (clip off)
@@ -959,9 +960,10 @@ export function Layout({ navItems }: LayoutProps) {
                                 style={{ clipPath: dotClip }}
                             />
                             {/* Pictures — however many name this panel, each on its own frame
-                                over the panel box, each cut to the panel's shape scaled into
-                                that frame. `spill` (and the editor's full-reveal selection)
-                                drops the clip so a picture pops out over the frame lines. */}
+                                over the panel box, each cut to this panel's shape. `spill`
+                                (and the editor's full-reveal selection) drops the clip so a
+                                picture pops out over the frame lines, exactly as it does for
+                                a bubble. */}
                             <PanelImages
                                 images={imgT}
                                 panel={i}
@@ -1007,28 +1009,12 @@ export function Layout({ navItems }: LayoutProps) {
                             strokeLinejoin="miter"
                         />
                     ))}
-                    {/* A picture that has been given its own frame is inked like the panel
-                        it sits in — that border is what makes an inset picture read as a
-                        panel-within-a-panel rather than as a pasted cut-out. A full-panel
-                        frame is skipped: its ink would land on the panel outline already
-                        drawn above, doubling the stroke along an identical path. */}
-                    {imgT.map((img, k) => {
-                        if (isFullPanelFrame(img)) return null
-                        const poly = panelPolys[img.panel]
-                        if (!poly) return null
-                        const pts = imgFramePoints(poly.vp, poly.bounds, img)
-                        if (pts.length === 0) return null
-                        return (
-                            <polygon
-                                key={`img-${k}`}
-                                points={pts.map(([x, y]) => `${x},${y}`).join(' ')}
-                                fill="none"
-                                stroke="#111111"
-                                strokeWidth="5"
-                                strokeLinejoin="miter"
-                            />
-                        )
-                    })}
+                    {/* Only panels are inked. A picture's frame is where it sits, not a
+                        border it wears: the ink that used to be drawn around every moved
+                        frame put a second black outline on the page in normal viewing,
+                        where there is no frame to be looking at. The frame is visible in
+                        the editor, drawn by the overlay's own chrome, and nowhere else —
+                        which is how a bubble's placement has always worked. */}
                 </svg>
 
                 {/* Layer 3 — Ben-Day wash canvas (page transitions; blank when idle) */}

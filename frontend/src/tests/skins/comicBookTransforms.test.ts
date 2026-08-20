@@ -12,9 +12,8 @@ import {
   fullImgStyle,
   imgClipStyle,
   imgFrameBox,
-  imgFramePoints,
-  imgFramePoly,
   imgFrameStyle,
+  imgPanelClip,
   imgRect,
   anchorToFractions,
   bubbleRect,
@@ -24,7 +23,7 @@ import {
 import type { ImgTransform } from '../../skins/comic-book/editor/types'
 import { PANELS } from '../../skins/comic-book/panels'
 
-/** A picture at the shipped default: full-panel frame, identity framing inside it. */
+/** A picture on a frame covering its whole panel box, identity framing inside it. */
 const img = (over: Partial<ImgTransform> = {}): ImgTransform => ({
   panel: 0,
   src: '/comic-book/logo.webp',
@@ -163,7 +162,7 @@ describe('imgFrameBox / imgRect / imgFrameStyle', () => {
   })
 })
 
-describe('imgFramePoints / imgFramePoly', () => {
+describe('imgPanelClip', () => {
   const bounds = { x: 100, y: 200, w: 400, h: 300 }
   // A slanted quad, like the real panel polygons — the gutters are not square.
   const vp: [number, number][] = [
@@ -173,44 +172,35 @@ describe('imgFramePoints / imgFramePoly', () => {
     [120, 480],
   ]
 
-  // This is what keeps an unmoved picture cropping exactly as it always did: the
-  // default frame is the panel, so the frame's shape is the panel's shape.
-  it('is the panel polygon itself at the shipped full-panel frame', () => {
-    expect(imgFramePoints(vp, bounds, img())).toEqual(vp)
-    expect(imgFramePoly(vp, bounds, img())).toBe(toClipPath(vp, bounds.x, bounds.y))
+  // The crop is the panel, at the panel's own size, wherever the frame happens to be:
+  // the same shape a non-spilling bubble is cut to. Only the origin moves, because the
+  // clip lands on the frame element rather than on the panel.
+  it('is the panel polygon itself when the frame covers the panel box', () => {
+    expect(imgPanelClip(vp, bounds, img())).toBe(toClipPath(vp, bounds.x, bounds.y))
   })
 
-  // Taking the panel's shape rather than a plain rectangle is what keeps this a comic:
-  // an inset picture reads as a smaller panel, with the same slant as the grid around it.
-  it('scales that same shape into an inset frame', () => {
+  it('re-origins that same shape onto an inset frame, without shrinking it', () => {
     const t = { left: 50, top: 0, width: 50, height: 50 }
-    expect(imgFramePoints(vp, bounds, t)).toEqual([
-      [300, 200],
-      [500, 210],
-      [490, 350],
-      [310, 340],
-    ])
-  })
-
-  it('keeps the slant when a frame is inset — it is not squared off to a rectangle', () => {
-    const pts = imgFramePoints(vp, bounds, { left: 20, top: 20, width: 55, height: 55 })
-    expect(pts[0][1]).not.toBe(pts[1][1]) // top edge still slopes
-    expect(pts[0][0]).not.toBe(pts[3][0]) // left edge still leans
-  })
-
-  it('emits the clip relative to the frame, so the shape lands on the picture', () => {
-    const t = { left: 50, top: 0, width: 50, height: 50 }
-    expect(imgFramePoly(vp, bounds, t)).toBe(
-      'polygon(0px 0px, 200px 10px, 190px 150px, 10px 140px)',
+    expect(imgPanelClip(vp, bounds, t)).toBe(
+      'polygon(-200px 0px, 200px 20px, 180px 300px, -180px 280px)',
     )
   })
 
-  // First paint, before layout has measured anything. Scaling a shape into a zero-size
-  // box is a division by zero, and a NaN in a clip-path hides the picture outright.
-  it('has no shape to scale against a zero-size panel box', () => {
-    expect(imgFramePoints(vp, { x: 0, y: 0, w: 0, h: 300 }, img())).toEqual([])
-    expect(imgFramePoints(vp, { x: 0, y: 0, w: 400, h: 0 }, img())).toEqual([])
-    expect(imgFramePoly(vp, { x: 0, y: 0, w: 0, h: 0 }, img())).toBe('none')
+  // The Mailman 2 bug. The crop used to be the panel's shape *scaled into the frame*, so
+  // a frame wider than its panel dragged the crop out with it and the picture reached
+  // into the gutter with `spill` unchecked. At the panel's true size it cannot.
+  it('does not grow with a frame that overhangs its panel', () => {
+    const xs = (clip: string) =>
+      [...clip.matchAll(/(-?\d+(?:\.\d+)?)px (-?\d+(?:\.\d+)?)px/g)].map(m => Number(m[1]))
+    const span = (clip: string) => Math.max(...xs(clip)) - Math.min(...xs(clip))
+    const wide = imgPanelClip(vp, bounds, { left: -25, top: -25, width: 150, height: 150 })
+    expect(span(wide)).toBe(span(imgPanelClip(vp, bounds, img())))
+  })
+
+  // First paint, before layout has measured anything: there is no panel shape to cut
+  // with yet, and an empty polygon() would hide the picture outright.
+  it('has no shape to cut with before the panel is measured', () => {
+    expect(imgPanelClip([], bounds, img())).toBe('none')
   })
 })
 
@@ -415,11 +405,12 @@ describe('default config parity', () => {
     })
   })
 
-  // The frame is new, so the shipped values are the compatibility guarantee: every
-  // picture starts on its whole panel and crops exactly as it did before it had one.
-  it('starts every picture on the full-panel frame', () => {
+  // The frame is the picture's own box, and deliberately not the panel's: a frame of
+  // exactly 0/0/100/100 puts the editor's selection outline on the panel's own outline,
+  // leaving nothing to grab that is distinguishable from the slot it sits in.
+  it('starts every picture on its own frame, overhanging the panel box', () => {
     PANEL_IMG_TRANSFORMS.forEach(t => {
-      expect([t.left, t.top, t.width, t.height]).toEqual([0, 0, 100, 100])
+      expect([t.left, t.top, t.width, t.height]).toEqual([-5, -5, 110, 110])
     })
   })
 

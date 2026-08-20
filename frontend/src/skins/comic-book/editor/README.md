@@ -29,13 +29,15 @@ cannot read as one utterance.
 
 **A picture has two independent framings, which is why it has so many fields.**
 `left`/`top`/`width`/`height` are the *frame*: its own rectangle over the panel box, in
-% of that box, cut to the panel's polygon scaled into it (`imgFramePoly`). A picture
-left at the default `0/0/100/100` therefore crops exactly as a panel image always did,
-and an inset one reads as a small comic panel rather than a rectangle pasted on top.
-`scale`/`offsetX`/`offsetY`/`anchor` are the second framing: they move the picture
-*inside* that frame. Before pictures became entities the frame was the panel polygon
-itself, so dragging could only slide the picture under a window that stayed put, and a
-second picture on the same panel had nowhere to go.
+% of that box — where the picture sits and how big it renders, exactly as a bubble's
+`top`/`right`/`width` is. The frame is geometry and nothing else. It draws no ink and
+cuts no shape: while `spill` is off the *panel* crops the picture (`imgPanelClip`, the
+panel polygon at true size, offset onto the frame's origin), and while it is on nothing
+does — which is a bubble's rule, unchanged. `scale`/`offsetX`/`offsetY`/`anchor` are
+the second framing: they move the picture *inside* that frame. Before pictures became
+entities the frame was the panel polygon itself, so dragging could only slide the
+picture under a window that stayed put, and a second picture on the same panel had
+nowhere to go.
 
 **Bubbles are drawn, not imported.** Every shape is one closed ring of the same 64
 vertices sampled from a shared ellipse, so a shape change interpolates vertex-for-

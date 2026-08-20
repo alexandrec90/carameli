@@ -9,7 +9,6 @@ import {
   dragBubble,
   dragImg,
   dragImgFrame,
-  isFullPanelFrame,
   resizeBubble,
   resizeImgFrame,
   rotateBubble,
@@ -19,7 +18,7 @@ import {
 } from '../../skins/comic-book/editor/transforms'
 import type { BubbleTransform, ImgTransform } from '../../skins/comic-book/editor/types'
 
-/** A picture at the shipped default: full-panel frame, identity framing inside it. */
+/** A picture on a frame covering its whole panel box, identity framing inside it. */
 const img = (over: Partial<ImgTransform> = {}): ImgTransform => ({
   panel: 0,
   src: '/comic-book/logo.webp',
@@ -176,22 +175,6 @@ describe('sizeImgFrame', () => {
     let t = img({ width: 50, height: 50 })
     for (let i = 0; i < 4; i++) t = sizeImgFrame(t, IMG_FRAME.step)
     expect(t.width).toBeCloseTo(50 + IMG_FRAME.step * 4, 10)
-  })
-})
-
-describe('isFullPanelFrame', () => {
-  // The editor inks only the frames that are not full-panel: a full-panel one would
-  // stroke the panel outline a second time along the identical path.
-  it('is true for the shipped default and false once the frame moves or resizes', () => {
-    expect(isFullPanelFrame(img())).toBe(true)
-    expect(isFullPanelFrame(img({ left: 0.5 }))).toBe(false)
-    expect(isFullPanelFrame(img({ top: -1 }))).toBe(false)
-    expect(isFullPanelFrame(img({ width: 99 }))).toBe(false)
-    expect(isFullPanelFrame(img({ height: 101 }))).toBe(false)
-  })
-
-  it('ignores the framing inside the frame, which does not change the outline', () => {
-    expect(isFullPanelFrame(img({ scale: 2, offsetX: 40, anchor: 'left top' }))).toBe(true)
   })
 })
 

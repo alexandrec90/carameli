@@ -55,9 +55,9 @@ describe('seedConfig', () => {
     })
   })
 
-  it('ships every picture on the default full-panel frame', () => {
+  it('ships every picture on the shared default frame', () => {
     seedConfig().images.forEach(t => {
-      expect([t.left, t.top, t.width, t.height]).toEqual([0, 0, 100, 100])
+      expect([t.left, t.top, t.width, t.height]).toEqual([-5, -5, 110, 110])
     })
   })
 
@@ -380,12 +380,12 @@ describe('addImg', () => {
     expect(config.images[index]).toEqual({ ...NEW_IMAGE, panel: 6 })
   })
 
-  // A second picture added at the full-panel frame would land exactly on the one
-  // already there, and adding it would read as nothing having happened.
+  // A second picture added on the shipped frame would land exactly on the one already
+  // there, and adding it would read as nothing having happened.
   it('starts the new picture inset, not covering the panel', () => {
     const { config, index } = addImg(seedConfig(), 0)
     const t = config.images[index]
-    expect([t.left, t.top]).not.toEqual([0, 0])
+    expect([t.left, t.top]).not.toEqual([-5, -5])
     expect(t.width).toBeLessThan(100)
     expect(t.height).toBeLessThan(100)
   })
