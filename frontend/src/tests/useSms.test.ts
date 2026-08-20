@@ -1,11 +1,19 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { SmsMessage } from '../api/client'
+import type { PhoneLine, SmsMessage } from '../api/client'
 
 const listMock = vi.fn()
+const sendMock = vi.fn()
+const phoneLinesMock = vi.fn()
 
 vi.mock('../api/client', () => ({
-  api: { sms: { list: (...args: unknown[]) => listMock(...args) } },
+  api: {
+    sms: {
+      list: (...args: unknown[]) => listMock(...args),
+      send: (...args: unknown[]) => sendMock(...args),
+    },
+    customers: { getPhoneLines: (...args: unknown[]) => phoneLinesMock(...args) },
+  },
 }))
 vi.mock('../lib/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
@@ -28,9 +36,26 @@ function makeMessage(over: Partial<SmsMessage> = {}): SmsMessage {
   }
 }
 
+function makeLine(over: Partial<PhoneLine> = {}): PhoneLine {
+  return {
+    id: 'line-1',
+    customer_id: 'cust-1',
+    phone_number: '+14155550000',
+    provider_sid: 'prov-1',
+    sms_enabled: true,
+    recording_enabled: false,
+    active: true,
+    created_at: '2026-06-01T00:00:00',
+    ...over,
+  }
+}
+
 describe('useSms', () => {
   beforeEach(() => {
     listMock.mockReset()
+    sendMock.mockReset()
+    phoneLinesMock.mockReset()
+    phoneLinesMock.mockResolvedValue([])
   })
 
   it('loads messages and maps them to formatted rows', async () => {
@@ -87,5 +112,101 @@ describe('useSms', () => {
     await waitFor(() => expect(result.current.loading).toBe(false))
     expect(result.current.error).toBe('Failed to load SMS messages')
     expect(result.current.rows).toEqual([])
+  })
+
+  it('pre-fills the sender with the first active SMS-enabled line', async () => {
+    listMock.mockResolvedValue({ messages: [], vs_customer_id: 1 })
+    phoneLinesMock.mockResolvedValue([
+      makeLine({ id: 'l1', phone_number: '+14155550000', sms_enabled: false }),
+      makeLine({ id: 'l2', phone_number: '+14155550002', active: false }),
+      makeLine({ id: 'l3', phone_number: '+14155550003' }),
+    ])
+    const { result } = renderHook(() => useSms())
+
+    await waitFor(() =>
+      expect(result.current.form?.fields.find((f) => f.key === 'from_number')?.default).toBe(
+        '+14155550003',
+      ),
+    )
+    expect(result.current.form?.fields.map((f) => f.key)).toEqual([
+      'from_number',
+      'to_number',
+      'body',
+    ])
+  })
+
+  it('sends a message and re-loads the list', async () => {
+    listMock.mockResolvedValue({ messages: [], vs_customer_id: 1 })
+    sendMock.mockResolvedValue({ success: true, message_sid: 'SM9', detail: null })
+    const { result } = renderHook(() => useSms())
+    await waitFor(() => expect(result.current.loading).toBe(false))
+
+    await act(async () => {
+      await result.current.form?.onSubmit({
+        from_number: ' +14155550000 ',
+        to_number: '+14155550001',
+        body: 'hello',
+      })
+    })
+
+    expect(sendMock).toHaveBeenCalledWith(1, {
+      from_number: '+14155550000',
+      to_number: '+14155550001',
+      body: 'hello',
+    })
+    expect(listMock).toHaveBeenCalledTimes(2) // list refreshed after the send
+    expect(result.current.error).toBe('')
+  })
+
+  it('rejects a non-+1 destination without calling the API', async () => {
+    listMock.mockResolvedValue({ messages: [], vs_customer_id: 1 })
+    const { result } = renderHook(() => useSms())
+    await waitFor(() => expect(result.current.loading).toBe(false))
+
+    await act(async () => {
+      await result.current.form?.onSubmit({
+        from_number: '+14155550000',
+        to_number: '+447700900000',
+        body: 'hello',
+      })
+    })
+
+    expect(sendMock).not.toHaveBeenCalled()
+    expect(result.current.error).toBe('Only +1 (US/Canada) destinations are supported')
+  })
+
+  it('rejects a blank body without calling the API', async () => {
+    listMock.mockResolvedValue({ messages: [], vs_customer_id: 1 })
+    const { result } = renderHook(() => useSms())
+    await waitFor(() => expect(result.current.loading).toBe(false))
+
+    await act(async () => {
+      await result.current.form?.onSubmit({
+        from_number: '+14155550000',
+        to_number: '+14155550001',
+        body: '   ',
+      })
+    })
+
+    expect(sendMock).not.toHaveBeenCalled()
+    expect(result.current.error).toBe('From, To and a message body are all required')
+  })
+
+  it('surfaces a provider failure from the send call', async () => {
+    listMock.mockResolvedValue({ messages: [], vs_customer_id: 1 })
+    sendMock.mockRejectedValue(new Error('502 provider error'))
+    const { result } = renderHook(() => useSms())
+    await waitFor(() => expect(result.current.loading).toBe(false))
+
+    await act(async () => {
+      await result.current.form?.onSubmit({
+        from_number: '+14155550000',
+        to_number: '+14155550001',
+        body: 'hello',
+      })
+    })
+
+    expect(result.current.error).toBe('Failed to send SMS')
+    expect(listMock).toHaveBeenCalledTimes(1) // no refresh on failure
   })
 })
