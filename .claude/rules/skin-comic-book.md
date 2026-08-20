@@ -122,7 +122,31 @@ glance:
 | --- | --- | --- |
 | `soft` | the bare ellipse | speech; 64 straight segments read as smooth |
 | `cloud` | union of 8 overlapping lobes | a thought bubble is *meshed ellipses*, so its lobe junctions cut back **inside** the base ellipse. A modulation that only bulged outward read as a scalloped balloon |
-| `lightning` | 8 triangular spikes | action; valley → straight climb → straight fall, so every turn is a corner. Crown height, valley depth and the crown's offset within its period are each jittered, because evenly spaced identical spikes read as a **sun** |
+| `lightning` | 19 authored spikes (`boltShape.ts`) | action; a 1960s pop-art impact burst. Valley → straight climb → straight fall, so every turn is a corner |
+
+`lightning`'s spikes are a **table, not a formula**, and that distinction is the whole
+reason it reads as a burst. Two earlier versions modulated the ellipse — a cosine, then
+a jittered triangle wave — and both read as a **sun**, because any radial function of
+the angle spaces its spikes evenly and gives them broadly one length. Piling on more
+jitter does not fix that; it only makes a soft shape noisy.
+
+So `SPIKES` in `boltShape.ts` authors each spike's span, lean, length and notch depth
+by hand: irregular spacing, a handful of points projecting far past a body most spikes
+only stub out of, and notches deep enough that the silhouette is sawtooth rather than
+scalloped. When retuning it, keep the spans summing to the ring — that budget is the
+morph invariant above, not a detail of this type.
+
+Two consequences worth knowing before editing either file:
+
+- **`boltMod` clamps every vertex against the viewBox at its own angle.** The box is
+  padded below the ellipse and tight at the flanks, so a sideways spike has far less
+  headroom than a diagonal one; the clamp is what makes the flank spikes shorter
+  without the table encoding the box's shape by hand. The burst it replaced cleared
+  the edge only because no crown happened to land on a lateral extreme.
+- **`.cb-bubble-shape` joins with `miter` and a raised `stroke-miterlimit`.** A round
+  join sands the point off an acute spike, and the SVG default miterlimit bevels one —
+  the same lost point by another name. An outline drawn as a polygon has to be inked
+  as one.
 
 A fourth "shout" type used to sit beside `lightning` and was removed: it was the same
 spiky drawing at a lower amplitude, so nothing in the panel or the editor dropdown
