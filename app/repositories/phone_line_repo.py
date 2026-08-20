@@ -41,6 +41,15 @@ class PhoneLineRepo:
         )
         return result.scalar_one_or_none()
 
+    async def get_by_id(self, phone_line_id: uuid.UUID) -> PhoneLine | None:
+        result = await self.session.execute(
+            select(PhoneLine).where(
+                PhoneLine.id == phone_line_id,
+                PhoneLine.active.is_(True),
+            )
+        )
+        return result.scalar_one_or_none()
+
     async def get_all_for_customer(self, customer_id: uuid.UUID) -> list[PhoneLine]:
         result = await self.session.execute(
             select(PhoneLine).where(

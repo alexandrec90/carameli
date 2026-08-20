@@ -12,7 +12,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.core.database import get_session
 from app.core.metrics import WEBHOOK_FAILURES_TOTAL
+from app.core.phone import dialed_to_e164
 from app.core.sip import agent_sip_uri
+from app.models.extension import Extension
 from app.models.phone_line import PhoneLine
 from app.schemas.call_event import WebhookAck
 from app.services import (
@@ -225,11 +227,29 @@ async def jambonz_incoming_call_webhook(
 
     to_number: str = data.get("to", "") or ""
     call_sid: str = data.get("call_sid", "") or ""
+    from_number: str = data.get("from", "") or ""
     logger.info("Jambonz incoming-call webhook: call_sid=%s to=%s", call_sid, to_number)
 
     if not to_number:
         logger.warning("Jambonz incoming-call webhook: missing 'to' field call_sid=%s", call_sid)
         return JSONResponse([])
+
+    # A registered softphone dialling out arrives on this same hook, distinguished
+    # only by its 'from' being one of our SIP usernames rather than a PSTN number.
+    try:
+        caller_ext = await extension_service.get_by_sip_username_global(session, from_number)
+    except Exception:
+        WEBHOOK_FAILURES_TOTAL.inc()
+        logger.warning(
+            "Failed to look up calling extension for from=%s call_sid=%s",
+            from_number,
+            call_sid,
+            exc_info=True,
+        )
+        caller_ext = None
+
+    if caller_ext is not None:
+        return JSONResponse(await _outbound_dial_verbs(session, caller_ext, to_number, call_sid))
 
     try:
         phone_line = await phone_line_service.get_by_phone_number_global(session, to_number)
@@ -286,6 +306,79 @@ async def jambonz_incoming_call_webhook(
         "No inbound route for to=%s call_sid=%s; answering with no verbs", to_number, call_sid
     )
     return JSONResponse([])
+
+
+async def _outbound_dial_verbs(
+    session: AsyncSession, caller: Extension, to_number: str, call_sid: str
+) -> list[dict[str, Any]]:
+    """Build the dial verb array for a call placed by one of our registered devices."""
+    internal = await extension_service.get_by_number(session, caller.customer_id, to_number)
+    if internal is not None:
+        logger.info(
+            "Routing device call_sid=%s from ext=%s to ext=%s",
+            call_sid,
+            caller.extension_number,
+            internal.extension_number,
+        )
+        return [
+            {
+                "verb": "dial",
+                "callerId": caller.extension_number,
+                "answerOnBridge": True,
+                "target": [
+                    {
+                        "type": "sip",
+                        "sipUri": agent_sip_uri(internal.sip_username, internal.sip_domain_sid),
+                    }
+                ],
+            }
+        ]
+
+    destination = dialed_to_e164(to_number)
+    if destination is None:
+        logger.warning(
+            "Device call_sid=%s from ext=%s dialled an unroutable destination",
+            call_sid,
+            caller.extension_number,
+        )
+        return []
+
+    phone_line = await _outbound_caller_line(session, caller)
+    if phone_line is None:
+        # Carriers reject a From that is not a number on the account, so a device
+        # with no DID assigned cannot place a PSTN call at all.
+        logger.warning(
+            "Device call_sid=%s from ext=%s has no DID for caller ID; dropping PSTN call",
+            call_sid,
+            caller.extension_number,
+        )
+        return []
+
+    target: dict[str, Any] = {"type": "phone", "number": destination}
+    if settings.jambonz_outbound_trunk:
+        target["trunk"] = settings.jambonz_outbound_trunk
+
+    verbs: list[dict[str, Any]] = []
+    if _recording_enabled(phone_line):
+        verbs.append(_RECORD_START_VERB)
+    verbs.append(
+        {
+            "verb": "dial",
+            "callerId": phone_line.phone_number,
+            "answerOnBridge": True,
+            "target": [target],
+        }
+    )
+    logger.info("Routing device call_sid=%s from ext=%s to PSTN", call_sid, caller.extension_number)
+    return verbs
+
+
+async def _outbound_caller_line(session: AsyncSession, caller: Extension) -> PhoneLine | None:
+    """Return the phone line whose DID this extension presents as caller ID."""
+    pointer = await pointer_service.get_for_extension(session, caller.id)
+    if pointer is None:
+        return None
+    return await phone_line_service.get_by_id(session, pointer.phone_line_id)
 
 
 async def _inbound_dial_verbs(

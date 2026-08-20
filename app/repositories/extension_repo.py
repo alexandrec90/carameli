@@ -97,6 +97,22 @@ class ExtensionRepo:
         )
         return result.scalar_one_or_none()
 
+    async def get_by_sip_username_global(self, sip_username: str) -> Extension | None:
+        """Look up an active extension by SIP username across every customer.
+
+        Unscoped on purpose: a device-originated call hook identifies the caller
+        only by the SIP username it registered with, and that username already
+        embeds the customer it belongs to. The caller is responsible for scoping
+        anything it does afterwards to ``extension.customer_id``.
+        """
+        result = await self.session.execute(
+            select(Extension).where(
+                Extension.sip_username == sip_username,
+                Extension.active.is_(True),
+            )
+        )
+        return result.scalars().first()
+
     async def get_all_for_customer(self, customer_id: uuid.UUID) -> list[Extension]:
         result = await self.session.execute(
             select(Extension).where(
