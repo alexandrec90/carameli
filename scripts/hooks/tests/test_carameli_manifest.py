@@ -53,4 +53,6 @@ def test_manifest_reproduces_carameli_frontend_tier():
     assert c.frontend.src == "frontend/src/"
     assert c.frontend.skin == "frontend/src/skins"
     assert c.frontend.test_cmd == ("run", "test:run")
-    assert c.frontend.typecheck_cmd == ("run", "typecheck")
+    # `lint:types` is the script `frontend/package.json` actually defines; the tier
+    # was pointed at it in 3c14236 and this assertion was left naming the old one.
+    assert c.frontend.typecheck_cmd == ("run", "lint:types")
