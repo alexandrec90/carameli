@@ -57,9 +57,13 @@ VanillaLand change on a staging server, and it still depends on the branded clie
 honouring a realm that is not `vanillasoft.com` — untested, and not something to find
 out during a demo.
 
-**Use Zoiper.** It is a generic SIP client, it takes a realm, username and password, and
-it is the supported way to demo this. Keep VS Connect in the story as what production
-would replace, not as the phone on the desk.
+**Carameli has its own softphone, and it is the shortest path to a demo.** The
+*Softphone* page registers the browser itself against the call engine over SIP-over-WSS
+(SIP.js), on a credential the API issues to the logged-in session — so there is nothing
+to install and no password to retype. Zoiper stays in this runbook as the second opinion:
+when the browser phone will not register, a Zoiper account on the same credential says
+whether the problem is the credential or the browser. Keep VS Connect in the story as
+what production would replace, not as the phone on the desk.
 
 ## One-time account setup
 
@@ -131,6 +135,31 @@ than letting Telnyx reject a duplicate order as a purchase failure.
 The API key is `API_KEY_SECRET` from the running deployment — pass `--api-key`, or export
 `CARAMELI_API_KEY`. The password is printed to stdout and written nowhere; re-running
 against an existing extension returns 409 rather than reissuing it.
+
+## Register the built-in softphone
+
+Open **Softphone** in the Carameli UI, pick the extension, and press *Register*. The page
+calls `POST /api/v1/extensions/{id}/webphone-credential`, which returns the SIP username,
+password and realm plus the WSS URI to register to, and hands them straight to SIP.js —
+the password is never shown, never logged and never stored by the browser beyond the life
+of the page.
+
+That endpoint reuses the password already on the extension when there is one, so a second
+tab does not knock the first offline. **New password** rotates it: the call engine is
+updated first, then Carameli stores the new one, so every other client holding the old
+password — a desk phone, a copy of Zoiper — stops registering. That is the revocation
+path, and it is the reason the button is not called *Refresh*.
+
+Three things it needs, none of which the page can supply for itself:
+
+| Requirement | Why, and what fails without it |
+| --- | --- |
+| A secure origin | `getUserMedia` is refused outside HTTPS and `localhost`, so the mic never opens and the call connects with no audio. |
+| `SIP_WSS_PORT` / `SIP_WSS_URL` | The WSS URI is `wss://<the extension's realm>:<SIP_WSS_PORT>`, which is where jambonz Cloud's SBC listens. A self-hosted engine that terminates WSS elsewhere needs `SIP_WSS_URL`. |
+| An extension with a provisioned SIP client | Without `sip_credential_sid` the endpoint answers 409; the page says so rather than retrying. |
+
+Media does **not** traverse the ngrok tunnel or Carameli: the browser negotiates
+DTLS-SRTP with the engine's SBC directly, exactly as a native client would.
 
 ## Register Zoiper
 

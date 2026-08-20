@@ -41,6 +41,12 @@ class Settings(BaseSettings):
     jambonz_outbound_trunk: str = ""
     sip_credential_encryption_secret: str = ""
 
+    # Browser softphone. The WSS endpoint is derived from the extension's own SIP
+    # realm (`wss://<realm>:<port>`); set sip_wss_url to override the whole URI when
+    # the SBC is not reachable there.
+    sip_wss_port: int = 8443
+    sip_wss_url: str = ""
+
     # Per-call SCI context is intentionally short-lived. VanillaSoft posts it
     # immediately before originating the corresponding call.
     sci_preparation_ttl_seconds: int = Field(default=300, ge=30, le=3600)

@@ -101,6 +101,7 @@ def _mock_call_engine() -> MagicMock:
             client_sid=f"client-{username}", sip_realm="sip.test"
         )
     )
+    engine.update_sip_client_password = AsyncMock()
     engine.deprovision_sip_client = AsyncMock()
     engine.play_audio_to_call = AsyncMock(return_value={"status": "playing"})
     engine.get_active_calls = AsyncMock(return_value=[])

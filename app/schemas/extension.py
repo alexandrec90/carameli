@@ -118,3 +118,17 @@ class UpdateExtensionRequest(BaseModel):
 
 class ExtensionListResponse(BaseModel):
     extensions: list[ExtensionResponse]
+
+
+class WebphoneCredentialResponse(BaseModel):
+    """A SIP credential for a browser softphone, plus where to register it.
+
+    The password is live and is never returned by any other route; treat the whole
+    response as a secret (the handler sends it `no-store`).
+    """
+
+    extension_number: str
+    sip_username: str
+    sip_password: str
+    sip_realm: str
+    ws_uri: str

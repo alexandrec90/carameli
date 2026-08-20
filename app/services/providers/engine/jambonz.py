@@ -259,6 +259,24 @@ class JambonzEngine:
         logger.info("Jambonz SIP client created: client_sid=%s username=%s", client_sid, username)
         return ProvisionedSipClient(client_sid=client_sid, sip_realm=sip_realm)
 
+    async def update_sip_client_password(self, client_sid: str, password: str) -> None:
+        """Set a new password on an existing SIP client.
+
+        Rotation, not re-creation: the username stays put, so everything that dials
+        ``sip:<username>@<realm>`` — call routing, callbacks, voicemail drop — keeps
+        working while the credential itself changes.
+        """
+        resp = await self._client.put(f"/Clients/{client_sid}", json={"password": password})
+        if resp.is_error:
+            logger.error(
+                "Jambonz SIP client password update failed: client_sid=%s status=%s body=%s",
+                client_sid,
+                resp.status_code,
+                resp.text,
+            )
+            resp.raise_for_status()
+        logger.info("Jambonz SIP client password rotated: client_sid=%s", client_sid)
+
     async def deprovision_sip_client(self, client_sid: str) -> None:
         resp = await self._client.delete(f"/Clients/{client_sid}")
         if resp.is_error and resp.status_code != 404:

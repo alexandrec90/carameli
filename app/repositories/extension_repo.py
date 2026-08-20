@@ -171,6 +171,19 @@ class ExtensionRepo:
         )
         return list(result.scalars().all())
 
+    async def set_password(self, ext: Extension, encrypted: str) -> Extension:
+        """Store a re-issued SIP password.
+
+        Also clears ``sip_secret_delivered_at``: the row holds a live secret again,
+        and leaving the stamp set would make an already-delivered extension look
+        like one whose password had been erased.
+        """
+        ext.sip_password_encrypted = encrypted
+        ext.sip_secret_delivered_at = None
+        await self.session.commit()
+        await self.session.refresh(ext)
+        return ext
+
     async def mark_credentials_delivered(self, extensions: list[Extension]) -> None:
         delivered_at = datetime.now(UTC).replace(tzinfo=None)
         for ext in extensions:

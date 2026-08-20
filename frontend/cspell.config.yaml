@@ -28,6 +28,7 @@ words:
   - rtpengine
   - smsws
   - unposted
+  - zoiper
   # Three.js / R3F / 3D rendering terms
   - drei
   - glsl
