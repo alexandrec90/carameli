@@ -65,6 +65,17 @@ export const TAIL_DIRS = {
   'up-right': { label: 'Up right', ux: D, uy: -D },
 } as const
 
+/**
+ * Polar angle of ring index `i`. Index 0 is the top of the ellipse and the ring runs
+ * clockwise. It lives here beside RING_POINTS because it *is* the sampling: every
+ * module that turns a ring index into geometry has to agree on it, and two of them do
+ * — `bubbleShape.ts` places the vertices, and `boltShape.ts` sizes each action spike
+ * against the box at the spike's own angle.
+ */
+export function ringTheta(i: number): number {
+  return -Math.PI / 2 + (TAU * i) / RING_POINTS
+}
+
 export type TailDir = keyof typeof TAIL_DIRS
 
 /** All tail directions in display order — for the editor dropdown. */
