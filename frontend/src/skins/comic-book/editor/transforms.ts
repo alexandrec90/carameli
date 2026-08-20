@@ -146,21 +146,30 @@ export function fullImgStyle(
 }
 
 /**
- * Style for the .cb-img-clip wrapper around a panel image. The panel's polygon
- * clip-path ({@link imgPanelClip}) is what crops the full-source image
- * ({@link fullImgStyle}) into a comic panel. `spill: true` drops the clip so the
- * picture pops out past the panel edge —
- * z-index 4 lifts it above the panel-outline SVG (z-index 3) so the frame lines
+ * Style for the .cb-img-clip wrapper around a panel image, which is two separate
+ * containments that used to be one.
+ *
+ * `overflow: hidden` is unconditional, and it is not a crop in the sense `spill`
+ * asks about: {@link fullImgStyle} renders the picture at full source geometry so
+ * pan and zoom re-frame it under a fixed window, and the frame *is* that window.
+ * Without it the frame stops describing how big the picture renders — the picture
+ * overhangs its own outline, and anything that switched the overflow back on
+ * (selecting it, say) redrew the page.
+ *
+ * The panel polygon ({@link imgPanelClip}) is the crop `spill` governs, and it is
+ * the only one: `spill: true` drops it so the picture crosses the panel edge, with
+ * z-index 4 lifting it above the panel-outline SVG (z-index 3) so the frame lines
  * don't cross it (panels themselves are z-index:auto, so children escape into the
- * root stacking context). The editor's full-reveal does the same unclipping while
- * an image is selected.
+ * root stacking context).
  *
  * Deliberately the same rule a bubble gets from PanelBubbles: `spill` asks whether
  * this entity's ink may cross the *panel* edge, and means the same thing for both.
+ * Selection is not part of it — a bubble does not redraw when you click it, and
+ * neither does a picture.
  */
-export function imgClipStyle(spill: boolean, reveal: boolean, clip: string): CSSProperties {
-  return spill || reveal
-    ? { clipPath: 'none', overflow: 'visible', zIndex: 4 }
+export function imgClipStyle(spill: boolean, clip: string): CSSProperties {
+  return spill
+    ? { clipPath: 'none', overflow: 'hidden', zIndex: 4 }
     : { clipPath: clip, overflow: 'hidden' }
 }
 

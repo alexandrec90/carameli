@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { resolveEditFlag, shouldRevealImg } from '../../skins/comic-book/editor/useEditorMode'
+import { resolveEditFlag } from '../../skins/comic-book/editor/useEditorMode'
 
 // The pure parts of the editor-mode hook. Everything that edits the config itself
 // lives in configOps.ts and is covered by editorConfigOps.test.ts.
@@ -42,27 +42,3 @@ describe('resolveEditFlag', () => {
   })
 })
 
-describe('shouldRevealImg', () => {
-  // The index is into the picture array, not the panel grid: two pictures may share a
-  // panel, and only the one being dragged drops its frame clip.
-  it('reveals only the selected picture', () => {
-    const selected = { kind: 'img', index: 3 } as const
-    expect(shouldRevealImg(true, selected, 3)).toBe(true)
-    expect(shouldRevealImg(true, selected, 2)).toBe(false)
-  })
-
-  it('does not reveal when the editor is inactive', () => {
-    expect(shouldRevealImg(false, { kind: 'img', index: 3 }, 3)).toBe(false)
-  })
-
-  it('does not reveal when nothing is selected', () => {
-    expect(shouldRevealImg(true, null, 0)).toBe(false)
-  })
-
-  // Each kind indexes its own array now, so an index means nothing without the kind —
-  // reading a bubble's or a panel's as a picture's would uncrop an unrelated picture.
-  it('does not reveal for a selection of another kind at the same index', () => {
-    expect(shouldRevealImg(true, { kind: 'bubble', index: 3 }, 3)).toBe(false)
-    expect(shouldRevealImg(true, { kind: 'panel', index: 3 }, 3)).toBe(false)
-  })
-})

@@ -8,7 +8,7 @@ import PanelImages from './PanelImages'
 import { PANELS } from './panels'
 import { PANEL_IMG_TRANSFORMS, PANEL_BUBBLE_TRANSFORMS } from './editor/layoutConfig'
 import { toClipPath } from './editor/transforms'
-import { shouldRevealImg, useEditorMode } from './editor/useEditorMode'
+import { useEditorMode } from './editor/useEditorMode'
 import {
     drawLoadingRipple, drawWash, parseCssColor, washPhaseAt,
     WASH_COVER_MS, WASH_HOLD_MS,
@@ -912,15 +912,6 @@ export function Layout({ navItems }: LayoutProps) {
                     // rebuilds it per picture rather than reusing this one.
                     const dotClip = toClipPath(vp, bounds.x, bounds.y)
 
-                    // While editing, the selected picture reveals its full self (clip off)
-                    // so the whole of it stays visible for framing; the outline SVG still
-                    // draws the crop shape on top. The panel is lifted whenever any of its
-                    // pictures is the revealed one.
-                    const revealFull = imgT.some(
-                        (img, k) =>
-                            img.panel === i && shouldRevealImg(editor.active, editor.selected, k),
-                    )
-
                     return (
                         <div
                             key={i}
@@ -928,7 +919,6 @@ export function Layout({ navItems }: LayoutProps) {
                                 'cb-panel',
                                 info.isLogo ? 'logo' : '',
                                 info.path ? 'clickable' : '',
-                                revealFull ? 'cb-panel-reveal' : '',
                                 // Lift the panel over the ink-line SVG while its
                                 // bubbles show, so they are not crossed by frame ink.
                                 !editor.active && hovered === i ? 'cb-panel-lift' : '',
@@ -961,16 +951,15 @@ export function Layout({ navItems }: LayoutProps) {
                             />
                             {/* Pictures — however many name this panel, each on its own frame
                                 over the panel box, each cut to this panel's shape. `spill`
-                                (and the editor's full-reveal selection) drops the clip so a
-                                picture pops out over the frame lines, exactly as it does for
-                                a bubble. */}
+                                drops that clip so a picture pops out over the frame lines,
+                                exactly as it does for a bubble. Selection changes nothing
+                                here: the frame is always the picture's rendered size. */}
                             <PanelImages
                                 images={imgT}
                                 panel={i}
                                 bounds={bounds}
                                 vp={vp}
                                 natSizes={natSizes}
-                                isRevealed={k => shouldRevealImg(editor.active, editor.selected, k)}
                                 onSettled={markSettled}
                                 onNatSize={recordNatSize}
                             />

@@ -145,18 +145,13 @@
   cursor: pointer;
 }
 
-/* Editor: the selected panel reveals its full (unclipped) image for framing. z-index 3
-   raises the revealed image over neighbouring panels' content, but the panel-outline
-   SVG (also z-index 3, painted later in the DOM) still draws on top, so the crop
-   shape stays visible while framing. */
-.cb-panel-reveal {
-  z-index: 3;
-}
-
-/* Clip wrapper around one picture — holds overflow:hidden and the frame's polygon
-   clip-path (supplied inline) so zoom/pan stays inside the frame shape. Its box comes
-   from the inline style too: a picture's frame is its own rectangle over the panel,
-   not the panel itself, so there is no `inset: 0` to fall back on. */
+/* Clip wrapper around one picture. `overflow: hidden` is what makes the frame the
+   picture's rendered size — the img inside is laid out at full source geometry so pan
+   and zoom re-frame it under this window — and it is never lifted, so the picture's
+   edges are always the outline the editor draws. The panel's polygon clip-path arrives
+   inline beside it and is the part `spill` turns off. The box is inline too: a picture's
+   frame is its own rectangle over the panel, not the panel itself, so there is no
+   `inset: 0` to fall back on. */
 .cb-img-clip {
   position: absolute;
   overflow: hidden;

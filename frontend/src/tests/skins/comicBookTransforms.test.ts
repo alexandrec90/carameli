@@ -207,24 +207,27 @@ describe('imgPanelClip', () => {
 describe('imgClipStyle', () => {
   const CLIP = 'polygon(0px 0px, 10px 0px, 10px 10px, 0px 10px)'
 
-  it('clips to the panel polygon when spill is off and not revealed', () => {
-    expect(imgClipStyle(false, false, CLIP)).toEqual({
+  it('clips to the panel polygon when spill is off', () => {
+    expect(imgClipStyle(false, CLIP)).toEqual({
       clipPath: CLIP,
       overflow: 'hidden',
     })
   })
 
   it('unclips and lifts above the frame lines (z-4 > svg z-3) when spill is on', () => {
-    expect(imgClipStyle(true, false, CLIP)).toEqual({
+    expect(imgClipStyle(true, CLIP)).toEqual({
       clipPath: 'none',
-      overflow: 'visible',
+      overflow: 'hidden',
       zIndex: 4,
     })
   })
 
-  it('unclips for the editor full-reveal selection regardless of spill', () => {
-    expect(imgClipStyle(false, true, CLIP).clipPath).toBe('none')
-    expect(imgClipStyle(true, true, CLIP).clipPath).toBe('none')
+  // The frame is how big the picture renders, and that holds however `spill` is set: the
+  // img inside is laid out at full source geometry, so an overflow that could be lifted
+  // is a picture overhanging the outline the editor draws around it.
+  it('never lets the picture escape its own frame', () => {
+    expect(imgClipStyle(false, CLIP).overflow).toBe('hidden')
+    expect(imgClipStyle(true, CLIP).overflow).toBe('hidden')
   })
 })
 

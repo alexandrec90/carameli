@@ -19,8 +19,6 @@ interface PanelImagesProps {
   vp: [number, number][]
   /** Natural pixel size of each loaded source, keyed by `src`; missing until it loads. */
   natSizes: Record<string, { w: number; h: number }>
-  /** Whether picture `index` (into `images`) is revealed — editor selection. */
-  isRevealed(index: number): boolean
   /** Called once per picture element when it has loaded or failed. */
   onSettled(): void
   /** Called with a source's natural size the first time it loads. */
@@ -33,10 +31,14 @@ interface PanelImagesProps {
  * an append and never has to line up with anything.
  *
  * Each picture has its own frame over the panel box ({@link imgFrameStyle}) — where it
- * sits and how big it renders, and nothing more. The frame draws no ink and cuts no
- * shape: while `spill` is off the *panel* crops the picture ({@link imgPanelClip}), and
- * while it is on nothing does. That is a bubble's rule, unchanged, which is the point —
- * a picture is an entity that lives on a panel, not a second copy of one.
+ * sits and how big it renders. The frame draws no ink and cuts no *shape*: while `spill`
+ * is off the panel crops the picture ({@link imgPanelClip}), and while it is on nothing
+ * does. That is a bubble's rule, unchanged, which is the point — a picture is an entity
+ * that lives on a panel, not a second copy of one.
+ *
+ * "How big it renders" is the frame's other half, and it holds whatever is selected: the
+ * wrapper keeps `overflow: hidden` at all times, so the picture fills its frame and stops
+ * there. Nothing about clicking a picture changes what is drawn.
  *
  * Natural sizes are keyed by `src` rather than by index: two pictures on the same panel
  * may well be the same file, and keying by index would make the second one wait for its
@@ -48,7 +50,6 @@ export default function PanelImages({
   bounds,
   vp,
   natSizes,
-  isRevealed,
   onSettled,
   onNatSize,
 }: PanelImagesProps) {
@@ -58,14 +59,13 @@ export default function PanelImages({
         if (img.panel !== panel) return null
         const frame = imgFrameBox(bounds, img)
         const nat = natSizes[img.src]
-        const reveal = isRevealed(i)
         return (
           <div
             key={i}
             className="cb-img-clip"
             style={{
               ...imgFrameStyle(bounds, img),
-              ...imgClipStyle(img.spill, reveal, imgPanelClip(vp, bounds, img)),
+              ...imgClipStyle(img.spill, imgPanelClip(vp, bounds, img)),
             }}
           >
             {/* Full-source geometry once the natural size is known, so pan/zoom

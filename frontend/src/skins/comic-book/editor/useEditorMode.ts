@@ -56,20 +56,6 @@ export interface EditorModeApi {
 }
 
 /**
- * True when picture `index` should render unclipped (a "full reveal") for framing: the
- * editor is active and that picture is the current selection. PanelImages uses this to
- * drop the frame clip on the selected picture so the whole of it stays visible while
- * you drag/zoom it — the outline SVG still marks where the crop lands.
- */
-export function shouldRevealImg(
-  active: boolean,
-  selected: EditorModeApi['selected'],
-  index: number,
-): boolean {
-  return active && selected?.kind === 'img' && selected.index === index
-}
-
-/**
  * Resolve the editor flag for this load. `?edit=1` switches the editor on and
  * `?edit=0` switches it off; either way `storedFlag` is what the persisted flag
  * should become (`null` = removed) so the outcome survives client-side
