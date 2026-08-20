@@ -236,8 +236,11 @@ async def jambonz_incoming_call_webhook(
 
     # A registered softphone dialling out arrives on this same hook, distinguished
     # only by its 'from' being one of our SIP usernames rather than a PSTN number.
+    # Jambonz sends the bare user part, but tolerate a realm-qualified 'from' too —
+    # a SIP username never contains '@', so this cannot widen the match.
+    from_user = from_number.split("@", 1)[0]
     try:
-        caller_ext = await extension_service.get_by_sip_username_global(session, from_number)
+        caller_ext = await extension_service.get_by_sip_username_global(session, from_user)
     except Exception:
         WEBHOOK_FAILURES_TOTAL.inc()
         logger.warning(

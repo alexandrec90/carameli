@@ -155,6 +155,25 @@ async def test_device_call_records_when_record_all_calls_is_on(
     assert verbs[1]["verb"] == "dial"
 
 
+async def test_device_call_accepts_a_realm_qualified_from(client, db_session) -> None:
+    """Some engines report the caller as user@realm rather than the bare user."""
+    data = await _setup_customer_line_extension(client, db_session, 8809, "+18685550100", "410")
+
+    resp = await client.post(
+        _INCOMING,
+        json={
+            "call_sid": "CAdev009",
+            "to": "+14388762750",
+            "from": f"{data['ext']['sip_username']}@{data['ext']['sip_domain_sid']}",
+        },
+    )
+
+    assert resp.status_code == 200
+    verbs = resp.json()
+    assert verbs[0]["callerId"] == "+18685550100"
+    assert verbs[0]["target"] == [{"type": "phone", "number": "+14388762750"}]
+
+
 async def test_carrier_call_to_a_did_is_still_routed_inbound(client, db_session) -> None:
     """The device branch must not shadow ordinary inbound DID routing."""
     phone = "+18675550100"
