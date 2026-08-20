@@ -191,11 +191,11 @@ describe('ringPoints', () => {
     found.forEach(i => expect(i % (RING_POINTS / 8)).toBe(0))
   })
 
-  // Spikes are triangles, so the outline can climb from a valley to a crown in a
-  // single segment. A cosine of the same amplitude cannot: it spreads that climb
-  // over a quarter period, which is what made the old burst look soft.
+  // Spikes are triangles, so the outline spends its whole valley-to-crown swing on
+  // the rise's few segments. A cosine of the same amplitude cannot: it eases into
+  // and out of the crown, which is what made the old burst look soft.
   it('turns lightning corners abruptly rather than cresting a cosine', () => {
-    expect(steepestStep(radii('lightning'))).toBeGreaterThan(0.5)
+    expect(steepestStep(radii('lightning'))).toBeGreaterThan(0.3)
     expect(steepestStep(radii('cloud'))).toBeLessThan(0.1)
   })
 

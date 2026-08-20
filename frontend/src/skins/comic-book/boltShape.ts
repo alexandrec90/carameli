@@ -6,14 +6,20 @@
 // noise is piled onto it. Adding jitter to a smooth burst was the previous attempt and
 // it is why the outline still read as soft and organic.
 //
-// A burst reads as a burst because its perimeter is an **authored sequence of
-// alternating peaks and notches** whose spacing, lean and length all differ: a handful
-// of points project dramatically, most are stubs, and the notches between them cut
-// deep enough that the silhouette is sawtooth rather than scalloped. So the spikes are
-// a table, not a formula. Each entry owns a run of consecutive ring vertices and is
-// walked as two straight segments — valley → crown, then crown → the *next* spike's
-// valley — so every vertex is either a corner or a point on a straight edge, and
-// nothing is ever interpolated through a curve.
+// The spikes are therefore a table, not a formula — and the table is **traced, not
+// invented**: `public/comic-book/jagged bubble.png` is the reference drawing, and each
+// entry below is one of its fifteen real spikes, extracted by sampling the outline's
+// radius around its interior centroid, taking the local maxima and minima of that
+// radial profile, and quantising them onto the shared ring. Two hand-authored tables
+// preceded this one and both read as generic starbursts; what they missed is
+// measurable in the trace — the drawing's notches cut far deeper (down to 0.67 of the
+// base ellipse) and its spike lengths spread far wider (0.17 to 1.0 of full reach)
+// than either table dared.
+//
+// Each entry owns a run of consecutive ring vertices and is walked as two straight
+// segments — valley → crown, then crown → the *next* spike's valley — so every vertex
+// is either a corner or a point on a straight edge, and nothing is ever interpolated
+// through a curve.
 //
 // The ring itself still belongs to `bubbleShape.ts`: this module only says how far
 // from the centre each of its RING_POINTS vertices sits, in base-ellipse units.
@@ -40,7 +46,7 @@ interface Spike {
 const BOLT_BODY = 0.8
 
 /** How far past the body a full-length spike aims, in base-ellipse units. */
-const BOLT_REACH = 0.62
+const BOLT_REACH = 0.65
 
 /**
  * View units kept between a vertex and the viewBox edge. It has to exceed the
@@ -53,42 +59,34 @@ const BOX_MARGIN = 1.5
 const ROUGHNESS = 0.02
 
 /**
- * The perimeter, clockwise from the top of the ellipse (ring index 0). Nineteen
- * spikes over 64 vertices: enough for the sawtooth to read at a glance, few enough
- * that each one still gets two or more vertices and stays a triangle.
+ * The perimeter, clockwise from the top of the ellipse (ring index 0), traced from
+ * `public/comic-book/jagged bubble.png` — fifteen spikes over 64 vertices, in the
+ * order the reference draws them, rotated so its notch nearest the top lands on ring
+ * index 0. `reach` and `valley` are the traced radii, linearly remapped so the
+ * deepest notch sits at 0.67 (jitter-safe above the 0.65 lettering floor) and the
+ * longest spike at full reach.
  *
- * Read the columns as the design brief: the spans are irregular so the spacing is
- * never periodic, `reach` alternates a stub against a long point rather than easing
- * between them, and the deepest valleys sit next to the longest spikes so the notch
- * and the point amplify each other. The five entries at reach ≥ 0.9 are the ones that
- * carry the silhouette — top, up-right, both flanks, the bottom, and the long
- * lower-left point.
- *
- * One span is tuned rather than authored: the spans before the right flank are sized
- * so no spike *starts* on ring index 16, the horizontal axis. A spike starts at its
- * valley, and the lettering box reaches almost to the ellipse's flanks, so a notch
- * placed exactly there is the one position where the interior reads as pinched.
+ * The character the trace preserves, which is what the hand-authored tables missed:
+ * one spike (`reach: 1`, aimed lower-left like the reference's dominant point) is
+ * nearly twice the length of the median, a run of genuinely stubby spikes sits on the
+ * lower arc (reach ≤ 0.3), and the deepest notches neighbour the longest points.
  */
 const SPIKES: Spike[] = [
-  { span: 4, rise: 2, reach: 0.95, valley: 0.8 }, // top
-  { span: 3, rise: 1, reach: 0.3, valley: 0.74 },
-  { span: 2, rise: 1, reach: 1, valley: 0.83 }, // up-right, long
-  { span: 4, rise: 3, reach: 0.45, valley: 0.72 },
-  { span: 4, rise: 2, reach: 0.72, valley: 0.85 },
-  { span: 3, rise: 1, reach: 1, valley: 0.76 }, // right flank, long
-  { span: 5, rise: 2, reach: 0.34, valley: 0.88 },
-  { span: 3, rise: 1, reach: 0.86, valley: 0.75 },
-  { span: 4, rise: 2, reach: 0.52, valley: 0.82 },
-  { span: 2, rise: 1, reach: 0.9, valley: 0.71 }, // bottom, long
-  { span: 4, rise: 3, reach: 0.28, valley: 0.84 },
-  { span: 5, rise: 3, reach: 1, valley: 0.73 }, // lower-left, longest
-  { span: 3, rise: 1, reach: 0.4, valley: 0.87 },
-  { span: 4, rise: 2, reach: 1, valley: 0.78 }, // left flank, long
-  { span: 2, rise: 1, reach: 0.36, valley: 0.72 },
-  { span: 3, rise: 2, reach: 0.66, valley: 0.86 },
-  { span: 4, rise: 1, reach: 0.94, valley: 0.74 }, // up-left, long
-  { span: 3, rise: 2, reach: 0.24, valley: 0.83 },
-  { span: 2, rise: 1, reach: 0.58, valley: 0.8 },
+  { span: 4, rise: 1, reach: 0.48, valley: 0.74 }, // top, leaning hard left
+  { span: 4, rise: 2, reach: 0.44, valley: 0.76 },
+  { span: 5, rise: 2, reach: 0.56, valley: 0.8 }, // up-right
+  { span: 4, rise: 2, reach: 0.61, valley: 0.84 }, // right flank (box-clamped)
+  { span: 2, rise: 1, reach: 0.36, valley: 0.87 },
+  { span: 5, rise: 2, reach: 0.55, valley: 0.86 }, // down-right
+  { span: 5, rise: 2, reach: 0.25, valley: 0.73 },
+  { span: 5, rise: 3, reach: 0.28, valley: 0.67 }, // bottom stub after the deepest notch
+  { span: 4, rise: 2, reach: 1, valley: 0.72 }, // lower-left, the dominant point
+  { span: 5, rise: 2, reach: 0.42, valley: 0.81 },
+  { span: 5, rise: 2, reach: 0.51, valley: 0.82 },
+  { span: 3, rise: 2, reach: 0.4, valley: 0.83 }, // left flank
+  { span: 5, rise: 3, reach: 0.54, valley: 0.81 }, // up-left
+  { span: 5, rise: 3, reach: 0.3, valley: 0.72 },
+  { span: 3, rise: 1, reach: 0.17, valley: 0.72 }, // top-left stub
 ]
 
 /** How many spikes the outline carries — exported so a test can pin the count. */

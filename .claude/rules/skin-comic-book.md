@@ -122,7 +122,7 @@ glance:
 | --- | --- | --- |
 | `soft` | the bare ellipse | speech; 64 straight segments read as smooth |
 | `cloud` | union of 8 overlapping lobes | a thought bubble is *meshed ellipses*, so its lobe junctions cut back **inside** the base ellipse. A modulation that only bulged outward read as a scalloped balloon |
-| `lightning` | 19 authored spikes (`boltShape.ts`) | action; a 1960s pop-art impact burst. Valley → straight climb → straight fall, so every turn is a corner |
+| `lightning` | 15 traced spikes (`boltShape.ts`) | action; a 1960s pop-art impact burst. Valley → straight climb → straight fall, so every turn is a corner |
 
 `lightning`'s spikes are a **table, not a formula**, and that distinction is the whole
 reason it reads as a burst. Two earlier versions modulated the ellipse — a cosine, then
@@ -130,11 +130,15 @@ a jittered triangle wave — and both read as a **sun**, because any radial func
 the angle spaces its spikes evenly and gives them broadly one length. Piling on more
 jitter does not fix that; it only makes a soft shape noisy.
 
-So `SPIKES` in `boltShape.ts` authors each spike's span, lean, length and notch depth
-by hand: irregular spacing, a handful of points projecting far past a body most spikes
-only stub out of, and notches deep enough that the silhouette is sawtooth rather than
-scalloped. When retuning it, keep the spans summing to the ring — that budget is the
-morph invariant above, not a detail of this type.
+The table itself is **traced from the reference drawing**,
+`public/comic-book/jagged bubble.png`: each entry is one of its fifteen real spikes,
+read off the outline's radial profile around its interior centroid and quantised onto
+the ring. A third hand-authored attempt is the one move known not to work — two
+preceded the trace and both drifted back toward even spacing, shallow notches and
+mid-length spikes, because the drawing's actual swings (notches to 0.67, reach spread
+0.17–1.0) look like mistakes until they are measured. Retune it by re-tracing the
+reference, and keep the spans summing to the ring — that budget is the morph invariant
+above, not a detail of this type.
 
 Two consequences worth knowing before editing either file:
 
