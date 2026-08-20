@@ -71,6 +71,17 @@ export type TailDir = keyof typeof TAIL_DIRS
 export const TAIL_DIR_KEYS = Object.keys(TAIL_DIRS) as TailDir[]
 
 /**
+ * Whether `v` still names a direction — the tail counterpart of `isBubbleType`, and
+ * needed for the same reason: `tailRingIndex`, `tailTip` and `cloudPuffs` all
+ * destructure `TAIL_DIRS[dir]`, so a direction that a persisted config outlived
+ * throws rather than degrading to no tail.
+ */
+export function isTailDir(v: unknown): v is TailDir {
+  // Own properties only — see the note in `isBubbleType`.
+  return typeof v === 'string' && Object.prototype.hasOwnProperty.call(TAIL_DIRS, v)
+}
+
+/**
  * How far past the ellipse edge a fully-extended tail reaches, in view units. Set to
  * what the old fixed bottom-left tail reached, so a `down-left` tail is the shape it
  * has always been and every other direction is the same tail, turned.

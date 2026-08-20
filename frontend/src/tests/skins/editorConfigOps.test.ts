@@ -18,9 +18,20 @@ import {
   seedConfig,
 } from '../../skins/comic-book/editor/configOps'
 import {
+  BUBBLE_TYPE_KEYS,
+  isBubbleType,
+} from '../../skins/comic-book/editor/bubbleTypes'
+import {
   PANEL_IMG_TRANSFORMS,
   PANEL_BUBBLE_TRANSFORMS,
 } from '../../skins/comic-book/editor/layoutConfig'
+import {
+  RING_POINTS,
+  TAIL_DIR_KEYS,
+  cloudPuffs,
+  isTailDir,
+} from '../../skins/comic-book/bubbleBox'
+import { puffOpacity, ringPoints } from '../../skins/comic-book/bubbleShape'
 import { PANELS } from '../../skins/comic-book/panels'
 
 /** Index of the first shipped bubble that declares a link, with its partner. */
@@ -229,6 +240,83 @@ describe('hydrateConfig', () => {
       bubbles: [{ ...NEW_BUBBLE, panel: 0, linkTo: 1 }, { ...NEW_BUBBLE, panel: 1 }],
     })
     expect(hydrateConfig(raw).bubbles[0].linkTo).toBeNull()
+  })
+
+  // The registries shrink. `jagged` was a fourth bubble type, and a working copy saved
+  // while it existed went on naming it — through a hydrate that casts the payload into
+  // BubbleTransform rather than checking it — until `SHAPES['jagged']` came back
+  // undefined and `ringPoints` threw on the destructure, blanking the whole page.
+  // Everything below is that payload, one retired name at a time.
+  it('replaces a retired resting type with the plain ellipse', () => {
+    const raw = JSON.stringify({
+      images: [],
+      bubbles: [{ ...NEW_BUBBLE, type: 'jagged', text: 'KA-POW!' }],
+    })
+    const [b] = hydrateConfig(raw).bubbles
+    expect(b.type).toBe('soft')
+    // The one dead attribute goes; the author's words and framing stay.
+    expect(b.text).toBe('KA-POW!')
+    expect(b.width).toBe(NEW_BUBBLE.width)
+  })
+
+  it('clears a retired hover or click morph target rather than resting it', () => {
+    const raw = JSON.stringify({
+      images: [],
+      bubbles: [{ ...NEW_BUBBLE, hoverType: 'jagged', clickType: 'cloud' }],
+    })
+    const [b] = hydrateConfig(raw).bubbles
+    // null already spells "stay as you are" — the bubble stops morphing on hover and
+    // keeps the click morph it still has.
+    expect(b.hoverType).toBeNull()
+    expect(b.clickType).toBe('cloud')
+  })
+
+  it('replaces a retired tail direction with no tail', () => {
+    const raw = JSON.stringify({
+      images: [],
+      bubbles: [{ ...NEW_BUBBLE, tail: 'sideways' }],
+    })
+    expect(hydrateConfig(raw).bubbles[0].tail).toBe('none')
+  })
+
+  it('leaves every live type and direction exactly as authored', () => {
+    const bubbles = BUBBLE_TYPE_KEYS.flatMap(type =>
+      TAIL_DIR_KEYS.map(tail => ({ ...NEW_BUBBLE, panel: 0, type, tail, hoverType: type })),
+    )
+    expect(hydrateConfig(JSON.stringify({ images: [], bubbles })).bubbles).toEqual(bubbles)
+  })
+
+  // The reversion check: this is the assertion that fails if the coercion is removed,
+  // because it exercises the crash itself rather than the field it comes from.
+  it('yields bubbles every renderer can draw without throwing', () => {
+    const raw = JSON.stringify({
+      images: [],
+      bubbles: [{ ...NEW_BUBBLE, type: 'jagged', hoverType: 'jagged', tail: 'sideways' }],
+    })
+    for (const b of hydrateConfig(raw).bubbles) {
+      expect(() => ringPoints(b.type, b.tail)).not.toThrow()
+      expect(() => puffOpacity(b.type)).not.toThrow()
+      expect(() => cloudPuffs(b.tail)).not.toThrow()
+      expect(ringPoints(b.type, b.tail)).toHaveLength(RING_POINTS * 2)
+    }
+  })
+})
+
+describe('isBubbleType / isTailDir', () => {
+  it('accepts exactly the registered names', () => {
+    BUBBLE_TYPE_KEYS.forEach(k => expect(isBubbleType(k)).toBe(true))
+    TAIL_DIR_KEYS.forEach(k => expect(isTailDir(k)).toBe(true))
+  })
+
+  it('rejects a retired name, a non-string, and an inherited property', () => {
+    expect(isBubbleType('jagged')).toBe(false)
+    expect(isBubbleType(null)).toBe(false)
+    expect(isBubbleType(undefined)).toBe(false)
+    expect(isTailDir('sideways')).toBe(false)
+    expect(isTailDir(3)).toBe(false)
+    // `in` would say yes to these; the own-property check is why the guard does not.
+    expect(isBubbleType('toString')).toBe(false)
+    expect(isTailDir('constructor')).toBe(false)
   })
 })
 

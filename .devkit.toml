@@ -51,4 +51,6 @@ dir = "frontend"
 src = "frontend/src/"
 skin = "frontend/src/skins"
 test_cmd = ["run", "test:run"]
-typecheck_cmd = ["run", "typecheck"]
+# `lint:types`, not `typecheck` — this project has no script by that name, so the tier
+# was spending an npm invocation to print "Missing script" on every skin change.
+typecheck_cmd = ["run", "lint:types"]

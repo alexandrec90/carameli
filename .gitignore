@@ -24,8 +24,12 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
-lib64/
+# Anchored to the repo root. Unanchored, `lib/` matches a directory of that name at
+# any depth, and it did: `frontend/src/tests/lib/` was excluded wholesale, so
+# `logger.test.ts` sat on disk passing locally and was never committed or run in CI.
+# These two are setuptools build output and only ever appear at the top level.
+/lib/
+/lib64/
 parts/
 sdist/
 var/
