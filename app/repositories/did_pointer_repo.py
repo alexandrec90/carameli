@@ -45,6 +45,13 @@ class DidPointerRepo:
         )
         return result.scalars().first()
 
+    async def get_for_extension(self, extension_id: uuid.UUID) -> DidPointer | None:
+        """Return the first pointer mapped to an extension (for outbound caller ID)."""
+        result = await self.session.execute(
+            select(DidPointer).where(DidPointer.extension_id == extension_id)
+        )
+        return result.scalars().first()
+
     async def delete(self, pointer: DidPointer) -> None:
         await self.session.delete(pointer)
         await self.session.commit()

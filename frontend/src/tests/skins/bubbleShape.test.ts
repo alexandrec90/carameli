@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
+import { BOLT_SPIKES } from '../../skins/comic-book/boltShape'
 import {
   BUBBLE_ASPECT,
   BUBBLE_ELLIPSE_N,
@@ -194,30 +195,29 @@ describe('ringPoints', () => {
   // single segment. A cosine of the same amplitude cannot: it spreads that climb
   // over a quarter period, which is what made the old burst look soft.
   it('turns lightning corners abruptly rather than cresting a cosine', () => {
-    expect(steepestStep(radii('lightning'))).toBeGreaterThan(0.25)
+    expect(steepestStep(radii('lightning'))).toBeGreaterThan(0.5)
     expect(steepestStep(radii('cloud'))).toBeLessThan(0.1)
   })
 
-  it('gives lightning eight spikes of differing height', () => {
-    const r = radii('lightning')
-    const heights = crests(r).map(i => r[i])
-    expect(heights).toHaveLength(8)
-    // Uneven: the crowns span a visible range rather than all reaching one radius.
-    expect(Math.max(...heights) - Math.min(...heights)).toBeGreaterThan(0.05)
-    expect(new Set(heights.map(h => h.toFixed(2))).size).toBeGreaterThan(3)
+  // The count the eye actually reads, asserted through the rendered ring rather than
+  // through boltShape's table — a spike the roughness flattened into its neighbour
+  // would still be in the table but would not be a point on the outline.
+  it('gives lightning one crest per authored spike', () => {
+    expect(crests(radii('lightning'))).toHaveLength(BOLT_SPIKES)
   })
 
   // A sun is the failure mode to avoid: evenly spaced, identical, symmetric rays.
-  // Both properties below hold for a sun and must not hold here.
-  it('leans lightning spikes unevenly so it cannot read as a sun', () => {
+  // Every property below holds for a sun and must not hold here.
+  it('varies lightning spike spacing and length so it cannot read as a sun', () => {
     const r = radii('lightning')
-    const period = RING_POINTS / 8
-    // Not periodic: rotating by one spike does not map the outline onto itself.
-    const drift = Math.max(...r.map((v, i) => Math.abs(v - r[(i + period) % r.length])))
-    expect(drift).toBeGreaterThan(0.05)
-    // Not symmetric within a spike: crowns sit at different offsets in their period.
-    const offsets = new Set(crests(r).map(i => i % period))
-    expect(offsets.size).toBeGreaterThan(1)
+    const found = crests(r)
+    // Not evenly spaced: the gaps between consecutive crests are not one number.
+    const gaps = found.map((v, i) => (found[(i + 1) % found.length] - v + RING_POINTS) % RING_POINTS)
+    expect(new Set(gaps).size).toBeGreaterThan(2)
+    // Not one length: a handful project far past a body most spikes only stub out of.
+    const heights = found.map(i => r[i])
+    expect(Math.max(...heights) - Math.min(...heights)).toBeGreaterThan(0.35)
+    expect(new Set(heights.map(h => h.toFixed(2))).size).toBeGreaterThan(12)
   })
 
   it('is deterministic, jittered lightning included', () => {
