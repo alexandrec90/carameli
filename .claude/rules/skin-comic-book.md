@@ -160,11 +160,17 @@ that comparison).
 in the grid, so there are exactly as many of those as there are polygons, whatever ends
 up drawn on each.
 
-A picture carries **two independent framings**, and conflating them is the mistake to
-avoid: `left`/`top`/`width`/`height` are its frame over the panel box (in % of that
-box), while `scale`/`offsetX`/`offsetY`/`anchor` move the picture *within* that frame.
-The frame used to be the panel polygon itself, so dragging a picture could only slide
-it under a window that stayed put.
+A picture is placed by **three numbers and no fourth**: `left`/`top`/`width` are its
+frame over the panel box, in % of that box. The height is derived — width ÷ the
+*source's* own aspect ratio (`imgAspect`, from the natural size captured on load) —
+exactly as a bubble's height follows `BUBBLE_ASPECT`. That is what makes the frame the
+picture's outline rather than a window cut through it, and it is the invariant to
+protect: **an authored height is a crop**. A `height` field plus `scale`/`offsetX`/
+`offsetY`/`anchor` shipped briefly, and with one authored height per panel the eight
+pictures showed between 38% and 98% of their source, no two framed alike, with the
+editor's selection outline drawn around the crop window instead of around the picture.
+Earlier still the frame was the panel polygon itself, so dragging a picture could only
+slide it under a window that stayed put.
 
 **A frame is geometry, not a shape and not a border.** It draws no ink at any time —
 the only outline a picture ever shows is the editor overlay's own selection chrome —
@@ -262,9 +268,8 @@ Drawn on a static `<canvas>` that sits behind content panels. Lines are redrawn 
 ## Per-Panel Image & Bubble Framing
 
 `editor/layoutConfig.ts` is the **source of truth** for picture placement and framing
-(`PANEL_IMG_TRANSFORMS`: panel / src / alt / left / top / width / height / scale /
-offsetX / offsetY / anchor / spill, with `src` drawn from the `PANEL_ASSETS` manifest
-in `editor/assets.ts`) and speech-bubble
+(`PANEL_IMG_TRANSFORMS`: panel / src / alt / left / top / width / spill, with `src`
+drawn from the `PANEL_ASSETS` manifest in `editor/assets.ts`) and speech-bubble
 placement and behaviour (`PANEL_BUBBLE_TRANSFORMS`: panel / top / right / width /
 rotate / spill / type / tail / text, plus `hoverType` / `clickType` event morph
 targets and the `linkTo` tube partner). The renderer in `Layout.tsx` reads from these
@@ -291,9 +296,9 @@ not the bubble a tube pointed at.
 | Enable / disable | `?edit=1` / `?edit=0` in dev | Flag persists in `localStorage['comic-book:edit']`; `?edit=0` clears it |
 | Gate | `import.meta.env.DEV && (?edit=1 \|\| flag)` | Never ships — `?edit=1` is inert in prod |
 | Select | click a **panel**, a **picture** or a **bubble** | A picture wins over the panel under it, a bubble over both; a panel is only outlined — it is the slot the **+** buttons add to |
-| Adjust | drag / wheel / handles / arrows | Move the frame or bubble, resize (bottom-right grip), pan the picture inside its frame (top-left grip, picture only), rotate (top-right grip, bubble only), nudge (⇧×10); for a picture **Alt** swaps the two framings |
+| Adjust | drag / wheel / handles / arrows | Move the frame or bubble, resize (bottom-right grip — width only for a picture, whose height follows its source), rotate (top-right grip, bubble only), nudge (⇧×10) |
 | Add / remove | **+ Image** / **+ Bubble** toolbar buttons, **Delete image** / **Delete bubble** in the inspector | Adds to the selected panel; deleting a bubble clears any link naming it |
-| Picture fields | inspector selects | panel, picture (`PANEL_ASSETS`), alt (empty = decorative), anchor, spill |
+| Picture fields | inspector selects | panel, picture (`PANEL_ASSETS`), alt (empty = decorative), spill |
 | Bubble fields | inspector selects | panel, type, **tail** (nine options incl. **No tail**), text, hover/click morph, link |
 | Pages | **Page** dropdown in toolbar | Switch route in edit mode (replays the wash); "Loading screen" entry previews the loading overlay + its exit wash |
 | Save | **Save** button | `POST /__comic-editor/save` writes `layoutConfig.ts` (dev server only); **Copy config** / **.ts** are the fallbacks |

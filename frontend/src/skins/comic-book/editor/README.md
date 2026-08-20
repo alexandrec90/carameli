@@ -8,7 +8,7 @@ numbers back into source.
 
 [`layoutConfig.ts`](./layoutConfig.ts) holds `PANEL_IMG_TRANSFORMS` and
 `PANEL_BUBBLE_TRANSFORMS` — picture placement **and content** (panel / src / alt /
-left / top / width / height / scale / offsetX / offsetY / anchor / spill) and bubble
+left / top / width / spill) and bubble
 placement **and content** (panel / top / right / width / rotate / spill / type / tail /
 text), plus each bubble's event morph targets (`hoverType`, `clickType`) and its
 connector-tube partner (`linkTo`). A picture's `src` is a public URL, offered in the
@@ -27,17 +27,28 @@ the **same panel** — the editor only offers same-panel partners, and the rende
 any cross-panel link it is handed, because half a tube appearing on a different hover
 cannot read as one utterance.
 
-**A picture has two independent framings, which is why it has so many fields.**
-`left`/`top`/`width`/`height` are the *frame*: its own rectangle over the panel box, in
-% of that box — where the picture sits and how big it renders, exactly as a bubble's
-`top`/`right`/`width` is. The frame is geometry and nothing else. It draws no ink and
-cuts no shape: while `spill` is off the *panel* crops the picture (`imgPanelClip`, the
-panel polygon at true size, offset onto the frame's origin), and while it is on nothing
-does — which is a bubble's rule, unchanged. `scale`/`offsetX`/`offsetY`/`anchor` are
-the second framing: they move the picture *inside* that frame. Before pictures became
-entities the frame was the panel polygon itself, so dragging could only slide the
-picture under a window that stayed put, and a second picture on the same panel had
-nowhere to go.
+**A picture's frame is the picture, and it has no height.** `left`/`top`/`width` are
+its rectangle over the panel box, in % of that box — where the picture sits and how big
+it renders, exactly as a bubble's `top`/`right`/`width` is. The height is not authored:
+it is the width divided by the *source's* own aspect ratio (`imgAspect`, from the
+natural size captured on load), precisely as a bubble's height follows `BUBBLE_ASPECT`.
+So the frame is the picture's true outline — it can be moved and resized, never
+reshaped, and nothing it does can crop the source.
+
+The frame is geometry and nothing else. It draws no ink and cuts no shape: while
+`spill` is off the *panel* crops the picture (`imgPanelClip`, the panel polygon at true
+size, offset onto the frame's origin), and while it is on nothing does — which is a
+bubble's rule, unchanged.
+
+There were briefly four more fields — an authored `height`, plus `scale`/`offsetX`/
+`offsetY`/`anchor` framing the picture *inside* that box. They existed to choose which
+part of a picture survived being forced into a box of the wrong shape, and every shape
+but one crops: with one authored height per panel the eight shipped pictures showed
+between 38% and 98% of their source, no two framed alike, and the editor's selection
+outline was the crop window rather than the picture. Nothing is forced now, so there is
+nothing left to choose. Before that, the frame was the panel polygon itself, so
+dragging could only slide the picture under a window that stayed put and a second
+picture on the same panel had nowhere to go.
 
 **Bubbles are drawn, not imported.** Every shape is one closed ring of the same 64
 vertices sampled from a shared ellipse, so a shape change interpolates vertex-for-
@@ -64,18 +75,17 @@ different images can only crossfade. A new bubble type belongs in `bubbleShape.t
 3. Adjust:
    - **Drag** the selection to move the frame (picture) / the bubble.
    - **Drag the bottom-right handle** to resize the frame (picture) / the bubble.
-   - **Drag the round top-left handle** to pan the picture inside its frame (picture only).
-     A picture is framed twice, so it needs two grips: the body moves the window, this
-     one slides the picture behind it.
+     Only the horizontal component counts for a picture: its height follows the source,
+     so the picture keeps its proportions and cannot be squashed.
    - **Drag the round top-right handle** to rotate (bubble only).
-   - **Wheel** over the selection to zoom the picture inside its frame / resize (bubble).
-   - **Arrow keys** nudge (hold **⇧** for ×10); **+/-** zoom (picture) / resize (bubble);
-     for a picture hold **Alt** to pan and size the *frame* instead; **Del** deletes;
-     **Esc** deselects.
+   - **Wheel** over the selection to resize it.
+   - **Arrow keys** nudge (hold **⇧** for ×10); **+/-** resize; **Del** deletes;
+     **Esc** deselects. The same set for a picture and a bubble — they are the same
+     kind of thing on a panel.
    - For pictures: pick the **panel** it belongs to, the **picture** it draws (from
-     `PANEL_ASSETS`), and its **alt** text — empty marks it decorative — plus the
-     **anchor**, which decides what survives when the picture's aspect ratio does not
-     match the frame's.
+     `PANEL_ASSETS`), and its **alt** text — empty marks it decorative. There is no
+     anchor, because there is nothing to anchor: a frame is built to its source's
+     ratio, so the whole picture is always in shot.
    - **Allow spill outside panel** checkbox — off (default for pictures) clips the
      element to the frame's polygon (overflow hidden behind its edge); on lets it
      bleed past (default for bubbles).
@@ -136,13 +146,13 @@ bubbleTypes.ts      BubbleType + BUBBLE_TYPES (lettering font per type) — ship
 layoutConfig.ts     PANEL_IMG_TRANSFORMS, PANEL_BUBBLE_TRANSFORMS — source of truth
 configOps.ts        PURE config edits: seed/hydrate/patch, add/remove picture or bubble, link sanitation
 serialize.ts        PURE serialization back to layoutConfig.ts (headers included)
-transforms.ts       PURE helpers: CSS builders, frame/drag/scale math, clamp
+transforms.ts       PURE helpers: CSS builders, frame/drag/size math, source aspect, clamp
 useEditorMode.ts    hook: flag detection, working copy, persistence, selection
 useOverlayInteraction.ts  pointer/wheel/keyboard wiring (thin)
 useToolbarDrag.ts   hook: draggable toolbar position (viewport-clamped, persisted)
 EditorOverlay.tsx   overlay UI: targets, outline, + Image / + Bubble, actions (dev-only, dynamically imported)
 InspectorPanel.tsx  selection inspector: read-outs, spill, per-element reset, delete
-ImageInspector.tsx  picture-only controls: panel, picture, alt, anchor
+ImageInspector.tsx  picture-only controls: panel, picture, alt
 BubbleInspector.tsx bubble-only controls: panel, type, tail, text, hover/click, link
 PageSelect.tsx      toolbar dropdown: switch page / preview the loading screen
 pageSelection.ts    PURE helpers behind PageSelect (sentinel value, selection resolution)

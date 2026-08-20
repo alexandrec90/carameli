@@ -1,10 +1,9 @@
 import {
-  fullImgStyle,
+  imgAspect,
   imgClipStyle,
-  imgFrameBox,
+  imgFillStyle,
   imgFrameStyle,
   imgPanelClip,
-  imgTransformStyle,
 } from './editor/transforms'
 import type { ImgTransform } from './editor/types'
 
@@ -36,9 +35,10 @@ interface PanelImagesProps {
  * does. That is a bubble's rule, unchanged, which is the point — a picture is an entity
  * that lives on a panel, not a second copy of one.
  *
- * "How big it renders" is the frame's other half, and it holds whatever is selected: the
- * wrapper keeps `overflow: hidden` at all times, so the picture fills its frame and stops
- * there. Nothing about clicking a picture changes what is drawn.
+ * The frame's height is not authored: it is the width divided by the source's own
+ * aspect ratio ({@link imgAspect}), so a picture is drawn whole, at its true
+ * proportions, and the box the editor outlines is the picture's own edge. Nothing about
+ * clicking a picture changes what is drawn.
  *
  * Natural sizes are keyed by `src` rather than by index: two pictures on the same panel
  * may well be the same file, and keying by index would make the second one wait for its
@@ -57,38 +57,26 @@ export default function PanelImages({
     <>
       {images.map((img, i) => {
         if (img.panel !== panel) return null
-        const frame = imgFrameBox(bounds, img)
-        const nat = natSizes[img.src]
+        const aspect = imgAspect(natSizes[img.src])
         return (
           <div
             key={i}
             className="cb-img-clip"
             style={{
-              ...imgFrameStyle(bounds, img),
-              ...imgClipStyle(img.spill, imgPanelClip(vp, bounds, img)),
+              ...imgFrameStyle(bounds, img, aspect),
+              ...imgClipStyle(img.spill, imgPanelClip(vp, bounds, img, aspect)),
             }}
           >
-            {/* Full-source geometry once the natural size is known, so pan/zoom
-                re-frames the picture under the clip instead of moving a pre-cropped
-                box; the identical cover-fit fallback renders until then. */}
+            {/* Fills the frame exactly, because the frame was built to this source's
+                ratio. Until it loads the frame is square and the picture letterboxes
+                inside it — one frame, behind the loading sheet. */}
             <img
               src={img.src}
               alt={img.alt}
               className="cb-panel-img"
               loading="eager"
               draggable={false}
-              style={
-                nat
-                  ? fullImgStyle(frame, nat, img)
-                  : {
-                      position: 'absolute',
-                      left: 0,
-                      top: 0,
-                      width: frame.w,
-                      height: frame.h,
-                      ...imgTransformStyle(img),
-                    }
-              }
+              style={imgFillStyle()}
               onLoad={e => {
                 const el = e.currentTarget
                 onNatSize(img.src, { w: el.naturalWidth, h: el.naturalHeight })

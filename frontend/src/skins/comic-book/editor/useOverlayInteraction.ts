@@ -5,15 +5,12 @@ import type { PanelPoly } from '../Layout'
 import {
   BUBBLE_W,
   IMG_FRAME,
-  IMG_SCALE,
   dragBubble,
-  dragImg,
   dragImgFrame,
   resizeBubble,
   resizeImgFrame,
   rotateBubble,
   scaleBubble,
-  scaleImg,
   sizeImgFrame,
 } from './transforms'
 import type { BubbleTransform, ImgTransform } from './types'
@@ -22,18 +19,17 @@ import type { EditorModeApi } from './useEditorMode'
 /**
  * What a pointer drag is doing to the selected target.
  *
- * `move` and `pan` are two different gestures on a picture and used to be one: `move`
- * slides the frame across the panel, `pan` slides the picture behind the frame. They
- * were indistinguishable while a picture's frame *was* its panel and could not move.
+ * There is no `pan`. A picture had a second gesture back when its frame was a window
+ * cut through it, so the picture could slide behind the window; the frame is the
+ * picture's own outline now, so moving it moves the picture. One gesture, and the same
+ * one a bubble has.
  */
-export type DragMode = 'move' | 'resize' | 'rotate' | 'pan'
+export type DragMode = 'move' | 'resize' | 'rotate'
 
 /** px-delta → degree factor for the bubble rotate handle. */
 const BUBBLE_ROTATE_DEG = 0.5
-/** Wheel `deltaY` → scale-delta factor for image zoom. */
-const WHEEL_SCALE = 0.001
-/** Wheel `deltaY` → bubble width-% factor (one 100px notch = 2% of the panel box). */
-const WHEEL_BUBBLE_W = 0.02
+/** Wheel `deltaY` → width-% factor (one 100px notch = 2% of the panel box). */
+const WHEEL_WIDTH = 0.02
 
 interface DragState {
   id: number
@@ -120,12 +116,12 @@ export function useOverlayInteraction(
     const dy = e.clientY - d.startY
 
     if (sel.kind === 'img' && d.startImg) {
+      // Only dx counts on a resize: the height is the source's to decide, so a corner
+      // drag sets the width and the picture keeps its proportions.
       const next =
-        d.mode === 'pan'
-          ? dragImg(d.startImg, dx, dy)
-          : d.mode === 'resize'
-            ? resizeImgFrame(d.startImg, dx, dy, bounds.w, bounds.h)
-            : dragImgFrame(d.startImg, dx, dy, bounds.w, bounds.h)
+        d.mode === 'resize'
+          ? resizeImgFrame(d.startImg, dx, bounds.w)
+          : dragImgFrame(d.startImg, dx, dy, bounds.w, bounds.h)
       api.setImg(sel.index, next)
     } else if (sel.kind === 'bubble' && d.startBubble) {
       const next =
@@ -150,15 +146,16 @@ export function useOverlayInteraction(
     const sel = api.selected
     if (sel?.kind === 'img') {
       const cur = api.config.images[sel.index]
-      if (cur) api.setImg(sel.index, scaleImg(cur, -e.deltaY * WHEEL_SCALE))
+      if (cur) api.setImg(sel.index, sizeImgFrame(cur, -e.deltaY * WHEEL_WIDTH))
     } else if (sel?.kind === 'bubble') {
       const cur = api.config.bubbles[sel.index]
-      if (cur) api.setBubble(sel.index, scaleBubble(cur, -e.deltaY * WHEEL_BUBBLE_W))
+      if (cur) api.setBubble(sel.index, scaleBubble(cur, -e.deltaY * WHEEL_WIDTH))
     }
   }
 
-  // Keyboard: arrows nudge (Shift = 10px, Alt on a picture pans it inside its frame),
-  // +/- zoom or resize, Delete removes the selection, Esc deselects.
+  // Keyboard: arrows nudge (Shift = 10px), +/- resize, Delete removes the selection,
+  // Esc deselects. The same set for a picture and a bubble, because they are the same
+  // kind of thing on a panel now.
   useEffect(() => {
     const sel = api.selected
     if (!sel) return
@@ -175,27 +172,15 @@ export function useOverlayInteraction(
       if (sel.kind === 'img') {
         const cur = api.config.images[sel.index]
         if (!cur || !bounds) return
-        // Alt pans the picture behind its frame; without it the frame itself moves.
         const nudge = (dx: number, dy: number): ImgTransform =>
-          e.altKey ? dragImg(cur, dx, dy) : dragImgFrame(cur, dx, dy, bounds.w, bounds.h)
+          dragImgFrame(cur, dx, dy, bounds.w, bounds.h)
         switch (e.key) {
           case 'ArrowLeft': api.setImg(sel.index, nudge(-step, 0)); break
           case 'ArrowRight': api.setImg(sel.index, nudge(step, 0)); break
           case 'ArrowUp': api.setImg(sel.index, nudge(0, -step)); break
           case 'ArrowDown': api.setImg(sel.index, nudge(0, step)); break
-          // Alt sizes the frame; plain +/- zooms the picture inside it.
-          case '+': case '=':
-            api.setImg(
-              sel.index,
-              e.altKey ? sizeImgFrame(cur, IMG_FRAME.step) : scaleImg(cur, IMG_SCALE.step),
-            )
-            break
-          case '-': case '_':
-            api.setImg(
-              sel.index,
-              e.altKey ? sizeImgFrame(cur, -IMG_FRAME.step) : scaleImg(cur, -IMG_SCALE.step),
-            )
-            break
+          case '+': case '=': api.setImg(sel.index, sizeImgFrame(cur, IMG_FRAME.step)); break
+          case '-': case '_': api.setImg(sel.index, sizeImgFrame(cur, -IMG_FRAME.step)); break
           case 'Delete': case 'Backspace': api.deleteImg(sel.index); break
           case 'Escape': api.clear(); break
           default: handled = false

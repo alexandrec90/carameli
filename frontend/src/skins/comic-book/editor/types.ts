@@ -2,22 +2,31 @@ import type { TailDir } from '../bubbleBox'
 import type { BubbleType } from './bubbleTypes'
 
 /**
- * One picture on the page: which panel it belongs to, which file it shows, the frame
- * it is cropped to, and how the picture is framed *inside* that crop.
+ * One picture on the page: which panel it belongs to, which file it shows, and where
+ * on that panel it sits.
  *
- * A panel may own any number of pictures, or none. The frame — `left`/`top`/`width`/
- * `height`, in % of the panel box — is the picture's own placement, exactly as a
- * bubble's `top`/`right`/`width` is. It used to be the panel polygon itself, which
- * meant dragging an image only slid the picture under a window that stayed put, and a
- * second picture on the same panel had nowhere to be.
+ * A panel may own any number of pictures, or none. The frame — `left`/`top`/`width`,
+ * in % of the panel box — is the picture's own placement, exactly as a bubble's
+ * `top`/`right`/`width` is. It used to be the panel polygon itself, which meant
+ * dragging an image only slid the picture under a window that stayed put, and a second
+ * picture on the same panel had nowhere to be.
+ *
+ * There is no `height`, and that absence is the design. The height follows the
+ * source's aspect ratio, the way a bubble's follows BUBBLE_ASPECT, so the frame is the
+ * picture's outline and never a window cut through it. An authored height was a second
+ * shape the picture had to be forced into, and forcing it is what cropped: with one
+ * height per panel the eight shipped pictures each lost a different amount of their
+ * source, and the box the editor drew was the surviving crop rather than the picture.
+ *
+ * Nothing frames the picture *inside* the frame any more either — no `scale`, no
+ * `offsetX`/`offsetY`, no `anchor`. Those chose which part of a picture survived, and
+ * nothing is discarded now: moving the frame moves the picture and resizing it resizes
+ * the picture.
  *
  * The frame is geometry alone. It is not a shape and not a border: it draws no ink,
  * and the crop comes from the *panel* (see `imgPanelClip`) or, with `spill` on, from
  * nothing. A frame that also cropped meant a picture whose frame was wider than its
  * panel escaped the panel with `spill` unchecked.
- *
- * `scale`/`offsetX`/`offsetY`/`anchor` are the second, independent framing: they move
- * the picture *within* its frame, which is what dragging used to do to the whole image.
  */
 export interface ImgTransform {
   /** Index into PANELS of the panel this picture belongs to. */
@@ -30,18 +39,8 @@ export interface ImgTransform {
   left: number
   /** Frame top edge, in % of the panel box. May be negative. */
   top: number
-  /** Frame width, in % of the panel box. */
+  /** Frame width, in % of the panel box. The height follows the source's ratio. */
   width: number
-  /** Frame height, in % of the panel box. */
-  height: number
-  /** Zoom factor for the picture inside the frame (CSS transform: scale). */
-  scale: number
-  /** Horizontal pan of the picture inside the frame, in px. */
-  offsetX: number
-  /** Vertical pan of the picture inside the frame, in px. */
-  offsetY: number
-  /** CSS object-position anchor the framing starts from, e.g. 'center bottom'. */
-  anchor: string
   /** When true the picture may bleed past the panel edge; when false it is clipped to it. */
   spill: boolean
 }

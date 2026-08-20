@@ -57,15 +57,12 @@ export default function InspectorPanel({ api, panel }: InspectorPanelProps) {
       <dl className="cb-ed-values">
         {selImg && (
           <>
-            {/* The frame — the picture's own window over the panel box. */}
+            {/* The frame — the picture's own box on the panel. No height: it is the
+                width divided by the source's aspect ratio, so the frame is the
+                picture's outline and there is no second number able to crop it. */}
             <div><dt>left</dt><dd>{fmt(selImg.left)}%</dd></div>
             <div><dt>top</dt><dd>{fmt(selImg.top)}%</dd></div>
             <div><dt>width</dt><dd>{fmt(selImg.width)}%</dd></div>
-            <div><dt>height</dt><dd>{fmt(selImg.height)}%</dd></div>
-            {/* The picture's framing inside that window. */}
-            <div><dt>scale</dt><dd>{fmt(selImg.scale)}</dd></div>
-            <div><dt>offsetX</dt><dd>{fmt(selImg.offsetX)}</dd></div>
-            <div><dt>offsetY</dt><dd>{fmt(selImg.offsetY)}</dd></div>
           </>
         )}
         {selBubble && (
@@ -117,7 +114,7 @@ export default function InspectorPanel({ api, panel }: InspectorPanelProps) {
 
       <div className="cb-ed-hint">
         {selImg
-          ? 'Drag to move the frame · corner handle resizes it · the round grip pans the picture inside · wheel zooms · arrows nudge (⇧×10, ⌥ pans) · +/− · Del · Esc'
+          ? 'Drag to move · corner handle or wheel resizes it (the height follows the picture) · arrows nudge (⇧×10) · +/− · Del · Esc'
           : 'Drag to move · handle to resize/rotate · arrows nudge (⇧×10) · +/− · Del · Esc'}
       </div>
     </>

@@ -5,12 +5,6 @@ import type { ImgTransform, BubbleTransform } from './types'
 
 // ─── Interaction bounds (Phase 3) ───────────────────────────────────────────────
 
-/**
- * Image zoom limits. Below 1 the image no longer fills the panel (objectFit:cover
- * leaves the Ben-Day dot background showing through) — intentional, so a panel image
- * can be shrunk as well as enlarged.
- */
-export const IMG_SCALE = { min: 0.2, max: 4, step: 0.05 }
 /** Bubble width limits, in % of the panel box. */
 export const BUBBLE_W = { min: 15, max: 90, step: 1 }
 /** Bubble rotation limits, in degrees. */
@@ -19,20 +13,6 @@ export const ROTATE = { min: -30, max: 30 }
 /** Clamp `v` into the inclusive `[min, max]` range. */
 export function clamp(v: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, v))
-}
-
-/**
- * Pan the picture *inside* its frame by a px drag. This is the second of an image's
- * two framings: {@link dragImgFrame} moves the window, this slides the picture behind
- * it. They were the same gesture back when the window was the panel and could not move.
- */
-export function dragImg(t: ImgTransform, dxPx: number, dyPx: number): ImgTransform {
-  return { ...t, offsetX: t.offsetX + dxPx, offsetY: t.offsetY + dyPx }
-}
-
-/** Zoom an image around its centre by a wheel/handle delta, clamped to IMG_SCALE. */
-export function scaleImg(t: ImgTransform, deltaScale: number): ImgTransform {
-  return { ...t, scale: clamp(t.scale + deltaScale, IMG_SCALE.min, IMG_SCALE.max) }
 }
 
 /**
@@ -70,91 +50,42 @@ export function rotateBubble(b: BubbleTransform, deltaDeg: number): BubbleTransf
 
 // ─── CSS builders ────────────────────────────────────────────────────────────────
 
-/** CSS for the <img> inside the clip wrapper. */
-export function imgTransformStyle(t: ImgTransform): CSSProperties {
-  return {
-    objectFit: 'cover',
-    objectPosition: t.anchor,
-    transform: `translate(${t.offsetX}px, ${t.offsetY}px) scale(${t.scale})`,
-    transformOrigin: 'center center',
-  }
-}
-
 /**
- * Map a CSS `object-position` anchor keyword pair (e.g. `'center bottom'`) to
- * fractional coordinates in [0, 1]: x → 0 left / 0.5 center / 1 right,
- * y → 0 top / 0.5 center / 1 bottom. Unknown/missing keywords fall back to 0.5.
- */
-export function anchorToFractions(anchor: string): [number, number] {
-  const frac = (k: string, lo: string, hi: string): number =>
-    k === lo ? 0 : k === hi ? 1 : 0.5
-  const [x = 'center', y = 'center'] = anchor.trim().split(/\s+/)
-  return [frac(x, 'left', 'right'), frac(y, 'top', 'bottom')]
-}
-
-/**
- * Full-source framing style: render the *entire* source image (no cover cropping),
- * scaled and positioned so that at identity (scale 1 / offset 0) it is pixel-identical
- * to {@link imgTransformStyle}'s `object-fit: cover` box. This is the picture's real
- * geometry once its natural size is known: the frame's polygon clip supplies the
- * comic-panel crop, so panning slides the picture under the frame (re-framing it)
- * instead of moving a pre-cropped box — no source pixels are ever discarded. In edit
- * mode the selected image simply drops the clip, revealing the same geometry.
+ * Style for the <img> inside the clip wrapper: fill the frame, and nothing else.
  *
- * `bounds` is the *frame* box, not the panel box: an inset picture covers its own
- * frame, which is the whole point of the frame being the picture's own.
+ * There is no `object-fit: cover` here and no transform, because the frame is built
+ * to the source's own aspect ratio ({@link imgFrameBox}) — so filling it *is* drawing
+ * the whole picture at its true proportions. `contain` rather than `fill` only so the
+ * one frame before the natural size is known letterboxes instead of stretching.
  *
- * Geometry: the cover box (`bounds`) renders the natural image (`nat`) at
- * `coverScale = max(bw/nw, bh/nh)`; this draws the natural image at that same
- * scale (× the transform's zoom) and positions its centre where the cover content's
- * centre lands after `translate(offset) scale(t.scale)` about the box centre.
+ * What used to be here — a cover box, an `object-position` anchor, and a
+ * translate/scale pan-and-zoom on top — existed to choose which part of the picture
+ * survived being forced into a box of the wrong shape. Nothing is forced any more,
+ * so there is nothing left to choose: moving the frame moves the picture, resizing
+ * the frame resizes the picture, and no source pixel is ever discarded.
  */
-export function fullImgStyle(
-  bounds: { w: number; h: number },
-  nat: { w: number; h: number },
-  t: ImgTransform,
-): CSSProperties {
-  const { w: bw, h: bh } = bounds
-  const { w: nw, h: nh } = nat
-  const cover = Math.max(bw / nw, bh / nh)
-  const fw = nw * cover
-  const fh = nh * cover
-  const [ax, ay] = anchorToFractions(t.anchor)
-  // Cover content centre in box coords (before the panel transform).
-  const cx = ax * (bw - fw) + fw / 2
-  const cy = ay * (bh - fh) + fh / 2
-  const ox = bw / 2
-  const oy = bh / 2
-  // Apply translate(offset) scale about the box centre, matching imgTransformStyle.
-  const centerX = ox + t.offsetX + t.scale * (cx - ox)
-  const centerY = oy + t.offsetY + t.scale * (cy - oy)
+export function imgFillStyle(): CSSProperties {
   return {
     position: 'absolute',
-    left: centerX - nw / 2,
-    top: centerY - nh / 2,
-    width: nw,
-    height: nh,
-    // The natural size must be honoured verbatim — override any global
-    // `img { max-width: 100% }` reset, which would otherwise cap the width to the
-    // wrapper and collapse this geometry (image flies off-screen).
+    left: 0,
+    top: 0,
+    width: '100%',
+    height: '100%',
+    // The natural size must not cap the box — a global `img { max-width: 100% }`
+    // reset would otherwise shrink an enlarged picture back to its source width.
     maxWidth: 'none',
     maxHeight: 'none',
-    objectFit: 'fill',
-    transform: `scale(${cover * t.scale})`,
-    transformOrigin: 'center center',
+    objectFit: 'contain',
   }
 }
 
 /**
- * Style for the .cb-img-clip wrapper around a panel image, which is two separate
- * containments that used to be one.
+ * Style for the .cb-img-clip wrapper around a panel image.
  *
- * `overflow: hidden` is unconditional, and it is not a crop in the sense `spill`
- * asks about: {@link fullImgStyle} renders the picture at full source geometry so
- * pan and zoom re-frame it under a fixed window, and the frame *is* that window.
- * Without it the frame stops describing how big the picture renders — the picture
- * overhangs its own outline, and anything that switched the overflow back on
- * (selecting it, say) redrew the page.
+ * `overflow: hidden` is unconditional and is now only a guard: the picture is built
+ * to fill this box exactly, so there is nothing to overflow. It stays because a
+ * wrapper that can be overflowed by one frame's worth of stale geometry (a resize
+ * between load and layout, say) would flash the picture outside its own outline.
  *
  * The panel polygon ({@link imgPanelClip}) is the crop `spill` governs, and it is
  * the only one: `spill: true` drops it so the picture crosses the panel edge, with
@@ -212,18 +143,37 @@ export function bubbleStyle(b: BubbleTransform): CSSProperties {
 // Serialization back to layoutConfig.ts lives in ./serialize.ts.
 
 // ─── Image frames ────────────────────────────────────────────────────────────────
-// A picture's frame is its own rectangle over the panel box, in % — not the panel
-// polygon it used to borrow. That is what lets a panel hold two pictures, and what
-// makes dragging one move its window instead of sliding the picture under a window
-// that never moved.
+// A picture's frame is its own rectangle over the panel box — not the panel polygon
+// it used to borrow. That is what lets a panel hold two pictures, and what makes
+// dragging one move its window instead of sliding the picture under a window that
+// never moved.
 //
-// The frame is geometry and nothing else: where the picture sits and how big it
-// renders, exactly as `top`/`right`/`width` are for a bubble. It is not a shape, it
-// draws no ink, and it does no cropping — the panel does the cropping, or nothing
-// does when `spill` is on.
+// The frame is geometry alone: it draws no ink and it does no cropping. The panel
+// does the cropping, or nothing does when `spill` is on.
+//
+// Only `left`/`top`/`width` are authored. The height follows the *source's* aspect
+// ratio, exactly as a bubble's height follows BUBBLE_ASPECT — which is what makes the
+// frame the picture's true outline rather than a window cut through it. An authored
+// height can be any shape, and every shape but one crops: the eight shipped pictures
+// showed between 38% and 98% of their source depending on how their panel happened to
+// be proportioned, so no two were framed alike and the editor's selection outline was
+// the crop rather than the picture.
 
-/** Frame size limits, in % of the panel box. */
+/** Frame width limits, in % of the panel box. */
 export const IMG_FRAME = { min: 5, max: 400, step: 1 }
+
+/**
+ * Aspect ratio (w / h) used for a picture whose source has not loaded yet, so a frame
+ * always has a defined shape. Square is arbitrary and never seen: the page stays
+ * behind its loading sheet until every picture has settled, and the frame snaps to the
+ * real ratio on the load event.
+ */
+export const IMG_ASPECT_FALLBACK = 1
+
+/** A source's aspect ratio (w / h), or {@link IMG_ASPECT_FALLBACK} before it loads. */
+export function imgAspect(nat: { w: number; h: number } | undefined): number {
+  return nat && nat.w > 0 && nat.h > 0 ? nat.w / nat.h : IMG_ASPECT_FALLBACK
+}
 
 /** Convert a viewport-coord polygon to a CSS `polygon()`, relative to an origin. */
 export function toClipPath(pts: [number, number][], ox: number, oy: number): string {
@@ -234,16 +184,22 @@ export function toClipPath(pts: [number, number][], ox: number, oy: number): str
  * A picture's frame in coordinates relative to its panel element — which is what the
  * absolutely-positioned clip wrapper needs, since the panel element is itself placed at
  * the panel's bounds.
+ *
+ * `aspect` is the *source's* ratio, from {@link imgAspect}: the width is authored and
+ * the height is whatever that width implies for this picture. Hand it the same value
+ * the renderer used, or the outline stops describing the picture.
  */
 export function imgFrameBox(
   bounds: { w: number; h: number },
-  t: Pick<ImgTransform, 'left' | 'top' | 'width' | 'height'>,
+  t: Pick<ImgTransform, 'left' | 'top' | 'width'>,
+  aspect: number,
 ): { x: number; y: number; w: number; h: number } {
+  const w = (t.width / 100) * bounds.w
   return {
     x: (t.left / 100) * bounds.w,
     y: (t.top / 100) * bounds.h,
-    w: (t.width / 100) * bounds.w,
-    h: (t.height / 100) * bounds.h,
+    w,
+    h: w / (aspect > 0 ? aspect : IMG_ASPECT_FALLBACK),
   }
 }
 
@@ -254,9 +210,10 @@ export function imgFrameBox(
  */
 export function imgRect(
   bounds: { x: number; y: number; w: number; h: number },
-  t: Pick<ImgTransform, 'left' | 'top' | 'width' | 'height'>,
+  t: Pick<ImgTransform, 'left' | 'top' | 'width'>,
+  aspect: number,
 ): { x: number; y: number; w: number; h: number } {
-  const box = imgFrameBox(bounds, t)
+  const box = imgFrameBox(bounds, t, aspect)
   return { x: bounds.x + box.x, y: bounds.y + box.y, w: box.w, h: box.h }
 }
 
@@ -279,10 +236,11 @@ export function imgRect(
 export function imgPanelClip(
   vp: [number, number][],
   bounds: { x: number; y: number; w: number; h: number },
-  t: Pick<ImgTransform, 'left' | 'top' | 'width' | 'height'>,
+  t: Pick<ImgTransform, 'left' | 'top' | 'width'>,
+  aspect: number,
 ): string {
   if (vp.length === 0) return 'none'
-  const rect = imgRect(bounds, t)
+  const rect = imgRect(bounds, t, aspect)
   return toClipPath(vp, rect.x, rect.y)
 }
 
@@ -303,41 +261,29 @@ export function dragImgFrame(
 }
 
 /**
- * Grow/shrink a picture's frame by a delta in % of the panel box, both axes at once —
- * the keyboard's `+`/`-`, where there is no drag direction to take two deltas from.
+ * Grow/shrink a picture by a width delta in % of the panel box, clamped to IMG_FRAME.
+ * One axis, because there is only one: the height is the source's to decide.
  */
 export function sizeImgFrame(t: ImgTransform, deltaPct: number): ImgTransform {
-  return {
-    ...t,
-    width: clamp(t.width + deltaPct, IMG_FRAME.min, IMG_FRAME.max),
-    height: clamp(t.height + deltaPct, IMG_FRAME.min, IMG_FRAME.max),
-  }
+  return { ...t, width: clamp(t.width + deltaPct, IMG_FRAME.min, IMG_FRAME.max) }
 }
 
 /**
- * Resize a picture's frame from its bottom-right corner by a px handle drag. The top
- * left stays put, so the handle tracks the pointer.
+ * Resize a picture's frame from its bottom-right corner by a px handle drag. Only the
+ * horizontal component counts — the height follows the source — so the handle tracks
+ * the pointer along x and the picture keeps its proportions. The top left stays put.
  */
-export function resizeImgFrame(
-  t: ImgTransform,
-  dWidthPx: number,
-  dHeightPx: number,
-  panelW: number,
-  panelH: number,
-): ImgTransform {
-  if (panelW <= 0 || panelH <= 0) return t
-  return {
-    ...t,
-    width: clamp(t.width + (dWidthPx / panelW) * 100, IMG_FRAME.min, IMG_FRAME.max),
-    height: clamp(t.height + (dHeightPx / panelH) * 100, IMG_FRAME.min, IMG_FRAME.max),
-  }
+export function resizeImgFrame(t: ImgTransform, dWidthPx: number, panelW: number): ImgTransform {
+  if (panelW <= 0) return t
+  return sizeImgFrame(t, (dWidthPx / panelW) * 100)
 }
 
 /** Inline style placing the .cb-img-clip wrapper on its frame within the panel. */
 export function imgFrameStyle(
   bounds: { w: number; h: number },
-  t: Pick<ImgTransform, 'left' | 'top' | 'width' | 'height'>,
+  t: Pick<ImgTransform, 'left' | 'top' | 'width'>,
+  aspect: number,
 ): CSSProperties {
-  const box = imgFrameBox(bounds, t)
+  const box = imgFrameBox(bounds, t, aspect)
   return { position: 'absolute', left: box.x, top: box.y, width: box.w, height: box.h }
 }

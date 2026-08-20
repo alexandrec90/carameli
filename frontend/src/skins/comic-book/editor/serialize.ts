@@ -40,20 +40,25 @@ function strLiteral(s: string): string {
 
 const IMG_HEADER = `// Not parallel to PANELS: each picture names its \`panel\`, so a panel may own several or
 // none, and the array is ordered by panel only for readability. \`src\`/\`alt\` are the
-// picture itself; \`left\`/\`top\`/\`width\`/\`height\` are its frame, in % of the panel box,
-// and may go negative or past 100 to hang the frame off an edge.
-// \`scale\`/\`offsetX\`/\`offsetY\`/\`anchor\` then frame the picture *inside* its frame;
-// \`spill: false\` clips it to the panel, \`spill: true\` lets it bleed into the gutter —
-// the same question, and the same answer, as a bubble's \`spill\`.
+// picture itself; \`left\`/\`top\`/\`width\` are its frame, in % of the panel box, and may go
+// negative or past 100 to hang it off an edge. \`spill: false\` clips the picture to the
+// panel, \`spill: true\` lets it bleed into the gutter — the same question, and the same
+// answer, as a bubble's \`spill\`.
 //
-// The eight ship on a -5/-5/110/110 frame rather than on 0/0/100/100, and the
-// difference is the point rather than a tweak. A frame of exactly 0/0/100/100 *is* the
-// panel box: the editor draws its selection outline in the same place it draws the
-// panel's, so there is no picture to grab that is distinguishable from the slot it sits
-// in — which was the original complaint. Art that overhangs the window it is read
-// through is also the ordinary comic relationship, and it is the one framing that keeps
-// covering when the grid reflows (\`computeLayout\` reshapes every panel between the
-// landscape, portrait and square layouts). Retune any of them in the editor and Save.`
+// There is no \`height\`, and no \`scale\`/\`offsetX\`/\`offsetY\`/\`anchor\` either. A picture's
+// height is its width divided by the source's own aspect ratio, exactly as a bubble's
+// follows BUBBLE_ASPECT, so the frame *is* the picture's outline: it can be moved and
+// resized but never reshaped, and nothing it does can crop the source. Those four fields
+// existed to choose which part of a picture survived being forced into a box of the
+// wrong shape, and no picture is forced now — with one authored height per panel the
+// eight below showed between 38% and 98% of their source, no two framed alike.
+//
+// The eight ship fitted to their landscape panels: the largest each can be with all of
+// it in shot. Panel polygons are oblique, so a picture filling its panel box still has
+// its corners cut by the panel while \`spill\` is off — that crop is the panel's, and is
+// exactly what the checkbox governs. \`computeLayout\` reshapes every panel between the
+// landscape, portrait and square layouts, so these widths suit one of the three: retune
+// per layout in the editor and Save.`
 
 const BUBBLE_HEADER = `// Not parallel to PANELS either: each bubble names its \`panel\`, a panel may own any
 // number of them, and the array is ordered by panel only for readability. \`type\`/\`text\`
@@ -76,11 +81,10 @@ const BUBBLE_HEADER = `// Not parallel to PANELS either: each bubble names its \
  * `layoutConfig.ts` (the two `export const` blocks, each under its explanatory
  * comment).
  *
- * Numbers are rounded for clean output: frame percentages to 1 decimal, image `scale`
- * to 2, pixel offsets and bubble percentages to integers, `rotate` to 1. `src`, `alt`
- * and bubble `text` go through {@link strLiteral} so an apostrophe, a quote or a
- * backslash the author typed stays valid TS; `anchor` and the bubble enums come from
- * fixed dropdowns and are quoted plainly.
+ * Numbers are rounded for clean output: frame percentages to 1 decimal, bubble
+ * percentages to integers, `rotate` to 1. `src`, `alt` and bubble `text` go through
+ * {@link strLiteral} so an apostrophe, a quote or a backslash the author typed stays
+ * valid TS; the bubble enums come from fixed dropdowns and are quoted plainly.
  */
 export function serializeConfig(c: EditorConfig): string {
   const imgLines = c.images
@@ -88,9 +92,7 @@ export function serializeConfig(c: EditorConfig): string {
       t =>
         `  { panel: ${t.panel}, src: ${strLiteral(t.src)}, alt: ${strLiteral(t.alt)}, ` +
         `left: ${round(t.left, 1)}, top: ${round(t.top, 1)}, ` +
-        `width: ${round(t.width, 1)}, height: ${round(t.height, 1)}, ` +
-        `scale: ${round(t.scale, 2)}, offsetX: ${Math.round(t.offsetX)}, ` +
-        `offsetY: ${Math.round(t.offsetY)}, anchor: '${t.anchor}', spill: ${t.spill} },`,
+        `width: ${round(t.width, 1)}, spill: ${t.spill} },`,
     )
     .join('\n')
   const bubbleLines = c.bubbles

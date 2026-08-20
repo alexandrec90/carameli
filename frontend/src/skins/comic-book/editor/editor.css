@@ -89,17 +89,6 @@
   cursor: grab;
 }
 
-/* Top-left corner: pan the picture inside its frame (image only). Round, like the
-   rotate grip, because both move content rather than resize a box — and a colour of
-   its own, so a picture's two framings are never mistaken for each other. */
-.cb-ed-handle-pan {
-  left: -8px;
-  top: -8px;
-  background: #28c8a0;
-  border-radius: 50%;
-  cursor: grab;
-}
-
 /* A selected panel is only outlined — there is nothing about a grid slot to drag, so
    it takes no pointer events and carries no handles. */
 .cb-ed-outline-panel {

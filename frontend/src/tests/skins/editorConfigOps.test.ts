@@ -55,9 +55,15 @@ describe('seedConfig', () => {
     })
   })
 
-  it('ships every picture on the shared default frame', () => {
+  // Every picture ships fitted to its own panel, so there is no shared frame to assert
+  // any more — only that each one is placed and sized, and by nothing else. A stray
+  // `height` here is the crop the whole change removed, coming back through the config.
+  it('ships every picture placed by position and width alone', () => {
     seedConfig().images.forEach(t => {
-      expect([t.left, t.top, t.width, t.height]).toEqual([-5, -5, 110, 110])
+      expect(Number.isFinite(t.left)).toBe(true)
+      expect(Number.isFinite(t.top)).toBe(true)
+      expect(t.width).toBeGreaterThan(0)
+      expect(t).not.toHaveProperty('height')
     })
   })
 
@@ -84,8 +90,8 @@ describe('seedConfig', () => {
     const cfg = seedConfig()
     expect(cfg.images[0]).not.toBe(PANEL_IMG_TRANSFORMS[0])
     expect(cfg.bubbles[0]).not.toBe(PANEL_BUBBLE_TRANSFORMS[0])
-    cfg.images[0].scale = 99
-    expect(PANEL_IMG_TRANSFORMS[0].scale).toBe(1)
+    cfg.images[0].width = 99
+    expect(PANEL_IMG_TRANSFORMS[0].width).not.toBe(99)
   })
 })
 
@@ -133,7 +139,7 @@ describe('hydrateConfig', () => {
   })
 
   it('round-trips a mutated config', () => {
-    const cfg = patchImg(seedConfig(), 3, { scale: 1.4, offsetY: -12 })
+    const cfg = patchImg(seedConfig(), 3, { left: 1.4, top: -12 })
     expect(hydrateConfig(JSON.stringify(cfg))).toEqual(cfg)
   })
 
@@ -172,12 +178,7 @@ describe('hydrateConfig', () => {
   // every picture on the page into the logo.
   it('backfills fields missing from an older payload (pre-panel/tail)', () => {
     const legacy = {
-      images: PANEL_IMG_TRANSFORMS.map(({ scale, offsetX, offsetY, anchor }) => ({
-        scale,
-        offsetX,
-        offsetY,
-        anchor,
-      })),
+      images: PANEL_IMG_TRANSFORMS.map(({ left, top, width }) => ({ left, top, width })),
       bubbles: [{ top: 10, right: 20, width: 30, rotate: 0 }],
     }
     const cfg = hydrateConfig(JSON.stringify(legacy))
@@ -188,12 +189,34 @@ describe('hydrateConfig', () => {
   })
 
   it('keeps whatever framing the older payload had already changed', () => {
+    const legacy = { images: [{ left: 30, top: -10, width: 40 }], bubbles: [] }
+    expect(hydrateConfig(JSON.stringify(legacy)).images).toEqual([
+      { ...PANEL_IMG_TRANSFORMS[0], left: 30, top: -10, width: 40 },
+    ])
+  })
+
+  // A working copy saved while a picture still had an authored height and a pan/zoom
+  // inside it. Those five fields no longer mean anything, and carrying them through
+  // would put them straight back into the next Save — so they are dropped, while the
+  // frame the author had dragged survives.
+  it('drops the retired framing fields from a pre-aspect payload', () => {
     const legacy = {
-      images: [{ scale: 2, offsetX: 30, offsetY: -10, anchor: 'left top' }],
+      images: [
+        {
+          left: 30,
+          top: -10,
+          width: 40,
+          height: 90,
+          scale: 2,
+          offsetX: 30,
+          offsetY: -10,
+          anchor: 'left top',
+        },
+      ],
       bubbles: [],
     }
     expect(hydrateConfig(JSON.stringify(legacy)).images).toEqual([
-      { ...PANEL_IMG_TRANSFORMS[0], scale: 2, offsetX: 30, offsetY: -10, anchor: 'left top' },
+      { ...PANEL_IMG_TRANSFORMS[0], left: 30, top: -10, width: 40 },
     ])
   })
 
@@ -322,8 +345,8 @@ describe('isBubbleType / isTailDir', () => {
 
 describe('patchImg / patchBubble', () => {
   it('patch-merges an image entry and leaves others untouched', () => {
-    const next = patchImg(seedConfig(), 1, { scale: 2 })
-    expect(next.images[1]).toEqual({ ...PANEL_IMG_TRANSFORMS[1], scale: 2 })
+    const next = patchImg(seedConfig(), 1, { width: 42 })
+    expect(next.images[1]).toEqual({ ...PANEL_IMG_TRANSFORMS[1], width: 42 })
     expect(next.images[0]).toEqual(PANEL_IMG_TRANSFORMS[0])
   })
 
@@ -358,15 +381,15 @@ describe('patchImg / patchBubble', () => {
 
   it('does not mutate the input config', () => {
     const base = seedConfig()
-    patchImg(base, 0, { scale: 5 })
+    patchImg(base, 0, { width: 5 })
     patchBubble(base, 0, { panel: 7 })
-    expect(base.images[0].scale).toBe(1)
+    expect(base.images[0].width).toBe(PANEL_IMG_TRANSFORMS[0].width)
     expect(base.bubbles[0].panel).toBe(PANEL_BUBBLE_TRANSFORMS[0].panel)
   })
 
   it('is a no-op for an out-of-range index', () => {
     const base = seedConfig()
-    expect(patchImg(base, 99, { scale: 5 })).toEqual(base)
+    expect(patchImg(base, 99, { width: 5 })).toEqual(base)
     expect(patchBubble(base, 99, { rotate: 5 })).toEqual(base)
   })
 })
@@ -380,14 +403,16 @@ describe('addImg', () => {
     expect(config.images[index]).toEqual({ ...NEW_IMAGE, panel: 6 })
   })
 
-  // A second picture added on the shipped frame would land exactly on the one already
-  // there, and adding it would read as nothing having happened.
+  // A picture added on top of the one already on that panel would read as nothing
+  // having happened, so the template is deliberately inset and smaller than a panel.
   it('starts the new picture inset, not covering the panel', () => {
     const { config, index } = addImg(seedConfig(), 0)
     const t = config.images[index]
-    expect([t.left, t.top]).not.toEqual([-5, -5])
+    expect([t.left, t.top]).not.toEqual([
+      PANEL_IMG_TRANSFORMS[0].left,
+      PANEL_IMG_TRANSFORMS[0].top,
+    ])
     expect(t.width).toBeLessThan(100)
-    expect(t.height).toBeLessThan(100)
   })
 
   it('leaves the existing pictures alone', () => {
@@ -514,7 +539,7 @@ describe('removeBubble', () => {
 
 describe('resetOneIn', () => {
   it('restores a single image entry to its default', () => {
-    const edited = patchImg(seedConfig(), 2, { scale: 3, offsetX: 50 })
+    const edited = patchImg(seedConfig(), 2, { left: 3, width: 50 })
     expect(resetOneIn(edited, 'img', 2).images[2]).toEqual(PANEL_IMG_TRANSFORMS[2])
   })
 
@@ -524,11 +549,11 @@ describe('resetOneIn', () => {
   })
 
   it('leaves sibling entries of the same kind alone', () => {
-    let cfg = patchImg(seedConfig(), 1, { scale: 2 })
-    cfg = patchImg(cfg, 2, { scale: 3 })
+    let cfg = patchImg(seedConfig(), 1, { width: 22 })
+    cfg = patchImg(cfg, 2, { width: 33 })
     const reset = resetOneIn(cfg, 'img', 1)
     expect(reset.images[1]).toEqual(PANEL_IMG_TRANSFORMS[1])
-    expect(reset.images[2].scale).toBe(3)
+    expect(reset.images[2].width).toBe(33)
   })
 
   // An added bubble has no shipped default to go back to; deleting it is the delete
@@ -546,8 +571,8 @@ describe('resetOneIn', () => {
   })
 
   // Reset is what undoes a frame drag, which is the gesture the whole change is about.
-  it('restores a dragged frame, not just the framing inside it', () => {
-    const edited = patchImg(seedConfig(), 2, { left: 40, top: -15, width: 30, height: 30 })
+  it('restores a dragged frame', () => {
+    const edited = patchImg(seedConfig(), 2, { left: 40, top: -15, width: 30 })
     expect(resetOneIn(edited, 'img', 2).images[2]).toEqual(PANEL_IMG_TRANSFORMS[2])
   })
 })

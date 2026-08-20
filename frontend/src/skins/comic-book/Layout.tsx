@@ -704,10 +704,12 @@ export function Layout({ navItems }: LayoutProps) {
             : computeLayout(window.innerWidth, window.innerHeight)
     )
     // Natural (intrinsic) pixel size of each loaded source, captured on load and keyed
-    // by `src`. Drives fullImgStyle (the real framing); absent until the img loads,
-    // during which the equivalent object-fit:cover fallback renders. Keyed by source
-    // rather than by index because two pictures may be the same file, and the second
-    // should not have to wait for its own load to learn a size already known.
+    // by `src`. It is what gives a picture's frame its height, so both the renderer and
+    // the editor overlay read it from here — an outline drawn from a ratio derived
+    // anywhere else would not sit on the picture. Absent until the img loads, during
+    // which the frame is square. Keyed by source rather than by index because two
+    // pictures may be the same file, and the second should not have to wait for its own
+    // load to learn a size already known.
     const [natSizes, setNatSizes] = useState<Record<string, { w: number; h: number }>>({})
     // True once every panel image has loaded or errored.
     const [ready, setReady] = useState(false)
@@ -952,8 +954,9 @@ export function Layout({ navItems }: LayoutProps) {
                             {/* Pictures — however many name this panel, each on its own frame
                                 over the panel box, each cut to this panel's shape. `spill`
                                 drops that clip so a picture pops out over the frame lines,
-                                exactly as it does for a bubble. Selection changes nothing
-                                here: the frame is always the picture's rendered size. */}
+                                exactly as it does for a bubble. The frame's height comes
+                                from the source's own ratio, so it is the picture's
+                                outline; selection changes nothing about what is drawn. */}
                             <PanelImages
                                 images={imgT}
                                 panel={i}
@@ -1017,6 +1020,7 @@ export function Layout({ navItems }: LayoutProps) {
                     <EditorOverlay
                         api={editor}
                         panelPolys={panelPolys}
+                        natSizes={natSizes}
                         pageSelect={{
                             navItems,
                             previewingLoading: previewLoading,

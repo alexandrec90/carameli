@@ -26,11 +26,6 @@ export const NEW_IMAGE: Omit<ImgTransform, 'panel'> = {
   left: 20,
   top: 20,
   width: 55,
-  height: 55,
-  scale: 1,
-  offsetX: 0,
-  offsetY: 0,
-  anchor: 'center center',
   spill: false,
 }
 
@@ -138,6 +133,24 @@ function clampPanel<T extends { panel: number }>(entry: T): T {
  * Build a config from a persisted JSON string. Falls back to {@link seedConfig}
  * for null, malformed JSON, or a structurally invalid payload — never throws.
  */
+/**
+ * The fields an image entry may carry, and the reason the payload is picked apart
+ * rather than spread whole: a config saved before a picture's height was derived from
+ * its source also holds `height`, `scale`, `offsetX`, `offsetY` and `anchor`. Nothing
+ * reads them now, but spreading them back in would leave a working copy whose entries
+ * are not ImgTransforms, and the next Save would carry the corpses forward.
+ */
+const IMG_FIELDS = ['panel', 'src', 'alt', 'left', 'top', 'width', 'spill'] as const
+
+/** Keep only {@link IMG_FIELDS} from a persisted entry, dropping any retired key. */
+function pickImgFields(t: Partial<ImgTransform>): Partial<ImgTransform> {
+  const out: Partial<ImgTransform> = {}
+  IMG_FIELDS.forEach(k => {
+    if (k in t) Object.assign(out, { [k]: t[k] })
+  })
+  return out
+}
+
 export function hydrateConfig(raw: string | null): EditorConfig {
   if (raw == null) return seedConfig()
   try {
@@ -171,7 +184,7 @@ export function hydrateConfig(raw: string | null): EditorConfig {
           panel: 0,
           ...NEW_IMAGE,
           ...shipped,
-          ...(t as Partial<ImgTransform>),
+          ...pickImgFields(t as Partial<ImgTransform>),
         })
       }),
       bubbles: sanitizeLinks(

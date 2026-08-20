@@ -42,7 +42,11 @@ describe('serializeConfig', () => {
   it('carries the explanatory headers, the same-panel link rule included', () => {
     const ts = serializeConfig(seedConfig())
     expect(ts).toContain('Not parallel to PANELS: each picture names its `panel`')
-    expect(ts).toContain("the same question, and the same answer, as a bubble's `spill`")
+    expect(ts).toContain("answer, as a bubble's `spill`")
+    // The rule that keeps a picture uncropped lives in this prose and nowhere else in
+    // the emitted file, so a save that dropped it would leave the next reader of
+    // layoutConfig.ts free to hand-write a height back in.
+    expect(ts).toContain('There is no `height`')
     expect(ts).toContain('must name a bubble on the same panel')
     expect(ts).toContain("`tail` which way the tail points ('none'")
     expect(ts).toContain('Two pairs ship linked')
@@ -52,13 +56,11 @@ describe('serializeConfig', () => {
     const ts = serializeConfig(seedConfig())
     expect(ts).toContain(
       "{ panel: 0, src: '/comic-book/logo.webp', alt: 'Carameli', " +
-        'left: -5, top: -5, width: 110, height: 110, scale: 1, offsetX: 0, offsetY: 0, ' +
-        "anchor: 'center center', spill: false },",
+        'left: 0, top: 20.6, width: 100, spill: false },',
     )
     expect(ts).toContain(
       "{ panel: 1, src: '/comic-book/switchboard.webp', alt: 'Switchboard', " +
-        'left: -5, top: -5, width: 110, height: 110, scale: 1, offsetX: 0, offsetY: 0, ' +
-        "anchor: 'center bottom', spill: false },",
+        'left: 0, top: 40.7, width: 100, spill: false },',
     )
     expect(ts).toContain(
       '{ panel: 0, top: -35, right: -12, width: 55, rotate: -5, spill: true, ' +
@@ -70,8 +72,21 @@ describe('serializeConfig', () => {
   // The frame is the picture's own now, so it is the part a save must carry: an
   // emitter that dropped it would silently snap every picture back onto its panel.
   it('writes the frame a picture was dragged and resized to', () => {
-    const ts = serializeConfig(patchImg(seedConfig(), 3, { left: -12.5, top: 20, width: 55, height: 40 }))
-    expect(ts).toContain('left: -12.5, top: 20, width: 55, height: 40,')
+    const ts = serializeConfig(patchImg(seedConfig(), 3, { left: -12.5, top: 20, width: 55 }))
+    expect(ts).toContain('left: -12.5, top: 20, width: 55, spill: false },')
+  })
+
+  // Three numbers and no fourth. A picture's height is its width over the source's own
+  // ratio, so an emitted `height` — or a `scale`, an offset, an `anchor` — would be a
+  // second opinion about the shape of a box the source already decides, and the shape
+  // it decided against is a crop.
+  it('emits no field able to reshape a picture', () => {
+    const ts = serializeConfig(seedConfig())
+    const imgLines = ts.split('\n').filter(l => l.includes("src: '/comic-book/"))
+    expect(imgLines).toHaveLength(PANEL_IMG_TRANSFORMS.length)
+    imgLines.forEach(line => {
+      expect(line).not.toMatch(/\b(height|scale|offsetX|offsetY|anchor)\b/)
+    })
   })
 
   it('writes the panel a picture belongs to, so two may share one', () => {
@@ -108,21 +123,15 @@ describe('serializeConfig', () => {
 
   it('rounds float noise out of the output', () => {
     let cfg = patchImg(seedConfig(), 1, {
-      // A drag produces percentages with long tails; a wheel produces scale noise.
+      // A drag produces percentages with long tails; so does a wheel notch.
       left: 19.999999998,
       top: 20.04,
       width: 55.06,
-      height: 55.949999,
-      scale: 1.0000000002,
-      offsetX: 12.4,
-      offsetY: -8.7,
     })
     cfg = patchBubble(cfg, 1, { top: -35.49, right: -11.6, width: 54.8, rotate: -4.96 })
     const ts = serializeConfig(cfg)
     expect(ts).not.toMatch(/\d\.\d{3,}/) // no long decimal tails anywhere
-    expect(ts).toContain(
-      'left: 20, top: 20, width: 55.1, height: 55.9, scale: 1, offsetX: 12, offsetY: -9,',
-    )
+    expect(ts).toContain('left: 20, top: 20, width: 55.1, spill: false },')
     expect(ts).toContain('{ panel: 0, top: -35, right: -12, width: 55, rotate: -5, spill: true,')
   })
 
@@ -142,11 +151,6 @@ describe('serializeConfig', () => {
     expect(ts).not.toContain("\\'")
   })
 
-  it('keeps two decimals of precision on scale', () => {
-    const cfg = patchImg(seedConfig(), 2, { scale: 1.234 })
-    expect(serializeConfig(cfg)).toContain('scale: 1.23,')
-  })
-
   // Frame percentages keep one decimal, not zero: a 400-wide panel resolves 0.1% to
   // sub-pixel, and rounding to integers would visibly nudge a frame on every save.
   it('keeps one decimal of precision on the frame', () => {
@@ -156,7 +160,7 @@ describe('serializeConfig', () => {
   })
 
   it('produces a string that re-evaluates back to the same config', () => {
-    const cfg = patchBubble(patchImg(seedConfig(), 0, { scale: 1.5, offsetY: -20 }), 0, {
+    const cfg = patchBubble(patchImg(seedConfig(), 0, { left: 1.5, top: -20 }), 0, {
       top: -40,
       width: 60,
     })
@@ -165,8 +169,8 @@ describe('serializeConfig', () => {
     expect(parsed.bubbles).toHaveLength(PANEL_BUBBLE_TRANSFORMS.length)
     expect(parsed.images[0]).toEqual({
       ...PANEL_IMG_TRANSFORMS[0],
-      scale: 1.5,
-      offsetY: -20,
+      left: 1.5,
+      top: -20,
     })
     expect(parsed.bubbles[0]).toEqual({ ...PANEL_BUBBLE_TRANSFORMS[0], top: -40, width: 60 })
   })

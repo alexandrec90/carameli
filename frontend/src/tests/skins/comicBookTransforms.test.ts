@@ -8,14 +8,14 @@ import {
   PANEL_BUBBLE_TRANSFORMS,
 } from '../../skins/comic-book/editor/layoutConfig'
 import {
-  imgTransformStyle,
-  fullImgStyle,
+  IMG_ASPECT_FALLBACK,
+  imgAspect,
   imgClipStyle,
+  imgFillStyle,
   imgFrameBox,
   imgFrameStyle,
   imgPanelClip,
   imgRect,
-  anchorToFractions,
   bubbleRect,
   bubbleStyle,
   toClipPath,
@@ -23,7 +23,7 @@ import {
 import type { ImgTransform } from '../../skins/comic-book/editor/types'
 import { PANELS } from '../../skins/comic-book/panels'
 
-/** A picture on a frame covering its whole panel box, identity framing inside it. */
+/** A picture whose frame spans the full width of its panel box, at the panel's origin. */
 const img = (over: Partial<ImgTransform> = {}): ImgTransform => ({
   panel: 0,
   src: '/comic-book/logo.webp',
@@ -31,78 +31,51 @@ const img = (over: Partial<ImgTransform> = {}): ImgTransform => ({
   left: 0,
   top: 0,
   width: 100,
-  height: 100,
-  scale: 1,
-  offsetX: 0,
-  offsetY: 0,
-  anchor: 'center bottom',
   spill: false,
   ...over,
 })
 
-describe('imgTransformStyle', () => {
-  it('builds the expected CSS for a sample transform', () => {
-    const style = imgTransformStyle(img({ scale: 1.5, offsetX: 10, offsetY: -20 }))
-    expect(style.objectFit).toBe('cover')
-    expect(style.objectPosition).toBe('center bottom')
-    expect(style.transform).toBe('translate(10px, -20px) scale(1.5)')
-    expect(style.transformOrigin).toBe('center center')
+/** Aspect of the 400x300 panel box the geometry tests below use. */
+const PANEL_ASPECT = 4 / 3
+
+describe('imgAspect', () => {
+  it('is the source ratio once the picture has loaded', () => {
+    expect(imgAspect({ w: 800, h: 400 })).toBe(2)
+    expect(imgAspect({ w: 300, h: 600 })).toBe(0.5)
   })
 
-  it('reproduces the identity framing at scale 1 / offset 0', () => {
-    const style = imgTransformStyle(img({ anchor: 'center center' }))
-    expect(style.transform).toBe('translate(0px, 0px) scale(1)')
-    expect(style.objectPosition).toBe('center center')
-  })
-})
-
-describe('anchorToFractions', () => {
-  it('maps keyword pairs to [x, y] fractions', () => {
-    expect(anchorToFractions('center center')).toEqual([0.5, 0.5])
-    expect(anchorToFractions('center bottom')).toEqual([0.5, 1])
-    expect(anchorToFractions('left top')).toEqual([0, 0])
-    expect(anchorToFractions('right bottom')).toEqual([1, 1])
-  })
-
-  it('tolerates extra whitespace and missing keywords', () => {
-    expect(anchorToFractions('  right   ')).toEqual([1, 0.5])
-    expect(anchorToFractions('')).toEqual([0.5, 0.5])
+  // The page stays behind its loading sheet until every picture settles, so the
+  // fallback is never seen — but a frame with no shape at all would divide by zero.
+  it('falls back to square before the source is known, and on a degenerate one', () => {
+    expect(imgAspect(undefined)).toBe(IMG_ASPECT_FALLBACK)
+    expect(imgAspect({ w: 0, h: 400 })).toBe(IMG_ASPECT_FALLBACK)
+    expect(imgAspect({ w: 800, h: 0 })).toBe(IMG_ASPECT_FALLBACK)
   })
 })
 
-describe('fullImgStyle', () => {
-  // `bounds` here is the *frame* box, not the panel box — an inset picture covers its
-  // own frame, which is the whole point of the frame being the picture's.
-  const t = img
-
-  it('bottom-anchors a portrait image so the cover crop still shows the bottom', () => {
-    // 100×100 box, 100×200 source: cover scale 1, so the box shows the bottom 100px.
-    // The full 200px-tall image is revealed above the box (top: -100).
-    const s = fullImgStyle({ w: 100, h: 100 }, { w: 100, h: 200 }, t())
-    expect(s.left).toBe(0)
-    expect(s.top).toBe(-100)
-    expect(s.width).toBe(100)
-    expect(s.height).toBe(200)
-    expect(s.transform).toBe('scale(1)')
-    expect(s.objectFit).toBe('fill')
-    // Must opt out of a global `img { max-width: 100% }` reset, else the natural
-    // width collapses to the wrapper and the reveal geometry breaks.
-    expect(s.maxWidth).toBe('none')
-    expect(s.maxHeight).toBe('none')
+describe('imgFillStyle', () => {
+  // No cover crop, no object-position, no transform. The frame was built to this
+  // source's ratio, so filling it *is* drawing the whole picture at true proportions —
+  // and there is nothing left able to choose which part of it survives.
+  it('fills the frame and nothing else', () => {
+    const s = imgFillStyle()
+    expect(s).toEqual({
+      position: 'absolute',
+      left: 0,
+      top: 0,
+      width: '100%',
+      height: '100%',
+      maxWidth: 'none',
+      maxHeight: 'none',
+      objectFit: 'contain',
+    })
   })
 
-  it('center-anchors a wide image so it reveals symmetrically left/right', () => {
-    const s = fullImgStyle({ w: 100, h: 100 }, { w: 200, h: 100 }, t({ anchor: 'center center' }))
-    expect(s.left).toBe(-50)
-    expect(s.top).toBe(0)
-    expect(s.transform).toBe('scale(1)')
-  })
-
-  it('folds the transform zoom into the reveal scale and re-centres the pan', () => {
-    const s = fullImgStyle({ w: 100, h: 100 }, { w: 100, h: 200 }, t({ scale: 2 }))
-    expect(s.left).toBe(0)
-    expect(s.top).toBe(-150)
-    expect(s.transform).toBe('scale(2)')
+  // A global `img { max-width: 100% }` reset would otherwise shrink an enlarged
+  // picture back to its source width, and the frame would stop being its outline.
+  it('opts out of the max-width reset', () => {
+    expect(imgFillStyle().maxWidth).toBe('none')
+    expect(imgFillStyle().maxHeight).toBe('none')
   })
 })
 
@@ -116,31 +89,52 @@ describe('fullImgStyle', () => {
 describe('imgFrameBox / imgRect / imgFrameStyle', () => {
   const bounds = { x: 100, y: 200, w: 400, h: 300 }
 
-  it('reads the frame as percentages of the panel box', () => {
-    expect(imgFrameBox(bounds, { left: 25, top: 10, width: 50, height: 40 })).toEqual({
-      x: 100,
-      y: 30,
-      w: 200,
-      h: 120,
-    })
+  it('reads left/top/width as percentages of the panel box', () => {
+    const box = imgFrameBox(bounds, { left: 25, top: 10, width: 50 }, 2)
+    expect(box).toEqual({ x: 100, y: 30, w: 200, h: 100 })
   })
 
-  it('is the whole panel box at the shipped default', () => {
-    expect(imgFrameBox(bounds, img())).toEqual({ x: 0, y: 0, w: 400, h: 300 })
-    expect(imgRect(bounds, img())).toEqual(bounds)
+  // The guarantee the whole change exists for: the height is never authored, so the
+  // box is always the source's own shape and the outline the editor draws around a
+  // picture is the picture's outline. Three panels' worth of ratios, one rule.
+  it('always derives the height from the source ratio, never from the panel', () => {
+    for (const aspect of [0.5, 1, 1.5, PANEL_ASPECT, 3.2]) {
+      for (const width of [12, 55, 100, 180]) {
+        const box = imgFrameBox(bounds, { left: 0, top: 0, width }, aspect)
+        expect(box.w / box.h).toBeCloseTo(aspect, 10)
+      }
+    }
+  })
+
+  it('covers the panel box exactly when the source shares its ratio', () => {
+    expect(imgFrameBox(bounds, img(), PANEL_ASPECT)).toEqual({ x: 0, y: 0, w: 400, h: 300 })
+    expect(imgRect(bounds, img(), PANEL_ASPECT)).toEqual(bounds)
+  })
+
+  // A tall source at the same width is taller than the panel, and is *not* squashed
+  // into it — the overhang is the panel's to crop, per `spill`.
+  it('overhangs the panel rather than being squashed into it', () => {
+    expect(imgFrameBox(bounds, img(), 1).h).toBe(400)
+  })
+
+  // Square, so the shape is defined, and never seen: the page waits behind its
+  // loading sheet. It matters only that this cannot divide by zero.
+  it('falls back to a square frame for an unmeasured source', () => {
+    const box = imgFrameBox(bounds, { left: 0, top: 0, width: 50 }, 0)
+    expect(box.w).toBe(box.h)
   })
 
   // Negative and past-100 are how a picture hangs off an edge into the gutter, so
   // neither function may clamp — the frame is allowed to leave the panel.
   it('lets the frame hang off the panel in either direction', () => {
-    const box = imgFrameBox(bounds, { left: -25, top: -10, width: 150, height: 120 })
-    expect(box).toEqual({ x: -100, y: -30, w: 600, h: 360 })
+    const box = imgFrameBox(bounds, { left: -25, top: -10, width: 150 }, 2)
+    expect(box).toEqual({ x: -100, y: -30, w: 600, h: 300 })
   })
 
   it('imgRect is imgFrameBox offset into viewport coordinates', () => {
-    const t = { left: 25, top: 10, width: 50, height: 40 }
-    const box = imgFrameBox(bounds, t)
-    expect(imgRect(bounds, t)).toEqual({
+    const t = { left: 25, top: 10, width: 50 }
+    const box = imgFrameBox(bounds, t, 2)
+    expect(imgRect(bounds, t, 2)).toEqual({
       x: bounds.x + box.x,
       y: bounds.y + box.y,
       w: box.w,
@@ -151,14 +145,23 @@ describe('imgFrameBox / imgRect / imgFrameStyle', () => {
   // The wrapper is absolutely positioned inside the panel element, which already sits
   // at the panel's bounds — so it takes the panel-relative box, not the viewport one.
   it('imgFrameStyle places the wrapper on the panel-relative box', () => {
-    const t = { left: 25, top: 10, width: 50, height: 40 }
-    expect(imgFrameStyle(bounds, t)).toEqual({
+    expect(imgFrameStyle(bounds, { left: 25, top: 10, width: 50 }, 2)).toEqual({
       position: 'absolute',
       left: 100,
       top: 30,
       width: 200,
-      height: 120,
+      height: 100,
     })
+  })
+
+  // The renderer places the wrapper and the overlay outlines it. Handed the same
+  // aspect they must agree to the pixel, or the selection box is around thin air.
+  it('draws the wrapper on exactly the box the overlay outlines', () => {
+    const t = { left: 25, top: 10, width: 50 }
+    const style = imgFrameStyle(bounds, t, 0.75)
+    const rect = imgRect(bounds, t, 0.75)
+    expect([style.left, style.top]).toEqual([rect.x - bounds.x, rect.y - bounds.y])
+    expect([style.width, style.height]).toEqual([rect.w, rect.h])
   })
 })
 
@@ -176,12 +179,12 @@ describe('imgPanelClip', () => {
   // the same shape a non-spilling bubble is cut to. Only the origin moves, because the
   // clip lands on the frame element rather than on the panel.
   it('is the panel polygon itself when the frame covers the panel box', () => {
-    expect(imgPanelClip(vp, bounds, img())).toBe(toClipPath(vp, bounds.x, bounds.y))
+    expect(imgPanelClip(vp, bounds, img(), 4 / 3)).toBe(toClipPath(vp, bounds.x, bounds.y))
   })
 
   it('re-origins that same shape onto an inset frame, without shrinking it', () => {
-    const t = { left: 50, top: 0, width: 50, height: 50 }
-    expect(imgPanelClip(vp, bounds, t)).toBe(
+    const t = { left: 50, top: 0, width: 50 }
+    expect(imgPanelClip(vp, bounds, t, 1)).toBe(
       'polygon(-200px 0px, 200px 20px, 180px 300px, -180px 280px)',
     )
   })
@@ -193,14 +196,14 @@ describe('imgPanelClip', () => {
     const xs = (clip: string) =>
       [...clip.matchAll(/(-?\d+(?:\.\d+)?)px (-?\d+(?:\.\d+)?)px/g)].map(m => Number(m[1]))
     const span = (clip: string) => Math.max(...xs(clip)) - Math.min(...xs(clip))
-    const wide = imgPanelClip(vp, bounds, { left: -25, top: -25, width: 150, height: 150 })
-    expect(span(wide)).toBe(span(imgPanelClip(vp, bounds, img())))
+    const wide = imgPanelClip(vp, bounds, { left: -25, top: -25, width: 150 }, 1)
+    expect(span(wide)).toBe(span(imgPanelClip(vp, bounds, img(), 1)))
   })
 
   // First paint, before layout has measured anything: there is no panel shape to cut
   // with yet, and an empty polygon() would hide the picture outright.
   it('has no shape to cut with before the panel is measured', () => {
-    expect(imgPanelClip([], bounds, img())).toBe('none')
+    expect(imgPanelClip([], bounds, img(), 1)).toBe('none')
   })
 })
 
@@ -315,21 +318,6 @@ describe('BUBBLE_TYPES', () => {
 })
 
 describe('default config parity', () => {
-  it('uses center center only for the logo and center bottom for the rest', () => {
-    expect(PANEL_IMG_TRANSFORMS[0].anchor).toBe('center center')
-    PANEL_IMG_TRANSFORMS.slice(1).forEach(t => {
-      expect(t.anchor).toBe('center bottom')
-    })
-  })
-
-  it('keeps every image transform at identity framing', () => {
-    PANEL_IMG_TRANSFORMS.forEach(t => {
-      expect(t.scale).toBe(1)
-      expect(t.offsetX).toBe(0)
-      expect(t.offsetY).toBe(0)
-    })
-  })
-
   it('floats every bubble into the gutter with a caption and a rotation', () => {
     PANEL_BUBBLE_TRANSFORMS.forEach(b => {
       expect(b.spill).toBe(true)
@@ -408,12 +396,29 @@ describe('default config parity', () => {
     })
   })
 
-  // The frame is the picture's own box, and deliberately not the panel's: a frame of
-  // exactly 0/0/100/100 puts the editor's selection outline on the panel's own outline,
-  // leaving nothing to grab that is distinguishable from the slot it sits in.
-  it('starts every picture on its own frame, overhanging the panel box', () => {
+  // A picture is placed by three numbers and nothing else. A fourth — any authored
+  // height — is what let a frame be a shape the source is not, and every such shape
+  // but one crops: the eight shipped pictures showed between 38% and 98% of their
+  // source before this, no two framed alike. Reading extra keys off the config is how
+  // that comes back, so assert the exact key set rather than only the three values.
+  it('places every picture by frame position and width alone', () => {
     PANEL_IMG_TRANSFORMS.forEach(t => {
-      expect([t.left, t.top, t.width, t.height]).toEqual([-5, -5, 110, 110])
+      expect(Object.keys(t).sort()).toEqual(
+        ['alt', 'left', 'panel', 'spill', 'src', 'top', 'width'],
+      )
+      expect(Number.isFinite(t.left)).toBe(true)
+      expect(Number.isFinite(t.top)).toBe(true)
+      expect(t.width).toBeGreaterThan(0)
+    })
+  })
+
+  // Fitted to their panels, not stretched over them: a shipped picture that needed
+  // three times its panel's width to be seen whole would mean the fit was recomputed
+  // from the wrong box.
+  it('ships every picture at a width its panel can hold', () => {
+    PANEL_IMG_TRANSFORMS.forEach(t => {
+      expect(t.width).toBeGreaterThanOrEqual(50)
+      expect(t.width).toBeLessThanOrEqual(100)
     })
   })
 

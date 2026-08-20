@@ -9,7 +9,7 @@ import InspectorPanel from './InspectorPanel'
 import PageSelect from './PageSelect'
 import type { PageSelectProps } from './PageSelect'
 import { serializeConfig, serializeConfigFile } from './serialize'
-import { bubbleRect, imgRect } from './transforms'
+import { bubbleRect, imgAspect, imgRect } from './transforms'
 import { useOverlayInteraction } from './useOverlayInteraction'
 import { useToolbarDrag } from './useToolbarDrag'
 import type { EditorModeApi } from './useEditorMode'
@@ -25,6 +25,13 @@ interface Rect {
 interface EditorOverlayProps {
   api: EditorModeApi
   panelPolys: PanelPoly[]
+  /**
+   * Natural pixel size of each loaded source, keyed by `src` — the same map the
+   * renderer draws from. A picture's frame height comes from its source's ratio, so
+   * the overlay has to read that ratio from where the renderer read it; deriving it
+   * anywhere else is how a selection outline stops sitting on the picture.
+   */
+  natSizes: Record<string, { w: number; h: number }>
   pageSelect: PageSelectProps
 }
 
@@ -55,13 +62,19 @@ function downloadConfig(text: string): void {
  * editor/layoutConfig.ts on disk (HMR then reloads it); Reset reverts unsaved edits
  * to the last saved file. Both degrade to the clipboard/download fallbacks.
  */
-export default function EditorOverlay({ api, panelPolys, pageSelect }: EditorOverlayProps) {
+export default function EditorOverlay({
+  api,
+  panelPolys,
+  natSizes,
+  pageSelect,
+}: EditorOverlayProps) {
   useEffect(() => {
     logger.info('Comic-book editor overlay active', { panels: panelPolys.length })
   }, [panelPolys.length])
 
   const { selected, config } = api
   const interaction = useOverlayInteraction(api, panelPolys)
+  const aspectOf = (src: string) => imgAspect(natSizes[src])
   const toolbarDrag = useToolbarDrag()
   const [copied, setCopied] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -83,7 +96,7 @@ export default function EditorOverlay({ api, panelPolys, pageSelect }: EditorOve
   const selectedRect: Rect | null = !selPoly
     ? null
     : selImg
-      ? imgRect(selPoly.bounds, selImg)
+      ? imgRect(selPoly.bounds, selImg, aspectOf(selImg.src))
       : selBubble
         ? bubbleRect(selPoly.bounds, selBubble)
         : selPoly.bounds
@@ -168,7 +181,7 @@ export default function EditorOverlay({ api, panelPolys, pageSelect }: EditorOve
             key={i}
             type="button"
             className="cb-ed-target cb-ed-target-img"
-            style={rectStyle(imgRect(poly.bounds, img))}
+            style={rectStyle(imgRect(poly.bounds, img, aspectOf(img.src)))}
             aria-label={`Select ${assetLabel(img.src)} on ${PANELS[img.panel]?.label ?? `panel ${img.panel}`}`}
             onClick={() => api.select('img', i)}
           />
@@ -211,23 +224,15 @@ export default function EditorOverlay({ api, panelPolys, pageSelect }: EditorOve
         >
           <div
             className="cb-ed-handle cb-ed-handle-br"
-            title={selected.kind === 'img' ? 'Drag to resize the frame' : 'Drag to resize'}
+            title={
+              selected.kind === 'img'
+                ? 'Drag to resize (the height follows the picture)'
+                : 'Drag to resize'
+            }
             onPointerDown={e => interaction.beginDrag(e, 'resize')}
             onPointerMove={interaction.onPointerMove}
             onPointerUp={interaction.onPointerUp}
           />
-          {/* A picture has two framings, so it needs two grips: the body moves the
-              frame across the panel, this one slides the picture behind it. Dragging
-              the body used to do the second thing, which is the whole complaint. */}
-          {selected.kind === 'img' && (
-            <div
-              className="cb-ed-handle cb-ed-handle-pan"
-              title="Drag to pan the picture inside its frame"
-              onPointerDown={e => interaction.beginDrag(e, 'pan')}
-              onPointerMove={interaction.onPointerMove}
-              onPointerUp={interaction.onPointerUp}
-            />
-          )}
           {selected.kind === 'bubble' && (
             <div
               className="cb-ed-handle cb-ed-handle-rot"

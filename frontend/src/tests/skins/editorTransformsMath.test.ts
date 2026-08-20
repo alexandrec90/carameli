@@ -3,22 +3,23 @@ import { describe, expect, it } from 'vitest'
 import {
   BUBBLE_W,
   IMG_FRAME,
-  IMG_SCALE,
   ROTATE,
   clamp,
   dragBubble,
-  dragImg,
   dragImgFrame,
   resizeBubble,
   resizeImgFrame,
   rotateBubble,
   scaleBubble,
-  scaleImg,
   sizeImgFrame,
 } from '../../skins/comic-book/editor/transforms'
 import type { BubbleTransform, ImgTransform } from '../../skins/comic-book/editor/types'
 
-/** A picture on a frame covering its whole panel box, identity framing inside it. */
+/**
+ * A picture whose frame spans the full width of its panel box. There is no height and
+ * no framing-inside-the-frame: those fields are gone, and the image half of this file
+ * is about what that leaves — a box you move and a width you size.
+ */
 const img = (over: Partial<ImgTransform> = {}): ImgTransform => ({
   panel: 0,
   src: '/comic-book/logo.webp',
@@ -26,11 +27,6 @@ const img = (over: Partial<ImgTransform> = {}): ImgTransform => ({
   left: 0,
   top: 0,
   width: 100,
-  height: 100,
-  scale: 1,
-  offsetX: 0,
-  offsetY: 0,
-  anchor: 'center bottom',
   spill: false,
   ...over,
 })
@@ -64,26 +60,11 @@ describe('clamp', () => {
   })
 })
 
-describe('dragImg', () => {
-  it('adds the px deltas to the offsets and leaves scale/anchor alone', () => {
-    const next = dragImg(img({ offsetX: 4, offsetY: -2, scale: 1.5 }), 10, -20)
-    expect(next).toEqual(img({ offsetX: 14, offsetY: -22, scale: 1.5 }))
-  })
-
-  it('does not mutate the input', () => {
-    const base = img()
-    dragImg(base, 5, 5)
-    expect(base.offsetX).toBe(0)
-  })
-
-  // A picture has two independent framings now. This one slides the picture behind a
-  // window that stays put; dragImgFrame moves the window. Before the frame existed
-  // they were the same gesture, and that was the bug.
-  it('leaves the frame exactly where it was', () => {
-    const next = dragImg(img({ left: 20, top: 20, width: 55, height: 55 }), 40, 40)
-    expect([next.left, next.top, next.width, next.height]).toEqual([20, 20, 55, 55])
-  })
-})
+// A picture briefly had two framings — a frame you moved and a picture you slid behind
+// it — and `dragImg`/`scaleImg` were the second one. Both are gone. A frame built to
+// the source's own ratio has no inside for anything to slide in: the picture fills it
+// exactly, so moving the frame moves the picture and sizing the frame sizes it. One
+// gesture each, which is what a bubble has always had.
 
 describe('dragImgFrame', () => {
   it('converts a px drag to % of the panel box on each axis', () => {
@@ -92,12 +73,11 @@ describe('dragImgFrame', () => {
     expect(next.top).toBe(-5) // 10 + -15/100*100
   })
 
-  it('leaves the frame size and the picture inside it alone', () => {
-    const next = dragImgFrame(img({ width: 55, height: 40, offsetX: 7, scale: 2 }), 20, 20, 200, 100)
-    expect(next.width).toBe(55)
-    expect(next.height).toBe(40)
-    expect(next.offsetX).toBe(7)
-    expect(next.scale).toBe(2)
+  // The picture *is* the frame, so a move must not resize it — a drag that changed the
+  // width would make a picture grow as you carried it across the panel.
+  it('changes nothing but the position', () => {
+    const base = img({ left: 10, top: 10, width: 55, spill: true })
+    expect(dragImgFrame(base, 20, 20, 200, 100)).toEqual({ ...base, left: 20, top: 30 })
   })
 
   // Deliberately unclamped: hanging a frame off an edge is how a picture bleeds into
@@ -121,85 +101,56 @@ describe('dragImgFrame', () => {
 })
 
 describe('resizeImgFrame', () => {
-  it('converts a corner px drag to a width/height % on each axis separately', () => {
-    const next = resizeImgFrame(img({ width: 50, height: 50 }), 40, -25, 200, 100)
-    expect(next.width).toBe(70) // 50 + 40/200*100
-    expect(next.height).toBe(25) // 50 + -25/100*100
+  // One axis, and only one. The corner handle used to take dx *and* dy and write a
+  // width and a height, which is how a picture ended up in a box of the wrong shape
+  // and was cropped to fit it. dy is not a parameter any more, so it cannot be.
+  it('converts the horizontal component of a corner drag to a width %', () => {
+    expect(resizeImgFrame(img({ width: 50 }), 40, 200).width).toBe(70) // 50 + 40/200*100
   })
 
   it('anchors the top-left, so the handle tracks the pointer', () => {
-    const next = resizeImgFrame(img({ left: 20, top: 30 }), 40, 40, 200, 200)
+    const next = resizeImgFrame(img({ left: 20, top: 30 }), 40, 200)
     expect(next.left).toBe(20)
     expect(next.top).toBe(30)
   })
 
-  it('clamps to IMG_FRAME on both axes', () => {
-    expect(resizeImgFrame(img({ width: 50 }), 9999, 0, 200, 200).width).toBe(IMG_FRAME.max)
-    expect(resizeImgFrame(img({ height: 50 }), 0, -9999, 200, 200).height).toBe(IMG_FRAME.min)
+  it('clamps to IMG_FRAME', () => {
+    expect(resizeImgFrame(img({ width: 50 }), 9999, 200).width).toBe(IMG_FRAME.max)
+    expect(resizeImgFrame(img({ width: 50 }), -9999, 200).width).toBe(IMG_FRAME.min)
   })
 
-  it('is a no-op against a zero-size panel box', () => {
+  it('is a no-op against a zero-width panel box', () => {
     const base = img()
-    expect(resizeImgFrame(base, 40, 40, 0, 0)).toBe(base)
+    expect(resizeImgFrame(base, 40, 0)).toBe(base)
   })
 })
 
 describe('sizeImgFrame', () => {
-  it('grows both axes by the same % — the keyboard has no drag direction', () => {
-    const next = sizeImgFrame(img({ width: 40, height: 60 }), 5)
-    expect(next.width).toBe(45)
-    expect(next.height).toBe(65)
+  it('adds the delta to the width', () => {
+    expect(sizeImgFrame(img({ width: 40 }), 5).width).toBe(45)
   })
 
   it('shrinks on a negative delta and clamps at the floor', () => {
-    expect(sizeImgFrame(img({ width: 40, height: 40 }), -5).width).toBe(35)
-    expect(sizeImgFrame(img({ width: 6, height: 6 }), -50)).toMatchObject({
-      width: IMG_FRAME.min,
-      height: IMG_FRAME.min,
-    })
+    expect(sizeImgFrame(img({ width: 40 }), -5).width).toBe(35)
+    expect(sizeImgFrame(img({ width: 6 }), -50).width).toBe(IMG_FRAME.min)
   })
 
   it('clamps at the ceiling', () => {
-    expect(sizeImgFrame(img({ width: 390, height: 390 }), 50).width).toBe(IMG_FRAME.max)
+    expect(sizeImgFrame(img({ width: 390 }), 50).width).toBe(IMG_FRAME.max)
   })
 
-  it('leaves the frame position and the picture inside it alone', () => {
-    const next = sizeImgFrame(img({ left: 12, top: -4, scale: 1.5, offsetX: 9 }), IMG_FRAME.step)
-    expect(next.left).toBe(12)
-    expect(next.top).toBe(-4)
-    expect(next.scale).toBe(1.5)
-    expect(next.offsetX).toBe(9)
+  // Width is the only number there is, and that is the guarantee rather than a
+  // simplification: nothing about resizing a picture can decide which part of it you
+  // see, because no field for that survives to be written.
+  it('changes nothing but the width', () => {
+    const base = img({ left: 12, top: -4, width: 40, spill: true })
+    expect(sizeImgFrame(base, 5)).toEqual({ ...base, width: 45 })
   })
 
   it('accumulates repeated step deltas', () => {
-    let t = img({ width: 50, height: 50 })
+    let t = img({ width: 50 })
     for (let i = 0; i < 4; i++) t = sizeImgFrame(t, IMG_FRAME.step)
     expect(t.width).toBeCloseTo(50 + IMG_FRAME.step * 4, 10)
-  })
-})
-
-describe('scaleImg', () => {
-  it('adds the delta within range', () => {
-    expect(scaleImg(img({ scale: 2 }), 0.5).scale).toBe(2.5)
-  })
-
-  it('allows zooming out below fill (scale < 1)', () => {
-    expect(scaleImg(img({ scale: 1 }), -0.5).scale).toBe(0.5)
-  })
-
-  it('clamps at the min', () => {
-    expect(scaleImg(img({ scale: 0.3 }), -0.5).scale).toBe(IMG_SCALE.min)
-    expect(IMG_SCALE.min).toBe(0.2)
-  })
-
-  it('clamps at the max', () => {
-    expect(scaleImg(img({ scale: 3.9 }), 1).scale).toBe(IMG_SCALE.max)
-  })
-
-  it('accumulates repeated step deltas', () => {
-    let t = img({ scale: 1 })
-    for (let i = 0; i < 4; i++) t = scaleImg(t, IMG_SCALE.step)
-    expect(t.scale).toBeCloseTo(1 + IMG_SCALE.step * 4, 10)
   })
 })
 

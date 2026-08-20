@@ -2,29 +2,34 @@ import type { ImgTransform, BubbleTransform } from './types'
 
 // Not parallel to PANELS: each picture names its `panel`, so a panel may own several or
 // none, and the array is ordered by panel only for readability. `src`/`alt` are the
-// picture itself; `left`/`top`/`width`/`height` are its frame, in % of the panel box,
-// and may go negative or past 100 to hang the frame off an edge.
-// `scale`/`offsetX`/`offsetY`/`anchor` then frame the picture *inside* its frame;
-// `spill: false` clips it to the panel, `spill: true` lets it bleed into the gutter —
-// the same question, and the same answer, as a bubble's `spill`.
+// picture itself; `left`/`top`/`width` are its frame, in % of the panel box, and may go
+// negative or past 100 to hang it off an edge. `spill: false` clips the picture to the
+// panel, `spill: true` lets it bleed into the gutter — the same question, and the same
+// answer, as a bubble's `spill`.
 //
-// The eight ship on a -5/-5/110/110 frame rather than on 0/0/100/100, and the
-// difference is the point rather than a tweak. A frame of exactly 0/0/100/100 *is* the
-// panel box: the editor draws its selection outline in the same place it draws the
-// panel's, so there is no picture to grab that is distinguishable from the slot it sits
-// in — which was the original complaint. Art that overhangs the window it is read
-// through is also the ordinary comic relationship, and it is the one framing that keeps
-// covering when the grid reflows (`computeLayout` reshapes every panel between the
-// landscape, portrait and square layouts). Retune any of them in the editor and Save.
+// There is no `height`, and no `scale`/`offsetX`/`offsetY`/`anchor` either. A picture's
+// height is its width divided by the source's own aspect ratio, exactly as a bubble's
+// follows BUBBLE_ASPECT, so the frame *is* the picture's outline: it can be moved and
+// resized but never reshaped, and nothing it does can crop the source. Those four fields
+// existed to choose which part of a picture survived being forced into a box of the
+// wrong shape, and no picture is forced now — with one authored height per panel the
+// eight below showed between 38% and 98% of their source, no two framed alike.
+//
+// The eight ship fitted to their landscape panels: the largest each can be with all of
+// it in shot. Panel polygons are oblique, so a picture filling its panel box still has
+// its corners cut by the panel while `spill` is off — that crop is the panel's, and is
+// exactly what the checkbox governs. `computeLayout` reshapes every panel between the
+// landscape, portrait and square layouts, so these widths suit one of the three: retune
+// per layout in the editor and Save.
 export const PANEL_IMG_TRANSFORMS: ImgTransform[] = [
-  { panel: 0, src: '/comic-book/logo.webp', alt: 'Carameli', left: -5, top: -5, width: 110, height: 110, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center center', spill: false },
-  { panel: 1, src: '/comic-book/switchboard.webp', alt: 'Switchboard', left: -5, top: -5, width: 110, height: 110, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center bottom', spill: false },
-  { panel: 2, src: '/comic-book/mailman1.webp', alt: 'Mail carrier', left: -5, top: -5, width: 110, height: 110, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center bottom', spill: false },
-  { panel: 3, src: '/comic-book/mechanic.webp', alt: 'Mechanic', left: -5, top: -5, width: 110, height: 110, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center bottom', spill: false },
-  { panel: 4, src: '/comic-book/receptionist.webp', alt: 'Receptionist', left: -5, top: -5, width: 110, height: 110, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center bottom', spill: false },
-  { panel: 5, src: '/comic-book/rolodex.webp', alt: 'Rolodex', left: -5, top: -5, width: 110, height: 110, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center bottom', spill: false },
-  { panel: 6, src: '/comic-book/rotary%20phone.webp', alt: 'Rotary phone', left: -5, top: -5, width: 110, height: 110, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center bottom', spill: false },
-  { panel: 7, src: '/comic-book/mailman2.webp', alt: 'Post office', left: -5, top: -5, width: 110, height: 110, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center bottom', spill: false },
+  { panel: 0, src: '/comic-book/logo.webp', alt: 'Carameli', left: 0, top: 20.6, width: 100, spill: false },
+  { panel: 1, src: '/comic-book/switchboard.webp', alt: 'Switchboard', left: 0, top: 40.7, width: 100, spill: false },
+  { panel: 2, src: '/comic-book/mailman1.webp', alt: 'Mail carrier', left: 0, top: 61.6, width: 100, spill: false },
+  { panel: 3, src: '/comic-book/mechanic.webp', alt: 'Mechanic', left: 1.9, top: 0, width: 96.3, spill: false },
+  { panel: 4, src: '/comic-book/receptionist.webp', alt: 'Receptionist', left: 12.1, top: 0, width: 75.8, spill: false },
+  { panel: 5, src: '/comic-book/rolodex.webp', alt: 'Rolodex', left: 1.3, top: 0, width: 97.5, spill: false },
+  { panel: 6, src: '/comic-book/rotary%20phone.webp', alt: 'Rotary phone', left: 0, top: 28.9, width: 100, spill: false },
+  { panel: 7, src: '/comic-book/mailman2.webp', alt: 'Post office', left: 0, top: 34.6, width: 100, spill: false },
 ]
 
 // Not parallel to PANELS either: each bubble names its `panel`, a panel may own any
