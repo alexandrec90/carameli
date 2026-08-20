@@ -27,6 +27,33 @@ def _parse_jambonz_datetime(value: Any) -> datetime | None:
         return None
 
 
+def _normalize_registration(item: object) -> dict[str, Any] | None:
+    """Coerce one ``RegisteredSipUsers`` entry into a ``{"sipUser": <bare username>}`` record.
+
+    Returns ``None`` for an entry carrying no username, so a malformed row is dropped
+    rather than registering the empty string -- which would otherwise match every
+    extension whose ``sip_username`` failed to load.
+    """
+    if isinstance(item, str):
+        raw: str = item
+        extra: dict[str, Any] = {}
+    elif isinstance(item, dict):
+        raw = str(
+            item.get("sipUser")
+            or item.get("sip_user")
+            or item.get("name")
+            or item.get("user")
+            or ""
+        )
+        extra = dict(item)
+    else:
+        return None
+    username = raw.split("@", 1)[0].strip()
+    if not username:
+        return None
+    return {**extra, "sipUser": username}
+
+
 class JambonzEngine:
     """CallEngineProvider implementation backed by a self-hosted Jambonz instance."""
 
@@ -319,15 +346,18 @@ class JambonzEngine:
         return records
 
     async def get_registrations(self) -> list[dict]:
-        """Return SIP registrations for this Jambonz account.
+        """Return SIP registrations for this Jambonz account, as ``{"sipUser": ...}``.
 
-        Each item includes at minimum: sipUser (the SIP username).
+        Endpoint: ``GET /v1/Accounts/{account_sid}/RegisteredSipUsers``. The lowercase
+        ``/registrations`` spelling this used to send 404s on jambonz.cloud, and the
+        failure is invisible where it matters: `poll_agent_status` catches the error and
+        skips the poll, so every agent reads as offline and nothing says why.
 
-        Endpoint: GET /v1/Accounts/{account_sid}/registrations
-        NOTE: verify this path against your Jambonz version; some releases use
-        GET /v1/registrations (global) or a different casing.
+        The entry shape varies by release -- bare username strings, or objects keyed
+        ``name`` / ``sipUser`` / ``sip_user`` -- and a username may arrive qualified with
+        the SIP realm, so entries are normalised here rather than at each caller.
         """
-        url = f"/Accounts/{self._account_sid}/registrations"
+        url = f"/Accounts/{self._account_sid}/RegisteredSipUsers"
         resp = await self._client.get(url)
         if resp.is_error:
             logger.error(
@@ -337,9 +367,11 @@ class JambonzEngine:
             )
             resp.raise_for_status()
         data = resp.json()
-        if isinstance(data, list):
-            return cast(list[dict[Any, Any]], data)
-        return cast(list[dict[Any, Any]], data.get("registrations", data.get("data", [])))
+        if isinstance(data, dict):
+            data = data.get("registrations") or data.get("data") or []
+        if not isinstance(data, list):
+            return []
+        return [entry for entry in map(_normalize_registration, data) if entry is not None]
 
     async def initiate_callback(
         self, agent_sip_uri: str, contact_number: str, webhook_url: str

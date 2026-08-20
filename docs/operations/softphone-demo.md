@@ -63,16 +63,22 @@ would replace, not as the phone on the desk.
 
 ## One-time account setup
 
-These steps are portal work — they need account credentials and they spend money, so
-they are yours, not an agent's.
+Both providers expose all of this over their REST APIs, so once the keys in `.env` are
+valid none of it is portal work. Only two things genuinely are not automatable: signing
+up for the accounts in the first place, and paying for them.
 
-1. **Telnyx.** Create a SIP connection (credential or FQDN) authorised for the call
-   engine's signalling addresses, and assign the purchased DIDs to it. Set the numbers'
-   inbound voice destination to the call engine, and their messaging webhook to
-   Carameli. `TELNYX_API_KEY`, `TELNYX_MESSAGING_PROFILE_ID` and
-   `TELNYX_WEBHOOK_BASE_URL` come from here.
-2. **jambonz.cloud.** Create the account, register Telnyx as a carrier in both
-   directions, and create an application whose call hook and status hook point at
+1. **Telnyx** (`https://api.telnyx.com/v2`, `Bearer $TELNYX_API_KEY`). Numbers are sold
+   through `POST /number_orders` — `POST /phone_numbers` does not exist and 404s with
+   error 10005. A number the account already owns is found with
+   `GET /phone_numbers?filter[phone_number]=+1...`, whose `data[].id` is the resource id
+   everything else takes. Attach it to a SIP connection authorised for the call engine's
+   signalling addresses via `PATCH /phone_numbers/{id}` with `connection_id`.
+   `TELNYX_MESSAGING_PROFILE_ID` and `TELNYX_WEBHOOK_BASE_URL` govern SMS and come from
+   `/messaging_profiles`.
+2. **jambonz.cloud** (`https://api.jambonz.cloud/v1`, `Bearer $JAMBONZ_API_KEY`).
+   `GET /Accounts/{sid}` reports the **SIP realm** — the domain the softphone registers
+   to, and the value Carameli stores as `sip_domain_sid`. Register Telnyx under
+   `/VoipCarriers`, and create an application under `/Applications` whose hooks point at
    Carameli's public URL:
 
    | Hook | URL |
@@ -80,13 +86,18 @@ they are yours, not an agent's.
    | Call hook | `{JAMBONZ_WEBHOOK_BASE_URL}/webhooks/jambonz/incoming-call` |
    | Call status hook | `{JAMBONZ_WEBHOOK_BASE_URL}/webhooks/jambonz/call-status` |
 
-   Collect `JAMBONZ_ACCOUNT_SID` and `JAMBONZ_API_KEY`, and note the account's **SIP
-   realm** — that is the domain the softphone registers to, and the value Carameli
-   stores as `sip_domain_sid`.
-3. **A public URL for Carameli** — `scripts/start-ngrok.py` with a static domain. Set
-   both `JAMBONZ_WEBHOOK_BASE_URL` and `TELNYX_WEBHOOK_BASE_URL` to it. Only webhooks
-   traverse it; media flows Telnyx to call engine and never touches the tunnel.
-4. **Secrets.** `JAMBONZ_WEBHOOK_SECRET` and `TELNYX_WEBHOOK_SECRET` must match what
+   Bind the DID under `/PhoneNumbers` to that carrier and application.
+3. **Check the account is active.** `GET /Accounts/{sid}` returns `is_active` and, on a
+   trial, `trial_end_date`. A lapsed trial reads `is_active: 0` while every other API
+   call still succeeds, so provisioning looks healthy right up to the point where no
+   phone can register and no call arrives. Confirm this **before** blaming SIP.
+   Reactivating it is a billing decision and is deliberately not scripted.
+4. **A public URL for Carameli** — `scripts/start-ngrok.py` with a static domain. It
+   rewrites the webhook base URLs in `.env`, pushes the new URL to the Telnyx messaging
+   profile, and recreates the `app` and `worker` containers, so do not run it mid-demo.
+   Only webhooks traverse the tunnel; media flows Telnyx to call engine and never
+   touches it.
+5. **Secrets.** `JAMBONZ_WEBHOOK_SECRET` and `TELNYX_WEBHOOK_SECRET` must match what
    each provider signs with, and `SIP_CREDENTIAL_ENCRYPTION_SECRET` must be set —
    provisioning an extension fails without it. See `.env.example`.
 
@@ -112,6 +123,11 @@ already added through `POST /vsapi/1.0.0/PhoneLine/Add`; the pointer is what
 `_inbound_dial_verbs` in `app/api/webhooks/call_status.py` reads to decide that an
 inbound call should ring this extension.
 
+`PhoneLine/Add` handles a number the account already owns — buying DIDs in the Telnyx
+portal first and wiring them into Carameli afterwards is the ordinary order of
+operations, and `TelnyxCarrier.provision_number` checks ownership before ordering rather
+than letting Telnyx reject a duplicate order as a purchase failure.
+
 The API key is `API_KEY_SECRET` from the running deployment — pass `--api-key`, or export
 `CARAMELI_API_KEY`. The password is printed to stdout and written nowhere; re-running
 against an existing extension returns 409 rather than reissuing it.
@@ -136,9 +152,12 @@ failure will look like a call that connects and then plays silence.
 
 Each step fails differently, so do not skip ahead.
 
-1. **Registration.** The call engine's registrations list shows the SIP user. Carameli
-   reads the same list through `get_registrations`, so a registered phone that Carameli
-   cannot see is an account or credential mismatch, not a network problem.
+1. **Registration.** `GET /Accounts/{sid}/RegisteredSipUsers` on the call engine shows
+   the SIP user — that route, not `/registrations`, which 404s on jambonz.cloud.
+   Carameli reads the same list through `get_registrations`, so a registered phone that
+   Carameli cannot see is an account or credential mismatch, not a network problem. An
+   empty list with a phone that insists it is registered usually means the account is
+   inactive (step 3 of the setup above).
 2. **Inbound.** Call the DID from a mobile. The softphone rings.
    - No ring, and no `incoming-call` in Carameli's log → Telnyx is not sending the call
      to the engine.
@@ -164,8 +183,11 @@ Anything reachable through the API or the repo is automatable, and now is: exten
 credential provisioning, DID pointers, the routing code, the verification endpoints, and
 this runbook.
 
-The rest is not, and not because it is hard — it needs portal credentials and it spends
-money. Buying and assigning DIDs, creating the Telnyx SIP connection, creating the
-jambonz.cloud account and carrier, and installing and registering Zoiper are yours. Once
-those exist, hand over the base URL, the API key and the realm, and the per-demo setup is
-one command.
+Provider setup is automatable too, and the earlier framing of it as portal work was
+wrong: buying and assigning DIDs, the Telnyx SIP connection, the jambonz carrier,
+application and number binding are all REST calls against the keys already in `.env`.
+
+What is genuinely left: signing up for the provider accounts, paying for them —
+including reactivating a lapsed trial, which is why an inactive account is its own
+verification step — and installing Zoiper and typing the printed block into it. Given the
+base URL and the API key, everything between those two ends is one command.

@@ -96,6 +96,12 @@ Avoid destructive or disruptive lifecycle commands without confirmation:
 - `restart` and `up --build` can interrupt the user's active session.
 - use `docker compose exec -T` from scripts and automation.
 
+DB-backed tests read `DATABASE_URL` from `.env` and TRUNCATE every table before each
+run. A worktree gets its own compose stack on its own host ports, but a `.env` copied
+from the primary checkout still names the primary's port -- so running those tests in a
+worktree wipes the main stack's data. Point a worktree `.env` at its own `DB_HOST_PORT`
+before running anything DB-backed.
+
 Run focused verification for changed behavior. Typical commands:
 
 ```text

@@ -99,6 +99,16 @@ class TelnyxCarrier:
         return [{"phone_number": item["phone_number"]} for item in data]
 
     async def provision_number(self, number: str, country_code: str = "US") -> dict:
+        # A number the account already holds is registered rather than re-ordered.
+        # Buying the DIDs in the Telnyx portal first and wiring them into Carameli
+        # afterwards is the ordinary way round, and Telnyx rejects an order for a
+        # number already on the account -- so without this, "add this phone line"
+        # fails for every number an operator actually has.
+        owned_sid = await self._find_owned_number_id(number)
+        if owned_sid is not None:
+            logger.info("Telnyx number already on the account, skipping order: number=%s", number)
+            return {"provider_sid": owned_sid, "phone_number": number}
+
         # Telnyx sells numbers through number orders; POST /v2/phone_numbers does
         # not exist (it 404s with error 10005). The order response's
         # phone_numbers[].id is the *number-order-phone-number* record id, not
@@ -122,6 +132,24 @@ class TelnyxCarrier:
             "phone_number": number,
         }
 
+    async def _find_owned_number_id(self, number: str) -> str | None:
+        """Return the phone-number resource id if the account already holds ``number``.
+
+        ``None`` means "not on the account", which is a normal answer here and not an
+        error; a transport or auth failure still raises.
+        """
+        resp = await self._client.get("/phone_numbers", params={"filter[phone_number]": number})
+        if resp.is_error:
+            logger.error(
+                "Telnyx phone-number lookup failed: number=%s status=%s body=%s",
+                number,
+                resp.status_code,
+                resp.text,
+            )
+            resp.raise_for_status()
+        data = resp.json().get("data", [])
+        return str(data[0]["id"]) if data else None
+
     async def _lookup_phone_number_id(self, number: str) -> str:
         """Resolve the phone-number resource id for a number we just ordered.
 
@@ -130,18 +158,9 @@ class TelnyxCarrier:
         may not have landed on the account yet, so poll briefly.
         """
         for _ in range(_PROVISION_LOOKUP_ATTEMPTS):
-            resp = await self._client.get("/phone_numbers", params={"filter[phone_number]": number})
-            if resp.is_error:
-                logger.error(
-                    "Telnyx phone-number lookup failed: number=%s status=%s body=%s",
-                    number,
-                    resp.status_code,
-                    resp.text,
-                )
-                resp.raise_for_status()
-            data = resp.json().get("data", [])
-            if data:
-                return str(data[0]["id"])
+            found = await self._find_owned_number_id(number)
+            if found is not None:
+                return found
             await asyncio.sleep(_PROVISION_LOOKUP_DELAY_S)
         raise RuntimeError(f"Telnyx number order for {number} settled without a phone-number id")
 
