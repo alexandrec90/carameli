@@ -3,6 +3,7 @@ import type { NavItem } from '../routes'
 import type { UseDashboardResult } from '../hooks/useDashboard'
 import type { UsePhoneLinesResult } from '../hooks/usePhoneLines'
 import type { UseExtensionsResult } from '../hooks/useExtensions'
+import type { UseSoftphoneResult } from '../hooks/useSoftphone'
 import type { DataPageProps } from '../lib/dataPage'
 
 export interface PlaceholderProps {
@@ -27,6 +28,7 @@ export interface SkinViews {
   Dashboard: React.ComponentType<UseDashboardResult>
   PhoneLines: React.ComponentType<UsePhoneLinesResult>
   Extensions: React.ComponentType<UseExtensionsResult>
+  Softphone: React.ComponentType<UseSoftphoneResult>
   Placeholder: React.ComponentType<PlaceholderProps>
   DataPage: React.ComponentType<DataPageProps>
 }

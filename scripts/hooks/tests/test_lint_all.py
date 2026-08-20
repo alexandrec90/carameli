@@ -99,6 +99,21 @@ def test_host_tools_skip_when_no_relevant_change():
     assert la.t_vulture(fe_only) == {"vulture": ([], 0)}
 
 
+def test_vulture_scans_the_whole_package_even_in_changed_mode(monkeypatch):
+    # Regression: scoping vulture to the changed files made it report names that
+    # are used from other modules -- CarrierProvider's `...`-bodied parameters
+    # fired the moment base.py entered the changed set, while `vulture app/` was
+    # clean. Whether it runs is scoped; what it looks at is not.
+    seen = []
+    monkeypatch.setattr(la, "run", lambda cmd: seen.append(cmd) or ([], 0))
+
+    la.t_vulture(["app/services/providers/base.py"])
+
+    assert len(seen) == 1
+    assert seen[0].startswith("vulture app/ ")
+    assert "base.py" not in seen[0]
+
+
 def test_gated_tools_skip_when_no_relevant_change():
     py_only = ["app/services/x.py"]
     assert la.t_eslint(py_only) == {"eslint": ([], 0)}
