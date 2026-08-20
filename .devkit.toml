@@ -54,3 +54,25 @@ test_cmd = ["run", "test:run"]
 # `lint:types`, not `typecheck` — this project has no script by that name, so the tier
 # was spending an npm invocation to print "Missing script" on every skin change.
 typecheck_cmd = ["run", "lint:types"]
+
+# The interpreter a box is provisioned with. Without it `worktree.py` falls back to
+# reading the `FROM python:` tag in Dockerfile and says so on every spawn; the fallback
+# is right, but a box that silently guesses its Python is a box whose first third-party
+# import can fail for a reason that reads as a broken branch.
+[python]
+version = "3.12"
+
+# Extra `.env` assignments an ephemeral box must make for itself. Seeding copies this
+# checkout's `.env` verbatim, so anything *derived* from a port still names the primary
+# stack's -- and for DATABASE_URL that is not a misconfiguration, it is data loss:
+# tests/conftest.py TRUNCATEs every table in whatever DATABASE_URL names, so a bare
+# `pytest` in a box emptied the primary checkout's development database (2026-08-20).
+# `${NAME}` expands against the ports devkit already leased for the box.
+[worktree]
+# One key per line as a subtable, rather than an inline table: the DB URLs carry the
+# local compose password, which detect-secrets flags, and a pragma has to sit on the
+# line it exempts.
+[worktree.env]
+DATABASE_URL = "postgresql+asyncpg://carameli:carameli_local_dev@localhost:${DB_HOST_PORT}/carameli" # pragma: allowlist secret
+DIRECT_DATABASE_URL = "postgresql+asyncpg://carameli:carameli_local_dev@localhost:${DB_HOST_PORT}/carameli" # pragma: allowlist secret
+VITE_API_BASE_URL = "http://localhost:${APP_HOST_PORT}"
