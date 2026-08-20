@@ -34,7 +34,12 @@ redis_port = 6379
 # Mirror docker-compose.yml's POSTGRES_* and CI's env block.
 user = "carameli"
 password = "carameli_local_dev" # pragma: allowlist secret
-name = "carameli"
+# NOT "carameli": the test session TRUNCATEs every table in whatever it is pointed at,
+# and the compose `carameli` database is the one holding the provisioned customer,
+# extension and DID rows this laptop's stack runs on. `tests/conftest.py` now refuses
+# a target nobody marked disposable; this makes the disposable one the default rather
+# than something each caller has to remember.
+name = "carameli_test"
 url_scheme = "postgresql+asyncpg"
 url_env = ["DATABASE_URL", "DIRECT_DATABASE_URL"]
 redis_env = "REDIS_URL"
@@ -61,18 +66,3 @@ typecheck_cmd = ["run", "lint:types"]
 # import can fail for a reason that reads as a broken branch.
 [python]
 version = "3.12"
-
-# Extra `.env` assignments an ephemeral box must make for itself. Seeding copies this
-# checkout's `.env` verbatim, so anything *derived* from a port still names the primary
-# stack's -- and for DATABASE_URL that is not a misconfiguration, it is data loss:
-# tests/conftest.py TRUNCATEs every table in whatever DATABASE_URL names, so a bare
-# `pytest` in a box emptied the primary checkout's development database (2026-08-20).
-# `${NAME}` expands against the ports devkit already leased for the box.
-[worktree]
-# One key per line as a subtable, rather than an inline table: the DB URLs carry the
-# local compose password, which detect-secrets flags, and a pragma has to sit on the
-# line it exempts.
-[worktree.env]
-DATABASE_URL = "postgresql+asyncpg://carameli:carameli_local_dev@localhost:${DB_HOST_PORT}/carameli" # pragma: allowlist secret
-DIRECT_DATABASE_URL = "postgresql+asyncpg://carameli:carameli_local_dev@localhost:${DB_HOST_PORT}/carameli" # pragma: allowlist secret
-VITE_API_BASE_URL = "http://localhost:${APP_HOST_PORT}"

@@ -3,8 +3,9 @@ from __future__ import annotations
 import hashlib
 import json
 import os
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Mapping
 from pathlib import Path
+from urllib.parse import urlsplit
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -107,8 +108,51 @@ def _mock_call_engine() -> MagicMock:
     return engine
 
 
+def assert_disposable_database(url: str, env: Mapping[str, str]) -> None:
+    """Refuse to run when `url` names a database nobody marked as disposable.
+
+    `test_engine` empties every table before the first test. That is correct against
+    a scratch database and catastrophic against any other, and nothing in the run
+    distinguishes them: the truncation is silent, instant, and the suite passes
+    either way, so the loss surfaces days later as calls that stop routing.
+
+    It has already happened once. On 2026-08-20 a bare `pytest` inside an ephemeral
+    worktree emptied the primary stack's `carameli` database -- the box had seeded
+    its `.env` from the source checkout, so DATABASE_URL named localhost:5432 while
+    the box's own Postgres sat unused on its leased port. No backup existed.
+
+    Three things count as consent, and a name is not one of them on its own:
+
+    - `CI` is set. A runner's Postgres is created per job and dies with it.
+    - the database name ends in `_test`, which is a name chosen for this.
+    - `CARAMELI_ALLOW_DB_TRUNCATE=1`, for a scratch database called something else.
+
+    Everything else raises here rather than at the first missing row.
+    """
+    name = urlsplit(url).path.lstrip("/") or "(unnamed)"
+    if env.get("CI"):
+        return
+    if name.endswith("_test") or name == "test":
+        return
+    if env.get("CARAMELI_ALLOW_DB_TRUNCATE") == "1":
+        return
+
+    target = urlsplit(url).netloc.rsplit("@", 1)[-1]
+    raise RuntimeError(
+        f"refusing to empty the database {name!r} on {target}: the test session "
+        f"TRUNCATEs every table before it starts, and nothing marks this one as "
+        f"disposable.\n"
+        f"  - point DATABASE_URL at a scratch database whose name ends in '_test' "
+        f"(carameli_test exists for this), or\n"
+        f"  - export CARAMELI_ALLOW_DB_TRUNCATE=1 if you meant this one.\n"
+        f"Inside a worktree box, DATABASE_URL is seeded from the source checkout and "
+        f"names the PRIMARY stack's database, not the box's own."
+    )
+
+
 @pytest_asyncio.fixture(scope="session")
 async def test_engine() -> AsyncGenerator[AsyncEngine, None]:
+    assert_disposable_database(settings.database_url, os.environ)
     engine = create_async_engine(
         settings.database_url,
         echo=False,
