@@ -143,10 +143,29 @@ Settings → Accounts → Add → SIP, then:
 | Password | the password the script printed |
 | Auth username | same as username |
 | Outbound proxy | blank, unless the hosted account documents one |
-| Transport | UDP first; try TCP or TLS only if UDP fails to register |
+| Transport | UDP |
 
 The account must show **Registered**. Until it does, nothing below will work, and the
 failure will look like a call that connects and then plays silence.
+
+**Zoiper's transport probe lies about the cause.** Its account wizard reports each
+transport as found or `NOT FOUND`, and a `NOT FOUND` reads as a firewall or a wrong
+port — but the probe reports anything other than an auth challenge that way, so an SBC
+that answers and *declines* looks identical to one that is not there. It also tags TLS
+`PRO` whatever the server supports: TLS is a paid Zoiper feature, not a probe result.
+Ignore both and use UDP, which jambonz.cloud advertises by SRV and serves on 5060.
+
+Prove which it is before touching Zoiper's settings:
+
+```bash
+python scripts/probe-sip-registration.py --realm <sip realm> --user <sip_username>
+```
+
+One unauthenticated `REGISTER`, `Expires: 0`, no password sent and no binding left
+behind. **401** means the SBC is reachable on UDP and challenged — everything below the
+transport is fine. **403** means it answered and refused, and jambonz says why in
+`X-Reason` (`Account has been deactivated` is the lapsed-trial case from step 3 above).
+A timeout is the only answer that is actually a network problem.
 
 ## Verify, in this order
 
@@ -157,7 +176,7 @@ Each step fails differently, so do not skip ahead.
    Carameli reads the same list through `get_registrations`, so a registered phone that
    Carameli cannot see is an account or credential mismatch, not a network problem. An
    empty list with a phone that insists it is registered usually means the account is
-   inactive (step 3 of the setup above).
+   inactive — `scripts/probe-sip-registration.py` says so outright.
 2. **Inbound.** Call the DID from a mobile. The softphone rings.
    - No ring, and no `incoming-call` in Carameli's log → Telnyx is not sending the call
      to the engine.
