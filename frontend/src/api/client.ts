@@ -121,6 +121,11 @@ export const api = {
         `/vsapi/1.0.0/VsMessaging/Sms/List/${customerId}${qs ? `?${qs}` : ''}`
       )
     },
+    send: (customerId: number, body: SendSmsBody) =>
+      request<SmsStatusResponse>(`/vsapi/1.0.0/VsMessaging/Sms/Send/${customerId}`, {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
   },
 
   groupExtensions: {
@@ -449,6 +454,19 @@ export interface SmsMessage {
 export interface SmsMessageListResponse {
   messages: SmsMessage[]
   vs_customer_id: number
+}
+
+/** Wire shape of POST /VsMessaging/Sms/Send — mirrors app/schemas/sms.py SendSmsRequest. */
+export interface SendSmsBody {
+  from_number: string
+  to_number: string
+  body: string
+}
+
+export interface SmsStatusResponse {
+  success: boolean
+  message_sid: string | null
+  detail: string | null
 }
 
 export interface GroupExtension {

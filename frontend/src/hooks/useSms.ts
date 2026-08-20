@@ -41,6 +41,7 @@ export function useSms(): DataPageProps {
   const [search, setSearch] = useState('')
   const [start, setStart] = useState('')
   const [end, setEnd] = useState('')
+  const [senders, setSenders] = useState<string[]>([])
 
   const load = useCallback(async () => {
     logger.info('Loading SMS messages', { route: '/sms', start, end })
@@ -62,6 +63,56 @@ export function useSms(): DataPageProps {
   useEffect(() => {
     void load()
   }, [load])
+
+  // SMS-capable DIDs for this customer. Only used to pre-fill the composer's
+  // sender, so a failure here degrades to an empty field rather than an error.
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      try {
+        const lines = await api.customers.getPhoneLines(DEMO_VS_CUSTOMER_ID)
+        if (cancelled) return
+        setSenders(lines.filter((l) => l.active && l.sms_enabled).map((l) => l.phone_number))
+      } catch (e) {
+        logger.warn('Failed to load SMS-capable phone lines', { error: String(e) })
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const send = useCallback(
+    async (values: Record<string, string>) => {
+      const fromNumber = (values.from_number ?? '').trim()
+      const toNumber = (values.to_number ?? '').trim()
+      const body = values.body ?? ''
+      setError('')
+      if (!fromNumber || !toNumber || !body.trim()) {
+        setError('From, To and a message body are all required')
+        return
+      }
+      // The backend rejects non-US/CA destinations with a 400; say so up front
+      // rather than surfacing a generic provider failure.
+      if (!toNumber.startsWith('+1')) {
+        setError('Only +1 (US/Canada) destinations are supported')
+        return
+      }
+      logger.info('Sending SMS', { from: fromNumber, to: toNumber, length: body.length })
+      try {
+        await api.sms.send(DEMO_VS_CUSTOMER_ID, {
+          from_number: fromNumber,
+          to_number: toNumber,
+          body,
+        })
+        await load()
+      } catch (e) {
+        logger.error('Failed to send SMS', { error: String(e) })
+        setError('Failed to send SMS')
+      }
+    },
+    [load],
+  )
 
   const allRows = useMemo(() => (messages ?? []).map(toRow), [messages])
 
@@ -109,6 +160,29 @@ export function useSms(): DataPageProps {
       { key: 'refresh', label: 'Refresh', onClick: () => void load(), variant: 'primary' },
       { key: 'export', label: 'Export CSV', onClick: exportCsv },
     ],
+    form: {
+      newLabel: 'New message',
+      submitLabel: 'Send',
+      fields: [
+        {
+          key: 'from_number',
+          label: 'From (an SMS-enabled Carameli number)',
+          kind: 'text',
+          placeholder: '+15551234567',
+          required: true,
+          default: senders[0] ?? '',
+        },
+        {
+          key: 'to_number',
+          label: 'To',
+          kind: 'text',
+          placeholder: '+15557654321',
+          required: true,
+        },
+        { key: 'body', label: 'Message', kind: 'textarea', required: true },
+      ],
+      onSubmit: send,
+    },
     emptyText: 'No SMS messages for the selected range',
   }
 }
