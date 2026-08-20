@@ -16,8 +16,6 @@ Keep it in sync with `.devkit.toml`; a deliberate manifest change should
 update both in the same commit.
 """
 
-import re
-import tomllib
 
 from conftest import REPO_ROOT, load_module
 
@@ -61,21 +59,3 @@ def test_manifest_reproduces_carameli_frontend_tier():
     # `lint:types` is the script `frontend/package.json` actually defines; the tier
     # was pointed at it in 3c14236 and this assertion was left naming the old one.
     assert c.frontend.typecheck_cmd == ("run", "lint:types")
-
-
-# `[python]` is read straight from the TOML rather than through `harness_config`:
-# it is consumed by devkit's *own* copy of that module when `worktree.py` spawns a
-# box, and this repo's vendored copy is a release behind it. Going through the
-# vendored copy would make the test pass by reading a field that does not exist yet.
-def manifest() -> dict:
-    return tomllib.loads((REPO_ROOT / ".devkit.toml").read_text(encoding="utf-8"))
-
-
-def test_manifest_pins_the_python_the_image_runs():
-    # Unpinned, `worktree.py` falls back to parsing the Dockerfile and warns on every
-    # spawn. The pin is only correct while it agrees with the image.
-    dockerfile = (REPO_ROOT / "Dockerfile").read_text(encoding="utf-8")
-    tags = set(re.findall(r"^FROM python:([0-9.]+)", dockerfile, re.MULTILINE))
-
-    assert len(tags) == 1, f"Dockerfile names more than one Python: {sorted(tags)}"
-    assert manifest()["python"]["version"] == tags.pop()

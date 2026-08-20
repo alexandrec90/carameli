@@ -59,10 +59,3 @@ test_cmd = ["run", "test:run"]
 # `lint:types`, not `typecheck` — this project has no script by that name, so the tier
 # was spending an npm invocation to print "Missing script" on every skin change.
 typecheck_cmd = ["run", "lint:types"]
-
-# The interpreter a box is provisioned with. Without it `worktree.py` falls back to
-# reading the `FROM python:` tag in Dockerfile and says so on every spawn; the fallback
-# is right, but a box that silently guesses its Python is a box whose first third-party
-# import can fail for a reason that reads as a broken branch.
-[python]
-version = "3.12"
