@@ -42,6 +42,17 @@ import script_common
 REPO_ROOT = Path(__file__).resolve().parents[1]
 IS_CI = bool(os.environ.get("CI"))
 
+# Files detect-secrets must not scan. This has to stay byte-identical to the
+# `exclude:` on the detect-secrets hook in `.pre-commit-config.yaml`, which carries
+# the rationale for each entry -- the two tools scanning different file sets is not
+# a difference of opinion, it is drift that never converges: whatever only this
+# side sees gets written into `.secrets.baseline` on every run, while the
+# pre-commit hook keeps passing on the committed baseline because it never looked.
+# That is exactly how DEVKIT_FILES.json's 42 hashes came to be baselined and then
+# rewritten by every clean-tree lint run once a `sync-devkit.py --pull` moved one.
+# `test_secrets_exclude_matches_pre_commit` fails if the two ever diverge again.
+SECRETS_EXCLUDE_RE = r"(\.secrets\.baseline|\.env\.example|DEVKIT_FILES\.json)$"
+
 
 def _ensure_venv_on_path() -> None:
     """Prepend the local venv's bin dir so subprocesses resolve ruff/mypy/etc."""
@@ -377,6 +388,10 @@ def t_detect_secrets(changed: list[str] | None = None) -> dict:
     NB: the update flag is `--baseline`; `--update` does not exist in detect-secrets
     1.5 -- the old call using it failed silently, which is why findings were
     re-reported as "new" on every run without ever landing in the baseline.
+
+    The scanned file set comes from `SECRETS_EXCLUDE_RE`, shared with the pre-commit
+    hook; scanning anything that hook skips produces baseline churn nothing ever
+    settles.
     """
     import json
 
@@ -384,7 +399,7 @@ def t_detect_secrets(changed: list[str] | None = None) -> dict:
     if changed is not None and not _sel(changed, lambda f: f != ".secrets.baseline"):
         return {"detect-secrets": ([], 0)}
 
-    exclude = '--exclude-files "\\.secrets\\.baseline"'
+    exclude = f'--exclude-files "{SECRETS_EXCLUDE_RE}"'
     baseline = REPO_ROOT / ".secrets.baseline"
 
     if not baseline.exists():

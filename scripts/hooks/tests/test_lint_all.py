@@ -1,6 +1,9 @@
 """Tests for scripts/lint-all.py tool-set composition (local vs CI) and the
 --changed scoping mode."""
 
+import json
+import re
+
 from conftest import load_module
 
 la = load_module("scripts/lint-all.py")
@@ -234,3 +237,28 @@ def test_detect_secrets_restores_timestamp_only_churn(monkeypatch, tmp_path, cap
     assert la.t_detect_secrets(None) == {"detect-secrets": ([], 0)}
     assert baseline.read_text(encoding="utf-8") == before
     assert "detect-secrets" not in capsys.readouterr().out
+
+
+# --- detect-secrets: one exclusion list, shared with the pre-commit hook ------
+
+
+def test_secrets_exclude_matches_pre_commit():
+    # Two scanners over two different file sets never converge: whatever only
+    # lint-all sees is written into .secrets.baseline on every run, while the
+    # pre-commit hook keeps passing on the committed baseline because it never
+    # looked at that file. That is how DEVKIT_FILES.json got baselined and then
+    # rewritten by every clean-tree lint run. The pre-commit `exclude:` is the
+    # authority (it carries the rationale); lint-all must mirror it exactly.
+    cfg = (la.REPO_ROOT / ".pre-commit-config.yaml").read_text(encoding="utf-8")
+    block = re.search(r"- id: detect-secrets\b(.*?)(?=\n {6}- id: |\Z)", cfg, re.S)
+    assert block, "no detect-secrets hook in .pre-commit-config.yaml"
+    assert re.findall(r"^\s+exclude:\s*(\S+)\s*$", block.group(1), re.M) == [la.SECRETS_EXCLUDE_RE]
+
+
+def test_baseline_has_no_entries_for_excluded_files():
+    # The reversion check for the drift itself: a re-baselined DEVKIT_FILES.json
+    # (or .env.example) in the committed baseline means the exclusion regressed,
+    # even if SECRETS_EXCLUDE_RE still reads correctly.
+    data = json.loads((la.REPO_ROOT / ".secrets.baseline").read_text(encoding="utf-8"))
+    excluded = re.compile(la.SECRETS_EXCLUDE_RE)
+    assert [f for f in (data.get("results") or {}) if excluded.search(f.replace("\\", "/"))] == []
