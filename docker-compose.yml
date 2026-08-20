@@ -179,7 +179,26 @@ services:
       retries: 5
       start_period: 60s
 
-  # --- Jambonz call engine stack ---
+  # --- Jambonz control plane and media servers (NOT a working call path) ---
+  #
+  # What this profile gives you: the jambonz REST API (`jambonz`), its MariaDB,
+  # FreeSWITCH and rtpengine. That is enough to provision accounts and SIP
+  # clients against a local API, and it is what the provider integration talks
+  # to when JAMBONZ_BASE_URL points at http://jambonz:3000.
+  #
+  # What it CANNOT do is place or receive a call, and nothing here will tell you
+  # so at runtime -- it just sits there. A jambonz call path also needs the SIP
+  # edge and the tier that executes call-control verbs: drachtio-server,
+  # sbc-inbound, sbc-outbound, sbc-call-router and feature-server. None of them
+  # are defined in this repo. `feature-server` in particular is the component
+  # that fetches our webhook and runs the JSON verbs we return, so without it
+  # our own call-control code is never invoked at all.
+  #
+  # Real calls therefore go through the hosted service (JAMBONZ_BASE_URL =
+  # https://api.jambonz.cloud). Standing the missing tier up locally is a
+  # multi-day job -- a public SIP endpoint, a trunk pointed at it, and RTP
+  # through WSL2 NAT -- so reach for the hosted account rather than assuming
+  # `--profile telephony` is one env var away from an end-to-end demo.
   #
   # Everything below (through `jambonz`) carries the `telephony` profile: it only
   # starts when COMPOSE_PROFILES=telephony is set (in .env — the default for the
