@@ -179,7 +179,26 @@ services:
       retries: 5
       start_period: 60s
 
-  # --- Jambonz call engine stack ---
+  # --- Jambonz control plane and media servers (NOT a working call path) ---
+  #
+  # What this profile gives you: the jambonz REST API (`jambonz`), its MariaDB,
+  # FreeSWITCH and rtpengine. That is enough to provision accounts and SIP
+  # clients against a local API, and it is what the provider integration talks
+  # to when JAMBONZ_BASE_URL points at http://jambonz:3000.
+  #
+  # What it CANNOT do is place or receive a call, and nothing here will tell you
+  # so at runtime -- it just sits there. A jambonz call path also needs the SIP
+  # edge and the tier that executes call-control verbs: drachtio-server,
+  # sbc-inbound, sbc-outbound, sbc-call-router and feature-server. None of them
+  # are defined in this repo. `feature-server` in particular is the component
+  # that fetches our webhook and runs the JSON verbs we return, so without it
+  # our own call-control code is never invoked at all.
+  #
+  # Real calls therefore go through the hosted service (JAMBONZ_BASE_URL =
+  # https://api.jambonz.cloud). Standing the missing tier up locally is a
+  # multi-day job -- a public SIP endpoint, a trunk pointed at it, and RTP
+  # through WSL2 NAT -- so reach for the hosted account rather than assuming
+  # `--profile telephony` is one env var away from an end-to-end demo.
   #
   # Everything below (through `jambonz`) carries the `telephony` profile: it only
   # starts when COMPOSE_PROFILES=telephony is set (in .env — the default for the
@@ -236,7 +255,9 @@ services:
       retries: 10
 
   freeswitch:
-    image: drachtio/drachtio-freeswitch-mrf
+    # Pinned by digest: this repo still ships new builds (0.9.6, Apr 2026), so a
+    # bare tag drifts the media server under us between `pull`s.
+    image: drachtio/drachtio-freeswitch-mrf:0.9.6@sha256:cb81acc1112990ca33693374f1de7443d44cf9c95e6ae6c02ba1edcee4b68bba
     restart: unless-stopped
     profiles: ["telephony"]
     stop_grace_period: 3s
@@ -265,7 +286,10 @@ services:
       start_period: 30s
 
   rtpengine:
-    image: drachtio/rtpengine
+    # Pinned by digest. `latest` here has not been rebuilt since 2021-03-12 and
+    # the repo publishes no newer tag, so this locks what we already run rather
+    # than freezing a moving target.
+    image: drachtio/rtpengine@sha256:d5bf3715baa197d89f89a70207d06d5509a4284b7392310a94a466ace07afb96
     restart: unless-stopped
     profiles: ["telephony"]
     network_mode: host
@@ -307,7 +331,8 @@ services:
   # One-shot init container: creates/upgrades the Jambonz MySQL schema.
   # Runs upgrade-jambonz-db.js which is a no-op for any already-applied migration.
   jambonz-db-init:
-    image: ghcr.io/jambonz/api-server
+    # Pinned by digest -- see the `jambonz` service below for why.
+    image: ghcr.io/jambonz/api-server@sha256:34afdba0411bd145f4bca9b65a74751b388a3c6c822f4f65f6d2486dadd072dd
     restart: "no"
     profiles: ["telephony"]
     working_dir: /opt/app
@@ -323,7 +348,12 @@ services:
         condition: service_healthy
 
   jambonz:
-    image: ghcr.io/jambonz/api-server
+    # Pinned by digest. Jambonz went dual-licensed on 2026-01-20: 10.x and above
+    # need a paid licence key tied to the deployment FQDN, while 0.9.x and older
+    # stay MIT. This GHCR `latest` is a 2023-04-06 0.8.x build and the registry
+    # has published nothing since, so we are on the free line -- but an untagged
+    # pull is the one way that could change without anyone deciding it.
+    image: ghcr.io/jambonz/api-server@sha256:34afdba0411bd145f4bca9b65a74751b388a3c6c822f4f65f6d2486dadd072dd
     restart: unless-stopped
     profiles: ["telephony"]
     stop_grace_period: 3s
