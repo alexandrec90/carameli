@@ -91,3 +91,62 @@ def test_detects_a_dependency_the_profile_does_not_define() -> None:
     }
     assert _undefined_under("monitoring", broken) == [("grafana", "influxdb")]
     assert _undefined_under("telephony", broken) == []
+
+
+# --- Image pinning -------------------------------------------------------------
+#
+# A service with a `build:` key names an image we produce locally, so its
+# reference is an output name rather than something pulled from a registry.
+# Only pulled images can drift, so only those are checked here.
+
+#: Services whose image must be pinned to a digest, not merely to a tag.
+#:
+#: These are the drachtio/jambonz call-path images. Two reasons a floating tag is
+#: worse here than elsewhere: jambonz went dual-licensed on 2026-01-20, so a tag
+#: that rolled onto 10.x would silently put the stack on a build that demands a
+#: paid licence key; and the upstreams behind `rtpengine` and `api-server` have
+#: published nothing since 2021 and 2023 respectively, so `latest` is a claim
+#: about maintenance that is no longer true. A digest states what we actually run.
+DIGEST_PINNED_SERVICES = frozenset({"freeswitch", "rtpengine", "jambonz", "jambonz-db-init"})
+
+
+def _pulled_images() -> dict[str, str]:
+    """Service name -> image reference, for services compose pulls rather than builds."""
+    return {
+        name: spec["image"]
+        for name, spec in _services().items()
+        if spec.get("image") and not spec.get("build")
+    }
+
+
+def test_every_pulled_image_names_a_tag_or_a_digest() -> None:
+    """A bare repository name resolves to `latest`, which is whatever it is today."""
+    bare = sorted(
+        name
+        for name, ref in _pulled_images().items()
+        if "@" not in ref and ":" not in ref.rsplit("/", 1)[-1]
+    )
+    assert not bare, "unpinned image reference (no tag, no digest): " + ", ".join(bare)
+
+
+@pytest.mark.parametrize("service", sorted(DIGEST_PINNED_SERVICES))
+def test_call_path_images_are_digest_pinned(service: str) -> None:
+    """Parametrised so a failure names the service rather than the first one found."""
+    images = _pulled_images()
+    assert service in images, f"{service} is not a pulled-image service any more"
+    assert "@sha256:" in images[service], (
+        f"{service} must pin a digest, not just a tag -- got {images[service]!r}. "
+        "See DIGEST_PINNED_SERVICES for why this one in particular."
+    )
+
+
+def test_detects_an_image_that_names_no_tag() -> None:
+    """The bare-reference check fails when it should."""
+    refs = {
+        "pinned": "ghcr.io/x/y@sha256:" + "0" * 64,
+        "tagged": "postgres:18",
+        "port_in_registry_host": "registry.local:5000/x/y:1.2",
+        "bare": "ghcr.io/jambonz/api-server",
+    }
+    bare = [n for n, r in refs.items() if "@" not in r and ":" not in r.rsplit("/", 1)[-1]]
+    assert bare == ["bare"]
