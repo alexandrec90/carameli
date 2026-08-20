@@ -86,13 +86,21 @@ usable test suite both change: `docs/operations/local-integration-testing.md` an
 
 Docker Desktop is required for database-backed tests and stack operations. Check
 `docker ps` first. Telephony services are opt-in with `--profile telephony` and may run
-only in the primary worktree because rtpengine uses host networking.
+only in the primary worktree because rtpengine uses host networking. That profile
+ships no SBC and no feature server, so a softphone cannot register against it;
+putting a real phone on an extension is `docs/operations/softphone-demo.md`.
 
 Avoid destructive or disruptive lifecycle commands without confirmation:
 
 - `docker compose down -v` deletes database volumes.
 - `restart` and `up --build` can interrupt the user's active session.
 - use `docker compose exec -T` from scripts and automation.
+
+DB-backed tests read `DATABASE_URL` from `.env` and TRUNCATE every table before each
+run. A worktree gets its own compose stack on its own host ports, but a `.env` copied
+from the primary checkout still names the primary's port -- so running those tests in a
+worktree wipes the main stack's data. Point a worktree `.env` at its own `DB_HOST_PORT`
+before running anything DB-backed.
 
 Run focused verification for changed behavior. Typical commands:
 

@@ -92,7 +92,8 @@ async def test_provision_number_orders_and_returns_sid_and_number() -> None:
         200, {"data": [{"id": "PN123abc", "phone_number": "+14155550100"}]}
     )
     carrier._client.post = AsyncMock(return_value=order_resp)
-    carrier._client.get = AsyncMock(return_value=lookup_resp)
+    # First GET is the "do we already own it?" pre-check; second resolves the sid.
+    carrier._client.get = AsyncMock(side_effect=[_mock_response(200, {"data": []}), lookup_resp])
 
     result = await carrier.provision_number("+14155550100")
 
@@ -122,12 +123,12 @@ async def test_provision_number_pending_order_falls_back_to_lookup() -> None:
         200, {"data": [{"id": "PN123abc", "phone_number": "+14155550100"}]}
     )
     carrier._client.post = AsyncMock(return_value=order_resp)
-    carrier._client.get = AsyncMock(return_value=lookup_resp)
+    carrier._client.get = AsyncMock(side_effect=[_mock_response(200, {"data": []}), lookup_resp])
 
     result = await carrier.provision_number("+14155550100")
 
     assert result == {"provider_sid": "PN123abc", "phone_number": "+14155550100"}
-    carrier._client.get.assert_awaited_once()
+    assert carrier._client.get.await_count == 2  # ownership pre-check, then the sid lookup
     params = carrier._client.get.call_args.kwargs["params"]
     assert params == {"filter[phone_number]": "+14155550100"}
 
@@ -146,7 +147,8 @@ async def test_provision_number_lookup_exhausted_raises(monkeypatch) -> None:
     with pytest.raises(RuntimeError, match="phone-number id"):
         await carrier.provision_number("+14155550100")
 
-    assert carrier._client.get.await_count == 2
+    # One ownership pre-check, then _PROVISION_LOOKUP_ATTEMPTS post-order lookups.
+    assert carrier._client.get.await_count == 3
 
 
 async def test_provision_number_raises_on_error() -> None:
@@ -154,9 +156,46 @@ async def test_provision_number_raises_on_error() -> None:
     fake_resp = _mock_response(422, {"errors": [{"detail": "number unavailable"}]})
     fake_resp.raise_for_status = MagicMock(side_effect=Exception("HTTP 422"))
     carrier._client.post = AsyncMock(return_value=fake_resp)
+    carrier._client.get = AsyncMock(return_value=_mock_response(200, {"data": []}))
 
     with pytest.raises(Exception, match="HTTP 422"):
         await carrier.provision_number("+14155550100")
+
+
+async def test_provision_number_registers_a_number_the_account_already_owns() -> None:
+    """Buying DIDs in the portal first is the ordinary order of operations.
+
+    Telnyx rejects an order for a number already on the account, so without the
+    ownership pre-check `POST /vsapi/1.0.0/PhoneLine/Add` fails for exactly the numbers
+    an operator has in hand -- and the 502 it returns says "Provider error purchasing
+    DID", which reads as a Telnyx outage rather than as a number that is already theirs.
+    """
+    carrier = _make_carrier()
+    carrier._client.post = AsyncMock()
+    carrier._client.get = AsyncMock(
+        return_value=_mock_response(
+            200, {"data": [{"id": "PN123abc", "phone_number": "+14155550100"}]}
+        )
+    )
+
+    result = await carrier.provision_number("+14155550100")
+
+    assert result == {"provider_sid": "PN123abc", "phone_number": "+14155550100"}
+    carrier._client.post.assert_not_awaited()
+
+
+async def test_provision_number_propagates_a_failing_ownership_check() -> None:
+    """An auth or transport failure on the pre-check is not "number not owned"."""
+    carrier = _make_carrier()
+    fake_resp = _mock_response(401, {"errors": [{"detail": "unauthorized"}]})
+    fake_resp.raise_for_status = MagicMock(side_effect=Exception("HTTP 401"))
+    carrier._client.get = AsyncMock(return_value=fake_resp)
+    carrier._client.post = AsyncMock()
+
+    with pytest.raises(Exception, match="HTTP 401"):
+        await carrier.provision_number("+14155550100")
+
+    carrier._client.post.assert_not_awaited()
 
 
 # ---------------------------------------------------------------------------
