@@ -252,15 +252,23 @@ def test_resolve_config_defaults_to_localhost_with_the_env_key() -> None:
 def test_resolve_config_prefers_the_dedicated_env_var() -> None:
     resolved = script.resolve_config(
         _args(),
-        {"CARAMELI_API_KEY": "dedicated", "API_KEY_SECRET": "fallback"},  # pragma: allowlist secret - fixture env, asserts precedence
+        {
+            "CARAMELI_API_KEY": "dedicated",
+            "API_KEY_SECRET": "fallback",
+        },  # pragma: allowlist secret - fixture env, asserts precedence
     )
     assert resolved == ("http://localhost:8000", "dedicated")
 
 
 def test_resolve_config_prefers_explicit_flags_over_the_environment() -> None:
     resolved = script.resolve_config(
-        _args(base_url="https://demo.example", api_key="flag"),  # pragma: allowlist secret - fixture flag value
-        {"CARAMELI_BASE_URL": "http://ignored", "CARAMELI_API_KEY": "ignored"},  # pragma: allowlist secret - fixture env, asserted to be ignored
+        _args(
+            base_url="https://demo.example", api_key="flag"
+        ),  # pragma: allowlist secret - fixture flag value
+        {
+            "CARAMELI_BASE_URL": "http://ignored",
+            "CARAMELI_API_KEY": "ignored",
+        },  # pragma: allowlist secret - fixture env, asserted to be ignored
     )
     assert resolved == ("https://demo.example", "flag")
 
