@@ -168,6 +168,13 @@ services:
       # Windows bind mounts don't deliver inotify events to the container, so
       # Vite's watcher needs polling for HMR to work. See frontend/vite.config.ts.
       - CHOKIDAR_USEPOLLING=true
+      # ...and polling is why this line exists. Chokidar stats every watched path
+      # on libuv's threadpool, which defaults to 4 threads; sirv serves static
+      # files from that same pool, so a sweep starves every asset request behind
+      # it. Requesting the 8 comic-book panel images in parallel, as the browser
+      # preloads them: 35.3s at the default 4, 1.4s here. Raise the pool and the
+      # sweep and the responses stop competing. See frontend/devWatchPolicy.ts.
+      - UV_THREADPOOL_SIZE=64
     healthcheck:
       test:
         [
