@@ -15,7 +15,7 @@ import {
   imgFramePoints,
   imgFramePoly,
   imgFrameStyle,
-  imgInkPoints,
+  imgVisibleRect,
   imgRect,
   renderedImgRect,
   anchorToFractions,
@@ -180,55 +180,48 @@ describe('renderedImgRect', () => {
   })
 })
 
-describe('imgInkPoints', () => {
+describe('imgVisibleRect', () => {
   const bounds = { x: 100, y: 200, w: 400, h: 300 }
-  const vp: [number, number][] = [
-    [100, 200],
-    [500, 220],
-    [480, 500],
-    [120, 480],
-  ]
   // Tall source in the wide full-panel frame: fit 0.5 → a 100×300 box, centred
   // and flush with the floor — x 250..350, y 200..500.
   const nat = { w: 200, h: 600 }
+  const frame = { x: 100, y: 200, w: 400, h: 300 }
 
-  it("traces the image's own rectangle, not the panel polygon", () => {
-    expect(imgInkPoints(vp, bounds, nat, img())).toEqual([
-      [250, 200],
-      [350, 200],
-      [350, 500],
-      [250, 500],
-    ])
+  it("is the image's own rectangle, not the panel frame, at identity", () => {
+    expect(imgVisibleRect(bounds, nat, img())).toEqual({ x: 250, y: 200, w: 100, h: 300 })
   })
 
-  it('has no ink before the natural size is known', () => {
-    expect(imgInkPoints(vp, bounds, undefined, img())).toEqual([])
+  it('falls back to the frame before the natural size is known', () => {
+    expect(imgVisibleRect(bounds, undefined, img())).toEqual(frame)
   })
 
-  it('falls back to the frame polygon once a zoom crops past every edge', () => {
+  it('falls back to the frame once a zoom crops past every edge', () => {
     // scale 4 renders 400×1200 over the 400×300 frame — a filled, deliberate crop,
-    // so the ink is the frame's own slanted shape again.
-    expect(imgInkPoints(vp, bounds, nat, img({ scale: 4 }))).toEqual(
-      imgFramePoints(vp, bounds, img()),
-    )
+    // so the frame is the only edge the picture visibly has.
+    expect(imgVisibleRect(bounds, nat, img({ scale: 4 }))).toEqual(frame)
   })
 
   it('clamps to the frame when a pan pushes one edge out', () => {
     // offsetX 200 slides the 100-wide box to x 450..550; the frame ends at 500.
-    expect(imgInkPoints(vp, bounds, nat, img({ offsetX: 200 }))).toEqual([
-      [450, 200],
-      [500, 200],
-      [500, 500],
-      [450, 500],
-    ])
+    expect(imgVisibleRect(bounds, nat, img({ offsetX: 200 }))).toEqual({
+      x: 450,
+      y: 200,
+      w: 50,
+      h: 300,
+    })
   })
 
-  it('returns nothing when the picture is panned fully outside its frame', () => {
-    expect(imgInkPoints(vp, bounds, nat, img({ offsetX: 600 }))).toEqual([])
+  it('falls back to the frame when the picture is panned fully outside it', () => {
+    expect(imgVisibleRect(bounds, nat, img({ offsetX: 600 }))).toEqual(frame)
   })
 
-  it('has no shape against a zero-size panel box', () => {
-    expect(imgInkPoints(vp, { x: 0, y: 0, w: 0, h: 300 }, nat, img())).toEqual([])
+  it('returns the degenerate frame against a zero-size panel box', () => {
+    expect(imgVisibleRect({ x: 0, y: 0, w: 0, h: 300 }, nat, img())).toEqual({
+      x: 0,
+      y: 0,
+      w: 0,
+      h: 300,
+    })
   })
 })
 

@@ -330,46 +330,31 @@ export function renderedImgRect(
 }
 
 /**
- * The polygon a picture's ink border is drawn along, in viewport coordinates.
+ * The rectangle a picture visibly occupies, in viewport coordinates — the editor's
+ * notion of "the image", as opposed to the frame it hangs in ({@link imgRect}).
  *
- * The border belongs to the picture, not the panel: it traces the image's own
- * rectangle ({@link renderedImgRect}), which is why it can never cut across the
- * artwork — the frame is derived from the picture rather than imposed on it. Until
- * the natural size is known there is no rectangle to trace, so no ink.
- *
- * A deliberately cropped picture is the exception that proves the rule: once zoom or
- * pan pushes every image edge past the frame, the frame's crop is the only edge the
- * picture visibly has, so the ink follows the frame polygon ({@link imgFramePoints})
- * exactly as a filled panel always was. In between (one edge pushed out, not all),
- * the rectangle is clamped to the frame box so the ink never outlines pixels the
- * clip discarded.
+ * At the shipped identity transform this is the artwork's own border: the whole
+ * source contain-fitted into its frame ({@link renderedImgRect}), so a hover or
+ * selection outline traces the image's true proportions rather than the panel's.
+ * It is clamped to the frame box, never outlining pixels the clip discarded. The
+ * frame itself is the fallback whenever there is nothing tighter to trace: the
+ * natural size is not known yet, a zoom crops past every edge, or a pan pushes the
+ * picture fully outside its frame.
  */
-export function imgInkPoints(
-  vp: [number, number][],
+export function imgVisibleRect(
   bounds: { x: number; y: number; w: number; h: number },
   nat: { w: number; h: number } | undefined,
   t: ImgTransform,
-): [number, number][] {
-  if (!nat || bounds.w <= 0 || bounds.h <= 0) return []
+): { x: number; y: number; w: number; h: number } {
   const frame = imgRect(bounds, t)
+  if (!nat || frame.w <= 0 || frame.h <= 0) return frame
   const r = renderedImgRect(frame, nat, t)
-  const covers =
-    r.x <= frame.x &&
-    r.y <= frame.y &&
-    r.x + r.w >= frame.x + frame.w &&
-    r.y + r.h >= frame.y + frame.h
-  if (covers) return imgFramePoints(vp, bounds, t)
   const x1 = Math.max(r.x, frame.x)
   const y1 = Math.max(r.y, frame.y)
   const x2 = Math.min(r.x + r.w, frame.x + frame.w)
   const y2 = Math.min(r.y + r.h, frame.y + frame.h)
-  if (x2 <= x1 || y2 <= y1) return []
-  return [
-    [x1, y1],
-    [x2, y1],
-    [x2, y2],
-    [x1, y2],
-  ]
+  if (x2 <= x1 || y2 <= y1) return frame
+  return { x: x1, y: y1, w: x2 - x1, h: y2 - y1 }
 }
 
 /** Move a picture's frame by a px drag → % of the panel box. */

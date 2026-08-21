@@ -7,7 +7,7 @@ import PanelBubbles from './PanelBubbles'
 import PanelImages from './PanelImages'
 import { PANELS } from './panels'
 import { PANEL_IMG_TRANSFORMS, PANEL_BUBBLE_TRANSFORMS } from './editor/layoutConfig'
-import { imgInkPoints, toClipPath } from './editor/transforms'
+import { toClipPath } from './editor/transforms'
 import { shouldRevealImg, useEditorMode } from './editor/useEditorMode'
 import {
     drawLoadingRipple, drawWash, parseCssColor, washPhaseAt,
@@ -1007,26 +1007,6 @@ export function Layout({ navItems }: LayoutProps) {
                             strokeLinejoin="miter"
                         />
                     ))}
-                    {/* Each picture is also inked along its own edges — the image's
-                        rendered rectangle, independent of the panel outline above, so
-                        the artwork carries its own frame at its own proportions
-                        (imgInkPoints). No ink until the natural size is known. */}
-                    {imgT.map((img, k) => {
-                        const poly = panelPolys[img.panel]
-                        if (!poly) return null
-                        const pts = imgInkPoints(poly.vp, poly.bounds, natSizes[img.src], img)
-                        if (pts.length === 0) return null
-                        return (
-                            <polygon
-                                key={`img-${k}`}
-                                points={pts.map(([x, y]) => `${x},${y}`).join(' ')}
-                                fill="none"
-                                stroke="#111111"
-                                strokeWidth="5"
-                                strokeLinejoin="miter"
-                            />
-                        )
-                    })}
                 </svg>
 
                 {/* Layer 3 — Ben-Day wash canvas (page transitions; blank when idle) */}
@@ -1040,6 +1020,7 @@ export function Layout({ navItems }: LayoutProps) {
                     <EditorOverlay
                         api={editor}
                         panelPolys={panelPolys}
+                        natSizes={natSizes}
                         pageSelect={{
                             navItems,
                             previewingLoading: previewLoading,

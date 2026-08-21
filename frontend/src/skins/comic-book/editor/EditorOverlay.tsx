@@ -9,7 +9,7 @@ import InspectorPanel from './InspectorPanel'
 import PageSelect from './PageSelect'
 import type { PageSelectProps } from './PageSelect'
 import { serializeConfig, serializeConfigFile } from './serialize'
-import { bubbleRect, imgRect } from './transforms'
+import { bubbleRect, imgVisibleRect } from './transforms'
 import { useOverlayInteraction } from './useOverlayInteraction'
 import { useToolbarDrag } from './useToolbarDrag'
 import type { EditorModeApi } from './useEditorMode'
@@ -25,6 +25,9 @@ interface Rect {
 interface EditorOverlayProps {
   api: EditorModeApi
   panelPolys: PanelPoly[]
+  /** Natural pixel size of each loaded source, keyed by `src` — sizes the visible
+      image rect the hover and selection outlines trace. */
+  natSizes: Record<string, { w: number; h: number }>
   pageSelect: PageSelectProps
 }
 
@@ -55,7 +58,7 @@ function downloadConfig(text: string): void {
  * editor/layoutConfig.ts on disk (HMR then reloads it); Reset reverts unsaved edits
  * to the last saved file. Both degrade to the clipboard/download fallbacks.
  */
-export default function EditorOverlay({ api, panelPolys, pageSelect }: EditorOverlayProps) {
+export default function EditorOverlay({ api, panelPolys, natSizes, pageSelect }: EditorOverlayProps) {
   useEffect(() => {
     logger.info('Comic-book editor overlay active', { panels: panelPolys.length })
   }, [panelPolys.length])
@@ -83,7 +86,7 @@ export default function EditorOverlay({ api, panelPolys, pageSelect }: EditorOve
   const selectedRect: Rect | null = !selPoly
     ? null
     : selImg
-      ? imgRect(selPoly.bounds, selImg)
+      ? imgVisibleRect(selPoly.bounds, natSizes[selImg.src], selImg)
       : selBubble
         ? bubbleRect(selPoly.bounds, selBubble)
         : selPoly.bounds
@@ -157,9 +160,9 @@ export default function EditorOverlay({ api, panelPolys, pageSelect }: EditorOve
         />
       ))}
 
-      {/* One click target per picture, on its own frame. They paint after the panel
-          targets so a picture wins the click where the two overlap — which is always,
-          since a frame lives on a panel. */}
+      {/* One click target per picture, on the rectangle its pixels visibly occupy —
+          the image, not the frame it hangs in. They paint after the panel targets so a
+          picture wins the click where the two overlap. */}
       {config.images.map((img, i) => {
         const poly = panelPolys[img.panel]
         if (!poly) return null
@@ -168,7 +171,7 @@ export default function EditorOverlay({ api, panelPolys, pageSelect }: EditorOve
             key={i}
             type="button"
             className="cb-ed-target cb-ed-target-img"
-            style={rectStyle(imgRect(poly.bounds, img))}
+            style={rectStyle(imgVisibleRect(poly.bounds, natSizes[img.src], img))}
             aria-label={`Select ${assetLabel(img.src)} on ${PANELS[img.panel]?.label ?? `panel ${img.panel}`}`}
             onClick={() => api.select('img', i)}
           />
