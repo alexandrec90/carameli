@@ -1,3 +1,4 @@
+import type { PanelBgStyle } from '../panelPatterns'
 import type { ImgTransform, BubbleTransform } from './types'
 
 // Not parallel to PANELS: each picture names its `panel`, so a panel may own several or
@@ -17,6 +18,10 @@ export const PANEL_IMG_TRANSFORMS: ImgTransform[] = [
   { panel: 5, src: '/comic-book/rolodex.webp', alt: 'Rolodex', left: 0, top: 0, width: 100, height: 100, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center bottom', spill: false },
   { panel: 6, src: '/comic-book/rotary%20phone.webp', alt: 'Rotary phone', left: 0, top: 0, width: 100, height: 100, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center bottom', spill: false },
   { panel: 7, src: '/comic-book/mailman2.webp', alt: 'Post office', left: 0, top: 0, width: 100, height: 100, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center bottom', spill: false },
+  { panel: 8, src: '/comic-book/logo2.webp', alt: 'Carameli', left: 0, top: 0, width: 100, height: 100, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center center', spill: false },
+  { panel: 9, src: '/comic-book/notepad.webp', alt: 'Notepad', left: 0, top: 0, width: 100, height: 100, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center bottom', spill: false },
+  { panel: 10, src: '/comic-book/push-button-phone.webp', alt: 'Push-button phone', left: 0, top: 0, width: 100, height: 100, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center bottom', spill: false },
+  { panel: 11, src: '/comic-book/man-woman-talking.webp', alt: 'Phone conversation', left: 0, top: 0, width: 100, height: 100, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center bottom', spill: false },
 ]
 
 // Not parallel to PANELS either: each bubble names its `panel`, a panel may own any
@@ -45,4 +50,30 @@ export const PANEL_BUBBLE_TRANSFORMS: BubbleTransform[] = [
   { panel: 5, top: -35, right: -12, width: 55, rotate: -5, spill: true, type: 'lightning', tail: 'down-left', text: 'RING RING!', linkTo: null, hoverType: 'cloud', clickType: 'soft' },
   { panel: 6, top: -35, right: -12, width: 55, rotate: -5, spill: true, type: 'lightning', tail: 'down-left', text: 'Ka-POW!', linkTo: null, hoverType: 'soft', clickType: 'cloud' },
   { panel: 7, top: -35, right: -12, width: 55, rotate: -5, spill: true, type: 'cloud', tail: 'down-left', text: 'Delivering dreams...', linkTo: null, hoverType: 'soft', clickType: 'lightning' },
+  { panel: 8, top: -35, right: -12, width: 55, rotate: -5, spill: true, type: 'soft', tail: 'down-left', text: "It's Carameli!", linkTo: null, hoverType: 'cloud', clickType: 'lightning' },
+  { panel: 9, top: -35, right: -12, width: 55, rotate: -5, spill: true, type: 'soft', tail: 'down-right', text: 'Taking notes!', linkTo: null, hoverType: 'cloud', clickType: 'lightning' },
+  { panel: 10, top: -35, right: -12, width: 55, rotate: -5, spill: true, type: 'lightning', tail: 'down-left', text: 'RING RING!', linkTo: null, hoverType: 'cloud', clickType: 'soft' },
+  { panel: 11, top: -35, right: -12, width: 55, rotate: -5, spill: true, type: 'cloud', tail: 'down-left', text: 'Hello?', linkTo: null, hoverType: 'soft', clickType: 'lightning' },
+]
+
+// The one array here that IS parallel to PANELS: a pattern belongs to the panel slot
+// itself, not to a picture or a bubble on it, so entry `i` is the Ben-Day background
+// drawn behind `PANELS[i]` — whichever page that panel sits on. Only the style name is
+// the author's choice; the colors and dot metrics stay tuned per panel in
+// panelPatterns.ts (PANEL_BG_CONFIGS), so switching a panel's pattern keeps its
+// palette. A retired or misspelled name falls back to the shipped default on hydrate
+// rather than failing the draw.
+export const PANEL_PATTERNS: PanelBgStyle[] = [
+  'halftone-gradient', // Logo
+  'sunburst', // Switchboard
+  'color-block', // Mailman 1
+  'vignette', // Mechanic
+  'radial-dots', // Receptionist
+  'diagonal-stripes', // Rolodex
+  'concentric-rings', // Rotary phone
+  'corner-burst', // Mailman 2
+  'radial-dots', // Logo 2
+  'diagonal-stripes', // Notepad
+  'concentric-rings', // Push-button phone
+  'sunburst', // Conversation
 ]

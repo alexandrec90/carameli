@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import type { CSSProperties } from 'react'
 
 import { logger } from '../../../lib/logger'
-import type { PanelPoly } from '../Layout'
+import type { PanelPoly } from '../panelGeometry'
 import { PANELS } from '../panels'
 import { assetLabel } from './assets'
 import InspectorPanel from './InspectorPanel'
@@ -24,7 +24,7 @@ interface Rect {
 
 interface EditorOverlayProps {
   api: EditorModeApi
-  panelPolys: PanelPoly[]
+  panelPolys: (PanelPoly | null)[]
   pageSelect: PageSelectProps
 }
 
@@ -145,17 +145,21 @@ export default function EditorOverlay({ api, panelPolys, pageSelect }: EditorOve
 
       {/* Per-panel click targets — the backdrop for everything drawn on a panel.
           Selecting a panel is what "+ Image" and "+ Bubble" act on, and it is the only
-          way to reach a panel that has nothing on it yet. */}
-      {panelPolys.map((poly, i) => (
-        <button
-          key={i}
-          type="button"
-          className="cb-ed-target"
-          style={rectStyle(poly.bounds)}
-          aria-label={`Select ${PANELS[i]?.label ?? `panel ${i}`}`}
-          onClick={() => api.select('panel', i)}
-        />
-      ))}
+          way to reach a panel that has nothing on it yet. The array is sparse: a null
+          slot is a panel that lives on some other page, so it gets no target here. */}
+      {panelPolys.map((poly, i) => {
+        if (!poly) return null
+        return (
+          <button
+            key={i}
+            type="button"
+            className="cb-ed-target"
+            style={rectStyle(poly.bounds)}
+            aria-label={`Select ${PANELS[i]?.label ?? `panel ${i}`}`}
+            onClick={() => api.select('panel', i)}
+          />
+        )
+      })}
 
       {/* One click target per picture, on its own frame. They paint after the panel
           targets so a picture wins the click where the two overlap — which is always,

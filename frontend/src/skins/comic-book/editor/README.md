@@ -11,7 +11,11 @@ numbers back into source.
 left / top / width / height / scale / offsetX / offsetY / anchor / spill) and bubble
 placement **and content** (panel / top / right / width / rotate / spill / type / tail /
 text), plus each bubble's event morph targets (`hoverType`, `clickType`) and its
-connector-tube partner (`linkTo`). A picture's `src` is a public URL, offered in the
+connector-tube partner (`linkTo`). It also holds `PANEL_PATTERNS` — each panel's
+Ben-Day background style, the one array here that **is** parallel to `PANELS`; the
+per-panel palette and dot metrics stay tuned in
+[`../panelPatterns.ts`](../panelPatterns.ts) (`PANEL_BG_CONFIGS`), so switching a
+panel's pattern keeps its colors. A picture's `src` is a public URL, offered in the
 editor by the static manifest in [`assets.ts`](./assets.ts) (`PANEL_ASSETS`). The
 bubble `type` resolves to a lettering font via [`bubbleTypes.ts`](./bubbleTypes.ts)
 (`BUBBLE_TYPES`); the outline itself is generated vector geometry in
@@ -54,7 +58,9 @@ different images can only crossfade. A new bubble type belongs in `bubbleShape.t
    bubble is shown without hover so it can be selected.) A picture wins the click over
    the panel under it, and a bubble over both. Selecting the panel itself is how you
    reach one that has nothing on it yet, and it is what **+ Image** / **+ Bubble** add
-   to; a panel has nothing to drag, so it is only outlined.
+   to; a panel has nothing to drag, so it is only outlined. With a panel selected,
+   the inspector offers its background **pattern** style — the palette stays the
+   panel's own, so switching styles keeps its colors.
    - The overlay blocks the panels' own click navigation, so use the **Page**
      dropdown in the toolbar to move between pages (each switch replays the
      Ben-Day wash transition). The **Loading screen** entry previews the loading
@@ -102,7 +108,7 @@ different images can only crossfade. A new bubble type belongs in `bubbleShape.t
    unsaved edits and reverts to the last saved file.
 5. Reload **without** `?edit=1` — your saved change is now the baseline.
 
-**Copy config** / **.ts** remain as fallbacks: Copy puts the two paste-ready
+**Copy config** / **.ts** remain as fallbacks: Copy puts the three paste-ready
 `export const` blocks on the clipboard; **.ts** downloads a complete `layoutConfig.ts`.
 Both are used automatically if the Save endpoint or clipboard is unavailable.
 
@@ -131,8 +137,10 @@ bubbleTypes.ts      BubbleType + BUBBLE_TYPES (lettering font per type) — ship
 ../PanelBubble.tsx  one bubble: outline SVG + text + hover/press morph state
 ../PanelBubbles.tsx one panel's bubbles: filters the array by panel, clips the non-spilling ones
 ../BubbleTubes.tsx  viewport-level tube layer for every linked pair
-layoutConfig.ts     PANEL_IMG_TRANSFORMS, PANEL_BUBBLE_TRANSFORMS — source of truth
-configOps.ts        PURE config edits: seed/hydrate/patch, add/remove picture or bubble, link sanitation
+../panelPatterns.ts pattern style registry + per-panel palette/dot tuning (PANEL_BG_CONFIGS)
+layoutConfig.ts     PANEL_IMG_TRANSFORMS, PANEL_BUBBLE_TRANSFORMS, PANEL_PATTERNS — source of truth
+configOps.ts        PURE config edits: seed/patch, add/remove picture or bubble, pattern switch, link sanitation
+configHydrate.ts    PURE rebuild from a persisted payload: backfill, enum coercion, pattern fallback
 serialize.ts        PURE serialization back to layoutConfig.ts (headers included)
 transforms.ts       PURE helpers: CSS builders, frame/drag/scale math, clamp
 useEditorMode.ts    hook: flag detection, working copy, persistence, selection

@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import type { PointerEvent as ReactPointerEvent, WheelEvent as ReactWheelEvent } from 'react'
 
-import type { PanelPoly } from '../Layout'
+import type { PanelPoly } from '../panelGeometry'
 import {
   BUBBLE_W,
   IMG_FRAME,
@@ -58,7 +58,10 @@ export interface OverlayInteraction {
  * bubbles. Getting this wrong scales a drag by another panel's dimensions, so it is
  * resolved in one place for every input path.
  */
-function selectionBounds(api: EditorModeApi, panelPolys: PanelPoly[]): PanelPoly['bounds'] | null {
+function selectionBounds(
+  api: EditorModeApi,
+  panelPolys: (PanelPoly | null)[],
+): PanelPoly['bounds'] | null {
   const sel = api.selected
   if (!sel) return null
   const panel =
@@ -90,7 +93,7 @@ function isTypingTarget(target: EventTarget | null): boolean {
  */
 export function useOverlayInteraction(
   api: EditorModeApi,
-  panelPolys: PanelPoly[],
+  panelPolys: (PanelPoly | null)[],
 ): OverlayInteraction {
   const drag = useRef<DragState | null>(null)
 

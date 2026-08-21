@@ -1,13 +1,15 @@
 import { useCallback, useMemo, useState } from 'react'
 
 import { logger } from '../../../lib/logger'
+import type { PanelBgStyle } from '../panelPatterns'
+import { hydrateConfig } from './configHydrate'
 import {
   CONFIG_KEY,
   addBubble,
   addImg,
-  hydrateConfig,
   patchBubble,
   patchImg,
+  patchPattern,
   removeBubble,
   removeImg,
   resetOneIn,
@@ -43,6 +45,8 @@ export interface EditorModeApi {
   clear(): void
   setImg(index: number, patch: Partial<ImgTransform>): void
   setBubble(index: number, patch: Partial<BubbleTransform>): void
+  /** Set panel `panel`'s background pattern style. */
+  setPattern(panel: number, style: PanelBgStyle): void
   /** Append a picture on `panel` and select it. */
   addImgOn(panel: number): void
   /** Delete picture `index`, clearing the selection it leaves behind. */
@@ -151,6 +155,11 @@ export function useEditorMode(): EditorModeApi {
     [apply],
   )
 
+  const setPattern = useCallback(
+    (panel: number, style: PanelBgStyle) => apply(prev => patchPattern(prev, panel, style)),
+    [apply],
+  )
+
   const addImgOn = useCallback(
     (panel: number) => {
       let added = -1
@@ -227,6 +236,7 @@ export function useEditorMode(): EditorModeApi {
       clear,
       setImg,
       setBubble,
+      setPattern,
       addImgOn,
       deleteImg,
       addBubbleOn,
@@ -242,6 +252,7 @@ export function useEditorMode(): EditorModeApi {
       clear,
       setImg,
       setBubble,
+      setPattern,
       addImgOn,
       deleteImg,
       addBubbleOn,

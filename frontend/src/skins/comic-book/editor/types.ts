@@ -1,4 +1,5 @@
 import type { TailDir } from '../bubbleBox'
+import type { PanelBgStyle } from '../panelPatterns'
 import type { BubbleType } from './bubbleTypes'
 
 /**
@@ -88,11 +89,13 @@ export interface BubbleTransform {
 }
 
 /**
- * The editor's working document. Neither array is parallel to PANELS: each entry names
- * its own panel, so both are free-length and adding one is an append that has to line
- * up with nothing.
+ * The editor's working document. Neither entry array is parallel to PANELS: each entry
+ * names its own panel, so both are free-length and adding one is an append that has to
+ * line up with nothing. `patterns` is the exception — a background belongs to the panel
+ * slot itself, so it IS parallel to PANELS and always exactly that length.
  */
 export interface EditorConfig {
   images: ImgTransform[]
   bubbles: BubbleTransform[]
+  patterns: PanelBgStyle[]
 }

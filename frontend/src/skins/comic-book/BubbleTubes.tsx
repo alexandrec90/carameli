@@ -2,10 +2,10 @@ import { linkedPairs, tubeBetween } from './bubbleTube'
 import type { TubeGeometry } from './bubbleTube'
 import { bubbleRect } from './editor/transforms'
 import type { BubbleTransform } from './editor/types'
-import type { PanelPoly } from './Layout'
+import type { PanelPoly } from './panelGeometry'
 
 interface BubbleTubesProps {
-  polys: PanelPoly[]
+  polys: (PanelPoly | null)[]
   bubbles: BubbleTransform[]
   /** Whether bubble `index` is currently revealed. */
   isVisible(index: number): boolean

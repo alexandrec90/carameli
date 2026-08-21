@@ -60,6 +60,18 @@ The layout is a **comic-book page** decomposed into panels:
 
 Views must tile their content inside the panel regions defined by the canvas lines. Use `position: absolute` panels over the canvas. Exact coordinates are computed at runtime from `window.innerWidth / innerHeight`.
 
+### Two pages, one panel list
+
+There are two grids: the **4-panel home page** on `/` (`computeHomeLayout` in
+`pageLayouts.ts` — 2×2, the logo panel smallest) and the **classic 8-panel grid**
+everywhere else (`classicLayouts.ts` — the old home page set aside, not destroyed).
+Every panel of both lives in the one `PANELS` list (`panels.ts`), each naming its
+`page`; `computePagePolys` returns a PANELS-length **sparse** array with a polygon
+only at the current page's indices and `null` elsewhere. Consumers keep indexing
+panels and polygons by the same number and must guard the nulls. Both layouts share
+the same visual system — `OUTER_M` / `HG` margins and gutters, slanted dividers,
+outward-only spill (`panelGeometry.ts`).
+
 ## Component Patterns
 
 ### Button
@@ -284,17 +296,20 @@ offsetX / offsetY / anchor / spill, with `src` drawn from the `PANEL_ASSETS` man
 in `editor/assets.ts`) and speech-bubble
 placement and behaviour (`PANEL_BUBBLE_TRANSFORMS`: panel / top / right / width /
 rotate / spill / type / tail / text, plus `hoverType` / `clickType` event morph
-targets and the `linkTo` tube partner). The renderer in `Layout.tsx` reads from these
-arrays — there are **no magic framing numbers** in `Layout.tsx` or the CSS for
-images/bubbles, and no bubble text. To retune them, use the editor rather than
-hand-editing scattered values.
+targets and the `linkTo` tube partner) and each panel's background pattern style
+(`PANEL_PATTERNS`, the one array parallel to `PANELS`; the per-panel palette and dot
+metrics stay in `PANEL_BG_CONFIGS` in `panelPatterns.ts`). The renderer in
+`Layout.tsx` reads from these arrays — there are **no magic framing numbers** in
+`Layout.tsx` or the CSS for images/bubbles, and no bubble text. To retune them, use
+the editor rather than hand-editing scattered values.
 
 **Save overwrites `layoutConfig.ts` verbatim** with what `serialize.ts` emits, so
 anything that module does not write is deleted on the first save. That is why the
 file's explanatory comments are emitted as headers by `serialize.ts`, and why nothing
 else — a `NEW_IMAGE` or `NEW_BUBBLE` default, a helper — may live in `layoutConfig.ts`.
-Config edits themselves live in `configOps.ts` (React-free: seed/hydrate/patch,
-add/remove picture or bubble, link sanitation).
+Config edits themselves live in `configOps.ts` (React-free: seed/patch, add/remove
+picture or bubble, pattern switch, link sanitation); rebuilding a working copy from a
+persisted payload is `configHydrate.ts` (backfill, enum coercion, pattern fallback).
 
 The bubble box's on-screen geometry comes from `bubbleRect` in `transforms.ts`, used
 by **both** the renderer (to aim tubes) and the editor (hit target and selection
@@ -307,9 +322,10 @@ not the bubble a tube pointed at.
 | --- | --- | --- |
 | Enable / disable | `?edit=1` / `?edit=0` in dev | Flag persists in `localStorage['comic-book:edit']`; `?edit=0` clears it |
 | Gate | `import.meta.env.DEV && (?edit=1 \|\| flag)` | Never ships — `?edit=1` is inert in prod |
-| Select | click a **panel**, a **picture** or a **bubble** | A picture wins over the panel under it, a bubble over both; a panel is only outlined — it is the slot the **+** buttons add to |
+| Select | click a **panel**, a **picture** or a **bubble** | A picture wins over the panel under it, a bubble over both; a panel is the slot the **+** buttons add to, and where its background pattern is picked |
 | Adjust | drag / wheel / handles / arrows | Move the frame or bubble, resize (bottom-right grip), pan the picture inside its frame (top-left grip, picture only), rotate (top-right grip, bubble only), nudge (⇧×10); for a picture **Alt** swaps the two framings |
 | Add / remove | **+ Image** / **+ Bubble** toolbar buttons, **Delete image** / **Delete bubble** in the inspector | Adds to the selected panel; deleting a bubble clears any link naming it |
+| Panel fields | inspector select | background **pattern** style (`PATTERN_STYLE_KEYS`; palette stays per panel) |
 | Picture fields | inspector selects | panel, picture (`PANEL_ASSETS`), alt (empty = decorative), anchor, spill |
 | Bubble fields | inspector selects | panel, type, **tail** (nine options incl. **No tail**), text, hover/click morph, link |
 | Pages | **Page** dropdown in toolbar | Switch route in edit mode (replays the wash); "Loading screen" entry previews the loading overlay + its exit wash |

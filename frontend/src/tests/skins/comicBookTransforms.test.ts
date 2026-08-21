@@ -322,10 +322,9 @@ describe('BUBBLE_TYPES', () => {
 })
 
 describe('default config parity', () => {
-  it('uses center center only for the logo and center bottom for the rest', () => {
-    expect(PANEL_IMG_TRANSFORMS[0].anchor).toBe('center center')
-    PANEL_IMG_TRANSFORMS.slice(1).forEach(t => {
-      expect(t.anchor).toBe('center bottom')
+  it('uses center center only for the logo panels and center bottom for the rest', () => {
+    PANEL_IMG_TRANSFORMS.forEach(t => {
+      expect(t.anchor).toBe(PANELS[t.panel].isLogo ? 'center center' : 'center bottom')
     })
   })
 

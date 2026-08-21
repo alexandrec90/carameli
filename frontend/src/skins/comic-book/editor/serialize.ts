@@ -1,4 +1,6 @@
+import { PANELS } from '../panels'
 import type { BubbleType } from './bubbleTypes'
+import { PANEL_PATTERNS } from './layoutConfig'
 import type { EditorConfig } from './types'
 
 // Turning the editor's working copy back into `layoutConfig.ts`. The Save button
@@ -6,7 +8,7 @@ import type { EditorConfig } from './types'
 // verbatim — so anything this module does not emit is deleted on the first save.
 // That is why the header prose below lives here rather than only in the file it
 // describes: the rule about links staying on one panel is not recoverable from the
-// data, and a saved config that had dropped it would read as permission. Keep the two
+// data, and a saved config that had dropped it would read as permission. Keep the three
 // headers byte-identical with the ones in `layoutConfig.ts`, so a save with nothing
 // changed is a no-op diff rather than a paragraph quietly going missing.
 
@@ -63,9 +65,17 @@ const BUBBLE_HEADER = `// Not parallel to PANELS either: each bubble names its \
 // landscape layout; the portrait and square layouts reshape the panels, so a pair may
 // end up close enough there to drop its tube. Retune per layout in the editor.`
 
+const PATTERN_HEADER = `// The one array here that IS parallel to PANELS: a pattern belongs to the panel slot
+// itself, not to a picture or a bubble on it, so entry \`i\` is the Ben-Day background
+// drawn behind \`PANELS[i]\` — whichever page that panel sits on. Only the style name is
+// the author's choice; the colors and dot metrics stay tuned per panel in
+// panelPatterns.ts (PANEL_BG_CONFIGS), so switching a panel's pattern keeps its
+// palette. A retired or misspelled name falls back to the shipped default on hydrate
+// rather than failing the draw.`
+
 /**
  * Serialize a working {@link EditorConfig} into paste-ready TS matching
- * `layoutConfig.ts` (the two `export const` blocks, each under its explanatory
+ * `layoutConfig.ts` (the three `export const` blocks, each under its explanatory
  * comment).
  *
  * Numbers are rounded for clean output: frame percentages to 1 decimal, image `scale`
@@ -95,17 +105,26 @@ export function serializeConfig(c: EditorConfig): string {
         `hoverType: ${typeLiteral(b.hoverType)}, clickType: ${typeLiteral(b.clickType)} },`,
     )
     .join('\n')
+  // Patterns iterate PANELS, not the config: the array is parallel by contract, so a
+  // slot the working copy never touched still serializes as its shipped default.
+  const patternLines = PANELS
+    .map((p, i) => `  '${c.patterns[i] ?? PANEL_PATTERNS[i]}', // ${p.label}`)
+    .join('\n')
   return (
     `${IMG_HEADER}\nexport const PANEL_IMG_TRANSFORMS: ImgTransform[] = [\n${imgLines}\n]\n\n` +
-    `${BUBBLE_HEADER}\nexport const PANEL_BUBBLE_TRANSFORMS: BubbleTransform[] = [\n${bubbleLines}\n]\n`
+    `${BUBBLE_HEADER}\nexport const PANEL_BUBBLE_TRANSFORMS: BubbleTransform[] = [\n${bubbleLines}\n]\n\n` +
+    `${PATTERN_HEADER}\nexport const PANEL_PATTERNS: PanelBgStyle[] = [\n${patternLines}\n]\n`
   )
 }
 
 /**
  * Serialize a full, ready-to-write `editor/layoutConfig.ts` file: the type import
- * header plus the two `export const` blocks from {@link serializeConfig}. Used by the
- * editor's Save button, which POSTs this verbatim to the dev-only write endpoint.
+ * header plus the three `export const` blocks from {@link serializeConfig}. Used by
+ * the editor's Save button, which POSTs this verbatim to the dev-only write endpoint.
  */
 export function serializeConfigFile(c: EditorConfig): string {
-  return `import type { ImgTransform, BubbleTransform } from './types'\n\n${serializeConfig(c)}`
+  return (
+    `import type { PanelBgStyle } from '../panelPatterns'\n` +
+    `import type { ImgTransform, BubbleTransform } from './types'\n\n${serializeConfig(c)}`
+  )
 }

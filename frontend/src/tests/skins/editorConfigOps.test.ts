@@ -1,16 +1,20 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  hydrateConfig,
+  normalizePatterns,
+} from '../../skins/comic-book/editor/configHydrate'
+import {
   NEW_BUBBLE,
   NEW_IMAGE,
   addBubble,
   addImg,
   cloneConfig,
-  hydrateConfig,
   indicesOnPanel,
   linkCandidates,
   patchBubble,
   patchImg,
+  patchPattern,
   removeBubble,
   removeImg,
   resetOneIn,
@@ -24,6 +28,7 @@ import {
 import {
   PANEL_IMG_TRANSFORMS,
   PANEL_BUBBLE_TRANSFORMS,
+  PANEL_PATTERNS,
 } from '../../skins/comic-book/editor/layoutConfig'
 import {
   RING_POINTS,
@@ -32,6 +37,10 @@ import {
   isTailDir,
 } from '../../skins/comic-book/bubbleBox'
 import { puffOpacity, ringPoints } from '../../skins/comic-book/bubbleShape'
+import {
+  PATTERN_STYLE_KEYS,
+  isPanelBgStyle,
+} from '../../skins/comic-book/panelPatterns'
 import { PANELS } from '../../skins/comic-book/panels'
 
 /** Index of the first shipped bubble that declares a link, with its partner. */
@@ -39,10 +48,19 @@ const LINKED = PANEL_BUBBLE_TRANSFORMS.findIndex(b => b.linkTo !== null)
 const LINKED_TO = PANEL_BUBBLE_TRANSFORMS[LINKED].linkTo as number
 
 describe('seedConfig', () => {
-  it('returns the constants verbatim, both arrays as authored', () => {
+  it('returns the constants verbatim, all three arrays as authored', () => {
     const cfg = seedConfig()
     expect(cfg.images).toEqual(PANEL_IMG_TRANSFORMS)
     expect(cfg.bubbles).toEqual(PANEL_BUBBLE_TRANSFORMS)
+    expect(cfg.patterns).toEqual(PANEL_PATTERNS)
+  })
+
+  // The one array that IS parallel to PANELS: every consumer indexes it by panel
+  // number, so a seed shorter than the grid would draw some panels with no style.
+  it('ships one pattern per panel slot, every one a registered style', () => {
+    const cfg = seedConfig()
+    expect(cfg.patterns).toHaveLength(PANELS.length)
+    cfg.patterns.forEach(p => expect(isPanelBgStyle(p)).toBe(true))
   })
 
   // Pictures stopped being parallel to the panels at the same time bubbles did; the
@@ -84,8 +102,11 @@ describe('seedConfig', () => {
     const cfg = seedConfig()
     expect(cfg.images[0]).not.toBe(PANEL_IMG_TRANSFORMS[0])
     expect(cfg.bubbles[0]).not.toBe(PANEL_BUBBLE_TRANSFORMS[0])
+    expect(cfg.patterns).not.toBe(PANEL_PATTERNS)
     cfg.images[0].scale = 99
     expect(PANEL_IMG_TRANSFORMS[0].scale).toBe(1)
+    cfg.patterns[0] = 'sunburst'
+    expect(PANEL_PATTERNS[0]).toBe('halftone-gradient')
   })
 })
 
@@ -96,6 +117,8 @@ describe('cloneConfig', () => {
     expect(b).toEqual(a)
     b.bubbles[2].top = -100
     expect(a.bubbles[2].top).not.toBe(-100)
+    b.patterns[1] = 'vignette'
+    expect(a.patterns[1]).not.toBe('vignette')
   })
 })
 
@@ -155,6 +178,9 @@ describe('hydrateConfig', () => {
     expect(hydrateConfig(JSON.stringify({ images: [], bubbles: [] }))).toEqual({
       images: [],
       bubbles: [],
+      // Patterns are the exception: the array is parallel to PANELS by contract, so
+      // "nothing" is not a length it can have — absence re-seeds the defaults.
+      patterns: [...PANEL_PATTERNS],
     })
   })
 
@@ -300,12 +326,69 @@ describe('hydrateConfig', () => {
       expect(ringPoints(b.type, b.tail)).toHaveLength(RING_POINTS * 2)
     }
   })
+
+  // A payload saved before patterns existed has no `patterns` key at all; its images
+  // and bubbles are still the author's, so it must hydrate rather than re-seed.
+  it('seeds the default patterns into a payload that predates them', () => {
+    const cfg = patchImg(seedConfig(), 0, { scale: 2 })
+    const raw = JSON.stringify({ images: cfg.images, bubbles: cfg.bubbles })
+    const out = hydrateConfig(raw)
+    expect(out.patterns).toEqual([...PANEL_PATTERNS])
+    expect(out.images[0].scale).toBe(2)
+  })
+
+  it('replaces a retired pattern style with that slot’s shipped default', () => {
+    const cfg = seedConfig()
+    const patterns = [...cfg.patterns]
+    patterns[2] = 'plaid' as never
+    const out = hydrateConfig(JSON.stringify({ ...cfg, patterns }))
+    expect(out.patterns[2]).toBe(PANEL_PATTERNS[2])
+    // The author's other choices survive the one dead name.
+    expect(out.patterns.filter((_, i) => i !== 2)).toEqual(
+      PANEL_PATTERNS.filter((_, i) => i !== 2),
+    )
+  })
+
+  it('round-trips an edited pattern', () => {
+    const cfg = patchPattern(seedConfig(), 8, 'corner-burst')
+    expect(hydrateConfig(JSON.stringify(cfg))).toEqual(cfg)
+  })
 })
 
-describe('isBubbleType / isTailDir', () => {
+describe('normalizePatterns', () => {
+  it('returns the shipped defaults for a missing or non-array value', () => {
+    expect(normalizePatterns(undefined)).toEqual([...PANEL_PATTERNS])
+    expect(normalizePatterns('sunburst')).toEqual([...PANEL_PATTERNS])
+  })
+
+  it('falls back per slot, keeping the valid names around a bad one', () => {
+    const patterns: unknown[] = [...PANEL_PATTERNS]
+    patterns[0] = 'plaid'
+    patterns[3] = 7
+    const out = normalizePatterns(patterns)
+    expect(out[0]).toBe(PANEL_PATTERNS[0])
+    expect(out[3]).toBe(PANEL_PATTERNS[3])
+    expect(out[1]).toBe(PANEL_PATTERNS[1])
+  })
+
+  it('forces the array to PANELS length, short or long', () => {
+    expect(normalizePatterns(PANEL_PATTERNS.slice(0, 2))).toHaveLength(PANELS.length)
+    expect(normalizePatterns([...PANEL_PATTERNS, 'sunburst'])).toHaveLength(PANELS.length)
+    // A short payload keeps what it had and backfills the rest.
+    expect(normalizePatterns([PANEL_PATTERNS[1]])[0]).toBe(PANEL_PATTERNS[1])
+  })
+
+  it('passes a fully valid array through unchanged', () => {
+    const flipped = [...PANEL_PATTERNS].reverse()
+    expect(normalizePatterns(flipped)).toEqual(flipped)
+  })
+})
+
+describe('isBubbleType / isTailDir / isPanelBgStyle', () => {
   it('accepts exactly the registered names', () => {
     BUBBLE_TYPE_KEYS.forEach(k => expect(isBubbleType(k)).toBe(true))
     TAIL_DIR_KEYS.forEach(k => expect(isTailDir(k)).toBe(true))
+    PATTERN_STYLE_KEYS.forEach(k => expect(isPanelBgStyle(k)).toBe(true))
   })
 
   it('rejects a retired name, a non-string, and an inherited property', () => {
@@ -314,9 +397,12 @@ describe('isBubbleType / isTailDir', () => {
     expect(isBubbleType(undefined)).toBe(false)
     expect(isTailDir('sideways')).toBe(false)
     expect(isTailDir(3)).toBe(false)
+    expect(isPanelBgStyle('plaid')).toBe(false)
+    expect(isPanelBgStyle(undefined)).toBe(false)
     // `in` would say yes to these; the own-property check is why the guard does not.
     expect(isBubbleType('toString')).toBe(false)
     expect(isTailDir('constructor')).toBe(false)
+    expect(isPanelBgStyle('toString')).toBe(false)
   })
 })
 
@@ -368,6 +454,28 @@ describe('patchImg / patchBubble', () => {
     const base = seedConfig()
     expect(patchImg(base, 99, { scale: 5 })).toEqual(base)
     expect(patchBubble(base, 99, { rotate: 5 })).toEqual(base)
+  })
+})
+
+describe('patchPattern', () => {
+  it('sets one panel’s style and leaves the others as they were', () => {
+    const next = patchPattern(seedConfig(), 1, 'vignette')
+    expect(next.patterns[1]).toBe('vignette')
+    expect(next.patterns.filter((_, i) => i !== 1)).toEqual(
+      PANEL_PATTERNS.filter((_, i) => i !== 1),
+    )
+  })
+
+  it('is a no-op for a panel number outside the grid', () => {
+    const base = seedConfig()
+    expect(patchPattern(base, 99, 'sunburst')).toEqual(base)
+    expect(patchPattern(base, -1, 'sunburst')).toEqual(base)
+  })
+
+  it('does not mutate the input config', () => {
+    const base = seedConfig()
+    patchPattern(base, 0, 'sunburst')
+    expect(base.patterns[0]).toBe(PANEL_PATTERNS[0])
   })
 })
 
