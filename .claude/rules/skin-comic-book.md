@@ -131,7 +131,7 @@ the angle spaces its spikes evenly and gives them broadly one length. Piling on 
 jitter does not fix that; it only makes a soft shape noisy.
 
 The table itself is **traced from the reference drawing**,
-`public/comic-book/jagged bubble.png`: each entry is one of its fifteen real spikes,
+`assets-src/comic-book/jagged bubble.png`: each entry is one of its fifteen real spikes,
 read off the outline's radial profile around its interior centroid and quantised onto
 the ring. A third hand-authored attempt is the one move known not to work — two
 preceded the trace and both drifted back toward even spacing, shallow notches and
@@ -225,7 +225,7 @@ by design; a corridor shorter than its own width reads as a smudge.
 ```tsx
 <img
   className="cb-asset"
-  src="/comic-book/character-agent.png"
+  src="/comic-book/receptionist.webp"
   alt="Agent character"
 />
 ```
@@ -344,7 +344,7 @@ editor math, config editing and serialization is pure and unit-tested in
 7. **Never use cold/neutral fonts** — only Bangers (display) and Comic Neue (body)
 8. **All text in nav/headings must be UPPERCASE** — enforce at CSS level with `text-transform: uppercase`
 9. **Ben-Day dot canvas must always be running** (never frozen on a static frame) even when no interaction is happening
-10. **Served Gemini assets live exclusively in `public/comic-book/`, and are `.webp`** — no inline base64, no external URLs, and no PNG. The lossless masters belong in `frontend/assets-src/comic-book/`, which is not copied into the build; re-encode from there rather than from a `.webp`
+10. **Served Gemini assets live exclusively in `public/comic-book/`, and are `.webp`** — no inline base64, no external URLs, and no PNG. The lossless masters belong in `frontend/assets-src/comic-book/`, which is not copied into the build; re-encode from there rather than from a `.webp`. **`frontend/assetPolicy.ts` is where this stops being advice**: it holds the format rule, the per-image and whole-tree byte budgets and the dimension ratchet as exported constants, and `frontend/assetPolicy.test.ts` checks the served tree against them both ways — an asset nothing references fails as dead weight, and a path named in a comment or in this file fails once the file it names has moved. Change a budget by editing the constant, so the diff says what a visitor now downloads. **Panel art is fetched only by this skin**, through the guard script in `index.html`: its `SKINS`/`DEFAULT` must match `src/skins/registry.ts` and its `PANELS` must match `editor/layoutConfig.ts`, both asserted by that same test file. As static `<link rel="preload">` tags the panels were fetched by all four skins — 1.94 MB of art `barebone` never painted — which no static check can catch, because the references were real; `tests/e2e/test_asset_usage.py` catches it in a browser instead, by comparing what each skin fetched against what it drew
 11. Files over 250 lines (TS/TSX/CSS) must be split before commit.
 12. **Never link two bubbles across panels** — a tube's two ends share one `panel`, or there is no tube
 13. **Never give a panel bubble its own tail path** — the tail is a ring vertex, so `'none'` and a turn both morph
