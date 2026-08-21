@@ -15,9 +15,7 @@ import {
   imgFramePoints,
   imgFramePoly,
   imgFrameStyle,
-  imgInkPoints,
   imgRect,
-  renderedImgRect,
   anchorToFractions,
   bubbleRect,
   bubbleStyle,
@@ -147,88 +145,6 @@ describe('fullImgStyle', () => {
         expect(r.bottom).toBeLessThanOrEqual(h + 1e-6)
       })
     })
-  })
-})
-
-describe('renderedImgRect', () => {
-  const frame = { x: 10, y: 20, w: 100, h: 100 }
-
-  it('is the contain-fit box resting on the anchor at identity', () => {
-    // 100×200 source in a 100×100 frame: fit 0.5 → a 50×100 box, centred
-    // horizontally and flush with the frame floor at the default center bottom.
-    expect(renderedImgRect(frame, { w: 100, h: 200 }, img())).toEqual({
-      x: 35,
-      y: 20,
-      w: 50,
-      h: 100,
-    })
-  })
-
-  it('agrees with fullImgStyle about where the pixels land', () => {
-    // Same geometry engine underneath — recomputed here from the style so a change
-    // to either path that moves the picture away from its border fails this.
-    const t = img({ scale: 1.4, offsetX: 7, offsetY: -3, anchor: 'left top' })
-    const nat = { w: 300, h: 180 }
-    const s = fullImgStyle({ w: frame.w, h: frame.h }, nat, t)
-    const m = /scale\(([^)]+)\)/.exec(String(s.transform))
-    const k = m ? Number(m[1]) : NaN
-    const r = renderedImgRect(frame, nat, t)
-    expect(r.x + r.w / 2).toBeCloseTo(frame.x + Number(s.left) + nat.w / 2, 10)
-    expect(r.y + r.h / 2).toBeCloseTo(frame.y + Number(s.top) + nat.h / 2, 10)
-    expect(r.w).toBeCloseTo(nat.w * k, 10)
-    expect(r.h).toBeCloseTo(nat.h * k, 10)
-  })
-})
-
-describe('imgInkPoints', () => {
-  const bounds = { x: 100, y: 200, w: 400, h: 300 }
-  const vp: [number, number][] = [
-    [100, 200],
-    [500, 220],
-    [480, 500],
-    [120, 480],
-  ]
-  // Tall source in the wide full-panel frame: fit 0.5 → a 100×300 box, centred
-  // and flush with the floor — x 250..350, y 200..500.
-  const nat = { w: 200, h: 600 }
-
-  it("traces the image's own rectangle, not the panel polygon", () => {
-    expect(imgInkPoints(vp, bounds, nat, img())).toEqual([
-      [250, 200],
-      [350, 200],
-      [350, 500],
-      [250, 500],
-    ])
-  })
-
-  it('has no ink before the natural size is known', () => {
-    expect(imgInkPoints(vp, bounds, undefined, img())).toEqual([])
-  })
-
-  it('falls back to the frame polygon once a zoom crops past every edge', () => {
-    // scale 4 renders 400×1200 over the 400×300 frame — a filled, deliberate crop,
-    // so the ink is the frame's own slanted shape again.
-    expect(imgInkPoints(vp, bounds, nat, img({ scale: 4 }))).toEqual(
-      imgFramePoints(vp, bounds, img()),
-    )
-  })
-
-  it('clamps to the frame when a pan pushes one edge out', () => {
-    // offsetX 200 slides the 100-wide box to x 450..550; the frame ends at 500.
-    expect(imgInkPoints(vp, bounds, nat, img({ offsetX: 200 }))).toEqual([
-      [450, 200],
-      [500, 200],
-      [500, 500],
-      [450, 500],
-    ])
-  })
-
-  it('returns nothing when the picture is panned fully outside its frame', () => {
-    expect(imgInkPoints(vp, bounds, nat, img({ offsetX: 600 }))).toEqual([])
-  })
-
-  it('has no shape against a zero-size panel box', () => {
-    expect(imgInkPoints(vp, { x: 0, y: 0, w: 0, h: 300 }, nat, img())).toEqual([])
   })
 })
 

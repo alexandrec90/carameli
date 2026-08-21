@@ -7,7 +7,7 @@ import PanelBubbles from './PanelBubbles'
 import PanelImages from './PanelImages'
 import { PANELS } from './panels'
 import { PANEL_IMG_TRANSFORMS, PANEL_BUBBLE_TRANSFORMS } from './editor/layoutConfig'
-import { imgInkPoints, toClipPath } from './editor/transforms'
+import { toClipPath } from './editor/transforms'
 import { shouldRevealImg, useEditorMode } from './editor/useEditorMode'
 import {
     drawLoadingRipple, drawWash, parseCssColor, washPhaseAt,
@@ -689,8 +689,6 @@ export function Layout({ navItems }: LayoutProps) {
 
     // Source transforms from the editor's working copy when active, else constants.
     const imgT = editor.active ? editor.config.images : PANEL_IMG_TRANSFORMS
-    // Panels a picture frames for itself — their grid outline stays un-inked below.
-    const inkedPanels = new Set(imgT.map(t => t.panel))
     const bubbleT = editor.active ? editor.config.bubbles : PANEL_BUBBLE_TRANSFORMS
 
     const panelDotRefs = useRef<(HTMLCanvasElement | null)[]>([])
@@ -999,43 +997,16 @@ export function Layout({ navItems }: LayoutProps) {
                     className="cb-panel-svg"
                     aria-hidden="true"
                 >
-                    {/* A panel that holds no picture keeps the grid outline. One that
-                        does is framed by its pictures instead — inking the panel polygon
-                        around a contained picture is exactly the border that never
-                        matched the artwork. */}
-                    {panelPolys.map((poly, i) =>
-                        inkedPanels.has(i) ? null : (
-                            <polygon
-                                key={i}
-                                points={poly.vp.map(([x, y]) => `${x},${y}`).join(' ')}
-                                fill="none"
-                                stroke="#111111"
-                                strokeWidth="5"
-                                strokeLinejoin="miter"
-                            />
-                        ),
-                    )}
-                    {/* Every picture is inked along its own edges — the image's actual
-                        rectangle, never the panel's polygon, so the border always matches
-                        the artwork. No ink until the natural size is known; a picture
-                        zoomed into a deliberate crop is inked along its frame, the only
-                        edge it visibly has (imgInkPoints). */}
-                    {imgT.map((img, k) => {
-                        const poly = panelPolys[img.panel]
-                        if (!poly) return null
-                        const pts = imgInkPoints(poly.vp, poly.bounds, natSizes[img.src], img)
-                        if (pts.length === 0) return null
-                        return (
-                            <polygon
-                                key={`img-${k}`}
-                                points={pts.map(([x, y]) => `${x},${y}`).join(' ')}
-                                fill="none"
-                                stroke="#111111"
-                                strokeWidth="5"
-                                strokeLinejoin="miter"
-                            />
-                        )
-                    })}
+                    {panelPolys.map((poly, i) => (
+                        <polygon
+                            key={i}
+                            points={poly.vp.map(([x, y]) => `${x},${y}`).join(' ')}
+                            fill="none"
+                            stroke="#111111"
+                            strokeWidth="5"
+                            strokeLinejoin="miter"
+                        />
+                    ))}
                 </svg>
 
                 {/* Layer 3 — Ben-Day wash canvas (page transitions; blank when idle) */}

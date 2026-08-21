@@ -100,8 +100,6 @@ export function anchorToFractions(anchor: string): [number, number] {
  * are where the image's centre lands, in box coordinates; `fit` excludes the
  * transform's own zoom.
  *
- * One function, two consumers ({@link fullImgStyle}, {@link renderedImgRect}), so the
- * picture that is drawn and the border drawn around it cannot disagree.
  */
 function containGeometry(
   bounds: { w: number; h: number },
@@ -311,65 +309,6 @@ export function imgFramePoly(
   if (pts.length === 0) return 'none'
   const rect = imgRect(bounds, t)
   return toClipPath(pts, rect.x, rect.y)
-}
-
-/**
- * The rectangle the image's pixels actually occupy, in viewport coordinates —
- * {@link fullImgStyle}'s geometry reduced to a box. At the shipped identity transform
- * this is the artwork's own border: the whole source contain-fitted into its frame.
- */
-export function renderedImgRect(
-  frame: { x: number; y: number; w: number; h: number },
-  nat: { w: number; h: number },
-  t: ImgTransform,
-): { x: number; y: number; w: number; h: number } {
-  const { fit, centerX, centerY } = containGeometry(frame, nat, t)
-  const w = nat.w * fit * t.scale
-  const h = nat.h * fit * t.scale
-  return { x: frame.x + centerX - w / 2, y: frame.y + centerY - h / 2, w, h }
-}
-
-/**
- * The polygon a picture's ink border is drawn along, in viewport coordinates.
- *
- * The border belongs to the picture, not the panel: it traces the image's own
- * rectangle ({@link renderedImgRect}), which is why it can never cut across the
- * artwork — the frame is derived from the picture rather than imposed on it. Until
- * the natural size is known there is no rectangle to trace, so no ink.
- *
- * A deliberately cropped picture is the exception that proves the rule: once zoom or
- * pan pushes every image edge past the frame, the frame's crop is the only edge the
- * picture visibly has, so the ink follows the frame polygon ({@link imgFramePoints})
- * exactly as a filled panel always was. In between (one edge pushed out, not all),
- * the rectangle is clamped to the frame box so the ink never outlines pixels the
- * clip discarded.
- */
-export function imgInkPoints(
-  vp: [number, number][],
-  bounds: { x: number; y: number; w: number; h: number },
-  nat: { w: number; h: number } | undefined,
-  t: ImgTransform,
-): [number, number][] {
-  if (!nat || bounds.w <= 0 || bounds.h <= 0) return []
-  const frame = imgRect(bounds, t)
-  const r = renderedImgRect(frame, nat, t)
-  const covers =
-    r.x <= frame.x &&
-    r.y <= frame.y &&
-    r.x + r.w >= frame.x + frame.w &&
-    r.y + r.h >= frame.y + frame.h
-  if (covers) return imgFramePoints(vp, bounds, t)
-  const x1 = Math.max(r.x, frame.x)
-  const y1 = Math.max(r.y, frame.y)
-  const x2 = Math.min(r.x + r.w, frame.x + frame.w)
-  const y2 = Math.min(r.y + r.h, frame.y + frame.h)
-  if (x2 <= x1 || y2 <= y1) return []
-  return [
-    [x1, y1],
-    [x2, y1],
-    [x2, y2],
-    [x1, y2],
-  ]
 }
 
 /** Move a picture's frame by a px drag → % of the panel box. */
