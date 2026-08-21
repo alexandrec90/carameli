@@ -15,7 +15,7 @@ paths:
 
 **Renderer:** React DOM + Canvas 2D (for Ben-Day dots, panel lines, the wash overlay)
 **Animation:** CSS `@keyframes` + `requestAnimationFrame` canvas loops (no spring libraries)
-**Assets:** `<img>` tags pointing to Gemini-generated PNGs in `public/comic-book/` — desaturated via CSS `filter: grayscale(1)` at rest, re-colorized on hover via CSS custom-property driven `filter: sepia(1) saturate(X) hue-rotate(Ydeg)`
+**Assets:** `<img>` tags pointing to Gemini-generated **`.webp`** in `public/comic-book/` — desaturated via CSS `filter: grayscale(1)` at rest, re-colorized on hover via CSS custom-property driven `filter: sepia(1) saturate(X) hue-rotate(Ydeg)`. The PNG masters they were encoded from live in `frontend/assets-src/comic-book/`, **outside the served tree**: Vite copies `public/` into `dist/` verbatim, so while the masters sat beside the WebPs every build shipped ~24 MB of PNG that no page ever requested.
 **Page transitions:** Ben-Day wash — a wave of paper-colored halftone dots sweeps diagonally from the top-left corner, merges into a solid sheet carrying the loading screen's ripple, then shrinks away to reveal the incoming page (`benDayWash.ts`)
 **Fonts:** `Bangers` (Google Fonts, display/headings), `Comic Neue` (body text)
 
@@ -122,7 +122,7 @@ glance:
 | --- | --- | --- |
 | `soft` | the bare ellipse | speech; 64 straight segments read as smooth |
 | `cloud` | union of 8 overlapping lobes | a thought bubble is *meshed ellipses*, so its lobe junctions cut back **inside** the base ellipse. A modulation that only bulged outward read as a scalloped balloon |
-| `lightning` | 19 authored spikes (`boltShape.ts`) | action; a 1960s pop-art impact burst. Valley → straight climb → straight fall, so every turn is a corner |
+| `lightning` | 15 traced spikes (`boltShape.ts`) | action; a 1960s pop-art impact burst. Valley → straight climb → straight fall, so every turn is a corner |
 
 `lightning`'s spikes are a **table, not a formula**, and that distinction is the whole
 reason it reads as a burst. Two earlier versions modulated the ellipse — a cosine, then
@@ -130,14 +130,24 @@ a jittered triangle wave — and both read as a **sun**, because any radial func
 the angle spaces its spikes evenly and gives them broadly one length. Piling on more
 jitter does not fix that; it only makes a soft shape noisy.
 
-So `SPIKES` in `boltShape.ts` authors each spike's span, lean, length and notch depth
-by hand: irregular spacing, a handful of points projecting far past a body most spikes
-only stub out of, and notches deep enough that the silhouette is sawtooth rather than
-scalloped. When retuning it, keep the spans summing to the ring — that budget is the
-morph invariant above, not a detail of this type.
+The table itself is **traced from the reference drawing**,
+`assets-src/comic-book/jagged bubble.png`: each entry is one of its fifteen real spikes,
+read off the outline's radial profile around its interior centroid and quantised onto
+the ring. A third hand-authored attempt is the one move known not to work — two
+preceded the trace and both drifted back toward even spacing, shallow notches and
+mid-length spikes, because the drawing's actual swings (notches to 0.67, reach spread
+0.17–1.0) look like mistakes until they are measured. Retune it by re-tracing the
+reference, and keep the spans summing to the ring — that budget is the morph invariant
+above, not a detail of this type.
 
-Two consequences worth knowing before editing either file:
+Three consequences worth knowing before editing either file:
 
+- **An edge is a chord, not a radius ramp.** A non-corner vertex takes the radius
+  where its ray crosses the straight line between the two corners around it.
+  Interpolating the radius itself across the ring — the obvious spelling — sweeps it
+  across changing angles and bows every edge into a shallow arc, which is precisely
+  the softness the reference does not have. The straightness test in
+  `boltShape.test.ts` pins this.
 - **`boltMod` clamps every vertex against the viewBox at its own angle.** The box is
   padded below the ellipse and tight at the flanks, so a sideways spike has far less
   headroom than a diagonal one; the clamp is what makes the flank spikes shorter
@@ -215,7 +225,7 @@ by design; a corridor shorter than its own width reads as a smudge.
 ```tsx
 <img
   className="cb-asset"
-  src="/comic-book/character-agent.png"
+  src="/comic-book/receptionist.webp"
   alt="Agent character"
 />
 ```
@@ -334,7 +344,7 @@ editor math, config editing and serialization is pure and unit-tested in
 7. **Never use cold/neutral fonts** — only Bangers (display) and Comic Neue (body)
 8. **All text in nav/headings must be UPPERCASE** — enforce at CSS level with `text-transform: uppercase`
 9. **Ben-Day dot canvas must always be running** (never frozen on a static frame) even when no interaction is happening
-10. **Gemini assets live exclusively in `public/comic-book/`** — no inline base64, no external URLs
+10. **Served Gemini assets live exclusively in `public/comic-book/`, and are `.webp`** — no inline base64, no external URLs, and no PNG. The lossless masters belong in `frontend/assets-src/comic-book/`, which is not copied into the build; re-encode from there rather than from a `.webp`. **`frontend/assetPolicy.ts` is where this stops being advice**: it holds the format rule, the per-image and whole-tree byte budgets and the dimension ratchet as exported constants, and `frontend/assetPolicy.test.ts` checks the served tree against them both ways — an asset nothing references fails as dead weight, and a path named in a comment or in this file fails once the file it names has moved. Change a budget by editing the constant, so the diff says what a visitor now downloads. **Panel art is fetched only by this skin**, through the guard script in `index.html`: its `SKINS`/`DEFAULT` must match `src/skins/registry.ts` and its `PANELS` must match `editor/layoutConfig.ts`, both asserted by that same test file. As static `<link rel="preload">` tags the panels were fetched by all four skins — 1.94 MB of art `barebone` never painted — which no static check can catch, because the references were real; `tests/e2e/test_asset_usage.py` catches it in a browser instead, by comparing what each skin fetched against what it drew
 11. Files over 250 lines (TS/TSX/CSS) must be split before commit.
 12. **Never link two bubbles across panels** — a tube's two ends share one `panel`, or there is no tube
 13. **Never give a panel bubble its own tail path** — the tail is a ring vertex, so `'none'` and a turn both morph
