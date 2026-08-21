@@ -117,12 +117,19 @@ python scripts/lint-all.py --changed
 python scripts/run-tests.py --changed
 npm --prefix frontend run test:run
 npm --prefix frontend run lint
+npm --prefix frontend run test:bundle
 ```
 
 The frontend has no `typecheck` script; type checking is `lint:types`
 (`tsc --noEmit`). Run the whole `lint` rather than that one part: it also chains
-`lint:eslint`, `lint:css` and `lint:spelling`, and cspell rejects unknown words in
-`.ts`/`.tsx` too, so an ordinary identifier fails CI having passed `lint:types`.
+`lint:eslint`, `lint:css`, `lint:spelling` and `lint:deadweight`, and cspell rejects
+unknown words in `.ts`/`.tsx` too, so an ordinary identifier fails CI having passed
+`lint:types`.
+
+`test:bundle` builds and then measures what the build produced against the ratchets in
+`frontend/bundlePolicy.ts`. It is separate from `test:run` because it needs a `dist/`
+and fails without one. It, `assetPolicy.ts` and `lint:deadweight` (knip) are the three
+non-overlapping payload budgets; `frontend/CLAUDE.md` says which covers what.
 
 The default pytest configuration excludes every `paid` test. Sandbox, chargeable,
 and live-provider tiers require explicit opt-in; never broaden a free aggregate to
