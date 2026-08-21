@@ -80,3 +80,19 @@ typecheck_cmd = ["run", "lint:types"]
 # survive; "Docker: Start Stack" brings it back.
 [docker]
 auto_stop = true
+
+# The cheap preview: `worktree.py preview <ref> --ui` (or the "Preview: Open a UI
+# Branch (Frontend Only)" task) starts only these services in the preview box and
+# borrows everything else from this checkout's already-running stack on its pinned
+# ports. ui_env lands in the box's .env after the port variables, so the compose
+# frontend service picks it up: the empty base URL sends the browser through the
+# Vite dev proxy (same origin — the app's CORS allow-list never has to name the
+# box's port), and the proxy reaches the donor app across the host bridge because
+# a `--no-deps` box has no `app` container. `${APP_HOST_PORT}` here expands to the
+# DONOR's app port, not the box's — that is the point.
+[worktree]
+ui_services = ["frontend"]
+
+[worktree.ui_env]
+VITE_API_BASE_URL = ""
+VITE_PROXY_TARGET = "http://host.docker.internal:${APP_HOST_PORT}"
