@@ -47,7 +47,7 @@
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^7.1.1",
     "globals": "^17.11.0",
-    "happy-dom": "^20.11.2",
+    "happy-dom": "^20.11.6",
     "jsdom": "^29.1.1",
     "markdownlint-cli": "^0.49.1",
     "postcss": "^8.5.26",
@@ -58,7 +58,7 @@
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.67.0",
     "vite": "^8.2.1",
-    "vitest": "^4.1.10"
+    "vitest": "^4.1.11"
   },
   "overrides": {
     "eslint-plugin-jsx-a11y": {
