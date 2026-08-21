@@ -1,0 +1,322 @@
+/**
+ * Enforcement for {@link ./assetPolicy.ts} — the served tree, checked against itself.
+ *
+ * Two halves, and the split matters. The first half tests the header parsing and the
+ * reference extraction as ordinary pure functions, against buffers and strings built
+ * here. The second half points those functions at the real `public/` directory and
+ * asserts the policy. If the second half fails, the first half is what tells you the
+ * finding is about the assets rather than about a regex.
+ *
+ * **These are invariants, not benchmarks.** No assertion here times anything. A load
+ * time measured in CI measures the runner — it is noisy on a shared box, it fails on a
+ * bad afternoon, and a test that fails for reasons nobody controls gets muted within a
+ * month. Payload size is the half of performance that is deterministic, reviewable, and
+ * caused entirely by decisions in this repo, so it is the half a test can own. Measuring
+ * the other half is a browser's job: `npm run build && npx lighthouse` against a preview,
+ * or the `chrome-devtools` MCP performance trace, both run against something real.
+ */
+
+import { readFileSync } from 'node:fs'
+import path from 'node:path'
+import { describe, expect, it } from 'vitest'
+
+import {
+  ASSETS_SRC_DIR,
+  CONTENT_IMAGE_DIRS,
+  FRONTEND_ROOT,
+  MAX_CONTENT_IMAGE_BYTES,
+  MAX_CONTENT_IMAGE_EDGE,
+  MAX_PRELOAD_BYTES,
+  MAX_PUBLIC_BYTES,
+  PUBLIC_DIR,
+  findPreloadedImages,
+  findRepoPathReferences,
+  findServedReferences,
+  isContentImage,
+  listReferenceSources,
+  listServedImages,
+  rasterExemptionFor,
+  readImageSize,
+  readImageSizeAt,
+  walkFiles,
+} from './assetPolicy'
+
+const KB = 1024
+
+const kb = (bytes: number): string => `${(bytes / KB).toFixed(1)} KB`
+
+/** Synthetic headers, so the parser is tested against known dimensions. */
+function pngHeader(width: number, height: number): Buffer {
+  const buf = Buffer.alloc(24)
+  Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]).copy(buf, 0)
+  buf.write('IHDR', 12, 'latin1')
+  buf.writeUInt32BE(width, 16)
+  buf.writeUInt32BE(height, 20)
+  return buf
+}
+
+function webpHeader(chunk: 'VP8X' | 'VP8L' | 'VP8 ', width: number, height: number): Buffer {
+  const buf = Buffer.alloc(32)
+  buf.write('RIFF', 0, 'latin1')
+  buf.write('WEBP', 8, 'latin1')
+  buf.write(chunk, 12, 'latin1')
+  if (chunk === 'VP8X') {
+    buf.writeUIntLE(width - 1, 24, 3)
+    buf.writeUIntLE(height - 1, 27, 3)
+  } else if (chunk === 'VP8L') {
+    buf.writeUInt32LE(((height - 1) << 14) | (width - 1), 21)
+  } else {
+    buf.writeUInt16LE(width, 26)
+    buf.writeUInt16LE(height, 28)
+  }
+  return buf
+}
+
+describe('readImageSize', () => {
+  it('reads a PNG IHDR', () => {
+    expect(readImageSize(pngHeader(2816, 1536))).toEqual({ width: 2816, height: 1536 })
+  })
+
+  it.each(['VP8X', 'VP8L', 'VP8 '] as const)('reads a %s WebP header', chunk => {
+    expect(readImageSize(webpHeader(chunk, 2816, 1536))).toEqual({
+      width: 2816,
+      height: 1536,
+    })
+  })
+
+  it('returns undefined for a format it does not parse, rather than guessing', () => {
+    // An ICO holds several sizes at once; there is no single answer to return.
+    expect(readImageSize(Buffer.from([0x00, 0x00, 0x01, 0x00, 0x03, 0x00]))).toBeUndefined()
+  })
+
+  it('returns undefined for a truncated header instead of reading past the end', () => {
+    expect(readImageSize(pngHeader(64, 64).subarray(0, 12))).toBeUndefined()
+  })
+
+  it('agrees with the real files it is pointed at', () => {
+    // Guards the synthetic fixtures above: a parser can be self-consistently wrong.
+    const logo = readImageSizeAt(path.join(PUBLIC_DIR, 'comic-book', 'logo.webp'))
+    expect(logo?.width).toBeGreaterThan(0)
+    expect(logo?.height).toBeGreaterThan(0)
+  })
+})
+
+describe('findServedReferences', () => {
+  it('finds a root-relative asset URL', () => {
+    expect(findServedReferences(`src="/comic-book/logo.webp"`)).toEqual([
+      '/comic-book/logo.webp',
+    ])
+  })
+
+  it('decodes percent-escapes, which name the same file as the space they encode', () => {
+    expect(findServedReferences(`'/comic-book/rotary%20phone.webp'`)).toEqual([
+      '/comic-book/rotary phone.webp',
+    ])
+  })
+
+  it('survives a malformed escape instead of throwing over it', () => {
+    expect(() => findServedReferences('/a/100%-wide.png')).not.toThrow()
+  })
+
+  it('does not read a URL out of the middle of a repository path', () => {
+    // The README's re-encode command names a master by repo path. Matching the tail of
+    // it as a URL invented `/comic-book/switchboard.png` and reported a 404 for a file
+    // that is exactly where it should be.
+    expect(findServedReferences('-i "assets-src/comic-book/switchboard.png"')).toEqual([])
+  })
+
+  it('deduplicates, since one asset is usually named in several places', () => {
+    const source = `"/icons/icon-512.png" "/icons/icon-512.png"`
+    expect(findServedReferences(source)).toHaveLength(1)
+  })
+})
+
+describe('findRepoPathReferences', () => {
+  it('finds a repo-relative path cited in prose, spaces and all', () => {
+    const comment = 'the reference drawing is `assets-src/comic-book/jagged bubble.png`'
+    expect(findRepoPathReferences(comment)).toEqual(['assets-src/comic-book/jagged bubble.png'])
+  })
+
+  it('ignores a served URL, which the other extractor owns', () => {
+    expect(findRepoPathReferences('href="/comic-book/logo.webp"')).toEqual([])
+  })
+})
+
+describe('findPreloadedImages', () => {
+  it('collects image preloads in document order and skips other preloads', () => {
+    const html = `
+      <link rel="preload" as="font" href="/fonts/x.woff2" />
+      <link rel="preload" as="image" href="/comic-book/logo.webp" />
+      <link rel="stylesheet" href="/comic-book/ignored.webp" />
+      <link rel="preload" as="image" href="/comic-book/rotary%20phone.webp" />`
+    expect(findPreloadedImages(html)).toEqual([
+      '/comic-book/logo.webp',
+      '/comic-book/rotary phone.webp',
+    ])
+  })
+})
+
+describe('the served tree', () => {
+  const served = listServedImages()
+
+  it('is not empty, so a broken walk cannot pass every check below by default', () => {
+    expect(served.length).toBeGreaterThan(5)
+  })
+
+  it('serves content images as .webp only', () => {
+    const offenders = served
+      .filter(asset => isContentImage(asset.relPath))
+      .filter(asset => path.extname(asset.relPath).toLowerCase() !== '.webp')
+      .map(asset => `${asset.relPath} (${kb(asset.bytes)})`)
+
+    expect(
+      offenders,
+      `Non-WebP files in ${CONTENT_IMAGE_DIRS.join(', ')}. Vite copies public/ into ` +
+        'dist/ verbatim, so each of these ships to every visitor at full size. If it is ' +
+        'a master or a traced reference, it belongs in assets-src/; if it is meant to be ' +
+        'displayed, export it to .webp. Only a platform contract earns an entry in ' +
+        'RASTER_EXEMPTIONS, and the entry has to say what the contract is.',
+    ).toEqual([])
+  })
+
+  it('serves no raster outside the content dirs without a stated reason', () => {
+    const unexplained = served
+      .filter(asset => !isContentImage(asset.relPath))
+      .filter(asset => !['.webp', '.svg'].includes(path.extname(asset.relPath).toLowerCase()))
+      .filter(asset => !rasterExemptionFor(asset.relPath))
+      .map(asset => asset.relPath)
+
+    expect(
+      unexplained,
+      'These are PNG/JPEG outside a content directory and outside RASTER_EXEMPTIONS. ' +
+        'Either convert them, or add an exemption naming the contract that forbids it.',
+    ).toEqual([])
+  })
+
+  it('keeps every content image under the per-image ceiling', () => {
+    const oversized = served
+      .filter(asset => isContentImage(asset.relPath))
+      .filter(asset => asset.bytes > MAX_CONTENT_IMAGE_BYTES)
+      .map(asset => `${asset.relPath}: ${kb(asset.bytes)}`)
+
+    expect(
+      oversized,
+      `Over the ${kb(MAX_CONTENT_IMAGE_BYTES)} per-image ceiling. Re-export at lower ` +
+        'quality or smaller dimensions rather than raising the ceiling — this number is ' +
+        'a ratchet, and the panels are already several times their display width.',
+    ).toEqual([])
+  })
+
+  it('keeps every content image within the dimension ratchet', () => {
+    const tooLarge: string[] = []
+    for (const asset of served.filter(a => isContentImage(a.relPath))) {
+      const size = readImageSizeAt(asset.absPath)
+      if (!size) continue
+      const edge = Math.max(size.width, size.height)
+      if (edge > MAX_CONTENT_IMAGE_EDGE) {
+        tooLarge.push(`${asset.relPath}: ${size.width}x${size.height}`)
+      }
+    }
+
+    expect(
+      tooLarge,
+      `Longer than ${MAX_CONTENT_IMAGE_EDGE}px on the long edge. The panels already ` +
+        'carry 3-4x their display width; nothing here should get bigger.',
+    ).toEqual([])
+  })
+
+  it('keeps the preloaded critical path within budget', () => {
+    const html = readFileSync(path.join(FRONTEND_ROOT, 'index.html'), 'utf-8')
+    const preloaded = findPreloadedImages(html)
+    const byUrl = new Map(served.map(asset => [asset.url, asset]))
+
+    const missing = preloaded.filter(url => !byUrl.has(url))
+    expect(missing, 'index.html preloads assets that are not in public/').toEqual([])
+
+    const total = preloaded.reduce((sum, url) => sum + (byUrl.get(url)?.bytes ?? 0), 0)
+    expect(
+      total,
+      `The ${preloaded.length} preloaded images total ${kb(total)}, over the ` +
+        `${kb(MAX_PRELOAD_BYTES)} budget. This is the critical path: the comic-book ` +
+        'layout gates its ready state on the last of them to load, so this number is ' +
+        'roughly what a visitor waits for. Adding a preload without removing one, or ' +
+        'growing a panel, is what puts it over.',
+    ).toBeLessThanOrEqual(MAX_PRELOAD_BYTES)
+  })
+
+  it('keeps the whole served tree within budget', () => {
+    const total = walkFiles(PUBLIC_DIR).reduce(
+      (sum, rel) => sum + readFileSync(path.join(PUBLIC_DIR, rel)).byteLength,
+      0,
+    )
+    expect(
+      total,
+      `public/ is ${kb(total)}, over the ${kb(MAX_PUBLIC_BYTES)} budget. Everything ` +
+        'here is copied into dist/ unexamined, so this is a floor on build size.',
+    ).toBeLessThanOrEqual(MAX_PUBLIC_BYTES)
+  })
+})
+
+describe('references', () => {
+  const sources = listReferenceSources()
+  const text = new Map(sources.map(file => [file, readFileSync(file, 'utf-8')]))
+  const rel = (file: string): string => path.relative(FRONTEND_ROOT, file).replace(/\\/g, '/')
+
+  it('scans the files it means to, so an empty scan cannot pass as a clean one', () => {
+    expect(sources.length).toBeGreaterThan(10)
+    expect(sources.some(file => file.endsWith('index.html'))).toBe(true)
+  })
+
+  it('ships nothing from public/ that no source references', () => {
+    const referenced = new Set<string>()
+    for (const source of text.values()) {
+      for (const url of findServedReferences(source)) referenced.add(url)
+    }
+
+    const orphans = listServedImages()
+      .filter(asset => !referenced.has(asset.url))
+      .map(asset => `${asset.relPath} (${kb(asset.bytes)})`)
+
+    expect(
+      orphans,
+      'In public/ but named by nothing — shipped to every visitor and used by none. ' +
+        'A traced reference or a master belongs in assets-src/; anything genuinely ' +
+        'unused should be deleted. If one is loaded through a URL this scan cannot ' +
+        'see, that URL is built dynamically, which no code here does today.',
+    ).toEqual([])
+  })
+
+  it('names no served asset that is missing from public/', () => {
+    const available = new Set(listServedImages().map(asset => asset.url))
+    const broken: string[] = []
+    for (const [file, source] of text) {
+      for (const url of findServedReferences(source)) {
+        if (!available.has(url)) broken.push(`${rel(file)} -> ${url}`)
+      }
+    }
+
+    expect(broken, 'Referenced but absent from public/ — a 404 at runtime.').toEqual([])
+  })
+
+  it('cites no repository path that has moved out from under it', () => {
+    // The check that would have caught this file's own change. Masters are referenced
+    // only from prose, so a `git mv` breaks those citations and nothing else notices.
+    const onDisk = new Set<string>([
+      ...walkFiles(PUBLIC_DIR).map(rel => `public/${rel}`),
+      ...walkFiles(ASSETS_SRC_DIR).map(rel => `assets-src/${rel}`),
+    ])
+
+    const stale: string[] = []
+    for (const [file, source] of text) {
+      for (const cited of findRepoPathReferences(source)) {
+        if (!onDisk.has(cited)) stale.push(`${rel(file)} -> ${cited}`)
+      }
+    }
+
+    expect(
+      stale,
+      'A comment or doc names an asset path that no longer exists. Nothing imports a ' +
+        'master, so prose is the only reference one has and a move breaks it silently.',
+    ).toEqual([])
+  })
+})

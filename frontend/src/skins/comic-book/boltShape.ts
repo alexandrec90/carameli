@@ -7,7 +7,7 @@
 // it is why the outline still read as soft and organic.
 //
 // The spikes are therefore a table, not a formula — and the table is **traced, not
-// invented**: `public/comic-book/jagged bubble.png` is the reference drawing, and each
+// invented**: `assets-src/comic-book/jagged bubble.png` is the reference drawing, and each
 // entry below is one of its fifteen real spikes, extracted by sampling the outline's
 // radius around its interior centroid, taking the local maxima and minima of that
 // radial profile, and quantising them onto the shared ring. Two hand-authored tables
@@ -56,7 +56,7 @@ const BOX_MARGIN = 1.5
 
 /**
  * The perimeter, clockwise from the top of the ellipse (ring index 0), traced from
- * `public/comic-book/jagged bubble.png` — fifteen spikes over 64 vertices, in the
+ * `assets-src/comic-book/jagged bubble.png` — fifteen spikes over 64 vertices, in the
  * order the reference draws them, rotated so its notch nearest the top lands on ring
  * index 0. `reach` and `valley` are the traced radii, linearly remapped so the
  * deepest notch sits at 0.67 (above the 0.65 lettering floor) and the longest spike
