@@ -252,7 +252,39 @@ def test_all_targets_excludes_paid_tiers():
     paid_targets = {"telnyx-sandbox", "telnyx-chargeable", "live-e2e"}
     assert paid_targets.isdisjoint(rt._ALL_TARGETS)
     assert paid_targets <= rt._VALID_TARGETS
-    assert set(rt._ALL_TARGETS) == {"pytest", "hook-tests", "frontend-tests"}
+    assert set(rt._ALL_TARGETS) == {
+        "pytest",
+        "hook-tests",
+        "frontend-tests",
+        "bundle-budgets",
+    }
+
+
+def test_bundle_budgets_is_a_free_aggregate_target_running_the_build():
+    # The dist/ byte budgets (frontend/bundlePolicy.ts) are only enforced by
+    # `test:bundle`, which builds first -- so `test:run` cannot reach them and
+    # neither could the desktop test task until this target existed. Free (Node
+    # only, no provider, no Docker), so it belongs in the aggregate: a budget
+    # nobody runs until the PR gate is not a ratchet.
+    assert "bundle-budgets" in rt._VALID_TARGETS
+    assert "bundle-budgets" in rt._ALL_TARGETS
+    assert rt._BUNDLE_BUDGETS_ARGV[-1] == "test:bundle"
+    assert "--prefix" in rt._BUNDLE_BUDGETS_ARGV
+
+
+def test_bundle_budgets_target_dispatches_to_the_bundle_command(monkeypatch):
+    seen: list[list[str]] = []
+
+    def fake_run_argv(argv, extra_env=None):
+        seen.append(argv)
+        return ([], 0)
+
+    monkeypatch.setattr(rt, "run_argv", fake_run_argv)
+
+    results = rt.run_named_target("bundle-budgets")
+
+    assert set(results) == {"bundle-budgets"}
+    assert seen == [rt._BUNDLE_BUDGETS_ARGV]
 
 
 def test_each_paid_tier_runs_only_its_own_tier():

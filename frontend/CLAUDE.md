@@ -41,6 +41,12 @@ tells you which.
 result: the budgets fail rather than skip when there is no `dist/`, which is right for
 the gate and wrong for a suite anyone runs on an unbuilt tree.
 
+Nothing here needs running by hand to be enforced. The PR gate runs `test:run` and
+`test:bundle` in its frontend job and `lint` (which chains `lint:deadweight`) in its
+lint job. Locally the same three are reachable from `scripts/run-tests.py`:
+`--target frontend-tests`, `--target bundle-budgets`, or `--all` for both, which is
+what the desktop task *Test: Run Carameli Target — free* dispatches.
+
 The third row is the one whose absence is easy to miss, because unused code costs zero
 shipped bytes — Vite tree-shakes it — and everything else: install time in every CI job,
 a Dependabot PR per release, an audit surface. Five three.js packages sat in

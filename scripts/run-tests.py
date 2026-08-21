@@ -68,6 +68,12 @@ _CI_HOOK_ARGV = ["python", "-m", "pytest", "scripts/hooks/tests", "-q", "--color
 _CI_FRONTEND_ARGV = ["npm", "--prefix", "frontend", "run", "test:run"]
 _LOCAL_HOOK_ARGV = ["python", "-m", "pytest", "scripts/hooks/tests", "-q", "--color=no"]
 _LOCAL_FRONTEND_ARGV = ["npm", "--prefix", "frontend", "run", "test:run"]
+# `test:bundle` builds first, then measures what the build produced against the
+# ratchets in frontend/bundlePolicy.ts -- the same command on CI and locally,
+# since it needs Node and nothing else. Kept as its own target rather than
+# folded into `frontend-tests`: a failing unit test and a blown byte budget want
+# different fixes, and `test:run` must stay runnable on an unbuilt tree.
+_BUNDLE_BUDGETS_ARGV = ["npm", "--prefix", "frontend", "run", "test:bundle"]
 _LOCAL_WEBHOOK_E2E_ARGV = [
     "docker",
     "compose",
@@ -186,6 +192,7 @@ _VALID_TARGETS = {
     "pytest",
     "hook-tests",
     "frontend-tests",
+    "bundle-budgets",
     "webhook-e2e",
     "telnyx-sandbox",
     "telnyx-chargeable",
@@ -199,7 +206,7 @@ _CRITICAL_TARGETS = {"pytest", "webhook-e2e"}
 # belong here: `run-tests.py --all` runs this set, so a paid tier (telnyx-sandbox,
 # a valid opt-in --target) must never be added -- it would hit a live provider on
 # every aggregate run. Paid tiers are opt-in via their own dedicated tasks.
-_ALL_TARGETS = ("pytest", "hook-tests", "frontend-tests")
+_ALL_TARGETS = ("pytest", "hook-tests", "frontend-tests", "bundle-budgets")
 _WINDOWS_BATCH_LAUNCHERS = {"npm", "npx", "vite"}
 
 
@@ -271,9 +278,10 @@ USAGE = """usage: python scripts/run-tests.py [--changed] [--all] [--target <nam
   (no args)        full backend suite (in-container xdist locally; direct on CI)
   --changed        changed-only via testmon, xdist fallback (default suite only)
                    (--fast is a deprecated alias)
-  --all            every FREE target (pytest, hook-tests, frontend-tests)
-  --target <name>  one of: pytest, hook-tests, frontend-tests, webhook-e2e,
-                   telnyx-sandbox, telnyx-chargeable, live-e2e
+  --all            every FREE target (pytest, hook-tests, frontend-tests,
+                   bundle-budgets)
+  --target <name>  one of: pytest, hook-tests, frontend-tests, bundle-budgets,
+                   webhook-e2e, telnyx-sandbox, telnyx-chargeable, live-e2e
   PATH ...         pytest targets (file, dir, or path::node_id); overrides the
                    suite selection. This is how the vendored Stop hook invokes
                    the runner.
@@ -400,6 +408,8 @@ def run_named_target(target: str) -> dict[str, tuple[list[str], int]]:
         return {"hook-tests": run_argv(_CI_HOOK_ARGV if IS_CI else _LOCAL_HOOK_ARGV)}
     if target == "frontend-tests":
         return {"frontend-tests": run_argv(_CI_FRONTEND_ARGV if IS_CI else _LOCAL_FRONTEND_ARGV)}
+    if target == "bundle-budgets":
+        return {"bundle-budgets": run_argv(_BUNDLE_BUDGETS_ARGV)}
     if target == "webhook-e2e":
         argv = _CI_WEBHOOK_E2E_ARGV if IS_CI else _LOCAL_WEBHOOK_E2E_ARGV
         return {"webhook-e2e": run_argv(argv)}
@@ -458,11 +468,12 @@ def critical_skip_lines(skips: list[tuple[str, str]]) -> list[str]:
 
 
 def run_ci() -> dict[str, tuple[list[str], int]]:
-    print("\nRunning pytest + hook tests + frontend tests (CI)...")
+    print("\nRunning pytest + hook tests + frontend tests + bundle budgets (CI)...")
     return {
         "pytest": run_argv(_CI_PYTEST_ARGV),
         "hook-tests": run_argv(_CI_HOOK_ARGV),
         "frontend-tests": run_argv(_CI_FRONTEND_ARGV),
+        "bundle-budgets": run_argv(_BUNDLE_BUDGETS_ARGV),
     }
 
 

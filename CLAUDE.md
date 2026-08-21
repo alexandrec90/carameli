@@ -131,6 +131,11 @@ unknown words in `.ts`/`.tsx` too, so an ordinary identifier fails CI having pas
 and fails without one. It, `assetPolicy.ts` and `lint:deadweight` (knip) are the three
 non-overlapping payload budgets; `frontend/CLAUDE.md` says which covers what.
 
+It is also the `bundle-budgets` target of `scripts/run-tests.py`, so it runs in `--all`
+alongside pytest, the hook tests and vitest, and is one of the choices the desktop
+*Test: Run Carameli Target — free* task offers. A budget only reachable by typing an
+npm script is a budget that gets checked when the PR gate says no, which is late.
+
 The default pytest configuration excludes every `paid` test. Sandbox, chargeable,
 and live-provider tiers require explicit opt-in; never broaden a free aggregate to
 include them.
