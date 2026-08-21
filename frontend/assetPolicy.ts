@@ -281,7 +281,7 @@ const EXTENSION_ALTERNATION = IMAGE_EXTENSIONS.map(ext => ext.slice(1)).join('|'
  * finding was. Comparing the undecoded spelling is the correct fallback: if it does not
  * match a file on disk, the reference check reports it as the broken reference it is.
  */
-function safeDecode(value: string): string {
+export function safeDecode(value: string): string {
   try {
     return decodeURIComponent(value)
   } catch {
@@ -342,14 +342,42 @@ export function listReferenceSources(root: string = FRONTEND_ROOT): string[] {
   return files.sort()
 }
 
-/** `href` of every `<link rel="preload" as="image">` in `html`, in document order. */
+/**
+ * Every image `html` preloads, whether by a static tag or through the skin guard.
+ *
+ * Both spellings have to count. The panel art is preloaded only for the skin that
+ * draws it, which means the tags are built by an inline script rather than written
+ * out — and a check that read only static tags would have gone from measuring eight
+ * images to measuring none the moment that guard landed, reporting a critical path of
+ * 0 KB as comfortably inside budget.
+ */
 export function findPreloadedImages(html: string): string[] {
-  const pattern = /<link\b[^>]*\brel=["']preload["'][^>]*>/gi
   const out: string[] = []
-  for (const [tag] of html.matchAll(pattern)) {
+
+  const tags = /<link\b[^>]*\brel=["']preload["'][^>]*>/gi
+  for (const [tag] of html.matchAll(tags)) {
     if (!/\bas=["']image["']/i.test(tag)) continue
     const href = /\bhref=["']([^"']+)["']/i.exec(tag)
     if (href) out.push(safeDecode(href[1]))
   }
-  return out
+
+  out.push(...findGuardedPanels(html))
+  return [...new Set(out)]
+}
+
+/** The `PANELS` list the skin guard preloads, or `[]` if the guard is not there. */
+export function findGuardedPanels(html: string): string[] {
+  const block = /\bvar\s+PANELS\s*=\s*\[([\s\S]*?)\]/.exec(html)
+  if (!block) return []
+  return [...block[1].matchAll(/['"]([^'"]+)['"]/g)].map(match => safeDecode(match[1]))
+}
+
+/** The skin list and default the inline guard resolves against. */
+export function findGuardedSkins(html: string): { skins: string[]; fallback?: string } {
+  const list = /\bvar\s+SKINS\s*=\s*\[([\s\S]*?)\]/.exec(html)
+  const fallback = /\bvar\s+DEFAULT\s*=\s*['"]([^'"]+)['"]/.exec(html)
+  return {
+    skins: list ? [...list[1].matchAll(/['"]([^'"]+)['"]/g)].map(match => match[1]) : [],
+    fallback: fallback?.[1],
+  }
 }

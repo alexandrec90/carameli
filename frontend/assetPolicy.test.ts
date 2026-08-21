@@ -20,6 +20,8 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 
+import { PANEL_IMG_TRANSFORMS } from './src/skins/comic-book/editor/layoutConfig'
+import { DEFAULT_SKIN, SKIN_NAMES } from './src/skins/registry'
 import {
   ASSETS_SRC_DIR,
   CONTENT_IMAGE_DIRS,
@@ -29,6 +31,8 @@ import {
   MAX_PRELOAD_BYTES,
   MAX_PUBLIC_BYTES,
   PUBLIC_DIR,
+  findGuardedPanels,
+  findGuardedSkins,
   findPreloadedImages,
   findRepoPathReferences,
   findServedReferences,
@@ -36,6 +40,7 @@ import {
   listReferenceSources,
   listServedImages,
   rasterExemptionFor,
+  safeDecode,
   readImageSize,
   readImageSizeAt,
   walkFiles,
@@ -154,6 +159,70 @@ describe('findPreloadedImages', () => {
       '/comic-book/rotary phone.webp',
     ])
   })
+
+  it('reads the preloads the skin guard builds, not only the ones written as tags', () => {
+    // The regression this whole pair exists for. When the panel preloads moved into the
+    // guard, a tags-only reader went from measuring eight images to measuring none —
+    // and reported a 0 KB critical path as comfortably inside a 2.1 MB budget. A check
+    // that silently starts measuring nothing is worse than no check, because it goes on
+    // reporting green.
+    const html = `<script>var PANELS = ['/comic-book/logo.webp', '/a/b%20c.webp'];</script>`
+    expect(findGuardedPanels(html)).toEqual(['/comic-book/logo.webp', '/a/b c.webp'])
+    expect(findPreloadedImages(html)).toEqual(['/comic-book/logo.webp', '/a/b c.webp'])
+  })
+
+  it('counts an image once when both spellings name it', () => {
+    const html = `
+      <link rel="preload" as="image" href="/comic-book/logo.webp" />
+      <script>var PANELS = ['/comic-book/logo.webp'];</script>`
+    expect(findPreloadedImages(html)).toEqual(['/comic-book/logo.webp'])
+  })
+
+  it('returns nothing for a page with no guard, rather than throwing', () => {
+    expect(findGuardedPanels('<html></html>')).toEqual([])
+    expect(findGuardedSkins('<html></html>')).toEqual({ skins: [], fallback: undefined })
+  })
+})
+
+describe('the skin guard in index.html', () => {
+  // Three constants are duplicated into an inline script in `index.html`: the skin list,
+  // the default, and the panel URLs. The duplication is deliberate — the guard has to run
+  // before any module is fetched, so it cannot import them — but a copy nothing checks is
+  // a copy that drifts. Each of these asserts one half of the agreement its comment
+  // promises, so editing `registry.ts` or `layoutConfig.ts` alone fails here rather than
+  // in a browser, on one skin, as a missing preload nobody notices.
+  const html = readFileSync(path.join(FRONTEND_ROOT, 'index.html'), 'utf-8')
+
+  it('resolves a stored skin the same way the app does', () => {
+    const { skins, fallback } = findGuardedSkins(html)
+
+    expect(
+      skins,
+      'The guard SKINS list has drifted from SKIN_NAMES in src/skins/registry.ts. A skin ' +
+        'missing here is treated as unrecognised and falls back to the default, so the ' +
+        'guard would preload comic-book art for a visitor the app puts on another skin.',
+    ).toEqual([...SKIN_NAMES])
+
+    expect(
+      fallback,
+      'The guard DEFAULT has drifted from DEFAULT_SKIN in src/skins/registry.ts. A first ' +
+        'visit renders one skin and preloads for another: the art arrives for a page that ' +
+        'never draws it, and the page that does draw it waits.',
+    ).toBe(DEFAULT_SKIN)
+  })
+
+  it('preloads exactly the panels the layout draws, in the order it draws them', () => {
+    const drawn = [...new Set(PANEL_IMG_TRANSFORMS.map(transform => safeDecode(transform.src)))]
+
+    expect(
+      findGuardedPanels(html),
+      'The guard PANELS list has drifted from PANEL_IMG_TRANSFORMS in ' +
+        'src/skins/comic-book/editor/layoutConfig.ts. A panel dropped from the guard is ' +
+        'fetched late, after the chunk that draws it, which is the load this preload list ' +
+        'exists to avoid; a panel left in it after the layout stopped drawing it is bytes ' +
+        'nobody sees. Order is the preload priority, so it has to match too.',
+    ).toEqual(drawn)
+  })
 })
 
 describe('the served tree', () => {
@@ -229,6 +298,12 @@ describe('the served tree', () => {
     const html = readFileSync(path.join(FRONTEND_ROOT, 'index.html'), 'utf-8')
     const preloaded = findPreloadedImages(html)
     const byUrl = new Map(served.map(asset => [asset.url, asset]))
+
+    expect(
+      preloaded.length,
+      'index.html preloads no images at all. Every budget below it then passes on an ' +
+        'empty set, so this is asserted rather than assumed.',
+    ).toBeGreaterThan(0)
 
     const missing = preloaded.filter(url => !byUrl.has(url))
     expect(missing, 'index.html preloads assets that are not in public/').toEqual([])

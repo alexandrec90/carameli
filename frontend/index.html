@@ -20,19 +20,58 @@
   <link
     href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Lobster&family=Outfit:wght@400;500;700;800&display=swap"
     rel="stylesheet" />
-  <!-- Comic-book panel bubble fonts -->
-  <link
-    href="https://fonts.googleapis.com/css2?family=Bangers&family=Boogaloo&family=Permanent+Marker&display=swap"
-    rel="stylesheet" />
-  <!-- Preload comic-book panel images so the browser fetches them before JS executes -->
-  <link rel="preload" as="image" href="/comic-book/logo.webp" />
-  <link rel="preload" as="image" href="/comic-book/switchboard.webp" />
-  <link rel="preload" as="image" href="/comic-book/mailman1.webp" />
-  <link rel="preload" as="image" href="/comic-book/mechanic.webp" />
-  <link rel="preload" as="image" href="/comic-book/receptionist.webp" />
-  <link rel="preload" as="image" href="/comic-book/rolodex.webp" />
-  <link rel="preload" as="image" href="/comic-book/rotary%20phone.webp" />
-  <link rel="preload" as="image" href="/comic-book/mailman2.webp" />
+  <!--
+    Comic-book's panel art and lettering fonts, fetched only by the skin that draws
+    them. As static tags in here they were fetched by all four skins: on `barebone` a
+    reload pulled 1.94 MB of panel art the page never painted, plus a render-blocking
+    stylesheet for three fonts nothing used.
+
+    The stored skin is readable synchronously, so the guard costs microseconds and the
+    preload scanner still sees the tags on the skin that wants them — the fonts
+    included, because comic-book's *loading* screen is set in Bangers before its chunk
+    has even been fetched.
+
+    SKINS and DEFAULT must match `src/skins/registry.ts`, and PANELS must match the
+    images `editor/layoutConfig.ts` draws. Both agreements are asserted by
+    `assetPolicy.test.ts` rather than left to whoever edits one of them next.
+  -->
+  <script>
+    (function () {
+      var SKINS = ['carameli', 'candy-shop', 'barebone', 'comic-book'];
+      var DEFAULT = 'comic-book';
+      var PANELS = [
+        '/comic-book/logo.webp',
+        '/comic-book/switchboard.webp',
+        '/comic-book/mailman1.webp',
+        '/comic-book/mechanic.webp',
+        '/comic-book/receptionist.webp',
+        '/comic-book/rolodex.webp',
+        '/comic-book/rotary%20phone.webp',
+        '/comic-book/mailman2.webp',
+      ];
+      var FONTS =
+        'https://fonts.googleapis.com/css2?family=Bangers&family=Boogaloo&family=Permanent+Marker&display=swap';
+
+      var stored = null;
+      // Safari in private mode throws on localStorage rather than returning null.
+      try { stored = localStorage.getItem('skin'); } catch (e) { stored = null; }
+      if (SKINS.indexOf(stored) === -1) stored = DEFAULT;
+      if (stored !== 'comic-book') return;
+
+      for (var i = 0; i < PANELS.length; i++) {
+        var preload = document.createElement('link');
+        preload.rel = 'preload';
+        preload.as = 'image';
+        preload.href = PANELS[i];
+        document.head.appendChild(preload);
+      }
+
+      var fonts = document.createElement('link');
+      fonts.rel = 'stylesheet';
+      fonts.href = FONTS;
+      document.head.appendChild(fonts);
+    })();
+  </script>
 </head>
 
 <body>
