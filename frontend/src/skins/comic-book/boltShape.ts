@@ -46,25 +46,21 @@ interface Spike {
 const BOLT_BODY = 0.8
 
 /** How far past the body a full-length spike aims, in base-ellipse units. */
-const BOLT_REACH = 0.65
+const BOLT_REACH = 0.85
 
 /**
- * View units kept between a vertex and the viewBox edge. It has to exceed the
- * roughness a crown can pick up (ROUGHNESS / 2 × ELLIPSE.rx ≈ 0.84), or the guard in
- * {@link boltMod} would let a jittered crown out of the box the ring test pins it to.
+ * View units kept between a vertex and the viewBox edge — breathing room so a clamped
+ * crown's ink does not sit flush against the panel border.
  */
 const BOX_MARGIN = 1.5
-
-/** Peak-to-peak wobble added per vertex — hand-drawn ink, not a shape change. */
-const ROUGHNESS = 0.02
 
 /**
  * The perimeter, clockwise from the top of the ellipse (ring index 0), traced from
  * `public/comic-book/jagged bubble.png` — fifteen spikes over 64 vertices, in the
  * order the reference draws them, rotated so its notch nearest the top lands on ring
  * index 0. `reach` and `valley` are the traced radii, linearly remapped so the
- * deepest notch sits at 0.67 (jitter-safe above the 0.65 lettering floor) and the
- * longest spike at full reach.
+ * deepest notch sits at 0.67 (above the 0.65 lettering floor) and the longest spike
+ * at full reach.
  *
  * The character the trace preserves, which is what the hand-authored tables missed:
  * one spike (`reach: 1`, aimed lower-left like the reference's dominant point) is
@@ -101,16 +97,6 @@ const SPIKE_STARTS: number[] = SPIKES.map((_, k) =>
 const SPIKE_AT: number[] = SPIKES.flatMap((s, k) => Array<number>(s.span).fill(k))
 
 /**
- * Deterministic [0, 1) hash. The roughness has to be stable across renders — the
- * morph loop resamples the ring, and a `Math.random` would make the outline crawl —
- * and stable geometry is also what makes it assertable in a test.
- */
-function jitter(i: number): number {
-  const s = Math.sin(i * 12.9898) * 43758.5453
-  return s - Math.floor(s)
-}
-
-/**
  * Largest radius a vertex at `theta` can take and stay inside BUBBLE_VIEW. The box is
  * padded below the ellipse for the tail and tight at the flanks, so this is not one
  * number: a spike aimed sideways has ~0.37 of headroom past the body while one aimed
@@ -142,20 +128,47 @@ const CROWNS: number[] = SPIKES.map((s, k) =>
 )
 
 /**
+ * A ring vertex as a point in the space where the base ellipse is the unit circle.
+ * The map from here to BUBBLE_VIEW is affine (scale by rx/ry, then translate), and
+ * affine maps preserve straight lines — so a chord computed in this space renders as
+ * a dead-straight edge on screen.
+ */
+function ringPointN(i: number, m: number): [number, number] {
+  const theta = ringTheta(i)
+  return [m * Math.cos(theta), m * Math.sin(theta)]
+}
+
+/**
  * Radius of ring vertex `i` in base-ellipse units: 1 is on the ellipse, below cuts in.
  *
- * Every vertex sits on one of its spike's two straight segments. The final `min` is
- * the box guard — it only bites on a crown the roughness nudged past its ceiling, and
- * it is what makes "no spike leaves the viewBox" structural rather than lucky.
+ * A corner vertex (valley or crown) takes its authored radius; every other vertex
+ * takes the radius at which its ray crosses the **straight chord** between the two
+ * corners around it. Interpolating the radius itself — the previous implementation —
+ * sweeps a linearly-growing radius across changing angles, which traces a shallow
+ * spiral arc: every edge bowed, and the outline read as soft against the reference's
+ * ruler-straight lines.
+ *
+ * The final `min` is the box guard, and it is what makes "no spike leaves the
+ * viewBox" structural rather than lucky. It cannot break an edge's straightness: the
+ * inset box is convex and both corners are clamped inside it, so the chord between
+ * them never crosses the cap.
  */
 export function boltMod(i: number): number {
   const k = SPIKE_AT[i]
   const s = SPIKES[k]
   const j = i - SPIKE_STARTS[k]
-  const climbing = j <= s.rise
-  const from = climbing ? s.valley : CROWNS[k]
+  if (j === 0) return Math.min(CAPS[i], s.valley)
+  if (j === s.rise) return Math.min(CAPS[i], CROWNS[k])
+  const climbing = j < s.rise
   // The falling edge aims at the *next* spike's valley, so the ring closes seamlessly.
-  const to = climbing ? CROWNS[k] : SPIKES[(k + 1) % SPIKES.length].valley
-  const t = climbing ? j / s.rise : (j - s.rise) / (s.span - s.rise)
-  return Math.min(CAPS[i], from + (to - from) * t + ROUGHNESS * (jitter(i) - 0.5))
+  const a = climbing ? SPIKE_STARTS[k] : SPIKE_STARTS[k] + s.rise
+  const b = climbing ? SPIKE_STARTS[k] + s.rise : SPIKE_STARTS[k] + s.span
+  const [ax, ay] = ringPointN(a, climbing ? s.valley : CROWNS[k])
+  const [bx, by] = ringPointN(b, climbing ? CROWNS[k] : SPIKES[(k + 1) % SPIKES.length].valley)
+  const theta = ringTheta(i)
+  // Ray r·(cos θ, sin θ) meets the line A→B where r·(d × (B−A)) = A × B.
+  const r =
+    (ax * by - ay * bx) /
+    (Math.cos(theta) * (by - ay) - Math.sin(theta) * (bx - ax))
+  return Math.min(CAPS[i], r)
 }

@@ -71,6 +71,22 @@ describe('boltMod', () => {
     expect(step).toBeGreaterThan(0.3)
   })
 
+  // The reference's edges are ruler-straight, and straightness lives in view space:
+  // interpolating the *radius* across vertices — the previous implementation — sweeps
+  // it across changing angles and bows every edge into a shallow arc, which is what
+  // made the outline read as soft. So every non-corner vertex must be collinear with
+  // its two neighbours (a corner's neighbours sit on that corner's own chords).
+  it('draws every edge dead straight', () => {
+    const corners = new Set([...CRESTS, ...TROUGHS])
+    R.forEach((_, i) => {
+      if (corners.has(i)) return
+      const [x0, y0] = point((i + RING_POINTS - 1) % RING_POINTS)
+      const [x1, y1] = point(i)
+      const [x2, y2] = point((i + 1) % RING_POINTS)
+      expect(Math.abs((x1 - x0) * (y2 - y0) - (y1 - y0) * (x2 - x0))).toBeLessThan(1e-6)
+    })
+  })
+
   // Uniform spacing is the sun look. The spans are irregular by construction, so the
   // distance from one tip to the next takes several different values.
   it('spaces the spikes irregularly', () => {
@@ -110,8 +126,8 @@ describe('boltMod', () => {
     })
   })
 
-  // The morph loop resamples the ring every frame, so a Math.random roughness would
-  // make the ink crawl. Stable geometry is also what makes everything above assertable.
+  // The morph loop resamples the ring every frame, so any randomness here would make
+  // the ink crawl. Stable geometry is also what makes everything above assertable.
   it('is deterministic', () => {
     expect(Array.from({ length: RING_POINTS }, (_, i) => boltMod(i))).toEqual(R)
   })

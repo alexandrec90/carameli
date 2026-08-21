@@ -200,8 +200,8 @@ describe('ringPoints', () => {
   })
 
   // The count the eye actually reads, asserted through the rendered ring rather than
-  // through boltShape's table — a spike the roughness flattened into its neighbour
-  // would still be in the table but would not be a point on the outline.
+  // through boltShape's table — a spike a retune flattened into its neighbour would
+  // still be in the table but would not be a point on the outline.
   it('gives lightning one crest per authored spike', () => {
     expect(crests(radii('lightning'))).toHaveLength(BOLT_SPIKES)
   })
@@ -220,7 +220,7 @@ describe('ringPoints', () => {
     expect(new Set(heights.map(h => h.toFixed(2))).size).toBeGreaterThan(12)
   })
 
-  it('is deterministic, jittered lightning included', () => {
+  it('is deterministic, lightning included', () => {
     expect(ringPoints('lightning', 'up')).toEqual(ringPoints('lightning', 'up'))
   })
 })

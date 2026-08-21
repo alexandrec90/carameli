@@ -140,8 +140,14 @@ mid-length spikes, because the drawing's actual swings (notches to 0.67, reach s
 reference, and keep the spans summing to the ring — that budget is the morph invariant
 above, not a detail of this type.
 
-Two consequences worth knowing before editing either file:
+Three consequences worth knowing before editing either file:
 
+- **An edge is a chord, not a radius ramp.** A non-corner vertex takes the radius
+  where its ray crosses the straight line between the two corners around it.
+  Interpolating the radius itself across the ring — the obvious spelling — sweeps it
+  across changing angles and bows every edge into a shallow arc, which is precisely
+  the softness the reference does not have. The straightness test in
+  `boltShape.test.ts` pins this.
 - **`boltMod` clamps every vertex against the viewBox at its own angle.** The box is
   padded below the ellipse and tight at the flanks, so a sideways spike has far less
   headroom than a diagonal one; the clamp is what makes the flank spikes shorter
