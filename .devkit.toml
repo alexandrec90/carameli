@@ -16,6 +16,13 @@ app = "app/"
 tests = "tests/"
 unit_tests = "tests/unit"
 
+# The interpreter every ephemeral box is provisioned on. Without this, worktree.py
+# infers it from the Dockerfile's `FROM python:` tag and warns on every box spawn --
+# and that warning lands as the first line of the worktree guard's block message,
+# where it reads as a hook error. Keep in step with the Dockerfile pin.
+[python]
+version = "3.12"
+
 # The PreToolUse Bash output cap. `enforce-capped-bash.py` blocks an uncapped Bash
 # call and quotes `max_bytes` in the reason; `invoke-capped.py` applies it. One field
 # feeds both, so the number the agent is told to use is the number it gets.
