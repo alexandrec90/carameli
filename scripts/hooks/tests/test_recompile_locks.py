@@ -157,9 +157,7 @@ def test_pr_gate_typechecks_builds_and_runs_hook_tests():
     # so check the chain instead: the gate runs test:bundle, and test:bundle
     # runs the build. Both halves have to hold for a compile break to fail here.
     gate = (REPO_ROOT / ".github/workflows/pr-gate.yml").read_text(encoding="utf-8")
-    package_json = json.loads(
-        (REPO_ROOT / "frontend/package.json").read_text(encoding="utf-8")
-    )
+    package_json = json.loads((REPO_ROOT / "frontend/package.json").read_text(encoding="utf-8"))
 
     assert "npm run test:bundle" in gate
     assert "npm run build" in package_json["scripts"]["test:bundle"]
