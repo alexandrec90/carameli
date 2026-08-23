@@ -8,6 +8,7 @@ import {
 // The file the Save button overwrites, as text — the only way to assert that a save
 // with nothing changed rewrites it byte for byte.
 import layoutConfigSource from '../../skins/comic-book/editor/layoutConfig.ts?raw'
+import { moveVertex } from '../../skins/comic-book/editor/panelGridOps'
 import { serializeConfig, serializeConfigFile } from '../../skins/comic-book/editor/serialize'
 import type { EditorConfig } from '../../skins/comic-book/editor/types'
 
@@ -19,13 +20,20 @@ function entryCount(ts: string, constName: string): number {
   return (arr.match(/\{/g) ?? []).length
 }
 
+/** The two transform blocks, without the grid block that follows them. */
+function transformsOf(ts: string): string {
+  const grids = ts.indexOf('export const PANEL_GRIDS')
+  return grids === -1 ? ts : ts.slice(0, grids)
+}
+
 /** Evaluate a serialized block back into a config, as a paste into the file would. */
 function reparse(ts: string): EditorConfig {
   const body = ts
-    .replace("import type { ImgTransform, BubbleTransform } from './types'", '')
+    .replace("import type { ImgTransform, BubbleTransform, PanelGrids } from './types'", '')
     .replace(/export const PANEL_IMG_TRANSFORMS: ImgTransform\[\] =/, 'const images =')
     .replace(/export const PANEL_BUBBLE_TRANSFORMS: BubbleTransform\[\] =/, 'const bubbles =')
-  return new Function(`${body}\nreturn { images, bubbles }`)() as EditorConfig
+    .replace(/export const PANEL_GRIDS: PanelGrids =/, 'const grids =')
+  return new Function(`${body}\nreturn { images, bubbles, grids }`)() as EditorConfig
 }
 
 describe('serializeConfig', () => {
@@ -119,11 +127,24 @@ describe('serializeConfig', () => {
     })
     cfg = patchBubble(cfg, 1, { top: -35.49, right: -11.6, width: 54.8, rotate: -4.96 })
     const ts = serializeConfig(cfg)
-    expect(ts).not.toMatch(/\d\.\d{3,}/) // no long decimal tails anywhere
+    // Transform values only. A vertex is a *fraction* of the frame, so its own rounding
+    // is four places (about a tenth of a pixel), and asserting "no three-decimal number
+    // anywhere" would now be asserting that the grid is rounded to a whole percent.
+    expect(transformsOf(ts)).not.toMatch(/\d\.\d{3,}/)
     expect(ts).toContain(
       'left: 20, top: 20, width: 55.1, height: 55.9, scale: 1, offsetX: 12, offsetY: -9,',
     )
     expect(ts).toContain('{ panel: 0, top: -35, right: -12, width: 55, rotate: -5, spill: true,')
+  })
+
+  it('rounds vertex noise out of the grids without flattening the shape', () => {
+    const cfg = seedConfig()
+    const grid = cfg.grids.landscape
+    // What a drag actually produces: a pointer pixel divided by the frame width.
+    cfg.grids.landscape = moveVertex(grid, 2, [0.2448979591836, 0.4171428571428])
+    const ts = serializeConfig(cfg)
+    expect(ts).toContain('[0.2449, 0.4171]')
+    expect(ts.slice(ts.indexOf('export const PANEL_GRIDS'))).not.toMatch(/\d\.\d{5,}/)
   })
 
   it('escapes bubble text with quotes, backslashes, and newlines', () => {
@@ -194,9 +215,10 @@ describe('serializeConfig', () => {
 describe('serializeConfigFile', () => {
   it('prepends the type import header to the two const blocks', () => {
     const file = serializeConfigFile(seedConfig())
-    expect(file.startsWith("import type { ImgTransform, BubbleTransform } from './types'")).toBe(true)
+    expect(file.startsWith("import type { ImgTransform, BubbleTransform, PanelGrids } from './types'")).toBe(true)
     expect(file).toContain('export const PANEL_IMG_TRANSFORMS: ImgTransform[] = [')
     expect(file).toContain('export const PANEL_BUBBLE_TRANSFORMS: BubbleTransform[] = [')
+    expect(file).toContain('export const PANEL_GRIDS: PanelGrids = {')
   })
 
   it('produces a body whose literals re-evaluate to the source config', () => {

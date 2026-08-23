@@ -72,9 +72,11 @@ words:
   - behaviours
   - neighbour
   - neighbours
+  - neighbouring
   - normalised
   - normalises
   - parameterised
+  - recognisably
   # Test-fixture shorthand (customer ids, vitest's unstubAllGlobals, distances)
   - cust
   - dists

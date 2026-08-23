@@ -58,7 +58,29 @@ The layout is a **comic-book page** decomposed into panels:
 
 ### Panel grid (default per-page)
 
-Views must tile their content inside the panel regions defined by the canvas lines. Use `position: absolute` panels over the canvas. Exact coordinates are computed at runtime from `window.innerWidth / innerHeight`.
+Views must tile their content inside the panel regions. Use `position: absolute`
+panels over the canvas; exact coordinates are computed at runtime from
+`window.innerWidth / innerHeight`.
+
+The regions come from `PANEL_GRIDS` in `editor/layoutConfig.ts` — one **shared-vertex
+planar subdivision** per window shape (`landscape` / `portrait` / `square`, picked by
+`layoutKindFor`). Each grid is one table of normalised `[x, y]` vertices plus one ring
+of indices per panel, index-parallel to `PANELS`. `panelGeometry.ts` turns a grid into
+viewport polygons: the outer frame is the viewport inset by `OUTER_M`, and each ring is
+then inset by `HALF_GUTTER` **perpendicular to every edge** (`polygonInset.ts`), so the
+gutter is the same width whatever angle a line runs at. A per-axis inset — what this
+replaced — narrows by the cosine of the angle, and a diagonal reads as a thinner line
+the further it leans.
+
+Three properties are structural rather than enforced, and should stay that way:
+
+- **The outer frame is not editable.** A frame edge belongs to exactly one ring, so it
+  is never a line *between* two panels, so the editor draws no handle on it.
+- **Panels cannot come apart.** The two rings either side of a line name the same
+  vertex indices, so one move moves both sides. Nothing copies the change across.
+- **No T-junctions.** A vertex lying on another panel's edge must be an endpoint of
+  that edge too; `panelGridValidate.ts` rejects a grid where it is not, and a persisted
+  grid that fails falls back to the shipped one rather than rendering torn.
 
 ## Component Patterns
 
@@ -284,11 +306,16 @@ screen and page transitions are one continuous visual system.
 
 ### Panel separator lines
 
-Drawn on a static `<canvas>` that sits behind content panels. Lines are redrawn on `resize`. Use canvas `lineCap: 'square'`, `lineWidth: 5`, `strokeStyle: '#111111'`.
+Each panel is stroked as one closed `<polygon>` on a viewport-level SVG above the
+pictures (`stroke="#111111"`, `strokeWidth="5"`, `strokeLinejoin="miter"`), so a panel's
+ink follows its shape however the grid is dragged. There is no separate line layer:
+what reads as a separator is the two panels' own borders either side of the gutter.
+The Ben-Day dots are still per-panel canvases, clipped to the same polygon.
 
 ## Per-Panel Image & Bubble Framing
 
-`editor/layoutConfig.ts` is the **source of truth** for picture placement and framing
+`editor/layoutConfig.ts` is the **source of truth** for the panel shapes themselves
+(`PANEL_GRIDS`, above), for picture placement and framing
 (`PANEL_IMG_TRANSFORMS`: panel / src / alt / left / top / width / height / scale /
 offsetX / offsetY / anchor / spill, with `src` drawn from the `PANEL_ASSETS` manifest
 in `editor/assets.ts`) and speech-bubble
@@ -304,7 +331,8 @@ anything that module does not write is deleted on the first save. That is why th
 file's explanatory comments are emitted as headers by `serialize.ts`, and why nothing
 else — a `NEW_IMAGE` or `NEW_BUBBLE` default, a helper — may live in `layoutConfig.ts`.
 Config edits themselves live in `configOps.ts` (React-free: seed/hydrate/patch,
-add/remove picture or bubble, link sanitation).
+add/remove picture or bubble, link sanitation), which re-exports `configSeed.ts` and
+`configHydrate.ts`; grid edits live in `panelGridOps.ts`.
 
 The bubble box's on-screen geometry comes from `bubbleRect` in `transforms.ts`, used
 by **both** the renderer (to aim tubes) and the editor (hit target and selection
@@ -323,6 +351,10 @@ not the bubble a tube pointed at.
 | Picture fields | inspector selects | panel, picture (`PANEL_ASSETS`), alt (empty = decorative), anchor, spill |
 | Bubble fields | inspector selects | panel, type, **tail** (nine options incl. **No tail**), text, hover/click morph, link |
 | Pages | **Page** dropdown in toolbar | Switch route in edit mode (replays the wash); "Loading screen" entry previews the loading overlay + its exit wash |
+| Mode | **Content** / **Panel shapes** toggle | Content places pictures and bubbles; shapes drags the lines between panels. Content click targets are not rendered in shapes mode — a panel-sized target would swallow every drag aimed at a line crossing it |
+| Reshape | drag a **line** or a **vertex** | A frame vertex slides along its own edge; the four corners are locked; the frame itself has no handle. Arrows nudge (⇧×10) |
+| Bend | **double-click a line**, drag the bend; **Delete** / **Straighten** removes it | Repeat for lightning bolts. A junction of three lines, or a vertex on the frame, is not a bend and is refused |
+| Reset shapes | **Reset shapes** in the shapes inspector | Restores the current window shape's grid only — the three are edited independently |
 | Save | **Save** button | `POST /__comic-editor/save` writes `layoutConfig.ts` (dev server only); **Copy config** / **.ts** are the fallbacks |
 | Reset all | clears working copy | Removes `localStorage['comic-book:editConfig']`, re-seeds from source |
 
@@ -340,7 +372,7 @@ editor math, config editing and serialization is pure and unit-tested in
 3. **Never import Three.js, R3F, or any WebGL library** — this skin is canvas 2D + DOM only
 4. **Never use CSS gradients as backgrounds** — Ben-Day dots only; solid fills for panels
 5. **Never color assets with CSS color property** — always via `filter: sepia/saturate/hue-rotate`
-6. **Never render panel separator lines with CSS `border`** — always drawn on canvas
+6. **Never render panel separator lines with CSS `border`** — a panel's ink is its own SVG polygon, so it follows the shape the grid gives it
 7. **Never use cold/neutral fonts** — only Bangers (display) and Comic Neue (body)
 8. **All text in nav/headings must be UPPERCASE** — enforce at CSS level with `text-transform: uppercase`
 9. **Ben-Day dot canvas must always be running** (never frozen on a static frame) even when no interaction is happening
@@ -348,3 +380,4 @@ editor math, config editing and serialization is pure and unit-tested in
 11. Files over 250 lines (TS/TSX/CSS) must be split before commit.
 12. **Never link two bubbles across panels** — a tube's two ends share one `panel`, or there is no tube
 13. **Never give a panel bubble its own tail path** — the tail is a ring vertex, so `'none'` and a turn both morph
+14. **Never hard-code a panel polygon or a gutter offset** — panel shapes come from `PANEL_GRIDS` through `gridPolys`, and the gutter is one perpendicular inset. A polygon written anywhere else stops moving when the grid does, and an offset applied per axis is the wrong width on every diagonal
