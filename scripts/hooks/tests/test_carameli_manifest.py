@@ -16,7 +16,6 @@ Keep it in sync with `.devkit.toml`; a deliberate manifest change should
 update both in the same commit.
 """
 
-
 from conftest import REPO_ROOT, load_module
 
 cfg = load_module("scripts/hooks/harness_config.py")

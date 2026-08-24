@@ -1,5 +1,12 @@
 import type { TailDir } from '../bubbleBox'
+import type { PanelGrids } from '../panelGeometry'
 import type { BubbleType } from './bubbleTypes'
+
+// The shape half of the document is declared next door, in ../panelGeometry.ts, because
+// the renderer needs it too and this module is the editor's. Re-exported here so
+// layoutConfig.ts — which the editor overwrites whole — keeps naming exactly one module
+// for its types.
+export type { LayoutKind, NormPt, PanelGrid, PanelGrids } from '../panelGeometry'
 
 /**
  * One picture on the page: which panel it belongs to, which file it shows, the frame
@@ -91,8 +98,14 @@ export interface BubbleTransform {
  * The editor's working document. Neither array is parallel to PANELS: each entry names
  * its own panel, so both are free-length and adding one is an append that has to line
  * up with nothing.
+ *
+ * `grids` is the exception and is *keyed* rather than listed — one panel subdivision per
+ * viewport shape, because the three reshape the page differently and a picture framed
+ * for the landscape one has nothing to say about the portrait one. The editor edits
+ * whichever grid the window it is open in draws.
  */
 export interface EditorConfig {
   images: ImgTransform[]
   bubbles: BubbleTransform[]
+  grids: PanelGrids
 }
