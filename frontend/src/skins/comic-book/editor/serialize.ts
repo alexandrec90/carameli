@@ -1,3 +1,5 @@
+import type { LayoutKind, PanelGrid, PanelGrids } from '../panelGeometry'
+import { PANELS } from '../panels'
 import type { BubbleType } from './bubbleTypes'
 import type { EditorConfig } from './types'
 
@@ -63,6 +65,48 @@ const BUBBLE_HEADER = `// Not parallel to PANELS either: each bubble names its \
 // landscape layout; the portrait and square layouts reshape the panels, so a pair may
 // end up close enough there to drop its tube. Retune per layout in the editor.`
 
+const GRID_HEADER = `// The panel shapes themselves, one grid per viewport shape. \`vertices\` are the corners of
+// the whole page in normalised frame space — 0 to 1 across the frame, y down — and each
+// entry of \`panels\` is one panel as a clockwise ring of indices into that table,
+// index-parallel to PANELS.
+//
+// Corners are **shared**: the divider between two panels is the run of vertices both
+// rings name, so moving one moves the line on both sides and the two cannot come apart.
+// A vertex added part-way along a divider bends it; repeat that and the divider is a
+// lightning bolt.
+//
+// Two things are deliberately not in here. The **outer frame** is not stored — it is the
+// viewport inset by OUTER_M, and a vertex sitting on it may only slide along it, a frame
+// corner not at all. Nor is the **gutter**: every panel is shrunk by the same
+// HALF_GUTTER perpendicular to each of its own edges as it is drawn, so the margins stay
+// equal however far the lines are leant over. Both live in ../panelGeometry.ts, and
+// neither is editable — which is what keeps every page on this grid recognisably the
+// same page.`
+
+const LAYOUT_KINDS: LayoutKind[] = ['landscape', 'portrait', 'square']
+
+/** One grid's two fields, indented for the record literal that holds it. */
+function gridBody(grid: PanelGrid): string {
+  const points = grid.vertices.map(([x, y]) => `[${round(x, 4)}, ${round(y, 4)}]`).join(', ')
+  const rings = grid.panels
+    .map((ring, i) => `      [${ring.join(', ')}], // ${PANELS[i]?.label ?? `panel ${i}`}`)
+    .join('\n')
+  return `    vertices: [${points}],\n    panels: [\n${rings}\n    ],`
+}
+
+/**
+ * Serialize the three panel grids as the `PANEL_GRIDS` block.
+ *
+ * Vertex coordinates are rounded to 4 places — about a tenth of a pixel on a 1200 px
+ * frame, so a drag lands where it was dropped — and the panel rings carry their panel's
+ * label as a trailing comment, because a bare row of indices says nothing about which
+ * slot of the page it is.
+ */
+export function serializeGrids(grids: PanelGrids): string {
+  const blocks = LAYOUT_KINDS.map(kind => `  ${kind}: {\n${gridBody(grids[kind])}\n  },`).join('\n')
+  return `${GRID_HEADER}\nexport const PANEL_GRIDS: PanelGrids = {\n${blocks}\n}\n`
+}
+
 /**
  * Serialize a working {@link EditorConfig} into paste-ready TS matching
  * `layoutConfig.ts` (the two `export const` blocks, each under its explanatory
@@ -97,7 +141,8 @@ export function serializeConfig(c: EditorConfig): string {
     .join('\n')
   return (
     `${IMG_HEADER}\nexport const PANEL_IMG_TRANSFORMS: ImgTransform[] = [\n${imgLines}\n]\n\n` +
-    `${BUBBLE_HEADER}\nexport const PANEL_BUBBLE_TRANSFORMS: BubbleTransform[] = [\n${bubbleLines}\n]\n`
+    `${BUBBLE_HEADER}\nexport const PANEL_BUBBLE_TRANSFORMS: BubbleTransform[] = [\n${bubbleLines}\n]\n\n` +
+    serializeGrids(c.grids)
   )
 }
 
@@ -107,5 +152,8 @@ export function serializeConfig(c: EditorConfig): string {
  * editor's Save button, which POSTs this verbatim to the dev-only write endpoint.
  */
 export function serializeConfigFile(c: EditorConfig): string {
-  return `import type { ImgTransform, BubbleTransform } from './types'\n\n${serializeConfig(c)}`
+  return (
+    `import type { ImgTransform, BubbleTransform, PanelGrids } from './types'\n\n` +
+    serializeConfig(c)
+  )
 }

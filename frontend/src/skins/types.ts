@@ -3,6 +3,7 @@ import type { NavItem } from '../routes'
 import type { UseDashboardResult } from '../hooks/useDashboard'
 import type { UsePhoneLinesResult } from '../hooks/usePhoneLines'
 import type { UseExtensionsResult } from '../hooks/useExtensions'
+import type { UseSoftphoneResult } from '../hooks/useSoftphone'
 import type { DataPageProps } from '../lib/dataPage'
 
 export interface PlaceholderProps {
@@ -13,6 +14,14 @@ export interface PlaceholderProps {
 // Functional-placeholder descriptor types live in lib/dataPage.ts so data hooks
 // can return them without importing from skins/. Re-exported here as part of the
 // skin contract.
+//
+// Only `DataForm` and `DataPageProps` have a skin importing them today, so the rest
+// read as dead re-exports to the dead-weight check. They are deliberate: a skin author
+// writing a table or a filter bar reaches for `DataColumn` and `DataFilter` from here,
+// and sending them to `lib/dataPage` instead would mean skins importing across the
+// boundary this module exists to draw. `@public` is the claim that they are surface
+// rather than leftovers — delete the tag if that stops being true.
+/** @public */
 export type {
   DataColumn,
   DataFilter,
@@ -27,6 +36,7 @@ export interface SkinViews {
   Dashboard: React.ComponentType<UseDashboardResult>
   PhoneLines: React.ComponentType<UsePhoneLinesResult>
   Extensions: React.ComponentType<UseExtensionsResult>
+  Softphone: React.ComponentType<UseSoftphoneResult>
   Placeholder: React.ComponentType<PlaceholderProps>
   DataPage: React.ComponentType<DataPageProps>
 }

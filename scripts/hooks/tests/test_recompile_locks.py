@@ -1,5 +1,6 @@
 """Tests for universal lock recompilation and its Dependabot workflow."""
 
+import json
 from types import SimpleNamespace
 
 from conftest import REPO_ROOT, load_module
@@ -149,9 +150,17 @@ def test_pr_gate_typechecks_builds_and_runs_hook_tests():
     # tailwind 4 both merged green while breaking tsc/vite build); the gate
     # must build for real. Hook/workflow tests are excluded from the app
     # suite by pytest.ini, so the gate must invoke them explicitly.
+    #
+    # The gate reaches the build through `test:bundle`, which builds and then
+    # measures the result against frontend/bundlePolicy.ts. Asserting the
+    # literal "npm run build" would pass for a script that merely mentions it,
+    # so check the chain instead: the gate runs test:bundle, and test:bundle
+    # runs the build. Both halves have to hold for a compile break to fail here.
     gate = (REPO_ROOT / ".github/workflows/pr-gate.yml").read_text(encoding="utf-8")
+    package_json = json.loads((REPO_ROOT / "frontend/package.json").read_text(encoding="utf-8"))
 
-    assert "npm run build" in gate
+    assert "npm run test:bundle" in gate
+    assert "npm run build" in package_json["scripts"]["test:bundle"]
     assert "pytest scripts/hooks/tests/" in gate
 
 

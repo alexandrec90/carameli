@@ -489,6 +489,12 @@ TEST_SECTIONS = [
         "npm --prefix frontend run test:run",
     ),
     (
+        "bundle-budgets",
+        "bundle-budgets",
+        filter_vitest_output,
+        "npm --prefix frontend run test:bundle",
+    ),
+    (
         "webhook-e2e",
         "webhook-e2e",
         filter_pytest_output,
@@ -519,7 +525,7 @@ TEST_SECTIONS = [
 # into their own artifact (logs/frontend-test-failures.log) via `include=` so the
 # vitest failures are separable from the backend (pytest-format) targets, which
 # stay in logs/test-failures.log. Local runs fold every section into one artifact.
-FRONTEND_TEST_TARGETS = frozenset({"frontend-tests"})
+FRONTEND_TEST_TARGETS = frozenset({"frontend-tests", "bundle-budgets"})
 BACKEND_TEST_TARGETS = frozenset(name for name, *_ in TEST_SECTIONS) - FRONTEND_TEST_TARGETS
 
 

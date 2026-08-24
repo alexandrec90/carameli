@@ -86,13 +86,29 @@ usable test suite both change: `docs/operations/local-integration-testing.md` an
 
 Docker Desktop is required for database-backed tests and stack operations. Check
 `docker ps` first. Telephony services are opt-in with `--profile telephony` and may run
-only in the primary worktree because rtpengine uses host networking.
+only in the primary worktree because rtpengine uses host networking. That profile
+ships no SBC and no feature server, so a softphone cannot register against it;
+putting a real phone on an extension is `docs/operations/softphone-demo.md`.
 
 Avoid destructive or disruptive lifecycle commands without confirmation:
 
 - `docker compose down -v` deletes database volumes.
 - `restart` and `up --build` can interrupt the user's active session.
 - use `docker compose exec -T` from scripts and automation.
+
+DB-backed tests read `DATABASE_URL` from `.env` and TRUNCATE every table before each
+run, so the database they are pointed at is destroyed. **`tests/conftest.py` refuses to
+run unless something marks that database disposable**: `CI` is set, the name ends in
+`_test`, or `CARAMELI_ALLOW_DB_TRUNCATE=1` is exported. `carameli_test` exists for this
+and `.devkit.toml` names it, so the harness path is safe by default; a bare `pytest`
+with a populated `.env` now stops with the target named instead of emptying it.
+
+The paragraph this replaces said the same thing as advice -- point a worktree's `.env`
+at its own `DB_HOST_PORT` -- and advice is what failed: on 2026-08-20 a bare `pytest`
+inside a box emptied the primary stack's `carameli` database anyway, because a box
+seeds its `.env` from the source checkout and so names the primary's port, and nothing
+in the run said otherwise. The guidance is still right and still worth following; the
+guard is what makes it hold when nobody does.
 
 Run focused verification for changed behavior. Typical commands:
 
@@ -101,12 +117,24 @@ python scripts/lint-all.py --changed
 python scripts/run-tests.py --changed
 npm --prefix frontend run test:run
 npm --prefix frontend run lint
+npm --prefix frontend run test:bundle
 ```
 
 The frontend has no `typecheck` script; type checking is `lint:types`
 (`tsc --noEmit`). Run the whole `lint` rather than that one part: it also chains
-`lint:eslint`, `lint:css` and `lint:spelling`, and cspell rejects unknown words in
-`.ts`/`.tsx` too, so an ordinary identifier fails CI having passed `lint:types`.
+`lint:eslint`, `lint:css`, `lint:spelling` and `lint:deadweight`, and cspell rejects
+unknown words in `.ts`/`.tsx` too, so an ordinary identifier fails CI having passed
+`lint:types`.
+
+`test:bundle` builds and then measures what the build produced against the ratchets in
+`frontend/bundlePolicy.ts`. It is separate from `test:run` because it needs a `dist/`
+and fails without one. It, `assetPolicy.ts` and `lint:deadweight` (knip) are the three
+non-overlapping payload budgets; `frontend/CLAUDE.md` says which covers what.
+
+It is also the `bundle-budgets` target of `scripts/run-tests.py`, so it runs in `--all`
+alongside pytest, the hook tests and vitest, and is one of the choices the desktop
+*Test: Run Carameli Target — free* task offers. A budget only reachable by typing an
+npm script is a budget that gets checked when the PR gate says no, which is late.
 
 The default pytest configuration excludes every `paid` test. Sandbox, chargeable,
 and live-provider tiers require explicit opt-in; never broaden a free aggregate to

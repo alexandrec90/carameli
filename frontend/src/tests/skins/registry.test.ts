@@ -10,6 +10,7 @@ const mockSkin: Skin = {
     Extensions: () => null,
     Placeholder: () => null,
     DataPage: () => null,
+    Softphone: () => null,
   },
 }
 

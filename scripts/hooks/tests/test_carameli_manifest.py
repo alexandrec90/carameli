@@ -33,7 +33,9 @@ def test_manifest_reproduces_carameli_db_tier():
 
     assert c.db.enabled is True
     assert c.db.services == ("db", "redis")
-    assert c.db.user == "carameli" and c.db.name == "carameli"
+    assert c.db.user == "carameli"
+    # Never the `carameli` database: the session fixture empties every table in it.
+    assert c.db.name == "carameli_test"
     assert c.db.password == "carameli_local_dev"  # pragma: allowlist secret
     assert c.db.url_scheme == "postgresql+asyncpg"
     # Both aliases matter: app code reads DATABASE_URL, alembic DIRECT_DATABASE_URL.
@@ -53,4 +55,6 @@ def test_manifest_reproduces_carameli_frontend_tier():
     assert c.frontend.src == "frontend/src/"
     assert c.frontend.skin == "frontend/src/skins"
     assert c.frontend.test_cmd == ("run", "test:run")
-    assert c.frontend.typecheck_cmd == ("run", "typecheck")
+    # `lint:types` is the script `frontend/package.json` actually defines; the tier
+    # was pointed at it in 3c14236 and this assertion was left naming the old one.
+    assert c.frontend.typecheck_cmd == ("run", "lint:types")

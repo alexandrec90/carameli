@@ -28,6 +28,7 @@ words:
   - rtpengine
   - smsws
   - unposted
+  - zoiper
   # Three.js / R3F / 3D rendering terms
   - drei
   - glsl
@@ -71,9 +72,11 @@ words:
   - behaviours
   - neighbour
   - neighbours
+  - neighbouring
   - normalised
   - normalises
   - parameterised
+  - recognisably
   # Test-fixture shorthand (customer ids, vitest's unstubAllGlobals, distances)
   - cust
   - dists

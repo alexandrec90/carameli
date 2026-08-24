@@ -322,6 +322,77 @@ async def test_list_recent_calls_raises_on_error() -> None:
 
 
 # ---------------------------------------------------------------------------
+# get_registrations
+# ---------------------------------------------------------------------------
+
+
+async def test_get_registrations_queries_the_registered_sip_users_route() -> None:
+    """The lowercase ``/registrations`` spelling 404s on jambonz.cloud.
+
+    Pinning the path matters more than it looks: `poll_agent_status` swallows the
+    resulting error and skips the poll, so the symptom is every agent reading as
+    offline with nothing in the sync log naming a bad URL.
+    """
+    engine = _make_engine()
+    engine._client.get = AsyncMock(return_value=_mock_response(200, []))
+
+    await engine.get_registrations()
+
+    engine._client.get.assert_awaited_once_with("/Accounts/ACC123/RegisteredSipUsers")
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        pytest.param(["ext101_abc"], id="bare-strings"),
+        pytest.param([{"name": "ext101_abc"}], id="name-key"),
+        pytest.param([{"sip_user": "ext101_abc"}], id="snake-key"),
+        pytest.param([{"sipUser": "ext101_abc@carameli.sip.jambonz.cloud"}], id="realm-qualified"),
+        pytest.param({"data": ["ext101_abc"]}, id="wrapped-in-data"),
+    ],
+)
+async def test_get_registrations_normalizes_every_shape_to_bare_sip_user(payload) -> None:
+    """`agent_status_sync` matches on the bare ``sip_username``, so this must too."""
+    engine = _make_engine()
+    engine._client.get = AsyncMock(return_value=_mock_response(200, payload))
+
+    result = await engine.get_registrations()
+
+    assert [row["sipUser"] for row in result] == ["ext101_abc"]
+
+
+async def test_get_registrations_drops_entries_carrying_no_username() -> None:
+    """An empty username would otherwise match every extension that failed to load."""
+    engine = _make_engine()
+    engine._client.get = AsyncMock(
+        return_value=_mock_response(200, ["", {"name": ""}, 42, {"sipUser": "ext101_abc"}])
+    )
+
+    assert await engine.get_registrations() == [{"sipUser": "ext101_abc"}]
+
+
+async def test_get_registrations_preserves_the_other_fields_on_a_dict_entry() -> None:
+    engine = _make_engine()
+    engine._client.get = AsyncMock(
+        return_value=_mock_response(200, [{"name": "ext101_abc", "contact": "sip:1.2.3.4"}])
+    )
+
+    assert await engine.get_registrations() == [
+        {"name": "ext101_abc", "contact": "sip:1.2.3.4", "sipUser": "ext101_abc"}
+    ]
+
+
+async def test_get_registrations_raises_on_error() -> None:
+    engine = _make_engine()
+    fake_resp = _mock_response(500, {"error": "server error"})
+    fake_resp.raise_for_status = MagicMock(side_effect=Exception("HTTP 500"))
+    engine._client.get = AsyncMock(return_value=fake_resp)
+
+    with pytest.raises(Exception, match="HTTP 500"):
+        await engine.get_registrations()
+
+
+# ---------------------------------------------------------------------------
 # Jambonz call-status webhook
 # ---------------------------------------------------------------------------
 

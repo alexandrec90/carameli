@@ -1,0 +1,106 @@
+/* Dev-only chrome for the panel-shape editor: the lines between panels, the corners
+   they meet at, and the inspector section that goes with them. Separate from
+   editor.css because that file is already at the 250-line split limit, and because
+   these rules only ever apply in shapes mode. */
+
+/* The seam layer covers the window, but only the strokes inside it take a pointer —
+   otherwise it would swallow the toolbar's clicks. */
+.cb-ed-seams {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: visible;
+}
+
+/* The visible line: thin, so it reads as the gutter it stands for. */
+.cb-ed-seam {
+  fill: none;
+  stroke: #2878ff;
+  stroke-width: 2;
+  stroke-linecap: round;
+  pointer-events: none;
+}
+
+/* The grabbable line: fat and invisible, sitting under the pointer either side of the
+   thin one. Its stroke-width is set in PanelSeams.tsx from SEAM_HIT_PX. */
+.cb-ed-seam-hit {
+  fill: none;
+  stroke: transparent;
+  stroke-linecap: round;
+  cursor: move;
+  pointer-events: stroke;
+}
+
+.cb-ed-seam-hit:hover + .cb-ed-seam,
+.cb-ed-seams g:hover .cb-ed-seam {
+  stroke: #ff8c00;
+  stroke-width: 3;
+}
+
+/* Corners. Colour says what the corner may do, which is the whole vocabulary of the
+   mode: blue moves anywhere, orange slides along its frame edge, grey does not move. */
+.cb-ed-vx {
+  stroke: #fff;
+  stroke-width: 2;
+  cursor: grab;
+  pointer-events: auto;
+}
+
+.cb-ed-vx-free {
+  fill: #2878ff;
+}
+
+.cb-ed-vx-edge {
+  fill: #ff8c00;
+}
+
+.cb-ed-vx-locked {
+  fill: rgb(120 120 120 / 70%);
+  cursor: not-allowed;
+}
+
+.cb-ed-vx-sel {
+  fill: #16c8a0;
+  stroke: #05261f;
+}
+
+.cb-ed-vx:not(.cb-ed-vx-locked):hover {
+  fill: #16c8a0;
+}
+
+/* Inspector section. */
+.cb-ed-shape {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.cb-ed-shape-kind {
+  font-size: 11px;
+  line-height: 1.4;
+  color: #ccc;
+}
+
+.cb-ed-shape-note {
+  font-size: 11px;
+  color: #16c8a0;
+}
+
+/* The mode switch. The active half is filled so it is obvious which surface is live —
+   the two modes hide each other's handles, so a wrong guess reads as a dead editor. */
+.cb-ed-modes {
+  display: flex;
+  gap: 4px;
+}
+
+.cb-ed-modes .cb-ed-btn {
+  flex: 1;
+}
+
+.cb-ed-btn-on {
+  background: #2878ff;
+  border-color: #2878ff;
+  color: #fff;
+}

@@ -97,6 +97,22 @@ class ExtensionRepo:
         )
         return result.scalar_one_or_none()
 
+    async def get_by_sip_username_global(self, sip_username: str) -> Extension | None:
+        """Look up an active extension by SIP username across every customer.
+
+        Unscoped on purpose: a device-originated call hook identifies the caller
+        only by the SIP username it registered with, and that username already
+        embeds the customer it belongs to. The caller is responsible for scoping
+        anything it does afterwards to ``extension.customer_id``.
+        """
+        result = await self.session.execute(
+            select(Extension).where(
+                Extension.sip_username == sip_username,
+                Extension.active.is_(True),
+            )
+        )
+        return result.scalars().first()
+
     async def get_all_for_customer(self, customer_id: uuid.UUID) -> list[Extension]:
         result = await self.session.execute(
             select(Extension).where(
@@ -154,6 +170,19 @@ class ExtensionRepo:
             .with_for_update()
         )
         return list(result.scalars().all())
+
+    async def set_password(self, ext: Extension, encrypted: str) -> Extension:
+        """Store a re-issued SIP password.
+
+        Also clears ``sip_secret_delivered_at``: the row holds a live secret again,
+        and leaving the stamp set would make an already-delivered extension look
+        like one whose password had been erased.
+        """
+        ext.sip_password_encrypted = encrypted
+        ext.sip_secret_delivered_at = None
+        await self.session.commit()
+        await self.session.refresh(ext)
+        return ext
 
     async def mark_credentials_delivered(self, extensions: list[Extension]) -> None:
         delivered_at = datetime.now(UTC).replace(tzinfo=None)

@@ -7,7 +7,13 @@ split across two overloads.
 
 from __future__ import annotations
 
+import uuid
+from unittest.mock import AsyncMock
+
 import pytest
+
+from app.main import app
+from app.services import extension_service
 
 from tests.conftest import AUTH_HEADERS
 
@@ -290,6 +296,111 @@ async def test_patch_extension_unknown_id_returns_404(client) -> None:
     resp = await client.patch(
         f"{_BASE}/00000000-0000-0000-0000-000000000000",
         json={"active": False},
+        headers=AUTH_HEADERS,
+    )
+    assert resp.status_code == 404
+
+
+# ── webphone credential ────────────────────────────────────────────
+
+
+async def _create_extension(client, vs_id: int, number: str) -> dict:
+    await _create_customer(client, vs_id)
+    resp = await client.post(
+        _BASE,
+        json={"vs_customer_id": vs_id, "extension_number": number},
+        headers=AUTH_HEADERS,
+    )
+    assert resp.status_code == 201
+    return resp.json()
+
+
+async def test_webphone_credential_returns_registration_details(client) -> None:
+    ext = await _create_extension(client, 7350, "600")
+    resp = await client.post(f"{_BASE}/{ext['id']}/webphone-credential", headers=AUTH_HEADERS)
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["extension_number"] == "600"
+    assert body["sip_username"] == ext["sip_username"]
+    assert body["sip_realm"] == "sip.test"
+    # Derived from the extension's own realm, so the browser never guesses the SBC.
+    assert body["ws_uri"] == "wss://sip.test:8443"
+    assert body["sip_password"]
+    # A live SIP password must not be cached on the way back to the browser.
+    assert resp.headers["cache-control"] == "no-store"
+
+
+async def test_webphone_credential_reuses_the_stored_password(client) -> None:
+    """A second tab must not knock the first one off the registration."""
+    ext = await _create_extension(client, 7351, "601")
+    first = await client.post(f"{_BASE}/{ext['id']}/webphone-credential", headers=AUTH_HEADERS)
+    second = await client.post(f"{_BASE}/{ext['id']}/webphone-credential", headers=AUTH_HEADERS)
+    assert first.json()["sip_password"] == second.json()["sip_password"]
+    app.state.engine.update_sip_client_password.assert_not_awaited()
+
+
+async def test_webphone_credential_rotate_mints_a_new_password(client) -> None:
+    ext = await _create_extension(client, 7352, "602")
+    first = await client.post(f"{_BASE}/{ext['id']}/webphone-credential", headers=AUTH_HEADERS)
+    rotated = await client.post(
+        f"{_BASE}/{ext['id']}/webphone-credential?rotate=true", headers=AUTH_HEADERS
+    )
+    assert rotated.status_code == 200
+    assert rotated.json()["sip_password"] != first.json()["sip_password"]
+    # The new password only works if the call engine has it too.
+    app.state.engine.update_sip_client_password.assert_awaited_once()
+    args = app.state.engine.update_sip_client_password.await_args.args
+    assert args[1] == rotated.json()["sip_password"]
+    # Rotation keeps the SIP username, so nothing that dials the extension changes.
+    assert rotated.json()["sip_username"] == first.json()["sip_username"]
+
+
+async def test_webphone_credential_mints_one_after_account_data_erased_it(client) -> None:
+    """The ordinary case: AccountData consumed the password, so there is none to reuse."""
+    ext = await _create_extension(client, 7353, "603")
+    consumed = await client.post(
+        "/vsapi/1.0.0/AccessCheck/AccountData", json=[7353], headers=AUTH_HEADERS
+    )
+    assert consumed.status_code == 200
+
+    resp = await client.post(f"{_BASE}/{ext['id']}/webphone-credential", headers=AUTH_HEADERS)
+    assert resp.status_code == 200
+    assert resp.json()["sip_password"]
+    app.state.engine.update_sip_client_password.assert_awaited_once()
+
+
+async def test_webphone_credential_without_a_sip_client_returns_409(client, db_session) -> None:
+    ext = await _create_extension(client, 7354, "604")
+    row = await extension_service.get_by_id(db_session, uuid.UUID(ext["id"]))
+    assert row is not None
+    row.sip_credential_sid = None
+    await db_session.commit()
+
+    resp = await client.post(f"{_BASE}/{ext['id']}/webphone-credential", headers=AUTH_HEADERS)
+    assert resp.status_code == 409
+
+
+async def test_webphone_credential_engine_failure_returns_502(client) -> None:
+    ext = await _create_extension(client, 7355, "605")
+    app.state.engine.update_sip_client_password = AsyncMock(side_effect=RuntimeError("boom"))
+    resp = await client.post(
+        f"{_BASE}/{ext['id']}/webphone-credential?rotate=true", headers=AUTH_HEADERS
+    )
+    assert resp.status_code == 502
+
+
+async def test_webphone_credential_cross_tenant_returns_403(client) -> None:
+    await _create_customer(client, 7356)
+    ext = await _create_extension(client, 7357, "606")
+    resp = await client.post(
+        f"{_BASE}/{ext['id']}/webphone-credential", headers=_customer_headers(7356)
+    )
+    assert resp.status_code == 403
+
+
+async def test_webphone_credential_unknown_id_returns_404(client) -> None:
+    resp = await client.post(
+        f"{_BASE}/00000000-0000-0000-0000-000000000000/webphone-credential",
         headers=AUTH_HEADERS,
     )
     assert resp.status_code == 404

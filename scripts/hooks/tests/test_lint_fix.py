@@ -293,13 +293,34 @@ def test_the_nearest_project_wins(tmp_path):
 
 
 def test_a_linked_worktree_counts_as_a_project(tmp_path):
-    """`.git` is a *file* in a linked worktree -- which is exactly what an ephemeral box
-    is -- so requiring a directory would put every box outside every project and
-    silently switch the hook off for all agent work."""
+    """An ephemeral box is a linked worktree, and its files must still be linted.
+
+    The marker it is claimed by is the config, not the `.git` *file* a linked worktree
+    carries in place of a directory: a worktree checks out tracked files, and the ruff
+    config is one of them. Asserted with the `.git` file present so the box shape is the
+    one under test rather than a plain directory that happens to hold a config.
+    """
     box = tmp_path / "box"
     box.mkdir()
     (box / ".git").write_text("gitdir: ../devkit/.git/worktrees/box\n", encoding="utf-8")
+    (box / "ruff.toml").write_text("line-length = 100\n", encoding="utf-8")
     assert lint_fix.project_root_for(box / "x.py").resolve() == box.resolve()
+
+
+def test_a_checkout_that_configures_no_ruff_is_not_a_project(tmp_path):
+    """A repository is not a claim that anyone configured ruff for it.
+
+    `.git` used to be a marker, so every checkout an agent can reach was in scope --
+    including a reference checkout that ships no harness and is exempt from the rest of
+    it. A `.py` file edited there was reformatted in place under ruff's *defaults* and
+    could exit 2 on a finding those defaults could not fix, which is this hook applying
+    rules nobody chose for that tree. Requiring a config file is the whole exemption,
+    and it needs no list of which checkouts are excused.
+    """
+    reference = tmp_path / "reference-checkout"
+    (reference / "src").mkdir(parents=True)
+    (reference / ".git").mkdir()
+    assert lint_fix.project_root_for(reference / "src" / "x.py") is None
 
 
 def test_no_marker_anywhere_above_is_none(tmp_path):
@@ -330,3 +351,53 @@ def test_ruff_arg_relativises_despite_lowercase_drive():
 def test_ruff_arg_absolute_when_outside_project(tmp_path):
     outside = tmp_path / "x.py"
     assert lint_fix.ruff_arg(outside, lint_fix.REPO_ROOT) == str(outside)
+
+
+# --- record_block: the harness-events ledger line behind every blocking run ---
+
+
+def ledger_lines(base: Path) -> list[str]:
+    path = base / "logs" / "harness-events.log"
+    if not path.exists():
+        return []
+    return path.read_text(encoding="utf-8").splitlines()
+
+
+def test_record_block_writes_files_and_first_detail(tmp_path, monkeypatch):
+    monkeypatch.setenv("DEVKIT_DIR", str(tmp_path))
+    lint_fix.record_block(["a.py", "b.py"], ["F821 undefined name", "second"])
+    (line,) = ledger_lines(tmp_path)
+    assert "\tevent=lint-fix-block\t" in line
+    assert "\tfiles=a.py;b.py\t" in line
+    assert line.endswith("\tdetail=F821 undefined name")
+    assert "\tproject=" in line
+    assert "\tversion=" in line
+
+
+def test_record_block_without_the_ledger_module_is_a_noop(tmp_path, monkeypatch):
+    monkeypatch.setenv("DEVKIT_DIR", str(tmp_path))
+    monkeypatch.setattr(lint_fix, "harness_events", None)
+    lint_fix.record_block(["a.py"], ["boom"])
+    assert ledger_lines(tmp_path) == []
+
+
+def test_main_records_when_it_blocks(monkeypatch, tmp_path, capsys):
+    ledger_root = tmp_path / "devkit"
+    ledger_root.mkdir()
+    monkeypatch.setenv("DEVKIT_DIR", str(ledger_root))
+    f = _project(tmp_path / "proj") / "x.py"
+    f.write_text("x = 1\n")
+    monkeypatch.setattr(lint_fix, "_read_stdin", lambda: _payload(str(f)))
+    monkeypatch.setattr(lint_fix, "find_ruff", lambda root: "ruff")
+
+    def fake_run(ruff, *args, **kw):
+        if args[0] == "check" and "--fix" not in args:
+            return result(returncode=1, stdout="x.py:1:1: F821 undefined name\n")
+        return result(returncode=0)
+
+    monkeypatch.setattr(lint_fix, "_run", fake_run)
+    assert lint_fix.main() == 2
+    (line,) = ledger_lines(ledger_root)
+    assert "\tevent=lint-fix-block\t" in line
+    assert "F821" in line
+    capsys.readouterr()

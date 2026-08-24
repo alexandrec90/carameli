@@ -118,12 +118,20 @@
 
 /* Plain by design: thick black ink outline, flat white fill, no texture and no
    gradient. non-scaling-stroke holds the ink weight steady whatever size a bubble is
-   scaled to, so it stays consistent with the canvas panel lines. */
+   scaled to, so it stays consistent with the canvas panel lines.
+
+   miter, not round: an action bubble's spikes are acute, and a round join sands the
+   point off every one of them — the outline was drawn as a polygon and has to be
+   inked as one. stroke-miterlimit is raised well past the SVG default of 4 because
+   that default silently *bevels* any join sharper than ~29 degrees, which is most of
+   the burst's tips; the bevel is the same lost point by another name. The other two
+   types have no join tight enough to notice the difference. */
 .cb-bubble-shape {
   fill: var(--cb-white);
   stroke: var(--cb-black);
   stroke-width: 4;
-  stroke-linejoin: round;
+  stroke-linejoin: miter;
+  stroke-miterlimit: 20;
   vector-effect: non-scaling-stroke;
 }
 

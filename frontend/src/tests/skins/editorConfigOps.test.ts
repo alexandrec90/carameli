@@ -13,15 +13,18 @@ import {
   patchImg,
   removeBubble,
   removeImg,
+  resetGrid,
   resetOneIn,
   sanitizeLinks,
   seedConfig,
+  setGrid,
 } from '../../skins/comic-book/editor/configOps'
 import {
   BUBBLE_TYPE_KEYS,
   isBubbleType,
 } from '../../skins/comic-book/editor/bubbleTypes'
 import {
+  PANEL_GRIDS,
   PANEL_IMG_TRANSFORMS,
   PANEL_BUBBLE_TRANSFORMS,
 } from '../../skins/comic-book/editor/layoutConfig'
@@ -150,11 +153,14 @@ describe('hydrateConfig', () => {
 
   // An author who deleted everything gets an empty page back, not the shipped one:
   // two arrays that are both present and both arrays is a valid document, and
-  // re-seeding here would make "delete all" impossible to persist.
+  // re-seeding here would make "delete all" impossible to persist. The grids come
+  // back seeded even so — there is no gesture that empties a page of its panels, so
+  // a payload without them is one written before they existed, not one cleared.
   it('keeps a payload that deliberately holds nothing', () => {
     expect(hydrateConfig(JSON.stringify({ images: [], bubbles: [] }))).toEqual({
       images: [],
       bubbles: [],
+      grids: seedConfig().grids,
     })
   })
 
@@ -595,5 +601,75 @@ describe('indicesOnPanel / linkCandidates', () => {
 
   it('is empty for an index with no bubble', () => {
     expect(linkCandidates(seedConfig().bubbles, 99)).toEqual([])
+  })
+})
+
+describe('grids in a config', () => {
+  it('seeds all three, deep-cloned from the constants', () => {
+    const cfg = seedConfig()
+    expect(Object.keys(cfg.grids).sort()).toEqual(['landscape', 'portrait', 'square'])
+    cfg.grids.landscape.vertices[0][0] = 0.5
+    cfg.grids.landscape.panels[0].push(99)
+    // The constant is untouched: a shallow copy would have handed every working config
+    // the same vertex table, and the first drag would have edited the shipped file.
+    expect(PANEL_GRIDS.landscape.vertices[0]).toEqual([0, 0])
+    expect(seedConfig().grids.landscape.panels[0]).toEqual(PANEL_GRIDS.landscape.panels[0])
+  })
+
+  it('is deep-cloned by cloneConfig too', () => {
+    const cfg = seedConfig()
+    const copy = cloneConfig(cfg)
+    copy.grids.square.vertices[1][1] = 0.42
+    expect(cfg.grids.square.vertices[1][1]).not.toBe(0.42)
+  })
+
+  it('setGrid replaces one breakpoint and leaves the other two alone', () => {
+    const cfg = seedConfig()
+    const edited = setGrid(cfg, 'portrait', {
+      vertices: [[0, 0], [1, 0], [1, 1], [0, 1]],
+      panels: [[0, 1, 2, 3]],
+    })
+    expect(edited.grids.portrait.panels).toHaveLength(1)
+    expect(edited.grids.landscape).toEqual(cfg.grids.landscape)
+    expect(edited.grids.square).toEqual(cfg.grids.square)
+    expect(cfg.grids.portrait).toEqual(PANEL_GRIDS.portrait)
+  })
+
+  it('resetGrid restores one breakpoint without undoing the others', () => {
+    let cfg = setGrid(seedConfig(), 'portrait', { vertices: [[0, 0]], panels: [[0]] })
+    cfg = setGrid(cfg, 'square', { vertices: [[0, 0]], panels: [[0]] })
+    const back = resetGrid(cfg, 'portrait')
+    expect(back.grids.portrait).toEqual(PANEL_GRIDS.portrait)
+    expect(back.grids.square.panels).toEqual([[0]])
+  })
+})
+
+describe('hydrateConfig grids', () => {
+  it('keeps a saved grid that is structurally sound', () => {
+    const saved = setGrid(seedConfig(), 'landscape', {
+      ...PANEL_GRIDS.landscape,
+      vertices: PANEL_GRIDS.landscape.vertices.map(([x, y], i) => (i === 2 ? [0.4, 0.4] : [x, y])),
+    })
+    const back = hydrateConfig(JSON.stringify(saved))
+    expect(back.grids.landscape.vertices[2]).toEqual([0.4, 0.4])
+  })
+
+  /*
+   * A subdivision is taken whole or not at all: a ring naming a vertex that is not in
+   * the table cannot be repaired into a page, only into a differently broken one. The
+   * author's pictures and words survive around the shipped grids.
+   */
+  it('falls back to the shipped grids when a saved one is broken, keeping the rest', () => {
+    const saved = patchImg(seedConfig(), 0, { left: 12.5 }) as unknown as Record<string, unknown>
+    saved.grids = { landscape: { vertices: [[0, 0]], panels: [[0, 7]] } }
+    const back = hydrateConfig(JSON.stringify(saved))
+    expect(back.grids).toEqual(seedConfig().grids)
+    expect(back.images[0].left).toBe(12.5)
+  })
+
+  it('falls back for a payload written before grids existed', () => {
+    const saved = seedConfig() as unknown as Record<string, unknown>
+    delete saved.grids
+    expect(hydrateConfig(JSON.stringify(saved)).grids).toEqual(seedConfig().grids)
   })
 })

@@ -61,6 +61,16 @@ export const api = {
         method: 'POST',
         body: JSON.stringify(body),
       }),
+    list: (customerId: number) =>
+      request<ExtensionListResponse>(`/api/v1/extensions?vs_customer_id=${customerId}`),
+    // POST, not GET: the endpoint mints a password when the extension has none
+    // stored, and `rotate` forces a fresh one (which is also how a leaked
+    // credential is revoked).
+    webphoneCredential: (extensionId: string, rotate = false) =>
+      request<WebphoneCredential>(
+        `/api/v1/extensions/${extensionId}/webphone-credential${rotate ? '?rotate=true' : ''}`,
+        { method: 'POST' }
+      ),
   },
 
   calls: {
@@ -121,6 +131,11 @@ export const api = {
         `/vsapi/1.0.0/VsMessaging/Sms/List/${customerId}${qs ? `?${qs}` : ''}`
       )
     },
+    send: (customerId: number, body: SendSmsBody) =>
+      request<SmsStatusResponse>(`/vsapi/1.0.0/VsMessaging/Sms/Send/${customerId}`, {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
   },
 
   groupExtensions: {
@@ -361,6 +376,26 @@ export interface Extension {
   created_at: string
 }
 
+export interface ExtensionListResponse {
+  extensions: Extension[]
+}
+
+/**
+ * Wire shape of POST /api/v1/extensions/{id}/webphone-credential — mirrors
+ * app/schemas/extension.py WebphoneCredentialResponse.
+ *
+ * The whole object is a secret: it carries a live SIP password. Keep it in
+ * component state for as long as the phone is registered and never log it,
+ * persist it, or put it in a URL.
+ */
+export interface WebphoneCredential {
+  extension_number: string
+  sip_username: string
+  sip_password: string
+  sip_realm: string
+  ws_uri: string
+}
+
 export interface AddPhoneLineBody {
   vs_customer_id: number
   area_code?: string
@@ -449,6 +484,19 @@ export interface SmsMessage {
 export interface SmsMessageListResponse {
   messages: SmsMessage[]
   vs_customer_id: number
+}
+
+/** Wire shape of POST /VsMessaging/Sms/Send — mirrors app/schemas/sms.py SendSmsRequest. */
+export interface SendSmsBody {
+  from_number: string
+  to_number: string
+  body: string
+}
+
+export interface SmsStatusResponse {
+  success: boolean
+  message_sid: string | null
+  detail: string | null
 }
 
 export interface GroupExtension {

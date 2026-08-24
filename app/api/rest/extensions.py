@@ -4,7 +4,7 @@ import logging
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.rest.deps import enforce_resource_scope, resolve_customer
@@ -17,6 +17,7 @@ from app.schemas.extension import (
     ExtensionListResponse,
     ExtensionResponse,
     UpdateExtensionRequest,
+    WebphoneCredentialResponse,
 )
 from app.services import extension_service
 
@@ -179,6 +180,63 @@ async def get_extension(
         raise HTTPException(status_code=404, detail="Extension not found")
     enforce_resource_scope(auth, ext.customer_id)
     return ExtensionResponse.model_validate(ext)
+
+
+@router.post(
+    "/{extension_id}/webphone-credential",
+    response_model=WebphoneCredentialResponse,
+    responses={
+        403: {"description": "Forbidden for this customer"},
+        404: {"description": "Extension not found"},
+        409: {"description": "Extension has no provisioned SIP client"},
+        502: {"description": "Call engine rejected the credential rotation"},
+        503: {"description": "Vault error"},
+    },
+)
+async def issue_webphone_credential(
+    extension_id: Annotated[uuid.UUID, Path()],
+    request: Request,
+    response: Response,
+    session: Annotated[AsyncSession, Depends(get_session)],
+    auth: Annotated[AuthContext, Depends(get_auth_context)],
+    rotate: Annotated[bool, Query()] = False,
+) -> WebphoneCredentialResponse:
+    """Issue the SIP credential a browser softphone registers this extension with.
+
+    POST rather than GET because it may mint a new password: the stored one is reused
+    when present, and `rotate=true` forces a fresh one — which is also how a leaked
+    credential is revoked, since the old password stops registering the moment the
+    call engine has the new one.
+    """
+    ext = await extension_service.get_by_id(session, extension_id)
+    if not ext:
+        raise HTTPException(status_code=404, detail="Extension not found")
+    enforce_resource_scope(auth, ext.customer_id)
+
+    try:
+        credential = await extension_service.issue_webphone_credential(
+            session,
+            request.app.state.engine,
+            ext,
+            rotate=rotate,
+        )
+    except extension_service.WebphoneCredentialError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from None
+    except CredentialVaultError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from None
+    except Exception as exc:
+        logger.error("Webphone credential issue failed extension_id=%s: %s", ext.id, exc)
+        raise HTTPException(status_code=502, detail="Call engine rejected the request") from None
+
+    # The body carries a live SIP password: keep it out of every cache on the way back.
+    response.headers["Cache-Control"] = "no-store"
+    return WebphoneCredentialResponse(
+        extension_number=ext.extension_number,
+        sip_username=credential.sip_username,
+        sip_password=credential.sip_password,
+        sip_realm=credential.sip_realm,
+        ws_uri=credential.ws_uri,
+    )
 
 
 @router.patch(

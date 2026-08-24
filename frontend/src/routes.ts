@@ -18,6 +18,7 @@ export const ROUTES: RouteItem[] = [
     { path: '/', label: 'Dashboard', element: lazy(() => import('./pages/Dashboard')) },
     { path: '/phone-lines', label: 'Phone Lines', element: lazy(() => import('./pages/PhoneLines')) },
     { path: '/extensions', label: 'Extensions', element: lazy(() => import('./pages/Extensions')) },
+    { path: '/phone', label: 'Softphone', element: lazy(() => import('./pages/Softphone')) },
     { path: '/group-extensions', label: 'Group Extensions', element: lazy(() => import('./pages/GroupExtensions')) },
     { path: '/intercom', label: 'Intercom', element: lazy(() => import('./pages/IntercomGroups')) },
     { path: '/multicast-intercom', label: 'Multicast Intercom', element: lazy(() => import('./pages/MulticastGroups')) },

@@ -19,6 +19,10 @@ async def get_by_number(
     return await PhoneLineRepo(session).get_by_number(customer_id, phone_number)
 
 
+async def get_by_id(session: AsyncSession, phone_line_id: uuid.UUID) -> PhoneLine | None:
+    return await PhoneLineRepo(session).get_by_id(phone_line_id)
+
+
 async def get_all_for_customer(session: AsyncSession, customer_id: uuid.UUID) -> list[PhoneLine]:
     return await PhoneLineRepo(session).get_all_for_customer(customer_id)
 

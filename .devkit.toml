@@ -34,7 +34,12 @@ redis_port = 6379
 # Mirror docker-compose.yml's POSTGRES_* and CI's env block.
 user = "carameli"
 password = "carameli_local_dev" # pragma: allowlist secret
-name = "carameli"
+# NOT "carameli": the test session TRUNCATEs every table in whatever it is pointed at,
+# and the compose `carameli` database is the one holding the provisioned customer,
+# extension and DID rows this laptop's stack runs on. `tests/conftest.py` now refuses
+# a target nobody marked disposable; this makes the disposable one the default rather
+# than something each caller has to remember.
+name = "carameli_test"
 url_scheme = "postgresql+asyncpg"
 url_env = ["DATABASE_URL", "DIRECT_DATABASE_URL"]
 redis_env = "REDIS_URL"
@@ -54,3 +59,24 @@ test_cmd = ["run", "test:run"]
 # `lint:types`, not `typecheck` — this project has no script by that name, so the tier
 # was spending an npm invocation to print "Missing script" on every skin change.
 typecheck_cmd = ["run", "lint:types"]
+
+# Tier 4: the nightly stop-idle pass may stop this stack.
+#
+# Opted in because this stack is the machine's largest background cost, not because
+# leaving it up is untidy. Measured 2026-08-21: with app, worker and frontend up,
+# `com.docker.backend.exe` on the Windows side burned 255% of one core -- and 209%
+# within 229 seconds of a cold start, so it is not a slow leak. The profile is ~550
+# ioctls/s moving 21 KB/s, about 39 bytes an operation: the three containers bind-mount
+# Windows paths and their reloaders stat those trees continuously across the 9p bridge.
+# Stopping them took it to 11.2%. Restarting Docker does not help, and `.wslconfig`'s
+# `processors=4` caps the WSL VM rather than that Windows process, so nothing already
+# in place bounded it.
+#
+# The guard in devkit's `keep_reason` is what makes this safe rather than a database
+# stopped out from under someone: it skips the stack while any of its ports carries an
+# established connection, skips it for the first two hours after start, and keeps it up
+# on any ambiguity at all -- an unreadable netstat or an unparseable start time. And it
+# is `docker stop`, never `down`, so named volumes and the containers themselves
+# survive; "Docker: Start Stack" brings it back.
+[docker]
+auto_stop = true

@@ -36,7 +36,16 @@ class Settings(BaseSettings):
     jambonz_webhook_base_url: str = "http://localhost:8000"
     jambonz_webhook_secret: str = ""
     jambonz_record_all_calls: bool = False
+    # Carrier trunk name to pin device-originated PSTN calls to. Blank lets Jambonz
+    # pick, which is correct while the account has exactly one carrier configured.
+    jambonz_outbound_trunk: str = ""
     sip_credential_encryption_secret: str = ""
+
+    # Browser softphone. The WSS endpoint is derived from the extension's own SIP
+    # realm (`wss://<realm>:<port>`); set sip_wss_url to override the whole URI when
+    # the SBC is not reachable there.
+    sip_wss_port: int = 8443
+    sip_wss_url: str = ""
 
     # Per-call SCI context is intentionally short-lived. VanillaSoft posts it
     # immediately before originating the corresponding call.

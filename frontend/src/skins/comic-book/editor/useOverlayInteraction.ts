@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import type { PointerEvent as ReactPointerEvent, WheelEvent as ReactWheelEvent } from 'react'
 
-import type { PanelPoly } from '../Layout'
+import type { PanelPoly } from '../panelGeometry'
 import {
   BUBBLE_W,
   IMG_FRAME,
