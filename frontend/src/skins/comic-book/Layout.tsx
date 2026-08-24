@@ -8,7 +8,7 @@ import PanelImages from './PanelImages'
 import { PANELS } from './panels'
 import { gridPolys, layoutKindFor } from './panelGeometry'
 import { PANEL_IMG_TRANSFORMS, PANEL_BUBBLE_TRANSFORMS, PANEL_GRIDS } from './editor/layoutConfig'
-import { imgFramePoints, isFullPanelFrame, toClipPath } from './editor/transforms'
+import { toClipPath } from './editor/transforms'
 import { shouldRevealImg, useEditorMode } from './editor/useEditorMode'
 import {
     drawLoadingRipple, drawWash, parseCssColor, washPhaseAt,
@@ -458,7 +458,7 @@ export function Layout({ navItems }: LayoutProps) {
     )
     // Natural (intrinsic) pixel size of each loaded source, captured on load and keyed
     // by `src`. Drives fullImgStyle (the real framing); absent until the img loads,
-    // during which the equivalent object-fit:cover fallback renders. Keyed by source
+    // during which the equivalent object-fit:contain fallback renders. Keyed by source
     // rather than by index because two pictures may be the same file, and the second
     // should not have to wait for its own load to learn a size already known.
     const [natSizes, setNatSizes] = useState<Record<string, { w: number; h: number }>>({})
@@ -760,28 +760,6 @@ export function Layout({ navItems }: LayoutProps) {
                             strokeLinejoin="miter"
                         />
                     ))}
-                    {/* A picture that has been given its own frame is inked like the panel
-                        it sits in — that border is what makes an inset picture read as a
-                        panel-within-a-panel rather than as a pasted cut-out. A full-panel
-                        frame is skipped: its ink would land on the panel outline already
-                        drawn above, doubling the stroke along an identical path. */}
-                    {imgT.map((img, k) => {
-                        if (isFullPanelFrame(img)) return null
-                        const poly = panelPolys[img.panel]
-                        if (!poly) return null
-                        const pts = imgFramePoints(poly.vp, poly.bounds, img)
-                        if (pts.length === 0) return null
-                        return (
-                            <polygon
-                                key={`img-${k}`}
-                                points={pts.map(([x, y]) => `${x},${y}`).join(' ')}
-                                fill="none"
-                                stroke="#111111"
-                                strokeWidth="5"
-                                strokeLinejoin="miter"
-                            />
-                        )
-                    })}
                 </svg>
 
                 {/* Layer 3 — Ben-Day wash canvas (page transitions; blank when idle) */}
@@ -795,6 +773,7 @@ export function Layout({ navItems }: LayoutProps) {
                     <EditorOverlay
                         api={editor}
                         panelPolys={panelPolys}
+                        natSizes={natSizes}
                         layoutKind={layoutKind}
                         viewport={viewport}
                         pageSelect={{

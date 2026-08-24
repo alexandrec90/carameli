@@ -70,7 +70,7 @@ export default function PanelImages({
           >
             {/* Full-source geometry once the natural size is known, so pan/zoom
                 re-frames the picture under the clip instead of moving a pre-cropped
-                box; the identical cover-fit fallback renders until then. */}
+                box; the identical contain-fit fallback renders until then. */}
             <img
               src={img.src}
               alt={img.alt}
