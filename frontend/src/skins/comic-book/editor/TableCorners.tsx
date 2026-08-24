@@ -1,14 +1,15 @@
 import type { Rect } from '../panelGeometry'
-import type { TableProjection } from './types'
+import type { ProjectedSurface } from './types'
 import type { EditorModeApi } from './useEditorMode'
-import { useTableCornerDrag } from './useTableCornerDrag'
+import { useSurfaceCornerDrag } from './useTableCornerDrag'
 import './editor-table.css'
 
 interface TableCornersProps {
   api: EditorModeApi
   /** Index of the picture the surface belongs to, into `api.config.images`. */
   index: number
-  table: TableProjection
+  surface: ProjectedSurface
+  kind: 'table' | 'numberPad'
   /** The picture's frame in viewport px — the box the quad's percentages measure. */
   rect: Rect
 }
@@ -26,21 +27,23 @@ const CORNER_NAMES = ['top-left', 'top-right', 'bottom-right', 'bottom-left']
  * *is* the quad — drag a grip onto the corner of the ruled area in the photograph and the
  * rows follow.
  */
-export default function TableCorners({ api, index, table, rect }: TableCornersProps) {
-  const drag = useTableCornerDrag(api, index, table, rect)
+export default function SurfaceCorners({ api, index, surface, kind, rect }: TableCornersProps) {
+  const drag = useSurfaceCornerDrag(api, index, surface, rect, kind)
   const points = drag.corners.map(([x, y]) => `${x},${y}`).join(' ')
+  const label = kind === 'table' ? 'table' : 'number pad'
+  const variant = kind === 'table' ? 'table' : 'number-pad'
 
   return (
     <>
-      <svg className="cb-ed-quad" aria-hidden="true">
+      <svg className={`cb-ed-quad cb-ed-quad-${variant}`} aria-hidden="true">
         <polygon points={points} />
       </svg>
       {drag.corners.map(([x, y], i) => (
         <div
           key={i}
-          className="cb-ed-handle cb-ed-quad-grip"
+          className={`cb-ed-handle cb-ed-quad-grip cb-ed-quad-grip-${variant}`}
           style={{ left: x - 7, top: y - 7 }}
-          title={`Drag the ${CORNER_NAMES[i]} corner of the table onto the surface`}
+          title={`Drag the ${CORNER_NAMES[i]} corner of the ${label} onto the surface`}
           onPointerDown={e => drag.onCornerDown(e, i)}
           onPointerMove={drag.onPointerMove}
           onPointerUp={drag.onPointerUp}

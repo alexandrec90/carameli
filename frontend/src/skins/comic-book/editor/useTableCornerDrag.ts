@@ -4,7 +4,7 @@ import type { PointerEvent as ReactPointerEvent } from 'react'
 import type { Rect } from '../panelGeometry'
 import { QUAD_RANGE, quadViewport } from '../tableProjection'
 import type { Quad } from '../tableProjection'
-import type { ImgTransform, TableProjection } from './types'
+import type { ImgTransform, NumberPadProjection, ProjectedSurface, TableProjection } from './types'
 import type { EditorModeApi } from './useEditorMode'
 
 // Dragging the four corners of a projected surface. The gesture is the whole tilt
@@ -39,15 +39,16 @@ export interface TableCornerDragApi {
  * that leaves the window and comes back puts the corner where it was picked up instead of
  * jumping it under the cursor.
  */
-export function useTableCornerDrag(
+export function useSurfaceCornerDrag(
   api: EditorModeApi,
   index: number,
-  table: TableProjection,
+  surface: ProjectedSurface,
   rect: Rect,
+  field: 'table' | 'numberPad',
 ): TableCornerDragApi {
   const drag = useRef<{ corner: number; offset: [number, number] } | null>(null)
 
-  const corners = useMemo(() => quadViewport(rect, table.quad), [rect, table.quad])
+  const corners = useMemo(() => quadViewport(rect, surface.quad), [rect, surface.quad])
 
   /** A pointer position as a percentage of the frame box. */
   const pct = useCallback(
@@ -60,23 +61,26 @@ export function useTableCornerDrag(
 
   const write = useCallback(
     (quad: Quad) => {
-      const patch: Partial<ImgTransform> = { table: { ...table, quad } }
+      const patch: Partial<ImgTransform> =
+        field === 'table'
+          ? { table: { ...surface, quad } as TableProjection }
+          : { numberPad: { ...surface, quad } as NumberPadProjection }
       api.setImg(index, patch)
     },
-    [api, index, table],
+    [api, field, index, surface],
   )
 
   const onCornerDown = useCallback(
     (e: ReactPointerEvent, corner: number) => {
       e.preventDefault()
       e.stopPropagation()
-      const at = table.quad[corner]
+      const at = surface.quad[corner]
       if (!at) return
       const [px, py] = pct(e)
       drag.current = { corner, offset: [at[0] - px, at[1] - py] }
       e.currentTarget.setPointerCapture(e.pointerId)
     },
-    [pct, table.quad],
+    [pct, surface.quad],
   )
 
   const onPointerMove = useCallback(
@@ -85,9 +89,9 @@ export function useTableCornerDrag(
       if (!state) return
       e.preventDefault()
       const [px, py] = pct(e)
-      write(setCorner(table.quad, state.corner, px + state.offset[0], py + state.offset[1]))
+      write(setCorner(surface.quad, state.corner, px + state.offset[0], py + state.offset[1]))
     },
-    [pct, table.quad, write],
+    [pct, surface.quad, write],
   )
 
   const onPointerUp = useCallback((e: ReactPointerEvent) => {

@@ -1,0 +1,21 @@
+/* A telephone number pad projected onto a picture. The homography is an inline
+   `transform`; this file describes the fixed three-column, four-row surface. */
+
+.cb-number-pad-surface {
+  position: absolute;
+  inset: 0 auto auto 0;
+  display: grid;
+  transform-origin: 0 0;
+  backface-visibility: hidden;
+  font-family: 'Comic Neue', cursive;
+  font-weight: 700;
+}
+
+.cb-number-pad-key {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  min-height: 0;
+  line-height: 1;
+}

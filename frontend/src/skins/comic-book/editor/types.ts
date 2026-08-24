@@ -23,9 +23,7 @@ export interface TableColumn {
 }
 
 /**
- * An HTML table projected onto the surface a picture depicts — ruled lines on a notepad,
- * a whiteboard, the face of a monitor. Optional on every picture, so any of them can be
- * turned into a surface and none of them is one by default.
+ * Shared placement and lettering for content projected onto a picture.
  *
  * **`quad` is the whole of the 3D tilt.** Four corners, clockwise from top-left, in % of
  * the picture's frame box, and `tableProjection.ts` turns them into the `matrix3d` that
@@ -36,6 +34,20 @@ export interface TableColumn {
  * one corner at a time. The convergence of the far edge comes out of the same four
  * numbers, so ruled lines that converge in the picture are matched rather than
  * approximated.
+ */
+export interface ProjectedSurface {
+  /** The surface's corners, clockwise from top-left, in % of the picture's frame box. */
+  quad: [[number, number], [number, number], [number, number], [number, number]]
+  /** Lettering height as a fraction of one row's height. */
+  fontScale: number
+  /** Ink colour for the projected content and its editor-only guides. */
+  ink: string
+}
+
+/**
+ * An HTML table projected onto the surface a picture depicts — ruled lines on a notepad,
+ * a whiteboard, the face of a monitor. Optional on every picture, so any of them can be
+ * turned into a surface and none of them is one by default.
  *
  * **`rows` is a count of slots, not of data.** The surface is divided into that many
  * equal bands, which is what a ruled page is; the data scrolls through them a whole row
@@ -43,9 +55,7 @@ export interface TableColumn {
  * band on the column labels rather than floating them above the surface, where they
  * would be the one thing not sitting on a line.
  */
-export interface TableProjection {
-  /** The surface's corners, clockwise from top-left, in % of the picture's frame box. */
-  quad: [[number, number], [number, number], [number, number], [number, number]]
+export interface TableProjection extends ProjectedSurface {
   /** Row bands the surface is divided into — match this to the lines in the picture. */
   rows: number
   /** Spend the first band on the column headings. */
@@ -54,11 +64,10 @@ export interface TableProjection {
   columns: TableColumn[]
   /** Cell text, row-major, one inner array per row. Longer than `rows` = scrollable. */
   data: string[][]
-  /** Lettering height as a fraction of a band's height. */
-  fontScale: number
-  /** Ink colour for the lettering and, in the editor, the band guides. */
-  ink: string
 }
+
+/** A fixed three-column, four-row telephone number pad projected onto a picture. */
+export type NumberPadProjection = ProjectedSurface
 
 /**
  * One picture on the page: which panel it belongs to, which file it shows, the frame
@@ -113,6 +122,12 @@ export interface ImgTransform {
    * A `null` in the working copy would not match it.
    */
   table?: TableProjection
+  /**
+   * A telephone number pad projected onto this picture; absent unless selected in the
+   * editor. Mutually exclusive with `table`, so one image has one set of surface
+   * corners and one projected content layer.
+   */
+  numberPad?: NumberPadProjection
 }
 
 /**
