@@ -60,6 +60,25 @@ test_cmd = ["run", "test:run"]
 # was spending an npm invocation to print "Missing script" on every skin change.
 typecheck_cmd = ["run", "lint:types"]
 
+# `.env` values a box has to derive from its own port lease.
+#
+# Seeding copies this checkout's `.env` verbatim and then appends a managed block, and
+# compose's dotenv parser takes the last assignment of a duplicated key -- so a key named
+# here overrides the seeded line without editing it. `${NAME}` expands against the env
+# devkit writes into that block: `COMPOSE_PROJECT_NAME` plus one `<SERVICE>_HOST_PORT`
+# per service in the port registry.
+#
+# CORS_ORIGINS is the whole reason this table exists. A box publishes its frontend on its
+# own port, but the seeded `CORS_ORIGINS` still names whatever this checkout's `.env`
+# says -- and this one says `*`, which `app/main.py` refuses (the CORS spec forbids a
+# wildcard alongside `allow_credentials=True`) and replaces with `DEFAULT_FRONTEND_ORIGIN`,
+# the primary's `http://localhost:5173`. The box's app then rejects every request the
+# box's own frontend makes. It surfaces as a console full of preflight failures against
+# `/vg/1.0.0/frontend-logs`, which reads as an application bug rather than as a box that
+# was provisioned half-configured.
+[worktree.env]
+CORS_ORIGINS = "http://localhost:${FRONTEND_HOST_PORT}"
+
 # Tier 4: the nightly stop-idle pass may stop this stack.
 #
 # Opted in because this stack is the machine's largest background cost, not because
