@@ -162,9 +162,15 @@ services:
       - frontend_node_modules:/app/node_modules
     environment:
       # The browser calls the API on the host-mapped port, so this must track
-      # APP_HOST_PORT when a worktree stack offsets its ports.
-      - VITE_API_BASE_URL=http://localhost:${APP_HOST_PORT:-8000}
-      - VITE_PROXY_TARGET=http://app:8000
+      # APP_HOST_PORT when a worktree stack offsets its ports. A UI-only preview
+      # box overrides both via its .env ([worktree] ui_env in .devkit.toml): the
+      # base URL set-but-empty routes the browser through the dev-server proxy
+      # (same origin, so the app's CORS allow-list never sees a foreign one), and
+      # the proxy target points at the donor checkout's app across the host
+      # bridge, since a `--no-deps` box has no `app` container of its own. The
+      # `-` (not `:-`) on VITE_API_BASE_URL is what lets that empty value win.
+      - VITE_API_BASE_URL=${VITE_API_BASE_URL-http://localhost:${APP_HOST_PORT:-8000}}
+      - VITE_PROXY_TARGET=${VITE_PROXY_TARGET:-http://app:8000}
       # Windows bind mounts don't deliver inotify events to the container, so
       # Vite's watcher needs polling for HMR to work. See frontend/vite.config.ts.
       - CHOKIDAR_USEPOLLING=true
