@@ -41,6 +41,23 @@ def test_the_nightly_pass_is_allowed_to_stop_this_stack() -> None:
     assert load()["docker"]["auto_stop"] is True
 
 
+def test_a_box_derives_its_cors_origin_from_its_own_frontend_port() -> None:
+    """`[worktree.env] CORS_ORIGINS` must name the box's own frontend port.
+
+    Without it, seeding copies this checkout's `CORS_ORIGINS=*` into the box, and
+    `app/main.py` replaces a wildcard with `DEFAULT_FRONTEND_ORIGIN` because the CORS
+    spec forbids `*` alongside `allow_credentials=True`. The box's app then allows only
+    the *primary's* `http://localhost:5173` and rejects every request the box's own
+    frontend makes — a preview whose console is nothing but preflight failures.
+
+    The template has to be spelled with `${FRONTEND_HOST_PORT}` exactly: devkit expands
+    it against the managed block it writes, and a template naming anything else is
+    dropped rather than written half-expanded, which leaves the seeded wildcard in force
+    with nothing to say it happened.
+    """
+    assert load()["worktree"]["env"]["CORS_ORIGINS"] == "http://localhost:${FRONTEND_HOST_PORT}"
+
+
 def test_the_docker_table_carries_no_key_the_harness_will_not_read() -> None:
     """A misspelled key here is not an error anywhere — devkit's reader takes the keys it
     knows and ignores the rest, so `auto-stop` or `autostop` would leave the stack opted
