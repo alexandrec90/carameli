@@ -16,7 +16,7 @@ _S3_SCHEME = "s3://"
 def recording_token(call_sid: str) -> str:
     """Long-lived HMAC token authorising a plain GET of one call's recording.
 
-    VanillaSoft's recording service fetches the stored URL with a bare GET (no
+    CRM's recording service fetches the stored URL with a bare GET (no
     headers), so the token rides in the query string and does not expire.
     """
     return hmac.new(settings.api_key_secret.encode(), call_sid.encode(), hashlib.sha256).hexdigest()
@@ -31,7 +31,7 @@ def verify_recording_token(call_sid: str, token: str) -> bool:
 
 
 def public_recording_url(call_sid: str) -> str:
-    """Carameli-served recording URL handed to VanillaSoft and API consumers.
+    """Carameli-served recording URL handed to CRM and API consumers.
 
     jambonz_webhook_base_url is Carameli's public base URL (the ngrok domain in
     the prototype).

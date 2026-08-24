@@ -17,11 +17,11 @@ logger = logging.getLogger(__name__)
 
 UNPOSTED_CALL_EVENTS = Gauge(
     "carameli_unposted_call_events",
-    "Call events waiting to be posted to VanillaSoft.",
+    "Call events waiting to be posted to CRM.",
 )
 UNPOSTED_SMS_MESSAGES = Gauge(
     "carameli_unposted_sms_messages",
-    "SMS messages waiting to be posted to VanillaSoft.",
+    "SMS messages waiting to be posted to CRM.",
 )
 ARQ_QUEUE_DEPTH = Gauge(
     "carameli_arq_queue_depth",

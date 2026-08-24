@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 class GroupExtension(Base):
-    """A group extension that rings a set of subscribed extensions (cloudli spec §14)."""
+    """A group extension that rings a set of subscribed extensions (legacy feature spec §14)."""
 
     __tablename__ = "group_extensions"
 

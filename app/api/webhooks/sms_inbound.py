@@ -15,7 +15,7 @@ from app.services import (
     customer_service,
     phone_line_service,
     sms_message_service,
-    vanillasoft_notify,
+    crm_notify,
 )
 
 logger = logging.getLogger(__name__)
@@ -151,7 +151,7 @@ async def telnyx_sms_inbound(
 
 
 async def _handle_inbound_message(session: AsyncSession, payload: dict[str, Any]) -> None:
-    """Persist an inbound SMS and forward it to VanillaSoft (notify/IncomingSmsMessage).
+    """Persist an inbound SMS and forward it to CRM (notify/IncomingSmsMessage).
 
     Failed forwards are retried by the ``retry_unposted_sms_messages`` ARQ job,
     which picks up rows whose ``posted`` flag is still False.
@@ -206,17 +206,17 @@ async def _handle_inbound_message(session: AsyncSession, payload: dict[str, Any]
         logger.exception("Failed to persist inbound SMS message_sid=%s", message_sid)
         return
 
-    if not settings.vanillasoft_webhook_url:
+    if not settings.crm_webhook_url:
         return
 
     vs_customer_id = customer.vs_customer_id if customer else None
-    posted = await vanillasoft_notify.post_notification(
-        vanillasoft_notify.INCOMING_SMS_PATH,
-        vanillasoft_notify.sms_message_payload(message, vs_customer_id, media_urls),
+    posted = await crm_notify.post_notification(
+        crm_notify.INCOMING_SMS_PATH,
+        crm_notify.sms_message_payload(message, vs_customer_id, media_urls),
     )
     if posted:
         await sms_message_service.mark_posted(session, message.id)
-        logger.info("Forwarded inbound SMS %s to VanillaSoft", message_sid)
+        logger.info("Forwarded inbound SMS %s to CRM", message_sid)
     else:
         logger.warning(
             "Inbound SMS forward failed message_sid=%s; retry job will pick it up", message_sid
@@ -257,8 +257,8 @@ async def _handle_delivery_receipt(session: AsyncSession, payload: dict[str, Any
         )
         return
 
-    # Forward the receipt to VanillaSoft so it can update the SMS delivery status.
-    if not settings.vanillasoft_webhook_url:
+    # Forward the receipt to CRM so it can update the SMS delivery status.
+    if not settings.crm_webhook_url:
         return
     try:
         message = await sms_message_service.get_by_message_sid(session, message_sid)
@@ -268,12 +268,10 @@ async def _handle_delivery_receipt(session: AsyncSession, payload: dict[str, Any
         if message.customer_id:
             customer = await customer_service.get_by_id(session, message.customer_id)
             vs_customer_id = customer.vs_customer_id if customer else None
-        await vanillasoft_notify.post_notification(
-            vanillasoft_notify.SMS_DELIVERY_RECEIPT_PATH,
-            vanillasoft_notify.sms_message_payload(message, vs_customer_id),
+        await crm_notify.post_notification(
+            crm_notify.SMS_DELIVERY_RECEIPT_PATH,
+            crm_notify.sms_message_payload(message, vs_customer_id),
         )
     except Exception:
         WEBHOOK_FAILURES_TOTAL.inc()
-        logger.exception(
-            "Failed to forward delivery receipt to VanillaSoft message_sid=%s", message_sid
-        )
+        logger.exception("Failed to forward delivery receipt to CRM message_sid=%s", message_sid)

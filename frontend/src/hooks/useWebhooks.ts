@@ -23,7 +23,7 @@ function toRow(s: WebhookSubscription): Record<string, string> {
 }
 
 /**
- * Data hook for the Webhooks management page (cloudli spec §5). Lists a customer's
+ * Data hook for the Webhooks management page (legacy feature spec §5). Lists a customer's
  * webhook subscriptions and returns a DataPageProps so every skin renders the same
  * behaviour. Full CRUD: the create form (DataForm) calls Add and the per-row
  * Deactivate action (DataRowAction) calls Deactivate, both re-fetching on success.

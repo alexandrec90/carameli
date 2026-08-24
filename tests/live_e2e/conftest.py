@@ -45,7 +45,7 @@ async def live_client(live_config: E2EConfig) -> AsyncIterator[CarameliClient]:
 
 @pytest_asyncio.fixture
 async def pubapi_client(live_config: E2EConfig) -> AsyncIterator[PubApiClient | None]:
-    """A VanillaSoft PubApi client when ``E2E_VS_CHECK=1``, else ``None``.
+    """A CRM PubApi client when ``E2E_VS_CHECK=1``, else ``None``.
 
     ``None`` is the "VS check not requested" signal a test branches on. It is never the
     "requested but unusable" signal: ``live_e2e_skip_reason`` already refuses to run the

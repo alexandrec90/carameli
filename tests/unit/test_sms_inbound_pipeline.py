@@ -1,4 +1,4 @@
-"""Tests for the inbound SMS pipeline: persistence, VanillaSoft forwarding,
+"""Tests for the inbound SMS pipeline: persistence, CRM forwarding,
 delivery-receipt forwarding, and the unposted-retry job."""
 
 from __future__ import annotations
@@ -12,7 +12,7 @@ from sqlalchemy import select
 
 from app.core.config import settings
 from app.models.sms_message import SmsMessage
-from app.services import vanillasoft_notify
+from app.services import crm_notify
 from app.services.sms_sync import retry_unposted_sms_messages
 from tests.conftest import AUTH_HEADERS, notify_payload
 
@@ -90,7 +90,7 @@ async def _get_message(db_session, message_sid: str) -> SmsMessage | None:
 async def test_inbound_sms_persisted_and_matched_to_customer(
     client, db_session, monkeypatch
 ) -> None:
-    monkeypatch.setattr(settings, "vanillasoft_webhook_url", None)
+    monkeypatch.setattr(settings, "crm_webhook_url", None)
     phone = "+18105550100"
     await _create_customer_with_line(client, 8601, phone)
 
@@ -113,7 +113,7 @@ async def test_inbound_sms_persisted_and_matched_to_customer(
 async def test_inbound_sms_unknown_did_persisted_without_customer(
     client, db_session, monkeypatch
 ) -> None:
-    monkeypatch.setattr(settings, "vanillasoft_webhook_url", None)
+    monkeypatch.setattr(settings, "crm_webhook_url", None)
     sid = f"SMin{uuid.uuid4().hex[:10]}"
     resp = await client.post(_WEBHOOK, json=_inbound_event(sid, to_number="+19995550000"))
     assert resp.status_code == 204
@@ -127,7 +127,7 @@ async def test_inbound_sms_unknown_did_persisted_without_customer(
 async def test_inbound_sms_duplicate_message_sid_is_idempotent(
     client, db_session, monkeypatch
 ) -> None:
-    monkeypatch.setattr(settings, "vanillasoft_webhook_url", None)
+    monkeypatch.setattr(settings, "crm_webhook_url", None)
     sid = f"SMin{uuid.uuid4().hex[:10]}"
     await client.post(_WEBHOOK, json=_inbound_event(sid))
     resp = await client.post(_WEBHOOK, json=_inbound_event(sid))
@@ -138,7 +138,7 @@ async def test_inbound_sms_duplicate_message_sid_is_idempotent(
 
 
 async def test_inbound_sms_missing_numbers_is_noop(client, db_session, monkeypatch) -> None:
-    monkeypatch.setattr(settings, "vanillasoft_webhook_url", None)
+    monkeypatch.setattr(settings, "crm_webhook_url", None)
     event = _inbound_event("SMin_missing")
     event["data"]["payload"]["to"] = []
     resp = await client.post(_WEBHOOK, json=event)
@@ -146,21 +146,21 @@ async def test_inbound_sms_missing_numbers_is_noop(client, db_session, monkeypat
     assert await _get_message(db_session, "SMin_missing") is None
 
 
-# ── message.received: VanillaSoft forward ──────────────────────────────────
+# ── message.received: CRM forward ──────────────────────────────────
 
 
-async def test_inbound_sms_forwarded_to_vanillasoft_and_marked_posted(
+async def test_inbound_sms_forwarded_to_crm_and_marked_posted(
     client, db_session, monkeypatch
 ) -> None:
-    monkeypatch.setattr(settings, "vanillasoft_webhook_url", "http://vs.example.com/voip")
-    monkeypatch.setattr(settings, "vanillasoft_webhook_secret", "cloudli-secret")
+    monkeypatch.setattr(settings, "crm_webhook_url", "http://vs.example.com/voip")
+    monkeypatch.setattr(settings, "crm_webhook_secret", "legacy-secret")
     monkeypatch.setattr(settings, "carameli_notify_secret", "carameli-secret")
     phone = "+18205550100"
     await _create_customer_with_line(client, 8602, phone)
 
     sid = f"SMin{uuid.uuid4().hex[:10]}"
     http = _mock_http()
-    with patch("app.services.vanillasoft_notify.httpx.AsyncClient", return_value=http):
+    with patch("app.services.crm_notify.httpx.AsyncClient", return_value=http):
         resp = await client.post(
             _WEBHOOK,
             json=_inbound_event(
@@ -173,8 +173,8 @@ async def test_inbound_sms_forwarded_to_vanillasoft_and_marked_posted(
     call = http.post.call_args
     assert call.args[0] == "http://vs.example.com/voip/notify/IncomingSmsMessage"
     assert call.kwargs["headers"]["Content-Type"] == "application/json"
-    assert "X-Cloudli-Auth" not in call.kwargs["headers"]
-    assert vanillasoft_notify.SIGNATURE_HEADER in call.kwargs["headers"]
+    assert settings.legacy_log_auth_header not in call.kwargs["headers"]
+    assert crm_notify.SIGNATURE_HEADER in call.kwargs["headers"]
     payload = notify_payload(call)
     assert payload["referenceId"] == sid
     assert payload["isOutbound"] is False
@@ -188,15 +188,15 @@ async def test_inbound_sms_forwarded_to_vanillasoft_and_marked_posted(
 
 
 async def test_inbound_sms_forward_failure_leaves_unposted(client, db_session, monkeypatch) -> None:
-    """A VanillaSoft outage must not block the ack; the row stays unposted for retry."""
-    monkeypatch.setattr(settings, "vanillasoft_webhook_url", "http://vs.example.com/voip")
+    """A CRM outage must not block the ack; the row stays unposted for retry."""
+    monkeypatch.setattr(settings, "crm_webhook_url", "http://vs.example.com/voip")
     phone = "+18305550100"
     await _create_customer_with_line(client, 8603, phone)
 
     sid = f"SMin{uuid.uuid4().hex[:10]}"
     http = _mock_http()
     http.post = AsyncMock(side_effect=ConnectionError("vs down"))
-    with patch("app.services.vanillasoft_notify.httpx.AsyncClient", return_value=http):
+    with patch("app.services.crm_notify.httpx.AsyncClient", return_value=http):
         resp = await client.post(_WEBHOOK, json=_inbound_event(sid, to_number=phone))
     assert resp.status_code == 204
 
@@ -208,9 +208,9 @@ async def test_inbound_sms_forward_failure_leaves_unposted(client, db_session, m
 # ── message.finalized: delivery receipt forward (A4) ───────────────────────
 
 
-async def test_delivery_receipt_forwarded_to_vanillasoft(client, db_session, monkeypatch) -> None:
-    monkeypatch.setattr(settings, "vanillasoft_webhook_url", "http://vs.example.com/voip")
-    monkeypatch.setattr(settings, "vanillasoft_webhook_secret", "cloudli-secret")
+async def test_delivery_receipt_forwarded_to_crm(client, db_session, monkeypatch) -> None:
+    monkeypatch.setattr(settings, "crm_webhook_url", "http://vs.example.com/voip")
+    monkeypatch.setattr(settings, "crm_webhook_secret", "legacy-secret")
     phone = "+18405550100"
     await _create_customer_with_line(client, 8604, phone)
 
@@ -236,7 +236,7 @@ async def test_delivery_receipt_forwarded_to_vanillasoft(client, db_session, mon
         }
     }
     http = _mock_http()
-    with patch("app.services.vanillasoft_notify.httpx.AsyncClient", return_value=http):
+    with patch("app.services.crm_notify.httpx.AsyncClient", return_value=http):
         resp = await client.post(_WEBHOOK, json=receipt)
     assert resp.status_code == 204
 
@@ -251,7 +251,7 @@ async def test_delivery_receipt_forwarded_to_vanillasoft(client, db_session, mon
 
 
 async def test_delivery_receipt_unknown_sid_does_not_forward(client, monkeypatch) -> None:
-    monkeypatch.setattr(settings, "vanillasoft_webhook_url", "http://vs.example.com/voip")
+    monkeypatch.setattr(settings, "crm_webhook_url", "http://vs.example.com/voip")
     receipt = {
         "data": {
             "event_type": "message.finalized",
@@ -262,7 +262,7 @@ async def test_delivery_receipt_unknown_sid_does_not_forward(client, monkeypatch
         }
     }
     http = _mock_http()
-    with patch("app.services.vanillasoft_notify.httpx.AsyncClient", return_value=http):
+    with patch("app.services.crm_notify.httpx.AsyncClient", return_value=http):
         resp = await client.post(_WEBHOOK, json=receipt)
     assert resp.status_code == 204
     http.post.assert_not_awaited()
@@ -295,15 +295,15 @@ def _mock_session() -> AsyncMock:
 
 
 async def test_sms_retry_skips_when_no_webhook_url(monkeypatch) -> None:
-    monkeypatch.setattr(settings, "vanillasoft_webhook_url", None)
+    monkeypatch.setattr(settings, "crm_webhook_url", None)
     with patch("app.services.sms_sync.async_session_factory") as factory:
         await retry_unposted_sms_messages(_CTX)
         factory.assert_not_called()
 
 
 async def test_sms_retry_forwards_and_marks_posted(monkeypatch) -> None:
-    monkeypatch.setattr(settings, "vanillasoft_webhook_url", "http://vs.example.com/voip")
-    monkeypatch.setattr(settings, "vanillasoft_webhook_secret", None)
+    monkeypatch.setattr(settings, "crm_webhook_url", "http://vs.example.com/voip")
+    monkeypatch.setattr(settings, "crm_webhook_secret", None)
     message = _make_unposted_message()
 
     mock_repo = AsyncMock()
@@ -313,7 +313,7 @@ async def test_sms_retry_forwards_and_marks_posted(monkeypatch) -> None:
     with (
         patch("app.services.sms_sync.async_session_factory", return_value=_mock_session()),
         patch("app.services.sms_sync.SmsMessageRepo", return_value=mock_repo),
-        patch("app.services.vanillasoft_notify.httpx.AsyncClient", return_value=http),
+        patch("app.services.crm_notify.httpx.AsyncClient", return_value=http),
     ):
         await retry_unposted_sms_messages(_CTX)
 
@@ -323,8 +323,8 @@ async def test_sms_retry_forwards_and_marks_posted(monkeypatch) -> None:
 
 
 async def test_sms_retry_failure_does_not_mark_posted(monkeypatch) -> None:
-    monkeypatch.setattr(settings, "vanillasoft_webhook_url", "http://vs.example.com/voip")
-    monkeypatch.setattr(settings, "vanillasoft_webhook_secret", None)
+    monkeypatch.setattr(settings, "crm_webhook_url", "http://vs.example.com/voip")
+    monkeypatch.setattr(settings, "crm_webhook_secret", None)
     message = _make_unposted_message()
 
     mock_repo = AsyncMock()
@@ -334,7 +334,7 @@ async def test_sms_retry_failure_does_not_mark_posted(monkeypatch) -> None:
     with (
         patch("app.services.sms_sync.async_session_factory", return_value=_mock_session()),
         patch("app.services.sms_sync.SmsMessageRepo", return_value=mock_repo),
-        patch("app.services.vanillasoft_notify.httpx.AsyncClient", return_value=http),
+        patch("app.services.crm_notify.httpx.AsyncClient", return_value=http),
     ):
         await retry_unposted_sms_messages(_CTX)
 

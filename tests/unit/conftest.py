@@ -23,9 +23,9 @@ def disable_external_integrations(monkeypatch: pytest.MonkeyPatch) -> None:
         "telnyx_webhook_secret": "",
         "jambonz_webhook_secret": "",
         "sip_credential_encryption_secret": "unit-test-sip-secret-at-least-32-characters",  # pragma: allowlist secret
-        "vanillasoft_webhook_url": None,
-        "vanillasoft_webhook_secret": None,
-        "vanillasoft_notify_prefix": "notify",
+        "crm_webhook_url": None,
+        "crm_webhook_secret": None,
+        "crm_notify_prefix": "notify",
         "carameli_notify_secret": None,
     }
     for name, value in disabled.items():

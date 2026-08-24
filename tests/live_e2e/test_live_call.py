@@ -4,13 +4,13 @@ For an unattended run we originate a call **via the Telnyx API directly** (not t
 Telnyx SDK) from DID A to DID B. B's inbound routing (jambonz app → Carameli webhooks)
 fires, producing a real inbound ``call_events`` row. We let it ring, hang up via the
 API, then poll Carameli for the row reaching a terminal status with ``posted=True`` —
-which, with the honest receiver, means VanillaSoft durably processed it.
+which, with the honest receiver, means CRM durably processed it.
 
 The true click-to-call path (``Callback/ByExtension``) needs a human to answer, so it
 lives here behind ``@pytest.mark.manual`` for attended runs.
 
 ``E2E_VS_CHECK=1`` adds a second, independent proof — reading the call back out of
-VanillaSoft's own PubApi call history rather than taking Carameli's ``posted`` flag at
+CRM's own PubApi call history rather than taking Carameli's ``posted`` flag at
 its word. It hangs off the **attended** test only, because that is the only flow whose
 evidence reaches ``GetCallHistory``; see ``helpers.py`` for why.
 """
@@ -90,10 +90,10 @@ async def _telnyx_hangup(call_control_id: str) -> None:
 async def _assert_vs_call_history(
     pubapi: PubApiClient, cfg: E2EConfig, started_after: datetime
 ) -> None:
-    """Assert the call is visible in VanillaSoft's own PubApi call history.
+    """Assert the call is visible in CRM's own PubApi call history.
 
     Deliberately independent of Carameli's ``posted`` flag: ``posted`` says the notify
-    POST was accepted, this says VanillaSoft's own read surface can see the call. The
+    POST was accepted, this says CRM's own read surface can see the call. The
     window is widened by ``PUBAPI_CLOCK_SKEW_MINUTES`` on both ends because the two
     machines' clocks are not the same clock.
 
@@ -114,17 +114,17 @@ async def _assert_vs_call_history(
         bool,
         timeout_s=120,
         interval_s=10,
-        description=f"VanillaSoft PubApi call history since {started_after.isoformat()}",
+        description=f"CRM PubApi call history since {started_after.isoformat()}",
     )
-    assert histories, "no VanillaSoft call-history record for the E2E call"
+    assert histories, "no CRM call-history record for the E2E call"
 
 
 async def test_inbound_call_posts(live_client: CarameliClient, live_config: E2EConfig) -> None:
     """Originate A→B via Telnyx; the inbound call_events row lands and posts to VS.
 
-    No PubApi read-back here even under ``E2E_VS_CHECK``: nothing creates a VanillaSoft
+    No PubApi read-back here even under ``E2E_VS_CHECK``: nothing creates a CRM
     *call-history* record for a call no agent placed through the CRM, so there would be
-    nothing to read. ``posted=True`` is the VanillaSoft assertion for this flow.
+    nothing to read. ``posted=True`` is the CRM assertion for this flow.
     """
     if not live_config.telnyx_connection_id:
         pytest.skip("Set E2E_TELNYX_CONNECTION_ID to originate calls unattended")
@@ -173,7 +173,7 @@ async def test_click_to_call_attended(
     """Attended click-to-call via Callback/ByExtension — a human must answer the agent leg.
 
     This is where ``E2E_VS_CHECK`` belongs: the agent clicked to call a contact from
-    inside VanillaSoft, so a call-history record exists for the CMV Call Data Service to
+    inside CRM, so a call-history record exists for the CMV Call Data Service to
     attach the Carameli call attempt to, and PubApi can therefore see it.
     """
     extension = os.getenv("E2E_EXTENSION")

@@ -31,37 +31,37 @@ Read the file first. It probably covers the ARQ worker settings and basic schedu
 ```python
 from unittest.mock import AsyncMock, patch, MagicMock
 import pytest
-from app.services.call_sync import retry_unposted_events, _vanillasoft_headers
+from app.services.call_sync import retry_unposted_events, _crm_headers
 
-# _vanillasoft_headers
-async def test_vanillasoft_headers_no_secret_returns_empty():
-    # Temporarily clear settings.vanillasoft_webhook_secret, call _vanillasoft_headers(),
+# _crm_headers
+async def test_crm_headers_no_secret_returns_empty():
+    # Temporarily clear settings.crm_webhook_secret, call _crm_headers(),
     # assert result == {}
 
-async def test_vanillasoft_headers_with_secret_returns_bearer():
-    # Set settings.vanillasoft_webhook_secret = "mysecret"  # pragma: allowlist secret
-    # assert _vanillasoft_headers() == {"Authorization": "Bearer mysecret"}
+async def test_crm_headers_with_secret_returns_bearer():
+    # Set settings.crm_webhook_secret = "mysecret"  # pragma: allowlist secret
+    # assert _crm_headers() == {"Authorization": "Bearer mysecret"}
 
 # retry_unposted_events — no webhook URL configured
 async def test_retry_no_webhook_url_returns_early(db_session):
-    # patch settings.vanillasoft_webhook_url = None
+    # patch settings.crm_webhook_url = None
     # Call retry_unposted_events({})
     # Assert no HTTP calls made (patch httpx.AsyncClient to verify)
 
 # retry_unposted_events — no unposted events
 async def test_retry_no_events_returns_early(db_session):
-    # settings.vanillasoft_webhook_url = "http://vs.test"
+    # settings.crm_webhook_url = "http://vs.test"
     # No call events in DB
     # Call retry_unposted_events({}) — must not raise, no HTTP calls
 
-# retry_unposted_events — VanillaSoft 200 → marks event as posted
+# retry_unposted_events — CRM 200 → marks event as posted
 async def test_retry_success_marks_event_posted(client, db_session):
     # Create a customer and a call event (status="completed", posted=False, older than 1 min)
     # patch httpx.AsyncClient.post to return a mock Response with is_success=True
     # Call retry_unposted_events({})
     # Assert event.posted_at is not None (re-query from db_session)
 
-# retry_unposted_events — VanillaSoft 500 → event stays unposted
+# retry_unposted_events — CRM 500 → event stays unposted
 async def test_retry_vs_500_event_stays_unposted(client, db_session):
     # Same setup as above but mock response is_success=False, status_code=500
     # Assert event.posted_at is still None

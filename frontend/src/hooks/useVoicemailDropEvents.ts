@@ -22,7 +22,7 @@ function toRow(e: VoicemailDropEvent): Record<string, string> {
 }
 
 /**
- * Read-only list hook for voicemail drop history (cloudli spec §18–19). Shared by
+ * Read-only list hook for voicemail drop history (legacy feature spec §18–19). Shared by
  * the Voicemail Broadcast and Mailbox Drop List pages, differentiated by title.
  */
 export function useVoicemailDropEvents(title: string, description: string): DataPageProps {

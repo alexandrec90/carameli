@@ -18,7 +18,7 @@ and the pointer to it.
 ## Testing & Integration
 
 - [ ] run ngrok and run associated tests
-- [ ] Set up and test VANILLASOFT_WEBHOOK_URL
+- [ ] Set up and test CRM_WEBHOOK_URL
 - [ ] Run `python scripts/run-load.py` (performance)
 - [ ] Run `python scripts/run-mutation.py` (mutation score)
 - [x] ~~*re-enable github actions — pre-commit/pre-push hooks and the `ci.yml` / `e2e-smoke.yml` workflows renamed back from `.disabled`*~~ [2026-07-14]
@@ -54,13 +54,13 @@ Entries before 2026-06 were trimmed on 2026-07-27 — recover them with
 - [x] ~~*logo top left should be smaller - panel can taper up toward top left not to squeeze other panels*~~ [2026-07-10]
 - [x] ~~*figure out a way to easily move/scale images in panels - make editor!*~~ [2026-07-10] → see [docs/plans/completed/comic-book-editor/](docs/plans/completed/comic-book-editor/)
 - [x] ~~*Postgres extension - why is server still listed as "voicegateway"?*~~ [2026-07-07]
-- [x] ~~*come up with comprehensive checklist of things you still need like run ngrok, set up telnyx, get phone numbers, plug vanillaland endpoints, etc. - mostly to set up more tests*~~ [2026-07-03] → see [docs/prototype-roadmap.md](docs/prototype-roadmap.md) (Workstream C + milestones)
+- [x] ~~*come up with comprehensive checklist of things you still need like run ngrok, set up telnyx, get phone numbers, plug legacy-crm endpoints, etc. - mostly to set up more tests*~~ [2026-07-03] → see [docs/prototype-roadmap.md](docs/prototype-roadmap.md) (Workstream C + milestones)
 - [x] ~~*I want to keep a closer eye on fixer performance - is all agent activity tracked? Token cost, tool calls, etc. Should I also keep timestamped error logs for reference?*~~ [2026-06-27]
 - [x] ~~*add an argument to fixers to disambiguate between mobile and desktop*~~ [2026-06-27]
 - [x] ~~*add a test for argument-less fixer determining whether they're running on mobile or desktop*~~ [2026-06-27]
 - [x] ~~*Test: Run E2E (headless) output isn't standard relative to others - also make sure all test output is standard - minimal terminal noise, filtered, actionable output to artifact file. Also update corresponding fixer skill.*~~ [2026-06-25]
 - [x] ~~*run the front-end parity plans A and B*~~ [2026-06-25] → remaining batches tracked in [docs/plans/active/frontend-parity/](docs/plans/active/frontend-parity/)
-- [x] ~~*check cloudli UI against what's implemented*~~ [2026-06-24]
+- [x] ~~*check legacy vendor UI against what's implemented*~~ [2026-06-24]
 - [x] ~~*understand why state.json are not all file scoped*~~ [2026-06-24]
 - [x] ~~*run skill to fix vibe coded design flaws*~~ [2026-06-24]
 - [x] ~~*check for mentions of bash - should use powershell*~~ [2026-06-24]

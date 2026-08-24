@@ -5,7 +5,7 @@ B's inbound. We never send twice. See ``helpers.py`` for the env contract and
 ``docs/operations/diagnostics-error-map.md`` for how to run and what it costs.
 
 The airtight assertion is the notify log line: with the honest receiver (phase 02) a
-logged "notify POST ok" means VanillaSoft *durably processed* the event — that's the
+logged "notify POST ok" means CRM *durably processed* the event — that's the
 loop-closing signal. ``posted`` is exposed on call events but not on SMS rows, so for
 SMS the runtime log is the mechanism.
 """
@@ -77,7 +77,7 @@ async def test_sms_round_trip(
     assert row is not None
     assert row["direction"] == "outbound"
 
-    # 2. Delivery receipt is forwarded to VanillaSoft (the outbound VS assertion).
+    # 2. Delivery receipt is forwarded to CRM (the outbound VS assertion).
     await poll_until(
         lambda: _return(_notify_ok(log_capture, "IncomingSmsMessageDeliveryReceipt")),
         timeout_s=120,
@@ -109,7 +109,7 @@ async def test_sms_round_trip(
     assert inbound is not None
     assert inbound["from_number"] == live_config.did_a
 
-    # 4. ...and the inbound message is forwarded to VanillaSoft.
+    # 4. ...and the inbound message is forwarded to CRM.
     await poll_until(
         lambda: _return(_notify_ok(log_capture, "IncomingSmsMessage")),
         timeout_s=120,

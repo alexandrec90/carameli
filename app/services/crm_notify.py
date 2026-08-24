@@ -17,8 +17,8 @@ from app.models.sms_message import SmsMessage
 logger = logging.getLogger(__name__)
 
 # Endpoint suffixes; the full path is
-# {VANILLASOFT_WEBHOOK_URL}/{VANILLASOFT_NOTIFY_PREFIX}/{suffix}.
-# The prefix selects the receiver: "notify" = legacy CloudliController,
+# {CRM_WEBHOOK_URL}/{CRM_NOTIFY_PREFIX}/{suffix}.
+# The prefix selects the receiver: "notify" = the legacy notify controller,
 # "carameli/notify" = honest CarameliNotifyController (post staging deploy).
 INCOMING_CALL_PATH = "IncomingCall"
 CALL_RECORDING_PATH = "CallRecording"
@@ -27,12 +27,12 @@ SMS_DELIVERY_RECEIPT_PATH = "IncomingSmsMessageDeliveryReceipt"
 
 SMS_PROVIDER_NAME = "Carameli"
 
-# VanillaSoft's CloudliController drops recordings whose source is "asterisk";
+# CRM's legacy notify controller drops recordings whose source is "asterisk";
 # any other value is accepted.
 RECORDING_SOURCE = "carameli"
 
 # Maps Carameli call statuses to the eventName enum consumed by
-# CloudliController.NotifyIncomingCall (IncomingCall.cs).
+# the legacy notify controller's incoming-call action (IncomingCall.cs).
 _EVENT_NAME_BY_STATUS = {
     "completed": "callHungup",
     "no-answer": "callHungup",
@@ -147,10 +147,10 @@ def sign_payload(body: bytes, timestamp: int, secret: str) -> str:
 def _headers(body: bytes, timestamp: int | None = None) -> dict[str, str]:
     """Headers for a notify POST.
 
-    Carameli signs with its **own** secret rather than reusing Cloudli's static
-    `X-Cloudli-Auth` value: one shared secret across two vendors means rotating either
-    rotates both, and a leaked Cloudli secret authenticates as Carameli. The receiver
-    now verifies this signature, so Carameli never sends Cloudli's credential.
+    Carameli signs with its **own** secret rather than reusing the legacy vendor's static
+    `X-Log-Auth` value: one shared secret across two vendors means rotating either
+    rotates both, and a leaked vendor secret authenticates as Carameli. The receiver
+    now verifies this signature, so Carameli never sends the legacy vendor's credential.
     """
     headers = {"Content-Type": "application/json"}
     if settings.carameli_notify_secret:
@@ -164,14 +164,14 @@ def _headers(body: bytes, timestamp: int | None = None) -> dict[str, str]:
 
 def _notify_url(path: str) -> str:
     """Join base URL, the configured notify prefix and the endpoint suffix."""
-    base = (settings.vanillasoft_webhook_url or "").rstrip("/")
-    prefix = settings.vanillasoft_notify_prefix.strip("/")
+    base = (settings.crm_webhook_url or "").rstrip("/")
+    prefix = settings.crm_notify_prefix.strip("/")
     return f"{base}/{prefix}/{path.lstrip('/')}"
 
 
 async def post_notification(path: str, payload: dict[str, Any]) -> bool:
-    """POST a notify payload to VanillaSoft; returns True on 2xx, never raises."""
-    if not settings.vanillasoft_webhook_url:
+    """POST a notify payload to CRM; returns True on 2xx, never raises."""
+    if not settings.crm_webhook_url:
         return False
     url = _notify_url(path)
     # Serialize once and post the exact bytes that were signed. Handing httpx `json=`
@@ -181,21 +181,21 @@ async def post_notification(path: str, payload: dict[str, Any]) -> bool:
     try:
         async with httpx.AsyncClient() as client:
             # 30 s: the honest receiver (phase 02) processes synchronously and the
-            # VanillaSoftWS SOAP hop can be slow; slower than that is a
-            # VanillaSoft-side bug to fix there, not a reason to shorten this.
+            # CRMWS SOAP hop can be slow; slower than that is a
+            # CRM-side bug to fix there, not a reason to shorten this.
             resp = await client.post(url, content=body, headers=_headers(body), timeout=30.0)
     except Exception:
-        logger.exception("VanillaSoft notify POST failed path=%s", path)
+        logger.exception("CRM notify POST failed path=%s", path)
         return False
     if resp.is_success:
-        logger.info("VanillaSoft notify POST ok path=%s", path)
+        logger.info("CRM notify POST ok path=%s", path)
         return True
-    # After phase 02 (honest receiver) the response body carries VanillaSoft's
+    # After phase 02 (honest receiver) the response body carries CRM's
     # real failure detail — capture it. ref joins the failure to its
     # call_events / sms_messages row; never log the whole payload (PII rule).
     log = logger.error if resp.status_code >= 500 else logger.warning
     log(
-        "VanillaSoft notify POST returned %s path=%s ref=%s body=%s",
+        "CRM notify POST returned %s path=%s ref=%s body=%s",
         resp.status_code,
         path,
         payload.get("callId") or payload.get("referenceId"),

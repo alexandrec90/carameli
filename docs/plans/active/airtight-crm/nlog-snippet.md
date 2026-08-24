@@ -1,13 +1,13 @@
 # NLog config snippet — ship `Carameli.*` logs to Carameli (`/webhooks/vs-log`)
 
 Human deliverable for **phase 03**. Apply this to the staging `NLog.config` of
-`VanillaSoft.VoipApi` (and any other host whose Carameli client traffic you want to
+`CRM VoIP API` (and any other host whose Carameli client traffic you want to
 capture — see "Which hosts" below). It is **additive**: the new rule uses `final="false"`
 so all existing local file/console targets keep logging unchanged.
 
 The endpoint authenticates with the same shared secret as the notify direction
-(`X-Cloudli-Auth` == Carameli's `VANILLASOFT_WEBHOOK_SECRET` == staging's
-`CloudliAuthValue` appSetting). No new secret.
+(`X-Log-Auth` == Carameli's `CRM_WEBHOOK_SECRET` == staging's
+`legacy shared-secret appSetting` appSetting). No new secret.
 
 ## Snippet
 
@@ -21,14 +21,14 @@ volume stays trivial.
   <target xsi:type="WebService" name="carameliShipInner"
           url="https://YOUR-NGROK-DOMAIN.ngrok-free.app/webhooks/vs-log"
           protocol="JsonPost" encoding="utf-8">
-    <header name="X-Cloudli-Auth" layout="${appsetting:item=CloudliAuthValue}" />
+    <header name="X-Log-Auth" layout="${appsetting:item=legacy shared-secret appSetting}" />
     <parameter name="time"      type="System.String" layout="${longdate}" />
     <parameter name="level"     type="System.String" layout="${level:upperCase=true}" />
     <parameter name="logger"    type="System.String" layout="${logger}" />
     <parameter name="message"   type="System.String" layout="${message}" />
     <parameter name="exception" type="System.String" layout="${exception:format=ToString}" />
     <parameter name="machine"   type="System.String" layout="${machinename}" />
-    <parameter name="auth"      type="System.String" layout="${appsetting:item=CloudliAuthValue}" />
+    <parameter name="auth"      type="System.String" layout="${appsetting:item=legacy shared-secret appSetting}" />
   </target>
 </target>
 
@@ -53,9 +53,9 @@ volume stays trivial.
 
 ## Which hosts
 
-The receiver path runs in `VanillaSoft.VoipApi` (which owns `NLog.config`); the client
+The receiver path runs in `CRM VoIP API` (which owns `NLog.config`); the client
 path (`CarameliClient` / `CarameliService`) runs in whichever host resolved
-`ICloudliService` via `CloudliServiceFactory` — PubApi, Webservice, NotificationService,
+`legacy VoIP service interface` via `legacy VoIP service factory` — PubApi, Webservice, NotificationService,
 Task Service, SMSDripService, VoipLineCountUpdate, VoipApi. Shipping from VoipApi
 alone covers the receiver plus its own client calls. Apply the same snippet to another
 host's NLog config only when that host's Carameli traffic actually matters.

@@ -1,4 +1,4 @@
-"""Direction 1 — VanillaLand -> Carameli: the contract ``CarameliClient.cs`` depends on.
+"""Direction 1 — LegacyCRM -> Carameli: the contract ``CarameliClient.cs`` depends on.
 
 These tests speak to the remote Carameli exactly as the .NET ``CarameliClient`` does:
 same base URL, same static Bearer key, same routes, same expected JSON envelopes. They
@@ -63,8 +63,8 @@ async def test_configured_api_key_is_accepted(
     """The configured key authenticates for the configured customer.
 
     This is the check that fails when ``CarameliApiKey`` in
-    ``AppCode/Vanillasoft.Web/Web.config`` is empty or stale — the single most likely
-    reason every VanillaLand-initiated VoIP operation returns a failure response.
+    ``AppCode/CRM.Web/Web.config`` is empty or stale — the single most likely
+    reason every LegacyCRM-initiated VoIP operation returns a failure response.
     """
     response = await carameli.get(
         carameli.native_url("extensions"),
@@ -167,7 +167,7 @@ async def test_vsapi_tree_is_served_at_the_configured_prefix(carameli: CarameliA
     response = await carameli.get(carameli.vsapi_url("GetAreaCodes/CA/QC"))
     assert response.status_code != 404, (
         "the /vsapi/1.0.0 tree is not served at this origin — check CarameliApiBaseUrl "
-        f"in AppCode/Vanillasoft.Web/Web.config. {describe(response)}"
+        f"in AppCode/CRM.Web/Web.config. {describe(response)}"
     )
     assert response.status_code == 200, describe(response)
     assert_json(response, "GET /vsapi/1.0.0/GetAreaCodes/CA/QC")

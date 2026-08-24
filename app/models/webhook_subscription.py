@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 class WebhookSubscription(Base):
-    """A customer's configuration to receive API events at a URI (cloudli spec §5)."""
+    """A customer's configuration to receive API events at a URI (legacy feature spec §5)."""
 
     __tablename__ = "webhook_subscriptions"
 

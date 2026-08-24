@@ -1,10 +1,10 @@
-# Phase 03 — VanillaSoft → Carameli log shipping (`/webhooks/vs-log`)
+# Phase 03 — CRM → Carameli log shipping (`/webhooks/vs-log`)
 
 > Read `00-overview.md` first. Covers the residual channel the honest receiver (phase 02)
-> can't: VanillaSoft-side errors that never become an HTTP response Carameli sees —
+> can't: CRM-side errors that never become an HTTP response Carameli sees —
 > exceptions inside `CarameliClient`/`CarameliService` (the VS→Carameli call direction),
 > plus anything still asynchronous on staging. Three parts: a Carameli ingest endpoint,
-> Carameli-scoped NLog logger names in VanillaLand, and the exact `NLog.config` XML as a
+> Carameli-scoped NLog logger names in LegacyCRM, and the exact `NLog.config` XML as a
 > human deliverable for staging. No new pip dependencies.
 
 ## Part A — Carameli: `POST /webhooks/vs-log`
@@ -13,7 +13,7 @@ New handler `app/api/webhooks/vs_log.py`, registered like the existing webhook r
 (see `app/api/webhooks/__init__.py` and mirror `sms_inbound.py`'s structure; the webhook
 rule `.claude/rules/webhooks.md` applies).
 
-- **Auth**: compare header `X-Cloudli-Auth` to `settings.vanillasoft_webhook_secret`
+- **Auth**: compare header `X-Log-Auth` to `settings.crm_webhook_secret`
   (constant-time compare via `hmac.compare_digest`). Mismatch → 403. Secret unconfigured →
   skip validation (established dev/CI convention). No customer scoping — this is a
   server-to-server diagnostics channel, like the other webhooks.
@@ -49,12 +49,12 @@ the mapped level with the machine tag; wrong secret → 403; secret via `auth` b
 (no header) → accepted; secret unconfigured → accepted (dev mode); bad payload → 400;
 oversized message/exception → truncated marker present; unknown level string → WARNING.
 
-## Part B — VanillaLand: Carameli-scoped logger names
+## Part B — LegacyCRM: Carameli-scoped logger names
 
 Decoupling requirement: NLog routing must be able to select **only Carameli traffic**.
 
 1. Inspect what `Logger.Log` actually is in the classes under
-   `AppCode/VanillaSoft.Backend/Carameli/` and in `CloudliController.cs` (shared static
+   `AppCode/<legacy-backend>/Carameli/` and in `the legacy notify controller` (shared static
    wrapper? NLog-backed? log4net?). Don't assume.
 2. If NLog-backed: give every Carameli class its own named logger, prefix `Carameli.` —
    e.g. `private static readonly NLog.Logger Log = NLog.LogManager.GetLogger("Carameli.Client");`
@@ -72,8 +72,8 @@ Decoupling requirement: NLog routing must be able to select **only Carameli traf
    Moq can't reach gets covered by the staging smoke in Part D. No local .NET build —
    CI verifies compilation.
 
-Which hosts matter: the receiver path runs in `VanillaSoft.VoipApi` (has `NLog.config`);
-the client path runs in the hosts that resolve `ICloudliService` via `CloudliServiceFactory`
+Which hosts matter: the receiver path runs in `CRM VoIP API` (has `NLog.config`);
+the client path runs in the hosts that resolve `legacy VoIP service interface` via `legacy VoIP service factory`
 (PubApi, Webservice, NotificationService, Task Service, SMSDripService, VoipLineCountUpdate,
 VoipApi). Shipping from VoipApi alone covers the receiver + its own client calls;
 apply the same config snippet to other hosts' NLog configs only if/when their Carameli
@@ -82,7 +82,7 @@ traffic matters (note this in the PR body rather than boiling the ocean).
 ## Part C — Deliverable: `NLog.config` snippet for staging (human applies)
 
 Produce this as a fenced block in the PR/commit body and in a short
-`docs/plans/active/airtight-vanillasoft/nlog-snippet.md` alongside the plan. Template (adjust
+`docs/plans/active/airtight-crm/nlog-snippet.md` alongside the plan. Template (adjust
 `url` to the real ngrok domain; keep `minlevel="Warn"` so volume stays trivial):
 
 ```xml
@@ -92,14 +92,14 @@ Produce this as a fenced block in the PR/commit body and in a short
   <target xsi:type="WebService" name="carameliShipInner"
           url="https://YOUR-NGROK-DOMAIN.ngrok-free.app/webhooks/vs-log"
           protocol="JsonPost" encoding="utf-8">
-    <header name="X-Cloudli-Auth" layout="${appsetting:item=CloudliAuthValue}" />
+    <header name="X-Log-Auth" layout="${appsetting:item=legacy shared-secret appSetting}" />
     <parameter name="time"      type="System.String" layout="${longdate}" />
     <parameter name="level"     type="System.String" layout="${level:upperCase=true}" />
     <parameter name="logger"    type="System.String" layout="${logger}" />
     <parameter name="message"   type="System.String" layout="${message}" />
     <parameter name="exception" type="System.String" layout="${exception:format=ToString}" />
     <parameter name="machine"   type="System.String" layout="${machinename}" />
-    <parameter name="auth"      type="System.String" layout="${appsetting:item=CloudliAuthValue}" />
+    <parameter name="auth"      type="System.String" layout="${appsetting:item=legacy shared-secret appSetting}" />
   </target>
 </target>
 

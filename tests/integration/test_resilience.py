@@ -42,8 +42,8 @@ async def test_retry_unposted_events_survives_redis_error() -> None:
         patch("app.services.call_sync.async_session_factory", return_value=mock_session),
         patch("app.services.call_sync.CallEventRepo", return_value=mock_repo),
     ):
-        mock_settings.vanillasoft_webhook_url = "http://vanillasoft.test/callback"
-        mock_settings.vanillasoft_webhook_secret = ""
+        mock_settings.crm_webhook_url = "http://crm.test/callback"
+        mock_settings.crm_webhook_secret = ""
 
         await retry_unposted_events({})
 
@@ -106,12 +106,12 @@ async def test_provision_failure_after_search_returns_502(client) -> None:
     assert "Provider" in resp.json().get("detail", "")
 
 
-async def test_vanillasoft_writeback_failure_does_not_block_webhook(client, monkeypatch) -> None:
-    """If VanillaSoft POST fails during webhook handling, acknowledge with 200."""
+async def test_crm_writeback_failure_does_not_block_webhook(client, monkeypatch) -> None:
+    """If CRM POST fails during webhook handling, acknowledge with 200."""
     monkeypatch.setattr(settings, "jambonz_webhook_secret", "")
-    monkeypatch.setattr(settings, "vanillasoft_webhook_url", "http://vanillasoft.test/callback")
+    monkeypatch.setattr(settings, "crm_webhook_url", "http://crm.test/callback")
 
-    with patch("app.services.vanillasoft_notify.httpx.AsyncClient") as mock_client_cls:
+    with patch("app.services.crm_notify.httpx.AsyncClient") as mock_client_cls:
         mock_http = MagicMock()
         mock_http.__aenter__ = AsyncMock(return_value=mock_http)
         mock_http.__aexit__ = AsyncMock(return_value=False)

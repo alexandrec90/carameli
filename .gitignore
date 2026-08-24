@@ -110,14 +110,14 @@ artifacts/
 /carameli.code-workspace
 /carameli-b.code-workspace
 
-# Ensure any accidental copies of the VanillaLand tree are ignored.
-# Directory-only (note every trailing slash): an unanchored `**/*VanillaLand*` also
-# matches plain files, and because Windows sets core.ignorecase it silently swallowed
-# `docs/reference/vanillaland-scope.md` — prose *about* the legacy tree is exactly what
-# this repo wants tracked. Ignore copies of the tree, not writing about it.
-VanillaLand/
-**/VanillaLand/
-**/*VanillaLand*/
+# Ensure any accidental copies of the legacy CRM tree are ignored. That tree is a
+# third party's licensed source and must never be committed here.
+# Directory-only (note every trailing slash): an unanchored `**/*LegacyCRM*` also
+# matches plain files, and because Windows sets core.ignorecase it would silently
+# swallow ordinary docs whose names mention the legacy tree.
+legacy-crm/
+**/legacy-crm/
+**/*LegacyCRM*/
 
 # Playwright
 /test-results/

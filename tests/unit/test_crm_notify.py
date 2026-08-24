@@ -1,4 +1,4 @@
-"""Schema tests pinning Carameli's webhook-out payloads to the VanillaSoft
+"""Schema tests pinning Carameli's webhook-out payloads to the CRM
 VoipApi model shapes (IncomingCall.cs, CallRecording.cs, SmsMessage.cs)."""
 
 from __future__ import annotations
@@ -15,11 +15,11 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from app.core.config import settings
-from app.services import vanillasoft_notify
+from app.services import crm_notify
 
 pytestmark = pytest.mark.asyncio(loop_scope="session")
 
-# Field sets copied from ../VanillaLand/AppCode/VanillaSoft.VoipApi/Models/.
+# Field sets copied from ../legacy-crm/AppCode/<legacy-voip-api>/Models/.
 _INCOMING_CALL_FIELDS = {
     "callId",
     "callIdUuid",
@@ -100,7 +100,7 @@ def _make_message(**overrides) -> MagicMock:
 
 
 async def test_incoming_call_payload_matches_model_shape() -> None:
-    payload = vanillasoft_notify.incoming_call_payload(_make_event(), 4321)
+    payload = crm_notify.incoming_call_payload(_make_event(), 4321)
     assert set(payload.keys()) == _INCOMING_CALL_FIELDS
     assert payload["callId"] == "CAnotify001"
     assert payload["callIdUuid"] == "CAnotify001"
@@ -127,12 +127,12 @@ async def test_incoming_call_payload_matches_model_shape() -> None:
     ],
 )
 async def test_incoming_call_event_name_mapping(status: str, event_name: str) -> None:
-    payload = vanillasoft_notify.incoming_call_payload(_make_event(status=status), 1)
+    payload = crm_notify.incoming_call_payload(_make_event(status=status), 1)
     assert payload["eventName"] == event_name
 
 
 async def test_incoming_call_unknown_customer_defaults() -> None:
-    payload = vanillasoft_notify.incoming_call_payload(_make_event(direction="outbound"), None)
+    payload = crm_notify.incoming_call_payload(_make_event(direction="outbound"), None)
     assert payload["customerId"] == 0
     assert payload["accountId"] == ""
     assert payload["isInbound"] is False
@@ -142,7 +142,7 @@ async def test_incoming_call_unknown_customer_defaults() -> None:
 
 
 async def test_call_recording_payload_matches_model_shape() -> None:
-    payload = vanillasoft_notify.call_recording_payload(
+    payload = crm_notify.call_recording_payload(
         _make_event(), 4321, "https://carameli.example.com/recordings/CAnotify001?token=abc"
     )
     assert set(payload.keys()) == _CALL_RECORDING_FIELDS
@@ -152,7 +152,7 @@ async def test_call_recording_payload_matches_model_shape() -> None:
     assert payload["calleeNumber"] == "+13135550002"
     assert payload["callerNumber"] == "+12125550001"
     assert payload["CustomerID"] == 4321
-    # VanillaSoft drops recordings whose source is "asterisk".
+    # CRM drops recordings whose source is "asterisk".
     assert payload["source"] != "asterisk"
 
 
@@ -160,7 +160,7 @@ async def test_call_recording_payload_matches_model_shape() -> None:
 
 
 async def test_sms_message_payload_matches_model_shape() -> None:
-    payload = vanillasoft_notify.sms_message_payload(
+    payload = crm_notify.sms_message_payload(
         _make_message(), 4321, ["https://mms.example.com/1.jpg"]
     )
     assert set(payload.keys()) == _SMS_MESSAGE_FIELDS
@@ -176,7 +176,7 @@ async def test_sms_message_payload_matches_model_shape() -> None:
 
 
 async def test_sms_message_payload_outbound_flag() -> None:
-    payload = vanillasoft_notify.sms_message_payload(_make_message(direction="outbound"), 7)
+    payload = crm_notify.sms_message_payload(_make_message(direction="outbound"), 7)
     assert payload["isOutbound"] is True
     assert payload["mediaUrls"] == []
 
@@ -197,24 +197,19 @@ def _mock_http(is_success: bool = True, status_code: int = 200, text: str = "") 
 
 
 async def test_post_notification_unconfigured_returns_false(monkeypatch) -> None:
-    monkeypatch.setattr(settings, "vanillasoft_webhook_url", None)
-    with patch("app.services.vanillasoft_notify.httpx.AsyncClient") as mock_cls:
-        assert (
-            await vanillasoft_notify.post_notification(vanillasoft_notify.INCOMING_CALL_PATH, {})
-            is False
-        )
+    monkeypatch.setattr(settings, "crm_webhook_url", None)
+    with patch("app.services.crm_notify.httpx.AsyncClient") as mock_cls:
+        assert await crm_notify.post_notification(crm_notify.INCOMING_CALL_PATH, {}) is False
         mock_cls.assert_not_called()
 
 
-async def test_post_notification_never_sends_cloudli_auth_header(monkeypatch) -> None:
-    monkeypatch.setattr(settings, "vanillasoft_webhook_url", "http://vs.example.com/api/")
-    monkeypatch.setattr(settings, "vanillasoft_webhook_secret", "shared-secret")
+async def test_post_notification_never_sends_legacy_vendor_auth_header(monkeypatch) -> None:
+    monkeypatch.setattr(settings, "crm_webhook_url", "http://vs.example.com/api/")
+    monkeypatch.setattr(settings, "crm_webhook_secret", "shared-secret")
     monkeypatch.setattr(settings, "carameli_notify_secret", None)
     http = _mock_http()
-    with patch("app.services.vanillasoft_notify.httpx.AsyncClient", return_value=http):
-        ok = await vanillasoft_notify.post_notification(
-            vanillasoft_notify.INCOMING_CALL_PATH, {"a": 1}
-        )
+    with patch("app.services.crm_notify.httpx.AsyncClient", return_value=http):
+        ok = await crm_notify.post_notification(crm_notify.INCOMING_CALL_PATH, {"a": 1})
     assert ok is True
     call = http.post.call_args
     assert call.args[0] == "http://vs.example.com/api/notify/IncomingCall"
@@ -231,7 +226,7 @@ async def test_post_notification_never_sends_cloudli_auth_header(monkeypatch) ->
 
 async def test_sign_payload_is_reproducible_by_a_receiver() -> None:
     body = b'{"callId":"CA1"}'
-    value = vanillasoft_notify.sign_payload(body, 1_700_000_000, "carameli-secret")
+    value = crm_notify.sign_payload(body, 1_700_000_000, "carameli-secret")
     assert value.startswith("t=1700000000,v1=")
     expected = hmac.new(b"carameli-secret", b"1700000000." + body, hashlib.sha256).hexdigest()
     assert value == f"t=1700000000,v1={expected}"
@@ -241,30 +236,28 @@ async def test_sign_payload_covers_the_timestamp() -> None:
     """The timestamp is inside the MAC, so a captured POST cannot be replayed with a
     fresh `t=`."""
     body = b'{"callId":"CA1"}'
-    a = vanillasoft_notify.sign_payload(body, 1_700_000_000, "s")
-    b = vanillasoft_notify.sign_payload(body, 1_700_000_001, "s")
+    a = crm_notify.sign_payload(body, 1_700_000_000, "s")
+    b = crm_notify.sign_payload(body, 1_700_000_001, "s")
     assert a.split("v1=")[1] != b.split("v1=")[1]
 
 
 async def test_sign_payload_differs_per_secret() -> None:
     body = b'{"callId":"CA1"}'
-    cloudli = vanillasoft_notify.sign_payload(body, 1_700_000_000, "cloudli-secret")
-    carameli = vanillasoft_notify.sign_payload(body, 1_700_000_000, "carameli-secret")
-    assert cloudli != carameli
+    legacy_vendor = crm_notify.sign_payload(body, 1_700_000_000, "legacy-secret")
+    carameli = crm_notify.sign_payload(body, 1_700_000_000, "carameli-secret")
+    assert legacy_vendor != carameli
 
 
 async def test_post_notification_signs_with_carameli_own_secret(monkeypatch) -> None:
-    monkeypatch.setattr(settings, "vanillasoft_webhook_url", "http://vs.example.com")
-    monkeypatch.setattr(settings, "vanillasoft_webhook_secret", "shared-secret")
+    monkeypatch.setattr(settings, "crm_webhook_url", "http://vs.example.com")
+    monkeypatch.setattr(settings, "crm_webhook_secret", "shared-secret")
     monkeypatch.setattr(settings, "carameli_notify_secret", "carameli-secret")
     http = _mock_http()
-    with patch("app.services.vanillasoft_notify.httpx.AsyncClient", return_value=http):
-        await vanillasoft_notify.post_notification(
-            vanillasoft_notify.INCOMING_CALL_PATH, {"callId": "CA1"}
-        )
+    with patch("app.services.crm_notify.httpx.AsyncClient", return_value=http):
+        await crm_notify.post_notification(crm_notify.INCOMING_CALL_PATH, {"callId": "CA1"})
     call = http.post.call_args
-    signature = call.kwargs["headers"][vanillasoft_notify.SIGNATURE_HEADER]
-    assert "X-Cloudli-Auth" not in call.kwargs["headers"]
+    signature = call.kwargs["headers"][crm_notify.SIGNATURE_HEADER]
+    assert settings.legacy_log_auth_header not in call.kwargs["headers"]
     timestamp, mac = signature.split(",")
     ts = int(timestamp.removeprefix("t="))
 
@@ -273,7 +266,7 @@ async def test_post_notification_signs_with_carameli_own_secret(monkeypatch) -> 
         b"carameli-secret", f"{ts}.".encode() + call.kwargs["content"], hashlib.sha256
     ).hexdigest()
     assert mac == f"v1={expected}"
-    # Not signed with Cloudli's shared value — that is the whole point of the split.
+    # Not signed with the legacy VoIP vendor's shared value — that is the whole point of the split.
     assert (
         mac
         != "v1="
@@ -284,14 +277,14 @@ async def test_post_notification_signs_with_carameli_own_secret(monkeypatch) -> 
 
 
 async def test_post_notification_signature_timestamp_is_current(monkeypatch) -> None:
-    monkeypatch.setattr(settings, "vanillasoft_webhook_url", "http://vs.example.com")
-    monkeypatch.setattr(settings, "vanillasoft_webhook_secret", None)
+    monkeypatch.setattr(settings, "crm_webhook_url", "http://vs.example.com")
+    monkeypatch.setattr(settings, "crm_webhook_secret", None)
     monkeypatch.setattr(settings, "carameli_notify_secret", "carameli-secret")
     http = _mock_http()
     before = int(time.time())
-    with patch("app.services.vanillasoft_notify.httpx.AsyncClient", return_value=http):
-        await vanillasoft_notify.post_notification(vanillasoft_notify.INCOMING_CALL_PATH, {})
-    signature = http.post.call_args.kwargs["headers"][vanillasoft_notify.SIGNATURE_HEADER]
+    with patch("app.services.crm_notify.httpx.AsyncClient", return_value=http):
+        await crm_notify.post_notification(crm_notify.INCOMING_CALL_PATH, {})
+    signature = http.post.call_args.kwargs["headers"][crm_notify.SIGNATURE_HEADER]
     ts = int(signature.split(",")[0].removeprefix("t="))
     assert before <= ts <= int(time.time())
 
@@ -299,47 +292,47 @@ async def test_post_notification_signature_timestamp_is_current(monkeypatch) -> 
 async def test_post_notification_omits_signature_when_unconfigured(monkeypatch) -> None:
     """Unset secret must not send an unsigned-but-present header — the receiver would
     have to decide whether an empty MAC counts."""
-    monkeypatch.setattr(settings, "vanillasoft_webhook_url", "http://vs.example.com")
-    monkeypatch.setattr(settings, "vanillasoft_webhook_secret", "shared-secret")
+    monkeypatch.setattr(settings, "crm_webhook_url", "http://vs.example.com")
+    monkeypatch.setattr(settings, "crm_webhook_secret", "shared-secret")
     monkeypatch.setattr(settings, "carameli_notify_secret", None)
     http = _mock_http()
-    with patch("app.services.vanillasoft_notify.httpx.AsyncClient", return_value=http):
-        await vanillasoft_notify.post_notification(vanillasoft_notify.INCOMING_CALL_PATH, {})
-    assert vanillasoft_notify.SIGNATURE_HEADER not in http.post.call_args.kwargs["headers"]
+    with patch("app.services.crm_notify.httpx.AsyncClient", return_value=http):
+        await crm_notify.post_notification(crm_notify.INCOMING_CALL_PATH, {})
+    assert crm_notify.SIGNATURE_HEADER not in http.post.call_args.kwargs["headers"]
 
 
 async def test_post_notification_signs_without_the_legacy_header(monkeypatch) -> None:
     """The end state: Carameli's own secret only, once the receiver verifies it."""
-    monkeypatch.setattr(settings, "vanillasoft_webhook_url", "http://vs.example.com")
-    monkeypatch.setattr(settings, "vanillasoft_webhook_secret", None)
+    monkeypatch.setattr(settings, "crm_webhook_url", "http://vs.example.com")
+    monkeypatch.setattr(settings, "crm_webhook_secret", None)
     monkeypatch.setattr(settings, "carameli_notify_secret", "carameli-secret")
     http = _mock_http()
-    with patch("app.services.vanillasoft_notify.httpx.AsyncClient", return_value=http):
-        await vanillasoft_notify.post_notification(vanillasoft_notify.INCOMING_CALL_PATH, {})
+    with patch("app.services.crm_notify.httpx.AsyncClient", return_value=http):
+        await crm_notify.post_notification(crm_notify.INCOMING_CALL_PATH, {})
     headers = http.post.call_args.kwargs["headers"]
-    assert "X-Cloudli-Auth" not in headers
-    assert vanillasoft_notify.SIGNATURE_HEADER in headers
+    assert settings.legacy_log_auth_header not in headers
+    assert crm_notify.SIGNATURE_HEADER in headers
 
 
 async def test_post_notification_timeout_covers_synchronous_receiver(monkeypatch) -> None:
     """The honest receiver processes on the request thread (SOAP hop included), so the
     client timeout must be 30 s — 10 s would abort still-running processing."""
-    monkeypatch.setattr(settings, "vanillasoft_webhook_url", "http://vs.example.com")
-    monkeypatch.setattr(settings, "vanillasoft_webhook_secret", None)
+    monkeypatch.setattr(settings, "crm_webhook_url", "http://vs.example.com")
+    monkeypatch.setattr(settings, "crm_webhook_secret", None)
     http = _mock_http()
-    with patch("app.services.vanillasoft_notify.httpx.AsyncClient", return_value=http):
-        await vanillasoft_notify.post_notification(vanillasoft_notify.INCOMING_CALL_PATH, {})
+    with patch("app.services.crm_notify.httpx.AsyncClient", return_value=http):
+        await crm_notify.post_notification(crm_notify.INCOMING_CALL_PATH, {})
     assert http.post.call_args.kwargs["timeout"] == 30.0
 
 
 async def test_notify_path_constants_are_bare_suffixes() -> None:
-    """The receiver prefix lives in VANILLASOFT_NOTIFY_PREFIX; a 'notify/' in a constant
+    """The receiver prefix lives in CRM_NOTIFY_PREFIX; a 'notify/' in a constant
     would double the prefix in every URL."""
     for constant in (
-        vanillasoft_notify.INCOMING_CALL_PATH,
-        vanillasoft_notify.CALL_RECORDING_PATH,
-        vanillasoft_notify.INCOMING_SMS_PATH,
-        vanillasoft_notify.SMS_DELIVERY_RECEIPT_PATH,
+        crm_notify.INCOMING_CALL_PATH,
+        crm_notify.CALL_RECORDING_PATH,
+        crm_notify.INCOMING_SMS_PATH,
+        crm_notify.SMS_DELIVERY_RECEIPT_PATH,
     ):
         assert "/" not in constant
 
@@ -354,47 +347,44 @@ async def test_notify_path_constants_are_bare_suffixes() -> None:
 async def test_post_notification_url_honours_notify_prefix(
     monkeypatch, prefix: str, expected_url: str
 ) -> None:
-    monkeypatch.setattr(settings, "vanillasoft_webhook_url", "http://vs.example.com/api")
-    monkeypatch.setattr(settings, "vanillasoft_webhook_secret", None)
-    monkeypatch.setattr(settings, "vanillasoft_notify_prefix", prefix)
+    monkeypatch.setattr(settings, "crm_webhook_url", "http://vs.example.com/api")
+    monkeypatch.setattr(settings, "crm_webhook_secret", None)
+    monkeypatch.setattr(settings, "crm_notify_prefix", prefix)
     http = _mock_http()
-    with patch("app.services.vanillasoft_notify.httpx.AsyncClient", return_value=http):
-        ok = await vanillasoft_notify.post_notification(vanillasoft_notify.INCOMING_SMS_PATH, {})
+    with patch("app.services.crm_notify.httpx.AsyncClient", return_value=http):
+        ok = await crm_notify.post_notification(crm_notify.INCOMING_SMS_PATH, {})
     assert ok is True
     assert http.post.call_args.args[0] == expected_url
 
 
 async def test_post_notification_url_normalizes_stray_slashes(monkeypatch) -> None:
-    monkeypatch.setattr(settings, "vanillasoft_webhook_url", "http://vs.example.com/api/")
-    monkeypatch.setattr(settings, "vanillasoft_webhook_secret", None)
-    monkeypatch.setattr(settings, "vanillasoft_notify_prefix", "/carameli/notify/")
+    monkeypatch.setattr(settings, "crm_webhook_url", "http://vs.example.com/api/")
+    monkeypatch.setattr(settings, "crm_webhook_secret", None)
+    monkeypatch.setattr(settings, "crm_notify_prefix", "/carameli/notify/")
     http = _mock_http()
-    with patch("app.services.vanillasoft_notify.httpx.AsyncClient", return_value=http):
-        await vanillasoft_notify.post_notification(vanillasoft_notify.CALL_RECORDING_PATH, {})
+    with patch("app.services.crm_notify.httpx.AsyncClient", return_value=http):
+        await crm_notify.post_notification(crm_notify.CALL_RECORDING_PATH, {})
     assert http.post.call_args.args[0] == "http://vs.example.com/api/carameli/notify/CallRecording"
 
 
 async def test_post_notification_non_2xx_returns_false(monkeypatch) -> None:
-    monkeypatch.setattr(settings, "vanillasoft_webhook_url", "http://vs.example.com")
-    monkeypatch.setattr(settings, "vanillasoft_webhook_secret", None)
+    monkeypatch.setattr(settings, "crm_webhook_url", "http://vs.example.com")
+    monkeypatch.setattr(settings, "crm_webhook_secret", None)
     http = _mock_http(is_success=False, status_code=500)
-    with patch("app.services.vanillasoft_notify.httpx.AsyncClient", return_value=http):
-        assert (
-            await vanillasoft_notify.post_notification(vanillasoft_notify.INCOMING_CALL_PATH, {})
-            is False
-        )
+    with patch("app.services.crm_notify.httpx.AsyncClient", return_value=http):
+        assert await crm_notify.post_notification(crm_notify.INCOMING_CALL_PATH, {}) is False
 
 
 async def test_post_notification_non_2xx_logs_body_and_ref(monkeypatch, caplog) -> None:
-    monkeypatch.setattr(settings, "vanillasoft_webhook_url", "http://vs.example.com")
-    monkeypatch.setattr(settings, "vanillasoft_webhook_secret", None)
+    monkeypatch.setattr(settings, "crm_webhook_url", "http://vs.example.com")
+    monkeypatch.setattr(settings, "crm_webhook_secret", None)
     http = _mock_http(is_success=False, status_code=400, text="Invalid customerId")
     with (
-        patch("app.services.vanillasoft_notify.httpx.AsyncClient", return_value=http),
-        caplog.at_level(logging.WARNING, logger="app.services.vanillasoft_notify"),
+        patch("app.services.crm_notify.httpx.AsyncClient", return_value=http),
+        caplog.at_level(logging.WARNING, logger="app.services.crm_notify"),
     ):
-        ok = await vanillasoft_notify.post_notification(
-            vanillasoft_notify.INCOMING_CALL_PATH, {"callId": "CAfail001"}
+        ok = await crm_notify.post_notification(
+            crm_notify.INCOMING_CALL_PATH, {"callId": "CAfail001"}
         )
     assert ok is False
     record = caplog.records[-1]
@@ -405,15 +395,15 @@ async def test_post_notification_non_2xx_logs_body_and_ref(monkeypatch, caplog) 
 
 
 async def test_post_notification_5xx_logs_error_with_reference_id(monkeypatch, caplog) -> None:
-    monkeypatch.setattr(settings, "vanillasoft_webhook_url", "http://vs.example.com")
-    monkeypatch.setattr(settings, "vanillasoft_webhook_secret", None)
+    monkeypatch.setattr(settings, "crm_webhook_url", "http://vs.example.com")
+    monkeypatch.setattr(settings, "crm_webhook_secret", None)
     http = _mock_http(is_success=False, status_code=500, text="SqlException: timeout")
     with (
-        patch("app.services.vanillasoft_notify.httpx.AsyncClient", return_value=http),
-        caplog.at_level(logging.WARNING, logger="app.services.vanillasoft_notify"),
+        patch("app.services.crm_notify.httpx.AsyncClient", return_value=http),
+        caplog.at_level(logging.WARNING, logger="app.services.crm_notify"),
     ):
-        ok = await vanillasoft_notify.post_notification(
-            vanillasoft_notify.INCOMING_SMS_PATH, {"referenceId": "SMfail001"}
+        ok = await crm_notify.post_notification(
+            crm_notify.INCOMING_SMS_PATH, {"referenceId": "SMfail001"}
         )
     assert ok is False
     record = caplog.records[-1]
@@ -423,14 +413,14 @@ async def test_post_notification_5xx_logs_error_with_reference_id(monkeypatch, c
 
 
 async def test_post_notification_non_2xx_truncates_long_body(monkeypatch, caplog) -> None:
-    monkeypatch.setattr(settings, "vanillasoft_webhook_url", "http://vs.example.com")
-    monkeypatch.setattr(settings, "vanillasoft_webhook_secret", None)
+    monkeypatch.setattr(settings, "crm_webhook_url", "http://vs.example.com")
+    monkeypatch.setattr(settings, "crm_webhook_secret", None)
     http = _mock_http(is_success=False, status_code=400, text="x" * 5000)
     with (
-        patch("app.services.vanillasoft_notify.httpx.AsyncClient", return_value=http),
-        caplog.at_level(logging.WARNING, logger="app.services.vanillasoft_notify"),
+        patch("app.services.crm_notify.httpx.AsyncClient", return_value=http),
+        caplog.at_level(logging.WARNING, logger="app.services.crm_notify"),
     ):
-        ok = await vanillasoft_notify.post_notification(vanillasoft_notify.INCOMING_CALL_PATH, {})
+        ok = await crm_notify.post_notification(crm_notify.INCOMING_CALL_PATH, {})
     assert ok is False
     message = caplog.records[-1].getMessage()
     assert "...[truncated]" in message
@@ -439,32 +429,29 @@ async def test_post_notification_non_2xx_truncates_long_body(monkeypatch, caplog
 
 
 async def test_truncate_short_body_unchanged() -> None:
-    assert vanillasoft_notify._truncate("short body") == "short body"
+    assert crm_notify._truncate("short body") == "short body"
 
 
 async def test_truncate_exact_limit_unchanged() -> None:
     text = "y" * 2000
-    assert vanillasoft_notify._truncate(text) == text
+    assert crm_notify._truncate(text) == text
 
 
 async def test_truncate_over_limit_capped_with_marker() -> None:
-    result = vanillasoft_notify._truncate("z" * 2001)
+    result = crm_notify._truncate("z" * 2001)
     assert result == "z" * 2000 + "...[truncated]"
 
 
 async def test_truncate_custom_limit() -> None:
-    assert vanillasoft_notify._truncate("abcdef", limit=4) == "abcd...[truncated]"
+    assert crm_notify._truncate("abcdef", limit=4) == "abcd...[truncated]"
 
 
 async def test_post_notification_connection_error_returns_false(monkeypatch) -> None:
-    monkeypatch.setattr(settings, "vanillasoft_webhook_url", "http://vs.example.com")
+    monkeypatch.setattr(settings, "crm_webhook_url", "http://vs.example.com")
     http = _mock_http()
     http.post = AsyncMock(side_effect=ConnectionError("down"))
-    with patch("app.services.vanillasoft_notify.httpx.AsyncClient", return_value=http):
-        assert (
-            await vanillasoft_notify.post_notification(vanillasoft_notify.INCOMING_CALL_PATH, {})
-            is False
-        )
+    with patch("app.services.crm_notify.httpx.AsyncClient", return_value=http):
+        assert await crm_notify.post_notification(crm_notify.INCOMING_CALL_PATH, {}) is False
 
 
 async def test_incoming_call_payload_roundtrip_with_orm_event(db_session) -> None:
@@ -482,7 +469,7 @@ async def test_incoming_call_payload_roundtrip_with_orm_event(db_session) -> Non
             "CallDuration": "12",
         },
     )
-    payload = vanillasoft_notify.incoming_call_payload(event, 99)
+    payload = crm_notify.incoming_call_payload(event, 99)
     assert set(payload.keys()) == _INCOMING_CALL_FIELDS
     assert payload["eventName"] == "callHungup"
     assert payload["isInbound"] is True

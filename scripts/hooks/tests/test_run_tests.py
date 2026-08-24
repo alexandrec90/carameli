@@ -82,7 +82,7 @@ def test_parse_cli_args_accepts_bare_test_paths():
     """Regression: `stop.py`'s `test_runner_argv` invokes `[run-tests.py, *targets]`.
 
     A path used to hit the strict-unknown-argument branch, so the Stop gate failed
-    with "Unknown argument: tests/integration/test_vanillaland_parity.py" — a
+    with "Unknown argument: tests/integration/test_legacy_crm_parity.py" — a
     complaint about this script's CLI, raised over a perfectly valid test file.
     Same vendored-hook/project-runner mismatch as the `--changed`/`--fast` case above.
     """

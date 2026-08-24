@@ -27,7 +27,7 @@ async def test_create_customer(client) -> None:
 
 
 async def test_legacy_add_customer_alias(client) -> None:
-    """VanillaSoft's CloudliClient still POSTs to VsCustomer/Add."""
+    """CRM's legacy VoIP client still POSTs to VsCustomer/Add."""
     payload = {
         "vs_customer_id": 4006,
         "api_key": "key-4006",
