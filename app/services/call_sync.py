@@ -14,7 +14,7 @@ from app.core.error_tracking import init_error_tracking
 from app.core.heartbeat import ping
 from app.repositories.call_event_repo import CallEventRepo
 from app.repositories.customer_repo import CustomerRepo
-from app.services import retention, vanillasoft_notify
+from app.services import retention, crm_notify
 from app.services.recording_archive_service import build_recording_archive
 from app.services.agent_status_sync import (
     poll_agent_status,
@@ -42,8 +42,8 @@ _CronFunction = Callable[[dict], Awaitable[None]]
 
 
 async def retry_unposted_events(ctx: dict) -> None:
-    """Retry posting call events (older than 1 min) to VanillaSoft that failed on first attempt."""
-    if not settings.vanillasoft_webhook_url:
+    """Retry posting call events (older than 1 min) to CRM that failed on first attempt."""
+    if not settings.crm_webhook_url:
         return
 
     async with async_session_factory() as session:
@@ -68,14 +68,14 @@ async def retry_unposted_events(ctx: dict) -> None:
                 customer = customer_map.get(event.customer_id) if event.customer_id else None
                 vs_customer_id = customer.vs_customer_id if customer else None
 
-                posted = await vanillasoft_notify.post_notification(
-                    vanillasoft_notify.INCOMING_CALL_PATH,
-                    vanillasoft_notify.incoming_call_payload(event, vs_customer_id),
+                posted = await crm_notify.post_notification(
+                    crm_notify.INCOMING_CALL_PATH,
+                    crm_notify.incoming_call_payload(event, vs_customer_id),
                 )
                 if posted:
                     await repo.mark_posted(event.id)
                     logger.info(
-                        "Retry: posted call event %s to VanillaSoft",
+                        "Retry: posted call event %s to CRM",
                         event.call_sid,
                     )
             except Exception:

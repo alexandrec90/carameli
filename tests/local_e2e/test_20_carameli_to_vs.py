@@ -1,17 +1,17 @@
-"""Direction 2 — Carameli -> VanillaLand: the honest receiver, driven locally.
+"""Direction 2 — Carameli -> LegacyCRM: the honest receiver, driven locally.
 
 These tests impersonate the remote Carameli: they build the exact notify payload
-``app/services/vanillasoft_notify.py`` builds, sign it with the shared secret, and POST
+``app/services/crm_notify.py`` builds, sign it with the shared secret, and POST
 the signed bytes to the local ``CarameliNotifyController``. That controller is
 deliberately *synchronous and honest* — 200 means the database write landed, and a
 failure carries its real reason in the response body — so a 200 here is a genuine
-end-to-end assertion about VanillaSoft, not an acknowledgement.
+end-to-end assertion about CRM, not an acknowledgement.
 
 Driving the receiver directly rather than waiting for real telephony is what makes this
 free and fast. The tunnel test at the end is the piece that proves the *remote* can
 actually reach it.
 
-These tests write rows to the local VanillaSoft database. Every synthetic identifier is
+These tests write rows to the local CRM database. Every synthetic identifier is
 prefixed ``LOCALE2E-`` so the rows are trivially identifiable and removable; see the
 runbook for the cleanup query.
 """
@@ -67,7 +67,7 @@ async def test_signed_incoming_call_is_accepted_and_persisted(config: LocalE2ECo
 
     assert response.status_code == 200, (
         "the honest receiver did not persist a valid IncomingCall. The body below is "
-        f"VanillaSoft's real reason: {describe(response)}"
+        f"CRM's real reason: {describe(response)}"
     )
 
 
@@ -269,6 +269,6 @@ async def test_remote_carameli_can_reach_the_local_receiver(
 
     assert response.status_code == 200, (
         "a signed notify through the public tunnel did not land. If the direct local "
-        "test passed, the fault is in the tunnel, not in VanillaSoft. "
+        "test passed, the fault is in the tunnel, not in CRM. "
         f"{describe(response)}"
     )

@@ -1,10 +1,10 @@
 """Unit coverage for the pure parts of ``tests/local_e2e/helpers.py``.
 
 The local integration suite only runs on a machine that has both a remote Carameli and a
-local VanillaLand IIS, so it never runs in CI. These tests are the same-commit coverage
+local LegacyCRM IIS, so it never runs in CI. These tests are the same-commit coverage
 for its logic, and — more importantly — they are the guard on the *duplicated* signing
 implementation: ``helpers.sign_payload`` is written independently of
-``app.services.vanillasoft_notify.sign_payload`` so it can cross-check it, and a test
+``app.services.crm_notify.sign_payload`` so it can cross-check it, and a test
 here pins the two together so the duplicate cannot drift into agreement-by-accident or
 disagreement-by-neglect.
 """
@@ -17,7 +17,7 @@ from typing import ClassVar
 import httpx
 import pytest
 
-from app.services import vanillasoft_notify
+from app.services import crm_notify
 from tests.local_e2e import helpers
 
 
@@ -38,14 +38,12 @@ class TestSigning:
         """The test-side duplicate and the shipped signer produce identical output."""
         body = b'{"callId":"abc","customerId":42}'
         assert helpers.sign_payload(body, 1_700_000_000, "shared") == (
-            vanillasoft_notify.sign_payload(body, 1_700_000_000, "shared")
+            crm_notify.sign_payload(body, 1_700_000_000, "shared")
         )
 
     def test_replay_tolerance_matches_the_production_constant(self) -> None:
         """A wider tolerance here than in production would hide a replay-window bug."""
-        assert helpers.SIGNATURE_TOLERANCE_SECONDS == (
-            vanillasoft_notify.SIGNATURE_TOLERANCE_SECONDS
-        )
+        assert helpers.SIGNATURE_TOLERANCE_SECONDS == (crm_notify.SIGNATURE_TOLERANCE_SECONDS)
 
     def test_signature_covers_the_timestamp(self) -> None:
         """Two timestamps over the same body must not share a MAC."""
@@ -176,7 +174,7 @@ class TestConfig:
         config = helpers.LocalE2EConfig.from_env()
         assert config is not None
         assert config.es_url == "http://localhost:9200"
-        assert config.es_index == "vanillasoft_dev.events"
+        assert config.es_index == "crm_dev.events"
 
     def test_from_env_returns_none_when_a_required_var_is_missing(
         self, monkeypatch: pytest.MonkeyPatch
@@ -368,7 +366,7 @@ class TestPayloadBuilders:
         assert payload["smsProviderName"] == "Carameli"
 
     def test_recording_payload_never_uses_the_dropped_source(self) -> None:
-        """VanillaSoft's legacy receiver silently drops recordings sourced 'asterisk'."""
+        """CRM's legacy receiver silently drops recordings sourced 'asterisk'."""
         payload = helpers.call_recording_payload(
             call_sid="CA1",
             vs_customer_id=42,

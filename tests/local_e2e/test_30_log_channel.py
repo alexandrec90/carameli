@@ -5,9 +5,9 @@ the integration. In the inverted topology that assumption needs re-proving, beca
 two log sinks moved:
 
 - **Carameli's own log** lives on the remote box, unreadable from here. The bridge is
-  ``POST /webhooks/vs-log``, which accepts a VanillaSoft-side record and re-emits it into
+  ``POST /webhooks/vs-log``, which accepts a CRM-side record and re-emits it into
   ``carameli.log`` — tested here for reachability and authentication.
-- **VanillaSoft's log** is shipped by NLog into the *local* Elasticsearch. That is the
+- **CRM's log** is shipped by NLog into the *local* Elasticsearch. That is the
   channel an agent on this machine actually greps, so this module proves a log line
   written by the receiver during a request really becomes a searchable document.
 
@@ -53,7 +53,7 @@ LOG_TEST_TIMEOUT_S = int(LOG_VISIBILITY_TIMEOUT_S) + 30
 async def test_vs_log_webhook_rejects_a_wrong_secret(config: LocalE2EConfig) -> None:
     """``/webhooks/vs-log`` on the remote must reject an unauthenticated record.
 
-    A 403 here is also the positive signal that ``VANILLASOFT_WEBHOOK_SECRET`` is
+    A 403 here is also the positive signal that ``CRM_WEBHOOK_SECRET`` is
     configured on the remote at all: with no secret set, the endpoint drops into dev mode
     and accepts anything, which would make the next test pass for the wrong reason.
     """
@@ -61,20 +61,20 @@ async def test_vs_log_webhook_rejects_a_wrong_secret(config: LocalE2EConfig) -> 
         response = await client.post(
             f"{config.carameli_base_url}/webhooks/vs-log",
             json=nlog_record(level="ERROR", message="local-e2e auth probe"),
-            headers={"X-Cloudli-Auth": "definitely-not-the-secret", **NGROK_SKIP_HEADER},
+            headers={config.log_auth_header: "definitely-not-the-secret", **NGROK_SKIP_HEADER},
         )
 
     assert response.status_code == 403, (
         "the remote /webhooks/vs-log accepted a wrong shared secret. If this is a 204, "
-        "VANILLASOFT_WEBHOOK_SECRET is unset on the remote and the endpoint is running "
+        "CRM_WEBHOOK_SECRET is unset on the remote and the endpoint is running "
         f"in dev mode. {describe(response)}"
     )
 
 
 async def test_vs_log_webhook_accepts_a_valid_record(config: LocalE2EConfig) -> None:
-    """A correctly authenticated VanillaSoft log record is ingested with 204.
+    """A correctly authenticated CRM log record is ingested with 204.
 
-    This is the escape hatch for VanillaSoft-side errors that never surface as an HTTP
+    This is the escape hatch for CRM-side errors that never surface as an HTTP
     response Carameli sees — exceptions inside ``CarameliClient``/``CarameliService``.
     Skips when the secret is not configured locally; without it there is nothing to test.
 
@@ -91,24 +91,24 @@ async def test_vs_log_webhook_accepts_a_valid_record(config: LocalE2EConfig) -> 
         response = await client.post(
             f"{config.carameli_base_url}/webhooks/vs-log",
             json=nlog_record(message=marker),
-            headers={"X-Cloudli-Auth": config.vs_webhook_secret, **NGROK_SKIP_HEADER},
+            headers={config.log_auth_header: config.vs_webhook_secret, **NGROK_SKIP_HEADER},
         )
 
     assert response.status_code == 204, (
         "the remote /webhooks/vs-log rejected a correctly authenticated record — "
-        "VS_WEBHOOK_SECRET does not match the remote's VANILLASOFT_WEBHOOK_SECRET. "
+        "VS_WEBHOOK_SECRET does not match the remote's CRM_WEBHOOK_SECRET. "
         f"{describe(response)}"
     )
 
 
 @pytest.mark.timeout(LOG_TEST_TIMEOUT_S)
-async def test_vanillasoft_logs_reach_local_elasticsearch(config: LocalE2EConfig) -> None:
+async def test_crm_logs_reach_local_elasticsearch(config: LocalE2EConfig) -> None:
     """A log line written by the receiver during a request becomes searchable locally.
 
     ``CarameliNotifyController`` logs ``Carameli NotifyIncomingCall received uuid=<id>``
     on entry, so posting a notify with a unique id and then finding that id in
     Elasticsearch proves the whole chain: IIS -> NLog -> ElasticSearch target -> local
-    index. Without this chain there is no way to see VanillaSoft-side errors from this
+    index. Without this chain there is no way to see CRM-side errors from this
     machine.
 
     Uses an intentionally unmappable ``eventName`` so the request is a cheap 400 that
@@ -151,8 +151,8 @@ async def test_vanillasoft_logs_reach_local_elasticsearch(config: LocalE2EConfig
         )
     except TimeoutError as exc:
         pytest.fail(
-            "VanillaSoft log lines are not reaching local Elasticsearch, so an agent on "
-            "this machine is blind to VanillaSoft-side errors. Check that "
+            "CRM log lines are not reaching local Elasticsearch, so an agent on "
+            "this machine is blind to CRM-side errors. Check that "
             "NLog.Targets.ElasticSearch is present in the VoipApi bin directory, that "
             "NLog.config points at the local ES, and that the IIS app pool has recycled "
             f"since the config changed. {exc}"

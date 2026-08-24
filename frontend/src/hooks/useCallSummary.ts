@@ -28,7 +28,7 @@ function toRow(r: CallSummaryRow): Record<string, string> {
 }
 
 /**
- * Data hook for the CDR Summary report page (cloudli spec §30–34). Owns the group-by
+ * Data hook for the CDR Summary report page (legacy feature spec §30–34). Owns the group-by
  * dimension (extension vs phone number) and the date range, and returns a DataPageProps
  * so every skin renders it via its DataPage view. Group-by is exposed as page actions
  * (the DataPage filter contract has no select kind); date filters re-fetch server-side

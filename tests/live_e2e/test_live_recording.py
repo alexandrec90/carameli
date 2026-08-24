@@ -7,7 +7,7 @@ verified end-to-end here yet.
 
 Flow: originate a recorded call → poll the call row for ``recording_url`` → GET the
 Carameli-served URL (expect 200, ``audio/*``) → assert the CallRecording notify
-reached VanillaSoft.
+reached CRM.
 """
 
 from __future__ import annotations
@@ -48,7 +48,7 @@ async def test_recorded_call_served_and_notified(
     live_config: E2EConfig,
     log_capture: LogCapture,
 ) -> None:
-    """A recorded call exposes a playable recording URL and notifies VanillaSoft."""
+    """A recorded call exposes a playable recording URL and notifies CRM."""
     if not live_config.telnyx_connection_id:
         pytest.skip("Set E2E_TELNYX_CONNECTION_ID to originate a recorded call")
     if not settings.telnyx_api_key:
@@ -96,7 +96,7 @@ async def test_recorded_call_served_and_notified(
     assert audio.status_code == 200, audio.text
     assert audio.headers.get("content-type", "").startswith("audio/"), audio.headers
 
-    # The CallRecording notify must have reached VanillaSoft.
+    # The CallRecording notify must have reached CRM.
     await poll_until(
         lambda: _contains(log_capture, "notify POST ok", "path=CallRecording"),
         timeout_s=120,

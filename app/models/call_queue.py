@@ -12,7 +12,7 @@ from app.core.database import Base
 
 
 class CallQueue(Base):
-    """A call queue configuration (cloudli spec §36). Config-only; routing engine
+    """A call queue configuration (legacy feature spec §36). Config-only; routing engine
     integration is deferred."""
 
     __tablename__ = "call_queues"

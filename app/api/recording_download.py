@@ -31,7 +31,7 @@ async def download_recording(
 ) -> RedirectResponse:
     """Redirect a token-authenticated GET to the call's fetchable recording URL."""
     # public: no bearer auth — authenticated by a per-call HMAC query token so
-    # VanillaSoft's recording service can fetch the MP3 with a plain GET.
+    # CRM's recording service can fetch the MP3 with a plain GET.
     if not recording_links.verify_recording_token(call_sid, token):
         logger.warning("Recording download rejected: bad token call_sid=%s", call_sid)
         raise HTTPException(status_code=403, detail="Invalid token")

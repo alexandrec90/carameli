@@ -1,8 +1,9 @@
-# Front-End Parity Plans — Cloudli → Carameli
+# Front-End Parity Plans — legacy console → Carameli
 
-Sequenced plans to bring the Carameli front-end to functional parity with Cloudli's
-39 pages (see `docs/reference/cloudli/cloudli-functional-spec.md` and
-`docs/reference/cloudli/carameli-frontend-gaps.md`). Each plan is sized for **one fresh session**.
+Sequenced plans to bring the Carameli front-end to functional parity with the 39 pages of
+the legacy vendor's console. The page-by-page breakdown those plans were written against
+is an unpublished local reference, not part of this repository. Each plan is sized for
+**one fresh session**.
 
 ## Foundation (DONE — Phase 0)
 
@@ -58,7 +59,7 @@ A CRUD vertical adds `POST /.../Add` + `PUT /.../Deactivate/{customerId}/{id}` r
 | Plan | Scope | Backend status | Size | State |
 | --- | --- | --- | --- | --- |
 | **A** | `plan-A-existing-backends.md` — surface data that already persists | List endpoint is the only new API | 1 session | — |
-| **B1** | `plan-B-feature-verticals.md` §B1 — Contacts / Contact Groups | None (owned by VanillaSoft) | small | **Done — structural placeholders shipped** |
+| **B1** | `plan-B-feature-verticals.md` §B1 — Contacts / Contact Groups | None (owned by CRM) | small | **Done — structural placeholders shipped** |
 | **B2** | §B2 — Contact centre: Agents, Queues, Skills | New models + CRUD | 1 session | Ready (decisions resolved) |
 | **B3** | §B3 — Extension variants: Group / Intercom / Multicast / Conferences / Parking | New models + CRUD | 1–2 sessions | Ready (decisions resolved) |
 | **B4** | §B4 — Media: Music / On-hold / Advertising / Prompts / Voicemail | New models + S3 + CRUD | 1–2 sessions | Ready (needs audio-cell column kind first) |

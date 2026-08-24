@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-Tests which safe Carameli/VanillaSoft diagnostic channels the current server identity can use.
+Tests which safe Carameli/CRM diagnostic channels the current server identity can use.
 
 .DESCRIPTION
 Runs non-mutating HTTPS, Windows Event Log, file-read, TCP, and SQL permission checks.
@@ -12,8 +12,8 @@ webhook, return database rows, or include log contents in the report.
 
 .EXAMPLE
 .\carameli-preflight.ps1 -CarameliUrl 'https://example.ngrok.app' `
-  -SqlHost 'sql-staging.example.com' -SqlDatabase 'VanillaSoft' `
-  -SqlReadObject 'dbo.IntendedTable' -LogPath 'C:\logs\vanillasoft.log'
+  -SqlHost 'sql-staging.example.com' -SqlDatabase 'CRM' `
+  -SqlReadObject 'dbo.IntendedTable' -LogPath 'C:\logs\crm.log'
 #>
 [CmdletBinding()]
 param(
@@ -22,7 +22,7 @@ param(
     [string] $CarameliUrl,
 
     [ValidatePattern('^$|^https?://')]
-    [string] $VanillaSoftNotifyUrl = '',
+    [string] $CRMNotifyUrl = '',
 
     [string] $SqlHost = '',
 
@@ -184,7 +184,7 @@ function New-SqlConnection {
     return New-Object System.Data.SqlClient.SqlConnection($builder.ConnectionString)
 }
 
-function Invoke-VanillaSoftRouteCheck {
+function Invoke-CRMRouteCheck {
     param(
         [Parameter(Mandatory = $true)][string] $Url,
         [Parameter(Mandatory = $true)][int] $Timeout
@@ -210,23 +210,23 @@ function Invoke-VanillaSoftRouteCheck {
 
 $checks = @()
 $healthUrl = $CarameliUrl.TrimEnd('/') + '/health'
-$checks += Invoke-Check -Name 'carameli-health' -Direction 'VanillaSoft -> Carameli' `
+$checks += Invoke-Check -Name 'carameli-health' -Direction 'CRM -> Carameli' `
     -Target $healthUrl -Action {
         $response = Invoke-WebRequest -Uri $healthUrl -Method Get -UseBasicParsing `
             -TimeoutSec $TimeoutSeconds
         "HTTP $([int] $response.StatusCode)"
     }
 
-if ([string]::IsNullOrWhiteSpace($VanillaSoftNotifyUrl)) {
-    $checks += New-NotRunResult -Name 'vanillasoft-notify-route' `
-        -Direction 'VanillaSoft host -> VanillaSoft app' `
-        -Detail 'pass -VanillaSoftNotifyUrl to test route existence with a non-mutating GET'
+if ([string]::IsNullOrWhiteSpace($CRMNotifyUrl)) {
+    $checks += New-NotRunResult -Name 'crm-notify-route' `
+        -Direction 'CRM host -> CRM app' `
+        -Detail 'pass -CRMNotifyUrl to test route existence with a non-mutating GET'
 }
 else {
-    $checks += Invoke-Check -Name 'vanillasoft-notify-route' `
-        -Direction 'VanillaSoft host -> VanillaSoft app' -Target $VanillaSoftNotifyUrl `
+    $checks += Invoke-Check -Name 'crm-notify-route' `
+        -Direction 'CRM host -> CRM app' -Target $CRMNotifyUrl `
         -Action {
-            Invoke-VanillaSoftRouteCheck -Url $VanillaSoftNotifyUrl -Timeout $TimeoutSeconds
+            Invoke-CRMRouteCheck -Url $CRMNotifyUrl -Timeout $TimeoutSeconds
         }
 }
 
@@ -272,7 +272,7 @@ else {
 if ([string]::IsNullOrWhiteSpace($SqlHost)) {
     foreach ($name in @('sql-tcp', 'sql-login', 'sql-object-read')) {
         $checks += New-NotRunResult -Name $name `
-            -Direction 'VanillaSoft host -> SQL Server' `
+            -Direction 'CRM host -> SQL Server' `
             -Detail 'pass -SqlHost to enable SQL connectivity checks'
     }
 }
@@ -282,7 +282,7 @@ else {
     $encrypt = -not $DisableSqlEncryption
     $trustCertificate = [bool] $TrustSqlServerCertificate
 
-    $checks += Invoke-Check -Name 'sql-tcp' -Direction 'VanillaSoft host -> SQL Server' `
+    $checks += Invoke-Check -Name 'sql-tcp' -Direction 'CRM host -> SQL Server' `
         -Target $sqlTarget -Action {
             Invoke-TcpConnect -HostName $SqlHost -Port $SqlPort -Timeout $TimeoutSeconds
         }

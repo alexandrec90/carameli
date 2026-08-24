@@ -20,7 +20,7 @@ function toRow(ec: ExemptionCode): Record<string, string> {
 }
 
 /**
- * Data hook for the Exemption Codes page (cloudli spec §11). Full CRUD —
+ * Data hook for the Exemption Codes page (legacy feature spec §11). Full CRUD —
  * create form + per-row Deactivate.
  */
 export function useExemptionCodes(): DataPageProps {

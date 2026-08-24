@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 class ParkingLot(Base):
-    """A call-parking extension config; live slot state is deferred (cloudli spec §10)."""
+    """A call-parking extension config; live slot state is deferred (legacy feature spec §10)."""
 
     __tablename__ = "parking_lots"
 

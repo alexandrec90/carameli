@@ -65,8 +65,8 @@ class TestParseDotenv:
 
     def test_keeps_windows_paths_intact(self) -> None:
         """``VS_REPO_DIR`` is a Windows path — backslashes are data, not escapes."""
-        parsed = script.parse_dotenv(r"VS_REPO_DIR=C:\Users\me\VanillaLand")
-        assert parsed["VS_REPO_DIR"] == r"C:\Users\me\VanillaLand"
+        parsed = script.parse_dotenv(r"VS_REPO_DIR=C:\Users\me\LegacyCRM")
+        assert parsed["VS_REPO_DIR"] == r"C:\Users\me\LegacyCRM"
 
     def test_keeps_equals_signs_inside_values(self) -> None:
         """Secrets are base64 and end in padding; splitting on every ``=`` truncates them."""
@@ -186,7 +186,7 @@ class TestCommandPlanning:
 class TestArtifact:
     def _results(self) -> list[Any]:
         return [
-            script.StepResult("vanillasoft up", script.OK, exit_code=0),
+            script.StepResult("crm up", script.OK, exit_code=0),
             script.StepResult(
                 "local_e2e suite", script.FAILED, exit_code=1, output="E   assert 400 == 204"
             ),
@@ -195,7 +195,7 @@ class TestArtifact:
 
     def test_summary_lists_every_step(self) -> None:
         text = script.render_artifact(self._results())
-        for name in ("vanillasoft up", "local_e2e suite", "outbound driver"):
+        for name in ("crm up", "local_e2e suite", "outbound driver"):
             assert name in text
 
     def test_failure_output_is_carried_into_the_file(self) -> None:

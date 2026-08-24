@@ -1,4 +1,4 @@
-"""Tests for the call-status → VanillaSoft write-back (A3) and the
+"""Tests for the call-status → CRM write-back (A3) and the
 CallRecording availability notification (A6c)."""
 
 from __future__ import annotations
@@ -9,7 +9,7 @@ import pytest
 
 from app.core.config import settings
 from app.repositories.call_event_repo import CallEventRepo
-from app.services import vanillasoft_notify
+from app.services import crm_notify
 from tests.conftest import AUTH_HEADERS, notify_payload
 
 pytestmark = pytest.mark.asyncio(loop_scope="session")
@@ -53,14 +53,14 @@ async def _create_customer_with_line(client, vs_id: int, phone: str) -> None:
 
 async def test_terminal_call_posts_incoming_call_contract(client, db_session, monkeypatch) -> None:
     """Completed call → notify/IncomingCall with IncomingCall.cs shape + Carameli HMAC."""
-    monkeypatch.setattr(settings, "vanillasoft_webhook_url", "http://vs.example.com/voip")
-    monkeypatch.setattr(settings, "vanillasoft_webhook_secret", "cloudli-secret")
+    monkeypatch.setattr(settings, "crm_webhook_url", "http://vs.example.com/voip")
+    monkeypatch.setattr(settings, "crm_webhook_secret", "legacy-secret")
     monkeypatch.setattr(settings, "carameli_notify_secret", "carameli-secret")
     phone = "+18605550100"
     await _create_customer_with_line(client, 8801, phone)
 
     http = _mock_http()
-    with patch("app.services.vanillasoft_notify.httpx.AsyncClient", return_value=http):
+    with patch("app.services.crm_notify.httpx.AsyncClient", return_value=http):
         resp = await client.post(
             _WEBHOOK,
             json={
@@ -78,8 +78,8 @@ async def test_terminal_call_posts_incoming_call_contract(client, db_session, mo
     call = http.post.call_args
     assert call.args[0] == "http://vs.example.com/voip/notify/IncomingCall"
     assert call.kwargs["headers"]["Content-Type"] == "application/json"
-    assert "X-Cloudli-Auth" not in call.kwargs["headers"]
-    assert vanillasoft_notify.SIGNATURE_HEADER in call.kwargs["headers"]
+    assert settings.legacy_log_auth_header not in call.kwargs["headers"]
+    assert crm_notify.SIGNATURE_HEADER in call.kwargs["headers"]
     payload = notify_payload(call)
     assert payload["callId"] == "CAwb001"
     assert payload["eventName"] == "callHungup"
@@ -95,13 +95,13 @@ async def test_terminal_call_posts_incoming_call_contract(client, db_session, mo
 
 async def test_terminal_call_with_recording_also_posts_call_recording(client, monkeypatch) -> None:
     """When a recording URL lands, notify/CallRecording fires with the Carameli URL."""
-    monkeypatch.setattr(settings, "vanillasoft_webhook_url", "http://vs.example.com/voip")
-    monkeypatch.setattr(settings, "vanillasoft_webhook_secret", None)
+    monkeypatch.setattr(settings, "crm_webhook_url", "http://vs.example.com/voip")
+    monkeypatch.setattr(settings, "crm_webhook_secret", None)
     phone = "+18615550100"
     await _create_customer_with_line(client, 8802, phone)
 
     http = _mock_http()
-    with patch("app.services.vanillasoft_notify.httpx.AsyncClient", return_value=http):
+    with patch("app.services.crm_notify.httpx.AsyncClient", return_value=http):
         resp = await client.post(
             _WEBHOOK,
             json={
@@ -131,9 +131,9 @@ async def test_terminal_call_with_recording_also_posts_call_recording(client, mo
 
 
 async def test_non_terminal_call_does_not_post(client, monkeypatch) -> None:
-    monkeypatch.setattr(settings, "vanillasoft_webhook_url", "http://vs.example.com/voip")
+    monkeypatch.setattr(settings, "crm_webhook_url", "http://vs.example.com/voip")
     http = _mock_http()
-    with patch("app.services.vanillasoft_notify.httpx.AsyncClient", return_value=http):
+    with patch("app.services.crm_notify.httpx.AsyncClient", return_value=http):
         resp = await client.post(
             _WEBHOOK,
             json={"call_sid": "CAwb003", "call_status": "ringing", "from": "+1", "to": "+2"},
@@ -142,12 +142,12 @@ async def test_non_terminal_call_does_not_post(client, monkeypatch) -> None:
     http.post.assert_not_awaited()
 
 
-async def test_vanillasoft_failure_leaves_event_unposted(client, db_session, monkeypatch) -> None:
-    """A VanillaSoft outage must not break webhook acknowledgement; retry job picks it up."""
-    monkeypatch.setattr(settings, "vanillasoft_webhook_url", "http://vs.example.com/voip")
+async def test_crm_failure_leaves_event_unposted(client, db_session, monkeypatch) -> None:
+    """A CRM outage must not break webhook acknowledgement; retry job picks it up."""
+    monkeypatch.setattr(settings, "crm_webhook_url", "http://vs.example.com/voip")
     http = _mock_http()
     http.post = AsyncMock(side_effect=ConnectionError("vs down"))
-    with patch("app.services.vanillasoft_notify.httpx.AsyncClient", return_value=http):
+    with patch("app.services.crm_notify.httpx.AsyncClient", return_value=http):
         resp = await client.post(
             _WEBHOOK,
             json={"call_sid": "CAwb004", "call_status": "completed", "from": "+1", "to": "+2"},
@@ -160,8 +160,8 @@ async def test_vanillasoft_failure_leaves_event_unposted(client, db_session, mon
 
 
 async def test_no_webhook_url_skips_write_back(client, monkeypatch) -> None:
-    monkeypatch.setattr(settings, "vanillasoft_webhook_url", None)
-    with patch("app.services.vanillasoft_notify.httpx.AsyncClient") as http_cls:
+    monkeypatch.setattr(settings, "crm_webhook_url", None)
+    with patch("app.services.crm_notify.httpx.AsyncClient") as http_cls:
         resp = await client.post(
             _WEBHOOK,
             json={"call_sid": "CAwb005", "call_status": "completed", "from": "+1", "to": "+2"},

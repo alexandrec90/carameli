@@ -1,7 +1,7 @@
 """Every ``/vsapi/1.0.0`` route exists, binds the .NET payload, and enforces auth.
 
-``/vsapi`` is the tree VanillaSoft's .NET clients call — ``CloudliClient.cs`` and
-``CarameliClient.cs`` under ``AppCode/VanillaSoft.Backend/``. It is also the tree where a
+``/vsapi`` is the tree CRM's .NET clients call — ``the legacy VoIP client`` and
+``CarameliClient.cs`` under ``AppCode/<legacy-backend>/``. It is also the tree where a
 break is least visible from here: nothing in Carameli's own frontend touches it, so a
 route that starts 404ing or stops accepting a payload shape is discovered by a support
 ticket rather than by a test.
@@ -112,7 +112,7 @@ async def test_every_openapi_route_is_in_the_manifest(
     uncovered = sorted(served - covered)
     assert not uncovered, (
         "these /vsapi routes are served but absent from tests/local_e2e/vsapi_manifest.py, "
-        "so nothing checks that VanillaSoft can still call them. Add each to ROUTES with "
+        "so nothing checks that CRM can still call them. Add each to ROUTES with "
         "its coverage class — DB (success-path) or EXTERNAL (contract-only, with the "
         f"provider call named in `why`): {uncovered}"
     )
@@ -157,7 +157,7 @@ async def test_route_requires_a_bearer_token(
 
     This is the one probe that is safe on *every* route including the provider-touching
     ones, because authentication is the outermost layer: nothing downstream of it runs.
-    It is also the test that proves the route is mounted — a 404 here means VanillaSoft's
+    It is also the test that proves the route is mounted — a 404 here means CRM's
     client is talking to a path Carameli no longer serves.
     """
     response = await _request(probe_client, config, route, bearer=None, body={})
@@ -236,7 +236,7 @@ async def test_rejections_use_the_fastapi_detail_shape(
 
     ``CarameliClient`` reads ``detail`` out of the body to populate
     ``CMVApiResponse.Message``; a rejection that returned a bare string or a differently
-    keyed object would surface to a VanillaSoft user as an empty error message, which is
+    keyed object would surface to a CRM user as an empty error message, which is
     the least debuggable failure this integration can produce.
     """
     response = await _request(probe_client, config, route, bearer=config.carameli_api_key, body={})

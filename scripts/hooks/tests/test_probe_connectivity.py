@@ -57,10 +57,10 @@ def test_resolve_config_ignores_empty_environment_values():
 @pytest.mark.parametrize(
     ("url", "expected"),
     [
-        ("https://wwac.vanillasoft.org/api", ("wwac.vanillasoft.org", 443)),
+        ("https://wwac.crm.org/api", ("wwac.crm.org", 443)),
         ("http://box.local/app", ("box.local", 80)),
         ("https://box.local:8443/app", ("box.local", 8443)),
-        ("wwac.vanillasoft.org", ("wwac.vanillasoft.org", 443)),
+        ("wwac.crm.org", ("wwac.crm.org", 443)),
     ],
 )
 def test_host_port_from_url(url, expected):

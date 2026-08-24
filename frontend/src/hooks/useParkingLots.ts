@@ -21,7 +21,7 @@ function toRow(p: ParkingLot): Record<string, string> {
 }
 
 /**
- * Data hook for the Call Parking page (cloudli spec §10). Lists a customer's
+ * Data hook for the Call Parking page (legacy feature spec §10). Lists a customer's
  * parking lot extensions and returns a DataPageProps so every skin renders the
  * same behaviour. Full CRUD: the create form calls Add and the per-row
  * Deactivate action calls Deactivate, both re-fetching on success.

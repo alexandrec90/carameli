@@ -2,13 +2,13 @@ import { usePlaceholderPage } from './usePlaceholderPage'
 import type { DataPageProps } from '../lib/dataPage'
 
 /**
- * Users (cloudli spec §1). Structural placeholder: organizational user management is a
- * VanillaSoft identity concern, not Carameli (see docs/plans/active/frontend-parity/plan-B-feature-verticals.md §B5).
+ * Users (legacy feature spec §1). Structural placeholder: organizational user management is a
+ * CRM identity concern, not Carameli (see docs/plans/active/frontend-parity/plan-B-feature-verticals.md §B5).
  */
 export function useUsers(): DataPageProps {
   return usePlaceholderPage({
     title: 'Users',
-    description: 'Organizational users (managed in VanillaSoft)',
+    description: 'Organizational users (managed in CRM)',
     route: '/users',
     columns: [
       { key: 'last_name', label: 'Last Name' },
@@ -21,6 +21,6 @@ export function useUsers(): DataPageProps {
       { key: 'id_number', label: 'Id Number' },
       { key: 'admin', label: 'Admin' },
     ],
-    emptyText: 'Users are managed in VanillaSoft',
+    emptyText: 'Users are managed in CRM',
   })
 }

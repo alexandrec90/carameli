@@ -22,7 +22,7 @@ function toRow(a: AudioAsset): Record<string, string> {
 }
 
 /**
- * Data hook for audio asset pages (cloudli spec §18–22, §25, §29). Parameterised
+ * Data hook for audio asset pages (legacy feature spec §18–22, §25, §29). Parameterised
  * by `kind` so each page (music, hold, ad, prompt, greeting, broadcast) gets its
  * own scoped list, upload form, and deactivate action.
  */

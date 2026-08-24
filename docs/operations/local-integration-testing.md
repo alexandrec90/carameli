@@ -1,18 +1,18 @@
-# Local integration testing: remote Carameli ⇄ local VanillaLand
+# Local integration testing: remote Carameli ⇄ local LegacyCRM
 
 This is the runbook for the **inverted topology**: Carameli runs on a remote box exposed
-through an ngrok tunnel, and VanillaLand runs locally in IIS on the developer machine.
+through an ngrok tunnel, and LegacyCRM runs locally in IIS on the developer machine.
 
 That is the mirror image of the setup
-[`docs/plans/active/airtight-vanillasoft/`](../plans/active/airtight-vanillasoft/00-overview.md)
-was written for (Carameli local, VanillaSoft at staging). The consequences are not
+[`docs/plans/active/airtight-crm/`](../plans/active/airtight-crm/00-overview.md)
+was written for (Carameli local, CRM at staging). The consequences are not
 cosmetic, so read this before reusing anything from those documents:
 
 | Concern | Plan's topology | This topology |
 | --- | --- | --- |
 | Carameli's log | local file, tail it | remote — unreadable from here |
-| VanillaSoft's log | remote staging NLog files | **local Elasticsearch**, greppable |
-| Who needs a tunnel | Carameli (for provider webhooks) | **both** — Carameli for its API, VanillaLand so notifies can be delivered back |
+| CRM's log | remote staging NLog files | **local Elasticsearch**, greppable |
+| Who needs a tunnel | Carameli (for provider webhooks) | **both** — Carameli for its API, LegacyCRM so notifies can be delivered back |
 | Test suite | `tests/live_e2e/`, costs real money | `tests/local_e2e/`, free |
 
 `tests/live_e2e/` is **not** the suite for this setup: it tails `logs/runtime/carameli.log`
@@ -25,8 +25,8 @@ on the local box (now the wrong box) and spends real Telnyx/jambonz money. Use
 tests/local_e2e/
   helpers.py               config, HMAC signing, payload builders, ES + polling helpers
   test_00_preflight.py     is the plumbing up at all
-  test_10_vs_to_carameli.py    VanillaLand -> Carameli contract (reads only)
-  test_20_carameli_to_vs.py    Carameli -> VanillaLand honest receiver
+  test_10_vs_to_carameli.py    LegacyCRM -> Carameli contract (reads only)
+  test_20_carameli_to_vs.py    Carameli -> LegacyCRM honest receiver
   test_30_log_channel.py       can an agent here read either side's errors
 ```
 
@@ -35,7 +35,7 @@ marked `paid` and is safe to run in a loop. It is gated on `RUN_LOCAL_E2E=1` plu
 infrastructure instead, and excluded from the default collection in `pytest.ini`.
 
 It also imports nothing from `app.*`. Carameli's Python stack is not installed on the
-VanillaLand machine — no Postgres, no Redis, frequently no Python at all — so the suite
+LegacyCRM machine — no Postgres, no Redis, frequently no Python at all — so the suite
 runs on stdlib plus `httpx`.
 
 ### Running it
@@ -61,35 +61,35 @@ Pass anything else straight through, e.g. `python scripts/run-local-e2e.py -k pr
 
 The pure helper logic is unit-tested in `tests/unit/test_local_e2e_helpers.py`, which
 **does** run in CI. That file also pins the suite's signing implementation against
-`app.services.vanillasoft_notify.sign_payload`, so the deliberate duplicate cannot drift.
+`app.services.crm_notify.sign_payload`, so the deliberate duplicate cannot drift.
 
 ## Setup
 
 ### 1. Local infrastructure
 
 ```powershell
-docker start vanillasoft-sql vanillasoft-es
+docker start crm-sql crm-es
 ```
 
-SQL Server holds the VanillaSoft database (`data source=localhost` in every
-`Web.config`); Elasticsearch is where NLog ships VanillaSoft's logs. Both are ordinary
+SQL Server holds the CRM database (`data source=localhost` in every
+`Web.config`); Elasticsearch is where NLog ships CRM's logs. Both are ordinary
 stopped containers after a reboot — a container that exited 137 was killed, usually by
 Docker Desktop's memory limit.
 
 IIS serves the site from the working tree, so there is nothing to deploy. The
-`VanillaLand` site maps two aliases to the same VoIP receiver application
-(`AppCode/VanillaSoft.VoipApi`):
+`LegacyCRM` site maps two aliases to the same VoIP receiver application
+(`AppCode/<legacy-voip-api>`):
 
 | Alias | Use |
 | --- | --- |
-| `/voip` | Vendor-neutral, preferred. Carameli answers under `/voip/carameli/notify/*`, Cloudli under `/voip/notify/*` |
-| `/cloudli` | Legacy, kept for back-compat with anything already pointing at it |
+| `/voip` | Vendor-neutral, preferred. Carameli answers under `/voip/carameli/notify/*`, the legacy VoIP vendor under `/voip/notify/*` |
+| `/legacy vendor` | Legacy, kept for back-compat with anything already pointing at it |
 
 Both serve identical routes; they are separate IIS applications over one physical path.
-The alias exists because Carameli is not a sub-part of Cloudli — the two vendors sit
+The alias exists because Carameli is not a sub-part of the legacy VoIP vendor — the two vendors sit
 side by side, and the URL should not imply otherwise. The receiver still lives inside the
-`VanillaSoft.VoipApi` *project*, which shares its payload models
-(`IncomingCall`/`SmsMessage`/`CallRecording`) and insert logic with `CloudliController`;
+`CRM VoIP API` *project*, which shares its payload models
+(`IncomingCall`/`SmsMessage`/`CallRecording`) and insert logic with `legacy notify controller`;
 splitting the project would mean extracting those into a class library first, because Web
 API discovers controllers in referenced assemblies and the two would collide on routes.
 
@@ -101,26 +101,26 @@ curl.exe -s -o NUL -w "%{http_code}`n" -X POST http://localhost:8021/voip/carame
 
 The site-level rewrite rule in the root `web.config` ("Redirect / to /web") must exclude
 each application alias, or requests get bounced to `/web`. `/voip` is listed there
-alongside `/appt/` and `/cloudli/`.
+alongside `/appt/` and `/legacy vendor/`.
 
 `404` means the project is not built into the application at all.
 
 `401` means a route is there — but **it does not prove the current build is running**, and
 this is the trap worth knowing about. `CarameliNotifyController` was originally guarded by
-`[CloudliHeaderAttribute]` (shared-secret header `X-Cloudli-Auth`) and only later moved to
+`[legacy auth-header filter]` (shared-secret header `X-Log-Auth`) and only later moved to
 `[CarameliSignature]` (HMAC `X-Carameli-Signature`). A stale binary rejects a correctly
 *signed* notify with exactly the same 401 a wrong secret produces. Tell them apart by
 offering the old header:
 
 ```powershell
 curl.exe -s -o NUL -w "%{http_code}`n" -X POST -H "Content-Type: application/json" `
-  -H "X-Cloudli-Auth: <CloudliAuthValue from Web.config>" -d "{}" `
+  -H "X-Log-Auth: <legacy shared-secret appSetting from Web.config>" -d "{}" `
   http://localhost:8021/voip/carameli/notify/IncomingCall
 ```
 
 Anything other than 401 means the legacy filter is still in charge and the application is
-running a build that predates the signature work — rebuild `VanillaSoft.VoipApi` and
-recycle the app pool. Compare `bin/VanillaSoft.VoipApi.dll`'s timestamp against the
+running a build that predates the signature work — rebuild `CRM VoIP API` and
+recycle the app pool. Compare `bin/CRM VoIP API.dll`'s timestamp against the
 commit that added `BusinessLogic/Carameli/CarameliSignatureAttribute.cs` when in doubt.
 
 ### 2. Database schema
@@ -128,7 +128,7 @@ commit that added `BusinessLogic/Carameli/CarameliSignatureAttribute.cs` when in
 A database created before this branch lacks the VoIP-vendor routing objects, and
 `VoipRoutingRepository` fails with `Invalid column name 'VoipVendor'` — which means no
 customer can be routed to Carameli at all. The SSDT project
-(`AppCode/VanillaSoft.Database`) already has both objects; this only applies them to an
+(`AppCode/CRM.Database`) already has both objects; this only applies them to an
 older database. Idempotent:
 
 ```sql
@@ -158,10 +158,10 @@ END
 GO
 ```
 
-Route the test customer to Carameli (`VoipVendor` 0 = CMV, 1 = Cloudli, 2 = Carameli):
+Route the test customer to Carameli (`VoipVendor` 0 = CMV, 1 = the legacy VoIP vendor, 2 = Carameli):
 
 ```sql
-UPDATE dbo.tblCustomer SET VoipVendor = 2, CloudliEnabled = 0 WHERE CustomerID = @id;
+UPDATE dbo.tblCustomer SET VoipVendor = 2, legacy-vendor toggle appSetting = 0 WHERE CustomerID = @id;
 ```
 
 `tblCMVCallNotification` has **no** foreign keys, so the notify tests insert successfully
@@ -175,10 +175,10 @@ Three values must agree across the two machines. All three currently ship empty 
 working tree, and an empty `CarameliNotifySecret` rejects *every* notify with 401 —
 indistinguishable from a wrong secret.
 
-| Value | Remote Carameli (`.env`) | Local VanillaLand |
+| Value | Remote Carameli (`.env`) | Local LegacyCRM |
 | --- | --- | --- |
-| notify signing secret | `CARAMELI_NOTIFY_SECRET` | `CarameliNotifySecret` in `AppCode/VanillaSoft.VoipApi/Web.config` |
-| Carameli API base | — | `CarameliApiBaseUrl` in `AppCode/Vanillasoft.Web/Web.config`, e.g. `https://<remote>.ngrok-free.dev/vsapi/1.0.0/` (**trailing slash required**) |
+| notify signing secret | `CARAMELI_NOTIFY_SECRET` | `CarameliNotifySecret` in `AppCode/<legacy-voip-api>/Web.config` |
+| Carameli API base | — | `CarameliApiBaseUrl` in `AppCode/CRM.Web/Web.config`, e.g. `https://<remote>.ngrok-free.dev/vsapi/1.0.0/` (**trailing slash required**) |
 | Carameli API key | key of the E2E customer | `CarameliApiKey` in the same file |
 
 `CarameliApiBaseUrl` needs the trailing slash and the full `/vsapi/1.0.0/` path:
@@ -190,7 +190,7 @@ covers it.
 Recycle the IIS app pool after editing a `Web.config`:
 
 ```powershell
-Restart-WebAppPool -Name VanillaSoft
+Restart-WebAppPool -Name CRM
 ```
 
 ### 4. The reverse tunnel
@@ -223,12 +223,12 @@ tunnels need no account at all — and set `VS_PUBLIC_BASE_URL` by hand.
 Then set, on the **remote** Carameli:
 
 ```dotenv
-VANILLASOFT_WEBHOOK_URL=https://<your-local-tunnel>.ngrok-free.dev/voip
-VANILLASOFT_NOTIFY_PREFIX=carameli/notify
+CRM_WEBHOOK_URL=https://<your-local-tunnel>.ngrok-free.dev/voip
+CRM_NOTIFY_PREFIX=carameli/notify
 ```
 
 The `/voip` suffix is the IIS application path, and the prefix flip is what moves
-Carameli off the legacy fire-and-forget `CloudliController` onto the honest receiver.
+Carameli off the legacy fire-and-forget `legacy notify controller` onto the honest receiver.
 Deploy order matters: the controller must be serving before Carameli starts posting to
 those routes — locally it already is, so flip the prefix whenever you like.
 
@@ -259,16 +259,16 @@ curl.exe -s -H "ngrok-skip-browser-warning: 1" https://<remote>.ngrok-free.dev/h
 
 | Failure mode | Evidence | How to read it |
 | --- | --- | --- |
-| VanillaSoft rejected or failed a notify | The response body itself — the receiver is synchronous and honest | The suite prints it in the assertion message; live traffic puts it in `carameli.log` on the remote |
-| VanillaSoft-side exception, any app | Local Elasticsearch, index `vanillasoft_dev.events` | query below |
-| VanillaSoft error outside an HTTP exchange Carameli sees | `POST /webhooks/vs-log` on the remote → `carameli.log` there | `test_30_log_channel.py` proves the channel works |
+| CRM rejected or failed a notify | The response body itself — the receiver is synchronous and honest | The suite prints it in the assertion message; live traffic puts it in `carameli.log` on the remote |
+| CRM-side exception, any app | Local Elasticsearch, index `crm_dev.events` | query below |
+| CRM error outside an HTTP exchange Carameli sees | `POST /webhooks/vs-log` on the remote → `carameli.log` there | `test_30_log_channel.py` proves the channel works |
 | Carameli's own errors | `logs/runtime/carameli.log` **on the remote box** | not readable from here — this is why the vs-log bridge exists |
 | Notify never arrived | Nothing local. Carameli's retry cron and reconciliation ERRORs, both remote | check the remote, or re-run `test_20` to prove the receiver is fine |
 
-Recent VanillaSoft errors from the local log channel:
+Recent CRM errors from the local log channel:
 
 ```bash
-curl -s "http://localhost:9200/vanillasoft_dev.events/_search" -H 'Content-Type: application/json' -d '{
+curl -s "http://localhost:9200/crm_dev.events/_search" -H 'Content-Type: application/json' -d '{
   "query": {"bool": {"filter": [{"terms": {"level": ["Error", "Fatal", "Warn"]}}]}},
   "sort": [{"@timestamp": "desc"}], "size": 20
 }'
@@ -277,14 +277,14 @@ curl -s "http://localhost:9200/vanillasoft_dev.events/_search" -H 'Content-Type:
 Everything one call left behind, joined on the call id:
 
 ```bash
-curl -s "http://localhost:9200/vanillasoft_dev.events/_search" -H 'Content-Type: application/json' -d '{
+curl -s "http://localhost:9200/crm_dev.events/_search" -H 'Content-Type: application/json' -d '{
   "query": {"match_phrase": {"message": "<callId>"}},
   "sort": [{"@timestamp": "asc"}], "size": 50
 }'
 ```
 
 The NLog configuration writing to that index is currently a **local, uncommitted change**
-in the VanillaLand working tree (`*.bak-carameli` files hold the originals). It logs at
+in the LegacyCRM working tree (`*.bak-carameli` files hold the originals). It logs at
 `Debug` on purpose — that verbosity is the point of the channel — and points at
 `http://localhost:9200`, never the company cluster. Lower it to `Warn` when you are done
 debugging, and do not commit the local URL over the shared one.
@@ -305,7 +305,7 @@ DELETE FROM dbo.tblCMVCallNotification WHERE UUID LIKE '10CA1E2E-%';
 - [`diagnostics-error-map.md`](diagnostics-error-map.md) — the error map for the
   *original* topology (Carameli local). Still correct about Carameli's own internals;
   its log-location advice does not apply here.
-- [`vanillasoft-connectivity-preflight.md`](vanillasoft-connectivity-preflight.md) —
+- [`crm-connectivity-preflight.md`](crm-connectivity-preflight.md) —
   host/identity/permission checks, written for Carameli-local. `scripts/probe-connectivity.py`
   probes *outward* from a Carameli machine and is not the right tool from here; the
   suite's `test_00_preflight.py` is.

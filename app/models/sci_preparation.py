@@ -12,7 +12,7 @@ from app.core.database import Base
 
 
 class SciPreparation(Base):
-    """Short-lived caller-ID selection for one VanillaSoft contact call."""
+    """Short-lived caller-ID selection for one CRM contact call."""
 
     __tablename__ = "sci_preparations"
     __table_args__ = (

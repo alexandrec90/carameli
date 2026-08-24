@@ -86,7 +86,7 @@ async def test_poll_until_timeout_message_embeds_last_value() -> None:
 
 _LOG = (
     "2026-07-07 10:00:00.100 | INFO     | app.services.x:12 | started\n"
-    "2026-07-07 10:00:01.200 | ERROR    | app.services.x:34 | VanillaSoft notify POST returned 500\n"
+    "2026-07-07 10:00:01.200 | ERROR    | app.services.x:34 | CRM notify POST returned 500\n"
     "2026-07-07 10:00:02.300 | WARNING  | app.services.x:56 | soft warning\n"
     "2026-07-07 10:00:03.400 | CRITICAL | app.services.x:78 | boom\n"
     "a line with no pipes at all\n"
@@ -350,7 +350,7 @@ def test_call_histories_since_keeps_only_calls_in_the_window() -> None:
 
 
 def test_call_histories_since_drops_undatable_rows() -> None:
-    """A row we cannot date is not evidence that this call reached VanillaSoft."""
+    """A row we cannot date is not evidence that this call reached CRM."""
     rows: list[dict[str, Any]] = [
         {"call_history_id": 1},
         {"call_history_id": 2, "call_date_time_utc": None},
@@ -383,7 +383,7 @@ def test_attended_call_test_consumes_the_vs_check() -> None:
 def test_unattended_call_test_does_not_read_pubapi() -> None:
     """The unattended flow must NOT assert on PubApi — there is nothing there to read.
 
-    Nothing creates a VanillaSoft call-history record for a call no agent placed from
+    Nothing creates a CRM call-history record for a call no agent placed from
     the CRM (CMVCallData.cs attaches attempts to records it *finds*), so a read-back
     here would fail on a healthy system. Pinning it keeps a well-meaning "apply the
     check to both flows" change from reintroducing that.

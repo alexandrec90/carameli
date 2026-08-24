@@ -1,4 +1,4 @@
-"""VanillaLand contract parity tests.
+"""LegacyCRM contract parity tests.
 
 Each test references the legacy source file that defines the original CMV/ASMX contract.
 Payload/response assertions focus on practical compatibility semantics in Carameli.
@@ -43,7 +43,7 @@ async def _add_phone_line(client, vs_customer_id: int, phone_number: str, sid: s
     return resp.json()
 
 
-# ── SMS contract (VanillaLand: ConnectMeVoice/CmvSMS.cs SendSMS) ─────────────
+# ── SMS contract (LegacyCRM: the legacy SMS backend SendSMS) ─────────────
 
 
 async def test_sms_send_compatibility_route_and_response_shape(client) -> None:
@@ -88,10 +88,10 @@ async def test_sms_send_legacy_field_names_rejected_as_invalid_input(client) -> 
     assert resp.status_code == 422
 
 
-# ── Customer provisioning (VanillaLand: ConnectMeVoice/CmvCustomer.cs) ──────
+# ── Customer provisioning (LegacyCRM: the legacy customer backend) ──────
 
 
-async def test_customer_create_vanillaland_required_fields(client) -> None:
+async def test_customer_create_legacy_crm_required_fields(client) -> None:
     """Legacy flow requires vs_customer_id + api_key-equivalent credentials."""
     data = await _create_customer(client, 5502, "key-5502")
 
@@ -113,10 +113,10 @@ async def test_customer_create_duplicate_vs_id_returns_409(client) -> None:
     assert resp.status_code == 409
 
 
-# ── Call status webhook (VanillaLand: CMVCallInfo.asmx NotifyIncomingCall) ───
+# ── Call status webhook (LegacyCRM: CMVCallInfo.asmx NotifyIncomingCall) ───
 
 
-async def test_call_status_webhook_vanillaland_payload_semantics(client, monkeypatch) -> None:
+async def test_call_status_webhook_legacy_crm_payload_semantics(client, monkeypatch) -> None:
     """Call status payload with identifier/status fields should be accepted."""
     from app.core.config import settings
 
@@ -137,7 +137,7 @@ async def test_call_status_webhook_vanillaland_payload_semantics(client, monkeyp
     assert resp.json().get("status") == "ok"
 
 
-# ── Callback contract (VanillaLand: ConnectMeVoice/CmvCallback.cs) ───────────
+# ── Callback contract (LegacyCRM: the legacy callback backend) ───────────
 
 
 async def test_callback_by_extension_contract_semantics(client) -> None:
@@ -172,7 +172,7 @@ async def test_callback_by_extension_contract_semantics(client) -> None:
     assert data["status"] == "queued"
 
 
-# ── Phone line lifecycle (VanillaLand: ConnectMeVoice/CmvPhoneNumber.cs) ─────
+# ── Phone line lifecycle (LegacyCRM: the legacy phone-number backend) ─────
 
 
 async def test_phone_line_lifecycle_add_count_deactivate(client) -> None:

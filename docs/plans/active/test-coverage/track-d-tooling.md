@@ -146,17 +146,17 @@ async def test_frontend_logs_written_to_logger(client, caplog):
 
 ---
 
-## Session D2 — VanillaLand contract parity tests
+## Session D2 — LegacyCRM contract parity tests
 
-**Goal:** For each Carameli endpoint that replaces a VanillaLand ASMX web service, assert that
+**Goal:** For each Carameli endpoint that replaces a LegacyCRM ASMX web service, assert that
 the request/response shape and error semantics match the legacy contract.
 
 ### Context
 
-VanillaLand is in `../VanillaLand/`. See `CLAUDE.md` for the technology mapping table.
+LegacyCRM is in `../legacy-crm/`. See `CLAUDE.md` for the technology mapping table.
 The primary contracts to cover:
 
-| VanillaLand | Carameli endpoint |
+| LegacyCRM | Carameli endpoint |
 |---|---|
 | `SMSWS.asmx` → `SendSMS` | `POST /vsapi/1.0.0/VsMessaging/Sms/Send` |
 | `CMVCallInfo.asmx` → call status | `POST /webhooks/jambonz/call-status` |
@@ -164,20 +164,20 @@ The primary contracts to cover:
 | `CmvCustomer.cs` → `VsCustomer/Add` | `POST /vsapi/1.0.0/VsCustomer/Create` |
 | `tblPhoneNumber` lifecycle | `/vsapi/1.0.0/PhoneLine/*` |
 
-### New file: `tests/integration/test_vanillaland_parity.py`
+### New file: `tests/integration/test_legacy_crm_parity.py`
 
-For each row in the table above, read the VanillaLand source file listed in
-the VanillaLand mapping in root `CLAUDE.md` and write a test that:
+For each row in the table above, read the LegacyCRM source file listed in
+the LegacyCRM mapping in root `CLAUDE.md` and write a test that:
 
-1. Sends the exact request shape VanillaLand would send (field names, casing, data types).
-2. Asserts the Carameli response matches the shape VanillaLand expects back.
-3. Where VanillaLand returns a specific error code/message for an invalid input, assert
+1. Sends the exact request shape LegacyCRM would send (field names, casing, data types).
+2. Asserts the Carameli response matches the shape LegacyCRM expects back.
+3. Where LegacyCRM returns a specific error code/message for an invalid input, assert
    Carameli returns a semantically equivalent HTTP error.
 
 ```python
-"""VanillaLand contract parity tests.
+"""LegacyCRM contract parity tests.
 
-Each test is annotated with the VanillaLand source file it mirrors.
+Each test is annotated with the LegacyCRM source file it mirrors.
 Payload shapes are taken directly from the ASMX service contracts.
 """
 
@@ -191,8 +191,8 @@ pytestmark = pytest.mark.asyncio(loop_scope="session")
 # ── SMS contract (mirrors SMSWS.asmx SendSMS) ─────────────────────────────
 
 
-async def test_sms_send_vanillaland_payload_shape(client):
-    """VanillaLand sends: vs_customer_id, from_number, to_number, message_body."""
+async def test_sms_send_legacy_crm_payload_shape(client):
+    """LegacyCRM sends: vs_customer_id, from_number, to_number, message_body."""
     from app.main import app
 
     await client.post(
@@ -211,7 +211,7 @@ async def test_sms_send_vanillaland_payload_shape(client):
         headers=AUTH_HEADERS,
     )
     app.state.carrier.send_sms = AsyncMock(return_value={"sid": "SMvl001", "status": "queued"})
-    # VanillaLand payload shape
+    # LegacyCRM payload shape
     resp = await client.post(
         "/vsapi/1.0.0/VsMessaging/Sms/Send",
         json={
@@ -225,15 +225,15 @@ async def test_sms_send_vanillaland_payload_shape(client):
     assert resp.status_code in (200, 201)
     data = resp.json()
     assert "sid" in data or "message_sid" in data, (
-        "Response must include a message SID (VanillaLand reads this field)"
+        "Response must include a message SID (LegacyCRM reads this field)"
     )
 
 
 # ── Customer provisioning (mirrors CmvCustomer.cs VsCustomer/Add) ─────────
 
 
-async def test_customer_create_vanillaland_required_fields(client):
-    """VanillaLand sends: vs_customer_id (int), api_key (str)."""
+async def test_customer_create_legacy_crm_required_fields(client):
+    """LegacyCRM sends: vs_customer_id (int), api_key (str)."""
     resp = await client.post(
         "/vsapi/1.0.0/VsCustomer/Create",
         json={"vs_customer_id": 5502, "api_key": "key-5502"},
@@ -242,14 +242,14 @@ async def test_customer_create_vanillaland_required_fields(client):
     assert resp.status_code == 201
     data = resp.json()
     assert data["vs_customer_id"] == 5502
-    # VanillaLand checks that the returned id is a UUID-shaped string
+    # LegacyCRM checks that the returned id is a UUID-shaped string
     import uuid
 
     uuid.UUID(data["id"])  # raises ValueError if not a UUID
 
 
 async def test_customer_create_duplicate_vs_id_returns_409(client):
-    """VanillaLand expects a 409 (or equivalent) on duplicate vs_customer_id."""
+    """LegacyCRM expects a 409 (or equivalent) on duplicate vs_customer_id."""
     await client.post(
         "/vsapi/1.0.0/VsCustomer/Create",
         json={"vs_customer_id": 5503, "api_key": "key-5503a"},
@@ -266,8 +266,8 @@ async def test_customer_create_duplicate_vs_id_returns_409(client):
 # ── Call status webhook (mirrors CMVCallInfo.asmx) ────────────────────────
 
 
-async def test_call_status_webhook_vanillaland_payload(client):
-    """VanillaLand's Jambonz equivalent sends: call_sid, call_status, duration, from, to."""
+async def test_call_status_webhook_legacy_crm_payload(client):
+    """LegacyCRM's Jambonz equivalent sends: call_sid, call_status, duration, from, to."""
     resp = await client.post(
         "/webhooks/jambonz/call-status",
         json={
@@ -284,7 +284,7 @@ async def test_call_status_webhook_vanillaland_payload(client):
 
 
 # Add more parity tests for: PhoneLine/Add, PhoneLine/Deactivate, VsExtension/Add
-# Read the VanillaLand source files in ../VanillaLand/ to get exact field names.
+# Read the LegacyCRM source files in ../legacy-crm/ to get exact field names.
 ```
 
 ### Snapshot approach (optional enhancement)
@@ -293,7 +293,7 @@ After the test suite is green, consider adding response snapshot tests using `sy
 
 ```bash
 pip install syrupy
-pytest tests/integration/test_vanillaland_parity.py --snapshot-update
+pytest tests/integration/test_legacy_crm_parity.py --snapshot-update
 ```
 
 On subsequent runs, any response shape change will fail the snapshot test.

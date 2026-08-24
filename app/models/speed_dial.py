@@ -12,7 +12,7 @@ from app.core.database import Base
 
 
 class SpeedDial(Base):
-    """A speed-dial shortcut (*75+code) for a customer (cloudli spec §28)."""
+    """A speed-dial shortcut (*75+code) for a customer (legacy feature spec §28)."""
 
     __tablename__ = "speed_dials"
 
