@@ -126,12 +126,6 @@ legacy-crm/
 /playwright/.cache/
 /playwright/.auth/
 
-# promptfoo eval cache / outputs (keep the dir, ignore the generated artifacts)
-.promptfoo/
-evals/output/*
-!evals/output/.gitkeep
-evals/.last-run.json
-
 # Claude Code local settings (personal permissions / preferences)
 .claude/settings.local.json
 
