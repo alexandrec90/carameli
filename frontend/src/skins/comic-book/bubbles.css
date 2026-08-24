@@ -1,6 +1,7 @@
+@import './bubbleInputs.css';
+
 /* Speech bubbles and their connector tubes.
-   Split out of comic-book.css to keep both files under the skin's 250-line ceiling
-   (see .claude/rules/skin-comic-book.md). Imported by Layout.tsx directly after
+   Split out to stay under the skin's 250-line ceiling; imported by Layout.tsx after
    comic-book.css, preserving the cascade order the rules had while they lived there —
    though every selector here is unique to bubbles, so nothing depends on it. */
 

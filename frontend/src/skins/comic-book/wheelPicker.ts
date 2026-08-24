@@ -4,20 +4,6 @@
 // way the rest of the skin's geometry is (see bubbleShape.ts, transforms.ts).
 
 /**
- * How a bubble presents its `text`: lettered as-is, or split on commas into a
- * scroll-wheel picker. A kind rather than a boolean so a third presentation --
- * a date drum, say -- is one more name here instead of a second flag.
- */
-export type BubbleContentKind = 'text' | 'wheel'
-
-export const BUBBLE_CONTENT_KINDS: BubbleContentKind[] = ['text', 'wheel']
-
-/** Runtime guard for persisted payloads, mirroring isBubbleType / isTailDir. */
-export function isBubbleContentKind(value: unknown): value is BubbleContentKind {
-  return typeof value === 'string' && (BUBBLE_CONTENT_KINDS as string[]).includes(value)
-}
-
-/**
  * One wheel row's height in em of the picker's own font size. The track offset is
  * computed from this in JS; `.cb-wheel-option` in bubbles.css states the same height
  * in CSS. Keep the two in step or the highlighted row drifts off the bubble's centre

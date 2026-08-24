@@ -1,6 +1,6 @@
 import type { TailDir } from '../bubbleBox'
+import type { BubbleContentKind } from '../bubbleContent'
 import type { PanelGrids } from '../panelGeometry'
-import type { BubbleContentKind } from '../wheelPicker'
 import type { BubbleType } from './bubbleTypes'
 
 // The shape half of the document is declared next door, in ../panelGeometry.ts, because
@@ -78,11 +78,11 @@ export interface BubbleTransform {
   /** Which way the tail points, or 'none' (see TAIL_DIRS in bubbleBox.ts). */
   tail: TailDir
   /**
-   * How `text` is presented: lettered as-is ('text'), or split on commas into a
-   * scroll-wheel picker ('wheel') the mouse wheel turns (see wheelPicker.ts).
+   * How `text` is presented: lettering, a wheel picker, a text input, or a
+   * region-aware phone input (see bubbleContent.ts).
    */
   content: BubbleContentKind
-  /** Bubble caption text — or, when `content` is 'wheel', its comma-delimited options. */
+  /** Caption/options, or the initial value of an editable input. */
   text: string
   /**
    * Bubble to join with a connector tube, by index into the bubble array; null when

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 
 import { BUBBLE_VIEW, cloudPuffs } from './bubbleBox'
 import { puffOpacity, resolveBubbleShape } from './bubbleShape'
+import BubbleInput from './BubbleInput'
 import BubbleWheel from './BubbleWheel'
 import { BUBBLE_TYPES } from './editor/bubbleTypes'
 import { bubbleStyle } from './editor/transforms'
@@ -24,16 +25,13 @@ interface PanelBubbleProps {
  * One speech bubble, drawn as vector geometry (see bubbleShape.ts) rather
  * than artwork so it can morph between shapes and weld to a connector tube.
  *
- * It stays decorative: `aria-hidden`, and it deliberately handles no `onClick`, so
- * a press still reaches the panel and navigates exactly as before — the shape pulse
- * rides along on `pointerdown`. That also keeps it clear of the jsx-a11y rules that
- * would demand keyboard handlers on a div; the panel itself is already keyboard
- * navigable for the real action. The wheel-picker presentation (BubbleWheel) keeps
- * the same bargain: its only input is the mouse wheel, which the panel has no use
- * for, so nothing aimed at the panel is swallowed.
+ * Text and wheel content stay decorative: `aria-hidden`, and a press still reaches
+ * the panel and navigates. Input content is a real form control instead; it stops its
+ * pointer and keyboard events so editing it never triggers the panel underneath.
  */
 export default function PanelBubble({ bubble, visible, interactive }: PanelBubbleProps) {
   const [hover, setHover] = useState(false)
+  const [focused, setFocused] = useState(false)
   const [pulsing, setPulsing] = useState(false)
   const timerRef = useRef(0)
   // Handed to BubbleWheel so its wheel listener covers the whole balloon.
@@ -54,10 +52,15 @@ export default function PanelBubble({ bubble, visible, interactive }: PanelBubbl
   // Lettering follows the shape: a shout balloon in the speech font reads wrong,
   // and comics do swap the lettering when the balloon changes character.
   const font = BUBBLE_TYPES[shape].font
+  const editableKind =
+    bubble.content === 'input' || bubble.content === 'phone' ? bubble.content : null
+  // A keyboard user can tab to an otherwise hidden input; focus reveals its bubble
+  // immediately and blur returns it to the panel-hover reveal rule.
+  const shown = visible || focused
 
   const className = [
     'cb-panel-bubble',
-    visible ? 'is-visible' : '',
+    shown ? 'is-visible' : '',
     interactive ? 'is-interactive' : '',
   ]
     .filter(Boolean)
@@ -67,11 +70,13 @@ export default function PanelBubble({ bubble, visible, interactive }: PanelBubbl
     <div
       ref={rootRef}
       className={className}
-      aria-hidden="true"
+      aria-hidden={editableKind ? undefined : true}
       style={bubbleStyle(bubble)}
       onPointerEnter={interactive ? () => setHover(true) : undefined}
       onPointerLeave={interactive ? () => setHover(false) : undefined}
       onPointerDown={interactive ? pulse : undefined}
+      onFocusCapture={editableKind && interactive ? () => setFocused(true) : undefined}
+      onBlurCapture={editableKind && interactive ? () => setFocused(false) : undefined}
     >
       <svg
         className="cb-panel-bubble-svg"
@@ -87,7 +92,15 @@ export default function PanelBubble({ bubble, visible, interactive }: PanelBubbl
           ))}
         </g>
       </svg>
-      {bubble.content === 'wheel' ? (
+      {editableKind ? (
+        <BubbleInput
+          key={`${editableKind}:${bubble.text}`}
+          kind={editableKind}
+          initialValue={bubble.text}
+          font={font}
+          enabled={interactive}
+        />
+      ) : bubble.content === 'wheel' ? (
         <BubbleWheel options={splitOptions(bubble.text)} font={font} open={hover} hostRef={rootRef} />
       ) : (
         <span className="cb-panel-bubble-text" style={{ fontFamily: `'${font}', cursive` }}>

@@ -1,7 +1,7 @@
 import { logger } from '../../../lib/logger'
 import { isTailDir } from '../bubbleBox'
+import { isBubbleContentKind } from '../bubbleContent'
 import { PANELS } from '../panels'
-import { isBubbleContentKind } from '../wheelPicker'
 import { isBubbleType } from './bubbleTypes'
 import { CONFIG_KEY, cloneGrids, NEW_BUBBLE, NEW_IMAGE, seedConfig } from './configSeed'
 import { isPanelGrids } from './panelGridValidate'
