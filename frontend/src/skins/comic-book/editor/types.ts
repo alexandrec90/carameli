@@ -1,12 +1,13 @@
 import type { TailDir } from '../bubbleBox'
 import type { PanelGrids } from '../panelGeometry'
+import type { BubbleContentKind } from '../wheelPicker'
 import type { BubbleType } from './bubbleTypes'
 
 // The shape half of the document is declared next door, in ../panelGeometry.ts, because
 // the renderer needs it too and this module is the editor's. Re-exported here so
 // layoutConfig.ts — which the editor overwrites whole — keeps naming exactly one module
 // for its types.
-export type { LayoutKind, NormPt, PanelGrid, PanelGrids } from '../panelGeometry'
+export type { LayoutKind, PanelGrid, PanelGrids } from '../panelGeometry'
 
 /**
  * One picture on the page: which panel it belongs to, which file it shows, the frame
@@ -76,7 +77,12 @@ export interface BubbleTransform {
   type: BubbleType
   /** Which way the tail points, or 'none' (see TAIL_DIRS in bubbleBox.ts). */
   tail: TailDir
-  /** Bubble caption text. */
+  /**
+   * How `text` is presented: lettered as-is ('text'), or split on commas into a
+   * scroll-wheel picker ('wheel') the mouse wheel turns (see wheelPicker.ts).
+   */
+  content: BubbleContentKind
+  /** Bubble caption text — or, when `content` is 'wheel', its comma-delimited options. */
   text: string
   /**
    * Bubble to join with a connector tube, by index into the bubble array; null when

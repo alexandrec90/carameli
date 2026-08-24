@@ -2,10 +2,12 @@ import { useEffect, useRef, useState } from 'react'
 
 import { BUBBLE_VIEW, cloudPuffs } from './bubbleBox'
 import { puffOpacity, resolveBubbleShape } from './bubbleShape'
+import BubbleWheel from './BubbleWheel'
 import { BUBBLE_TYPES } from './editor/bubbleTypes'
 import { bubbleStyle } from './editor/transforms'
 import type { BubbleTransform } from './editor/types'
 import { useBubbleMorph } from './useBubbleMorph'
+import { splitOptions } from './wheelPicker'
 
 /** How long a press holds its shape before easing back to the resting one. */
 const PULSE_MS = 560
@@ -26,12 +28,16 @@ interface PanelBubbleProps {
  * a press still reaches the panel and navigates exactly as before — the shape pulse
  * rides along on `pointerdown`. That also keeps it clear of the jsx-a11y rules that
  * would demand keyboard handlers on a div; the panel itself is already keyboard
- * navigable for the real action.
+ * navigable for the real action. The wheel-picker presentation (BubbleWheel) keeps
+ * the same bargain: its only input is the mouse wheel, which the panel has no use
+ * for, so nothing aimed at the panel is swallowed.
  */
 export default function PanelBubble({ bubble, visible, interactive }: PanelBubbleProps) {
   const [hover, setHover] = useState(false)
   const [pulsing, setPulsing] = useState(false)
   const timerRef = useRef(0)
+  // Handed to BubbleWheel so its wheel listener covers the whole balloon.
+  const rootRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => () => window.clearTimeout(timerRef.current), [])
 
@@ -59,6 +65,7 @@ export default function PanelBubble({ bubble, visible, interactive }: PanelBubbl
 
   return (
     <div
+      ref={rootRef}
       className={className}
       aria-hidden="true"
       style={bubbleStyle(bubble)}
@@ -80,9 +87,13 @@ export default function PanelBubble({ bubble, visible, interactive }: PanelBubbl
           ))}
         </g>
       </svg>
-      <span className="cb-panel-bubble-text" style={{ fontFamily: `'${font}', cursive` }}>
-        {bubble.text}
-      </span>
+      {bubble.content === 'wheel' ? (
+        <BubbleWheel options={splitOptions(bubble.text)} font={font} open={hover} hostRef={rootRef} />
+      ) : (
+        <span className="cb-panel-bubble-text" style={{ fontFamily: `'${font}', cursive` }}>
+          {bubble.text}
+        </span>
+      )}
     </div>
   )
 }

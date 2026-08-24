@@ -25,7 +25,9 @@ export const PANEL_IMG_TRANSFORMS: ImgTransform[] = [
 // pointer-over and press (null = stay put), `tail` which way the tail points ('none'
 // for no tail), and `linkTo` the bubble to join with a connector tube — an index into
 // this array, which must name a bubble on the same panel. `spill: true` keeps the
-// current look where bubbles float into the gutter.
+// current look where bubbles float into the gutter. `content` picks how `text` reads:
+// 'text' letters it as-is; 'wheel' splits it on commas into a scroll picker that the
+// mouse wheel turns, its unpicked options fading in while the bubble is hovered.
 //
 // Two pairs ship linked — the logo's and the mechanic's — each pair being one speaker's
 // line continuing across two balloons, so the second of each carries no tail and the
@@ -35,16 +37,16 @@ export const PANEL_IMG_TRANSFORMS: ImgTransform[] = [
 // landscape layout; the portrait and square layouts reshape the panels, so a pair may
 // end up close enough there to drop its tube. Retune per layout in the editor.
 export const PANEL_BUBBLE_TRANSFORMS: BubbleTransform[] = [
-  { panel: 0, top: -35, right: -12, width: 55, rotate: -5, spill: true, type: 'soft', tail: 'down-left', text: "It's Carameli!", linkTo: 1, hoverType: 'cloud', clickType: 'lightning' },
-  { panel: 0, top: 30, right: 45, width: 45, rotate: -5, spill: true, type: 'soft', tail: 'none', text: '...at your service!', linkTo: null, hoverType: 'cloud', clickType: 'lightning' },
-  { panel: 1, top: -35, right: -12, width: 55, rotate: -5, spill: true, type: 'soft', tail: 'down-right', text: 'Number please!', linkTo: null, hoverType: 'cloud', clickType: 'lightning' },
-  { panel: 2, top: -35, right: -12, width: 55, rotate: -5, spill: true, type: 'cloud', tail: 'down-left', text: 'I wonder...', linkTo: null, hoverType: 'soft', clickType: 'lightning' },
-  { panel: 3, top: -35, right: -12, width: 55, rotate: -5, spill: true, type: 'lightning', tail: 'down-left', text: 'FIXED!', linkTo: 5, hoverType: 'cloud', clickType: 'soft' },
-  { panel: 3, top: 30, right: 45, width: 45, rotate: -5, spill: true, type: 'soft', tail: 'none', text: '...for now.', linkTo: null, hoverType: 'cloud', clickType: 'lightning' },
-  { panel: 4, top: -30, right: 30, width: 45, rotate: -5, spill: true, type: 'soft', tail: 'down-right', text: 'One moment please!', linkTo: null, hoverType: 'cloud', clickType: 'lightning' },
-  { panel: 5, top: -35, right: -12, width: 55, rotate: -5, spill: true, type: 'lightning', tail: 'down-left', text: 'RING RING!', linkTo: null, hoverType: 'cloud', clickType: 'soft' },
-  { panel: 6, top: -35, right: -12, width: 55, rotate: -5, spill: true, type: 'lightning', tail: 'down-left', text: 'Ka-POW!', linkTo: null, hoverType: 'soft', clickType: 'cloud' },
-  { panel: 7, top: -35, right: -12, width: 55, rotate: -5, spill: true, type: 'cloud', tail: 'down-left', text: 'Delivering dreams...', linkTo: null, hoverType: 'soft', clickType: 'lightning' },
+  { panel: 0, top: -35, right: -12, width: 55, rotate: -5, spill: true, type: 'soft', tail: 'down-left', content: 'text', text: "It's Carameli!", linkTo: 1, hoverType: 'cloud', clickType: 'lightning' },
+  { panel: 0, top: 30, right: 45, width: 45, rotate: -5, spill: true, type: 'soft', tail: 'none', content: 'text', text: '...at your service!', linkTo: null, hoverType: 'cloud', clickType: 'lightning' },
+  { panel: 1, top: -35, right: -12, width: 55, rotate: -5, spill: true, type: 'soft', tail: 'down-right', content: 'text', text: 'Number please!', linkTo: null, hoverType: 'cloud', clickType: 'lightning' },
+  { panel: 2, top: -35, right: -12, width: 55, rotate: -5, spill: true, type: 'cloud', tail: 'down-left', content: 'text', text: 'I wonder...', linkTo: null, hoverType: 'soft', clickType: 'lightning' },
+  { panel: 3, top: -35, right: -12, width: 55, rotate: -5, spill: true, type: 'lightning', tail: 'down-left', content: 'text', text: 'FIXED!', linkTo: 5, hoverType: 'cloud', clickType: 'soft' },
+  { panel: 3, top: 30, right: 45, width: 45, rotate: -5, spill: true, type: 'soft', tail: 'none', content: 'text', text: '...for now.', linkTo: null, hoverType: 'cloud', clickType: 'lightning' },
+  { panel: 4, top: -30, right: 30, width: 45, rotate: -5, spill: true, type: 'soft', tail: 'down-right', content: 'text', text: 'One moment please!', linkTo: null, hoverType: 'cloud', clickType: 'lightning' },
+  { panel: 5, top: -35, right: -12, width: 55, rotate: -5, spill: true, type: 'lightning', tail: 'down-left', content: 'text', text: 'RING RING!', linkTo: null, hoverType: 'cloud', clickType: 'soft' },
+  { panel: 6, top: -35, right: -12, width: 55, rotate: -5, spill: true, type: 'lightning', tail: 'down-left', content: 'text', text: 'Ka-POW!', linkTo: null, hoverType: 'soft', clickType: 'cloud' },
+  { panel: 7, top: -35, right: -12, width: 55, rotate: -5, spill: true, type: 'cloud', tail: 'down-left', content: 'text', text: 'Delivering dreams...', linkTo: null, hoverType: 'soft', clickType: 'lightning' },
 ]
 
 // The panel shapes themselves, one grid per viewport shape. `vertices` are the corners of
