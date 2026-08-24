@@ -4,8 +4,8 @@
 //
 // It is its own module rather than a const in Layout.tsx because the editor overlay
 // needs the same names, and Layout lazy-imports the overlay — importing a runtime
-// value back out of Layout would close that into a cycle. A type-only import (PanelPoly)
-// does not, which is why that one stayed.
+// value back out of Layout would close that into a cycle. The panel *shapes* are next
+// door in panelGeometry.ts for the same reason, now that the editor edits them too.
 
 /** One panel of the grid. Geometry is computed per viewport; this is the rest. */
 export interface Panel {
@@ -18,7 +18,7 @@ export interface Panel {
 }
 
 /**
- * Index-parallel to the polygons `computeLayout` returns — panel `i` is `PANELS[i]`.
+ * Index-parallel to the polygons `gridPolys` returns — panel `i` is `PANELS[i]`.
  * That parallelism is the one that survives: a panel is a fixed slot in the grid, so
  * there are exactly as many of these as there are polygons, however many pictures or
  * balloons end up on each.

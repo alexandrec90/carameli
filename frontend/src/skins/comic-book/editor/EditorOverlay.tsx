@@ -1,26 +1,20 @@
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import type { CSSProperties } from 'react'
 
 import { logger } from '../../../lib/logger'
-import type { PanelPoly } from '../Layout'
+import type { LayoutKind, PanelPoly, Rect } from '../panelGeometry'
+import { frameRect } from '../panelGeometry'
 import { PANELS } from '../panels'
 import { assetLabel } from './assets'
-import InspectorPanel from './InspectorPanel'
-import PageSelect from './PageSelect'
+import EditorToolbar from './EditorToolbar'
 import type { PageSelectProps } from './PageSelect'
-import { serializeConfig, serializeConfigFile } from './serialize'
+import PanelSeams from './PanelSeams'
 import { bubbleRect, imgVisibleRect } from './transforms'
 import { useOverlayInteraction } from './useOverlayInteraction'
-import { useToolbarDrag } from './useToolbarDrag'
+import { useSeamDrag } from './useSeamDrag'
 import type { EditorModeApi } from './useEditorMode'
 import './editor.css'
-
-interface Rect {
-  x: number
-  y: number
-  w: number
-  h: number
-}
+import './editor-shapes.css'
 
 interface EditorOverlayProps {
   api: EditorModeApi
@@ -28,46 +22,49 @@ interface EditorOverlayProps {
   /** Natural pixel size of each loaded source, keyed by `src` — sizes the visible
       image rect the hover and selection outlines trace. */
   natSizes: Record<string, { w: number; h: number }>
+  /** Which of the three grids this window is showing, so shape edits reach the right one. */
+  layoutKind: LayoutKind
+  /** Viewport size in px — the shape editor needs the page frame, not the panels. */
+  viewport: { w: number; h: number }
   pageSelect: PageSelectProps
 }
-
-/** Dev-only endpoint (Vite middleware) that overwrites editor/layoutConfig.ts. */
-const SAVE_ENDPOINT = '/__comic-editor/save'
 
 function rectStyle(r: Rect): CSSProperties {
   return { left: r.x, top: r.y, width: r.w, height: r.h }
 }
 
-/** Fallback when the save endpoint/clipboard is unavailable: download the file. */
-function downloadConfig(text: string): void {
-  const blob = new Blob([text], { type: 'text/typescript' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = 'layoutConfig.ts'
-  a.click()
-  URL.revokeObjectURL(url)
-}
-
 /**
- * Dev-only editor overlay. Renders transparent per-panel click targets, a draggable
- * selection outline with resize/rotate handles, and a toolbar that hosts the
- * selection inspector plus Save / Reset / Copy / download actions.
+ * Dev-only editor overlay, in two modes.
  *
- * Save POSTs the serialized config to a dev-only Vite middleware that rewrites
- * editor/layoutConfig.ts on disk (HMR then reloads it); Reset reverts unsaved edits
- * to the last saved file. Both degrade to the clipboard/download fallbacks.
+ * *Content* renders transparent per-panel click targets and a draggable selection
+ * outline with resize/rotate/pan handles, for placing pictures and bubbles.
+ *
+ * *Panel shapes* puts those away and draws the grid itself: a handle on every line two
+ * panels share and on every corner those lines meet at. The outer frame gets neither,
+ * which is how it stays fixed — see PanelSeams.tsx.
+ *
+ * Both write through the same working copy, which Save POSTs to a dev-only Vite
+ * middleware that rewrites editor/layoutConfig.ts on disk (see EditorToolbar.tsx).
  */
-export default function EditorOverlay({ api, panelPolys, natSizes, pageSelect }: EditorOverlayProps) {
+export default function EditorOverlay({
+  api,
+  panelPolys,
+  natSizes,
+  layoutKind,
+  viewport,
+  pageSelect,
+}: EditorOverlayProps) {
   useEffect(() => {
     logger.info('Comic-book editor overlay active', { panels: panelPolys.length })
   }, [panelPolys.length])
 
-  const { selected, config } = api
+  const { selected, config, mode } = api
+  const shapeMode = mode === 'shapes'
   const interaction = useOverlayInteraction(api, panelPolys)
-  const toolbarDrag = useToolbarDrag()
-  const [copied, setCopied] = useState(false)
-  const [saved, setSaved] = useState(false)
+
+  const grid = config.grids[layoutKind]
+  const frame = frameRect(viewport.w, viewport.h)
+  const drag = useSeamDrag(api, layoutKind, grid, frame)
 
   // Everything drawn is placed against the panel it *names*, never against a panel
   // that shares its index — those parted company once a panel could own several of
@@ -91,51 +88,6 @@ export default function EditorOverlay({ api, panelPolys, natSizes, pageSelect }:
         ? bubbleRect(selPoly.bounds, selBubble)
         : selPoly.bounds
 
-  const onSave = () => {
-    const content = serializeConfigFile(config)
-    fetch(SAVE_ENDPOINT, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content }),
-    })
-      .then(res => {
-        if (!res.ok) throw new Error(`HTTP ${res.status}`)
-        setSaved(true)
-        logger.info('Comic-book editor: config saved to layoutConfig.ts')
-        window.setTimeout(() => setSaved(false), 1500)
-      })
-      .catch(err => {
-        logger.error('Comic-book editor: save failed, downloading instead', {
-          err: String(err),
-        })
-        downloadConfig(content)
-      })
-  }
-
-  const onCopyConfig = () => {
-    const text = serializeConfig(config)
-    const confirm = () => {
-      setCopied(true)
-      logger.info('Comic-book editor: config copied to clipboard')
-      window.setTimeout(() => setCopied(false), 1500)
-    }
-    if (navigator.clipboard?.writeText) {
-      navigator.clipboard
-        .writeText(text)
-        .then(confirm)
-        .catch(err => {
-          logger.error('Comic-book editor: clipboard write failed, downloading instead', {
-            err: String(err),
-          })
-          downloadConfig(serializeConfigFile(config))
-        })
-    } else {
-      downloadConfig(serializeConfigFile(config))
-    }
-  }
-
-  const onDownloadConfig = () => downloadConfig(serializeConfigFile(config))
-
   return (
     <div className="cb-ed-layer">
       {/* Empty-space click target — clears the selection */}
@@ -146,63 +98,70 @@ export default function EditorOverlay({ api, panelPolys, natSizes, pageSelect }:
         onClick={api.clear}
       />
 
-      {/* Per-panel click targets — the backdrop for everything drawn on a panel.
-          Selecting a panel is what "+ Image" and "+ Bubble" act on, and it is the only
-          way to reach a panel that has nothing on it yet. */}
-      {panelPolys.map((poly, i) => (
-        <button
-          key={i}
-          type="button"
-          className="cb-ed-target"
-          style={rectStyle(poly.bounds)}
-          aria-label={`Select ${PANELS[i]?.label ?? `panel ${i}`}`}
-          onClick={() => api.select('panel', i)}
-        />
-      ))}
+      {/* The content targets are not merely hidden in shapes mode, they are not rendered:
+          a panel-sized click target sitting over a seam would eat every drag aimed at the
+          line running through it. */}
+      {!shapeMode && (
+        <>
+          {/* Per-panel click targets — the backdrop for everything drawn on a panel.
+              Selecting a panel is what "+ Image" and "+ Bubble" act on, and it is the only
+              way to reach a panel that has nothing on it yet. */}
+          {panelPolys.map((poly, i) => (
+            <button
+              key={i}
+              type="button"
+              className="cb-ed-target"
+              style={rectStyle(poly.bounds)}
+              aria-label={`Select ${PANELS[i]?.label ?? `panel ${i}`}`}
+              onClick={() => api.select('panel', i)}
+            />
+          ))}
 
-      {/* One click target per picture, on the rectangle its pixels visibly occupy —
-          the image, not the frame it hangs in. They paint after the panel targets so a
-          picture wins the click where the two overlap. */}
-      {config.images.map((img, i) => {
-        const poly = panelPolys[img.panel]
-        if (!poly) return null
-        return (
-          <button
-            key={i}
-            type="button"
-            className="cb-ed-target cb-ed-target-img"
-            style={rectStyle(imgVisibleRect(poly.bounds, natSizes[img.src], img))}
-            aria-label={`Select ${assetLabel(img.src)} on ${PANELS[img.panel]?.label ?? `panel ${img.panel}`}`}
-            onClick={() => api.select('img', i)}
-          />
-        )
-      })}
+          {/* One click target per picture, on the rectangle its pixels visibly occupy —
+              the image, not the frame it hangs in. They paint after the panel targets so
+              a picture wins the click where the two overlap. */}
+          {config.images.map((img, i) => {
+            const poly = panelPolys[img.panel]
+            if (!poly) return null
+            return (
+              <button
+                key={i}
+                type="button"
+                className="cb-ed-target cb-ed-target-img"
+                style={rectStyle(imgVisibleRect(poly.bounds, natSizes[img.src], img))}
+                aria-label={`Select ${assetLabel(img.src)} on ${PANELS[img.panel]?.label ?? `panel ${img.panel}`}`}
+                onClick={() => api.select('img', i)}
+              />
+            )
+          })}
 
-      {/* One click target per bubble, placed against the panel it belongs to. They
-          paint last so a bubble stays clickable where it overlaps a picture, its own
-          panel — or a neighbour's, once it spills into the gutter. */}
-      {config.bubbles.map((bubble, i) => {
-        const poly = panelPolys[bubble.panel]
-        if (!poly) return null
-        return (
-          <button
-            key={i}
-            type="button"
-            className="cb-ed-target cb-ed-target-bubble"
-            style={rectStyle(bubbleRect(poly.bounds, bubble))}
-            aria-label={`Select ${PANELS[bubble.panel]?.label ?? `panel ${bubble.panel}`} bubble ${i}`}
-            onClick={() => api.select('bubble', i)}
-          />
-        )
-      })}
+          {/* One click target per bubble, placed against the panel it belongs to. They
+              paint last so a bubble stays clickable where it overlaps a picture, its own
+              panel — or a neighbour's, once it spills into the gutter. */}
+          {config.bubbles.map((bubble, i) => {
+            const poly = panelPolys[bubble.panel]
+            if (!poly) return null
+            return (
+              <button
+                key={i}
+                type="button"
+                className="cb-ed-target cb-ed-target-bubble"
+                style={rectStyle(bubbleRect(poly.bounds, bubble))}
+                aria-label={`Select ${PANELS[bubble.panel]?.label ?? `panel ${bubble.panel}`} bubble ${i}`}
+                onClick={() => api.select('bubble', i)}
+              />
+            )
+          })}
+        </>
+      )}
 
       {/* Selection outline. A picture or a bubble gets a draggable body plus handles;
           a selected *panel* is only ever outlined, because a panel is a slot in the
           grid and there is nothing about it to drag. */}
-      {selected?.kind === 'panel' && selectedRect && (
+      {!shapeMode && selected?.kind === 'panel' && selectedRect && (
         <div className="cb-ed-outline cb-ed-outline-panel" style={rectStyle(selectedRect)} aria-hidden="true" />
       )}
-      {selected && selected.kind !== 'panel' && selectedRect && (
+      {!shapeMode && selected && selected.kind !== 'panel' && selectedRect && (
         <div
           className="cb-ed-outline"
           style={rectStyle(selectedRect)}
@@ -243,72 +202,15 @@ export default function EditorOverlay({ api, panelPolys, natSizes, pageSelect }:
         </div>
       )}
 
+      {shapeMode && <PanelSeams grid={grid} frame={frame} drag={drag} />}
+
       {/* Toolbar — draggable by its title grip so it can be moved off a panel */}
-      <div className="cb-ed-toolbar" role="region" aria-label="Comic-book editor" {...toolbarDrag.rootProps}>
-        <div className="cb-ed-title cb-ed-grip" title="Drag to move" {...toolbarDrag.gripProps}>COMIC EDITOR</div>
-        <PageSelect {...pageSelect} />
-        {selected && selPanel !== null ? (
-          <InspectorPanel api={api} panel={selPanel} />
-        ) : (
-          <div className="cb-ed-hint">Click a panel, a picture or a bubble to select it.</div>
-        )}
-        <div className="cb-ed-actions">
-          {/* New pictures and bubbles land on the selected panel, because there is no
-              other answer to "which panel" that does not need a second click. */}
-          <button
-            type="button"
-            className="cb-ed-btn"
-            disabled={selPanel === null}
-            title={
-              selPanel === null
-                ? 'Select a panel first'
-                : `Add a picture to ${PANELS[selPanel]?.label ?? `panel ${selPanel}`}`
-            }
-            onClick={() => selPanel !== null && api.addImgOn(selPanel)}
-          >
-            + Image
-          </button>
-          <button
-            type="button"
-            className="cb-ed-btn"
-            disabled={selPanel === null}
-            title={
-              selPanel === null
-                ? 'Select a panel first'
-                : `Add a bubble to ${PANELS[selPanel]?.label ?? `panel ${selPanel}`}`
-            }
-            onClick={() => selPanel !== null && api.addBubbleOn(selPanel)}
-          >
-            + Bubble
-          </button>
-        </div>
-        <div className="cb-ed-actions">
-          <button type="button" className="cb-ed-btn cb-ed-btn-primary" onClick={onSave}>
-            {saved ? 'Saved!' : 'Save'}
-          </button>
-          <button
-            type="button"
-            className="cb-ed-btn"
-            title="Discard unsaved changes (revert to last saved file)"
-            onClick={api.resetAll}
-          >
-            Reset
-          </button>
-        </div>
-        <div className="cb-ed-actions">
-          <button type="button" className="cb-ed-btn" onClick={onCopyConfig}>
-            {copied ? 'Copied!' : 'Copy config'}
-          </button>
-          <button
-            type="button"
-            className="cb-ed-btn cb-ed-btn-icon"
-            title="Download layoutConfig.ts (clipboard/save fallback)"
-            onClick={onDownloadConfig}
-          >
-            .ts
-          </button>
-        </div>
-      </div>
+      <EditorToolbar
+        api={api}
+        selPanel={selPanel}
+        pageSelect={pageSelect}
+        shapes={{ kind: layoutKind, grid, drag }}
+      />
     </div>
   )
 }

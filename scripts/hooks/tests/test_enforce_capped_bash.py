@@ -278,10 +278,65 @@ def test_only_the_producing_end_of_a_pipeline_is_judged():
 
 @pytest.mark.parametrize(
     "cap",
-    ["| head -c 400", "| tail -c 400", "| head -20", "| tail -n 20", "| wc -l", "> out.txt"],
+    [
+        "| head -c 400",
+        "| tail -c 400",
+        "| head -20",
+        "| tail -n 20",
+        "| head",
+        "| tail",
+        "| wc -l",
+        "| grep -c warn",
+        "| grep -rc warn",
+        "| grep --count warn",
+        "> out.txt",
+    ],
 )
 def test_every_cap_spelling_counts(cap):
     assert allows(f"ls -R / {cap}")
+
+
+def test_an_uncounted_head_is_still_a_cap():
+    """Ten lines is `head`'s default, so the count was never what made it a bound.
+
+    Requiring one blocked `git status --porcelain | head`, which is the shape a session
+    reaches for first -- a report of this exact false positive is what removed it.
+    """
+    assert allows("git status --porcelain | head")
+    assert allows("cat big.log | tail")
+    assert allows("ls -R / | head foo.txt")
+
+
+@pytest.mark.parametrize(
+    "segment",
+    [
+        "| tail -f",
+        "| tail --follow",
+        "| tail -n +5",
+        "| head -n -5",
+    ],
+)
+def test_an_unbounded_head_or_tail_is_not_a_cap(segment):
+    """The flags that make `head`/`tail` unbounded: following, and counting from the
+    other end. An optional count must not admit these by matching the bare name."""
+    assert blocks(f"cat big.log {segment}")
+
+
+def test_a_counting_grep_bounds_a_blocked_head():
+    """One number per input is a bound, and this spelling was blocking real work.
+
+    `git show <ref>:<file> | grep -c <pattern>` -- reading whether a symbol survives in
+    a tagged tree -- was refused for want of a `wc`, and the block message's remedies
+    (`--stat`, `--name-only`) answer a different question than the one being asked.
+    """
+    assert allows('git show v1.2.3:scripts/hooks/hook.py | grep -c "def main"')
+    assert allows("cat big.log | egrep -c warn")
+
+
+def test_grep_context_is_not_a_count():
+    """`-C 3` prints three lines around every match, so the case distinction is load-bearing."""
+    assert blocks("git show HEAD | grep -C 3 warn")
+    assert blocks("cat big.log | grep warn")
 
 
 def test_a_descriptor_duplication_is_not_a_redirect():
@@ -320,6 +375,33 @@ def test_powershell_leaves_everything_else_alone():
     assert ps_allows("python -m pytest -q")
 
 
+def test_the_block_message_carries_the_harness_provenance_when_given_one():
+    """The stamp is injected, not read: the footer names a SHA, and an assertion that
+    had to predict it would pin this repo's current commit into the vendored suite."""
+    _, msg = hook.decide(
+        payload("Bash", "ls -la"), max_bytes=4000, stamp="(devkit harness deadbeef)"
+    )
+    assert msg.endswith("(devkit harness deadbeef)")
+    # The stamp is a footer, not a replacement -- the actionable half still leads.
+    assert "`ls`" in msg
+
+
+def test_no_stamp_leaves_the_message_exactly_as_it_was():
+    """A project whose harness cannot be identified gets the message unchanged, with
+    no trailing blank line hinting that something failed to render."""
+    _, msg = hook.decide(payload("Bash", "ls -la"), max_bytes=4000)
+    assert not msg.endswith("\n")
+
+
+def test_an_allowed_command_never_carries_a_stamp():
+    """The footer costs bytes in an agent's context; it is only earned when the hook
+    is the thing standing in the way."""
+    code, msg = hook.decide(
+        payload("Bash", "ls | wc -l"), max_bytes=4000, stamp="(devkit harness deadbeef)"
+    )
+    assert code == 0 and "deadbeef" not in msg
+
+
 def test_the_powershell_message_names_native_caps_only():
     _, msg = hook.decide(
         payload("Bash", "Get-ChildItem -Recurse"), max_bytes=4000, command_shell="powershell"
@@ -327,3 +409,54 @@ def test_the_powershell_message_names_native_caps_only():
     assert "Select-Object -First N" in msg
     assert "head -c" not in msg
     assert "--shell powershell" in msg
+
+
+# --- record_block: the harness-events ledger line behind every block ---
+
+
+def ledger_lines(base):
+    path = base / "logs" / "harness-events.log"
+    if not path.exists():
+        return []
+    return path.read_text(encoding="utf-8").splitlines()
+
+
+def test_record_block_writes_session_and_command(tmp_path, monkeypatch):
+    monkeypatch.setenv("DEVKIT_DIR", str(tmp_path))
+    body = {"tool_name": "Bash", "session_id": "s1", "tool_input": {"command": "ls -la"}}
+    hook.record_block(json.dumps(body))
+    (line,) = ledger_lines(tmp_path)
+    assert "\tevent=capped-bash-block\t" in line
+    assert "\tsession=s1\t" in line
+    assert line.endswith("\tcommand=ls -la")
+    assert "\tproject=" in line
+    assert "\tversion=" in line
+
+
+def test_record_block_on_malformed_payload_is_a_silent_noop(tmp_path, monkeypatch):
+    monkeypatch.setenv("DEVKIT_DIR", str(tmp_path))
+    hook.record_block("not json")
+    assert ledger_lines(tmp_path) == []
+
+
+def test_record_block_without_the_ledger_module_is_a_noop(tmp_path, monkeypatch):
+    """A partially vendored consumer imports the gate without harness_events; a block
+    must still block, with no ledger and no crash."""
+    monkeypatch.setenv("DEVKIT_DIR", str(tmp_path))
+    monkeypatch.setattr(hook, "harness_events", None)
+    hook.record_block(payload("Bash", "ls -la"))
+    assert ledger_lines(tmp_path) == []
+
+
+def test_main_records_only_when_it_blocks(tmp_path, monkeypatch, capsys):
+    import io
+
+    monkeypatch.setenv("DEVKIT_DIR", str(tmp_path))
+    monkeypatch.setattr("sys.stdin", io.StringIO(payload("Bash", "ls -la")))
+    assert hook.main([]) == hook.EXIT_BLOCK
+    assert len(ledger_lines(tmp_path)) == 1
+
+    monkeypatch.setattr("sys.stdin", io.StringIO(payload("Bash", "ls | wc -l")))
+    assert hook.main([]) == 0
+    assert len(ledger_lines(tmp_path)) == 1
+    capsys.readouterr()

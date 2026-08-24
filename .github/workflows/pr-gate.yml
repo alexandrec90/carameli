@@ -207,7 +207,7 @@ jobs:
         uses: actions/checkout@v7
         with:
           repository: alexandrec90/devkit
-          ref: v0.10.2
+          ref: v0.11.2
           path: .devkit-src
       - name: Vendored agent-harness in sync
         env:
@@ -226,8 +226,13 @@ jobs:
         with:
           install: "true"
       - run: npm run test:run
-      - name: Typecheck + production build
+      - name: Typecheck + production build + build budgets
         # Unit tests only exercise imported modules; tsc + vite build catch
         # compile breaks anywhere in src/, which majors that auto-merge (dev
         # tooling) or wait green for review (runtime) must not slip past.
-        run: npm run build
+        #
+        # `test:bundle` runs the build and then measures what it produced, against
+        # the ratchets in `frontend/bundlePolicy.ts`. It replaces the bare `build`
+        # rather than following it: the budgets need a `dist/` and fail without one,
+        # so building twice would only be slower.
+        run: npm run test:bundle

@@ -1,4 +1,4 @@
-import type { ImgTransform, BubbleTransform } from './types'
+import type { ImgTransform, BubbleTransform, PanelGrids } from './types'
 
 // Not parallel to PANELS: each picture names its `panel`, so a panel may own several or
 // none, and the array is ordered by panel only for readability. `src`/`alt` are the
@@ -46,3 +46,62 @@ export const PANEL_BUBBLE_TRANSFORMS: BubbleTransform[] = [
   { panel: 6, top: -35, right: -12, width: 55, rotate: -5, spill: true, type: 'lightning', tail: 'down-left', text: 'Ka-POW!', linkTo: null, hoverType: 'soft', clickType: 'cloud' },
   { panel: 7, top: -35, right: -12, width: 55, rotate: -5, spill: true, type: 'cloud', tail: 'down-left', text: 'Delivering dreams...', linkTo: null, hoverType: 'soft', clickType: 'lightning' },
 ]
+
+// The panel shapes themselves, one grid per viewport shape. `vertices` are the corners of
+// the whole page in normalised frame space — 0 to 1 across the frame, y down — and each
+// entry of `panels` is one panel as a clockwise ring of indices into that table,
+// index-parallel to PANELS.
+//
+// Corners are **shared**: the divider between two panels is the run of vertices both
+// rings name, so moving one moves the line on both sides and the two cannot come apart.
+// A vertex added part-way along a divider bends it; repeat that and the divider is a
+// lightning bolt.
+//
+// Two things are deliberately not in here. The **outer frame** is not stored — it is the
+// viewport inset by OUTER_M, and a vertex sitting on it may only slide along it, a frame
+// corner not at all. Nor is the **gutter**: every panel is shrunk by the same
+// HALF_GUTTER perpendicular to each of its own edges as it is drawn, so the margins stay
+// equal however far the lines are leant over. Both live in ../panelGeometry.ts, and
+// neither is editable — which is what keeps every page on this grid recognisably the
+// same page.
+export const PANEL_GRIDS: PanelGrids = {
+  landscape: {
+    vertices: [[0, 0], [0.2551, 0], [0.2449, 0.4171], [0, 0.4143], [0.7437, 0], [0.7563, 0.4229], [1, 0], [1, 0.4257], [0.2956, 0.4177], [0.3044, 0.7518], [0, 0.7545], [0.7551, 0.4229], [0.7449, 0.7478], [1, 0.7455], [0.5538, 0.7495], [0.5462, 1], [0, 1], [1, 1]],
+    panels: [
+      [0, 1, 2, 3], // Logo
+      [1, 4, 5, 11, 8, 2], // Switchboard
+      [4, 6, 7, 5], // Mailman 1
+      [3, 2, 8, 9, 10], // Mechanic
+      [8, 11, 12, 14, 9], // Receptionist
+      [11, 5, 7, 13, 12], // Rolodex
+      [10, 9, 14, 15, 16], // Rotary phone
+      [14, 12, 13, 17, 15], // Mailman 2
+    ],
+  },
+  portrait: {
+    vertices: [[0, 0], [0.4423, 0], [0.4577, 0.2202], [0, 0.2225], [1, 0], [1, 0.2175], [0.5602, 0.2197], [0.5398, 0.5003], [0, 0.4966], [1, 0.5034], [0.3936, 0.4993], [0.4064, 0.7505], [0, 0.7525], [1, 0.7475], [0.6089, 0.7494], [0.5911, 1], [0, 1], [1, 1]],
+    panels: [
+      [0, 1, 2, 3], // Logo
+      [1, 4, 5, 6, 2], // Switchboard
+      [3, 2, 6, 7, 10, 8], // Mailman 1
+      [6, 5, 9, 7], // Mechanic
+      [8, 10, 11, 12], // Receptionist
+      [10, 7, 9, 13, 14, 11], // Rolodex
+      [12, 11, 14, 15, 16], // Rotary phone
+      [14, 13, 17, 15], // Mailman 2
+    ],
+  },
+  square: {
+    vertices: [[0, 0], [0.3071, 0], [0.2929, 0.3783], [0, 0.3759], [0.7109, 0], [0.7291, 0.3819], [1, 0], [1, 0.3841], [0.4739, 0.3798], [0.4861, 0.7201], [0, 0.7251], [1, 0.7149], [0.2851, 0.7222], [0.2749, 1], [0, 1], [0.6429, 0.7185], [0.6571, 1], [1, 1]],
+    panels: [
+      [0, 1, 2, 3], // Logo
+      [1, 4, 5, 8, 2], // Switchboard
+      [4, 6, 7, 5], // Mailman 1
+      [3, 2, 8, 9, 12, 10], // Mechanic
+      [8, 5, 7, 11, 15, 9], // Receptionist
+      [10, 12, 13, 14], // Rolodex
+      [12, 9, 15, 16, 13], // Rotary phone
+      [15, 11, 17, 16], // Mailman 2
+    ],
+  },
+}

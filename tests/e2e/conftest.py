@@ -14,17 +14,39 @@ Run E2E tests:
 
 from __future__ import annotations
 
+import os
 from collections.abc import Generator
+from typing import TypedDict, cast
 
 import pytest
 from playwright.sync_api import Page, sync_playwright
 
-# Base URL for the frontend dev server.
-# Override via: pytest tests/e2e/ --base-url http://localhost:5173
-BASE_URL = "http://localhost:5173"
+# Base URL for the frontend dev server. A worktree does not get :5173 -- each box
+# leases its own ports -- so this is overridable, and both spellings work:
+#     pytest tests/e2e/ --base-url http://127.0.0.1:5199
+#     E2E_BASE_URL=http://127.0.0.1:5199 pytest tests/e2e/
+# The comment here used to promise the flag alone, while the fixture below returned the
+# constant unconditionally and the flag did nothing.
+DEFAULT_BASE_URL = "http://localhost:5173"
+BASE_URL = os.environ.get("E2E_BASE_URL", DEFAULT_BASE_URL)
 
 BROWSERS = ["chromium", "firefox", "webkit"]
-VIEWPORTS = [
+
+
+class Viewport(TypedDict):
+    """One entry in the layout matrix.
+
+    Spelled out rather than left as a dict literal: mixed int/str values infer as
+    `dict[str, object]`, and `int(entry["width"])` on an `object` is a type error at
+    every use site.
+    """
+
+    width: int
+    height: int
+    label: str
+
+
+VIEWPORTS: list[Viewport] = [
     {"width": 1280, "height": 800, "label": "desktop"},
     {"width": 375, "height": 812, "label": "mobile-portrait"},
     {"width": 812, "height": 375, "label": "mobile-landscape"},
@@ -32,9 +54,10 @@ VIEWPORTS = [
 
 
 @pytest.fixture(scope="session")
-def base_url() -> str:
-    """Frontend base URL used by E2E tests."""
-    return BASE_URL
+def base_url(request: pytest.FixtureRequest) -> str:
+    """Frontend base URL used by E2E tests, most explicit source winning."""
+    from_cli = request.config.getoption("--base-url", default=None)
+    return str(from_cli) if from_cli else BASE_URL
 
 
 @pytest.fixture(params=BROWSERS, ids=BROWSERS)
@@ -44,16 +67,16 @@ def matrix_browser_name(request: pytest.FixtureRequest) -> str:
 
 
 @pytest.fixture(params=VIEWPORTS, ids=[item["label"] for item in VIEWPORTS])
-def viewport(request: pytest.FixtureRequest) -> dict[str, int | str]:
+def viewport(request: pytest.FixtureRequest) -> Viewport:
     """Viewport matrix for desktop and mobile layout validation."""
-    return request.param
+    return cast(Viewport, request.param)
 
 
 @pytest.fixture
 def matrix_page(
     base_url: str,
     matrix_browser_name: str,
-    viewport: dict[str, int | str],
+    viewport: Viewport,
 ) -> Generator[Page, None, None]:
     """Dedicated page fixture parametrized across browsers and viewports."""
     with sync_playwright() as playwright:
@@ -62,10 +85,7 @@ def matrix_page(
         context = browser.new_context(
             base_url=base_url,
             reduced_motion="reduce",
-            viewport={
-                "width": int(viewport["width"]),
-                "height": int(viewport["height"]),
-            },
+            viewport={"width": viewport["width"], "height": viewport["height"]},
         )
         page = context.new_page()
 
@@ -88,7 +108,7 @@ def browser_context_args(
         # so CSS animations/transitions resolve instantly.
         "reduced_motion": "reduce",
         "viewport": {
-            "width": int(VIEWPORTS[0]["width"]),
-            "height": int(VIEWPORTS[0]["height"]),
+            "width": VIEWPORTS[0]["width"],
+            "height": VIEWPORTS[0]["height"],
         },
     }

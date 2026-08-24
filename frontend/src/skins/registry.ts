@@ -4,8 +4,10 @@ import type { Skin } from './types'
 export const SKIN_NAMES = ['carameli', 'candy-shop', 'barebone', 'comic-book'] as const
 export type SkinName = typeof SKIN_NAMES[number]
 
-// Each entry is a dynamic import — Vite splits each skin into its own chunk.
-// Heavy deps (Three.js, etc.) only ship to users of the skin that imports them.
+// Each entry is a dynamic import — Vite splits each skin into its own chunk, so a
+// skin's code and its dependencies reach only the visitors who load that skin.
+// `bundlePolicy.test.ts` asserts the split still happens: a static import anywhere on
+// the entry path silently undoes it, and nothing else here would notice.
 export const skinLoaders: Record<SkinName, () => Promise<{ default: Skin }>> = {
   carameli: () => import('./carameli'),
   'candy-shop': () => import('./candy-shop'),

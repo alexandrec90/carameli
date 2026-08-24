@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url'
 import { defineConfig, loadEnv } from 'vite'
 import type { Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
+import { configDefaults } from 'vitest/config'
 
 import { resolveDevWatch } from './devWatchPolicy'
 
@@ -89,6 +90,12 @@ export default defineConfig(({ mode }) => {
     test: {
       environment: 'happy-dom',
       globals: true,
+
+      // `bundlePolicy.test.ts` measures `dist/`, so it only means anything after a
+      // build. It fails rather than skips when there is none — see its header — which
+      // would make a plain `npm run test:run` red on any tree nobody has built. So it
+      // is excluded here and reached through `npm run test:bundle`, which builds first.
+      exclude: [...configDefaults.exclude, '**/bundlePolicy.test.ts'],
       // Pin the API base to empty so URL assertions stay hermetic regardless of
       // any ambient VITE_API_BASE_URL in the shell/CI. The app talks to the
       // backend through the dev-server proxy (relative paths), so '' is correct.
