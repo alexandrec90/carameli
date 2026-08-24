@@ -4,6 +4,7 @@ import { PANELS } from '../panels'
 import { isBubbleType } from './bubbleTypes'
 import { CONFIG_KEY, cloneGrids, NEW_BUBBLE, NEW_IMAGE, seedConfig } from './configSeed'
 import { isPanelGrids } from './panelGridValidate'
+import { coerceTable } from './tableValidate'
 import type { BubbleTransform, EditorConfig, ImgTransform } from './types'
 
 // Reading a persisted working copy back. Everything here exists because a payload
@@ -119,12 +120,23 @@ export function hydrateConfig(raw: string | null): EditorConfig {
         // a ninth picture the author added has no shipped entry to recover from, and
         // the template is then the whole answer.
         const shipped = seed.images[i] as ImgTransform | undefined
-        return clampPanel({
+        const merged = clampPanel({
           panel: 0,
           ...NEW_IMAGE,
           ...shipped,
           ...(t as Partial<ImgTransform>),
         })
+        // The one field the merge cannot backfill: a table is a nested document, so a
+        // payload written before a field existed — or with a cell that came back as a
+        // number — needs repairing inside rather than replacing whole. `coerceTable`
+        // returns undefined for the ordinary case of a picture that is not a surface,
+        // and the key is then left off entirely rather than set to undefined, which is
+        // how absence is spelled everywhere else this field is handled.
+        const table = coerceTable(merged.table)
+        if (table) return { ...merged, table }
+        const plain = { ...merged }
+        delete plain.table
+        return plain
       }),
       bubbles: sanitizeLinks(
         parsed.bubbles.map(b =>

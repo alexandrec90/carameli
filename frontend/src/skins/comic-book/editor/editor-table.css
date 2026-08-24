@@ -1,0 +1,33 @@
+/* The surface grips. Loaded by TableCorners.tsx, which only renders when a picture that
+   carries a table is selected, so a page with no surface on it pays nothing. */
+
+/* The quad outline. Full-viewport rather than boxed to the frame, because a corner may be
+   dragged past the frame's edge to hang the surface off it, and a clipped outline would
+   stop at the frame while the grip carried on. */
+.cb-ed-quad {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.cb-ed-quad polygon {
+  fill: rgb(40 120 255 / 8%);
+  stroke: #2878ff;
+  stroke-width: 1.5;
+  stroke-dasharray: 6 4;
+}
+
+/* A corner grip, in the same language as the resize handle (see editor.css) but round and
+   in the quad's own colour, so the four that tilt the table are never mistaken for the
+   one that resizes the frame they sit in. */
+.cb-ed-quad-grip {
+  border-radius: 50%;
+  cursor: grab;
+}
+
+.cb-ed-quad-grip:active {
+  cursor: grabbing;
+}

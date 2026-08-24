@@ -49,6 +49,23 @@ and an inset one reads as a small comic panel rather than a rectangle pasted on 
 itself, so dragging could only slide the picture under a window that stayed put, and a
 second picture on the same panel had nowhere to go.
 
+**A picture may also be a *surface*.** Switch **Project a table onto this image** on and
+the picture carries a `table`: four draggable corners (`quad`, in % of the picture's own
+frame), a row count, the columns, and the cell text. The corners are a projective map —
+`tableProjection.ts` solves the homography taking the unit square onto them and emits it
+as one `matrix3d` — so a table can be laid onto a notepad photographed at an angle and
+converge with it, which three rotation sliders cannot do. The field is **absent**, not
+null, on a picture that is not a surface; that absence is what "not a surface" is spelled
+as everywhere the config is cloned, hydrated or serialized.
+
+The surface divides into `rows` equal bands, and the scroll offset is an **integer index
+into the data**, never a pixel position: band *k* lands in exactly the same place at every
+offset, which is what keeps the lettering on the ruling drawn in the picture. Rows outside
+the window are not in the DOM at all, so there is no scroll container and therefore no
+scrollbar to hide. Out of edit mode a reader sees only the values and scrolls with the
+wheel; the guides, the dashed outline and the corner grips exist only while the editor is
+open.
+
 **Bubbles are drawn, not imported.** Every shape is one closed ring of the same 64
 vertices sampled from a shared ellipse, so a shape change interpolates vertex-for-
 vertex and reads as a morph. That is why there is no bubble artwork any more: two
@@ -89,6 +106,18 @@ different images can only crossfade. A new bubble type belongs in `bubbleShape.t
      `PANEL_ASSETS`), and its **alt** text — empty marks it decorative — plus the
      **anchor**, which decides what survives when the picture's aspect ratio does not
      match the frame's.
+   - **Project a table onto this image** (picture only) turns the picture into a
+     surface. A starter table appears with its corners near the picture's own, plus:
+     **Rows** (how many bands are visible at once — set it to the number of ruled lines
+     you want to fill), **Text** (font size as a fraction of a band), **Ink** (a colour
+     picker), a **Headings** checkbox, the four **corner** X/Y fields, and a **Columns**
+     list where each column gets a heading, a width weight and an alignment. The cell
+     text is one row per line, columns separated by a tab or a `|`.
+     - **Drag the four square corner grips** onto the surface in the photograph — the
+       band guides are drawn *through* the same projection, so once they sit on the
+       ruled lines the rows do too. **Reset corners** puts them back.
+     - Switching the checkbox off deletes the table, including the cells; the picture
+       itself is untouched.
    - **Allow spill outside panel** checkbox — off (default for pictures) clips the
      element to the frame's polygon (overflow hidden behind its edge); on lets it
      bleed past (default for bubbles).
@@ -162,6 +191,10 @@ bubbleTypes.ts      BubbleType + BUBBLE_TYPES (lettering font per type) — ship
 ../PanelBubble.tsx  one bubble: outline SVG + text + hover/press morph state
 ../PanelBubbles.tsx one panel's bubbles: filters the array by panel, clips the non-spilling ones
 ../BubbleTubes.tsx  viewport-level tube layer for every linked pair
+../tableProjection.ts PURE: the corner quad -> homography -> `matrix3d`, and the layout box
+../tableData.ts     PURE: rows visible at an offset, wheel-to-rows, column widths, cell text
+../ProjectedTable.tsx one picture's surface: the projected table, its wheel and its keys
+../table.css        surface + cell styles, and the editor-only band guides
 ../panelGeometry.ts PURE grid -> polygon geometry: frame, normalised space, vertex constraints
 ../polygonInset.ts  PURE polygon maths: the perpendicular gutter inset, bounding box
 panelGridOps.ts     PURE grid edits: move vertex, insert/remove bend, seam listing
@@ -173,6 +206,14 @@ configHydrate.ts    PURE: parse a persisted payload back into a config, falling 
 useSeamDrag.ts      hook: which gesture a pointer means, and the grid edit it maps to
 PanelSeams.tsx      the draggable line + vertex handles (shapes mode)
 ShapeInspector.tsx  shapes-mode inspector: vertex read-out, straighten, reset grid
+tableValidate.ts    PURE: a new table, and the repair of one read back out of a payload
+serializeTable.ts   PURE: a table as the nested block on a picture's line
+tsLiteral.ts        PURE: quoting and number rounding shared by the two serializers
+useTableCornerDrag.ts hook: dragging a corner grip, and the clamped single-corner edit
+TableCorners.tsx    the four square corner grips (content mode, surfaces only)
+TableInspector.tsx  table controls: the on/off switch, rows, text, ink, headings, corners
+TableColumnsInspector.tsx  the columns list and the cell-text box
+editor-table.css    corner grip and table-inspector styles
 serialize.ts        PURE serialization back to layoutConfig.ts (headers included)
 transforms.ts       PURE helpers: CSS builders, frame/drag/scale math, clamp
 useEditorMode.ts    hook: flag detection, working copy, persistence, selection
@@ -199,4 +240,5 @@ and not the other fails there rather than on the first save.
 All math/serialization is pure and unit-tested under
 `frontend/src/tests/skins/` (`comicBookTransforms`, `editorTransformsMath`,
 `editorMode`, `editorConfigOps`, `editorSerialize`, `pageSelection`,
-`editorToolbarDrag`, `bubbleShape`, `bubbleTube`, `panelGeometry`, `panelGridOps`).
+`editorToolbarDrag`, `bubbleShape`, `bubbleTube`, `panelGeometry`, `panelGridOps`,
+`tableProjection`, `tableData`, `tableConfig`, `ProjectedTable`).

@@ -8,6 +8,17 @@ import type { ImgTransform, BubbleTransform, PanelGrids } from './types'
 // panel rather than as a bare rectangle. `scale`/`offsetX`/`offsetY`/`anchor` then
 // frame the picture *inside* its frame; `spill: false` clips it there, `spill: true`
 // lets it bleed past.
+//
+// A picture with a `table` is a **surface**: an HTML table is projected onto it, so a
+// photographed notepad can hold live rows. `quad` is the four corners of that surface in
+// % of the frame, clockwise from top-left, and they are what tilts it — four corners fix
+// a projective map exactly, which is what a plane in a photograph needs and three
+// rotation angles cannot express. Drag them onto the drawn lines in the editor. `rows` is
+// how many bands the surface is cut into, so a row always lands on the same line however
+// far the reader has scrolled; `header` spends the first band on the column labels.
+// `data` is every row, of which only `rows` are on screen at once — the wheel moves a
+// whole row at a time and there is no scrollbar. Outside the editor only those values
+// show: no outline, no guides, no bar.
 export const PANEL_IMG_TRANSFORMS: ImgTransform[] = [
   { panel: 0, src: '/comic-book/logo.webp', alt: 'Carameli', left: 0, top: 0, width: 100, height: 100, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center center', spill: false },
   { panel: 1, src: '/comic-book/switchboard.webp', alt: 'Switchboard', left: 0, top: 0, width: 100, height: 100, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center bottom', spill: false },

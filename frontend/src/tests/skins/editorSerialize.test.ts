@@ -10,6 +10,7 @@ import {
 import layoutConfigSource from '../../skins/comic-book/editor/layoutConfig.ts?raw'
 import { moveVertex } from '../../skins/comic-book/editor/panelGridOps'
 import { serializeConfig, serializeConfigFile } from '../../skins/comic-book/editor/serialize'
+import { newTable } from '../../skins/comic-book/editor/tableValidate'
 import type { EditorConfig } from '../../skins/comic-book/editor/types'
 
 /** Count `{ ... }` object entries inside the named const's array literal. */
@@ -209,6 +210,30 @@ describe('serializeConfig', () => {
     expect(parsed.images).toHaveLength(config.images.length)
     expect(parsed.images[index]).toEqual(config.images[index])
     expect(parsed.images.filter(t => t.panel === 3)).toHaveLength(2)
+  })
+
+  // A surface is a nested block on a picture line, and the picture's own fields have to
+  // come through it unchanged: an emitter that closed the brace in the wrong place
+  // produces a file that still parses and has lost the anchor or the spill flag.
+  it('round-trips a picture the author turned into a surface', () => {
+    const cfg = patchImg(seedConfig(), 2, { table: newTable() })
+    const parsed = reparse(serializeConfig(cfg))
+    expect(parsed.images[2]).toEqual(cfg.images[2])
+    expect(parsed.images[2].table?.data).toEqual(newTable().data)
+  })
+
+  /*
+   * The other half of that, and the reason `table` is absent rather than null: a picture
+   * that is not a surface must come back with no `table` key whatsoever. An emitter that
+   * wrote `table: null` would round-trip through this reparse and then fail the
+   * byte-for-byte test below, having already put eight dead keys into the shipped file.
+   */
+  it('writes nothing on the seven pictures that are not surfaces', () => {
+    const cfg = patchImg(seedConfig(), 2, { table: newTable() })
+    const ts = serializeConfig(cfg)
+    expect((ts.match(/ table: \{/g) ?? [])).toHaveLength(1)
+    expect(serializeConfig(seedConfig())).not.toContain('table:')
+    expect(reparse(serializeConfig(seedConfig())).images.every(t => !('table' in t))).toBe(true)
   })
 })
 

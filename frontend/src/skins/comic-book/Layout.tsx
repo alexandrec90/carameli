@@ -722,6 +722,7 @@ export function Layout({ navItems }: LayoutProps) {
                                 vp={vp}
                                 natSizes={natSizes}
                                 isRevealed={k => shouldRevealImg(editor.active, editor.selected, k)}
+                                editing={editor.active}
                                 onSettled={markSettled}
                                 onNatSize={recordNatSize}
                             />

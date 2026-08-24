@@ -1,5 +1,6 @@
 import { PANELS } from '../panels'
 import { PANEL_ASSETS } from './assets'
+import TableInspector from './TableInspector'
 import type { ImgTransform } from './types'
 import type { EditorModeApi } from './useEditorMode'
 
@@ -30,6 +31,10 @@ const ANCHORS = [
  * its window, so there was nothing here to edit and dragging could only slide the
  * picture underneath. Now the frame is the picture's own rectangle over the panel box
  * and a panel can hold as many as the author wants.
+ *
+ * TableInspector then hangs off the bottom of it: any picture may be turned into a
+ * surface with a table projected onto it, which is a property of the picture rather than
+ * of the panel it sits on.
  */
 export default function ImageInspector({ api, index, image }: ImageInspectorProps) {
   const set = (patch: Partial<ImgTransform>) => api.setImg(index, patch)
@@ -88,6 +93,7 @@ export default function ImageInspector({ api, index, image }: ImageInspectorProp
           ))}
         </select>
       </label>
+      <TableInspector api={api} index={index} image={image} />
     </>
   )
 }

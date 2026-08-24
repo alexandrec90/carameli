@@ -6,7 +6,59 @@ import type { BubbleType } from './bubbleTypes'
 // the renderer needs it too and this module is the editor's. Re-exported here so
 // layoutConfig.ts — which the editor overwrites whole — keeps naming exactly one module
 // for its types.
-export type { LayoutKind, NormPt, PanelGrid, PanelGrids } from '../panelGeometry'
+export type { LayoutKind, PanelGrid, PanelGrids } from '../panelGeometry'
+
+/** One column of a projected table. */
+export interface TableColumn {
+  /** Heading text, drawn in the first row slot when `header` is on. */
+  label: string
+  /**
+   * Share of the surface's width, as a weight against the other columns — not a
+   * percentage. Adding a fourth column to three that already summed to 100 would
+   * otherwise mean retyping all three.
+   */
+  width: number
+  /** Cell text alignment within the column. */
+  align: 'left' | 'center' | 'right'
+}
+
+/**
+ * An HTML table projected onto the surface a picture depicts — ruled lines on a notepad,
+ * a whiteboard, the face of a monitor. Optional on every picture, so any of them can be
+ * turned into a surface and none of them is one by default.
+ *
+ * **`quad` is the whole of the 3D tilt.** Four corners, clockwise from top-left, in % of
+ * the picture's frame box, and `tableProjection.ts` turns them into the `matrix3d` that
+ * lands the table on them. Corners rather than rotate/perspective angles because the
+ * task is *matching a plane already in the photograph*: three angles describe the same
+ * plane, but only as a three-way search where every axis undoes the last, whereas a
+ * projective map through four point correspondences is unique and is dragged into place
+ * one corner at a time. The convergence of the far edge comes out of the same four
+ * numbers, so ruled lines that converge in the picture are matched rather than
+ * approximated.
+ *
+ * **`rows` is a count of slots, not of data.** The surface is divided into that many
+ * equal bands, which is what a ruled page is; the data scrolls through them a whole row
+ * at a time, so every band stays exactly where it was drawn. `header` spends the first
+ * band on the column labels rather than floating them above the surface, where they
+ * would be the one thing not sitting on a line.
+ */
+export interface TableProjection {
+  /** The surface's corners, clockwise from top-left, in % of the picture's frame box. */
+  quad: [[number, number], [number, number], [number, number], [number, number]]
+  /** Row bands the surface is divided into — match this to the lines in the picture. */
+  rows: number
+  /** Spend the first band on the column headings. */
+  header: boolean
+  /** The columns, left to right. */
+  columns: TableColumn[]
+  /** Cell text, row-major, one inner array per row. Longer than `rows` = scrollable. */
+  data: string[][]
+  /** Lettering height as a fraction of a band's height. */
+  fontScale: number
+  /** Ink colour for the lettering and, in the editor, the band guides. */
+  ink: string
+}
 
 /**
  * One picture on the page: which panel it belongs to, which file it shows, the frame
@@ -49,6 +101,18 @@ export interface ImgTransform {
   anchor: string
   /** When true the picture may bleed past its frame; when false it is clipped to it. */
   spill: boolean
+  /**
+   * A table projected onto whatever surface this picture depicts; **absent** on an
+   * ordinary picture. Optional rather than always-present so `layoutConfig.ts` carries
+   * the field only on the pictures that are surfaces — the serializer omits it
+   * otherwise, and eight lines of `table: null` would say nothing.
+   *
+   * Absent rather than `null` for the same reason, and it is load-bearing: the round-trip
+   * guarantee is that re-evaluating a saved file gives back the config it was written
+   * from, and a picture that went out with no `table` key comes back with no `table` key.
+   * A `null` in the working copy would not match it.
+   */
+  table?: TableProjection
 }
 
 /**
