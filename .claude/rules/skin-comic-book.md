@@ -242,6 +242,53 @@ the slice of outline it covers. Both z-indices are load-bearing — above the li
 panel (z 8), below the Ben-Day wash (z 10). Overlapping bubbles draw no tube at all,
 by design; a corridor shorter than its own width reads as a smudge.
 
+### Bubble chains — a column read as an SMS thread
+
+A bubble's `chain` name joins it to a **vertical column** of balloons on the same
+panel that is read as one speaker's message thread (`bubbleChain.ts`, rendered by
+`PanelBubbleChain.tsx`). The balloons are the author's drawing and never move; the
+**messages move through them**, arriving at the top. Slot order is by `top`
+descending, so **slot 0 is the lowest balloon — the root, the one that carries the
+tail**; every slot above it is a later message and should have `tail: 'none'`.
+
+`PANEL_BUBBLE_CHAINS` in `layoutConfig.ts` holds one entry per name in use, with two
+independent toggles and the thread itself:
+
+| Field | Effect |
+| --- | --- |
+| `grow` | reveals the column one balloon at a time, `stepMs` apart, instead of all at once |
+| `scroll` | the mouse wheel moves a window over a thread longer than the column |
+| `messages` | the thread; **empty means the chain speaks its own balloons' `text`**, in slot order |
+
+The list is **derived, not authored**: `syncChains` recomputes it from the names the
+bubbles carry after every edit that can touch one, so naming a chain creates its entry
+and renaming the last member away removes it. There is deliberately no add-chain or
+delete-chain operation — a chain with no members and a member with no chain are both
+unreachable states rather than states to be validated.
+
+Three rules hold this together, each enforced where it can be enforced by construction:
+
+- **A chained balloon takes no tube.** A slot holds whatever message has scrolled into
+  it, so a tube welded to it would join a different sentence each time. Dropped in
+  `sanitizeLinks` (data), never offered by `linkCandidates` (editor), and refused by
+  `linkedPairs` (renderer) — the same three-place pattern as the same-panel rule.
+- **A chain is one panel's.** `chainSlots` filters on panel as well as name, so two
+  panels may reuse a name without their balloons ever being on screen together.
+- **Only up.** The window arithmetic assumes time runs upward: `visibleWindow` puts the
+  oldest visible message in slot 0, and a wheel-up advances the thread. A horizontal
+  chain is not a supported layout — it would need a second axis in every one of those
+  functions, not a CSS change.
+
+Both behaviours are per chain, so a page can hold a live thread beside a plain
+multi-balloon utterance. All of the arithmetic is pure and in `bubbleChain.ts`;
+`PanelBubbleChain.tsx` adds only what cannot be — the growth timer, the wheel
+listener, and the rewind when the panel stops being hovered. **Keys are message
+indices, not slot indices**: a message keeps its DOM node as it moves down the column,
+which is what lets CSS transition its `top`/`right`/`width` rather than flickering
+text through four stationary balloons. The arrival effect is a `@keyframes` animation
+(`bubbleChains.css`) and not a transition, because a node that mounts already carrying
+`is-visible` has no previous value to transition from.
+
 ### Asset Image (Gemini-generated)
 
 ```tsx
@@ -321,8 +368,10 @@ offsetX / offsetY / anchor / spill, with `src` drawn from the `PANEL_ASSETS` man
 in `editor/assets.ts`) and speech-bubble
 placement and behaviour (`PANEL_BUBBLE_TRANSFORMS`: panel / top / right / width /
 rotate / spill / type / tail / content / text, plus `hoverType` / `clickType` event
-morph targets and the `linkTo` tube partner; `content: 'wheel'` presents `text` as
-comma-delimited options on a scroll picker — see `wheelPicker.ts`). The renderer in `Layout.tsx` reads from these
+morph targets, the `linkTo` tube partner and the `chain` this balloon is a slot of;
+`content: 'wheel'` presents `text` as
+comma-delimited options on a scroll picker — see `wheelPicker.ts`) and the chain
+settings those names resolve to (`PANEL_BUBBLE_CHAINS`, above). The renderer in `Layout.tsx` reads from these
 arrays — there are **no magic framing numbers** in `Layout.tsx` or the CSS for
 images/bubbles, and no bubble text. To retune them, use the editor rather than
 hand-editing scattered values.
@@ -333,7 +382,8 @@ file's explanatory comments are emitted as headers by `serialize.ts`, and why no
 else — a `NEW_IMAGE` or `NEW_BUBBLE` default, a helper — may live in `layoutConfig.ts`.
 Config edits themselves live in `configOps.ts` (React-free: seed/hydrate/patch,
 add/remove picture or bubble, link sanitation), which re-exports `configSeed.ts` and
-`configHydrate.ts`; grid edits live in `panelGridOps.ts`.
+`configHydrate.ts`; grid edits live in `panelGridOps.ts` and the chain list's own
+lifecycle in `chainOps.ts`.
 
 The bubble box's on-screen geometry comes from `bubbleRect` in `transforms.ts`, used
 by **both** the renderer (to aim tubes) and the editor (hit target and selection
@@ -350,7 +400,8 @@ not the bubble a tube pointed at.
 | Adjust | drag / wheel / handles / arrows | Move the frame or bubble, resize (bottom-right grip), pan the picture inside its frame (top-left grip, picture only), rotate (top-right grip, bubble only), nudge (⇧×10); for a picture **Alt** swaps the two framings |
 | Add / remove | **+ Image** / **+ Bubble** toolbar buttons, **Delete image** / **Delete bubble** in the inspector | Adds to the selected panel; deleting a bubble clears any link naming it |
 | Picture fields | inspector selects | panel, picture (`PANEL_ASSETS`), alt (empty = decorative), anchor, spill |
-| Bubble fields | inspector selects | panel, type, **tail** (nine options incl. **No tail**), **content** (Text / Wheel picker — wheel splits the text on commas into scrollable options), text, hover/click morph, link |
+| Bubble fields | inspector selects | panel, type, **tail** (nine options incl. **No tail**), **content** (Text / Wheel picker — wheel splits the text on commas into scrollable options), text, hover/click morph, **chain** (free text, completing on the names already in use), link |
+| Chain fields | inspector, below the bubble's own, when the bubble names a chain | **grow** / **step ms**, **scroll**, **messages** (one per line; empty = speak the balloons' own text), **+ Balloon in chain** — they edit the whole column, not the selected balloon. Chained balloons render flat in edit mode so each stays selectable |
 | Pages | **Page** dropdown in toolbar | Switch route in edit mode (replays the wash); "Loading screen" entry previews the loading overlay + its exit wash |
 | Mode | **Content** / **Panel shapes** toggle | Content places pictures and bubbles; shapes drags the lines between panels. Content click targets are not rendered in shapes mode — a panel-sized target would swallow every drag aimed at a line crossing it |
 | Reshape | drag a **line** or a **vertex** | A frame vertex slides along its own edge; the four corners are locked; the frame itself has no handle. Arrows nudge (⇧×10) |
@@ -382,3 +433,5 @@ editor math, config editing and serialization is pure and unit-tested in
 12. **Never link two bubbles across panels** — a tube's two ends share one `panel`, or there is no tube
 13. **Never give a panel bubble its own tail path** — the tail is a ring vertex, so `'none'` and a turn both morph
 14. **Never hard-code a panel polygon or a gutter offset** — panel shapes come from `PANEL_GRIDS` through `gridPolys`, and the gutter is one perpendicular inset. A polygon written anywhere else stops moving when the grid does, and an offset applied per axis is the wrong width on every diagonal
+15. **Never tube a chained bubble, and never give a chain more than one tail** — a slot holds whatever message has scrolled into it, so a tube would join a different sentence on each turn of the wheel; the tail belongs to the root alone, and a stack of them reads as several people talking at once
+16. **Never key a chain's balloons by slot** — keying by message index is what makes a scroll animate, because the node moves and CSS transitions its position. Keyed by slot the nodes stand still and their text flickers

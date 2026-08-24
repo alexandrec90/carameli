@@ -1,5 +1,6 @@
 import { PANEL_ASSETS } from './assets'
-import { PANEL_IMG_TRANSFORMS, PANEL_BUBBLE_TRANSFORMS, PANEL_GRIDS } from './layoutConfig'
+import { cloneChain } from './chainOps'
+import { PANEL_BUBBLE_CHAINS, PANEL_IMG_TRANSFORMS, PANEL_BUBBLE_TRANSFORMS, PANEL_GRIDS } from './layoutConfig'
 import type { BubbleTransform, EditorConfig, ImgTransform, LayoutKind, PanelGrid, PanelGrids } from './types'
 
 // What a config *starts* as, and how one is copied. Split out of configOps.ts so that
@@ -42,6 +43,7 @@ export const NEW_BUBBLE: Omit<BubbleTransform, 'panel'> = {
   linkTo: null,
   hoverType: null,
   clickType: null,
+  chain: '',
 }
 
 export const LAYOUT_KINDS: LayoutKind[] = ['landscape', 'portrait', 'square']
@@ -68,6 +70,7 @@ export function seedConfig(): EditorConfig {
   return {
     images: PANEL_IMG_TRANSFORMS.map(t => ({ ...t })),
     bubbles: PANEL_BUBBLE_TRANSFORMS.map(b => ({ ...b })),
+    chains: PANEL_BUBBLE_CHAINS.map(cloneChain),
     grids: cloneGrids(PANEL_GRIDS),
   }
 }
@@ -77,6 +80,7 @@ export function cloneConfig(c: EditorConfig): EditorConfig {
   return {
     images: c.images.map(t => ({ ...t })),
     bubbles: c.bubbles.map(b => ({ ...b })),
+    chains: c.chains.map(cloneChain),
     grids: cloneGrids(c.grids),
   }
 }

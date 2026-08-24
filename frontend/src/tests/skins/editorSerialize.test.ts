@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest'
 
-import { addImg, patchBubble, patchImg, seedConfig } from '../../skins/comic-book/editor/configOps'
+import {
+  addImg,
+  patchBubble,
+  patchChain,
+  patchImg,
+  seedConfig,
+} from '../../skins/comic-book/editor/configOps'
 import {
   PANEL_BUBBLE_TRANSFORMS,
   PANEL_IMG_TRANSFORMS,
@@ -12,6 +18,9 @@ import { moveVertex } from '../../skins/comic-book/editor/panelGridOps'
 import { serializeConfig, serializeConfigFile } from '../../skins/comic-book/editor/serialize'
 import type { EditorConfig } from '../../skins/comic-book/editor/types'
 
+const IMPORT_LINE =
+  "import type { ImgTransform, BubbleTransform, BubbleChain, PanelGrids } from './types'"
+
 /** Count `{ ... }` object entries inside the named const's array literal. */
 function entryCount(ts: string, constName: string): number {
   const after = ts.slice(ts.indexOf(`export const ${constName}`))
@@ -20,20 +29,21 @@ function entryCount(ts: string, constName: string): number {
   return (arr.match(/\{/g) ?? []).length
 }
 
-/** The two transform blocks, without the grid block that follows them. */
+/** The two transform blocks, without the chain and grid blocks that follow them. */
 function transformsOf(ts: string): string {
-  const grids = ts.indexOf('export const PANEL_GRIDS')
-  return grids === -1 ? ts : ts.slice(0, grids)
+  const chains = ts.indexOf('export const PANEL_BUBBLE_CHAINS')
+  return chains === -1 ? ts : ts.slice(0, chains)
 }
 
 /** Evaluate a serialized block back into a config, as a paste into the file would. */
 function reparse(ts: string): EditorConfig {
   const body = ts
-    .replace("import type { ImgTransform, BubbleTransform, PanelGrids } from './types'", '')
+    .replace(IMPORT_LINE, '')
     .replace(/export const PANEL_IMG_TRANSFORMS: ImgTransform\[\] =/, 'const images =')
     .replace(/export const PANEL_BUBBLE_TRANSFORMS: BubbleTransform\[\] =/, 'const bubbles =')
+    .replace(/export const PANEL_BUBBLE_CHAINS: BubbleChain\[\] =/, 'const chains =')
     .replace(/export const PANEL_GRIDS: PanelGrids =/, 'const grids =')
-  return new Function(`${body}\nreturn { images, bubbles, grids }`)() as EditorConfig
+  return new Function(`${body}\nreturn { images, bubbles, chains, grids }`)() as EditorConfig
 }
 
 describe('serializeConfig', () => {
@@ -72,7 +82,7 @@ describe('serializeConfig', () => {
       '{ panel: 0, top: -35, right: -12, width: 55, rotate: -5, spill: true, ' +
         "type: 'soft', tail: 'down-left', content: 'text', " +
         'text: "It\'s Carameli!", linkTo: 1, ' +
-        "hoverType: 'cloud', clickType: 'lightning' },",
+        "hoverType: 'cloud', clickType: 'lightning', chain: '' },",
     )
   })
 
@@ -119,7 +129,7 @@ describe('serializeConfig', () => {
       clickType: null,
     })
     const ts = serializeConfig(cfg)
-    expect(ts).toContain('linkTo: null, hoverType: null, clickType: null },')
+    expect(ts).toContain("linkTo: null, hoverType: null, clickType: null, chain: '' },")
     expect(ts).not.toContain("'null'")
   })
 
@@ -221,10 +231,64 @@ describe('serializeConfig', () => {
   })
 })
 
+describe('serializeConfig chains', () => {
+  /** The seed config with one two-slot chain on panel 6, and settings on it. */
+  function threaded(): EditorConfig {
+    let cfg = seedConfig()
+    cfg = patchBubble(cfg, 0, { chain: 'her side' })
+    cfg = patchBubble(cfg, 1, { chain: 'her side' })
+    return patchChain(cfg, 'her side', { grow: true, scroll: false, stepMs: 450, messages: ['Hi', 'You up?'] })
+  }
+
+  it('writes the chain’s name on every bubble that carries one', () => {
+    const ts = serializeConfig(threaded())
+    expect((ts.match(/chain: 'her side'/g) ?? [])).toHaveLength(2)
+  })
+
+  it('emits the chain block with the settings and the thread', () => {
+    const ts = serializeConfig(threaded())
+    expect(ts).toContain('export const PANEL_BUBBLE_CHAINS: BubbleChain[] = [')
+    expect(ts).toContain(
+      "  { id: 'her side', grow: true, scroll: false, stepMs: 450, " +
+        "messages: ['Hi', 'You up?'] },",
+    )
+  })
+
+  // No page has a chain until an author draws one, so that is the state the shipped
+  // file is in — an empty multi-line literal would read as something having been deleted.
+  it('emits an empty list on one line', () => {
+    expect(serializeConfig(seedConfig())).toContain(
+      'export const PANEL_BUBBLE_CHAINS: BubbleChain[] = []\n',
+    )
+  })
+
+  it('carries the chain header prose, which is not recoverable from the data', () => {
+    const ts = serializeConfig(seedConfig())
+    expect(ts).toContain('the lowest is the root that carries the tail')
+    expect(ts).toContain('the list is derived from them, not')
+  })
+
+  it('escapes an apostrophe an author typed into a message', () => {
+    const cfg = patchChain(threaded(), 'her side', { messages: ["It's me"] })
+    expect(serializeConfig(cfg)).toContain('messages: ["It\'s me"]')
+  })
+
+  it('rounds a delay to whole milliseconds — a timer has no use for a fraction', () => {
+    const cfg = threaded()
+    cfg.chains[0].stepMs = 450.6
+    expect(serializeConfig(cfg)).toContain('stepMs: 451,')
+  })
+
+  it('produces a chain block that re-evaluates back to the same list', () => {
+    const cfg = threaded()
+    expect(reparse(serializeConfig(cfg)).chains).toEqual(cfg.chains)
+  })
+})
+
 describe('serializeConfigFile', () => {
   it('prepends the type import header to the two const blocks', () => {
     const file = serializeConfigFile(seedConfig())
-    expect(file.startsWith("import type { ImgTransform, BubbleTransform, PanelGrids } from './types'")).toBe(true)
+    expect(file.startsWith(IMPORT_LINE)).toBe(true)
     expect(file).toContain('export const PANEL_IMG_TRANSFORMS: ImgTransform[] = [')
     expect(file).toContain('export const PANEL_BUBBLE_TRANSFORMS: BubbleTransform[] = [')
     expect(file).toContain('export const PANEL_GRIDS: PanelGrids = {')

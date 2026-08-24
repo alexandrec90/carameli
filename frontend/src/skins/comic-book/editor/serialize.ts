@@ -1,7 +1,7 @@
 import type { LayoutKind, PanelGrid, PanelGrids } from '../panelGeometry'
 import { PANELS } from '../panels'
 import type { BubbleType } from './bubbleTypes'
-import type { EditorConfig } from './types'
+import type { BubbleChain, EditorConfig } from './types'
 
 // Turning the editor's working copy back into `layoutConfig.ts`. The Save button
 // POSTs the result to the dev-only write endpoint, which overwrites that file
@@ -58,6 +58,8 @@ const BUBBLE_HEADER = `// Not parallel to PANELS either: each bubble names its \
 // current look where bubbles float into the gutter. \`content\` picks how \`text\` reads:
 // 'text' letters it as-is; 'wheel' splits it on commas into a scroll picker that the
 // mouse wheel turns, its unpicked options fading in while the bubble is hovered.
+// \`chain\` joins this balloon to a column of them read as one SMS thread ('' = alone);
+// a chained balloon takes no tube, since a slot holds whatever message scrolled into it.
 //
 // Two pairs ship linked — the logo's and the mechanic's — each pair being one speaker's
 // line continuing across two balloons, so the second of each carries no tail and the
@@ -66,6 +68,19 @@ const BUBBLE_HEADER = `// Not parallel to PANELS either: each bubble names its \
 // (tubeBetween returns null rather than a smudge). Those numbers are tuned for the
 // landscape layout; the portrait and square layouts reshape the panels, so a pair may
 // end up close enough there to drop its tube. Retune per layout in the editor.`
+
+const CHAIN_HEADER = `// One entry per chain name the bubbles above carry — the list is derived from them, not
+// authored beside them, so naming a chain on a balloon creates its entry and renaming the
+// last member away removes it. A chain is a vertical column of balloons read as one
+// speaker's SMS thread: the lowest is the root that carries the tail, and each one above
+// it is a later message.
+//
+// \`grow\` reveals the column one balloon at a time instead of all at once, \`stepMs\` apart.
+// \`scroll\` lets the mouse wheel move a window over a thread longer than the column, each
+// message sliding into the slot below the one it was in. \`messages\` is that thread; empty
+// means the chain speaks its own balloons' \`text\`, in slot order, which is what a chain
+// that only wants the growth animation wants. Both toggles are per chain: a page can want
+// a live thread beside a plain multi-balloon utterance. See ../bubbleChain.ts.`
 
 const GRID_HEADER = `// The panel shapes themselves, one grid per viewport shape. \`vertices\` are the corners of
 // the whole page in normalised frame space — 0 to 1 across the frame, y down — and each
@@ -110,6 +125,27 @@ export function serializeGrids(grids: PanelGrids): string {
 }
 
 /**
+ * Serialize the chain list as the `PANEL_BUBBLE_CHAINS` block.
+ *
+ * An empty list is emitted as `[]` on one line rather than as an empty multi-line
+ * literal: no page has a chain until an author draws one, so that is the state the
+ * shipped file is in and it should not read as something having been deleted.
+ */
+export function serializeChains(chains: BubbleChain[]): string {
+  const head = `${CHAIN_HEADER}\nexport const PANEL_BUBBLE_CHAINS: BubbleChain[] = `
+  if (chains.length === 0) return `${head}[]\n\n`
+  const lines = chains
+    .map(
+      c =>
+        `  { id: ${strLiteral(c.id)}, grow: ${c.grow}, scroll: ${c.scroll}, ` +
+        `stepMs: ${Math.round(c.stepMs)}, ` +
+        `messages: [${c.messages.map(strLiteral).join(', ')}] },`,
+    )
+    .join('\n')
+  return `${head}[\n${lines}\n]\n\n`
+}
+
+/**
  * Serialize a working {@link EditorConfig} into paste-ready TS matching
  * `layoutConfig.ts` (the two `export const` blocks, each under its explanatory
  * comment).
@@ -138,12 +174,14 @@ export function serializeConfig(c: EditorConfig): string {
         `width: ${Math.round(b.width)}, rotate: ${round(b.rotate, 1)}, ` +
         `spill: ${b.spill}, type: '${b.type}', tail: '${b.tail}', ` +
         `content: '${b.content}', text: ${strLiteral(b.text)}, linkTo: ${b.linkTo}, ` +
-        `hoverType: ${typeLiteral(b.hoverType)}, clickType: ${typeLiteral(b.clickType)} },`,
+        `hoverType: ${typeLiteral(b.hoverType)}, clickType: ${typeLiteral(b.clickType)}, ` +
+        `chain: ${strLiteral(b.chain)} },`,
     )
     .join('\n')
   return (
     `${IMG_HEADER}\nexport const PANEL_IMG_TRANSFORMS: ImgTransform[] = [\n${imgLines}\n]\n\n` +
     `${BUBBLE_HEADER}\nexport const PANEL_BUBBLE_TRANSFORMS: BubbleTransform[] = [\n${bubbleLines}\n]\n\n` +
+    serializeChains(c.chains) +
     serializeGrids(c.grids)
   )
 }
@@ -155,7 +193,7 @@ export function serializeConfig(c: EditorConfig): string {
  */
 export function serializeConfigFile(c: EditorConfig): string {
   return (
-    `import type { ImgTransform, BubbleTransform, PanelGrids } from './types'\n\n` +
+    `import type { ImgTransform, BubbleTransform, BubbleChain, PanelGrids } from './types'\n\n` +
     serializeConfig(c)
   )
 }

@@ -15,8 +15,9 @@ left / top / width / height / scale / offsetX / offsetY / anchor / spill) and bu
 placement **and content** (panel / top / right / width / rotate / spill / type / tail /
 content / text — `content: 'wheel'` presents `text` as comma-delimited options on a
 scroll picker, see [`../wheelPicker.ts`](../wheelPicker.ts)), plus each bubble's event
-morph targets (`hoverType`, `clickType`) and its
-connector-tube partner (`linkTo`). A picture's `src` is a public URL, offered in the
+morph targets (`hoverType`, `clickType`), its
+connector-tube partner (`linkTo`) and the message thread it is a slot of (`chain`,
+resolved through `PANEL_BUBBLE_CHAINS` — see *Bubble chains* below). A picture's `src` is a public URL, offered in the
 editor by the static manifest in [`assets.ts`](./assets.ts) (`PANEL_ASSETS`). The
 bubble `type` resolves to a lettering font via [`bubbleTypes.ts`](./bubbleTypes.ts)
 (`BUBBLE_TYPES`); the outline itself is generated vector geometry in
@@ -40,6 +41,19 @@ box, and hovering that panel is what reveals its bubbles. A `linkTo` partner mus
 the **same panel** — the editor only offers same-panel partners, and the renderer drops
 any cross-panel link it is handed, because half a tube appearing on a different hover
 cannot read as one utterance.
+
+**Bubble chains are a column of balloons read as one message thread.** Give two or more
+bubbles on a panel the same `chain` name and they become that thread's slots, ordered
+bottom-to-top: the lowest is slot 0, the *root*, and it is the only one that keeps a
+tail — the rest are the same speaker still talking. The chain's own settings live in a
+separate list keyed by that name (`PANEL_BUBBLE_CHAINS`): whether it `grow`s one balloon
+at a time, how fast (`stepMs`), whether the reader can `scroll` a longer transcript
+through it, and the `messages` themselves. That list is **derived**, not authored — every
+op that touches a bubble re-runs `syncChains`, so a name that no bubble carries any more
+simply stops existing and there is no add-chain or delete-chain operation to get out of
+step. A chained balloon can never also be a tube end: the tube welds two fixed shapes,
+while a slot holds whatever message has scrolled into it. See `../bubbleChain.ts` for the
+window arithmetic and `chainOps.ts` for the list's lifecycle.
 
 **A picture has two independent framings, which is why it has so many fields.**
 `left`/`top`/`width`/`height` are the *frame*: its own rectangle over the panel box, in
@@ -108,6 +122,15 @@ different images can only crossfade. A new bubble type belongs in `bubbleShape.t
      declare it at one end only — and the **link to** dropdown lists only the other
      bubbles on the same panel (it is disabled when there are none). Changing a
      bubble's panel clears a link that would have crossed one.
+   - Also for bubbles: the **chain** field (free text, completing on the names already
+     in use) makes this balloon a slot of that message thread. Naming one clears its
+     tube and greys the **link to** picker out, and the chain's own controls appear
+     below: **grow one at a time** with its **step ms**, **scroll** to let the reader
+     wheel a longer transcript through the column, the **messages** box (one per line —
+     leave it empty and the drawn balloons' own text is the transcript), and
+     **+ Balloon in chain**, which adds a slot above the current top one, in the same
+     column and with no tail. Chained balloons render flat and all-visible in edit
+     mode, so you are always drawing the whole column rather than chasing an animation.
    - **+ Image** / **+ Bubble** (toolbar) append a new picture or bubble to the
      selected panel — select the panel, a picture on it or a bubble on it first, so
      there is a panel to add to — and select what they added. **Delete image** /
@@ -155,7 +178,7 @@ in a prod build.
 ## Layout
 
 ```text
-types.ts            ImgTransform, BubbleTransform, EditorConfig
+types.ts            ImgTransform, BubbleTransform, BubbleChain, EditorConfig
 assets.ts           PANEL_ASSETS: the pictures a frame may point at (static manifest)
 bubbleTypes.ts      BubbleType + BUBBLE_TYPES (lettering font per type) — ships in prod
 ../panels.ts        PANELS: the grid slots — label, isLogo, route (what `panel` indexes)
@@ -163,9 +186,11 @@ bubbleTypes.ts      BubbleType + BUBBLE_TYPES (lettering font per type) — ship
 ../bubbleBox.ts     PURE authoring box: viewBox, base ellipse, TAIL_DIRS + tail geometry
 ../bubbleShape.ts   PURE outline geometry: the shared vertex ring, per-type modulation, morph lerp
 ../bubbleTube.ts    PURE connector-tube geometry + link/reveal semantics
+../bubbleChain.ts   PURE chain arithmetic: slot order, transcript, head clamp, visible window
 ../useBubbleMorph.ts  rAF morph driver — writes `d` to the DOM, not through React
 ../PanelBubble.tsx  one bubble: outline SVG + text + hover/press morph state
 ../PanelBubbles.tsx one panel's bubbles: filters the array by panel, clips the non-spilling ones
+../PanelBubbleChain.tsx  one chain: which slot holds which message, growth timer, wheel scroll
 ../BubbleTubes.tsx  viewport-level tube layer for every linked pair
 ../panelGeometry.ts PURE grid -> polygon geometry: frame, normalised space, vertex constraints
 ../polygonInset.ts  PURE polygon maths: the perpendicular gutter inset, bounding box
@@ -175,6 +200,7 @@ layoutConfig.ts     PANEL_IMG_TRANSFORMS, PANEL_BUBBLE_TRANSFORMS, PANEL_GRIDS �
 configOps.ts        PURE config edits: re-exports configSeed + configHydrate, patch/add/remove, links
 configSeed.ts       PURE: the working copy's seed, clone, and per-breakpoint grid set/reset
 configHydrate.ts    PURE: parse a persisted payload back into a config, falling back per field
+chainOps.ts         PURE chain-list lifecycle: derive from the bubbles, patch, clamp, hydrate
 useSeamDrag.ts      hook: which gesture a pointer means, and the grid edit it maps to
 PanelSeams.tsx      the draggable line + vertex handles (shapes mode)
 ShapeInspector.tsx  shapes-mode inspector: vertex read-out, straighten, reset grid
@@ -187,9 +213,11 @@ EditorOverlay.tsx   overlay UI: click targets, outlines, seams (dev-only, dynami
 EditorToolbar.tsx   toolbar chrome: mode toggle, page select, inspector slot, save/reset/export
 InspectorPanel.tsx  selection inspector: read-outs, spill, per-element reset, delete
 ImageInspector.tsx  picture-only controls: panel, picture, alt, anchor
-BubbleInspector.tsx bubble-only controls: panel, type, tail, content, text, hover/click, link
+BubbleInspector.tsx bubble-only controls: panel, type, tail, content, text, hover/click, link, chain
+ChainInspector.tsx  the chain half of that inspector: grow, step ms, scroll, messages, + slot
 PageSelect.tsx      toolbar dropdown: switch page / preview the loading screen
 pageSelection.ts    PURE helpers behind PageSelect (sentinel value, selection resolution)
+../bubbleChains.css chain slot placement + the arrival/scroll animations (ships in prod)
 editor.css          overlay chrome styles
 editor-shapes.css   seam and vertex handle styles
 ```
@@ -203,5 +231,6 @@ and not the other fails there rather than on the first save.
 
 All math/serialization is pure and unit-tested under
 `frontend/src/tests/skins/` (`comicBookTransforms`, `editorTransformsMath`,
-`editorMode`, `editorConfigOps`, `editorSerialize`, `pageSelection`,
-`editorToolbarDrag`, `bubbleShape`, `bubbleTube`, `panelGeometry`, `panelGridOps`).
+`editorMode`, `editorConfigOps`, `editorChainConfig`, `editorChainOps`,
+`editorSerialize`, `pageSelection`, `editorToolbarDrag`, `bubbleShape`, `bubbleTube`,
+`bubbleChain`, `panelGeometry`, `panelGridOps`).

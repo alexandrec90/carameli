@@ -50,6 +50,7 @@ const bubble = (over: Partial<BubbleTransform> = {}): BubbleTransform => ({
   linkTo: null,
   hoverType: null,
   clickType: null,
+  chain: '',
   ...over,
 })
 

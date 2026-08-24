@@ -1,4 +1,5 @@
 import type { TailDir } from '../bubbleBox'
+import type { BubbleChain } from '../bubbleChain'
 import type { PanelGrids } from '../panelGeometry'
 import type { BubbleContentKind } from '../wheelPicker'
 import type { BubbleType } from './bubbleTypes'
@@ -8,6 +9,11 @@ import type { BubbleType } from './bubbleTypes'
 // layoutConfig.ts — which the editor overwrites whole — keeps naming exactly one module
 // for its types.
 export type { LayoutKind, PanelGrid, PanelGrids } from '../panelGeometry'
+
+// Same bargain for chains: the renderer owns the behaviour (../bubbleChain.ts), the
+// editor owns the field on the bubble that joins one, and layoutConfig.ts imports both
+// names from here.
+export type { BubbleChain } from '../bubbleChain'
 
 /**
  * One picture on the page: which panel it belongs to, which file it shows, the frame
@@ -98,6 +104,22 @@ export interface BubbleTransform {
   hoverType: BubbleType | null
   /** Shape to pulse to when the bubble is pressed; null = stay put. */
   clickType: BubbleType | null
+  /**
+   * Name of the bubble chain this balloon is a slot of; '' when it stands alone.
+   *
+   * Bubbles sharing a name on the same panel form one vertical column — an SMS thread —
+   * ordered bottom-to-top by `top`, so the lowest is the root that carries the tail. The
+   * column's behaviour (does it grow in, does it scroll) is one entry in
+   * {@link EditorConfig.chains}, not a per-bubble flag, because it is a property of the
+   * thread rather than of any one balloon. See ../bubbleChain.ts.
+   *
+   * A chained bubble takes no connector tube. A tube joins two balloons that are on
+   * screen together and stay put; a chain slot holds a *different message* from one
+   * moment to the next, so a tube welded to it would be joining whatever happened to
+   * scroll into place. `sanitizeLinks` drops such a link the way it drops a cross-panel
+   * one, and the link picker never offers one.
+   */
+  chain: string
 }
 
 /**
@@ -109,9 +131,15 @@ export interface BubbleTransform {
  * viewport shape, because the three reshape the page differently and a picture framed
  * for the landscape one has nothing to say about the portrait one. The editor edits
  * whichever grid the window it is open in draws.
+ *
+ * `chains` is derived rather than authored: its entries are exactly the names the
+ * bubbles carry, kept in step by `syncChains` after every edit. Naming a chain on a
+ * bubble creates the entry; renaming the last member away removes it. That is what stops
+ * a config accumulating settings for threads that no longer exist.
  */
 export interface EditorConfig {
   images: ImgTransform[]
   bubbles: BubbleTransform[]
+  chains: BubbleChain[]
   grids: PanelGrids
 }

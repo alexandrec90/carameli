@@ -7,7 +7,7 @@ import PanelBubbles from './PanelBubbles'
 import PanelImages from './PanelImages'
 import { PANELS } from './panels'
 import { gridPolys, layoutKindFor } from './panelGeometry'
-import { PANEL_IMG_TRANSFORMS, PANEL_BUBBLE_TRANSFORMS, PANEL_GRIDS } from './editor/layoutConfig'
+import { PANEL_BUBBLE_CHAINS, PANEL_IMG_TRANSFORMS, PANEL_BUBBLE_TRANSFORMS, PANEL_GRIDS } from './editor/layoutConfig'
 import { imgFramePoints, isFullPanelFrame, toClipPath } from './editor/transforms'
 import { shouldRevealImg, useEditorMode } from './editor/useEditorMode'
 import {
@@ -16,6 +16,7 @@ import {
 } from './benDayWash'
 import './comic-book.css'
 import './bubbles.css'
+import './bubbleChains.css'
 
 // ─── Ben-Day dot renderer ────────────────────────────────────────────────────
 
@@ -432,6 +433,7 @@ export function Layout({ navItems }: LayoutProps) {
     // Source transforms from the editor's working copy when active, else constants.
     const imgT = editor.active ? editor.config.images : PANEL_IMG_TRANSFORMS
     const bubbleT = editor.active ? editor.config.bubbles : PANEL_BUBBLE_TRANSFORMS
+    const chainT = editor.active ? editor.config.chains : PANEL_BUBBLE_CHAINS
     const grids = editor.active ? editor.config.grids : PANEL_GRIDS
 
     const panelDotRefs = useRef<(HTMLCanvasElement | null)[]>([])
@@ -730,10 +732,12 @@ export function Layout({ navItems }: LayoutProps) {
                                 always in edit mode. */}
                             <PanelBubbles
                                 bubbles={bubbleT}
+                                chains={chainT}
                                 panel={i}
                                 clip={dotClip}
                                 isVisible={bubbleVisible}
                                 interactive={!editor.active}
+                                editing={editor.active}
                             />
                         </div>
                     )
