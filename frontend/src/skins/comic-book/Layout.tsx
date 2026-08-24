@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import type { LayoutProps } from '../types'
 import { isBubbleRevealed } from './bubbleTube'
@@ -6,12 +6,11 @@ import BubbleTubes from './BubbleTubes'
 import ComicPanel from './ComicPanel'
 import { LoadingOverlay, useLoadingScreen } from './LoadingOverlay'
 import PanelInk from './PanelInk'
-import { computePagePolys } from './pageLayouts'
-import type { PagePolys } from './pageLayouts'
+import { gridPolys, layoutKindFor } from './panelGeometry'
 import { PANEL_BG_CONFIGS, drawPanelBackground } from './panelPatterns'
 import { PANELS, pageForPath } from './panels'
 import {
-    PANEL_IMG_TRANSFORMS, PANEL_BUBBLE_TRANSFORMS, PANEL_PATTERNS,
+    PANEL_IMG_TRANSFORMS, PANEL_BUBBLE_TRANSFORMS, PANEL_GRIDS, PANEL_PATTERNS,
 } from './editor/layoutConfig'
 import { shouldRevealImg, useEditorMode } from './editor/useEditorMode'
 import { usePageWash } from './usePageWash'
@@ -32,9 +31,11 @@ function accentForPath(path: string): string {
 
 // ─── Panel contents ─────────────────────────────────────────────────────────
 // A panel is a slot in the grid and nothing more: its label, whether it is the logo,
-// where it navigates and which *page* it belongs to live in PANELS (./panels.ts).
-// computePagePolys (./pageLayouts.ts) returns a PANELS-length sparse array with a
-// polygon only at the indices whose panel sits on the current page.
+// where it navigates and which *page* it belongs to live in PANELS (./panels.ts),
+// index-parallel to the rings of every grid in PANEL_GRIDS. Each page's grid keeps a
+// ring for every panel, with an empty ring where the panel sits on the other page —
+// gridPolys hands those back with no vertices, and the sparse map below turns them
+// into null slots so nothing renders for them here.
 //
 // What is *drawn* in a panel is not parallel to anything. Pictures come from
 // PANEL_IMG_TRANSFORMS and bubbles from PANEL_BUBBLE_TRANSFORMS (both in
@@ -63,6 +64,7 @@ export function Layout({ navItems }: LayoutProps) {
     // Source transforms from the editor's working copy when active, else constants.
     const imgT = editor.active ? editor.config.images : PANEL_IMG_TRANSFORMS
     const bubbleT = editor.active ? editor.config.bubbles : PANEL_BUBBLE_TRANSFORMS
+    const grids = editor.active ? editor.config.grids : PANEL_GRIDS
     const patterns = editor.active ? editor.config.patterns : PANEL_PATTERNS
     // The dot loop is a useCallback([]) that outlives any one render; it reads the
     // current patterns through this ref so an editor pattern change repaints on the
@@ -78,10 +80,25 @@ export function Layout({ navItems }: LayoutProps) {
     const rafRef = useRef<number>(0)
     const settledCountRef = useRef(0)
 
-    const [panelPolys, setPanelPolys] = useState<PagePolys>(() =>
+    // The viewport, not the polygons. The shapes are *derived* from it, the page and
+    // the grid just below, which is what lets a drag in the shape editor repaint
+    // immediately: holding computed polygons in state meant nothing but a resize
+    // could change them.
+    const [viewport, setViewport] = useState<{ w: number; h: number }>(() =>
         typeof window === 'undefined'
-            ? []
-            : computePagePolys(window.innerWidth, window.innerHeight, page)
+            ? { w: 0, h: 0 }
+            : { w: window.innerWidth, h: window.innerHeight }
+    )
+    const layoutKind = layoutKindFor(viewport.w, viewport.h)
+    // Sparse, PANELS-length: a panel on the other page has an empty ring in this
+    // page's grid, which gridPolys returns as a vertex-less polygon — mapped to null
+    // here so every consumer can tell "not on this page" from a real shape.
+    const panelPolys = useMemo(
+        () => (viewport.w > 0 && viewport.h > 0
+            ? gridPolys(grids[page][layoutKind], viewport.w, viewport.h)
+                .map(p => (p.vp.length >= 3 ? p : null))
+            : []),
+        [grids, page, layoutKind, viewport.w, viewport.h],
     )
     // Natural (intrinsic) pixel size of each loaded source, captured on load and keyed
     // by `src`. Drives fullImgStyle (the real framing); absent until the img loads,
@@ -143,14 +160,12 @@ export function Layout({ navItems }: LayoutProps) {
         rafRef.current = requestAnimationFrame(animatePanelDots)
     }, [])
 
-    // ── Resize handler — recompute panel polygons ─────────────────────────────
-    // Keyed on `page` so client-side navigation between pages recomputes the grid
-    // through the same layout effect that seeds it.
+    // ── Resize handler — record the viewport; the polygons follow ─────────────
     const handleResize = useCallback(() => {
         const w = window.innerWidth
         const h = window.innerHeight
-        setPanelPolys(computePagePolys(w, h, page))
-    }, [page])
+        setViewport(prev => (prev.w === w && prev.h === h ? prev : { w, h }))
+    }, [])
 
     useLayoutEffect(() => { handleResize() }, [handleResize])
 
@@ -218,6 +233,9 @@ export function Layout({ navItems }: LayoutProps) {
                     <EditorOverlay
                         api={editor}
                         panelPolys={panelPolys}
+                        page={page}
+                        layoutKind={layoutKind}
+                        viewport={viewport}
                         pageSelect={{
                             navItems,
                             previewingLoading: loading.previewLoading,

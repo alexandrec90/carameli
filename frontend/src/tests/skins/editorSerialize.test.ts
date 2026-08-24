@@ -1,12 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import {
-  addImg,
-  patchBubble,
-  patchImg,
-  patchPattern,
-  seedConfig,
-} from '../../skins/comic-book/editor/configOps'
+import { addImg, patchBubble, patchImg, patchPattern, seedConfig } from '../../skins/comic-book/editor/configOps'
 import {
   PANEL_BUBBLE_TRANSFORMS,
   PANEL_IMG_TRANSFORMS,
@@ -15,6 +9,7 @@ import {
 // The file the Save button overwrites, as text — the only way to assert that a save
 // with nothing changed rewrites it byte for byte.
 import layoutConfigSource from '../../skins/comic-book/editor/layoutConfig.ts?raw'
+import { moveVertex } from '../../skins/comic-book/editor/panelGridOps'
 import { serializeConfig, serializeConfigFile } from '../../skins/comic-book/editor/serialize'
 import type { EditorConfig } from '../../skins/comic-book/editor/types'
 import { PANELS } from '../../skins/comic-book/panels'
@@ -38,19 +33,26 @@ function patternCount(ts: string): number {
   return (arr.match(/'/g) ?? []).length / 2
 }
 
+/** The two transform blocks, without the pattern and grid blocks that follow them. */
+function transformsOf(ts: string): string {
+  const patterns = ts.indexOf('export const PANEL_PATTERNS')
+  return patterns === -1 ? ts : ts.slice(0, patterns)
+}
+
 /** Evaluate a serialized block back into a config, as a paste into the file would. */
 function reparse(ts: string): EditorConfig {
   const body = ts
     .replace("import type { PanelBgStyle } from '../panelPatterns'", '')
-    .replace("import type { ImgTransform, BubbleTransform } from './types'", '')
+    .replace("import type { ImgTransform, BubbleTransform, PageGrids } from './types'", '')
     .replace(/export const PANEL_IMG_TRANSFORMS: ImgTransform\[\] =/, 'const images =')
     .replace(/export const PANEL_BUBBLE_TRANSFORMS: BubbleTransform\[\] =/, 'const bubbles =')
     .replace(/export const PANEL_PATTERNS: PanelBgStyle\[\] =/, 'const patterns =')
-  return new Function(`${body}\nreturn { images, bubbles, patterns }`)() as EditorConfig
+    .replace(/export const PANEL_GRIDS: PageGrids =/, 'const grids =')
+  return new Function(`${body}\nreturn { images, bubbles, grids, patterns }`)() as EditorConfig
 }
 
 describe('serializeConfig', () => {
-  it('emits all three const blocks, every picture, bubble and pattern', () => {
+  it('emits all the const blocks — every picture, bubble and pattern', () => {
     const ts = serializeConfig(seedConfig())
     expect(ts).toContain('export const PANEL_IMG_TRANSFORMS: ImgTransform[] = [')
     expect(ts).toContain('export const PANEL_BUBBLE_TRANSFORMS: BubbleTransform[] = [')
@@ -73,6 +75,24 @@ describe('serializeConfig', () => {
     expect(ts).toContain('falls back to the shipped default on hydrate')
   })
 
+  it('writes the pattern an author picked, under its panel label comment', () => {
+    const ts = serializeConfig(patchPattern(seedConfig(), 0, 'sunburst'))
+    expect(ts).toContain("  'sunburst', // Logo\n")
+    expect(ts).not.toContain("'halftone-gradient'")
+  })
+
+  // The patterns block iterates PANELS, not the config: the array is parallel by
+  // contract, so a slot the working copy never carried serializes as its default
+  // rather than as `undefined`.
+  it('serializes the shipped default for a pattern slot the config never carried', () => {
+    const cfg = seedConfig()
+    cfg.patterns = cfg.patterns.slice(0, 3)
+    const ts = serializeConfig(cfg)
+    expect(patternCount(ts)).toBe(PANELS.length)
+    expect(ts).not.toContain('undefined')
+    expect(ts).toContain("  'radial-dots', // Logo 2\n")
+  })
+
   it('reproduces the default values verbatim', () => {
     const ts = serializeConfig(seedConfig())
     expect(ts).toContain(
@@ -90,26 +110,6 @@ describe('serializeConfig', () => {
         'type: \'soft\', tail: \'down-left\', text: "It\'s Carameli!", linkTo: 1, ' +
         "hoverType: 'cloud', clickType: 'lightning' },",
     )
-    expect(ts).toContain("  'halftone-gradient', // Logo\n")
-    expect(ts).toContain("  'radial-dots', // Logo 2\n")
-  })
-
-  it('writes the pattern an author picked, under its panel label comment', () => {
-    const ts = serializeConfig(patchPattern(seedConfig(), 0, 'sunburst'))
-    expect(ts).toContain("  'sunburst', // Logo\n")
-    expect(ts).not.toContain("'halftone-gradient'")
-  })
-
-  // The patterns block iterates PANELS, not the config: the array is parallel by
-  // contract, so a slot the working copy never carried serializes as its default
-  // rather than as `undefined`.
-  it('serializes the shipped default for a pattern slot the config never carried', () => {
-    const cfg = seedConfig()
-    cfg.patterns = cfg.patterns.slice(0, 3)
-    const ts = serializeConfig(cfg)
-    expect(patternCount(ts)).toBe(PANELS.length)
-    expect(ts).not.toContain('undefined')
-    expect(ts).toContain("  'radial-dots', // Logo 2\n")
   })
 
   // The frame is the picture's own now, so it is the part a save must carry: an
@@ -164,11 +164,24 @@ describe('serializeConfig', () => {
     })
     cfg = patchBubble(cfg, 1, { top: -35.49, right: -11.6, width: 54.8, rotate: -4.96 })
     const ts = serializeConfig(cfg)
-    expect(ts).not.toMatch(/\d\.\d{3,}/) // no long decimal tails anywhere
+    // Transform values only. A vertex is a *fraction* of the frame, so its own rounding
+    // is four places (about a tenth of a pixel), and asserting "no three-decimal number
+    // anywhere" would now be asserting that the grid is rounded to a whole percent.
+    expect(transformsOf(ts)).not.toMatch(/\d\.\d{3,}/)
     expect(ts).toContain(
       'left: 20, top: 20, width: 55.1, height: 55.9, scale: 1, offsetX: 12, offsetY: -9,',
     )
     expect(ts).toContain('{ panel: 0, top: -35, right: -12, width: 55, rotate: -5, spill: true,')
+  })
+
+  it('rounds vertex noise out of the grids without flattening the shape', () => {
+    const cfg = seedConfig()
+    const grid = cfg.grids.classic.landscape
+    // What a drag actually produces: a pointer pixel divided by the frame width.
+    cfg.grids.classic.landscape = moveVertex(grid, 2, [0.2448979591836, 0.4171428571428])
+    const ts = serializeConfig(cfg)
+    expect(ts).toContain('[0.2449, 0.4171]')
+    expect(ts.slice(ts.indexOf('export const PANEL_GRIDS'))).not.toMatch(/\d\.\d{5,}/)
   })
 
   it('escapes bubble text with quotes, backslashes, and newlines', () => {
@@ -216,13 +229,6 @@ describe('serializeConfig', () => {
     expect(parsed.bubbles[0]).toEqual({ ...PANEL_BUBBLE_TRANSFORMS[0], top: -40, width: 60 })
   })
 
-  it('round-trips an edited pattern back to the same style name', () => {
-    const cfg = patchPattern(seedConfig(), 9, 'vignette')
-    const parsed = reparse(serializeConfig(cfg))
-    expect(parsed.patterns).toEqual(cfg.patterns)
-    expect(parsed.patterns[9]).toBe('vignette')
-  })
-
   it('round-trips a bubble the author added rather than dropping it', () => {
     const cfg = seedConfig()
     cfg.bubbles.push({ ...cfg.bubbles[0], panel: 7, text: 'Added', linkTo: null })
@@ -241,16 +247,24 @@ describe('serializeConfig', () => {
     expect(parsed.images[index]).toEqual(config.images[index])
     expect(parsed.images.filter(t => t.panel === 3)).toHaveLength(2)
   })
+
+  it('round-trips an edited pattern back to the same style name', () => {
+    const cfg = patchPattern(seedConfig(), 9, 'vignette')
+    const parsed = reparse(serializeConfig(cfg))
+    expect(parsed.patterns).toHaveLength(PANEL_PATTERNS.length)
+    expect(parsed.patterns[9]).toBe('vignette')
+  })
 })
 
 describe('serializeConfigFile', () => {
-  it('prepends the type import header to the three const blocks', () => {
+  it('prepends the import header to the const blocks', () => {
     const file = serializeConfigFile(seedConfig())
     expect(file.startsWith("import type { PanelBgStyle } from '../panelPatterns'")).toBe(true)
-    expect(file).toContain("import type { ImgTransform, BubbleTransform } from './types'")
+    expect(file).toContain("import type { ImgTransform, BubbleTransform, PageGrids } from './types'")
     expect(file).toContain('export const PANEL_IMG_TRANSFORMS: ImgTransform[] = [')
     expect(file).toContain('export const PANEL_BUBBLE_TRANSFORMS: BubbleTransform[] = [')
     expect(file).toContain('export const PANEL_PATTERNS: PanelBgStyle[] = [')
+    expect(file).toContain('export const PANEL_GRIDS: PageGrids = {')
   })
 
   it('produces a body whose literals re-evaluate to the source config', () => {

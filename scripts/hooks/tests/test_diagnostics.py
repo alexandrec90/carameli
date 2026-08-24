@@ -487,7 +487,7 @@ def test_backend_and_frontend_targets_partition_sections():
     # The two groups must cover every section exactly once -- no overlap, no gap,
     # or the CI split would drop or duplicate a target.
     all_names = {name for name, *_ in diag.TEST_SECTIONS}
-    assert {"frontend-tests"} == diag.FRONTEND_TEST_TARGETS
+    assert {"frontend-tests", "bundle-budgets"} == diag.FRONTEND_TEST_TARGETS
     assert all_names == diag.BACKEND_TEST_TARGETS | diag.FRONTEND_TEST_TARGETS
     assert not (diag.BACKEND_TEST_TARGETS & diag.FRONTEND_TEST_TARGETS)
 

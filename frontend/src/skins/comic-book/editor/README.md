@@ -1,8 +1,11 @@
 # Comic-Book Visual Layout Editor (dev-only)
 
 A small in-app editor for visually **placing, framing and resizing** the pictures and
-speech bubbles in the `comic-book` skin, plus an **export** that copies the tuned
-numbers back into source.
+speech bubbles in the `comic-book` skin, and for **reshaping the panels themselves**,
+plus an **export** that copies the tuned numbers back into source.
+
+It has two modes, switched at the top of the toolbar. **Content** places pictures and
+bubbles; **Panel shapes** drags the lines between panels.
 
 ## Source of truth
 
@@ -23,7 +26,21 @@ bubble `type` resolves to a lettering font via [`bubbleTypes.ts`](./bubbleTypes.
 modules — there are no more magic framing numbers, and no bubble text lives in
 `Layout.tsx`.
 
-**Neither array is parallel to the panels.** A picture and a bubble alike name their
+[`layoutConfig.ts`](./layoutConfig.ts) also holds `PANEL_GRIDS` — a `PageGrids`
+record: for each **page** (`classic` / `home`, chosen from the route by
+`pageForPath`), one panel subdivision per window shape (`landscape` / `portrait` /
+`square`, chosen by `layoutKindFor`). Every grid's ring table is `PANELS`-length: a
+panel that lives on the *other* page keeps its slot as an **empty ring**, which
+`gridPolys` hands back as a vertex-less polygon and `Layout.tsx` maps to `null`, so a
+panel index means the same thing everywhere. A grid is a **shared-vertex planar
+subdivision**: one table of
+normalised `[x, y]` points and one ring of indices per panel. The two panels either
+side of a line name the *same* indices for it, so moving a vertex moves both sides at
+once and they cannot come apart. `../panelGeometry.ts` turns a grid into viewport
+polygons; `panelGridOps.ts` holds the edits (move, bend, straighten) and
+`panelGridValidate.ts` the structural guard a persisted grid has to pass.
+
+**Neither transform array is parallel to the panels.** A picture and a bubble alike name their
 own `panel`, so a panel may own several of each or none, and each array's length is the
 author's. `panel` is the whole association: placement is measured against that panel's
 box, and hovering that panel is what reveals its bubbles. A `linkTo` partner must sit on
@@ -54,7 +71,10 @@ different images can only crossfade. A new bubble type belongs in `bubbleShape.t
    across client-side navigation; leave edit mode with `?edit=0` (which also
    clears the persisted flag). Toggle back and forth via the URL as needed —
    your unsaved working copy survives the round trip.
-2. Click a **panel**, a **picture** or a **bubble** to select it. (In edit mode every
+2. Pick a mode: **Content** (pictures and bubbles) or **Panel shapes** (the lines
+   between panels). In shapes mode the content click targets are not rendered at all,
+   because a panel-sized target would swallow every drag aimed at a line crossing it.
+3. *(Content)* Click a **panel**, a **picture** or a **bubble** to select it. (In edit mode every
    bubble is shown without hover so it can be selected.) A picture wins the click over
    the panel under it, and a bubble over both. Selecting the panel itself is how you
    reach one that has nothing on it yet, and it is what **+ Image** / **+ Bubble** add
@@ -65,7 +85,7 @@ different images can only crossfade. A new bubble type belongs in `bubbleShape.t
      dropdown in the toolbar to move between pages (each switch replays the
      Ben-Day wash transition). The **Loading screen** entry previews the loading
      overlay; picking any page again replays its exit wash.
-3. Adjust:
+4. *(Content)* Adjust:
    - **Drag** the selection to move the frame (picture) / the bubble.
    - **Drag the bottom-right handle** to resize the frame (picture) / the bubble.
    - **Drag the round top-left handle** to pan the picture inside its frame (picture only).
@@ -103,12 +123,29 @@ different images can only crossfade. A new bubble type belongs in `bubbleShape.t
    - The toolbar is **draggable by its COMIC EDITOR title bar** — move it off any
      panel it covers. The position is clamped to the viewport and persists in
      `localStorage` across reloads.
-4. Click **Save** to write the change straight back to `layoutConfig.ts` (a dev-only
+5. *(Panel shapes)* Every line between two panels is drawn as a blue handle:
+   - **Drag a line** to slide the whole of it; **drag a vertex** to move one end.
+   - A vertex **on the frame** slides along its own edge and no further, and the four
+     frame corners do not move at all. There is no handle on the frame itself: a frame
+     edge belongs to one panel only, so it is never a line between two, and the
+     gesture that would move it does not exist.
+   - **Double-click a line** to put a bend in it, then drag the bend — repeat for the
+     lightning-bolt shapes. **Delete** (or **Straighten** in the inspector) takes a
+     bend back out; a vertex where three lines meet, or one on the frame, is not a
+     bend and is refused.
+   - **Arrow keys** nudge the selected vertex (hold **⇧** for x10); **Esc** deselects.
+   - The gutter between panels stays the same width at every angle — it is measured
+     perpendicular to each edge, not per axis — and every panel stays inside the outer
+     frame. Neither is a rule applied afterwards; both fall out of the geometry.
+   - **Reset shapes** in the inspector restores the current window shape's grid, for
+     the current page. Each page's three grids are edited independently: resize the
+     window to reach another shape, switch pages to reach the other page's grids.
+6. Click **Save** to write the change straight back to `layoutConfig.ts` (a dev-only
    Vite endpoint, `POST /__comic-editor/save`); HMR reloads it. **Reset** discards
    unsaved edits and reverts to the last saved file.
-5. Reload **without** `?edit=1` — your saved change is now the baseline.
+7. Reload **without** `?edit=1` — your saved change is now the baseline.
 
-**Copy config** / **.ts** remain as fallbacks: Copy puts the three paste-ready
+**Copy config** / **.ts** remain as fallbacks: Copy puts the paste-ready
 `export const` blocks on the clipboard; **.ts** downloads a complete `layoutConfig.ts`.
 Both are used automatically if the Save endpoint or clipboard is unavailable.
 
@@ -128,7 +165,7 @@ in a prod build.
 types.ts            ImgTransform, BubbleTransform, EditorConfig
 assets.ts           PANEL_ASSETS: the pictures a frame may point at (static manifest)
 bubbleTypes.ts      BubbleType + BUBBLE_TYPES (lettering font per type) — ships in prod
-../panels.ts        PANELS: the grid slots — label, isLogo, route (what `panel` indexes)
+../panels.ts        PANELS: the grid slots — label, isLogo, route, page (what `panel` indexes)
 ../PanelImages.tsx  one panel's pictures: filters the array by panel, frames and clips each
 ../bubbleBox.ts     PURE authoring box: viewBox, base ellipse, TAIL_DIRS + tail geometry
 ../bubbleShape.ts   PURE outline geometry: the shared vertex ring, per-type modulation, morph lerp
@@ -137,22 +174,32 @@ bubbleTypes.ts      BubbleType + BUBBLE_TYPES (lettering font per type) — ship
 ../PanelBubble.tsx  one bubble: outline SVG + text + hover/press morph state
 ../PanelBubbles.tsx one panel's bubbles: filters the array by panel, clips the non-spilling ones
 ../BubbleTubes.tsx  viewport-level tube layer for every linked pair
+../panelGeometry.ts PURE grid -> polygon geometry: frame, normalised space, vertex constraints
 ../panelPatterns.ts pattern style registry + per-panel palette/dot tuning (PANEL_BG_CONFIGS)
-layoutConfig.ts     PANEL_IMG_TRANSFORMS, PANEL_BUBBLE_TRANSFORMS, PANEL_PATTERNS — source of truth
-configOps.ts        PURE config edits: seed/patch, add/remove picture or bubble, pattern switch, link sanitation
-configHydrate.ts    PURE rebuild from a persisted payload: backfill, enum coercion, pattern fallback
+../polygonInset.ts  PURE polygon maths: the perpendicular gutter inset, bounding box
+panelGridOps.ts     PURE grid edits: move vertex, insert/remove bend, seam listing
+panelGridValidate.ts PURE structural guard: rings, ranges, no T-junctions
+layoutConfig.ts     PANEL_IMG_TRANSFORMS, PANEL_BUBBLE_TRANSFORMS, PANEL_PATTERNS, PANEL_GRIDS — source of truth
+configOps.ts        PURE config edits: re-exports configSeed + configHydrate, patch/add/remove, links
+configSeed.ts       PURE: the working copy's seed, clone, and per-breakpoint grid set/reset
+configHydrate.ts    PURE: parse a persisted payload back into a config, falling back per field
+useSeamDrag.ts      hook: which gesture a pointer means, and the grid edit it maps to
+PanelSeams.tsx      the draggable line + vertex handles (shapes mode)
+ShapeInspector.tsx  shapes-mode inspector: vertex read-out, straighten, reset grid
 serialize.ts        PURE serialization back to layoutConfig.ts (headers included)
 transforms.ts       PURE helpers: CSS builders, frame/drag/scale math, clamp
 useEditorMode.ts    hook: flag detection, working copy, persistence, selection
 useOverlayInteraction.ts  pointer/wheel/keyboard wiring (thin)
 useToolbarDrag.ts   hook: draggable toolbar position (viewport-clamped, persisted)
-EditorOverlay.tsx   overlay UI: targets, outline, + Image / + Bubble, actions (dev-only, dynamically imported)
+EditorOverlay.tsx   overlay UI: click targets, outlines, seams (dev-only, dynamically imported)
+EditorToolbar.tsx   toolbar chrome: mode toggle, page select, inspector slot, save/reset/export
 InspectorPanel.tsx  selection inspector: read-outs, spill, per-element reset, delete
 ImageInspector.tsx  picture-only controls: panel, picture, alt, anchor
 BubbleInspector.tsx bubble-only controls: panel, type, tail, text, hover/click, link
 PageSelect.tsx      toolbar dropdown: switch page / preview the loading screen
 pageSelection.ts    PURE helpers behind PageSelect (sentinel value, selection resolution)
 editor.css          overlay chrome styles
+editor-shapes.css   seam and vertex handle styles
 ```
 
 Save overwrites `layoutConfig.ts` **verbatim** with what `serialize.ts` emits, so
@@ -165,4 +212,5 @@ and not the other fails there rather than on the first save.
 All math/serialization is pure and unit-tested under
 `frontend/src/tests/skins/` (`comicBookTransforms`, `editorTransformsMath`,
 `editorMode`, `editorConfigOps`, `editorSerialize`, `pageSelection`,
-`editorToolbarDrag`, `bubbleShape`, `bubbleTube`).
+`editorToolbarDrag`, `bubbleShape`, `bubbleTube`, `panelGeometry`, `panelGridOps`,
+`panelLayouts`).

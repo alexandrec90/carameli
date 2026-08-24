@@ -3,13 +3,16 @@ import { describe, expect, it } from 'vitest'
 import {
   DOCKER_POLL_INTERVAL_MS,
   MIN_SAFE_POLL_INTERVAL_MS,
+  WATCH_IGNORED,
   resolveDevWatch,
 } from './devWatchPolicy'
 
 /**
- * Pins both halves of the watcher trade-off documented in devWatchPolicy.ts:
+ * Pins all three halves of the watcher trade-off documented in devWatchPolicy.ts:
  * polling must stay on in Docker (else HMR silently dies across the NTFS bind
- * mount), and the interval must stay coarse (else it pegs the WSL2 VM).
+ * mount), the interval must stay coarse (else it pegs the WSL2 VM), and the sweep
+ * must stay off build output (else its stat calls starve libuv's threadpool and
+ * every static asset request queues behind them).
  */
 
 describe('resolveDevWatch', () => {
@@ -32,5 +35,26 @@ describe('resolveDevWatch', () => {
 
   it('treats an empty CHOKIDAR_USEPOLLING as unset rather than enabling polling', () => {
     expect(resolveDevWatch({ CHOKIDAR_USEPOLLING: '' })).toBeUndefined()
+  })
+
+  it('keeps the poll sweep off dist/, which Vite does not ignore by default', () => {
+    // dist/ is a byte-for-byte copy of public/ — ~30 MB of PNG masters restat'd
+    // twice a second for a tree the dev server never serves from.
+    expect(resolveDevWatch({ CHOKIDAR_USEPOLLING: 'true' })?.ignored).toContain('**/dist/**')
+  })
+
+  it('keeps the poll sweep off binary public assets, which cannot hot-update', () => {
+    const pattern = WATCH_IGNORED.find(p => p.startsWith('**/public/'))
+
+    expect(pattern).toBeDefined()
+    for (const ext of ['png', 'webp', 'woff2']) {
+      expect(pattern).toContain(ext)
+    }
+  })
+
+  it('never ignores src/, which is the only tree HMR exists to watch', () => {
+    for (const pattern of WATCH_IGNORED) {
+      expect(pattern).not.toMatch(/(^|\/)src\//)
+    }
   })
 })

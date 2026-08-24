@@ -1,6 +1,14 @@
 import type { TailDir } from '../bubbleBox'
+import type { PageGrids } from '../panelGeometry'
 import type { PanelBgStyle } from '../panelPatterns'
 import type { BubbleType } from './bubbleTypes'
+
+// The shape half of the document is declared next door, in ../panelGeometry.ts, because
+// the renderer needs it too and this module is the editor's. Re-exported here so
+// layoutConfig.ts — which the editor overwrites whole — keeps naming exactly one module
+// for its types.
+export type { LayoutKind, PageGrids, PanelGrid } from '../panelGeometry'
+export type { PanelPage } from '../panels'
 
 /**
  * One picture on the page: which panel it belongs to, which file it shows, the frame
@@ -89,13 +97,22 @@ export interface BubbleTransform {
 }
 
 /**
- * The editor's working document. Neither entry array is parallel to PANELS: each entry
- * names its own panel, so both are free-length and adding one is an append that has to
- * line up with nothing. `patterns` is the exception — a background belongs to the panel
- * slot itself, so it IS parallel to PANELS and always exactly that length.
+ * The editor's working document. Neither array is parallel to PANELS: each entry names
+ * its own panel, so both are free-length and adding one is an append that has to line
+ * up with nothing.
+ *
+ * `grids` is the exception and is *keyed* rather than listed — per page, then one panel
+ * subdivision per viewport shape, because the three reshape the page differently and a
+ * picture framed for the landscape one has nothing to say about the portrait one. The
+ * editor edits whichever grid the route and window it is open in draw.
+ *
+ * `patterns` is the other exception, and it *is* parallel to PANELS: a Ben-Day
+ * background belongs to the panel slot itself, not to a picture or a bubble on it, so
+ * entry `i` is the style drawn behind `PANELS[i]`.
  */
 export interface EditorConfig {
   images: ImgTransform[]
   bubbles: BubbleTransform[]
+  grids: PageGrids
   patterns: PanelBgStyle[]
 }

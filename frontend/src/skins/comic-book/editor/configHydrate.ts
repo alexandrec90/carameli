@@ -4,15 +4,34 @@ import { PANELS } from '../panels'
 import { isPanelBgStyle } from '../panelPatterns'
 import type { PanelBgStyle } from '../panelPatterns'
 import { isBubbleType } from './bubbleTypes'
-import { CONFIG_KEY, NEW_BUBBLE, NEW_IMAGE, sanitizeLinks, seedConfig } from './configOps'
+import { CONFIG_KEY, cloneGrids, NEW_BUBBLE, NEW_IMAGE, seedConfig } from './configSeed'
 import { PANEL_PATTERNS } from './layoutConfig'
+import { isPageGrids } from './panelGridValidate'
 import type { BubbleTransform, EditorConfig, ImgTransform } from './types'
 
-// Rebuilding a working copy from whatever localStorage holds. Persisted payloads
-// outlive the code that wrote them — fields appear, registries shrink, the grid
-// changes shape — so everything here is defensive by construction: fill what is
-// missing, coerce what is retired, clamp what is out of range, and never throw.
-// The pure edit operations live in ./configOps.ts.
+// Reading a persisted working copy back. Everything here exists because a payload
+// outlives the code that wrote it: fields get added, names get retired, and a saved
+// config has to come back as a page either way.
+
+/**
+ * Drop every link that can no longer be drawn: out of range, to itself, or across
+ * panels. Run after any edit that can invalidate one — a delete renumbers the array,
+ * and moving a bubble to another panel strands whatever it was joined to.
+ *
+ * It nulls rather than repairs, because there is no repair: the author's intent was
+ * to join two specific balloons, and once they are on different panels no tube
+ * expresses it. Leaving the stale index would have BubbleTubes silently skip it,
+ * which looks like a rendering bug rather than a config the editor undid.
+ */
+export function sanitizeLinks(bubbles: BubbleTransform[]): BubbleTransform[] {
+  return bubbles.map((b, i) => {
+    const j = b.linkTo
+    if (j == null) return b
+    const partner = bubbles[j]
+    if (j === i || !partner || partner.panel !== b.panel) return { ...b, linkTo: null }
+    return b
+  })
+}
 
 /**
  * Replace every shape or tail name a bubble carries that no longer exists.
@@ -55,33 +74,37 @@ function coerceBubbleEnums(b: BubbleTransform): BubbleTransform {
 }
 
 /**
- * Pull an entry's `panel` back into the panel list. A panel index from an older
- * payload — or from a config hand-edited against a different grid — can outrun it, and
- * clamping beats an entry that renders nowhere and so cannot be selected to be fixed.
- */
-function clampPanel<T extends { panel: number }>(entry: T): T {
-  return { ...entry, panel: Math.min(Math.max(entry.panel, 0), PANELS.length - 1) }
-}
-
-/**
- * A PANELS-length pattern array from whatever a payload carried. Per-slot: a name the
- * registry still knows survives, anything else — a retired style, a typo, a missing
- * entry from a payload saved before patterns existed — falls back to that slot's
- * shipped default. Length is forced to PANELS.length both ways, because the array is
- * parallel by contract and every consumer indexes it by panel number.
+ * The pattern array a payload carries, coerced back to one style per panel slot.
+ *
+ * Parallel to PANELS, so the length is not the author's: a short array (saved before a
+ * panel existed) backfills from the shipped defaults, a long one is cut, and a slot
+ * naming a style that has since been retired — or was never one — falls back to its
+ * shipped default rather than failing the draw. The style name is the whole entry, so
+ * unlike a bubble there is nothing else to save around it.
  */
 export function normalizePatterns(raw: unknown): PanelBgStyle[] {
-  const src = Array.isArray(raw) ? raw : []
+  const list = Array.isArray(raw) ? raw : []
   const dropped: Record<number, unknown> = {}
   const out = PANEL_PATTERNS.map((shipped, i) => {
-    if (isPanelBgStyle(src[i])) return src[i]
-    if (src[i] !== undefined) dropped[i] = src[i]
+    const candidate = list[i]
+    if (candidate === undefined) return shipped
+    if (isPanelBgStyle(candidate)) return candidate
+    dropped[i] = candidate
     return shipped
   })
   if (Object.keys(dropped).length > 0) {
     logger.warn('Dropped retired comic-book pattern styles', { key: CONFIG_KEY, dropped })
   }
   return out
+}
+
+/**
+ * Pull an entry's `panel` back into the panel list. A panel index from an older
+ * payload — or from a config hand-edited against a different grid — can outrun it, and
+ * clamping beats an entry that renders nowhere and so cannot be selected to be fixed.
+ */
+function clampPanel<T extends { panel: number }>(entry: T): T {
+  return { ...entry, panel: Math.min(Math.max(entry.panel, 0), PANELS.length - 1) }
 }
 
 /**
@@ -110,8 +133,16 @@ export function hydrateConfig(raw: string | null): EditorConfig {
     //
     // A bubble merges over NEW_BUBBLE alone. Its seed entry carries the *words*, and
     // resurrecting a line the author had deleted is worse than an empty balloon.
+    //
+    // `grids` gets neither treatment: it is taken whole or not at all. There is no
+    // field-by-field backfill for a subdivision — a payload with a ring naming a vertex
+    // that isn't there cannot be repaired into a page, only into a differently broken
+    // one — so a payload that fails the structural guard falls back to the shipped
+    // grids and the author's pictures and words survive around them.
     const seed = seedConfig()
     return {
+      grids: isPageGrids(parsed.grids, PANELS.length) ? cloneGrids(parsed.grids) : seed.grids,
+      patterns: normalizePatterns(parsed.patterns),
       images: parsed.images.map((t, i) => {
         // Typed as possibly-absent because the payload may be longer than the seed:
         // a ninth picture the author added has no shipped entry to recover from, and
@@ -136,9 +167,6 @@ export function hydrateConfig(raw: string | null): EditorConfig {
           ),
         ),
       ),
-      // Absence is not corruption: a payload saved before patterns existed has no
-      // `patterns` key at all, and its images and bubbles are still the author's.
-      patterns: normalizePatterns(parsed.patterns),
     }
   } catch (err) {
     logger.warn('Discarding malformed comic-book editor config', {

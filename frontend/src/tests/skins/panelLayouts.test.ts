@@ -1,15 +1,21 @@
 import { describe, expect, it, vi } from 'vitest'
 
-import { computeClassicLayout } from '../../skins/comic-book/classicLayouts'
-import { PANEL_PATTERNS } from '../../skins/comic-book/editor/layoutConfig'
-import { computeHomeLayout, computePagePolys } from '../../skins/comic-book/pageLayouts'
-import { HG, OUTER_M, SPILL } from '../../skins/comic-book/panelGeometry'
+import { PANEL_GRIDS, PANEL_PATTERNS } from '../../skins/comic-book/editor/layoutConfig'
+import { gridPolys } from '../../skins/comic-book/panelGeometry'
+import type { LayoutKind } from '../../skins/comic-book/panelGeometry'
 import {
   PANEL_BG_CONFIGS,
   PATTERN_STYLE_KEYS,
   drawPanelBackground,
 } from '../../skins/comic-book/panelPatterns'
 import { PANELS, pageForPath } from '../../skins/comic-book/panels'
+
+// The page-level behavior on top of the grids: which page a route shows, how a page's
+// grid becomes the sparse poly array Layout renders from, and the per-panel background
+// painting. The grids' *structure* (conforming seams, frame corners, empty other-page
+// rings) is panelGridOps.test.ts territory.
+
+const KINDS: LayoutKind[] = ['landscape', 'portrait', 'square']
 
 /** Shoelace area of a polygon in viewport coords. */
 function area(pts: [number, number][]): number {
@@ -26,6 +32,11 @@ function area(pts: [number, number][]): number {
 const HOME = PANELS.flatMap((p, i) => (p.page === 'home' ? [i] : []))
 const CLASSIC = PANELS.flatMap((p, i) => (p.page === 'classic' ? [i] : []))
 
+/** The sparse poly array Layout derives: null where the panel is on the other page. */
+function pagePolys(page: 'home' | 'classic', kind: LayoutKind) {
+  return gridPolys(PANEL_GRIDS[page][kind], 1440, 900).map(p => (p.vp.length >= 3 ? p : null))
+}
+
 describe('pageForPath', () => {
   it('shows the 4-panel home grid on the root route only', () => {
     expect(pageForPath('/')).toBe('home')
@@ -36,110 +47,61 @@ describe('pageForPath', () => {
   })
 })
 
-describe('computeHomeLayout', () => {
-  const LANDSCAPE: [number, number] = [1440, 900]
-  const PORTRAIT: [number, number] = [700, 1000]
-
-  it('returns one polygon per home panel', () => {
-    expect(computeHomeLayout(...LANDSCAPE)).toHaveLength(HOME.length)
+describe('the home page grids', () => {
+  it('names exactly four panels, the logo first', () => {
+    expect(HOME).toHaveLength(4)
+    expect(PANELS[HOME[0]].label).toBe('Logo 2')
   })
 
-  // The logo was asked for as the smallest panel, at every viewport shape — the
-  // portrait split widens it so it never collapses, but never past its siblings.
-  it.each([LANDSCAPE, PORTRAIT])('keeps the logo panel smallest at %dx%d', (w, h) => {
-    const [logo, ...rest] = computeHomeLayout(w, h).map(p => area(p.vp))
+  // The logo was asked for as the smallest panel, at every viewport shape.
+  it.each(KINDS)('keeps the logo panel smallest in the %s grid', kind => {
+    const polys = gridPolys(PANEL_GRIDS.home[kind], 1440, 900)
+    const [logo, ...rest] = HOME.map(i => area(polys[i].vp))
     rest.forEach(other => expect(logo).toBeLessThan(other))
   })
 
-  // The dividers are the visual system shared with the classic grid: none of them
-  // vertical or horizontal, so every panel edge along one is slanted.
-  it('slants the row divider and both column dividers', () => {
-    const [logo, notepad, phone, talk] = computeHomeLayout(...LANDSCAPE)
-    // Row divider: bottom edge of the logo panel is not horizontal.
-    expect(logo.vp[2][1]).not.toBe(logo.vp[3][1])
-    // Row-1 column divider: logo's right edge is not vertical, and notepad's left
-    // edge leans the same way.
-    expect(logo.vp[1][0]).not.toBe(logo.vp[2][0])
-    expect(notepad.vp[0][0]).not.toBe(notepad.vp[3][0])
-    // Row-2 column divider: skewed the other way than row 1's.
-    const skew1 = logo.vp[2][0] - logo.vp[1][0]
-    const skew2 = phone.vp[2][0] - phone.vp[1][0]
-    expect(Math.sign(skew1)).not.toBe(Math.sign(skew2))
-    expect(talk.vp[3][0]).not.toBe(talk.vp[0][0])
-  })
-
-  it('insets each panel a half-gutter from the dividers, leaving a full gutter', () => {
-    const [logo, notepad, phone, talk] = computeHomeLayout(...LANDSCAPE)
-    // Across the row-1 column divider, top corners sit 2×HG apart.
-    expect(notepad.vp[0][0] - logo.vp[1][0]).toBeCloseTo(2 * HG)
-    // Across the row divider, the left corners sit 2×HG apart vertically.
-    expect(phone.vp[0][1] - logo.vp[3][1]).toBeCloseTo(2 * HG)
-    // Across the row-2 column divider.
-    expect(talk.vp[0][0] - phone.vp[1][0]).toBeCloseTo(2 * HG)
-  })
-
-  it('keeps every polygon inside the outer margin', () => {
-    const [w, h] = LANDSCAPE
-    for (const p of computeHomeLayout(w, h)) {
-      for (const [x, y] of p.vp) {
-        expect(x).toBeGreaterThanOrEqual(OUTER_M)
-        expect(x).toBeLessThanOrEqual(w - OUTER_M)
-        expect(y).toBeGreaterThanOrEqual(OUTER_M)
-        expect(y).toBeLessThanOrEqual(h - OUTER_M)
+  // The dividers are the visual system shared with the classic grid: no seam runs
+  // exactly vertical or horizontal, so every panel edge along one is slanted.
+  it.each(KINDS)('slants every interior seam of the %s grid', kind => {
+    const grid = PANEL_GRIDS.home[kind]
+    const interior = grid.vertices.filter(([x, y]) => x > 0 && x < 1 && y > 0 && y < 1)
+    expect(interior.length).toBeGreaterThan(0)
+    for (const ring of grid.panels) {
+      for (let i = 0; i < ring.length; i++) {
+        const [ax, ay] = grid.vertices[ring[i]]
+        const [bx, by] = grid.vertices[ring[(i + 1) % ring.length]]
+        // A frame edge is axis-aligned by construction; only interior seams are held
+        // to the slant rule.
+        const onFrame =
+          (ax === 0 && bx === 0) || (ax === 1 && bx === 1) || (ay === 0 && by === 0) || (ay === 1 && by === 1)
+        if (onFrame) continue
+        expect(ax === bx && ay !== by).toBe(false)
+        expect(ay === by && ax !== bx).toBe(false)
       }
     }
   })
-
-  // Spill is allowed only toward the viewport boundary each corner panel touches,
-  // never into the gutters between panels.
-  it('lets each corner panel spill outward only', () => {
-    const dirs = computeHomeLayout(...LANDSCAPE).map(p => [
-      p.spillTop, p.spillRight, p.spillBottom, p.spillLeft,
-    ])
-    expect(dirs).toEqual([
-      [true, false, false, true], // logo — top-left corner
-      [true, true, false, false], // notepad — top-right
-      [false, false, true, true], // phone — bottom-left
-      [false, true, true, false], // conversation — bottom-right
-    ])
-  })
-
-  it('expands the spill polygon by SPILL on exactly the flagged edges', () => {
-    const [logo] = computeHomeLayout(...LANDSCAPE)
-    // Top-left panel: TL moves up and left, BR stays put.
-    expect(logo.spillVP[0]).toEqual([logo.vp[0][0] - SPILL, logo.vp[0][1] - SPILL])
-    expect(logo.spillVP[2]).toEqual(logo.vp[2])
-  })
 })
 
-describe('computePagePolys', () => {
-  it('spreads the home layout into a PANELS-length sparse array', () => {
-    const polys = computePagePolys(1440, 900, 'home')
+describe('page polys from the grids', () => {
+  it('spreads the home grid into a PANELS-length sparse array', () => {
+    const polys = pagePolys('home', 'landscape')
     expect(polys).toHaveLength(PANELS.length)
     HOME.forEach(i => expect(polys[i]).not.toBeNull())
     CLASSIC.forEach(i => expect(polys[i]).toBeNull())
   })
 
   it('fills only the classic slots for the classic page', () => {
-    const polys = computePagePolys(1440, 900, 'classic')
+    const polys = pagePolys('classic', 'landscape')
     expect(polys).toHaveLength(PANELS.length)
     CLASSIC.forEach(i => expect(polys[i]).not.toBeNull())
     HOME.forEach(i => expect(polys[i]).toBeNull())
-  })
-
-  it('hands each page panel its layout polygon, in order', () => {
-    const local = computeHomeLayout(1440, 900)
-    const polys = computePagePolys(1440, 900, 'home')
-    HOME.forEach((slot, j) => expect(polys[slot]).toEqual(local[j]))
-    const classicLocal = computeClassicLayout(1440, 900)
-    const classicPolys = computePagePolys(1440, 900, 'classic')
-    CLASSIC.forEach((slot, j) => expect(classicPolys[slot]).toEqual(classicLocal[j]))
   })
 })
 
 describe('PANELS / PANEL_BG_CONFIGS parallelism', () => {
   it('tunes a background for every panel slot', () => {
     expect(PANEL_BG_CONFIGS).toHaveLength(PANELS.length)
+    expect(PANEL_PATTERNS).toHaveLength(PANELS.length)
   })
 })
 
