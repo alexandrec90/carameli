@@ -1,6 +1,7 @@
 import { TAIL_DIRS, TAIL_DIR_KEYS } from '../bubbleBox'
 import type { TailDir } from '../bubbleBox'
 import { PANELS } from '../panels'
+import type { BubbleContentKind } from '../wheelPicker'
 import { BUBBLE_TYPES, BUBBLE_TYPE_KEYS } from './bubbleTypes'
 import type { BubbleType } from './bubbleTypes'
 import { linkCandidates } from './configOps'
@@ -29,7 +30,8 @@ function bubbleLabel(b: BubbleTransform, i: number): string {
 
 /**
  * The bubble-only half of the selection inspector: which panel it belongs to, its
- * shape and tail, its text, the event morph targets, and its connector link.
+ * shape and tail, how its text is presented, the text itself, the event morph
+ * targets, and its connector link.
  *
  * The link picker offers only the other bubbles on the same panel — that is where
  * the same-panel rule is enforced, by never presenting the invalid choice. Changing
@@ -78,7 +80,18 @@ export default function BubbleInspector({ api, index, bubble }: BubbleInspectorP
         </select>
       </label>
       <label className="cb-ed-field">
-        <span>text</span>
+        <span>content</span>
+        <select
+          className="cb-ed-select"
+          value={bubble.content}
+          onChange={e => api.setBubble(index, { content: e.target.value as BubbleContentKind })}
+        >
+          <option value="text">Text</option>
+          <option value="wheel">Wheel picker</option>
+        </select>
+      </label>
+      <label className="cb-ed-field">
+        <span>{bubble.content === 'wheel' ? 'options' : 'text'}</span>
         <textarea
           className="cb-ed-textarea"
           rows={2}
@@ -86,6 +99,12 @@ export default function BubbleInspector({ api, index, bubble }: BubbleInspectorP
           onChange={e => api.setBubble(index, { text: e.target.value })}
         />
       </label>
+      {bubble.content === 'wheel' && (
+        <div className="cb-ed-hint">
+          Comma-delimited: each entry is one option on the wheel. Hover the bubble and
+          scroll to turn it — the picker is live outside edit mode.
+        </div>
+      )}
 
       {/* Event morph targets. "no change" (null) means the bubble keeps its
           resting shape for that event, which is not the same as picking the

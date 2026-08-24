@@ -13,7 +13,9 @@ bubbles; **Panel shapes** drags the lines between panels.
 `PANEL_BUBBLE_TRANSFORMS` — picture placement **and content** (panel / src / alt /
 left / top / width / height / scale / offsetX / offsetY / anchor / spill) and bubble
 placement **and content** (panel / top / right / width / rotate / spill / type / tail /
-text), plus each bubble's event morph targets (`hoverType`, `clickType`) and its
+content / text — `content: 'wheel'` presents `text` as comma-delimited options on a
+scroll picker, see [`../wheelPicker.ts`](../wheelPicker.ts)), plus each bubble's event
+morph targets (`hoverType`, `clickType`) and its
 connector-tube partner (`linkTo`). A picture's `src` is a public URL, offered in the
 editor by the static manifest in [`assets.ts`](./assets.ts) (`PANEL_ASSETS`). The
 bubble `type` resolves to a lettering font via [`bubbleTypes.ts`](./bubbleTypes.ts)
@@ -94,7 +96,10 @@ different images can only crossfade. A new bubble type belongs in `bubbleShape.t
      bleed past (default for bubbles).
    - For bubbles: pick the **panel** it belongs to, a resting **type** (sets shape +
      lettering font), which way the **tail** points (**No tail** is one of the nine
-     options), edit the **text** inline, choose the shapes to morph to **on hover**
+     options), pick the **content** presentation (**Text**, or **Wheel picker** — the
+     text is then comma-delimited options on a scroll wheel: hover the bubble outside
+     edit mode and scroll to turn it), edit the **text** inline, choose the shapes to
+     morph to **on hover**
      and **on click** (`— no change —` keeps the resting shape), and pick a **link
      to** partner to join with a connector tube. Turning or removing a tail morphs
      like any other shape change, because the tail is one ring vertex pulled out.
@@ -182,7 +187,7 @@ EditorOverlay.tsx   overlay UI: click targets, outlines, seams (dev-only, dynami
 EditorToolbar.tsx   toolbar chrome: mode toggle, page select, inspector slot, save/reset/export
 InspectorPanel.tsx  selection inspector: read-outs, spill, per-element reset, delete
 ImageInspector.tsx  picture-only controls: panel, picture, alt, anchor
-BubbleInspector.tsx bubble-only controls: panel, type, tail, text, hover/click, link
+BubbleInspector.tsx bubble-only controls: panel, type, tail, content, text, hover/click, link
 PageSelect.tsx      toolbar dropdown: switch page / preview the loading screen
 pageSelection.ts    PURE helpers behind PageSelect (sentinel value, selection resolution)
 editor.css          overlay chrome styles

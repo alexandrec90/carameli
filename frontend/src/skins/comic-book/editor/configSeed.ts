@@ -37,6 +37,7 @@ export const NEW_BUBBLE: Omit<BubbleTransform, 'panel'> = {
   spill: true,
   type: 'soft',
   tail: 'down-left',
+  content: 'text',
   text: 'New bubble',
   linkTo: null,
   hoverType: null,
