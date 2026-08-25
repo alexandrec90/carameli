@@ -10,7 +10,7 @@ import { assetLabel } from './assets'
 import EditorToolbar from './EditorToolbar'
 import type { PageSelectProps } from './PageSelect'
 import PanelSeams from './PanelSeams'
-import TableCorners from './TableCorners'
+import SurfaceCorners from './TableCorners'
 import { bubbleRect, imgRect, imgVisibleRect } from './transforms'
 import { useOverlayInteraction } from './useOverlayInteraction'
 import { useSeamDrag } from './useSeamDrag'
@@ -211,14 +211,15 @@ export default function EditorOverlay({
         </div>
       )}
 
-      {/* The surface grips, when the selected picture carries a table. They paint after
+      {/* The grips for whichever projected content the selected picture carries. They paint after
           the selection outline so a corner dragged inside the frame still wins the
           pointer over the body that would otherwise move the whole picture. */}
-      {!shapeMode && selected?.kind === 'img' && selImg?.table && selPoly && (
-        <TableCorners
+      {!shapeMode && selected?.kind === 'img' && (selImg?.table || selImg?.numberPad) && selPoly && (
+        <SurfaceCorners
           api={api}
           index={selected.index}
-          table={selImg.table}
+          surface={selImg.table ?? selImg.numberPad!}
+          kind={selImg.table ? 'table' : 'numberPad'}
           rect={imgRect(selPoly.bounds, selImg)}
         />
       )}

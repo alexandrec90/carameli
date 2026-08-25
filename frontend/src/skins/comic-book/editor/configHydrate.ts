@@ -8,6 +8,7 @@ import { isBubbleType } from './bubbleTypes'
 import { hydrateChains, normalizeChainId, syncChains } from './chainOps'
 import { CONFIG_KEY, cloneGrids, NEW_BUBBLE, NEW_IMAGE, seedConfig } from './configSeed'
 import { PANEL_PATTERNS } from './layoutConfig'
+import { coerceNumberPad } from './numberPadValidate'
 import { isPageGrids } from './panelGridValidate'
 import { coerceTable } from './tableValidate'
 import type { BubbleTransform, EditorConfig, ImgTransform } from './types'
@@ -187,16 +188,19 @@ export function hydrateConfig(raw: string | null): EditorConfig {
           ...shipped,
           ...(t as Partial<ImgTransform>),
         })
-        // The one field the merge cannot backfill: a table is a nested document, so a
-        // payload written before a field existed — or with a cell that came back as a
-        // number — needs repairing inside rather than replacing whole. `coerceTable`
-        // returns undefined for the ordinary case of a picture that is not a surface,
-        // and the key is then left off entirely rather than set to undefined, which is
-        // how absence is spelled everywhere else this field is handled.
+        // Projected content is nested, so a payload written before a field existed — or
+        // with a cell that came back as a number — needs repair inside rather than a
+        // whole-value merge. Each coercer returns undefined for the ordinary case of a
+        // picture that is not that surface, and absent keys stay absent.
         const table = coerceTable(merged.table)
-        if (table) return { ...merged, table }
+        const numberPad = coerceNumberPad(merged.numberPad)
         const plain = { ...merged }
         delete plain.table
+        delete plain.numberPad
+        // Existing table payloads win if a hand-edited config names both. The editor
+        // presents one projected-content choice and never writes the ambiguous state.
+        if (table) return { ...plain, table }
+        if (numberPad) return { ...plain, numberPad }
         return plain
       }),
       bubbles,

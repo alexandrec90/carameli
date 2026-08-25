@@ -47,7 +47,10 @@ export default function TableInspector({ api, index, image }: TableInspectorProp
     // Switching a surface off nulls it rather than hiding it, and switching it back on
     // starts a fresh one: keeping a stashed copy would mean a picture silently carrying
     // rows nobody can see, which is what would then get saved into layoutConfig.ts.
-    api.setImg(index, { table: on ? newTable() : undefined })
+    api.setImg(index, {
+      table: on ? newTable() : undefined,
+      numberPad: on ? undefined : image.numberPad,
+    })
   }
 
   return (

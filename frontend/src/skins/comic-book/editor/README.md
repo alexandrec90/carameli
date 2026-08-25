@@ -146,6 +146,13 @@ different images can only crossfade. A new bubble type belongs in `bubbleShape.t
        ruled lines the rows do too. **Reset corners** puts them back.
      - Switching the checkbox off deletes the table, including the cells; the picture
        itself is untouched.
+   - **Project a number pad on this picture** (picture only) adds the fixed telephone
+     layout: 1–9 over the first three rows, then `*`, `0`, `#`. Drag its magenta corner
+     grips or type the corner coordinates to align it with the photographed plane; the
+     **Text** and **Ink** controls tune the symbols. Its 3 × 4 grid and outline are
+     visible alignment guides in the editor only. Outside edit mode, readers see the
+     twelve symbols directly on the image. A picture carries either a table or a number
+     pad, so switching either option on replaces the other projected content.
    - **Allow spill outside panel** checkbox — off (default for pictures) clips the
      element to the frame's polygon (overflow hidden behind its edge); on lets it
      bleed past (default for bubbles).
@@ -243,6 +250,8 @@ bubbleTypes.ts      BubbleType + BUBBLE_TYPES (lettering font per type) — ship
 ../tableData.ts     PURE: rows visible at an offset, wheel-to-rows, column widths, cell text
 ../ProjectedTable.tsx one picture's surface: the projected table, its wheel and its keys
 ../table.css        surface + cell styles, and the editor-only band guides
+../ProjectedNumberPad.tsx fixed 3 × 4 telephone keys on a projected surface
+../number-pad.css   number-pad lettering and surface layout
 ../panelGeometry.ts PURE grid -> polygon geometry: frame, normalised space, vertex constraints
 ../panelPatterns.ts pattern style registry + per-panel palette/dot tuning (PANEL_BG_CONFIGS)
 ../polygonInset.ts  PURE polygon maths: the perpendicular gutter inset, bounding box
@@ -257,11 +266,14 @@ useSeamDrag.ts      hook: which gesture a pointer means, and the grid edit it ma
 PanelSeams.tsx      the draggable line + vertex handles (shapes mode)
 ShapeInspector.tsx  shapes-mode inspector: vertex read-out, straighten, reset grid
 tableValidate.ts    PURE: a new table, and the repair of one read back out of a payload
+numberPadValidate.ts PURE: a new number pad, repair, and deep clone
 serializeTable.ts   PURE: a table as the nested block on a picture's line
+serializeNumberPad.ts PURE: a number pad as the nested block on a picture's line
 tsLiteral.ts        PURE: quoting and number rounding shared by the two serializers
 useTableCornerDrag.ts hook: dragging a corner grip, and the clamped single-corner edit
-TableCorners.tsx    the four square corner grips (content mode, surfaces only)
+TableCorners.tsx    the four corner grips shared by both projected content types
 TableInspector.tsx  table controls: the on/off switch, rows, text, ink, headings, corners
+NumberPadInspector.tsx number-pad on/off, text, ink, and corner controls
 TableColumnsInspector.tsx  the columns list and the cell-text box
 editor-table.css    corner grip and table-inspector styles
 serialize.ts        PURE serialization back to layoutConfig.ts (headers included)

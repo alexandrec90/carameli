@@ -1,5 +1,6 @@
 import { PANELS } from '../panels'
 import { PANEL_ASSETS } from './assets'
+import NumberPadInspector from './NumberPadInspector'
 import TableInspector from './TableInspector'
 import type { ImgTransform } from './types'
 import type { EditorModeApi } from './useEditorMode'
@@ -94,6 +95,7 @@ export default function ImageInspector({ api, index, image }: ImageInspectorProp
         </select>
       </label>
       <TableInspector api={api} index={index} image={image} />
+      <NumberPadInspector api={api} index={index} image={image} />
     </>
   )
 }
