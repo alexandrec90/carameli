@@ -19,8 +19,6 @@ export interface Panel {
   label: string
   /** The logo panel is styled apart from the story panels. */
   isLogo: boolean
-  /** Route a click navigates to; null = not clickable. */
-  path: string | null
   /** The page whose grid this panel sits on. */
   page: PanelPage
 }
@@ -33,18 +31,18 @@ export interface Panel {
  * that page's grids; the rest hold an empty ring and render nothing.
  */
 export const PANELS: Panel[] = [
-  { label: 'Logo', isLogo: true, path: '/', page: 'classic' },
-  { label: 'Switchboard', isLogo: false, path: '/phone-lines', page: 'classic' },
-  { label: 'Mailman 1', isLogo: false, path: '/', page: 'classic' },
-  { label: 'Mechanic', isLogo: false, path: '/extensions', page: 'classic' },
-  { label: 'Receptionist', isLogo: false, path: '/phone-lines', page: 'classic' },
-  { label: 'Rolodex', isLogo: false, path: '/extensions', page: 'classic' },
-  { label: 'Rotary phone', isLogo: false, path: '/phone-lines', page: 'classic' },
-  { label: 'Mailman 2', isLogo: false, path: '/', page: 'classic' },
-  { label: 'Logo 2', isLogo: true, path: '/', page: 'home' },
-  { label: 'Notepad', isLogo: false, path: '/sms', page: 'home' },
-  { label: 'Push-button phone', isLogo: false, path: '/phone', page: 'home' },
-  { label: 'Conversation', isLogo: false, path: '/calls', page: 'home' },
+  { label: 'Logo', isLogo: true, page: 'classic' },
+  { label: 'Switchboard', isLogo: false, page: 'classic' },
+  { label: 'Mailman 1', isLogo: false, page: 'classic' },
+  { label: 'Mechanic', isLogo: false, page: 'classic' },
+  { label: 'Receptionist', isLogo: false, page: 'classic' },
+  { label: 'Rolodex', isLogo: false, page: 'classic' },
+  { label: 'Rotary phone', isLogo: false, page: 'classic' },
+  { label: 'Mailman 2', isLogo: false, page: 'classic' },
+  { label: 'Logo 2', isLogo: true, page: 'home' },
+  { label: 'Notepad', isLogo: false, page: 'home' },
+  { label: 'Push-button phone', isLogo: false, page: 'home' },
+  { label: 'Conversation', isLogo: false, page: 'home' },
 ]
 
 /**
