@@ -188,7 +188,7 @@ pytestmark = pytest.mark.asyncio(loop_scope="session")
 #### 1. Redis outage during ARQ job enqueue
 
 The `retry_unposted_events` function in `app/services/call_sync.py` reads from Postgres
-and POSTs to VanillaSoft. It does **not** enqueue to Redis itself — but the ARQ worker
+and POSTs to CRM. It does **not** enqueue to Redis itself — but the ARQ worker
 cron scheduler pulls from Redis. Simulate a Redis connection error at the ARQ level:
 
 ```python
@@ -274,15 +274,15 @@ async def test_provision_failure_after_search_returns_502(client):
     assert "Provider" in resp.json().get("detail", "")
 ```
 
-#### 5. VanillaSoft write-back failure does not block webhook acknowledgement
+#### 5. CRM write-back failure does not block webhook acknowledgement
 
 ```python
-async def test_vanillasoft_writeback_failure_does_not_block_webhook(client):
-    """If VanillaSoft POST fails during the webhook handler, the webhook still returns 200."""
+async def test_crm_writeback_failure_does_not_block_webhook(client):
+    """If CRM POST fails during the webhook handler, the webhook still returns 200."""
     import httpx
     from app.core.config import settings
 
-    settings.vanillasoft_webhook_url = "http://vanillasoft.test/callback"
+    settings.crm_webhook_url = "http://crm.test/callback"
     with patch("app.api.webhooks.call_status.httpx.AsyncClient") as mock_client_cls:
         mock_http = MagicMock()
         mock_http.__aenter__ = AsyncMock(return_value=mock_http)
@@ -299,7 +299,7 @@ async def test_vanillasoft_writeback_failure_does_not_block_webhook(client):
                 "to": "+14155550001",
             },
         )
-    settings.vanillasoft_webhook_url = None
+    settings.crm_webhook_url = None
     assert resp.status_code == 200
 ```
 

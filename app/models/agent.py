@@ -12,7 +12,7 @@ from app.core.database import Base
 
 
 class Agent(Base):
-    """A configured contact-centre agent (cloudli spec §35). Config-only; real-time
+    """A configured contact-centre agent (legacy feature spec §35). Config-only; real-time
     presence lives in agent_statuses (polled separately)."""
 
     __tablename__ = "agents"

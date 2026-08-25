@@ -337,9 +337,9 @@ AUTH_HEADERS = {"Authorization": f"Bearer {API_KEY}"}
 
 
 def notify_payload(call) -> dict:
-    """Decode the JSON body of a mocked VanillaSoft notify POST.
+    """Decode the JSON body of a mocked CRM notify POST.
 
-    `vanillasoft_notify` pre-serializes the payload and posts `content=` so the
+    `crm_notify` pre-serializes the payload and posts `content=` so the
     `X-Carameli-Signature` HMAC covers the exact bytes on the wire — there is no
     `json=` kwarg to read.
     """

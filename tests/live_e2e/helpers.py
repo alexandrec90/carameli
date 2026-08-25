@@ -1,7 +1,7 @@
 """Pure helpers + thin API/log wrappers for the live E2E suite.
 
 The live suite (``tests/live_e2e/test_live_*.py``) drives the *real* integration —
-real Telnyx, jambonz.cloud, ngrok, and the VanillaSoft staging server — and observes
+real Telnyx, jambonz.cloud, ngrok, and the CRM staging server — and observes
 the live running stack from the outside. It never uses the unit/integration DB
 fixtures: all assertions go through Carameli's HTTP API and, for signals the API does
 not expose (e.g. SMS ``posted``), the runtime log at ``logs/runtime/carameli.log``.
@@ -21,30 +21,30 @@ Environment contract (see also ``.env.example`` and ``docs/operations/diagnostic
 | ``E2E_CUSTOMER_ID``      | That customer's ``vs_customer_id`` (needed for ``/List/{id}`` reads) |
 | ``E2E_DID_A``            | Owned Canadian test DID — the "from" number                  |
 | ``E2E_DID_B``            | Owned Canadian test DID — the "inbound" target               |
-| ``E2E_VS_CHECK``         | optional ``1``: also assert VanillaSoft-side via PubApi       |
-| ``E2E_PUBAPI_BASE_URL``  | required when ``E2E_VS_CHECK=1``: VanillaSoft PubApi root     |
+| ``E2E_VS_CHECK``         | optional ``1``: also assert CRM-side via PubApi       |
+| ``E2E_PUBAPI_BASE_URL``  | required when ``E2E_VS_CHECK=1``: CRM PubApi root     |
 | ``E2E_PUBAPI_KEY``       | required when ``E2E_VS_CHECK=1``: key for ``Authorization: APIKey=`` |
 | ``E2E_PUBAPI_PROJECT_ID`` | optional: restrict the PubApi call-history read to one project |
 | ``E2E_TELNYX_CONNECTION_ID`` | optional: Telnyx Call Control connection for unattended call origination |
 | ``E2E_RECORDING``        | optional ``1``: run the recording flow (roadmap A6 must be live) |
 
 ``E2E_VS_CHECK`` is the belt-and-suspenders check: rather than trusting Carameli's own
-``posted`` flag, read the call back out of VanillaSoft's ``GetCallHistory`` PubApi
+``posted`` flag, read the call back out of CRM's ``GetCallHistory`` PubApi
 endpoint. **It only applies to the attended click-to-call test**, and the reason is
 worth stating because it is not what the phase-05 plan assumed:
 
-*Nothing on the VanillaSoft side creates a call-history record from a Carameli
+*Nothing on the CRM side creates a call-history record from a Carameli
 notification.* ``CarameliNotifyController`` calls ``sp_CMVCallNotificationInsert``,
 which writes a CMV *notification* row. The CMV Call Data Service later calls
-``sp_CallHistoryCallAttemptInsert`` (``../VanillaLand/AppCode/CMV Call Data
+``sp_CallHistoryCallAttemptInsert`` (``../legacy-crm/AppCode/legacy-voip Call Data
 Service/CMVCallData.cs``, ``FindCallAttemptCallHistory``) — and that attaches the
 attempt to a call-history record it *found* via
 ``sp_CMVCallAttemptMatchCallHistoryFetch``. Call-history rows come from the CRM, when
 an agent works a contact.
 
 So for the unattended inbound flow — a call originated straight through Telnyx, that no
-agent placed from inside VanillaSoft — ``GetCallHistory`` has nothing to return no
-matter how staging is seeded, and ``posted=True`` is the only honest VanillaSoft
+agent placed from inside CRM — ``GetCallHistory`` has nothing to return no
+matter how staging is seeded, and ``posted=True`` is the only honest CRM
 assertion. For the attended flow the agent *did* dial a contact from the CRM, so the
 record exists and the read-back is meaningful.
 
@@ -334,12 +334,12 @@ class CarameliClient:
 
 
 # ---------------------------------------------------------------------------
-# VanillaSoft PubApi — the E2E_VS_CHECK read-back (see the module docstring).
+# CRM PubApi — the E2E_VS_CHECK read-back (see the module docstring).
 # ---------------------------------------------------------------------------
 
 # PubApi's DateRangeValidation caps GetCallHistory at a 7-day span; the E2E window is
 # minutes wide, so the cap never binds. The margin absorbs clock skew between this
-# machine and the VanillaSoft staging server.
+# machine and the CRM staging server.
 PUBAPI_CLOCK_SKEW_MINUTES = 5
 
 
@@ -383,7 +383,7 @@ def call_histories_since(rows: list[dict[str, Any]], since: datetime) -> list[di
     ``GetCallHistory`` filters on *modified* time, so a record touched during the window
     but placed long before it comes back too. This narrows to calls actually made in the
     window. Rows with an absent or unparseable timestamp are dropped rather than kept —
-    a record we cannot date is not evidence that *this* call reached VanillaSoft.
+    a record we cannot date is not evidence that *this* call reached CRM.
     """
     if since.tzinfo is None:
         since = since.replace(tzinfo=UTC)
@@ -404,10 +404,10 @@ def call_histories_since(rows: list[dict[str, Any]], since: datetime) -> list[di
 
 
 class PubApiClient:
-    """A minimal authed client for VanillaSoft's PubApi read endpoints.
+    """A minimal authed client for CRM's PubApi read endpoints.
 
     PubApi authenticates with ``Authorization: APIKey=<key>`` — not ``Bearer`` — per
-    ``ApiKeyUtil.GetApiKeyFromHeaders`` in the VanillaLand repo.
+    ``ApiKeyUtil.GetApiKeyFromHeaders`` in the LegacyCRM repo.
     """
 
     def __init__(self, base_url: str, api_key: str, *, timeout: float = 30) -> None:

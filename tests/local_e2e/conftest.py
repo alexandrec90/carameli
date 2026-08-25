@@ -1,6 +1,6 @@
 """Fixtures for the local integration suite — deliberately app-free and DB-free.
 
-This suite runs on the **VanillaLand** machine, where Carameli's Python stack is not
+This suite runs on the **LegacyCRM** machine, where Carameli's Python stack is not
 installed: no Postgres, no Redis, no ``app`` package. It therefore imports nothing from
 ``app.*`` and none of the shared DB fixtures in ``tests/conftest.py`` (those wrap a
 throwaway test database that does not exist here). Config comes from the environment; see
@@ -64,7 +64,7 @@ def public_vs_base_url(config: LocalE2EConfig) -> str:
         pytest.skip(
             "VS_PUBLIC_BASE_URL is not set — start a tunnel to local IIS "
             "(see docs/operations/local-integration-testing.md) to test the "
-            "Carameli -> VanillaLand direction"
+            "Carameli -> LegacyCRM direction"
         )
     return config.vs_public_base_url
 

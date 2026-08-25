@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 class IntercomGroup(Base):
-    """An intercom extension; subscribers receive calls on their speaker (cloudli spec §15)."""
+    """An intercom extension; subscribers receive calls on their speaker (legacy feature spec §15)."""
 
     __tablename__ = "intercom_groups"
 

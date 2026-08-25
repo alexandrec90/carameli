@@ -4,13 +4,14 @@ import type { CSSProperties } from 'react'
 import { logger } from '../../../lib/logger'
 import type { LayoutKind, PanelPoly, Rect } from '../panelGeometry'
 import { frameRect } from '../panelGeometry'
+import type { PanelPage } from '../panels'
 import { PANELS } from '../panels'
 import { assetLabel } from './assets'
 import EditorToolbar from './EditorToolbar'
 import type { PageSelectProps } from './PageSelect'
 import PanelSeams from './PanelSeams'
 import TableCorners from './TableCorners'
-import { bubbleRect, imgRect } from './transforms'
+import { bubbleRect, imgRect, imgVisibleRect } from './transforms'
 import { useOverlayInteraction } from './useOverlayInteraction'
 import { useSeamDrag } from './useSeamDrag'
 import type { EditorModeApi } from './useEditorMode'
@@ -19,7 +20,13 @@ import './editor-shapes.css'
 
 interface EditorOverlayProps {
   api: EditorModeApi
-  panelPolys: PanelPoly[]
+  /** One entry per PANELS slot; null where the panel lives on the other page. */
+  panelPolys: (PanelPoly | null)[]
+  /** Which page's grids this route is showing, so shape edits reach the right record. */
+  page: PanelPage
+  /** Natural pixel size of each loaded source, keyed by `src` — sizes the visible
+      image rect the hover and selection outlines trace. */
+  natSizes: Record<string, { w: number; h: number }>
   /** Which of the three grids this window is showing, so shape edits reach the right one. */
   layoutKind: LayoutKind
   /** Viewport size in px — the shape editor needs the page frame, not the panels. */
@@ -47,6 +54,8 @@ function rectStyle(r: Rect): CSSProperties {
 export default function EditorOverlay({
   api,
   panelPolys,
+  page,
+  natSizes,
   layoutKind,
   viewport,
   pageSelect,
@@ -59,9 +68,9 @@ export default function EditorOverlay({
   const shapeMode = mode === 'shapes'
   const interaction = useOverlayInteraction(api, panelPolys)
 
-  const grid = config.grids[layoutKind]
+  const grid = config.grids[page][layoutKind]
   const frame = frameRect(viewport.w, viewport.h)
-  const drag = useSeamDrag(api, layoutKind, grid, frame)
+  const drag = useSeamDrag(api, page, layoutKind, grid, frame)
 
   // Everything drawn is placed against the panel it *names*, never against a panel
   // that shares its index — those parted company once a panel could own several of
@@ -80,7 +89,7 @@ export default function EditorOverlay({
   const selectedRect: Rect | null = !selPoly
     ? null
     : selImg
-      ? imgRect(selPoly.bounds, selImg)
+      ? imgVisibleRect(selPoly.bounds, natSizes[selImg.src], selImg)
       : selBubble
         ? bubbleRect(selPoly.bounds, selBubble)
         : selPoly.bounds
@@ -103,20 +112,22 @@ export default function EditorOverlay({
           {/* Per-panel click targets — the backdrop for everything drawn on a panel.
               Selecting a panel is what "+ Image" and "+ Bubble" act on, and it is the only
               way to reach a panel that has nothing on it yet. */}
-          {panelPolys.map((poly, i) => (
-            <button
-              key={i}
-              type="button"
-              className="cb-ed-target"
-              style={rectStyle(poly.bounds)}
-              aria-label={`Select ${PANELS[i]?.label ?? `panel ${i}`}`}
-              onClick={() => api.select('panel', i)}
-            />
-          ))}
+          {panelPolys.map((poly, i) =>
+            poly === null ? null : (
+              <button
+                key={i}
+                type="button"
+                className="cb-ed-target"
+                style={rectStyle(poly.bounds)}
+                aria-label={`Select ${PANELS[i]?.label ?? `panel ${i}`}`}
+                onClick={() => api.select('panel', i)}
+              />
+            ),
+          )}
 
-          {/* One click target per picture, on its own frame. They paint after the panel
-              targets so a picture wins the click where the two overlap — which is always,
-              since a frame lives on a panel. */}
+          {/* One click target per picture, on the rectangle its pixels visibly occupy —
+              the image, not the frame it hangs in. They paint after the panel targets so
+              a picture wins the click where the two overlap. */}
           {config.images.map((img, i) => {
             const poly = panelPolys[img.panel]
             if (!poly) return null
@@ -125,7 +136,7 @@ export default function EditorOverlay({
                 key={i}
                 type="button"
                 className="cb-ed-target cb-ed-target-img"
-                style={rectStyle(imgRect(poly.bounds, img))}
+                style={rectStyle(imgVisibleRect(poly.bounds, natSizes[img.src], img))}
                 aria-label={`Select ${assetLabel(img.src)} on ${PANELS[img.panel]?.label ?? `panel ${img.panel}`}`}
                 onClick={() => api.select('img', i)}
               />
@@ -218,7 +229,7 @@ export default function EditorOverlay({
         api={api}
         selPanel={selPanel}
         pageSelect={pageSelect}
-        shapes={{ kind: layoutKind, grid, drag }}
+        shapes={{ page, kind: layoutKind, grid, drag }}
       />
     </div>
   )

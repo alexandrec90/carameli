@@ -1,9 +1,6 @@
 target-version = "py312"
 line-length = 100
 
-# Eval fixtures are intentionally broken test data — never lint them.
-extend-exclude = ["evals/fixtures"]
-
 [lint]
 # Correctness and security only. `.claude/rules/engineering.md` is the policy: lint
 # catches the problems a reviewer reads past, and "anything a formatter can decide" is

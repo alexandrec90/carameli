@@ -12,7 +12,7 @@ from app.core.database import Base
 
 
 class VoicemailDropEvent(Base):
-    """History record for a voicemail drop initiated via VsMessageDrop (cloudli spec §19)."""
+    """History record for a voicemail drop initiated via VsMessageDrop (legacy feature spec §19)."""
 
     __tablename__ = "voicemail_drop_events"
 

@@ -279,7 +279,7 @@ def build_parser() -> argparse.ArgumentParser:
         description="Provision a demo extension and print its SIP registration settings.",
     )
     parser.add_argument("--extension", required=True, help="extension number, e.g. 101")
-    parser.add_argument("--vs-customer-id", type=int, required=True, help="VanillaSoft customer id")
+    parser.add_argument("--vs-customer-id", type=int, required=True, help="CRM customer id")
     parser.add_argument(
         "--base-url",
         default=None,

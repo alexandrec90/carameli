@@ -8,7 +8,7 @@ ignorePaths:
   - ../logs
 words:
   - carameli
-  - vanillasoft
+  - crm
   - vonage
   - voip
   - vsapi
@@ -17,7 +17,7 @@ words:
   - twiml
   # Telephony / backend terms
   - asmx
-  - cloudli
+  - legacy vendor
   - dtmf
   - hungup
   - jambonz

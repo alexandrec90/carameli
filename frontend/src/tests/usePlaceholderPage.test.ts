@@ -47,7 +47,7 @@ describe('placeholder page hooks', () => {
     [useContactGroups, 'Contact Groups', 3],
     [useUsers, 'Users', 9],
     [useSubscriptionLogs, 'Subscription Logs', 6],
-  ] as const)('%o exposes the cloudli columns', (hook, title, columnCount) => {
+  ] as const)('%o exposes the legacy vendor columns', (hook, title, columnCount) => {
     const { result } = renderHook(() => hook())
     expect(result.current.title).toBe(title)
     expect(result.current.columns).toHaveLength(columnCount)

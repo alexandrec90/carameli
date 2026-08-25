@@ -18,7 +18,7 @@ function toRow(t: ApiTokenRow): Record<string, string> {
 }
 
 /**
- * Data hook for the API Token page (cloudli spec §4). Read-only view of the
+ * Data hook for the API Token page (legacy feature spec §4). Read-only view of the
  * customer's masked API key — no create form, no row actions.
  */
 export function useApiToken(): DataPageProps {

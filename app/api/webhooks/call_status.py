@@ -25,7 +25,7 @@ from app.services import (
     phone_line_service,
     pointer_service,
     recording_links,
-    vanillasoft_notify,
+    crm_notify,
 )
 
 logger = logging.getLogger(__name__)
@@ -92,7 +92,7 @@ async def jambonz_call_status_webhook(
     request: Request,
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> Response:
-    """Receive Jambonz call-status callbacks, persist to call_events, and notify VanillaSoft."""
+    """Receive Jambonz call-status callbacks, persist to call_events, and notify CRM."""
     raw_body = await request.body()
     signature = request.headers.get("X-Jambonz-Signature", "")
     _validate_jambonz_signature(raw_body, signature)
@@ -147,33 +147,33 @@ async def jambonz_call_status_webhook(
         logger.exception("Failed to persist Jambonz call event for call_sid=%s", call_sid)
         return JSONResponse({"status": "ok"})
 
-    # Write-back to VanillaSoft for terminal call states (CloudliController contract).
-    if settings.vanillasoft_webhook_url and _is_terminal_call_status(call_event.status):
+    # Write-back to CRM for terminal call states (legacy notify controller contract).
+    if settings.crm_webhook_url and _is_terminal_call_status(call_event.status):
         customer = None
         if call_event.customer_id:
             customer = await customer_service.get_by_id(session, call_event.customer_id)
         vs_customer_id = customer.vs_customer_id if customer else None
         try:
-            posted = await vanillasoft_notify.post_notification(
-                vanillasoft_notify.INCOMING_CALL_PATH,
-                vanillasoft_notify.incoming_call_payload(call_event, vs_customer_id),
+            posted = await crm_notify.post_notification(
+                crm_notify.INCOMING_CALL_PATH,
+                crm_notify.incoming_call_payload(call_event, vs_customer_id),
             )
             if posted:
                 await call_event_service.mark_posted(session, call_event.id)
-                logger.info("Posted Jambonz call event %s to VanillaSoft", call_sid)
+                logger.info("Posted Jambonz call event %s to CRM", call_sid)
         except Exception:
             WEBHOOK_FAILURES_TOTAL.inc()
             logger.exception(
-                "Failed to post Jambonz call event %s to VanillaSoft; will retry",
+                "Failed to post Jambonz call event %s to CRM; will retry",
                 call_sid,
             )
 
         # Recording availability notification — fired once the recording URL lands.
         if call_event.recording_url:
             try:
-                await vanillasoft_notify.post_notification(
-                    vanillasoft_notify.CALL_RECORDING_PATH,
-                    vanillasoft_notify.call_recording_payload(
+                await crm_notify.post_notification(
+                    crm_notify.CALL_RECORDING_PATH,
+                    crm_notify.call_recording_payload(
                         call_event,
                         vs_customer_id,
                         recording_links.public_recording_url(call_event.call_sid),

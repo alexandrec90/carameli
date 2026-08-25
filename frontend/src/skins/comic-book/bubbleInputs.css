@@ -1,0 +1,25 @@
+/* Real form fields lettered as part of their balloons. The underline is focus ink
+   rather than a box pasted over the illustration. */
+.cb-bubble-input {
+  box-sizing: border-box;
+  width: auto;
+  min-width: 0;
+  margin: 0;
+  padding: 0.15em 0.25em;
+  appearance: none;
+  background: transparent;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  outline: 0;
+  font-size: clamp(0.75rem, 2vw, 1.125rem);
+  font-weight: 700;
+}
+
+.cb-bubble-input:focus-visible {
+  border-bottom-color: var(--cb-black);
+}
+
+.cb-bubble-input:disabled {
+  color: var(--cb-black);
+  opacity: 1;
+}

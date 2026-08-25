@@ -1,7 +1,16 @@
 import { PANEL_ASSETS } from './assets'
-import { PANEL_IMG_TRANSFORMS, PANEL_BUBBLE_TRANSFORMS, PANEL_GRIDS } from './layoutConfig'
+import { PANEL_PAGES } from '../panels'
+import { PANEL_IMG_TRANSFORMS, PANEL_BUBBLE_TRANSFORMS, PANEL_GRIDS, PANEL_PATTERNS } from './layoutConfig'
 import { cloneTable } from './tableValidate'
-import type { BubbleTransform, EditorConfig, ImgTransform, LayoutKind, PanelGrid, PanelGrids } from './types'
+import type {
+  BubbleTransform,
+  EditorConfig,
+  ImgTransform,
+  LayoutKind,
+  PageGrids,
+  PanelGrid,
+  PanelPage,
+} from './types'
 
 // What a config *starts* as, and how one is copied. Split out of configOps.ts so that
 // file could stay under the size limit; the seam is that nothing here reads a payload
@@ -40,6 +49,7 @@ export const NEW_BUBBLE: Omit<BubbleTransform, 'panel'> = {
   spill: true,
   type: 'soft',
   tail: 'down-left',
+  content: 'text',
   text: 'New bubble',
   linkTo: null,
   hoverType: null,
@@ -49,18 +59,22 @@ export const NEW_BUBBLE: Omit<BubbleTransform, 'panel'> = {
 export const LAYOUT_KINDS: LayoutKind[] = ['landscape', 'portrait', 'square']
 
 /**
- * Deep clone of the three grids. Written out rather than spread because a grid is two
+ * Deep clone of every page's grids. Written out rather than spread because a grid is two
  * levels of array deep — a shallow copy would hand every working config the *same*
  * vertex table, and the first drag would edit the shipped constant along with it.
  */
-export function cloneGrids(grids: PanelGrids): PanelGrids {
-  const out = {} as PanelGrids
-  for (const kind of LAYOUT_KINDS) {
-    const grid = grids[kind]
-    out[kind] = {
-      vertices: grid.vertices.map(([x, y]) => [x, y]),
-      panels: grid.panels.map(ring => [...ring]),
+export function cloneGrids(grids: PageGrids): PageGrids {
+  const out = {} as PageGrids
+  for (const page of PANEL_PAGES) {
+    const pageGrids = {} as PageGrids[PanelPage]
+    for (const kind of LAYOUT_KINDS) {
+      const grid = grids[page][kind]
+      pageGrids[kind] = {
+        vertices: grid.vertices.map(([x, y]) => [x, y]),
+        panels: grid.panels.map(ring => [...ring]),
+      }
     }
+    out[page] = pageGrids
   }
   return out
 }
@@ -87,6 +101,7 @@ export function seedConfig(): EditorConfig {
     images: PANEL_IMG_TRANSFORMS.map(cloneImg),
     bubbles: PANEL_BUBBLE_TRANSFORMS.map(b => ({ ...b })),
     grids: cloneGrids(PANEL_GRIDS),
+    patterns: [...PANEL_PATTERNS],
   }
 }
 
@@ -96,21 +111,25 @@ export function cloneConfig(c: EditorConfig): EditorConfig {
     images: c.images.map(cloneImg),
     bubbles: c.bubbles.map(b => ({ ...b })),
     grids: cloneGrids(c.grids),
+    patterns: [...c.patterns],
   }
 }
 
-/** Replace one breakpoint's grid, returning a new config. */
-export function setGrid(config: EditorConfig, kind: LayoutKind, grid: PanelGrid): EditorConfig {
+/** Replace one page's grid for one breakpoint, returning a new config. */
+export function setGrid(config: EditorConfig, page: PanelPage, kind: LayoutKind, grid: PanelGrid): EditorConfig {
   const next = cloneConfig(config)
-  next.grids[kind] = { vertices: grid.vertices.map(([x, y]) => [x, y]), panels: grid.panels.map(r => [...r]) }
+  next.grids[page][kind] = {
+    vertices: grid.vertices.map(([x, y]) => [x, y]),
+    panels: grid.panels.map(r => [...r]),
+  }
   return next
 }
 
 /**
- * Restore one breakpoint's grid to the shipped default, returning a new config. Per
- * breakpoint rather than all three, because the author is looking at one window shape
- * and undoing the other two's shapes unseen is not what "reset" reads as.
+ * Restore one page's grid for one breakpoint to the shipped default, returning a new
+ * config. Per breakpoint rather than all three, because the author is looking at one
+ * window shape and undoing the other two's shapes unseen is not what "reset" reads as.
  */
-export function resetGrid(config: EditorConfig, kind: LayoutKind): EditorConfig {
-  return setGrid(config, kind, PANEL_GRIDS[kind])
+export function resetGrid(config: EditorConfig, page: PanelPage, kind: LayoutKind): EditorConfig {
+  return setGrid(config, page, kind, PANEL_GRIDS[page][kind])
 }

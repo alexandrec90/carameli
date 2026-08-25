@@ -24,7 +24,7 @@ async def assign_branch(
     session: Annotated[AsyncSession, Depends(get_session)],
     auth: Annotated[AuthContext, Depends(get_auth_context)],
 ) -> BranchAssignmentResponse:
-    """Attach an opaque VanillaSoft branch id to a DID or extension.
+    """Attach an opaque CRM branch id to a DID or extension.
 
     Branches are CRM organization metadata, not carrier resources, so this does
     not leak the legacy provider's branch concept into the provider Protocols.

@@ -1,6 +1,6 @@
 # Plan B — New Feature Verticals
 
-These cloudli pages need new Carameli backends (or a deliberate decision not to build one).
+These legacy vendor pages need new Carameli backends (or a deliberate decision not to build one).
 Each batch below was originally blocked on **open design questions**. As of **2026-06-25**
 those questions are resolved (decisions recorded inline), so every batch is now a mechanical
 handoff against the recipe in [README.md](README.md) — including the CRUD-capable `DataPage`
@@ -46,9 +46,9 @@ conventions in the README (auth scoping, migration-in-same-commit, tests-in-same
 ## B1 — Contacts (DONE as placeholders)
 
 - **Pages:** Contacts (#7), Contact Groups (#8)
-- **Decision:** Contacts/Contact Groups data is **owned by VanillaSoft CRM**
-  (`VanillaSoft.Model/Contact/`), not Carameli. Carameli is the telephony layer only, so we
-  do **not** build a contacts model here. Shipped as structural placeholders with the cloudli
+- **Decision:** Contacts/Contact Groups data is **owned by CRM**
+  (`CRM.Model/Contact/`), not Carameli. Carameli is the telephony layer only, so we
+  do **not** build a contacts model here. Shipped as structural placeholders with the legacy vendor
   columns. If real data is ever needed, surface it via a **read-only proxy to the PubApi**
   contact endpoints — do not create a local `contacts` table.
 - **Status:** Complete. Nothing further unless the read-only proxy is requested.
@@ -62,7 +62,7 @@ conventions in the README (auth scoping, migration-in-same-commit, tests-in-same
   UUID PK + `created_at`/`updated_at` + soft-delete, matching existing models.
 - **Decisions:**
   - **Config-only CRUD first.** Do **not** wire the Jambonz queue engine now
-    (`cloudli-feature-gaps.md` flags it as high-effort engine work). These pages are CRUD
+    (the local gap reference flags it as high-effort engine work). These pages are CRUD
     surfaces over config tables; call-routing integration is a later, separate plan.
   - **Agent ↔ extension is 1:1** (`extension_id` FK is unique on `agents`). Reuse the agent
     identity already modelled by `app/api/vsapi/agent_status.py` — do not invent a second one.
@@ -85,7 +85,7 @@ conventions in the README (auth scoping, migration-in-same-commit, tests-in-same
     and its `useExtensions` hook — high blast radius, no benefit. The core `extensions`
     contract stays untouched.
   - **Call Parking is config-only** for this plan: model the lot/slots config and CRUD it.
-    Defer live slot state (Redis) per `cloudli-feature-gaps.md` to an engine-work follow-up.
+    Defer live slot state (Redis) per the local gap reference to an engine-work follow-up.
 - **Front-end:** one CRUD `DataPage` per variant.
 
 ## B4 — Media & Audio (READY — needs one small contract add first)
@@ -117,7 +117,7 @@ conventions in the README (auth scoping, migration-in-same-commit, tests-in-same
   - **API tokens (#4): single-key read-only view.** `customers.api_key` already exists; do
     **not** build a multi-token model unless rotation/multiple keys becomes a real requirement.
     Surface the existing key (masked) in a read-only `DataPage`.
-  - **Users (#1):** VanillaSoft identity concern — placeholder shipped; same read-only-proxy
+  - **Users (#1):** CRM identity concern — placeholder shipped; same read-only-proxy
     note as Contacts if real data is ever needed.
   - **Subscription Logs (#3):** kept as a placeholder because there is **no producer yet** —
     Carameli has no webhook-*delivery* sender. When that sender lands, add a

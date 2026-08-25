@@ -2,7 +2,7 @@
 
 Durable project knowledge is tracked here. Generated output, raw captures, and personal
 scratch notes belong in the ignored `artifacts/` and `.local/` directories — including any
-VanillaLand/VanillaSoft material, which `.gitignore` keeps out of this repo entirely.
+legacy-crm/CRM material, which `.gitignore` keeps out of this repo entirely.
 
 ## Guide
 

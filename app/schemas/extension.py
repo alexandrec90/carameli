@@ -63,7 +63,7 @@ class AvailableExtensionsResponse(BaseModel):
 # --- Carameli-native REST (/api/v1) -------------------------------------------------
 # Resource-oriented bodies for the native API. `vs_customer_id` is optional here: a
 # customer-scoped token already identifies its customer, and only an admin token has to
-# name one. The legacy /vsapi shapes above stay published until VanillaSoft stops
+# name one. The legacy /vsapi shapes above stay published until CRM stops
 # calling them.
 
 # Bounds one bulk request so a typo'd range cannot ask for a million rows in one commit.

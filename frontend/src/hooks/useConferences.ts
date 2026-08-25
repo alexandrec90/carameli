@@ -23,7 +23,7 @@ function toRow(c: Conference): Record<string, string> {
 }
 
 /**
- * Data hook for the Telephone Conferences page (cloudli spec §24). Lists a
+ * Data hook for the Telephone Conferences page (legacy feature spec §24). Lists a
  * customer's permanent conferences and returns a DataPageProps so every skin
  * renders the same behaviour. Full CRUD: the create form calls Add and the
  * per-row Deactivate action calls Deactivate, both re-fetching on success.

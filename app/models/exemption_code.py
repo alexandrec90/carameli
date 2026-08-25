@@ -12,7 +12,7 @@ from app.core.database import Base
 
 
 class ExemptionCode(Base):
-    """A call-restriction exemption code for a customer (cloudli spec §11)."""
+    """A call-restriction exemption code for a customer (legacy feature spec §11)."""
 
     __tablename__ = "exemption_codes"
 
