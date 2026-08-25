@@ -10,6 +10,7 @@ import { serializeConfig, serializeConfigFile } from './serialize'
 import ShapeInspector from './ShapeInspector'
 import type { EditorModeApi } from './useEditorMode'
 import type { SeamDragApi } from './useSeamDrag'
+import { useToolbarColumns } from './useToolbarColumns'
 import { useToolbarDrag } from './useToolbarDrag'
 
 // The editor's own chrome: the mode switch, the inspector for whatever is selected, and
@@ -41,6 +42,7 @@ function downloadConfig(text: string): void {
 export default function EditorToolbar({ api, selPanel, pageSelect, shapes }: EditorToolbarProps) {
   const { config, mode } = api
   const toolbarDrag = useToolbarDrag()
+  const toolbarColumns = useToolbarColumns(toolbarDrag.rootProps.ref)
   const [copied, setCopied] = useState(false)
   const [saved, setSaved] = useState(false)
 
@@ -86,7 +88,13 @@ export default function EditorToolbar({ api, selPanel, pageSelect, shapes }: Edi
   }
 
   return (
-    <div className="cb-ed-toolbar" role="region" aria-label="Comic-book editor" {...toolbarDrag.rootProps}>
+    <div
+      className="cb-ed-toolbar"
+      role="region"
+      aria-label="Comic-book editor"
+      {...toolbarDrag.rootProps}
+      style={{ ...toolbarDrag.rootProps.style, ...toolbarColumns }}
+    >
       <div className="cb-ed-title cb-ed-grip" title="Drag to move" {...toolbarDrag.gripProps}>COMIC EDITOR</div>
 
       {/* Content or shapes — see EditMode in ./selection.ts for why these are modes and
