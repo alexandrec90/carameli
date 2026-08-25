@@ -8,7 +8,9 @@ import { isBubbleType } from './bubbleTypes'
 import { hydrateChains, normalizeChainId, syncChains } from './chainOps'
 import { CONFIG_KEY, cloneGrids, NEW_BUBBLE, NEW_IMAGE, seedConfig } from './configSeed'
 import { PANEL_PATTERNS } from './layoutConfig'
+import { coerceNumberPad } from './numberPadValidate'
 import { isPageGrids } from './panelGridValidate'
+import { coerceTable } from './tableValidate'
 import type { BubbleTransform, EditorConfig, ImgTransform } from './types'
 
 // Reading a persisted working copy back. Everything here exists because a payload
@@ -180,12 +182,26 @@ export function hydrateConfig(raw: string | null): EditorConfig {
         // a ninth picture the author added has no shipped entry to recover from, and
         // the template is then the whole answer.
         const shipped = seed.images[i] as ImgTransform | undefined
-        return clampPanel({
+        const merged = clampPanel({
           panel: 0,
           ...NEW_IMAGE,
           ...shipped,
           ...(t as Partial<ImgTransform>),
         })
+        // Projected content is nested, so a payload written before a field existed — or
+        // with a cell that came back as a number — needs repair inside rather than a
+        // whole-value merge. Each coercer returns undefined for the ordinary case of a
+        // picture that is not that surface, and absent keys stay absent.
+        const table = coerceTable(merged.table)
+        const numberPad = coerceNumberPad(merged.numberPad)
+        const plain = { ...merged }
+        delete plain.table
+        delete plain.numberPad
+        // Existing table payloads win if a hand-edited config names both. The editor
+        // presents one projected-content choice and never writes the ambiguous state.
+        if (table) return { ...plain, table }
+        if (numberPad) return { ...plain, numberPad }
+        return plain
       }),
       bubbles,
       // Rebuilt from the bubbles rather than trusted: the list is derived, so a payload

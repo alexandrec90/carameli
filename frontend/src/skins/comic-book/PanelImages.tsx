@@ -7,6 +7,8 @@ import {
   imgTransformStyle,
 } from './editor/transforms'
 import type { ImgTransform } from './editor/types'
+import ProjectedNumberPad from './ProjectedNumberPad'
+import ProjectedTable from './ProjectedTable'
 
 interface PanelImagesProps {
   /** Every picture on the page — `panel` decides which ones this panel draws. */
@@ -21,6 +23,8 @@ interface PanelImagesProps {
   natSizes: Record<string, { w: number; h: number }>
   /** Whether picture `index` (into `images`) is revealed — editor selection. */
   isRevealed(index: number): boolean
+  /** Editor active: projected content draws alignment guides and takes no pointer input. */
+  editing: boolean
   /** Called once per picture element when it has loaded or failed. */
   onSettled(): void
   /** Called with a source's natural size the first time it loads. */
@@ -49,6 +53,7 @@ export default function PanelImages({
   vp,
   natSizes,
   isRevealed,
+  editing,
   onSettled,
   onNatSize,
 }: PanelImagesProps) {
@@ -101,6 +106,19 @@ export default function PanelImages({
                 onSettled()
               }}
             />
+            {/* Projected content sits inside the frame wrapper on purpose: each surface
+                is measured in the frame's own box and clipped by its polygon, so moving
+                or resizing the picture carries the content along. */}
+            {img.table && (
+              <ProjectedTable table={img.table} frame={frame} editing={editing} />
+            )}
+            {img.numberPad && (
+              <ProjectedNumberPad
+                numberPad={img.numberPad}
+                frame={frame}
+                editing={editing}
+              />
+            )}
           </div>
         )
       })}

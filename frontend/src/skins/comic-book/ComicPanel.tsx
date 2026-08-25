@@ -91,6 +91,7 @@ export default function ComicPanel({
                 vp={vp}
                 natSizes={natSizes}
                 isRevealed={isRevealed}
+                editing={editorActive}
                 onSettled={onSettled}
                 onNatSize={onNatSize}
             />
