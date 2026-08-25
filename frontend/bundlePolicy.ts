@@ -78,8 +78,12 @@ export const MAX_EAGER_BYTES = 300 * 1024
  */
 export const MAX_LAZY_CHUNK_BYTES = 260 * 1024
 
-/** Every `.js` file in `dist/assets/`, summed. Today 765 KB across 46 chunks. */
-export const MAX_TOTAL_JS_BYTES = 800 * 1024
+/**
+ * Every `.js` file in `dist/assets/`, summed. Today 908 KB across 46 chunks; the
+ * regional phone formatter lives in the lazy comic-book skin rather than the eager
+ * entry graph.
+ */
+export const MAX_TOTAL_JS_BYTES = 920 * 1024
 
 /** Every `.css` file in `dist/assets/`, summed. Today 38 KB across 2 files. */
 export const MAX_TOTAL_CSS_BYTES = 44 * 1024

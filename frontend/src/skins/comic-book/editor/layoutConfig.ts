@@ -26,8 +26,8 @@ export const PANEL_IMG_TRANSFORMS: ImgTransform[] = [
 // for no tail), and `linkTo` the bubble to join with a connector tube — an index into
 // this array, which must name a bubble on the same panel. `spill: true` keeps the
 // current look where bubbles float into the gutter. `content` picks how `text` reads:
-// 'text' letters it as-is; 'wheel' splits it on commas into a scroll picker that the
-// mouse wheel turns, its unpicked options fading in while the bubble is hovered.
+// 'text' letters it as-is; 'wheel' splits it into comma-delimited options; 'input'
+// makes it editable; and 'phone' makes it an editable, region-formatted phone number.
 //
 // Two pairs ship linked — the logo's and the mechanic's — each pair being one speaker's
 // line continuing across two balloons, so the second of each carries no tail and the

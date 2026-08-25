@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
 
+import { isBubbleContentKind } from '../../skins/comic-book/bubbleContent'
 import {
   WHEEL_ROW_EM,
   WHEEL_STEP_DELTA,
   clampIndex,
-  isBubbleContentKind,
   splitOptions,
   wheelOffsetEm,
   wheelSteps,
@@ -86,9 +86,11 @@ describe('wheelOffsetEm', () => {
 })
 
 describe('isBubbleContentKind', () => {
-  it('accepts the two kinds and nothing else', () => {
+  it('accepts every supported presentation and nothing else', () => {
     expect(isBubbleContentKind('text')).toBe(true)
     expect(isBubbleContentKind('wheel')).toBe(true)
+    expect(isBubbleContentKind('input')).toBe(true)
+    expect(isBubbleContentKind('phone')).toBe(true)
     expect(isBubbleContentKind('spinner')).toBe(false)
     expect(isBubbleContentKind(undefined)).toBe(false)
     expect(isBubbleContentKind(1)).toBe(false)
