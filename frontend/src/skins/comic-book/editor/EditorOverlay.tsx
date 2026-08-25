@@ -15,6 +15,7 @@ import { useOverlayInteraction } from './useOverlayInteraction'
 import { useSeamDrag } from './useSeamDrag'
 import type { EditorModeApi } from './useEditorMode'
 import './editor.css'
+import './editor-toolbar.css'
 import './editor-shapes.css'
 
 interface EditorOverlayProps {
