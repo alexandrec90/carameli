@@ -20,7 +20,7 @@ function toRow(em: ExpansionModule): Record<string, string> {
 }
 
 /**
- * Data hook for the Expansion Modules page (cloudli spec §12). Full CRUD —
+ * Data hook for the Expansion Modules page (legacy feature spec §12). Full CRUD —
  * create form + per-row Deactivate.
  */
 export function useExpansionModules(): DataPageProps {

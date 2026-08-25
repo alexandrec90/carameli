@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
-"""Expose the local VanillaLand IIS site through ngrok so remote Carameli can deliver
+"""Expose the local LegacyCRM IIS site through ngrok so remote Carameli can deliver
 notifies back to it, then write the resulting URL into `.env.local-e2e`.
 
 This is the *reverse* tunnel. `scripts/start-ngrok.py` publishes Carameli's own API for
-provider webhooks; this one publishes VanillaSoft's VoipApi for the inverted topology
+provider webhooks; this one publishes CRM's VoipApi for the inverted topology
 described in docs/operations/local-integration-testing.md. They are never both needed on
 the same machine.
 
 Without this tunnel, remote Carameli cannot reach `localhost:8021` at all, its notify
 retries pile up unposted, and `tests/local_e2e/` skips the reverse-direction tests.
 
-Usage: python scripts/start-vs-tunnel.py [--port 8021] [--app-path /cloudli]
+Usage: python scripts/start-vs-tunnel.py [--port 8021] [--app-path /legacy vendor]
 """
 
 import argparse
@@ -32,8 +32,8 @@ NGROK_API = "http://127.0.0.1:4040/api/tunnels"
 DEFAULT_PORT = 8021
 # IIS serves the VoIP receiver as an application under the site root, so the public URL
 # must carry that path or every notify 404s. `/voip` is the vendor-neutral alias:
-# Carameli answers under /voip/carameli/notify/*, Cloudli under /voip/notify/*. The older
-# `/cloudli` alias points at the same application and still works — pass --app-path to
+# Carameli answers under /voip/carameli/notify/*, the legacy VoIP vendor under /voip/notify/*. The older
+# `/legacy vendor` alias points at the same application and still works — pass --app-path to
 # use it, or whatever a given environment registered.
 DEFAULT_APP_PATH = "/voip"
 
@@ -129,7 +129,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
-    print(f"\n=== Carameli VanillaLand Reverse Tunnel ===\nTarget   : localhost:{args.port}")
+    print(f"\n=== Carameli LegacyCRM Reverse Tunnel ===\nTarget   : localhost:{args.port}")
 
     url = already_running()
     if url:
@@ -161,8 +161,8 @@ def main(argv: list[str] | None = None) -> int:
     print(f"Public   : {public_base}")
     print(f"Wrote VS_PUBLIC_BASE_URL to {ENV_FILE.name}")
     print("\nSet these on the REMOTE Carameli, then restart it:\n")
-    print(f"  VANILLASOFT_WEBHOOK_URL={public_base}")
-    print("  VANILLASOFT_NOTIFY_PREFIX=carameli/notify")
+    print(f"  CRM_WEBHOOK_URL={public_base}")
+    print("  CRM_NOTIFY_PREFIX=carameli/notify")
     print("\nFree ngrok URLs change on every restart — re-run this script after one.\n")
     return 0
 

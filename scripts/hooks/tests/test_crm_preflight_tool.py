@@ -1,4 +1,4 @@
-"""Contract and smoke tests for the Windows VanillaSoft preflight tool."""
+"""Contract and smoke tests for the Windows CRM preflight tool."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import pytest
 from conftest import REPO_ROOT
 
-SCRIPT = REPO_ROOT / "tools" / "vanillasoft-preflight" / "carameli-preflight.ps1"
+SCRIPT = REPO_ROOT / "tools" / "crm-preflight" / "carameli-preflight.ps1"
 
 
 def _powershell() -> str:
@@ -80,7 +80,7 @@ def test_preflight_writes_pass_report_for_reachable_safe_channels(tmp_path, prob
     result = _run_preflight(
         "-CarameliUrl",
         probe_server,
-        "-VanillaSoftNotifyUrl",
+        "-CRMNotifyUrl",
         f"{probe_server}/notify",
         "-SkipEventLog",
         "-LogPath",
@@ -94,7 +94,7 @@ def test_preflight_writes_pass_report_for_reachable_safe_channels(tmp_path, prob
     checks = {check["name"]: check for check in report["checks"]}
     assert report["overall"] == "pass"
     assert checks["carameli-health"]["status"] == "pass"
-    assert checks["vanillasoft-notify-route"]["status"] == "pass"
+    assert checks["crm-notify-route"]["status"] == "pass"
     assert checks["log-file-read"]["status"] == "pass"
     assert checks["sql-login"]["status"] == "not_run"
     assert "content must not appear" not in output.read_text(encoding="utf-8")

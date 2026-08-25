@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 class Conference(Base):
-    """A permanent telephone conference room (cloudli spec §24)."""
+    """A permanent telephone conference room (legacy feature spec §24)."""
 
     __tablename__ = "conferences"
 

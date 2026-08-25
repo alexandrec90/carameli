@@ -1,4 +1,5 @@
 import type { TailDir } from '../bubbleBox'
+import type { BubbleContentKind } from '../bubbleContent'
 import type { PageGrids } from '../panelGeometry'
 import type { PanelBgStyle } from '../panelPatterns'
 import type { BubbleType } from './bubbleTypes'
@@ -78,7 +79,12 @@ export interface BubbleTransform {
   type: BubbleType
   /** Which way the tail points, or 'none' (see TAIL_DIRS in bubbleBox.ts). */
   tail: TailDir
-  /** Bubble caption text. */
+  /**
+   * How `text` is presented: lettering, a wheel picker, a text input, or a
+   * region-aware phone input (see bubbleContent.ts).
+   */
+  content: BubbleContentKind
+  /** Caption/options, or the initial value of an editable input. */
   text: string
   /**
    * Bubble to join with a connector tube, by index into the bubble array; null when

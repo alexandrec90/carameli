@@ -10,7 +10,7 @@ import { assetLabel } from './assets'
 import EditorToolbar from './EditorToolbar'
 import type { PageSelectProps } from './PageSelect'
 import PanelSeams from './PanelSeams'
-import { bubbleRect, imgRect } from './transforms'
+import { bubbleRect, imgVisibleRect } from './transforms'
 import { useOverlayInteraction } from './useOverlayInteraction'
 import { useSeamDrag } from './useSeamDrag'
 import type { EditorModeApi } from './useEditorMode'
@@ -23,6 +23,9 @@ interface EditorOverlayProps {
   panelPolys: (PanelPoly | null)[]
   /** Which page's grids this route is showing, so shape edits reach the right record. */
   page: PanelPage
+  /** Natural pixel size of each loaded source, keyed by `src` — sizes the visible
+      image rect the hover and selection outlines trace. */
+  natSizes: Record<string, { w: number; h: number }>
   /** Which of the three grids this window is showing, so shape edits reach the right one. */
   layoutKind: LayoutKind
   /** Viewport size in px — the shape editor needs the page frame, not the panels. */
@@ -51,6 +54,7 @@ export default function EditorOverlay({
   api,
   panelPolys,
   page,
+  natSizes,
   layoutKind,
   viewport,
   pageSelect,
@@ -84,7 +88,7 @@ export default function EditorOverlay({
   const selectedRect: Rect | null = !selPoly
     ? null
     : selImg
-      ? imgRect(selPoly.bounds, selImg)
+      ? imgVisibleRect(selPoly.bounds, natSizes[selImg.src], selImg)
       : selBubble
         ? bubbleRect(selPoly.bounds, selBubble)
         : selPoly.bounds
@@ -120,9 +124,9 @@ export default function EditorOverlay({
             ),
           )}
 
-          {/* One click target per picture, on its own frame. They paint after the panel
-              targets so a picture wins the click where the two overlap — which is always,
-              since a frame lives on a panel. */}
+          {/* One click target per picture, on the rectangle its pixels visibly occupy —
+              the image, not the frame it hangs in. They paint after the panel targets so
+              a picture wins the click where the two overlap. */}
           {config.images.map((img, i) => {
             const poly = panelPolys[img.panel]
             if (!poly) return null
@@ -131,7 +135,7 @@ export default function EditorOverlay({
                 key={i}
                 type="button"
                 className="cb-ed-target cb-ed-target-img"
-                style={rectStyle(imgRect(poly.bounds, img))}
+                style={rectStyle(imgVisibleRect(poly.bounds, natSizes[img.src], img))}
                 aria-label={`Select ${assetLabel(img.src)} on ${PANELS[img.panel]?.label ?? `panel ${img.panel}`}`}
                 onClick={() => api.select('img', i)}
               />

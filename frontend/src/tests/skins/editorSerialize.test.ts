@@ -107,7 +107,8 @@ describe('serializeConfig', () => {
     )
     expect(ts).toContain(
       '{ panel: 0, top: -35, right: -12, width: 55, rotate: -5, spill: true, ' +
-        'type: \'soft\', tail: \'down-left\', text: "It\'s Carameli!", linkTo: 1, ' +
+        "type: 'soft', tail: 'down-left', content: 'text', " +
+        'text: "It\'s Carameli!", linkTo: 1, ' +
         "hoverType: 'cloud', clickType: 'lightning' },",
     )
   })
@@ -132,6 +133,14 @@ describe('serializeConfig', () => {
   it('writes the panel a bubble belongs to, so the association survives a save', () => {
     const ts = serializeConfig(patchBubble(seedConfig(), 0, { panel: 6 }))
     expect(ts).toContain('{ panel: 6, top: -35,')
+  })
+
+  it('writes the content kind, so a wheel bubble survives a save', () => {
+    const ts = serializeConfig(
+      patchBubble(seedConfig(), 0, { content: 'wheel', text: 'One, Two, Three' }),
+    )
+    expect(ts).toContain("content: 'wheel', text: 'One, Two, Three',")
+    expect(serializeConfig(seedConfig())).toContain("content: 'text',")
   })
 
   it('writes the tail direction, "none" included and quoted like any other', () => {

@@ -1,4 +1,4 @@
-"""add posted flag to sms_messages for VanillaSoft forward tracking
+"""add posted flag to sms_messages for CRM forward tracking
 
 Revision ID: 011
 Revises: 010

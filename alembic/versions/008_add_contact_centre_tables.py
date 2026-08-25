@@ -4,7 +4,7 @@ Revision ID: 008
 Revises: 007
 Create Date: 2026-06-27 00:00:00.000000
 
-Config-only CRUD tables for the Contact Centre vertical (cloudli spec §35-37).
+Config-only CRUD tables for the Contact Centre vertical (legacy feature spec §35-37).
 Call-routing integration deferred; these are pure config surfaces.
 
 """

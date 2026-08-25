@@ -102,7 +102,7 @@ export function Layout({ navItems }: LayoutProps) {
     )
     // Natural (intrinsic) pixel size of each loaded source, captured on load and keyed
     // by `src`. Drives fullImgStyle (the real framing); absent until the img loads,
-    // during which the equivalent object-fit:cover fallback renders. Keyed by source
+    // during which the equivalent object-fit:contain fallback renders. Keyed by source
     // rather than by index because two pictures may be the same file, and the second
     // should not have to wait for its own load to learn a size already known.
     const [natSizes, setNatSizes] = useState<Record<string, { w: number; h: number }>>({})
@@ -234,6 +234,7 @@ export function Layout({ navItems }: LayoutProps) {
                         api={editor}
                         panelPolys={panelPolys}
                         page={page}
+                        natSizes={natSizes}
                         layoutKind={layoutKind}
                         viewport={viewport}
                         pageSelect={{

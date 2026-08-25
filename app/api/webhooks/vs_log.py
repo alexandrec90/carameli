@@ -9,7 +9,7 @@ from pydantic import ValidationError
 
 from app.core.config import settings
 from app.schemas.vs_log import VsLogEntry
-from app.services.vanillasoft_notify import _truncate
+from app.services.crm_notify import _truncate
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/webhooks", tags=["webhooks"])
@@ -32,15 +32,19 @@ _EXCEPTION_LIMIT = 4000
 
 
 def _authorized(request: Request, entry_auth: str | None) -> bool:
-    """Accept the shared secret from the ``X-Cloudli-Auth`` header or the body's
+    """Accept the shared secret from the configured auth header or the body's
     ``auth`` field (old NLog builds can't attach a header — see nlog-snippet.md).
+
+    The header *name* is configuration (``LEGACY_LOG_AUTH_HEADER``) rather than a
+    literal here: the legacy shipper sends a vendor-branded name, and that name is
+    deployment detail, not something this repository needs to carry.
 
     Secret unconfigured → dev/CI mode, skip validation (established convention).
     """
-    secret = settings.vanillasoft_webhook_secret
+    secret = settings.crm_webhook_secret
     if not secret:
         return True  # dev mode — skip
-    provided = request.headers.get("X-Cloudli-Auth") or entry_auth or ""
+    provided = request.headers.get(settings.legacy_log_auth_header) or entry_auth or ""
     return hmac.compare_digest(provided, secret)
 
 
@@ -60,16 +64,16 @@ def _authorized(request: Request, entry_auth: str | None) -> bool:
     },
 )
 async def vs_log_ingest(request: Request) -> Response:
-    """Ingest a VanillaSoft-side log record and re-emit it into ``carameli.log``.
+    """Ingest a CRM-side log record and re-emit it into ``carameli.log``.
 
-    Covers VanillaSoft errors that never surface as an HTTP response Carameli
+    Covers CRM errors that never surface as an HTTP response Carameli
     sees (exceptions inside ``CarameliClient``/``CarameliService``). NLog's
     WebService target POSTs one JSON object per record; we authenticate via the
     shared secret, then log the record under a ``vs.``-prefixed logger so entries
     are grep-distinguishable (``| vs.`` in the diagnostics doc). Log-only — never
     persisted to the database.
     """
-    # auth: shared-secret validation (X-Cloudli-Auth header or body 'auth' field).
+    # auth: shared-secret validation (LEGACY_LOG_AUTH_HEADER or body 'auth' field).
     # No customer scoping — server-to-server diagnostics channel, like other webhooks.
     try:
         body: Any = await request.json()

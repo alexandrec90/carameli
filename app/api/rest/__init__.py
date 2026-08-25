@@ -1,13 +1,13 @@
 """Carameli's own resource-oriented REST API.
 
-The `/vsapi/1.0.0/` tree mirrors legacy CMV/Cloudli RPC verbs (`VsExtension/Add`,
-`VsMessaging/Sms/Enable/{customerId}/{number}`) because that is what VanillaSoft calls
+The `/vsapi/1.0.0/` tree mirrors the legacy vendor's RPC verbs (`VsExtension/Add`,
+`VsMessaging/Sms/Enable/{customerId}/{number}`) because that is what CRM calls
 today. This tree is what Carameli actually offers: resources, real HTTP status codes,
 no success-in-body envelope.
 
-`CarameliClient` on the VanillaSoft side is the adapter, and translating between the
+`CarameliClient` on the CRM side is the adapter, and translating between the
 legacy shape and this one is its whole job — so the translation belongs there, not
-spread across both ends. The `/vsapi` routes stay published until VanillaSoft stops
+spread across both ends. The `/vsapi` routes stay published until CRM stops
 calling them.
 """
 

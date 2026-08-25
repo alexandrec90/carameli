@@ -1,10 +1,10 @@
 # Diagnostics: where every integration error lands
 
-You are here because "something didn't work" in the Carameli ⇄ VanillaSoft integration.
+You are here because "something didn't work" in the Carameli ⇄ CRM integration.
 This doc maps each failure mode to the evidence it leaves and what to grep or query. It
 assumes the "airtight error visibility" work
-(phases 01–05, `docs/plans/active/airtight-vanillasoft/`)
-is deployed: notify failures carry VanillaSoft's real error body, VanillaSoft-side
+(phases 01–05, `docs/plans/active/airtight-crm/`)
+is deployed: notify failures carry CRM's real error body, CRM-side
 errors ship into Carameli's log, and a reconciliation cron catches webhooks that never
 arrived.
 
@@ -12,7 +12,7 @@ Everything backend lands in **`logs/runtime/carameli.log`** (rotating, 10 MB × 
 log format is machine-parseable:
 
 ```text
-2026-07-07 10:00:01.200 | ERROR    | app.services.vanillasoft_notify:159 | VanillaSoft notify POST returned 500 path=IncomingCall ref=CA123 body=...
+2026-07-07 10:00:01.200 | ERROR    | app.services.crm_notify:159 | CRM notify POST returned 500 path=IncomingCall ref=CA123 body=...
 ```
 
 Fields: `timestamp.ms | LEVEL | module:lineno | message`.
@@ -23,7 +23,7 @@ Fields: `timestamp.ms | LEVEL | module:lineno | message`.
 | --- | --- | --- |
 | Carameli 500 (any handler) | Global exception handler → `carameli.log` | `grep -E "\| (ERROR\|CRITICAL) " logs/runtime/carameli.log` |
 | Provider (Telnyx/Jambonz) error in a handler | `carameli.log` ERROR with `vs_customer_id` + target number | `grep "Provider error" logs/runtime/carameli.log` |
-| Notify **rejected** by VanillaSoft (4xx) | `carameli.log` **WARNING** with status + response body (phase 01) | `grep "notify POST returned" logs/runtime/carameli.log` |
+| Notify **rejected** by CRM (4xx) | `carameli.log` **WARNING** with status + response body (phase 01) | `grep "notify POST returned" logs/runtime/carameli.log` |
 | Notify **failed** on VS side (5xx) | `carameli.log` **ERROR** with status + honest error body (phase 01 + 02) | `grep "notify POST returned 5" logs/runtime/carameli.log` |
 | Notify never left Carameli (network/timeout) | `carameli.log` ERROR `notify POST failed` (exception) | `grep "notify POST failed" logs/runtime/carameli.log` |
 | VS-internal / client-side error (outside an HTTP exchange Carameli sees) | Shipped via phase 03 NLog → `POST /webhooks/vs-log` → `carameli.log` under `vs.Carameli.*` | `grep "vs.Carameli." logs/runtime/carameli.log` |
@@ -94,7 +94,7 @@ Concretely, given a `call_sid`:
 1. `grep <call_sid> logs/runtime/carameli.log` — every stage Carameli logged.
 2. `curl -s "http://127.0.0.1:4040/api/requests/http?limit=100" | jq '... | select(test("<call_sid>"))'` — the raw webhook + our answer.
 3. `mcp__postgres__query`: `SELECT * FROM call_events WHERE call_sid = '<call_sid>';` — the local row and its `posted` flag.
-4. VanillaSoft staging: look for `notify/IncomingCall` with matching `callId`, then the
+4. CRM staging: look for `notify/IncomingCall` with matching `callId`, then the
    `sp_CMVCallNotificationInsert` rows.
 
 For SMS the same recipe uses `message_sid` (Telnyx id) ↔ `sms_messages.message_sid` ↔ VS
@@ -150,8 +150,8 @@ pytest tests/live_e2e -m live_e2e --collect-only
 | `E2E_API_KEY` | Bearer key for a dedicated E2E test customer |
 | `E2E_CUSTOMER_ID` | That customer's `vs_customer_id` (for `/List/{id}` reads) |
 | `E2E_DID_A`, `E2E_DID_B` | Two owned Canadian test DIDs; B is the inbound target |
-| `E2E_VS_CHECK` | optional `1`: also assert VanillaSoft-side via PubApi |
-| `E2E_PUBAPI_BASE_URL` | required when `E2E_VS_CHECK=1`: VanillaSoft PubApi root |
+| `E2E_VS_CHECK` | optional `1`: also assert CRM-side via PubApi |
+| `E2E_PUBAPI_BASE_URL` | required when `E2E_VS_CHECK=1`: CRM PubApi root |
 | `E2E_PUBAPI_KEY` | required when `E2E_VS_CHECK=1`: key for `Authorization: APIKey=` |
 | `E2E_PUBAPI_PROJECT_ID` | optional: restrict the PubApi call-history read to one project |
 | `E2E_TELNYX_CONNECTION_ID` | optional: Telnyx Call Control connection for unattended calls |
@@ -159,20 +159,20 @@ pytest tests/live_e2e -m live_e2e --collect-only
 | `E2E_RECORDING` | optional `1`: run the recording flow (roadmap A6 must be live) |
 
 Every flow asserts *at minimum*: the expected row appears via Carameli's API, and — the
-airtight part — the event reaches VanillaSoft durably. For calls that is `posted=True`
+airtight part — the event reaches CRM durably. For calls that is `posted=True`
 on the row; for SMS (where `posted` is not exposed on the API) it is the
-`notify POST ok` log line. With the honest receiver, both **mean** VanillaSoft
+`notify POST ok` log line. With the honest receiver, both **mean** CRM
 processed and persisted the event.
 
 ### The `E2E_VS_CHECK` opt-in
 
 `posted=True` is Carameli's own account of what happened. `E2E_VS_CHECK=1` adds an
-independent one: read the call back out of VanillaSoft's `GET /GetCallHistory` PubApi
+independent one: read the call back out of CRM's `GET /GetCallHistory` PubApi
 endpoint (auth header `Authorization: APIKey=<key>`, *not* `Bearer`) and assert a
 call-history record dated inside the test's window exists.
 
 **It applies to the attended click-to-call test only** (`-m manual`), and the reason
-matters more than the flag does — it says where VanillaSoft-side evidence for a Carameli
+matters more than the flag does — it says where CRM-side evidence for a Carameli
 call actually lands:
 
 | What | Where it lands | Readable via |
@@ -182,14 +182,14 @@ call actually lands:
 | The call-history record itself | created by the CRM when an agent works a contact | `GET /GetCallHistory` |
 
 Nothing in that chain *creates* a call-history record from a notification —
-`FindCallAttemptCallHistory` (`../VanillaLand/AppCode/CMV Call Data Service/CMVCallData.cs`)
+`FindCallAttemptCallHistory` (`../legacy-crm/AppCode/legacy-voip Call Data Service/CMVCallData.cs`)
 attaches the attempt to a record it found with `sp_CMVCallAttemptMatchCallHistoryFetch`.
 So for the **unattended** inbound flow, where the call was originated straight through
 Telnyx and no agent dialed from the CRM, `GetCallHistory` returns nothing however
 staging is seeded, and `posted=True` is the only honest assertion. Seeding a contact
 does not change this; the missing row is the call history, not the contact.
 
-For the attended flow the agent did dial a contact from inside VanillaSoft, so the
+For the attended flow the agent did dial a contact from inside CRM, so the
 record exists and the read-back is real evidence. Its precondition is just that flow's
 normal setup: the dialed contact exists in the E2E project and the PubApi key can reach
 that project. If you seed a contact by hand (PubApi `POST /contacts` with `project_id`

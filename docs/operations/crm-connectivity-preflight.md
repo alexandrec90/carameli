@@ -1,6 +1,6 @@
-# VanillaSoft connectivity preflight
+# CRM connectivity preflight
 
-Use this before designing or running a live Carameli–VanillaSoft test. It separates
+Use this before designing or running a live Carameli–CRM test. It separates
 three questions that otherwise get conflated:
 
 1. Can one host reach the other host?
@@ -11,12 +11,12 @@ The first two stages are non-mutating application checks. HTTP GET requests can 
 appear in IIS, proxy, or ngrok access logs. The final live E2E stage uses real provider
 traffic and may cost money.
 
-## Stage 1: Carameli to VanillaSoft
+## Stage 1: Carameli to CRM
 
 On the Carameli development machine, set these values in `.env`:
 
 ```dotenv
-VANILLASOFT_WEBHOOK_URL=https://vs-staging.example.com/voip
+CRM_WEBHOOK_URL=https://vs-staging.example.com/voip
 VS_PROBE_HOST=vs-staging.example.com
 VS_PROBE_DB_HOST=sql-staging.example.com
 NGROK_URL=https://your-domain.ngrok.app
@@ -31,18 +31,18 @@ Run:
 python scripts/probe-connectivity.py --json
 ```
 
-The probe checks VanillaSoft application HTTPS, the synchronous notify route, SQL
+The probe checks CRM application HTTPS, the synchronous notify route, SQL
 Server TCP 1433, WinRM, RPC, SMB, and the local ngrok inspector. It overwrites
 `logs/connectivity-probe.log` with the complete result. Port success proves network
 reachability only; it does not prove authentication or read permission.
 
-## Stage 2: permissions from the VanillaSoft server
+## Stage 2: permissions from the CRM server
 
-Copy this repository file to the VanillaSoft application server using the normal
+Copy this repository file to the CRM application server using the normal
 administrative channel:
 
 ```text
-tools/vanillasoft-preflight/carameli-preflight.ps1
+tools/crm-preflight/carameli-preflight.ps1
 ```
 
 Inspect it before running it. If Windows marks the copied file as downloaded, unblock
@@ -54,7 +54,7 @@ Unblock-File .\carameli-preflight.ps1
 
 ### Minimal reverse-path check
 
-This proves that the VanillaSoft server can reach Carameli through its public URL:
+This proves that the CRM server can reach Carameli through its public URL:
 
 ```powershell
 .\carameli-preflight.ps1 `
@@ -71,11 +71,11 @@ Run under the exact Windows identity that will perform diagnostics:
 ```powershell
 .\carameli-preflight.ps1 `
   -CarameliUrl 'https://your-domain.ngrok.app' `
-  -VanillaSoftNotifyUrl 'https://localhost/voip/carameli/notify/IncomingCall' `
+  -CRMNotifyUrl 'https://localhost/voip/carameli/notify/IncomingCall' `
   -EventLogName 'Application' `
-  -LogPath 'C:\path\to\vanillasoft.log' `
+  -LogPath 'C:\path\to\crm.log' `
   -SqlHost 'sql-staging.example.com' `
-  -SqlDatabase 'VanillaSoft' `
+  -SqlDatabase 'CRM' `
   -SqlReadObject 'dbo.IntendedTable'
 ```
 
@@ -98,7 +98,7 @@ $sqlCredential = Get-Credential
   -CarameliUrl 'https://your-domain.ngrok.app' `
   -SkipEventLog `
   -SqlHost 'sql-staging.example.com' `
-  -SqlDatabase 'VanillaSoft' `
+  -SqlDatabase 'CRM' `
   -SqlReadObject 'dbo.IntendedTable' `
   -SqlCredential $sqlCredential
 ```

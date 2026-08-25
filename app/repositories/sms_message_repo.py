@@ -102,7 +102,7 @@ class SmsMessageRepo:
         return result.scalar_one_or_none() is not None
 
     async def get_unposted_inbound(self) -> list[SmsMessage]:
-        """Inbound messages not yet forwarded to VanillaSoft, older than 1 minute."""
+        """Inbound messages not yet forwarded to CRM, older than 1 minute."""
         cutoff = datetime.now(UTC).replace(tzinfo=None) - _RETRY_AGE
         result = await self.session.execute(
             select(SmsMessage)

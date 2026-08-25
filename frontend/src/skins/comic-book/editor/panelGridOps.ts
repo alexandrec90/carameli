@@ -175,4 +175,3 @@ export function removeVertex(grid: PanelGrid, index: number): PanelGrid | null {
     panels: grid.panels.map(ring => ring.filter(v => v !== index).map(remap)),
   }
 }
-

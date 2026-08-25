@@ -13,7 +13,9 @@ bubbles; **Panel shapes** drags the lines between panels.
 `PANEL_BUBBLE_TRANSFORMS` — picture placement **and content** (panel / src / alt /
 left / top / width / height / scale / offsetX / offsetY / anchor / spill) and bubble
 placement **and content** (panel / top / right / width / rotate / spill / type / tail /
-text), plus each bubble's event morph targets (`hoverType`, `clickType`) and its
+content / text — lettering, a comma-delimited wheel picker, a text input, or a phone
+input formatted from the browser locale), plus each bubble's event morph targets
+(`hoverType`, `clickType`) and its
 connector-tube partner (`linkTo`). It also holds `PANEL_PATTERNS` — each panel's
 Ben-Day background style, the one array here that **is** parallel to `PANELS`; the
 per-panel palette and dot metrics stay tuned in
@@ -105,7 +107,12 @@ different images can only crossfade. A new bubble type belongs in `bubbleShape.t
      bleed past (default for bubbles).
    - For bubbles: pick the **panel** it belongs to, a resting **type** (sets shape +
      lettering font), which way the **tail** points (**No tail** is one of the nine
-     options), edit the **text** inline, choose the shapes to morph to **on hover**
+     options), pick the **content** presentation (**Text**, **Wheel picker**, **Text
+     input**, or **Phone input**). Wheel text is comma-delimited options: hover the
+     bubble outside edit mode and scroll to turn it. Input text is its initial value;
+     phone input formats live using the browser locale, while a leading `+` selects an
+     international calling code. Edit the **text** or **initial value**, choose the shapes to
+     morph to **on hover**
      and **on click** (`— no change —` keeps the resting shape), and pick a **link
      to** partner to join with a connector tube. Turning or removing a tail morphs
      like any other shape change, because the tail is one ring vertex pulled out.
@@ -171,7 +178,10 @@ bubbleTypes.ts      BubbleType + BUBBLE_TYPES (lettering font per type) — ship
 ../bubbleShape.ts   PURE outline geometry: the shared vertex ring, per-type modulation, morph lerp
 ../bubbleTube.ts    PURE connector-tube geometry + link/reveal semantics
 ../useBubbleMorph.ts  rAF morph driver — writes `d` to the DOM, not through React
-../PanelBubble.tsx  one bubble: outline SVG + text + hover/press morph state
+../PanelBubble.tsx  one bubble: outline SVG + content + hover/press morph state
+../BubbleInput.tsx  real text/phone input; isolates its events from panel navigation
+../phoneInput.ts    PURE locale detection, live phone formatting + caret/deletion math
+../bubbleContent.ts content-kind registry and persisted-value guard
 ../PanelBubbles.tsx one panel's bubbles: filters the array by panel, clips the non-spilling ones
 ../BubbleTubes.tsx  viewport-level tube layer for every linked pair
 ../panelGeometry.ts PURE grid -> polygon geometry: frame, normalised space, vertex constraints
@@ -195,7 +205,7 @@ EditorOverlay.tsx   overlay UI: click targets, outlines, seams (dev-only, dynami
 EditorToolbar.tsx   toolbar chrome: mode toggle, page select, inspector slot, save/reset/export
 InspectorPanel.tsx  selection inspector: read-outs, spill, per-element reset, delete
 ImageInspector.tsx  picture-only controls: panel, picture, alt, anchor
-BubbleInspector.tsx bubble-only controls: panel, type, tail, text, hover/click, link
+BubbleInspector.tsx bubble-only controls: panel, type, tail, content, text, hover/click, link
 PageSelect.tsx      toolbar dropdown: switch page / preview the loading screen
 pageSelection.ts    PURE helpers behind PageSelect (sentinel value, selection resolution)
 editor.css          overlay chrome styles

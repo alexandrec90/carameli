@@ -56,7 +56,9 @@ const BUBBLE_HEADER = `// Not parallel to PANELS either: each bubble names its \
 // pointer-over and press (null = stay put), \`tail\` which way the tail points ('none'
 // for no tail), and \`linkTo\` the bubble to join with a connector tube — an index into
 // this array, which must name a bubble on the same panel. \`spill: true\` keeps the
-// current look where bubbles float into the gutter.
+// current look where bubbles float into the gutter. \`content\` picks how \`text\` reads:
+// 'text' letters it as-is; 'wheel' splits it into comma-delimited options; 'input'
+// makes it editable; and 'phone' makes it an editable, region-formatted phone number.
 //
 // Two pairs ship linked — the logo's and the mechanic's — each pair being one speaker's
 // line continuing across two balloons, so the second of each carries no tail and the
@@ -150,7 +152,7 @@ export function serializeConfig(c: EditorConfig): string {
         `  { panel: ${b.panel}, top: ${Math.round(b.top)}, right: ${Math.round(b.right)}, ` +
         `width: ${Math.round(b.width)}, rotate: ${round(b.rotate, 1)}, ` +
         `spill: ${b.spill}, type: '${b.type}', tail: '${b.tail}', ` +
-        `text: ${strLiteral(b.text)}, linkTo: ${b.linkTo}, ` +
+        `content: '${b.content}', text: ${strLiteral(b.text)}, linkTo: ${b.linkTo}, ` +
         `hoverType: ${typeLiteral(b.hoverType)}, clickType: ${typeLiteral(b.clickType)} },`,
     )
     .join('\n')

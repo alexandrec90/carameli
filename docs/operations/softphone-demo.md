@@ -1,7 +1,7 @@
 # Softphone demo — registering a real phone against Carameli
 
 How to put a working softphone on a Carameli extension so an end-to-end demo — dial out
-from VanillaSoft, ring in on a Telnyx DID, hear both legs, get the recording back — runs
+from CRM, ring in on a Telnyx DID, hear both legs, get the recording back — runs
 on real audio rather than on webhook logs.
 
 Read this alongside [the prototype roadmap](../prototype-roadmap.md), which owns the
@@ -14,7 +14,7 @@ account-level decisions this runbook assumes.
                                               │
                                      webhooks │ verbs
                                               │
-                                          Carameli ──── VanillaSoft
+                                          Carameli ──── CRM
 ```
 
 Carameli is **not** the SIP registrar. It provisions a SIP client on the call engine
@@ -44,17 +44,17 @@ recorded in the roadmap. Switching back to a self-hosted engine later is a
 client (`CPCAPI2_SharedLibrary.dll`, `CPCLR.dll` in its install directory), and its
 branding, feature and server configuration files — `server.txt`, `features.xml`,
 `space_settings.xml`, and the per-profile `settings.cps` under
-`%APPDATA%\VanillaSoft\VS Connect\` — are all encrypted. The profile directories are
-named `<number>@vanillasoft.com`: the client is provisioned by logging in to
-VanillaSoft's own service, and there is no supported path to hand it a foreign SIP
+`%APPDATA%\CRM\VS Connect\` — are all encrypted. The profile directories are
+named `<number>@crm.com`: the client is provisioned by logging in to
+CRM's own service, and there is no supported path to hand it a foreign SIP
 realm from outside.
 
-The only route that could exist runs through VanillaSoft, not through the client: its
-`SaveDialingInformation` web method (`VanillaSoft.Webservice/VanillaSoftWS_DialingInformation.cs`)
+The only route that could exist runs through CRM, not through the client: its
+`SaveDialingInformation` web method (`CRM.Webservice/CRMWS_DialingInformation.cs`)
 persists a user's `SIPUserName` / `SIPPassword` / `SIPDomain`, and a `connectme`-typed
 line reads them back from the VoIP vendor. Making that serve Carameli's realm is a
-VanillaLand change on a staging server, and it still depends on the branded client
-honouring a realm that is not `vanillasoft.com` — untested, and not something to find
+LegacyCRM change on a staging server, and it still depends on the branded client
+honouring a realm that is not `crm.com` — untested, and not something to find
 out during a demo.
 
 **Carameli has its own softphone, and it is the shortest path to a demo.** The
@@ -110,7 +110,7 @@ up for the accounts in the first place, and paying for them.
 `POST /api/v1/extensions` accepts a `password`, which is what makes this a single
 command rather than a sequence: without one, the generated password is encrypted at rest
 and released exactly once through `POST /vsapi/1.0.0/AccessCheck/AccountData`, after
-which it is erased. That one-time delivery is the right contract for VanillaSoft and the
+which it is erased. That one-time delivery is the right contract for CRM and the
 wrong ergonomics for a demo.
 
 ```bash
@@ -218,8 +218,8 @@ Each step fails differently, so do not skip ahead.
    (`outbound-answered`). Answering the softphone is what triggers the second leg, so a
    call that rings and dies on answer is a webhook reachability problem, not a SIP one.
 4. **Recording and write-back.** With recording enabled, the recording URL lands on
-   `call_events`, and `POST notify/CallRecording` goes to VanillaSoft. Blank
-   `VANILLASOFT_WEBHOOK_URL` skips the write-back silently — check it before concluding
+   `call_events`, and `POST notify/CallRecording` goes to CRM. Blank
+   `CRM_WEBHOOK_URL` skips the write-back silently — check it before concluding
    the recording failed.
 
 `docs/operations/diagnostics-error-map.md` maps the failures that do not fit the four

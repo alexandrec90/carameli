@@ -2,10 +2,10 @@
 """One command that brings up both sides of the local integration and runs it end to end.
 
 ``scripts/run-local-e2e.py`` runs the pytest suite and nothing else: it assumes IIS is
-already serving VanillaSoft's VoipApi, that the SQL/Elasticsearch containers are up, and
+already serving CRM's VoipApi, that the SQL/Elasticsearch containers are up, and
 that Carameli is answering. When any of those is false the suite fails with a connection
 error, and the reader has to know which of four services to go start. This script owns
-that sequencing instead — boot VanillaSoft, boot Carameli, run the suite, run the .NET
+that sequencing instead — boot CRM, boot Carameli, run the suite, run the .NET
 outbound driver — and reports the whole thing as one artifact.
 
 **Stdlib only, and no virtualenv.** devkit's VS Code task dispatcher invokes it with the
@@ -38,7 +38,7 @@ SUITE = "tests/local_e2e"
 # different reactions: 2 means go write .env.local-e2e, 1 means go read the artifact.
 EXIT_UNCONFIGURED = 2
 
-# The VanillaLand-side entry points, relative to VS_REPO_DIR. Both are owned by that
+# The LegacyCRM-side entry points, relative to VS_REPO_DIR. Both are owned by that
 # repo; this script only knows where to look and what a non-zero exit means.
 VS_START_SCRIPT = Path(".local") / "carameli-e2e" / "start.ps1"
 VS_DRIVER_SCRIPT = Path("AppCode") / "CarameliE2EDriver" / "run.ps1"
@@ -120,32 +120,32 @@ def powershell_command(script: Path) -> list[str]:
 
     ``-File`` rather than ``-Command`` so the script's own exit code propagates: with
     ``-Command`` PowerShell exits 0 for a script that merely wrote to the error stream,
-    which would turn a failed VanillaSoft boot into a green run.
+    which would turn a failed CRM boot into a green run.
     """
     return ["powershell", "-ExecutionPolicy", "Bypass", "-File", str(script)]
 
 
 def vs_start_command(vs_repo_dir: str | None) -> tuple[list[str] | None, str]:
-    """Plan step 2: bring up the VanillaSoft side. ``(argv, note)``; ``argv`` None to skip.
+    """Plan step 2: bring up the CRM side. ``(argv, note)``; ``argv`` None to skip.
 
     ``start.ps1`` is idempotent — it no-ops on every service already running — so this is
     safe to invoke on a stack a parallel agent is using.
     """
     if not vs_repo_dir:
         return None, (
-            f"VS_REPO_DIR is not set in {ENV_FILE.name}, so the VanillaSoft side cannot "
+            f"VS_REPO_DIR is not set in {ENV_FILE.name}, so the CRM side cannot "
             f"be booted (see {ENV_EXAMPLE})"
         )
     script = Path(vs_repo_dir) / VS_START_SCRIPT
     if not script.is_file():
-        return None, f"{script} does not exist — VanillaSoft's boot script was not found"
+        return None, f"{script} does not exist — CRM's boot script was not found"
     return powershell_command(script), str(script)
 
 
 def driver_command(vs_repo_dir: str | None) -> tuple[list[str] | None, str]:
     """Plan step 5: the .NET outbound driver, which may not exist yet.
 
-    ``CarameliE2EDriver`` is being added in the VanillaLand repo. Its absence is a
+    ``CarameliE2EDriver`` is being added in the LegacyCRM repo. Its absence is a
     **skip that names the path**, never a silent pass — the note is how the reader learns
     the outbound direction went unexercised. Once present, a non-zero exit is a failure
     like any other.
@@ -156,7 +156,7 @@ def driver_command(vs_repo_dir: str | None) -> tuple[list[str] | None, str]:
     if not script.is_file():
         return None, (
             f"{script} does not exist yet — the .NET outbound driver is not in this "
-            "VanillaLand checkout, so the Carameli -> VanillaSoft direction is untested"
+            "LegacyCRM checkout, so the Carameli -> CRM direction is untested"
         )
     return powershell_command(script), str(script)
 
@@ -503,12 +503,12 @@ def main(argv: list[str] | None = None) -> int:
     child_env = dict(file_values)
     results: list[StepResult] = []
 
-    # 2. VanillaSoft side.
+    # 2. CRM side.
     command, note = vs_start_command(env.get("VS_REPO_DIR"))
     if command is None:
-        results.append(StepResult("vanillasoft up", FAILED, detail=note))
+        results.append(StepResult("crm up", FAILED, detail=note))
     else:
-        results.append(run_step("vanillasoft up", command, REPO_ROOT, child_env))
+        results.append(run_step("crm up", command, REPO_ROOT, child_env))
 
     # 3. Carameli side.
     results.append(ensure_carameli_up(env.get("CARAMELI_BASE_URL", ""), child_env))
@@ -526,7 +526,7 @@ def main(argv: list[str] | None = None) -> int:
         suite.detail = warning
     results.append(suite)
 
-    # 5. The .NET outbound driver, if this VanillaLand checkout has it yet.
+    # 5. The .NET outbound driver, if this LegacyCRM checkout has it yet.
     command, note = driver_command(env.get("VS_REPO_DIR"))
     if command is None:
         results.append(StepResult("outbound driver", SKIPPED, detail=note))

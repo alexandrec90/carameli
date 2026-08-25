@@ -1,17 +1,17 @@
-# Phase 01 — Log VanillaSoft's error responses on failed notifies
+# Phase 01 — Log CRM's error responses on failed notifies
 
 > Read `00-overview.md` first. Carameli repo only. No new dependencies, no migration
 > (unless the optional step is taken). Small, ships alone, valuable immediately: today
-> VanillaSoft's error text is thrown away, and after phase 02 that body *is* the
-> VanillaSoft-side stack trace / failure reason.
+> CRM's error text is thrown away, and after phase 02 that body *is* the
+> CRM-side stack trace / failure reason.
 
 ## Current behavior
 
-[`app/services/vanillasoft_notify.py`](../../../../app/services/vanillasoft_notify.py) —
+[`app/services/crm_notify.py`](../../../../app/services/crm_notify.py) —
 `post_notification(path, payload)` (~lines 121–136):
 
 - transport exception → `logger.exception(...)`, returns `False` ✔ (fine as-is)
-- non-2xx → `logger.warning("VanillaSoft notify POST returned %s path=%s", resp.status_code, path)`
+- non-2xx → `logger.warning("CRM notify POST returned %s path=%s", resp.status_code, path)`
   — **the response body is discarded**. That's the gap.
 
 ## Change
@@ -21,7 +21,7 @@
 
    ```python
    logger.warning(
-       "VanillaSoft notify POST returned %s path=%s body=%s",
+       "CRM notify POST returned %s path=%s body=%s",
        resp.status_code,
        path,
        _truncate(resp.text),
@@ -51,9 +51,9 @@
 ## Tests (same commit)
 
 Extend
-[`tests/unit/test_vanillasoft_notify.py`](../../../../tests/unit/test_vanillasoft_notify.py)
+[`tests/unit/test_crm_notify.py`](../../../../tests/unit/test_crm_notify.py)
 — it already covers `post_notification` by monkeypatching settings and patching
-`app.services.vanillasoft_notify.httpx.AsyncClient` with `unittest.mock` (see
+`app.services.crm_notify.httpx.AsyncClient` with `unittest.mock` (see
 `test_post_notification_non_2xx_returns_false` for the pattern; **reuse it**, don't
 introduce respx or new deps):
 
@@ -66,9 +66,9 @@ introduce respx or new deps):
 ## Verify
 
 ```sh
-pytest tests/unit/test_vanillasoft_notify.py
-ruff check app/services/vanillasoft_notify.py tests/unit/test_vanillasoft_notify.py
-mypy app/services/vanillasoft_notify.py
+pytest tests/unit/test_crm_notify.py
+ruff check app/services/crm_notify.py tests/unit/test_crm_notify.py
+mypy app/services/crm_notify.py
 ```
 
 (Stack down? Write tests anyway, defer execution to CI — per `CLAUDE.md`.)

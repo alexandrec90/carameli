@@ -12,7 +12,7 @@ from app.core.database import Base
 
 
 class AudioAsset(Base):
-    """A customer-owned audio file stored in S3 (cloudli spec §18-22, §25, §29)."""
+    """A customer-owned audio file stored in S3 (legacy feature spec §18-22, §25, §29)."""
 
     __tablename__ = "audio_assets"
     __table_args__ = (

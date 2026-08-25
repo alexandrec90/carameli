@@ -3,16 +3,16 @@
 logs/local-e2e-failures.log for AI-agent consumption.
 
 This suite covers the INVERTED topology: Carameli running remotely behind a tunnel,
-VanillaLand running locally in IIS. It costs nothing (no telephony) and is safe to
+LegacyCRM running locally in IIS. It costs nothing (no telephony) and is safe to
 re-run. Configure it with `.env.local-e2e` (see `.env.local-e2e.example`) and read
 docs/operations/local-integration-testing.md before the first run.
 
 Two things this runner handles that a bare `pytest tests/local_e2e` does not:
 
 1. `--confcutdir`. The suite must not load `tests/conftest.py`, which imports alembic,
-   SQLAlchemy and `app.main`. None of that is installed on the VanillaLand machine, and
+   SQLAlchemy and `app.main`. None of that is installed on the LegacyCRM machine, and
    requiring it would defeat the point of a dependency-light suite.
-2. Interpreter discovery. The VanillaLand machine has no project venv and often no
+2. Interpreter discovery. The LegacyCRM machine has no project venv and often no
    Python at all, so this falls back to an ephemeral `uv run` environment carrying just
    pytest and httpx.
 
@@ -45,23 +45,23 @@ _RESULT_RE = re.compile(r"^(tests[\\/].+?::\S+)\s+(PASSED|FAILED|SKIPPED|ERROR|X
 _FIX_HINTS: tuple[tuple[str, str], ...] = (
     (
         r"Invalid column name 'VoipVendor'|Invalid object name 'dbo\.tblVoipLineVendor'",
-        "The local VanillaSoft database predates this branch's VoIP-vendor routing. "
+        "The local CRM database predates this branch's VoIP-vendor routing. "
         "Apply the schema sync in docs/operations/local-integration-testing.md "
         "(tblCustomer.VoipVendor + dbo.tblVoipLineVendor).",
     ),
     (
         r"VS_CARAMELI_NOTIFY_SECRET does not match|CarameliNotifySecret",
-        "Set CarameliNotifySecret in AppCode/VanillaSoft.VoipApi/Web.config to the "
+        "Set CarameliNotifySecret in AppCode/<legacy-voip-api>/Web.config to the "
         "same value as the remote's CARAMELI_NOTIFY_SECRET, then recycle the IIS app "
         "pool. An empty appSetting rejects every notify with 401. If the secret IS set, "
         "suspect a stale build: a binary predating CarameliSignatureAttribute still "
-        "guards these routes with X-Cloudli-Auth and rejects signed requests "
+        "guards these routes with X-Log-Auth and rejects signed requests "
         "identically — see the 401 section of "
         "docs/operations/local-integration-testing.md.",
     ),
     (
         r"CARAMELI_API_KEY was not accepted|wrong Bearer key was accepted",
-        "Check CarameliApiKey / CarameliApiBaseUrl in AppCode/Vanillasoft.Web/Web.config "
+        "Check CarameliApiKey / CarameliApiBaseUrl in AppCode/CRM.Web/Web.config "
         "against the remote Carameli's E2E customer key.",
     ),
     (
@@ -71,7 +71,7 @@ _FIX_HINTS: tuple[tuple[str, str], ...] = (
     ),
     (
         r"is not deployed on the local VoipApi",
-        "Rebuild AppCode/VanillaSoft.VoipApi into the IIS application; the branch's "
+        "Rebuild AppCode/<legacy-voip-api> into the IIS application; the branch's "
         "CarameliNotifyController is not being served.",
     ),
     (
@@ -81,7 +81,7 @@ _FIX_HINTS: tuple[tuple[str, str], ...] = (
     ),
     (
         r"not reaching local Elasticsearch",
-        "The VanillaSoft log channel is down: confirm NLog.Targets.ElasticSearch is in "
+        "The CRM log channel is down: confirm NLog.Targets.ElasticSearch is in "
         "the VoipApi bin directory, NLog.config points at the local ES, and the IIS "
         "app pool has recycled since the config changed.",
     ),
@@ -105,7 +105,7 @@ def resolve_pytest_cmd(
     """Return (command prefix, description) for invoking pytest, or (None, reason).
 
     Prefers the project venv when it exists so a full dev machine uses its pinned
-    versions; falls back to an ephemeral `uv run` environment for the VanillaLand
+    versions; falls back to an ephemeral `uv run` environment for the LegacyCRM
     machine, which has neither the project installed nor Python on PATH.
     """
     if venv_python.exists():
@@ -247,7 +247,7 @@ def build_artifact(lines: list[str], exit_code: int, fail_count: int) -> str:
     sections = [
         "# Local integration failures (tests/local_e2e)",
         "",
-        "Topology: remote Carameli over a tunnel, local VanillaLand in IIS.",
+        "Topology: remote Carameli over a tunnel, local LegacyCRM in IIS.",
         "Runbook: docs/operations/local-integration-testing.md",
         "",
     ]

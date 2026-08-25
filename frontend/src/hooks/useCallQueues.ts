@@ -18,7 +18,7 @@ function toRow(q: CallQueue): Record<string, string> {
 }
 
 /**
- * Data hook for the Call Queues management page (cloudli spec §36). Config-only CRUD;
+ * Data hook for the Call Queues management page (legacy feature spec §36). Config-only CRUD;
  * routing engine integration deferred.
  */
 export function useCallQueues(): DataPageProps {

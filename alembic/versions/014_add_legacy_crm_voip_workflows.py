@@ -1,4 +1,4 @@
-"""add VanillaLand VoIP compatibility workflows
+"""add LegacyCRM VoIP compatibility workflows
 
 Revision ID: 014
 Revises: 013

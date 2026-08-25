@@ -1,7 +1,7 @@
 """The manifest of every ``/vsapi/1.0.0`` route, and what coverage each one gets.
 
-``/vsapi`` exists because VanillaSoft's .NET clients call it — ``CloudliClient.cs`` and
-``CarameliClient.cs`` in the VanillaLand repo. Nothing else does. That makes it the part
+``/vsapi`` exists because CRM's .NET clients call it — ``the legacy VoIP client`` and
+``CarameliClient.cs`` in the LegacyCRM repo. Nothing else does. That makes it the part
 of Carameli where a silent contract break is least likely to be noticed here and most
 likely to page someone there, and it was until now the least covered by this suite.
 
@@ -120,56 +120,56 @@ class Route:
 # --------------------------------------------------------------------------------------
 #
 # `caller` cites the .NET call site whose request shape the tests replay, as
-# `<file>:<line>` under AppCode/VanillaSoft.Backend/. An empty `caller` means neither
+# `<file>:<line>` under AppCode/<legacy-backend>/. An empty `caller` means neither
 # client calls the route today — those still get auth + validation coverage, because
 # "unused" is a fact about this week's callers and not about the route.
 
 ROUTES: tuple[Route, ...] = (
     # -- customers -----------------------------------------------------------------
-    Route("POST", "/VsCustomer/Add", DB, "CloudliClient.cs:899"),
+    Route("POST", "/VsCustomer/Add", DB, "the legacy VoIP client:899"),
     Route("POST", "/VsCustomer/Create", DB, "CarameliClient.cs:316"),
-    Route("GET", "/VsCustomer/Get/{customerId}", DB, "CloudliClient.cs:241"),
-    Route("GET", "/VsCustomer/GetCustid/{customerId}", DB, "CloudliClient.cs:272"),
-    Route("GET", "/VsCustomer/GetPhoneLines/{customerId}", DB, "CloudliClient.cs:520"),
+    Route("GET", "/VsCustomer/Get/{customerId}", DB, "the legacy VoIP client:241"),
+    Route("GET", "/VsCustomer/GetCustid/{customerId}", DB, "the legacy VoIP client:272"),
+    Route("GET", "/VsCustomer/GetPhoneLines/{customerId}", DB, "the legacy VoIP client:520"),
     # -- phone lines ---------------------------------------------------------------
     Route(
         "POST",
         "/PhoneLine/Add",
         EXTERNAL,
-        "CloudliClient.cs:436",
+        "the legacy VoIP client:436",
         "purchases a DID: carrier.search_available_numbers + purchase_number",
     ),
     Route(
         "PUT",
         "/PhoneLine/Deactivate",
         EXTERNAL,
-        "CloudliClient.cs:382",
+        "the legacy VoIP client:382",
         "releases the DID at the carrier: carrier.release_number",
     ),
-    Route("GET", "/PhoneLine/Get/{customerId}/{phoneNumber}", DB, "CloudliClient.cs:586"),
-    Route("GET", "/PhoneLine/GetCount/{customerId}", DB, "CloudliClient.cs:491"),
-    Route("PUT", "/PhoneLine/SetAutoAttendant", DB, "CloudliClient.cs:979"),
-    Route("PUT", "/PhoneLine/UpdateCallRecording", DB, "CloudliClient.cs:303"),
+    Route("GET", "/PhoneLine/Get/{customerId}/{phoneNumber}", DB, "the legacy VoIP client:586"),
+    Route("GET", "/PhoneLine/GetCount/{customerId}", DB, "the legacy VoIP client:491"),
+    Route("PUT", "/PhoneLine/SetAutoAttendant", DB, "the legacy VoIP client:979"),
+    Route("PUT", "/PhoneLine/UpdateCallRecording", DB, "the legacy VoIP client:303"),
     # -- extensions ----------------------------------------------------------------
     Route(
         "POST",
         "/VsExtension/Add",
         EXTERNAL,
-        "CloudliClient.cs:154",
+        "the legacy VoIP client:154",
         "provisions a SIP endpoint on the call engine via extension_service",
     ),
     Route(
         "PUT",
         "/VsExtension/Deactivate/{customerId}/{extension}",
         EXTERNAL,
-        "CloudliClient.cs:373",
+        "the legacy VoIP client:373",
         "deprovisions the SIP endpoint: extension_service.deactivate_provisioned(engine)",
     ),
     Route(
         "GET",
         "/VsExtension/GetAvailable/{customerId}/{startExt}/{endExt}",
         DB,
-        "CloudliClient.cs:210",
+        "the legacy VoIP client:210",
     ),
     # -- area codes ----------------------------------------------------------------
     # These two take no customer id anywhere, so an authenticated request has nothing to
@@ -178,7 +178,7 @@ ROUTES: tuple[Route, ...] = (
         "GET",
         "/GetAreaCodes",
         EXTERNAL,
-        "CloudliClient.cs:765",
+        "the legacy VoIP client:765",
         "carrier.get_available_area_codes — read-only, but a live Telnyx HTTP call",
         authenticated_probe=False,
     ),
@@ -186,7 +186,7 @@ ROUTES: tuple[Route, ...] = (
         "GET",
         "/GetAreaCodes/{country}/{state}",
         EXTERNAL,
-        "CloudliClient.cs:795",
+        "the legacy VoIP client:795",
         "carrier.get_available_area_codes — read-only, but a live Telnyx HTTP call",
         authenticated_probe=False,
     ),
@@ -195,21 +195,21 @@ ROUTES: tuple[Route, ...] = (
         "POST",
         "/VsMessaging/Sms/Send/{customerId}",
         EXTERNAL,
-        "CloudliClient.cs:626 / CarameliClient.cs:244",
+        "the legacy VoIP client:626 / CarameliClient.cs:244",
         "carrier.send_sms — a success here sends a real text message",
     ),
     Route(
         "PUT",
         "/VsMessaging/Sms/Enable/{customerId}/{smsPhoneNumber}",
         EXTERNAL,
-        "CloudliClient.cs:67",
+        "the legacy VoIP client:67",
         "carrier.enable_sms",
     ),
     Route(
         "PUT",
         "/VsMessaging/Sms/Disable/{customerId}/{smsPhoneNumber}",
         EXTERNAL,
-        "CloudliClient.cs:103",
+        "the legacy VoIP client:103",
         "carrier.disable_sms",
     ),
     Route("GET", "/VsMessaging/Sms/List/{customerId}", DB),
@@ -225,7 +225,7 @@ ROUTES: tuple[Route, ...] = (
         "POST",
         "/Callback/ByExtension",
         EXTERNAL,
-        "CloudliClient.cs:1134 / CarameliClient.cs:343",
+        "the legacy VoIP client:1134 / CarameliClient.cs:343",
         "engine.originate — a success here places a real call",
     ),
     Route("GET", "/VsCall/List/{customerId}", DB),
@@ -241,10 +241,10 @@ ROUTES: tuple[Route, ...] = (
         "POST",
         "/VsArchive",
         EXTERNAL,
-        "CloudliClient.cs:1069",
+        "the legacy VoIP client:1069",
         "enqueues an ARQ job that reads and writes S3",
     ),
-    Route("GET", "/VsArchive/{customerId}/{exportId}", DB, "CloudliClient.cs:1069"),
+    Route("GET", "/VsArchive/{customerId}/{exportId}", DB, "the legacy VoIP client:1069"),
     # -- voicemail drop ------------------------------------------------------------
     Route(
         "POST",
@@ -299,8 +299,8 @@ ROUTES: tuple[Route, ...] = (
     # -- misc ----------------------------------------------------------------------
     Route("GET", "/VsToken/List/{customerId}", DB),
     Route("GET", "/AgentStatus/{customerId}", DB),
-    Route("PUT", "/Branch/Assign", DB, "CloudliClient.cs:1024"),
-    Route("POST", "/Precall/Add", DB, "CloudliClient.cs:670"),
+    Route("PUT", "/Branch/Assign", DB, "the legacy VoIP client:1024"),
+    Route("POST", "/Precall/Add", DB, "the legacy VoIP client:670"),
     Route("POST", "/AddPointerToExtension", DB),
     Route("DELETE", "/DeletePointerToExtension", DB),
     Route("POST", "/PostSCIbyZipCode", DB),

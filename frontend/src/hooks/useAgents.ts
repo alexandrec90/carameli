@@ -20,7 +20,7 @@ function toRow(a: Agent): Record<string, string> {
 }
 
 /**
- * Data hook for the Agents management page (cloudli spec §35). Lists a customer's
+ * Data hook for the Agents management page (legacy feature spec §35). Lists a customer's
  * configured agents and returns a DataPageProps for full CRUD via DataPage.
  */
 export function useAgents(): DataPageProps {

@@ -40,7 +40,7 @@ class SmsMessage(Base):
     body: Mapped[str] = mapped_column(Text, nullable=False, default="")
     delivery_status: Mapped[str | None] = mapped_column(String(32), nullable=True)
     error_code: Mapped[str | None] = mapped_column(String(16), nullable=True)
-    # True once the inbound message has been forwarded to VanillaSoft.
+    # True once the inbound message has been forwarded to CRM.
     posted: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False, server_default=text("false")
     )

@@ -20,5 +20,5 @@ configuration—do not add handler-specific bypasses.
 
 Log provider event identifiers, not raw payloads, message bodies, phone-number content,
 or credentials. Persist enough state for idempotency and reconciliation. Acknowledge
-accepted events promptly; downstream VanillaSoft/provider work must be retriable and
+accepted events promptly; downstream CRM/provider work must be retriable and
 must not turn a successfully persisted callback into a provider retry storm.

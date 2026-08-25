@@ -25,7 +25,7 @@ function toRow(g: IntercomGroup): Record<string, string> {
 }
 
 /**
- * Data hook for the Intercom Extension page (cloudli spec §15). Lists a customer's
+ * Data hook for the Intercom Extension page (legacy feature spec §15). Lists a customer's
  * intercom extensions and returns a DataPageProps so every skin renders the same
  * behaviour. Full CRUD: the create form calls Add and the per-row Deactivate
  * action calls Deactivate, both re-fetching on success.

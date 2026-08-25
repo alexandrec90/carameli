@@ -1,7 +1,7 @@
 # Phase 05 — Live E2E suite + the diagnostics map
 
 > Read `00-overview.md` first. Carameli repo only. Two deliverables: (1) a live E2E test
-> suite that drives the real integration (real Telnyx, jambonz.cloud, ngrok, VanillaSoft
+> suite that drives the real integration (real Telnyx, jambonz.cloud, ngrok, CRM
 > staging) and (2) a diagnostics doc that maps every failure mode to where its evidence
 > lands, so a coding agent can triage without rediscovering the architecture. Backend
 > only — no Carameli front-end coverage. Assumes phases 01–04 are merged (02's honest
@@ -33,7 +33,7 @@
 | `E2E_BASE_URL` | Carameli's public base (the ngrok URL) or `http://localhost:8000` |
 | `E2E_API_KEY` | Bearer key for a dedicated **E2E test customer** (create once via `POST /vsapi/1.0.0/VsCustomer/Create`; don't reuse a real customer) |
 | `E2E_DID_A`, `E2E_DID_B` | Two owned Canadian test DIDs on the E2E customer (roadmap C6); B is the "inbound" target |
-| `E2E_VS_CHECK` | optional `1`: also assert VanillaSoft-side via PubApi (needs `E2E_PUBAPI_*` creds) — otherwise `posted=True` is the VS assertion |
+| `E2E_VS_CHECK` | optional `1`: also assert CRM-side via PubApi (needs `E2E_PUBAPI_*` creds) — otherwise `posted=True` is the VS assertion |
 
 ## Shared helpers (`tests/e2e/helpers.py`, unit-testable pure parts get unit tests)
 
@@ -51,7 +51,7 @@ Find the exact read endpoints before writing assertions (Grep `app/api/vsapi/` f
 call-events/SMS listing routes rather than trusting this doc). Every test asserts *at
 minimum*: the expected row appears via the API, and — the airtight part — its `posted`
 flag goes `True` within the retry window (30 s cron + margin). With the honest receiver,
-`posted=True` **means** VanillaSoft durably processed it; that's the loop-closing assertion.
+`posted=True` **means** CRM durably processed it; that's the loop-closing assertion.
 
 1. **Outbound SMS** — `Sms/Send` from DID A to DID B → poll the outbound row + delivery
    receipt status; receipt forwarding to VS asserted via `posted` on the receipt path.
@@ -77,8 +77,8 @@ flag goes `True` within the retry window (30 s cron + margin). With the honest r
    injection into this suite (killing ngrok mid-run is a documented *manual* drill — see
    the diagnostics doc — not an automated test).
 
-If `E2E_VS_CHECK=1`: after flow 3, query VanillaSoft's PubApi call-history read
-(`VanillaSoft.PubApi` `CallHistoryController` — confirm route/auth in the VanillaLand repo)
+If `E2E_VS_CHECK=1`: after flow 3, query CRM's PubApi call-history read
+(`CRM.PubApi` `CallHistoryController` — confirm route/auth in the LegacyCRM repo)
 for the call and assert it exists — belt-and-suspenders proof independent of `posted`.
 
 ## Deliverable 2 — `docs/operations/diagnostics-error-map.md`

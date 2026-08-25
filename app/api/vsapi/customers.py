@@ -55,12 +55,12 @@ async def create_customer(
 
     No carrier or engine resources are provisioned here.
 
-    Investigation (CmvCustomer.cs -> CreateAccount): VanillaLand's CMVClient.CreateAccount()
-    POSTs a ContactInfoVS payload to the legacy CloudLi VsCustomer/Add endpoint. ``/Add``
+    Investigation (CmvCustomer.cs -> CreateAccount): LegacyCRM's CMVClient.CreateAccount()
+    POSTs a ContactInfoVS payload to the legacy the legacy VoIP vendor VsCustomer/Add endpoint. ``/Add``
     and Carameli's clearer ``/Create`` route therefore share this handler. The .cs file is
     a thin HTTP client wrapper — it does not
     call Telnyx, Jambonz, or any other provider directly. There are no durable carrier
-    resources (SIP credentials, sub-accounts) created per-customer in the VanillaLand flow,
+    resources (SIP credentials, sub-accounts) created per-customer in the LegacyCRM flow,
     so no provider calls are needed here beyond the DB insert.
     """
     logger.info("Creating customer vs_customer_id=%s", body.vs_customer_id)
@@ -87,7 +87,7 @@ async def get_customer(
     session: Annotated[AsyncSession, Depends(get_session)],
     auth: Annotated[AuthContext, Depends(get_auth_context)],
 ) -> CustomerResponse:
-    """Return stored customer info by VanillaSoft customer ID."""
+    """Return stored customer info by CRM customer ID."""
     enforce_customer_scope(auth, customerId)
     customer = await customer_service.get_by_vs_id(session, customerId)
     if not customer:
@@ -106,7 +106,7 @@ async def get_customer_id(
     session: Annotated[AsyncSession, Depends(get_session)],
     auth: Annotated[AuthContext, Depends(get_auth_context)],
 ) -> CustomerIdResponse:
-    """Return Carameli's internal customer UUID for a VanillaSoft customer ID."""
+    """Return Carameli's internal customer UUID for a CRM customer ID."""
     enforce_customer_scope(auth, customerId)
     customer = await customer_service.get_by_vs_id(session, customerId)
     if not customer:
