@@ -7,8 +7,8 @@ import ComicPanel from './ComicPanel'
 import { LoadingOverlay, useLoadingScreen } from './LoadingOverlay'
 import PanelInk from './PanelInk'
 import { gridPolys, layoutKindFor } from './panelGeometry'
-import { PANEL_BG_CONFIGS, drawPanelBackground } from './panelPatterns'
 import { PANELS, pageForPath } from './panels'
+import { usePanelDots } from './usePanelDots'
 import {
     PANEL_IMG_TRANSFORMS, PANEL_BUBBLE_TRANSFORMS, PANEL_GRIDS, PANEL_PATTERNS,
 } from './editor/layoutConfig'
@@ -66,18 +66,7 @@ export function Layout({ navItems }: LayoutProps) {
     const bubbleT = editor.active ? editor.config.bubbles : PANEL_BUBBLE_TRANSFORMS
     const grids = editor.active ? editor.config.grids : PANEL_GRIDS
     const patterns = editor.active ? editor.config.patterns : PANEL_PATTERNS
-    // The dot loop is a useCallback([]) that outlives any one render; it reads the
-    // current patterns through this ref so an editor pattern change repaints on the
-    // next frame instead of being trapped in a stale closure. Written from an effect
-    // (never during render) — commit lands before the next rAF frame, which is the
-    // earliest the loop can look.
-    const patternsRef = useRef(patterns)
-    useEffect(() => {
-        patternsRef.current = patterns
-    }, [patterns])
 
-    const panelDotRefs = useRef<(HTMLCanvasElement | null)[]>([])
-    const rafRef = useRef<number>(0)
     const settledCountRef = useRef(0)
 
     // The viewport, not the polygons. The shapes are *derived* from it, the page and
@@ -137,28 +126,10 @@ export function Layout({ navItems }: LayoutProps) {
     const washRef = usePageWash(location.pathname, accent)
     const loading = useLoadingScreen(ready, accent)
 
-    // ── Ben-Day dot animation loop ────────────────────────────────────────────
-    const animatePanelDots = useCallback(() => {
-        const t = performance.now() / 1000
-        for (let i = 0; i < PANELS.length; i++) {
-            const canvas = panelDotRefs.current[i]
-            if (!canvas) continue
-            const ctx = canvas.getContext('2d')
-            if (!ctx) continue
-            const ow = canvas.offsetWidth
-            const oh = canvas.offsetHeight
-            if (ow > 0 && oh > 0 && (canvas.width !== ow || canvas.height !== oh)) {
-                canvas.width = ow
-                canvas.height = oh
-            }
-            if (canvas.width === 0 || canvas.height === 0) continue
-            drawPanelBackground(
-                ctx, canvas.width, canvas.height,
-                patternsRef.current[i] ?? PANEL_PATTERNS[i], PANEL_BG_CONFIGS[i], t,
-            )
-        }
-        rafRef.current = requestAnimationFrame(animatePanelDots)
-    }, [])
+    // ── Ben-Day dot canvases ──────────────────────────────────────────────────
+    // One rAF loop for every panel, but only the hovered panel's pattern moves —
+    // the rest hold the frame they froze on. See usePanelDots / panelDotAnim.
+    const dotRefs = usePanelDots(patterns, hovered)
 
     // ── Resize handler — record the viewport; the polygons follow ─────────────
     const handleResize = useCallback(() => {
@@ -171,12 +142,8 @@ export function Layout({ navItems }: LayoutProps) {
 
     useEffect(() => {
         window.addEventListener('resize', handleResize)
-        rafRef.current = requestAnimationFrame(animatePanelDots)
-        return () => {
-            window.removeEventListener('resize', handleResize)
-            cancelAnimationFrame(rafRef.current)
-        }
-    }, [handleResize, animatePanelDots])
+        return () => { window.removeEventListener('resize', handleResize) }
+    }, [handleResize])
 
     return (
         <>
@@ -206,7 +173,7 @@ export function Layout({ navItems }: LayoutProps) {
                             }
                             isRevealed={k => shouldRevealImg(editor.active, editor.selected, k)}
                             isBubbleVisible={bubbleVisible}
-                            dotRef={el => { panelDotRefs.current[i] = el }}
+                            dotRef={dotRefs[i]}
                             onSettled={markSettled}
                             onNatSize={recordNatSize}
                         />

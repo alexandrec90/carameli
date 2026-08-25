@@ -286,9 +286,43 @@ Fonts loaded from Google Fonts in `index.html`: `Bangers` (400) and `Comic Neue`
 
 ## Motion & Animation
 
-### Ben-Day dot breathing
+### Ben-Day dot motion — only on the active panel
 
-The dot canvas animates continuously with `requestAnimationFrame`, slowly shifting dot radius ± 0.5 px over a 3-second sine cycle. This is always running — never paused.
+One `requestAnimationFrame` loop drives every panel's dot canvas (`usePanelDots.ts`),
+but a panel is repainted only while it is **active** — hovered, which is also when its
+picture colorizes. A resting panel keeps the frame it stopped on.
+
+**Each panel owns its clock, and the clock is what stops** (`panelDotAnim.ts`). Drawing
+from a shared wall clock is the version to avoid: the pattern would jump forward by
+however long the pointer had been away the moment it returned, so every departure and
+return would land as a cut instead of a pause and a resume. Panels are seeded from
+their shipped `phase`, so a page at rest is not eight copies of one frame. An inactive
+panel is repainted for exactly one reason — its canvas went blank (resize, remount, or
+a pattern switch in the editor) — and then at the clock it froze on, not a fresh one.
+
+This is why eight simultaneous patterns cost one panel's worth of drawing, and why the
+eye is not pulled off the panel the pointer is on.
+
+Every style in `PATTERN_STYLES` moves, and every one is tuned far slower than the
+3-second breathe cycle — the drift should be noticed after watching, never read as a
+moving image. The renderers are split by *what* moves: `patternDrawFields.ts` drifts
+the field the dots are sized from, `patternDrawRadial.ts` turns or rocks a focal
+pattern.
+
+| Style | What moves |
+| --- | --- |
+| `halftone-gradient` | the dense end of the fade drifts along the gradient axis |
+| `sunburst` | the ray fan turns, one revolution in ~6 minutes |
+| `color-block` | a swell travels along the zone boundary, on a slower tide |
+| `vignette` | the clear middle opens and closes like an aperture |
+| `radial-dots` | the focal point wanders an open loop (two rates, so it never quite retraces) |
+| `diagonal-stripes` | the bands crawl sideways, one band width per ~11 s |
+| `concentric-rings` | ring waves travel outward from the focal point |
+| `corner-burst` | the fan rocks about its axis and opens and closes |
+
+Dot radius also breathes ± 0.35 px on a 3-second sine, shared by every style —
+which is why `panelPatternMotion.test.ts` leaves radius out of the frame signature it
+compares. A style that only breathed would otherwise pass a test for animating.
 
 ### Hover colorization
 
@@ -393,7 +427,7 @@ editor math, config editing and serialization is pure and unit-tested in
 6. **Never render panel separator lines with CSS `border`** — a panel's ink is its own SVG polygon, so it follows the shape the grid gives it
 7. **Never use cold/neutral fonts** — only Bangers (display) and Comic Neue (body)
 8. **All text in nav/headings must be UPPERCASE** — enforce at CSS level with `text-transform: uppercase`
-9. **Ben-Day dot canvas must always be running** (never frozen on a static frame) even when no interaction is happening
+9. **A panel's Ben-Day pattern animates only while that panel is active** — hovered and colorized. At rest it holds the frame its own clock froze on; it never restarts, and it never runs off a shared wall clock. Until 2026-08-25 this rule said the opposite ("must always be running … even when no interaction is happening"), which is how eight panels came to drift at once and pull the eye off the one being pointed at
 10. **Served Gemini assets live exclusively in `public/comic-book/`, and are `.webp`** — no inline base64, no external URLs, and no PNG. The lossless masters belong in `frontend/assets-src/comic-book/`, which is not copied into the build; re-encode from there rather than from a `.webp`. **`frontend/assetPolicy.ts` is where this stops being advice**: it holds the format rule, the per-image and whole-tree byte budgets and the dimension ratchet as exported constants, and `frontend/assetPolicy.test.ts` checks the served tree against them both ways — an asset nothing references fails as dead weight, and a path named in a comment or in this file fails once the file it names has moved. Change a budget by editing the constant, so the diff says what a visitor now downloads. **Panel art is fetched only by this skin**, through the guard script in `index.html`: its `SKINS`/`DEFAULT` must match `src/skins/registry.ts` and its `PANELS` must match `editor/layoutConfig.ts`, both asserted by that same test file. As static `<link rel="preload">` tags the panels were fetched by all four skins — 1.94 MB of art `barebone` never painted — which no static check can catch, because the references were real; `tests/e2e/test_asset_usage.py` catches it in a browser instead, by comparing what each skin fetched against what it drew
 11. Files over 250 lines (TS/TSX/CSS) must be split before commit.
 12. **Never link two bubbles across panels** — a tube's two ends share one `panel`, or there is no tube
