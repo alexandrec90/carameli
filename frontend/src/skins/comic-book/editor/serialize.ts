@@ -2,6 +2,9 @@ import type { LayoutKind, PageGrids, PanelGrid } from '../panelGeometry'
 import { PANEL_PAGES, PANELS } from '../panels'
 import type { BubbleType } from './bubbleTypes'
 import { PANEL_PATTERNS } from './layoutConfig'
+import { numberPadSuffix } from './serializeNumberPad'
+import { tableSuffix } from './serializeTable'
+import { round, strLiteral } from './tsLiteral'
 import type { BubbleChain, EditorConfig } from './types'
 
 // Turning the editor's working copy back into `layoutConfig.ts`. The Save button
@@ -13,32 +16,9 @@ import type { BubbleChain, EditorConfig } from './types'
 // headers byte-identical with the ones in `layoutConfig.ts`, so a save with nothing
 // changed is a no-op diff rather than a paragraph quietly going missing.
 
-/** Round to `decimals` places, dropping float noise (e.g. 1.0000000002 → 1). */
-function round(n: number, decimals: number): number {
-  const f = 10 ** decimals
-  return Math.round(n * f) / f
-}
-
 /** A nullable bubble type as a TS literal — `null` unquoted, a type quoted. */
 function typeLiteral(t: BubbleType | null): string {
   return t === null ? 'null' : `'${t}'`
-}
-
-/**
- * An author-typed string as a TS literal, quoted the way the rest of this codebase
- * quotes: single, unless the text holds more apostrophes than double quotes — which is
- * why `"It's Carameli!"` is the one double-quoted string in the shipped config.
- *
- * A plain `JSON.stringify` would be correct TS but would double-quote *every* string,
- * so the first Save rewrote all sixteen lines of a file nobody had edited. A whole-file
- * diff on a no-op save is how a real change goes unreviewed.
- */
-function strLiteral(s: string): string {
-  const count = (re: RegExp) => (s.match(re) ?? []).length
-  const json = JSON.stringify(s)
-  if (count(/'/g) > count(/"/g)) return json
-  // Re-quote: JSON escaped `"` for us and left `'` alone, so swap which one is escaped.
-  return `'${json.slice(1, -1).replace(/\\"/g, '"').replace(/'/g, "\\'")}'`
 }
 
 const IMG_HEADER = `// Not parallel to PANELS: each picture names its \`panel\`, so a panel may own several or
@@ -48,7 +28,24 @@ const IMG_HEADER = `// Not parallel to PANELS: each picture names its \`panel\`,
 // the panel's own polygon scaled into it, so an inset picture reads as a smaller comic
 // panel rather than as a bare rectangle. \`scale\`/\`offsetX\`/\`offsetY\`/\`anchor\` then
 // frame the picture *inside* its frame; \`spill: false\` clips it there, \`spill: true\`
-// lets it bleed past.`
+// lets it bleed past.
+//
+// A picture with a \`table\` is a **surface**: an HTML table is projected onto it, so a
+// photographed notepad can hold live rows. \`quad\` is the four corners of that surface in
+// % of the frame, clockwise from top-left, and they are what tilts it — four corners fix
+// a projective map exactly, which is what a plane in a photograph needs and three
+// rotation angles cannot express. Drag them onto the drawn lines in the editor. \`rows\` is
+// how many bands the surface is cut into, so a row always lands on the same line however
+// far the reader has scrolled; \`header\` spends the first band on the column labels.
+// \`data\` is every row, of which only \`rows\` are on screen at once — the wheel moves a
+// whole row at a time and there is no scrollbar. Outside the editor only those values
+// show: no outline, no guides, no bar.
+//
+// A picture with a \`numberPad\` is the other projected surface: the fixed telephone grid
+// is three columns by four rows (1–9, then *, 0, #). It uses the same draggable \`quad\`,
+// text scale and ink, but the grid is alignment chrome and appears only in the editor;
+// readers see the twelve symbols directly on the photographed surface. \`table\` and
+// \`numberPad\` are mutually exclusive, so one picture has one projected-content layer.`
 
 const BUBBLE_HEADER = `// Not parallel to PANELS either: each bubble names its \`panel\`, a panel may own any
 // number of them, and the array is ordered by panel only for readability. \`type\`/\`text\`
@@ -182,6 +179,11 @@ export function serializeChains(chains: BubbleChain[]): string {
  * and bubble `text` go through {@link strLiteral} so an apostrophe, a quote or a
  * backslash the author typed stays valid TS; `anchor` and the bubble enums come from
  * fixed dropdowns and are quoted plainly.
+ *
+ * A projected picture gains one nested block from {@link tableSuffix} or
+ * {@link numberPadSuffix}; an ordinary picture gains nothing, so pictures that predate
+ * surfaces keep emitting the exact single line they always did. The existing table wins
+ * if a hand-edited in-memory config names both, matching hydration and cloning.
  */
 export function serializeConfig(c: EditorConfig): string {
   const imgLines = c.images
@@ -191,7 +193,8 @@ export function serializeConfig(c: EditorConfig): string {
         `left: ${round(t.left, 1)}, top: ${round(t.top, 1)}, ` +
         `width: ${round(t.width, 1)}, height: ${round(t.height, 1)}, ` +
         `scale: ${round(t.scale, 2)}, offsetX: ${Math.round(t.offsetX)}, ` +
-        `offsetY: ${Math.round(t.offsetY)}, anchor: '${t.anchor}', spill: ${t.spill} },`,
+        `offsetY: ${Math.round(t.offsetY)}, anchor: '${t.anchor}', spill: ${t.spill}` +
+        `${t.table ? tableSuffix(t.table) : numberPadSuffix(t.numberPad)} },`,
     )
     .join('\n')
   const bubbleLines = c.bubbles

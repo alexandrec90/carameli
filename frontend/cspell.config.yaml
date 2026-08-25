@@ -76,6 +76,7 @@ words:
   - normalised
   - normalises
   - parameterised
+  - rasterised
   - recognisably
   # Test-fixture shorthand (customer ids, vitest's unstubAllGlobals, distances)
   - cust
@@ -92,6 +93,12 @@ words:
   - unrotated
   - unticking
   - unticks
+  # Projected-table terms: the geometry's name, the CSS class stem, and the two
+  # computing pioneers in the sample rows a new surface is seeded with.
+  - homography
+  - ptable
+  - Hedy
+  - Vint
   # Prefixed/compound forms used in the devkit plans
   - repoints
   - unadopted

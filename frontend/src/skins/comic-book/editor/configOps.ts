@@ -4,7 +4,7 @@ import {
   linkGroups, nextChainId, normalizeChainId, patchChainIn, propagateChains, syncChains,
 } from './chainOps'
 import type { PanelBgStyle } from '../panelPatterns'
-import { cloneConfig, NEW_BUBBLE, NEW_IMAGE, seedConfig } from './configSeed'
+import { cloneConfig, cloneImg, NEW_BUBBLE, NEW_IMAGE, seedConfig } from './configSeed'
 import { sanitizeLinks } from './configHydrate'
 import type { BubbleChain, BubbleTransform, EditorConfig, ImgTransform } from './types'
 
@@ -58,7 +58,7 @@ export function patchImg(
   patch: Partial<ImgTransform>,
 ): EditorConfig {
   const next = cloneConfig(config)
-  if (next.images[index]) next.images[index] = { ...next.images[index], ...patch }
+  if (next.images[index]) next.images[index] = cloneImg({ ...next.images[index], ...patch })
   return next
 }
 

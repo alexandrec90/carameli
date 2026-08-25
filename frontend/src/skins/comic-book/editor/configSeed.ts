@@ -8,6 +8,8 @@ import {
   PANEL_GRIDS,
   PANEL_PATTERNS,
 } from './layoutConfig'
+import { cloneNumberPad } from './numberPadValidate'
+import { cloneTable } from './tableValidate'
 import type {
   BubbleTransform,
   EditorConfig,
@@ -42,6 +44,8 @@ export const NEW_IMAGE: Omit<ImgTransform, 'panel'> = {
   offsetY: 0,
   anchor: 'center center',
   spill: false,
+  // No projected-content key: a picture is not a surface until the author selects one
+  // in its inspector, and absence is what "not a surface" is spelled as.
 }
 
 /** A brand-new bubble, before {@link addBubble} drops it on a panel. */
@@ -84,10 +88,31 @@ export function cloneGrids(grids: PageGrids): PageGrids {
   return out
 }
 
+/**
+ * Deep clone of one picture. Spread alone is not enough once a picture can carry
+ * projected content: a surface holds a quad and a table also holds columns and cells;
+ * a shallow copy would
+ * hand the working copy the *same* arrays the shipped constant holds — the first corner
+ * drag would then edit the module-level default along with it, which survives a Reset.
+ *
+ * A picture with no projected content comes back with neither optional **key**, rather
+ * than with one set to undefined. The two are interchangeable to `toEqual` and JSON, so
+ * nothing would have failed — which is the reason to be deliberate about it here: "not a
+ * surface" is spelled as absence everywhere else, and a clone that quietly introduced the
+ * key would make an `in` check mean nothing. If both fields appear in hand-edited data,
+ * the established table wins; hydration enforces the same backward-compatible rule.
+ */
+export function cloneImg(t: ImgTransform): ImgTransform {
+  const { table, numberPad, ...plain } = t
+  if (table) return { ...plain, table: cloneTable(table) }
+  if (numberPad) return { ...plain, numberPad: cloneNumberPad(numberPad) }
+  return plain
+}
+
 /** Deep clone of the on-disk constants — the canonical "default" config. */
 export function seedConfig(): EditorConfig {
   return {
-    images: PANEL_IMG_TRANSFORMS.map(t => ({ ...t })),
+    images: PANEL_IMG_TRANSFORMS.map(cloneImg),
     bubbles: PANEL_BUBBLE_TRANSFORMS.map(b => ({ ...b })),
     chains: PANEL_BUBBLE_CHAINS.map(cloneChain),
     grids: cloneGrids(PANEL_GRIDS),
@@ -98,7 +123,7 @@ export function seedConfig(): EditorConfig {
 /** Deep clone of an arbitrary config (no shared references with the input). */
 export function cloneConfig(c: EditorConfig): EditorConfig {
   return {
-    images: c.images.map(t => ({ ...t })),
+    images: c.images.map(cloneImg),
     bubbles: c.bubbles.map(b => ({ ...b })),
     chains: c.chains.map(cloneChain),
     grids: cloneGrids(c.grids),
