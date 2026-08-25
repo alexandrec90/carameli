@@ -28,6 +28,7 @@ describe('ComicPanel', () => {
           }}
           images={[]}
           bubbles={[]}
+          chains={[]}
           natSizes={{}}
           editorActive={false}
           hovered={false}

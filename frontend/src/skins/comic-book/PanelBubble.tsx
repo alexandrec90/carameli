@@ -19,6 +19,13 @@ interface PanelBubbleProps {
   visible: boolean
   /** False in edit mode: the editor overlay owns the pointer there. */
   interactive: boolean
+  /**
+   * True when this balloon is a slot of a live chain (see PanelBubbleChain). It moves
+   * between slots as the thread scrolls, so its placement animates rather than jumping,
+   * and it eases in on arrival instead of being there from the start. Off by default,
+   * and off in the editor, where a drag has to track the pointer exactly.
+   */
+  chained?: boolean
 }
 
 /**
@@ -29,7 +36,12 @@ interface PanelBubbleProps {
  * the panel and navigates. Input content is a real form control instead; it stops its
  * pointer and keyboard events so editing it never triggers the panel underneath.
  */
-export default function PanelBubble({ bubble, visible, interactive }: PanelBubbleProps) {
+export default function PanelBubble({
+  bubble,
+  visible,
+  interactive,
+  chained = false,
+}: PanelBubbleProps) {
   const [hover, setHover] = useState(false)
   const [focused, setFocused] = useState(false)
   const [pulsing, setPulsing] = useState(false)
@@ -62,6 +74,7 @@ export default function PanelBubble({ bubble, visible, interactive }: PanelBubbl
     'cb-panel-bubble',
     shown ? 'is-visible' : '',
     interactive ? 'is-interactive' : '',
+    chained ? 'cb-chain-bubble' : '',
   ]
     .filter(Boolean)
     .join(' ')
