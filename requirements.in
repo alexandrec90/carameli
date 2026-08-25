@@ -14,4 +14,4 @@ prometheus-fastapi-instrumentator>=8.1.0
 sentry-sdk[fastapi,arq]>=2.68.0
 python-multipart>=0.0.31
 starlette>=1.6.0
-boto3>=1.43.71
+boto3>=1.43.73
