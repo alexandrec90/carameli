@@ -1,9 +1,9 @@
 import type { NormPt } from './panelGeometry'
-import type { TableProjection } from './editor/types'
 
-// Putting a flat HTML table onto a surface drawn in a photograph — a notepad shot at an
-// angle, a whiteboard, a screen. Everything here is pure geometry; the renderer is
-// ProjectedTable.tsx and the editor's grips are editor/TableCorners.tsx.
+// Putting flat HTML content onto a surface drawn in a photograph — a notepad shot at an
+// angle, a whiteboard, a telephone keypad. Everything here is pure geometry; the
+// renderers are ProjectedTable.tsx and ProjectedNumberPad.tsx, and the editor's shared
+// grips are in editor/TableCorners.tsx.
 //
 // The tilt is expressed as **four corners**, not as rotateX/rotateY/perspective. Three
 // angle sliders can describe a plane but cannot describe *which* plane the photographer
@@ -13,7 +13,7 @@ import type { TableProjection } from './editor/types'
 // including the perspective convergence, because a projective map through four point
 // correspondences is unique.
 
-/** The four corners of a table surface, clockwise from top-left, in % of the frame box. */
+/** The four corners of a projected surface, clockwise from top-left, in % of the frame. */
 export type Quad = [NormPt, NormPt, NormPt, NormPt]
 
 /** A brand-new surface: inset from the frame so all four grips are on screen to grab. */
@@ -45,12 +45,12 @@ function dist(a: [number, number], b: [number, number]): number {
 }
 
 /**
- * The size to lay the table out at *before* it is projected, in px: the mean of the
+ * The size to lay the surface out at *before* it is projected, in px: the mean of the
  * quad's two horizontal edges by the mean of its two vertical ones.
  *
  * Laying out in the frame's own size and letting the transform shrink it would be
  * simpler and is wrong for text: a 3D-transformed element is rasterised once at its
- * layout size, so a table laid out four times larger than the quad it lands in is
+ * layout size, so content laid out four times larger than the quad it lands in is
  * downsampled lettering. Matching the average edge keeps the scale near 1 in the middle
  * of the surface, which is where a reader is looking.
  *
@@ -157,13 +157,13 @@ function round(n: number): number {
 
 /** The surface geometry a renderer needs, in one call. */
 export function surfaceStyle(
-  table: TableProjection,
+  surface: { quad: Quad },
   frame: { w: number; h: number },
 ): { width: number; height: number; transform: string } {
-  const src = quadSourceBox(table.quad, frame.w, frame.h)
+  const src = quadSourceBox(surface.quad, frame.w, frame.h)
   return {
     width: src.w,
     height: src.h,
-    transform: quadMatrix3d(table.quad, frame, src),
+    transform: quadMatrix3d(surface.quad, frame, src),
   }
 }

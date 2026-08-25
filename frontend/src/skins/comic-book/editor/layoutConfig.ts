@@ -20,6 +20,12 @@ import type { ImgTransform, BubbleTransform, PageGrids } from './types'
 // `data` is every row, of which only `rows` are on screen at once — the wheel moves a
 // whole row at a time and there is no scrollbar. Outside the editor only those values
 // show: no outline, no guides, no bar.
+//
+// A picture with a `numberPad` is the other projected surface: the fixed telephone grid
+// is three columns by four rows (1–9, then *, 0, #). It uses the same draggable `quad`,
+// text scale and ink, but the grid is alignment chrome and appears only in the editor;
+// readers see the twelve symbols directly on the photographed surface. `table` and
+// `numberPad` are mutually exclusive, so one picture has one projected-content layer.
 export const PANEL_IMG_TRANSFORMS: ImgTransform[] = [
   { panel: 0, src: '/comic-book/logo.webp', alt: 'Carameli', left: 0, top: 0, width: 100, height: 100, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center center', spill: false },
   { panel: 1, src: '/comic-book/switchboard.webp', alt: 'Switchboard', left: 0, top: 0, width: 100, height: 100, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center bottom', spill: false },

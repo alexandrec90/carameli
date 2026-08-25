@@ -2,6 +2,7 @@ import type { LayoutKind, PageGrids, PanelGrid } from '../panelGeometry'
 import { PANEL_PAGES, PANELS } from '../panels'
 import type { BubbleType } from './bubbleTypes'
 import { PANEL_PATTERNS } from './layoutConfig'
+import { numberPadSuffix } from './serializeNumberPad'
 import { tableSuffix } from './serializeTable'
 import { round, strLiteral } from './tsLiteral'
 import type { EditorConfig } from './types'
@@ -38,7 +39,13 @@ const IMG_HEADER = `// Not parallel to PANELS: each picture names its \`panel\`,
 // far the reader has scrolled; \`header\` spends the first band on the column labels.
 // \`data\` is every row, of which only \`rows\` are on screen at once — the wheel moves a
 // whole row at a time and there is no scrollbar. Outside the editor only those values
-// show: no outline, no guides, no bar.`
+// show: no outline, no guides, no bar.
+//
+// A picture with a \`numberPad\` is the other projected surface: the fixed telephone grid
+// is three columns by four rows (1–9, then *, 0, #). It uses the same draggable \`quad\`,
+// text scale and ink, but the grid is alignment chrome and appears only in the editor;
+// readers see the twelve symbols directly on the photographed surface. \`table\` and
+// \`numberPad\` are mutually exclusive, so one picture has one projected-content layer.`
 
 const BUBBLE_HEADER = `// Not parallel to PANELS either: each bubble names its \`panel\`, a panel may own any
 // number of them, and the array is ordered by panel only for readability. \`type\`/\`text\`
@@ -125,9 +132,10 @@ export function serializeGrids(grids: PageGrids): string {
  * backslash the author typed stays valid TS; `anchor` and the bubble enums come from
  * fixed dropdowns and are quoted plainly.
  *
- * A picture that is a projected surface gains a nested, multi-line `table: { … }` block
- * from {@link tableSuffix}; one that is not gains nothing, so the pictures that predate
- * surfaces keep emitting the exact single line they always did.
+ * A projected picture gains one nested block from {@link tableSuffix} or
+ * {@link numberPadSuffix}; an ordinary picture gains nothing, so pictures that predate
+ * surfaces keep emitting the exact single line they always did. The existing table wins
+ * if a hand-edited in-memory config names both, matching hydration and cloning.
  */
 export function serializeConfig(c: EditorConfig): string {
   const imgLines = c.images
@@ -138,7 +146,7 @@ export function serializeConfig(c: EditorConfig): string {
         `width: ${round(t.width, 1)}, height: ${round(t.height, 1)}, ` +
         `scale: ${round(t.scale, 2)}, offsetX: ${Math.round(t.offsetX)}, ` +
         `offsetY: ${Math.round(t.offsetY)}, anchor: '${t.anchor}', spill: ${t.spill}` +
-        `${tableSuffix(t.table)} },`,
+        `${t.table ? tableSuffix(t.table) : numberPadSuffix(t.numberPad)} },`,
     )
     .join('\n')
   const bubbleLines = c.bubbles

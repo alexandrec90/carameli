@@ -1,6 +1,7 @@
 import { PANEL_ASSETS } from './assets'
 import { PANEL_PAGES } from '../panels'
 import { PANEL_IMG_TRANSFORMS, PANEL_BUBBLE_TRANSFORMS, PANEL_GRIDS, PANEL_PATTERNS } from './layoutConfig'
+import { cloneNumberPad } from './numberPadValidate'
 import { cloneTable } from './tableValidate'
 import type {
   BubbleTransform,
@@ -36,8 +37,8 @@ export const NEW_IMAGE: Omit<ImgTransform, 'panel'> = {
   offsetY: 0,
   anchor: 'center center',
   spill: false,
-  // No `table` key: a picture is not a surface until the author switches one on in
-  // TableInspector, and the field's absence is what "not a surface" is spelled as.
+  // No projected-content key: a picture is not a surface until the author selects one
+  // in its inspector, and absence is what "not a surface" is spelled as.
 }
 
 /** A brand-new bubble, before {@link addBubble} drops it on a panel. */
@@ -80,19 +81,24 @@ export function cloneGrids(grids: PageGrids): PageGrids {
 }
 
 /**
- * Deep clone of one picture. Spread alone is not enough once a picture can carry a
- * table: the surface holds a quad, its columns and every cell, and a shallow copy would
+ * Deep clone of one picture. Spread alone is not enough once a picture can carry
+ * projected content: a surface holds a quad and a table also holds columns and cells;
+ * a shallow copy would
  * hand the working copy the *same* arrays the shipped constant holds — the first corner
  * drag would then edit the module-level default along with it, which survives a Reset.
  *
- * A picture with no table comes back with no `table` **key**, rather than with the key
- * set to undefined. The two are interchangeable to `toEqual` and to `JSON.stringify`, so
+ * A picture with no projected content comes back with neither optional **key**, rather
+ * than with one set to undefined. The two are interchangeable to `toEqual` and JSON, so
  * nothing would have failed — which is the reason to be deliberate about it here: "not a
  * surface" is spelled as absence everywhere else, and a clone that quietly introduced the
- * key would make `'table' in img` mean nothing.
+ * key would make an `in` check mean nothing. If both fields appear in hand-edited data,
+ * the established table wins; hydration enforces the same backward-compatible rule.
  */
 export function cloneImg(t: ImgTransform): ImgTransform {
-  return t.table ? { ...t, table: cloneTable(t.table) } : { ...t }
+  const { table, numberPad, ...plain } = t
+  if (table) return { ...plain, table: cloneTable(table) }
+  if (numberPad) return { ...plain, numberPad: cloneNumberPad(numberPad) }
+  return plain
 }
 
 /** Deep clone of the on-disk constants — the canonical "default" config. */

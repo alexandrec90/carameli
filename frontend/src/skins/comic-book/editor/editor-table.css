@@ -20,6 +20,11 @@
   stroke-dasharray: 6 4;
 }
 
+.cb-ed-quad-number-pad polygon {
+  fill: rgb(236 0 140 / 8%);
+  stroke: #ec008c;
+}
+
 /* A corner grip, in the same language as the resize handle (see editor.css) but round and
    in the quad's own colour, so the four that tilt the table are never mistaken for the
    one that resizes the frame they sit in. */
@@ -30,4 +35,8 @@
 
 .cb-ed-quad-grip:active {
   cursor: grabbing;
+}
+
+.cb-ed-quad-grip-number-pad {
+  background: #ec008c;
 }
