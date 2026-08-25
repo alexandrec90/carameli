@@ -27,6 +27,8 @@ function editorApi(): EditorModeApi {
     addBubbleOn: vi.fn(),
     setImg: vi.fn(),
     setBubble: vi.fn(),
+    setChain: vi.fn(),
+    addChainSlot: vi.fn(),
     setPattern: vi.fn(),
     deleteImg: vi.fn(),
     deleteBubble: vi.fn(),
