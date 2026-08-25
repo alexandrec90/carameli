@@ -11,15 +11,20 @@ import {
   seamsOf,
   vertexDegree,
 } from '../../skins/comic-book/editor/panelGridOps'
-import { gridProblems, isPanelGrid, isPanelGrids } from '../../skins/comic-book/editor/panelGridValidate'
+import {
+  gridProblems, isPageGrids, isPanelGrid, isPanelGrids,
+} from '../../skins/comic-book/editor/panelGridValidate'
 import { EDGE_MARGIN, frameRect, panelRing } from '../../skins/comic-book/panelGeometry'
 import type { LayoutKind, PanelGrid } from '../../skins/comic-book/panelGeometry'
-import { PANELS } from '../../skins/comic-book/panels'
+import { PANEL_PAGES, PANELS } from '../../skins/comic-book/panels'
 
 // The grid edits behind every shape gesture. They are pure functions of a grid, which is
 // the point: the drag hook only decides *which* one a gesture means.
 
 const KINDS: LayoutKind[] = ['landscape', 'portrait', 'square']
+
+/** Every shipped grid: one per page per viewport shape. */
+const PAGE_KINDS = PANEL_PAGES.flatMap(page => KINDS.map(kind => [page, kind] as const))
 
 /**
  * Two panels split by a straight seam from `[0.5, 0]` down to `[0.5, 1]`. Vertices 1 and
@@ -37,19 +42,34 @@ function splitGrid(): PanelGrid {
 }
 
 describe('the shipped grids', () => {
-  it.each(KINDS)('%s has one ring per panel and no structural problems', kind => {
-    const grid = PANEL_GRIDS[kind]
+  it.each(PAGE_KINDS)('%s %s has one ring per panel and no structural problems', (page, kind) => {
+    const grid = PANEL_GRIDS[page][kind]
     expect(grid.panels).toHaveLength(PANELS.length)
     expect(gridProblems(grid, PANELS.length)).toEqual([])
   })
 
-  it('passes the guard used on a persisted payload', () => {
-    expect(isPanelGrids(PANEL_GRIDS, PANELS.length)).toBe(true)
-    expect(isPanelGrid(PANEL_GRIDS.landscape, PANELS.length)).toBe(true)
+  // Every grid's ring table is PANELS-length across both pages: a panel that sits on
+  // the other page keeps its slot as an empty ring, which is what lets a panel index
+  // mean the same thing everywhere.
+  it.each(PAGE_KINDS)('%s %s keeps an empty ring for every other-page panel', (page, kind) => {
+    const grid = PANEL_GRIDS[page][kind]
+    PANELS.forEach((info, i) => {
+      if (info.page === page) {
+        expect(grid.panels[i].length).toBeGreaterThanOrEqual(3)
+      } else {
+        expect(grid.panels[i]).toEqual([])
+      }
+    })
   })
 
-  it.each(KINDS)('%s spans the whole frame — every corner is a locked vertex', kind => {
-    const corners = PANEL_GRIDS[kind].vertices.filter(
+  it('passes the guard used on a persisted payload', () => {
+    expect(isPageGrids(PANEL_GRIDS, PANELS.length)).toBe(true)
+    expect(isPanelGrids(PANEL_GRIDS.classic, PANELS.length)).toBe(true)
+    expect(isPanelGrid(PANEL_GRIDS.classic.landscape, PANELS.length)).toBe(true)
+  })
+
+  it.each(PAGE_KINDS)('%s %s spans the whole frame — every corner is a locked vertex', (page, kind) => {
+    const corners = PANEL_GRIDS[page][kind].vertices.filter(
       ([x, y]) => (x === 0 || x === 1) && (y === 0 || y === 1),
     )
     expect(corners).toHaveLength(4)
@@ -96,8 +116,8 @@ describe('seamsOf', () => {
    * is nothing to drag. It is not a rule the editor enforces after the fact — the gesture
    * does not exist.
    */
-  it.each(KINDS)('%s offers no handle on any frame edge', kind => {
-    const grid = PANEL_GRIDS[kind]
+  it.each(PAGE_KINDS)('%s %s offers no handle on any frame edge', (page, kind) => {
+    const grid = PANEL_GRIDS[page][kind]
     for (const seam of seamsOf(grid)) {
       const [ax, ay] = grid.vertices[seam.a]
       const [bx, by] = grid.vertices[seam.b]
@@ -109,7 +129,7 @@ describe('seamsOf', () => {
   })
 
   it('is ordered by vertex index, so a seam id does not wander between renders', () => {
-    const seams = seamsOf(PANEL_GRIDS.landscape)
+    const seams = seamsOf(PANEL_GRIDS.classic.landscape)
     const keys = seams.map(s => s.a * 1000 + s.b)
     expect([...keys].sort((p, q) => p - q)).toEqual(keys)
   })

@@ -1,9 +1,13 @@
 import { logger } from '../../../lib/logger'
 import { isTailDir } from '../bubbleBox'
+import { isBubbleContentKind } from '../bubbleContent'
 import { PANELS } from '../panels'
+import { isPanelBgStyle } from '../panelPatterns'
+import type { PanelBgStyle } from '../panelPatterns'
 import { isBubbleType } from './bubbleTypes'
 import { CONFIG_KEY, cloneGrids, NEW_BUBBLE, NEW_IMAGE, seedConfig } from './configSeed'
-import { isPanelGrids } from './panelGridValidate'
+import { PANEL_PATTERNS } from './layoutConfig'
+import { isPageGrids } from './panelGridValidate'
 import type { BubbleTransform, EditorConfig, ImgTransform } from './types'
 
 // Reading a persisted working copy back. Everything here exists because a payload
@@ -44,8 +48,10 @@ export function sanitizeLinks(bubbles: BubbleTransform[]): BubbleTransform[] {
  * plain ellipse is the one that asserts least about what the author meant. A retired
  * `hoverType`/`clickType` becomes `null`, which those fields already spell as "stay as
  * you are", so the bubble simply stops morphing on that event. A retired `tail` becomes
- * `'none'`, its own no-op. In each case the words, the placement and every other
- * property survive: the author loses the one attribute that no longer has a meaning.
+ * `'none'`, its own no-op. A retired `content` kind becomes `'text'` — the words are
+ * still there, just lettered plainly. In each case the words, the placement and every
+ * other property survive: the author loses the one attribute that no longer has a
+ * meaning.
  */
 function coerceBubbleEnums(b: BubbleTransform): BubbleTransform {
   const dropped: Record<string, unknown> = {}
@@ -64,10 +70,39 @@ function coerceBubbleEnums(b: BubbleTransform): BubbleTransform {
     dropped.tail = next.tail
     next.tail = 'none'
   }
+  if (!isBubbleContentKind(next.content)) {
+    dropped.content = next.content
+    next.content = 'text'
+  }
   if (Object.keys(dropped).length > 0) {
     logger.warn('Dropped retired comic-book bubble attributes', { key: CONFIG_KEY, dropped })
   }
   return next
+}
+
+/**
+ * The pattern array a payload carries, coerced back to one style per panel slot.
+ *
+ * Parallel to PANELS, so the length is not the author's: a short array (saved before a
+ * panel existed) backfills from the shipped defaults, a long one is cut, and a slot
+ * naming a style that has since been retired — or was never one — falls back to its
+ * shipped default rather than failing the draw. The style name is the whole entry, so
+ * unlike a bubble there is nothing else to save around it.
+ */
+export function normalizePatterns(raw: unknown): PanelBgStyle[] {
+  const list = Array.isArray(raw) ? raw : []
+  const dropped: Record<number, unknown> = {}
+  const out = PANEL_PATTERNS.map((shipped, i) => {
+    const candidate = list[i]
+    if (candidate === undefined) return shipped
+    if (isPanelBgStyle(candidate)) return candidate
+    dropped[i] = candidate
+    return shipped
+  })
+  if (Object.keys(dropped).length > 0) {
+    logger.warn('Dropped retired comic-book pattern styles', { key: CONFIG_KEY, dropped })
+  }
+  return out
 }
 
 /**
@@ -113,7 +148,8 @@ export function hydrateConfig(raw: string | null): EditorConfig {
     // grids and the author's pictures and words survive around them.
     const seed = seedConfig()
     return {
-      grids: isPanelGrids(parsed.grids, PANELS.length) ? cloneGrids(parsed.grids) : seed.grids,
+      grids: isPageGrids(parsed.grids, PANELS.length) ? cloneGrids(parsed.grids) : seed.grids,
+      patterns: normalizePatterns(parsed.patterns),
       images: parsed.images.map((t, i) => {
         // Typed as possibly-absent because the payload may be longer than the seed:
         // a ninth picture the author added has no shipped entry to recover from, and

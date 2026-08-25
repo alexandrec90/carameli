@@ -1,3 +1,4 @@
+import type { PanelBgStyle } from '../panelPatterns'
 import { cloneConfig, NEW_BUBBLE, NEW_IMAGE, seedConfig } from './configSeed'
 import { sanitizeLinks } from './configHydrate'
 import type { BubbleTransform, EditorConfig, ImgTransform } from './types'
@@ -14,6 +15,17 @@ import type { BubbleTransform, EditorConfig, ImgTransform } from './types'
 
 export { CONFIG_KEY, NEW_BUBBLE, NEW_IMAGE, cloneConfig, resetGrid, seedConfig, setGrid } from './configSeed'
 export { hydrateConfig, sanitizeLinks } from './configHydrate'
+
+/**
+ * Set one panel slot's background pattern, returning a new config. `patterns` is
+ * parallel to PANELS, so unlike the two entry arrays there is nothing to append or
+ * splice — an out-of-range index is a no-op rather than a growth.
+ */
+export function patchPattern(config: EditorConfig, panel: number, style: PanelBgStyle): EditorConfig {
+  const next = cloneConfig(config)
+  if (panel >= 0 && panel < next.patterns.length) next.patterns[panel] = style
+  return next
+}
 
 /** Patch-merge a single image entry, returning a new config. */
 export function patchImg(

@@ -1,6 +1,7 @@
-import type { LayoutKind, PanelGrid, PanelGrids } from '../panelGeometry'
-import { PANELS } from '../panels'
+import type { LayoutKind, PageGrids, PanelGrid } from '../panelGeometry'
+import { PANEL_PAGES, PANELS } from '../panels'
 import type { BubbleType } from './bubbleTypes'
+import { PANEL_PATTERNS } from './layoutConfig'
 import type { EditorConfig } from './types'
 
 // Turning the editor's working copy back into `layoutConfig.ts`. The Save button
@@ -8,7 +9,7 @@ import type { EditorConfig } from './types'
 // verbatim — so anything this module does not emit is deleted on the first save.
 // That is why the header prose below lives here rather than only in the file it
 // describes: the rule about links staying on one panel is not recoverable from the
-// data, and a saved config that had dropped it would read as permission. Keep the two
+// data, and a saved config that had dropped it would read as permission. Keep the four
 // headers byte-identical with the ones in `layoutConfig.ts`, so a save with nothing
 // changed is a no-op diff rather than a paragraph quietly going missing.
 
@@ -55,7 +56,9 @@ const BUBBLE_HEADER = `// Not parallel to PANELS either: each bubble names its \
 // pointer-over and press (null = stay put), \`tail\` which way the tail points ('none'
 // for no tail), and \`linkTo\` the bubble to join with a connector tube — an index into
 // this array, which must name a bubble on the same panel. \`spill: true\` keeps the
-// current look where bubbles float into the gutter.
+// current look where bubbles float into the gutter. \`content\` picks how \`text\` reads:
+// 'text' letters it as-is; 'wheel' splits it into comma-delimited options; 'input'
+// makes it editable; and 'phone' makes it an editable, region-formatted phone number.
 //
 // Two pairs ship linked — the logo's and the mechanic's — each pair being one speaker's
 // line continuing across two balloons, so the second of each carries no tail and the
@@ -65,10 +68,20 @@ const BUBBLE_HEADER = `// Not parallel to PANELS either: each bubble names its \
 // landscape layout; the portrait and square layouts reshape the panels, so a pair may
 // end up close enough there to drop its tube. Retune per layout in the editor.`
 
-const GRID_HEADER = `// The panel shapes themselves, one grid per viewport shape. \`vertices\` are the corners of
-// the whole page in normalised frame space — 0 to 1 across the frame, y down — and each
-// entry of \`panels\` is one panel as a clockwise ring of indices into that table,
-// index-parallel to PANELS.
+const PATTERN_HEADER = `// The one array here that IS parallel to PANELS: a pattern belongs to the panel slot
+// itself, not to a picture or a bubble on it, so entry \`i\` is the Ben-Day background
+// drawn behind \`PANELS[i]\` — whichever page that panel sits on. Only the style name is
+// the author's choice; the colors and dot metrics stay tuned per panel in
+// panelPatterns.ts (PANEL_BG_CONFIGS), so switching a panel's pattern keeps its
+// palette. A retired or misspelled name falls back to the shipped default on hydrate
+// rather than failing the draw.`
+
+const GRID_HEADER = `// The panel shapes themselves: one record per page, one grid per viewport shape inside
+// it. \`vertices\` are the corners of the whole page in normalised frame space — 0 to 1
+// across the frame, y down — and each entry of \`panels\` is one panel as a clockwise
+// ring of indices into that table. Every grid's ring table is index-parallel to PANELS
+// across *both* pages: a panel that sits on the other page keeps its slot as an empty
+// ring, so a panel index means the same thing everywhere.
 //
 // Corners are **shared**: the divider between two panels is the run of vertices both
 // rings name, so moving one moves the line on both sides and the two cannot come apart.
@@ -89,27 +102,31 @@ const LAYOUT_KINDS: LayoutKind[] = ['landscape', 'portrait', 'square']
 function gridBody(grid: PanelGrid): string {
   const points = grid.vertices.map(([x, y]) => `[${round(x, 4)}, ${round(y, 4)}]`).join(', ')
   const rings = grid.panels
-    .map((ring, i) => `      [${ring.join(', ')}], // ${PANELS[i]?.label ?? `panel ${i}`}`)
+    .map((ring, i) => `        [${ring.join(', ')}], // ${PANELS[i]?.label ?? `panel ${i}`}`)
     .join('\n')
-  return `    vertices: [${points}],\n    panels: [\n${rings}\n    ],`
+  return `      vertices: [${points}],\n      panels: [\n${rings}\n      ],`
 }
 
 /**
- * Serialize the three panel grids as the `PANEL_GRIDS` block.
+ * Serialize every page's panel grids as the `PANEL_GRIDS` block.
  *
  * Vertex coordinates are rounded to 4 places — about a tenth of a pixel on a 1200 px
  * frame, so a drag lands where it was dropped — and the panel rings carry their panel's
  * label as a trailing comment, because a bare row of indices says nothing about which
- * slot of the page it is.
+ * slot of the page it is. An empty ring is emitted as `[]` under the same label: the
+ * panel lives on the other page, and its slot stays visible rather than vanishing.
  */
-export function serializeGrids(grids: PanelGrids): string {
-  const blocks = LAYOUT_KINDS.map(kind => `  ${kind}: {\n${gridBody(grids[kind])}\n  },`).join('\n')
-  return `${GRID_HEADER}\nexport const PANEL_GRIDS: PanelGrids = {\n${blocks}\n}\n`
+export function serializeGrids(grids: PageGrids): string {
+  const pages = PANEL_PAGES.map(page => {
+    const blocks = LAYOUT_KINDS.map(kind => `    ${kind}: {\n${gridBody(grids[page][kind])}\n    },`).join('\n')
+    return `  ${page}: {\n${blocks}\n  },`
+  }).join('\n')
+  return `${GRID_HEADER}\nexport const PANEL_GRIDS: PageGrids = {\n${pages}\n}\n`
 }
 
 /**
  * Serialize a working {@link EditorConfig} into paste-ready TS matching
- * `layoutConfig.ts` (the two `export const` blocks, each under its explanatory
+ * `layoutConfig.ts` (the four `export const` blocks, each under its explanatory
  * comment).
  *
  * Numbers are rounded for clean output: frame percentages to 1 decimal, image `scale`
@@ -135,25 +152,30 @@ export function serializeConfig(c: EditorConfig): string {
         `  { panel: ${b.panel}, top: ${Math.round(b.top)}, right: ${Math.round(b.right)}, ` +
         `width: ${Math.round(b.width)}, rotate: ${round(b.rotate, 1)}, ` +
         `spill: ${b.spill}, type: '${b.type}', tail: '${b.tail}', ` +
-        `text: ${strLiteral(b.text)}, linkTo: ${b.linkTo}, ` +
+        `content: '${b.content}', text: ${strLiteral(b.text)}, linkTo: ${b.linkTo}, ` +
         `hoverType: ${typeLiteral(b.hoverType)}, clickType: ${typeLiteral(b.clickType)} },`,
     )
+    .join('\n')
+  const patternLines = PANELS
+    .map((p, i) => `  '${c.patterns[i] ?? PANEL_PATTERNS[i]}', // ${p.label}`)
     .join('\n')
   return (
     `${IMG_HEADER}\nexport const PANEL_IMG_TRANSFORMS: ImgTransform[] = [\n${imgLines}\n]\n\n` +
     `${BUBBLE_HEADER}\nexport const PANEL_BUBBLE_TRANSFORMS: BubbleTransform[] = [\n${bubbleLines}\n]\n\n` +
+    `${PATTERN_HEADER}\nexport const PANEL_PATTERNS: PanelBgStyle[] = [\n${patternLines}\n]\n\n` +
     serializeGrids(c.grids)
   )
 }
 
 /**
- * Serialize a full, ready-to-write `editor/layoutConfig.ts` file: the type import
- * header plus the two `export const` blocks from {@link serializeConfig}. Used by the
+ * Serialize a full, ready-to-write `editor/layoutConfig.ts` file: the import header
+ * plus the four `export const` blocks from {@link serializeConfig}. Used by the
  * editor's Save button, which POSTs this verbatim to the dev-only write endpoint.
  */
 export function serializeConfigFile(c: EditorConfig): string {
   return (
-    `import type { ImgTransform, BubbleTransform, PanelGrids } from './types'\n\n` +
+    `import type { PanelBgStyle } from '../panelPatterns'\n` +
+    `import type { ImgTransform, BubbleTransform, PageGrids } from './types'\n\n` +
     serializeConfig(c)
   )
 }
