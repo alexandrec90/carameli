@@ -39,16 +39,28 @@
     (function () {
       var SKINS = ['carameli', 'candy-shop', 'barebone', 'comic-book'];
       var DEFAULT = 'comic-book';
-      var PANELS = [
-        '/comic-book/logo.webp',
-        '/comic-book/switchboard.webp',
-        '/comic-book/mailman1.webp',
-        '/comic-book/mechanic.webp',
-        '/comic-book/receptionist.webp',
-        '/comic-book/rolodex.webp',
-        '/comic-book/rotary%20phone.webp',
-        '/comic-book/mailman2.webp',
-      ];
+      // One list per page, because the first paint draws only one page's panels:
+      // preloading both sets would put the other page's art on this page's critical
+      // path. The keys and the route split mirror pageForPath in
+      // `src/skins/comic-book/panels.ts`.
+      var PANELS = {
+        classic: [
+          '/comic-book/logo.webp',
+          '/comic-book/switchboard.webp',
+          '/comic-book/mailman1.webp',
+          '/comic-book/mechanic.webp',
+          '/comic-book/receptionist.webp',
+          '/comic-book/rolodex.webp',
+          '/comic-book/rotary%20phone.webp',
+          '/comic-book/mailman2.webp',
+        ],
+        home: [
+          '/comic-book/logo2.webp',
+          '/comic-book/notepad.webp',
+          '/comic-book/push-button-phone.webp',
+          '/comic-book/man-woman-talking.webp',
+        ],
+      };
       var FONTS =
         'https://fonts.googleapis.com/css2?family=Bangers&family=Boogaloo&family=Permanent+Marker&display=swap';
 
@@ -58,11 +70,12 @@
       if (SKINS.indexOf(stored) === -1) stored = DEFAULT;
       if (stored !== 'comic-book') return;
 
-      for (var i = 0; i < PANELS.length; i++) {
+      var list = PANELS[location.pathname === '/' ? 'home' : 'classic'];
+      for (var i = 0; i < list.length; i++) {
         var preload = document.createElement('link');
         preload.rel = 'preload';
         preload.as = 'image';
-        preload.href = PANELS[i];
+        preload.href = list[i];
         document.head.appendChild(preload);
       }
 

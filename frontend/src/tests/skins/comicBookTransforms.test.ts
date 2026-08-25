@@ -15,6 +15,7 @@ import {
   imgFramePoints,
   imgFramePoly,
   imgFrameStyle,
+  isFullPanelFrame,
   imgVisibleRect,
   imgRect,
   renderedImgRect,
@@ -332,6 +333,14 @@ describe('imgFramePoints / imgFramePoly', () => {
   })
 })
 
+describe('isFullPanelFrame', () => {
+  it('recognizes only the identity frame that duplicates the panel outline', () => {
+    expect(isFullPanelFrame(img())).toBe(true)
+    expect(isFullPanelFrame(img({ width: 99.9 }))).toBe(false)
+    expect(isFullPanelFrame(img({ left: 1 }))).toBe(false)
+  })
+})
+
 describe('imgClipStyle', () => {
   const CLIP = 'polygon(0px 0px, 10px 0px, 10px 10px, 0px 10px)'
 
@@ -441,10 +450,9 @@ describe('BUBBLE_TYPES', () => {
 })
 
 describe('default config parity', () => {
-  it('uses center center only for the logo and center bottom for the rest', () => {
-    expect(PANEL_IMG_TRANSFORMS[0].anchor).toBe('center center')
-    PANEL_IMG_TRANSFORMS.slice(1).forEach(t => {
-      expect(t.anchor).toBe('center bottom')
+  it('uses center center only for the logo panels and center bottom for the rest', () => {
+    PANEL_IMG_TRANSFORMS.forEach(t => {
+      expect(t.anchor).toBe(PANELS[t.panel].isLogo ? 'center center' : 'center bottom')
     })
   })
 

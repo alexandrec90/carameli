@@ -1,4 +1,6 @@
 import { PANELS } from '../panels'
+import { PATTERN_STYLES, PATTERN_STYLE_KEYS } from '../panelPatterns'
+import type { PanelBgStyle } from '../panelPatterns'
 import { assetLabel } from './assets'
 import BubbleInspector from './BubbleInspector'
 import ImageInspector from './ImageInspector'
@@ -31,13 +33,26 @@ export default function InspectorPanel({ api, panel }: InspectorPanelProps) {
   const selBubble = selected.kind === 'bubble' ? config.bubbles[selected.index] : null
 
   // A selected panel is a slot, not a drawn thing: it has no transform to read out and
-  // nothing to reset. It exists so "+ Image" / "+ Bubble" have somewhere to add to.
+  // nothing to reset — but the slot does own one editable attribute, its Ben-Day
+  // background pattern. It also exists so "+ Image" / "+ Bubble" have somewhere to add.
   if (selected.kind === 'panel') {
     const imgs = indicesOnPanel(config.images, panel).length
     const bubbles = indicesOnPanel(config.bubbles, panel).length
     return (
       <>
         <div className="cb-ed-label">{panelName} panel</div>
+        <label className="cb-ed-field">
+          <span>pattern</span>
+          <select
+            className="cb-ed-select"
+            value={config.patterns[panel] ?? PATTERN_STYLE_KEYS[0]}
+            onChange={e => api.setPattern(panel, e.target.value as PanelBgStyle)}
+          >
+            {PATTERN_STYLE_KEYS.map(key => (
+              <option key={key} value={key}>{PATTERN_STYLES[key].label}</option>
+            ))}
+          </select>
+        </label>
         <div className="cb-ed-hint">
           {imgs} picture{imgs === 1 ? '' : 's'} · {bubbles} bubble{bubbles === 1 ? '' : 's'}.
           Click one to edit it, or add another below.

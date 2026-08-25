@@ -20,6 +20,10 @@ export const PANEL_ASSETS: PanelAsset[] = [
   { src: '/comic-book/rolodex.webp', label: 'Rolodex' },
   { src: '/comic-book/rotary%20phone.webp', label: 'Rotary phone' },
   { src: '/comic-book/mailman2.webp', label: 'Post office' },
+  { src: '/comic-book/logo2.webp', label: 'Carameli logo 2' },
+  { src: '/comic-book/notepad.webp', label: 'Notepad' },
+  { src: '/comic-book/push-button-phone.webp', label: 'Push-button phone' },
+  { src: '/comic-book/man-woman-talking.webp', label: 'Phone conversation' },
 ]
 
 /**

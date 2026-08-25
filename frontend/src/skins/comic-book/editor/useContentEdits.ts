@@ -1,6 +1,7 @@
 import { useCallback, useMemo } from 'react'
 
-import { addBubble, addImg, patchBubble, patchImg, removeBubble, removeImg, resetOneIn } from './configOps'
+import type { PanelBgStyle } from '../panelPatterns'
+import { addBubble, addImg, patchBubble, patchImg, patchPattern, removeBubble, removeImg, resetOneIn } from './configOps'
 import type { SetSelection } from './selection'
 import type { BubbleTransform, EditorConfig, ImgTransform } from './types'
 
@@ -15,6 +16,7 @@ export type ApplyOp = (op: (prev: EditorConfig) => EditorConfig) => void
 export interface ContentEdits {
   setImg(index: number, patch: Partial<ImgTransform>): void
   setBubble(index: number, patch: Partial<BubbleTransform>): void
+  setPattern(panel: number, style: PanelBgStyle): void
   addImgOn(panel: number): void
   deleteImg(index: number): void
   addBubbleOn(panel: number): void
@@ -31,6 +33,11 @@ export function useContentEdits(apply: ApplyOp, setSelected: SetSelection): Cont
   const setBubble = useCallback(
     (index: number, patch: Partial<BubbleTransform>) =>
       apply(prev => patchBubble(prev, index, patch)),
+    [apply],
+  )
+
+  const setPattern = useCallback(
+    (panel: number, style: PanelBgStyle) => apply(prev => patchPattern(prev, panel, style)),
     [apply],
   )
 
@@ -90,7 +97,7 @@ export function useContentEdits(apply: ApplyOp, setSelected: SetSelection): Cont
   )
 
   return useMemo(
-    () => ({ setImg, setBubble, addImgOn, deleteImg, addBubbleOn, deleteBubble, resetOne }),
-    [setImg, setBubble, addImgOn, deleteImg, addBubbleOn, deleteBubble, resetOne],
+    () => ({ setImg, setBubble, setPattern, addImgOn, deleteImg, addBubbleOn, deleteBubble, resetOne }),
+    [setImg, setBubble, setPattern, addImgOn, deleteImg, addBubbleOn, deleteBubble, resetOne],
   )
 }

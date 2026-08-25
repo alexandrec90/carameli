@@ -5,7 +5,7 @@ import { clearStoredConfig, detectActive, persistConfig } from './editorStorage'
 import type { EditMode, Selection, SelectionKind } from './selection'
 import { useContentEdits } from './useContentEdits'
 import type { ContentEdits } from './useContentEdits'
-import type { EditorConfig, LayoutKind, PanelGrid } from './types'
+import type { EditorConfig, LayoutKind, PanelGrid, PanelPage } from './types'
 
 // The pure operations on a config live in ./configOps.ts and ./panelGridOps.ts, the
 // content mutators in ./useContentEdits.ts and the browser edges in ./editorStorage.ts;
@@ -24,14 +24,15 @@ export interface EditorModeApi extends ContentEdits {
   clear(): void
   resetAll(): void
   /**
-   * Replace one breakpoint's panel grid. Deliberately whole-grid and deliberately
-   * kind-addressed: every shape edit is a pure function in ./panelGridOps.ts that takes a
-   * grid and returns one, and the caller — which is the thing looking at a window of a
-   * known shape — says which of the three it just reshaped.
+   * Replace one page's panel grid for one breakpoint. Deliberately whole-grid and
+   * deliberately page-and-kind-addressed: every shape edit is a pure function in
+   * ./panelGridOps.ts that takes a grid and returns one, and the caller — which is the
+   * thing looking at a route and a window of a known shape — says which grid it just
+   * reshaped.
    */
-  setGridFor(kind: LayoutKind, grid: PanelGrid): void
-  /** Restore one breakpoint's grid to the shipped default. */
-  resetGridFor(kind: LayoutKind): void
+  setGridFor(page: PanelPage, kind: LayoutKind, grid: PanelGrid): void
+  /** Restore one page's grid for one breakpoint to the shipped default. */
+  resetGridFor(page: PanelPage, kind: LayoutKind): void
 }
 
 /**
@@ -92,13 +93,13 @@ export function useEditorMode(): EditorModeApi {
   const content = useContentEdits(apply, setSelected)
 
   const setGridFor = useCallback(
-    (kind: LayoutKind, grid: PanelGrid) => apply(prev => setGrid(prev, kind, grid)),
+    (page: PanelPage, kind: LayoutKind, grid: PanelGrid) => apply(prev => setGrid(prev, page, kind, grid)),
     [apply],
   )
 
   const resetGridFor = useCallback(
-    (kind: LayoutKind) => {
-      apply(prev => resetGrid(prev, kind))
+    (page: PanelPage, kind: LayoutKind) => {
+      apply(prev => resetGrid(prev, page, kind))
       // The default grid has fewer vertices than a bent one, so a surviving vertex
       // selection would point past the end of the table or at somebody else's corner.
       setSelected(null)
