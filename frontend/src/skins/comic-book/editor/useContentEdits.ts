@@ -1,7 +1,8 @@
 import { useCallback, useMemo } from 'react'
 
+import type { PanelBgStyle } from '../panelPatterns'
 import {
-  addBubble, addChainBubble, addImg, patchBubble, patchChain, patchImg,
+  addBubble, addChainBubble, addImg, patchBubble, patchChain, patchImg, patchPattern,
   removeBubble, removeImg, resetOneIn,
 } from './configOps'
 import type { SetSelection } from './selection'
@@ -24,6 +25,7 @@ export interface ContentEdits {
    * index captured a render ago would then patch its neighbour.
    */
   setChain(id: string, patch: Partial<BubbleChain>): void
+  setPattern(panel: number, style: PanelBgStyle): void
   addImgOn(panel: number): void
   deleteImg(index: number): void
   addBubbleOn(panel: number): void
@@ -47,6 +49,11 @@ export function useContentEdits(apply: ApplyOp, setSelected: SetSelection): Cont
 
   const setChain = useCallback(
     (id: string, patch: Partial<BubbleChain>) => apply(prev => patchChain(prev, id, patch)),
+    [apply],
+  )
+
+  const setPattern = useCallback(
+    (panel: number, style: PanelBgStyle) => apply(prev => patchPattern(prev, panel, style)),
     [apply],
   )
 
@@ -122,11 +129,11 @@ export function useContentEdits(apply: ApplyOp, setSelected: SetSelection): Cont
 
   return useMemo(
     () => ({
-      setImg, setBubble, setChain, addImgOn, deleteImg,
+      setImg, setBubble, setChain, setPattern, addImgOn, deleteImg,
       addBubbleOn, addChainSlot, deleteBubble, resetOne,
     }),
     [
-      setImg, setBubble, setChain, addImgOn, deleteImg,
+      setImg, setBubble, setChain, setPattern, addImgOn, deleteImg,
       addBubbleOn, addChainSlot, deleteBubble, resetOne,
     ],
   )

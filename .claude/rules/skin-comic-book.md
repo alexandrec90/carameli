@@ -82,6 +82,19 @@ Three properties are structural rather than enforced, and should stay that way:
   that edge too; `panelGridValidate.ts` rejects a grid where it is not, and a persisted
   grid that fails falls back to the shipped one rather than rendering torn.
 
+### Two pages, one panel list
+
+There are two pages of panels: the **4-panel home page** on `/` and the **classic
+8-panel grid** everywhere else (the old home page set aside, not destroyed).
+`pageForPath` in `panels.ts` picks the page from the route; every panel of both pages
+lives in the one `PANELS` list, each naming its `page`. `PANEL_GRIDS` is a
+`PageGrids` record — one set of three grids per page — and **every grid's ring table
+is `PANELS`-length**: a panel that lives on the other page keeps its slot as an empty
+ring, which `gridPolys` returns as a vertex-less polygon and `Layout.tsx` maps to
+`null`. Consumers keep indexing panels and polygons by the same number and must guard
+the nulls. Both pages share the same visual system — the outer frame, perpendicular
+gutters and slanted dividers all come from the same geometry.
+
 ## Component Patterns
 
 ### Button
@@ -369,21 +382,24 @@ in `editor/assets.ts`) and speech-bubble
 placement and behaviour (`PANEL_BUBBLE_TRANSFORMS`: panel / top / right / width /
 rotate / spill / type / tail / content / text, plus `hoverType` / `clickType` event
 morph targets, the `linkTo` tube partner and the `chain` this balloon is a slot of;
-`content: 'wheel'` presents `text` as
-comma-delimited options on a scroll picker — see `wheelPicker.ts`) and the chain
-settings those names resolve to (`PANEL_BUBBLE_CHAINS`, above). The renderer in `Layout.tsx` reads from these
-arrays — there are **no magic framing numbers** in `Layout.tsx` or the CSS for
-images/bubbles, and no bubble text. To retune them, use the editor rather than
-hand-editing scattered values.
+content may be lettering, a wheel picker, a text input or a locale-formatted phone
+input) and the chain settings those names resolve to (`PANEL_BUBBLE_CHAINS`, above),
+plus each panel's background pattern style
+(`PANEL_PATTERNS`, the one array parallel to `PANELS`; the per-panel palette and dot
+metrics stay in `PANEL_BG_CONFIGS` in `panelPatterns.ts`). The renderer in
+`Layout.tsx` reads from these arrays — there are **no magic framing numbers** in
+`Layout.tsx` or the CSS for images/bubbles, and no bubble text. To retune them, use
+the editor rather than hand-editing scattered values.
 
 **Save overwrites `layoutConfig.ts` verbatim** with what `serialize.ts` emits, so
 anything that module does not write is deleted on the first save. That is why the
 file's explanatory comments are emitted as headers by `serialize.ts`, and why nothing
 else — a `NEW_IMAGE` or `NEW_BUBBLE` default, a helper — may live in `layoutConfig.ts`.
 Config edits themselves live in `configOps.ts` (React-free: seed/hydrate/patch,
-add/remove picture or bubble, link sanitation), which re-exports `configSeed.ts` and
-`configHydrate.ts`; grid edits live in `panelGridOps.ts` and the chain list's own
-lifecycle in `chainOps.ts`.
+add/remove picture or bubble, pattern switch, link sanitation), which re-exports
+`configSeed.ts` and `configHydrate.ts` (backfill, enum coercion, pattern fallback);
+grid edits live in `panelGridOps.ts` and the chain list's own lifecycle in
+`chainOps.ts`.
 
 The bubble box's on-screen geometry comes from `bubbleRect` in `transforms.ts`, used
 by **both** the renderer (to aim tubes) and the editor (hit target and selection
@@ -396,11 +412,12 @@ not the bubble a tube pointed at.
 | --- | --- | --- |
 | Enable / disable | `?edit=1` / `?edit=0` in dev | Flag persists in `localStorage['comic-book:edit']`; `?edit=0` clears it |
 | Gate | `import.meta.env.DEV && (?edit=1 \|\| flag)` | Never ships — `?edit=1` is inert in prod |
-| Select | click a **panel**, a **picture** or a **bubble** | A picture wins over the panel under it, a bubble over both; a panel is only outlined — it is the slot the **+** buttons add to |
+| Select | click a **panel**, a **picture** or a **bubble** | A picture wins over the panel under it, a bubble over both; a panel is only outlined — it is the slot the **+** buttons add to, and where its background pattern is picked |
 | Adjust | drag / wheel / handles / arrows | Move the frame or bubble, resize (bottom-right grip), pan the picture inside its frame (top-left grip, picture only), rotate (top-right grip, bubble only), nudge (⇧×10); for a picture **Alt** swaps the two framings |
 | Add / remove | **+ Image** / **+ Bubble** toolbar buttons, **Delete image** / **Delete bubble** in the inspector | Adds to the selected panel; deleting a bubble clears any link naming it |
+| Panel fields | inspector select | background **pattern** style (`PATTERN_STYLE_KEYS`; palette stays per panel) |
 | Picture fields | inspector selects | panel, picture (`PANEL_ASSETS`), alt (empty = decorative), anchor, spill |
-| Bubble fields | inspector selects | panel, type, **tail** (nine options incl. **No tail**), **content** (Text / Wheel picker — wheel splits the text on commas into scrollable options), text, hover/click morph, **chain** (free text, completing on the names already in use), link |
+| Bubble fields | inspector selects | panel, type, **tail** (nine options incl. **No tail**), **content** (Text / Wheel picker / Text input / Phone input), authored text or initial value, hover/click morph, **chain** (free text, completing on the names already in use), link |
 | Chain fields | inspector, below the bubble's own, when the bubble names a chain | **grow** / **step ms**, **scroll**, **messages** (one per line; empty = speak the balloons' own text), **+ Balloon in chain** — they edit the whole column, not the selected balloon. Chained balloons render flat in edit mode so each stays selectable |
 | Pages | **Page** dropdown in toolbar | Switch route in edit mode (replays the wash); "Loading screen" entry previews the loading overlay + its exit wash |
 | Mode | **Content** / **Panel shapes** toggle | Content places pictures and bubbles; shapes drags the lines between panels. Content click targets are not rendered in shapes mode — a panel-sized target would swallow every drag aimed at a line crossing it |

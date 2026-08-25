@@ -6,9 +6,9 @@ import type { ImgTransform, BubbleTransform } from './types'
 // ─── Interaction bounds (Phase 3) ───────────────────────────────────────────────
 
 /**
- * Image zoom limits. Below 1 the image no longer fills the panel (objectFit:cover
- * leaves the Ben-Day dot background showing through) — intentional, so a panel image
- * can be shrunk as well as enlarged.
+ * Image zoom limits. At 1 the whole image fits inside its frame (contain), with the
+ * Ben-Day dot background showing through around it; above 1 it zooms toward a crop.
+ * Both directions are intentional — shrink as well as enlarge.
  */
 export const IMG_SCALE = { min: 0.2, max: 4, step: 0.05 }
 /** Bubble width limits, in % of the panel box. */
@@ -73,7 +73,7 @@ export function rotateBubble(b: BubbleTransform, deltaDeg: number): BubbleTransf
 /** CSS for the <img> inside the clip wrapper. */
 export function imgTransformStyle(t: ImgTransform): CSSProperties {
   return {
-    objectFit: 'cover',
+    objectFit: 'contain',
     objectPosition: t.anchor,
     transform: `translate(${t.offsetX}px, ${t.offsetY}px) scale(${t.scale})`,
     transformOrigin: 'center center',
@@ -93,41 +93,68 @@ export function anchorToFractions(anchor: string): [number, number] {
 }
 
 /**
- * Full-source framing style: render the *entire* source image (no cover cropping),
- * scaled and positioned so that at identity (scale 1 / offset 0) it is pixel-identical
- * to {@link imgTransformStyle}'s `object-fit: cover` box. This is the picture's real
- * geometry once its natural size is known: the frame's polygon clip supplies the
- * comic-panel crop, so panning slides the picture under the frame (re-framing it)
- * instead of moving a pre-cropped box — no source pixels are ever discarded. In edit
- * mode the selected image simply drops the clip, revealing the same geometry.
+ * The contain-fit geometry every full-source view derives from. The box (`bounds`)
+ * renders the natural image (`nat`) at `fit = min(bw/nw, bh/nh)` — the whole image
+ * visible, anchored inside the box — then `translate(offset) scale(t.scale)` is
+ * applied about the box centre, matching {@link imgTransformStyle}. `centerX`/`centerY`
+ * are where the image's centre lands, in box coordinates; `fit` excludes the
+ * transform's own zoom.
  *
- * `bounds` is the *frame* box, not the panel box: an inset picture covers its own
+ * One function, two consumers ({@link fullImgStyle}, {@link renderedImgRect}), so the
+ * picture that is drawn and the border drawn around it cannot disagree.
+ */
+function containGeometry(
+  bounds: { w: number; h: number },
+  nat: { w: number; h: number },
+  t: ImgTransform,
+): { fit: number; centerX: number; centerY: number } {
+  const { w: bw, h: bh } = bounds
+  const { w: nw, h: nh } = nat
+  const fit = Math.min(bw / nw, bh / nh)
+  const fw = nw * fit
+  const fh = nh * fit
+  const [ax, ay] = anchorToFractions(t.anchor)
+  // Contained content centre in box coords (before the panel transform).
+  const cx = ax * (bw - fw) + fw / 2
+  const cy = ay * (bh - fh) + fh / 2
+  const ox = bw / 2
+  const oy = bh / 2
+  return {
+    fit,
+    centerX: ox + t.offsetX + t.scale * (cx - ox),
+    centerY: oy + t.offsetY + t.scale * (cy - oy),
+  }
+}
+
+/**
+ * Full-source framing style: render the *entire* source image, scaled and positioned
+ * so that at identity (scale 1 / offset 0) it is pixel-identical to
+ * {@link imgTransformStyle}'s `object-fit: contain` box. This is the picture's real
+ * geometry once its natural size is known: the image keeps its own edges — the
+ * "original borders" of the artwork — and the frame's polygon clip only ever cuts in
+ * when a zoom or pan pushes the picture past its frame. In edit mode the selected
+ * image simply drops the clip, revealing the same geometry.
+ *
+ * `bounds` is the *frame* box, not the panel box: an inset picture fits its own
  * frame, which is the whole point of the frame being the picture's own.
  *
- * Geometry: the cover box (`bounds`) renders the natural image (`nat`) at
- * `coverScale = max(bw/nw, bh/nh)`; this draws the natural image at that same
- * scale (× the transform's zoom) and positions its centre where the cover content's
- * centre lands after `translate(offset) scale(t.scale)` about the box centre.
+ * Geometry: the contain box (`bounds`) renders the natural image (`nat`) at
+ * `fit = min(bw/nw, bh/nh)` — the whole image visible, anchored inside the box;
+ * this draws the natural image at that same scale (× the transform's zoom) and
+ * positions its centre where the contained content's centre lands after
+ * `translate(offset) scale(t.scale)` about the box centre.
+ *
+ * `min`, not `max`: the cover fit this replaces filled the frame by cropping
+ * whichever image dimension overshot it — a wide panel beheaded a tall picture, and
+ * the panel's ink border then cut across the artwork instead of framing it.
  */
 export function fullImgStyle(
   bounds: { w: number; h: number },
   nat: { w: number; h: number },
   t: ImgTransform,
 ): CSSProperties {
-  const { w: bw, h: bh } = bounds
   const { w: nw, h: nh } = nat
-  const cover = Math.max(bw / nw, bh / nh)
-  const fw = nw * cover
-  const fh = nh * cover
-  const [ax, ay] = anchorToFractions(t.anchor)
-  // Cover content centre in box coords (before the panel transform).
-  const cx = ax * (bw - fw) + fw / 2
-  const cy = ay * (bh - fh) + fh / 2
-  const ox = bw / 2
-  const oy = bh / 2
-  // Apply translate(offset) scale about the box centre, matching imgTransformStyle.
-  const centerX = ox + t.offsetX + t.scale * (cx - ox)
-  const centerY = oy + t.offsetY + t.scale * (cy - oy)
+  const { fit, centerX, centerY } = containGeometry(bounds, nat, t)
   return {
     position: 'absolute',
     left: centerX - nw / 2,
@@ -140,7 +167,7 @@ export function fullImgStyle(
     maxWidth: 'none',
     maxHeight: 'none',
     objectFit: 'fill',
-    transform: `scale(${cover * t.scale})`,
+    transform: `scale(${fit * t.scale})`,
     transformOrigin: 'center center',
   }
 }
@@ -286,6 +313,50 @@ export function imgFramePoly(
   return toClipPath(pts, rect.x, rect.y)
 }
 
+/**
+ * The rectangle the image's pixels actually occupy, in viewport coordinates —
+ * {@link fullImgStyle}'s geometry reduced to a box. At the shipped identity transform
+ * this is the artwork's own border: the whole source contain-fitted into its frame.
+ */
+export function renderedImgRect(
+  frame: { x: number; y: number; w: number; h: number },
+  nat: { w: number; h: number },
+  t: ImgTransform,
+): { x: number; y: number; w: number; h: number } {
+  const { fit, centerX, centerY } = containGeometry(frame, nat, t)
+  const w = nat.w * fit * t.scale
+  const h = nat.h * fit * t.scale
+  return { x: frame.x + centerX - w / 2, y: frame.y + centerY - h / 2, w, h }
+}
+
+/**
+ * The rectangle a picture visibly occupies, in viewport coordinates — the editor's
+ * notion of "the image", as opposed to the frame it hangs in ({@link imgRect}).
+ *
+ * At the shipped identity transform this is the artwork's own border: the whole
+ * source contain-fitted into its frame ({@link renderedImgRect}), so a hover or
+ * selection outline traces the image's true proportions rather than the panel's.
+ * It is clamped to the frame box, never outlining pixels the clip discarded. The
+ * frame itself is the fallback whenever there is nothing tighter to trace: the
+ * natural size is not known yet, a zoom crops past every edge, or a pan pushes the
+ * picture fully outside its frame.
+ */
+export function imgVisibleRect(
+  bounds: { x: number; y: number; w: number; h: number },
+  nat: { w: number; h: number } | undefined,
+  t: ImgTransform,
+): { x: number; y: number; w: number; h: number } {
+  const frame = imgRect(bounds, t)
+  if (!nat || frame.w <= 0 || frame.h <= 0) return frame
+  const r = renderedImgRect(frame, nat, t)
+  const x1 = Math.max(r.x, frame.x)
+  const y1 = Math.max(r.y, frame.y)
+  const x2 = Math.min(r.x + r.w, frame.x + frame.w)
+  const y2 = Math.min(r.y + r.h, frame.y + frame.h)
+  if (x2 <= x1 || y2 <= y1) return frame
+  return { x: x1, y: y1, w: x2 - x1, h: y2 - y1 }
+}
+
 /** Move a picture's frame by a px drag → % of the panel box. */
 export function dragImgFrame(
   t: ImgTransform,
@@ -343,9 +414,8 @@ export function imgFrameStyle(
 }
 
 /**
- * True when a picture's frame is exactly its panel — the shipped default. The editor
- * draws frame ink only around the ones that are not, since a full-panel frame would
- * stroke the panel outline a second time along the identical path.
+ * True when a picture's frame is exactly its panel — the shipped default. The ink
+ * layer skips these frames because the panel outline already strokes the same path.
  */
 export function isFullPanelFrame(
   t: Pick<ImgTransform, 'left' | 'top' | 'width' | 'height'>,

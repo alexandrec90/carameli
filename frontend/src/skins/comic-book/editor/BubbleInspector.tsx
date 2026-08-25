@@ -1,8 +1,8 @@
 import { TAIL_DIRS, TAIL_DIR_KEYS } from '../bubbleBox'
 import type { TailDir } from '../bubbleBox'
 import { chainIds } from '../bubbleChain'
+import type { BubbleContentKind } from '../bubbleContent'
 import { PANELS } from '../panels'
-import type { BubbleContentKind } from '../wheelPicker'
 import { BUBBLE_TYPES, BUBBLE_TYPE_KEYS } from './bubbleTypes'
 import type { BubbleType } from './bubbleTypes'
 import { linkCandidates } from './configOps'
@@ -89,10 +89,18 @@ export default function BubbleInspector({ api, index, bubble }: BubbleInspectorP
         >
           <option value="text">Text</option>
           <option value="wheel">Wheel picker</option>
+          <option value="input">Text input</option>
+          <option value="phone">Phone input</option>
         </select>
       </label>
       <label className="cb-ed-field">
-        <span>{bubble.content === 'wheel' ? 'options' : 'text'}</span>
+        <span>
+          {bubble.content === 'wheel'
+            ? 'options'
+            : bubble.content === 'input' || bubble.content === 'phone'
+              ? 'initial value'
+              : 'text'}
+        </span>
         <textarea
           className="cb-ed-textarea"
           rows={2}
@@ -104,6 +112,12 @@ export default function BubbleInspector({ api, index, bubble }: BubbleInspectorP
         <div className="cb-ed-hint">
           Comma-delimited: each entry is one option on the wheel. Hover the bubble and
           scroll to turn it — the picker is live outside edit mode.
+        </div>
+      )}
+      {(bubble.content === 'input' || bubble.content === 'phone') && (
+        <div className="cb-ed-hint">
+          This becomes an editable field outside edit mode. Phone input formats while
+          typing from the browser locale; a leading + always uses that country code.
         </div>
       )}
 

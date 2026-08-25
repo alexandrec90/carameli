@@ -4,6 +4,7 @@ import type { PointerEvent as ReactPointerEvent, MouseEvent as ReactMouseEvent }
 import { logger } from '../../../lib/logger'
 import type { LayoutKind, NormPt, PanelGrid, Rect, VpPt } from '../panelGeometry'
 import { toNormalized } from '../panelGeometry'
+import type { PanelPage } from '../panels'
 import type { SeamGeometry } from './panelGridOps'
 import { insertBend, isRemovableBend, moveVertex, moveVertices, removeVertex, seamGeometry } from './panelGridOps'
 import type { EditorModeApi } from './useEditorMode'
@@ -54,6 +55,7 @@ export interface SeamDragApi {
  */
 export function useSeamDrag(
   api: EditorModeApi,
+  page: PanelPage,
   kind: LayoutKind,
   grid: PanelGrid,
   frame: Rect,
@@ -106,13 +108,13 @@ export function useSeamDrag(
       e.preventDefault()
       const p = norm(e)
       if (state.kind === 'vertex') {
-        api.setGridFor(kind, moveVertex(grid, state.index, [p[0] + state.offset[0], p[1] + state.offset[1]]))
+        api.setGridFor(page, kind, moveVertex(grid, state.index, [p[0] + state.offset[0], p[1] + state.offset[1]]))
         return
       }
-      api.setGridFor(kind, moveVertices(grid, state.indices, p[0] - state.last[0], p[1] - state.last[1]))
+      api.setGridFor(page, kind, moveVertices(grid, state.indices, p[0] - state.last[0], p[1] - state.last[1]))
       state.last = p
     },
-    [api, grid, kind, norm],
+    [api, grid, kind, norm, page],
   )
 
   const onPointerUp = useCallback((e: ReactPointerEvent) => {
@@ -129,10 +131,10 @@ export function useSeamDrag(
       // sequence of corners the author placed, and starting each one in the middle would
       // make every seam bend the same way before it bent the way they meant.
       const { grid: next, index } = insertBend(grid, seam.a, seam.b, norm(e))
-      api.setGridFor(kind, next)
+      api.setGridFor(page, kind, next)
       api.select('vertex', index)
     },
-    [api, grid, kind, norm],
+    [api, grid, kind, norm, page],
   )
 
   const canDeleteSelected = selectedVertex !== null && isRemovableBend(grid, selectedVertex)
@@ -146,9 +148,9 @@ export function useSeamDrag(
       logger.warn('Comic-book editor: vertex is not a removable bend', { vertex: selectedVertex })
       return
     }
-    api.setGridFor(kind, next)
+    api.setGridFor(page, kind, next)
     api.clear()
-  }, [api, grid, kind, selectedVertex])
+  }, [api, grid, kind, page, selectedVertex])
 
   // Arrow keys nudge the selected corner a pixel at a time (ten with Shift), which is the
   // only way to place one exactly — a pointer cannot reliably hit a tenth of a percent.
@@ -170,6 +172,7 @@ export function useSeamDrag(
       const v = grid.vertices[selectedVertex]
       if (!v) return
       api.setGridFor(
+        page,
         kind,
         moveVertex(grid, selectedVertex, [
           v[0] + (frame.w > 0 ? dx / frame.w : 0),
@@ -179,7 +182,7 @@ export function useSeamDrag(
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [api, deleteSelected, frame.h, frame.w, grid, kind, selectedVertex])
+  }, [api, deleteSelected, frame.h, frame.w, grid, kind, page, selectedVertex])
 
   return {
     seams,

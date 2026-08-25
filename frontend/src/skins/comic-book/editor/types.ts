@@ -1,14 +1,16 @@
 import type { TailDir } from '../bubbleBox'
 import type { BubbleChain } from '../bubbleChain'
-import type { PanelGrids } from '../panelGeometry'
-import type { BubbleContentKind } from '../wheelPicker'
+import type { BubbleContentKind } from '../bubbleContent'
+import type { PageGrids } from '../panelGeometry'
+import type { PanelBgStyle } from '../panelPatterns'
 import type { BubbleType } from './bubbleTypes'
 
 // The shape half of the document is declared next door, in ../panelGeometry.ts, because
 // the renderer needs it too and this module is the editor's. Re-exported here so
 // layoutConfig.ts — which the editor overwrites whole — keeps naming exactly one module
 // for its types.
-export type { LayoutKind, PanelGrid, PanelGrids } from '../panelGeometry'
+export type { LayoutKind, PageGrids, PanelGrid } from '../panelGeometry'
+export type { PanelPage } from '../panels'
 
 // Same bargain for chains: the renderer owns the behaviour (../bubbleChain.ts), the
 // editor owns the field on the bubble that joins one, and layoutConfig.ts imports both
@@ -84,11 +86,11 @@ export interface BubbleTransform {
   /** Which way the tail points, or 'none' (see TAIL_DIRS in bubbleBox.ts). */
   tail: TailDir
   /**
-   * How `text` is presented: lettered as-is ('text'), or split on commas into a
-   * scroll-wheel picker ('wheel') the mouse wheel turns (see wheelPicker.ts).
+   * How `text` is presented: lettering, a wheel picker, a text input, or a
+   * region-aware phone input (see bubbleContent.ts).
    */
   content: BubbleContentKind
-  /** Bubble caption text — or, when `content` is 'wheel', its comma-delimited options. */
+  /** Caption/options, or the initial value of an editable input. */
   text: string
   /**
    * Bubble to join with a connector tube, by index into the bubble array; null when
@@ -127,19 +129,24 @@ export interface BubbleTransform {
  * its own panel, so both are free-length and adding one is an append that has to line
  * up with nothing.
  *
- * `grids` is the exception and is *keyed* rather than listed — one panel subdivision per
- * viewport shape, because the three reshape the page differently and a picture framed
- * for the landscape one has nothing to say about the portrait one. The editor edits
- * whichever grid the window it is open in draws.
- *
  * `chains` is derived rather than authored: its entries are exactly the names the
  * bubbles carry, kept in step by `syncChains` after every edit. Naming a chain on a
  * bubble creates the entry; renaming the last member away removes it. That is what stops
  * a config accumulating settings for threads that no longer exist.
+ *
+ * `grids` is the exception and is *keyed* rather than listed — per page, then one panel
+ * subdivision per viewport shape, because the three reshape the page differently and a
+ * picture framed for the landscape one has nothing to say about the portrait one. The
+ * editor edits whichever grid the route and window it is open in draw.
+ *
+ * `patterns` is the other exception, and it *is* parallel to PANELS: a Ben-Day
+ * background belongs to the panel slot itself, not to a picture or a bubble on it, so
+ * entry `i` is the style drawn behind `PANELS[i]`.
  */
 export interface EditorConfig {
   images: ImgTransform[]
   bubbles: BubbleTransform[]
   chains: BubbleChain[]
-  grids: PanelGrids
+  grids: PageGrids
+  patterns: PanelBgStyle[]
 }

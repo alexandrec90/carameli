@@ -2,6 +2,7 @@ import { useState } from 'react'
 
 import { logger } from '../../../lib/logger'
 import type { LayoutKind, PanelGrid } from '../panelGeometry'
+import type { PanelPage } from '../panels'
 import { PANELS } from '../panels'
 import InspectorPanel from './InspectorPanel'
 import PageSelect from './PageSelect'
@@ -24,7 +25,7 @@ interface EditorToolbarProps {
   /** The panel a new picture or bubble would go on, or null. */
   selPanel: number | null
   pageSelect: PageSelectProps
-  shapes: { kind: LayoutKind; grid: PanelGrid; drag: SeamDragApi }
+  shapes: { page: PanelPage; kind: LayoutKind; grid: PanelGrid; drag: SeamDragApi }
 }
 
 /** Fallback when the save endpoint/clipboard is unavailable: download the file. */
@@ -111,7 +112,7 @@ export default function EditorToolbar({ api, selPanel, pageSelect, shapes }: Edi
       <PageSelect {...pageSelect} />
 
       {mode === 'shapes' ? (
-        <ShapeInspector api={api} kind={shapes.kind} grid={shapes.grid} drag={shapes.drag} />
+        <ShapeInspector api={api} page={shapes.page} kind={shapes.kind} grid={shapes.grid} drag={shapes.drag} />
       ) : api.selected && selPanel !== null ? (
         <InspectorPanel api={api} panel={selPanel} />
       ) : (

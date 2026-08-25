@@ -1,5 +1,6 @@
 import { chainSlots } from '../bubbleChain'
 import { normalizeChainId, patchChainIn, syncChains } from './chainOps'
+import type { PanelBgStyle } from '../panelPatterns'
 import { cloneConfig, NEW_BUBBLE, NEW_IMAGE, seedConfig } from './configSeed'
 import { sanitizeLinks } from './configHydrate'
 import type { BubbleChain, BubbleTransform, EditorConfig, ImgTransform } from './types'
@@ -38,6 +39,17 @@ function reconcile(config: EditorConfig): EditorConfig {
  * author's drawing, and nothing re-spaces them afterwards.
  */
 const CHAIN_SLOT_GAP = 28
+
+/**
+ * Set one panel slot's background pattern, returning a new config. `patterns` is
+ * parallel to PANELS, so unlike the two entry arrays there is nothing to append or
+ * splice — an out-of-range index is a no-op rather than a growth.
+ */
+export function patchPattern(config: EditorConfig, panel: number, style: PanelBgStyle): EditorConfig {
+  const next = cloneConfig(config)
+  if (panel >= 0 && panel < next.patterns.length) next.patterns[panel] = style
+  return next
+}
 
 /** Patch-merge a single image entry, returning a new config. */
 export function patchImg(

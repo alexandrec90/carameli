@@ -154,7 +154,25 @@ services:
     restart: unless-stopped
     stop_grace_period: 3s
     working_dir: /app
-    command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
+    # `ci`, not `install`, and the reason is not reproducibility -- it is that
+    # `/app` is a bind mount of the host's `frontend/`. `npm install` rewrites
+    # `package-lock.json` in place (this image's npm strips the `libc` fields the
+    # committed lock carries), so every `docker compose up` left a tracked file
+    # modified on the host. In an ephemeral worktree box that is fatal: `worktree.py`
+    # refuses to reap a box holding a tracked change, on any verdict, so a preview
+    # whose PR had already merged kept its port slot forever. Three of them filled
+    # the registry and `Preview: Open a UI Branch` started failing outright. devkit
+    # fixed the same defect on its side of the provisioning step (`npm ci`); the
+    # container is the second writer, and it needs the same answer.
+    #
+    # Stamped rather than unconditional: `ci` wipes and reinstalls `node_modules`,
+    # which is a named volume that otherwise survives a restart. `-nt` reruns it
+    # exactly when the lock has moved, so a new dependency still lands and an
+    # ordinary restart stays instant.
+    command: >
+      sh -c "[ /app/node_modules/.ci-stamp -nt /app/package-lock.json ] ||
+      { npm ci --no-audit --no-fund && touch /app/node_modules/.ci-stamp; } &&
+      npm run dev -- --host 0.0.0.0"
     ports:
       - "${FRONTEND_HOST_PORT:-5173}:5173"
     volumes:

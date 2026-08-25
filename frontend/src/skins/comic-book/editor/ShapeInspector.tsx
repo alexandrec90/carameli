@@ -1,15 +1,17 @@
 import type { LayoutKind, PanelGrid } from '../panelGeometry'
 import { constraintOf } from '../panelGeometry'
+import type { PanelPage } from '../panels'
 import { moveVertex } from './panelGridOps'
 import type { EditorModeApi } from './useEditorMode'
 import type { SeamDragApi } from './useSeamDrag'
 
-// The toolbar half of the shape editor: which of the three grids is in front, what the
-// selected corner is and what it is allowed to do, and the two edits a pointer cannot
-// make — an exact coordinate, and straightening a bend back out.
+// The toolbar half of the shape editor: which page and which of its three grids is in
+// front, what the selected corner is and what it is allowed to do, and the two edits a
+// pointer cannot make — an exact coordinate, and straightening a bend back out.
 
 interface ShapeInspectorProps {
   api: EditorModeApi
+  page: PanelPage
   kind: LayoutKind
   grid: PanelGrid
   drag: SeamDragApi
@@ -30,7 +32,7 @@ function fromPercent(value: string, fallback: number): number {
   return Number.isFinite(n) ? n / 100 : fallback
 }
 
-export default function ShapeInspector({ api, kind, grid, drag }: ShapeInspectorProps) {
+export default function ShapeInspector({ api, page, kind, grid, drag }: ShapeInspectorProps) {
   const index = drag.selectedVertex
   const vertex = index === null ? null : grid.vertices[index]
   const constraint = vertex ? constraintOf(vertex) : null
@@ -39,7 +41,7 @@ export default function ShapeInspector({ api, kind, grid, drag }: ShapeInspector
     if (index === null || !vertex) return
     const next: [number, number] = [vertex[0], vertex[1]]
     next[axis] = fromPercent(value, vertex[axis])
-    api.setGridFor(kind, moveVertex(grid, index, next))
+    api.setGridFor(page, kind, moveVertex(grid, index, next))
   }
 
   return (
@@ -97,8 +99,8 @@ export default function ShapeInspector({ api, kind, grid, drag }: ShapeInspector
       <button
         type="button"
         className="cb-ed-btn"
-        title={`Restore the ${kind} panel shapes to the shipped defaults`}
-        onClick={() => api.resetGridFor(kind)}
+        title={`Restore the ${page} page's ${kind} panel shapes to the shipped defaults`}
+        onClick={() => api.resetGridFor(page, kind)}
       >
         Reset {kind} shapes
       </button>

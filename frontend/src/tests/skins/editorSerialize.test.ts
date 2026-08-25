@@ -5,11 +5,13 @@ import {
   patchBubble,
   patchChain,
   patchImg,
+  patchPattern,
   seedConfig,
 } from '../../skins/comic-book/editor/configOps'
 import {
   PANEL_BUBBLE_TRANSFORMS,
   PANEL_IMG_TRANSFORMS,
+  PANEL_PATTERNS,
 } from '../../skins/comic-book/editor/layoutConfig'
 // The file the Save button overwrites, as text — the only way to assert that a save
 // with nothing changed rewrites it byte for byte.
@@ -17,9 +19,10 @@ import layoutConfigSource from '../../skins/comic-book/editor/layoutConfig.ts?ra
 import { moveVertex } from '../../skins/comic-book/editor/panelGridOps'
 import { serializeConfig, serializeConfigFile } from '../../skins/comic-book/editor/serialize'
 import type { EditorConfig } from '../../skins/comic-book/editor/types'
+import { PANELS } from '../../skins/comic-book/panels'
 
 const IMPORT_LINE =
-  "import type { ImgTransform, BubbleTransform, BubbleChain, PanelGrids } from './types'"
+  "import type { ImgTransform, BubbleTransform, BubbleChain, PageGrids } from './types'"
 
 /** Count `{ ... }` object entries inside the named const's array literal. */
 function entryCount(ts: string, constName: string): number {
@@ -29,7 +32,18 @@ function entryCount(ts: string, constName: string): number {
   return (arr.match(/\{/g) ?? []).length
 }
 
-/** The two transform blocks, without the chain and grid blocks that follow them. */
+/**
+ * Count quoted style names inside the PANEL_PATTERNS array literal. The block holds
+ * bare strings, not `{ ... }` entries, so {@link entryCount} cannot count it.
+ */
+function patternCount(ts: string): number {
+  const after = ts.slice(ts.indexOf('export const PANEL_PATTERNS'))
+  const start = after.indexOf('= [') + 2 // skip past the `PanelBgStyle[]` type annotation
+  const arr = after.slice(start, after.indexOf(']', start))
+  return (arr.match(/'/g) ?? []).length / 2
+}
+
+/** The two transform blocks, without the chain, pattern and grid blocks that follow. */
 function transformsOf(ts: string): string {
   const chains = ts.indexOf('export const PANEL_BUBBLE_CHAINS')
   return chains === -1 ? ts : ts.slice(0, chains)
@@ -38,21 +52,25 @@ function transformsOf(ts: string): string {
 /** Evaluate a serialized block back into a config, as a paste into the file would. */
 function reparse(ts: string): EditorConfig {
   const body = ts
+    .replace("import type { PanelBgStyle } from '../panelPatterns'", '')
     .replace(IMPORT_LINE, '')
     .replace(/export const PANEL_IMG_TRANSFORMS: ImgTransform\[\] =/, 'const images =')
     .replace(/export const PANEL_BUBBLE_TRANSFORMS: BubbleTransform\[\] =/, 'const bubbles =')
     .replace(/export const PANEL_BUBBLE_CHAINS: BubbleChain\[\] =/, 'const chains =')
-    .replace(/export const PANEL_GRIDS: PanelGrids =/, 'const grids =')
-  return new Function(`${body}\nreturn { images, bubbles, chains, grids }`)() as EditorConfig
+    .replace(/export const PANEL_PATTERNS: PanelBgStyle\[\] =/, 'const patterns =')
+    .replace(/export const PANEL_GRIDS: PageGrids =/, 'const grids =')
+  return new Function(`${body}\nreturn { images, bubbles, chains, grids, patterns }`)() as EditorConfig
 }
 
 describe('serializeConfig', () => {
-  it('emits both const blocks, every picture and every bubble', () => {
+  it('emits all the const blocks — every picture, bubble and pattern', () => {
     const ts = serializeConfig(seedConfig())
     expect(ts).toContain('export const PANEL_IMG_TRANSFORMS: ImgTransform[] = [')
     expect(ts).toContain('export const PANEL_BUBBLE_TRANSFORMS: BubbleTransform[] = [')
+    expect(ts).toContain('export const PANEL_PATTERNS: PanelBgStyle[] = [')
     expect(entryCount(ts, 'PANEL_IMG_TRANSFORMS')).toBe(PANEL_IMG_TRANSFORMS.length)
     expect(entryCount(ts, 'PANEL_BUBBLE_TRANSFORMS')).toBe(PANEL_BUBBLE_TRANSFORMS.length)
+    expect(patternCount(ts)).toBe(PANEL_PATTERNS.length)
   })
 
   // Save overwrites layoutConfig.ts verbatim, so a rule that lives only in that file's
@@ -64,6 +82,26 @@ describe('serializeConfig', () => {
     expect(ts).toContain('must name a bubble on the same panel')
     expect(ts).toContain("`tail` which way the tail points ('none'")
     expect(ts).toContain('Two pairs ship linked')
+    expect(ts).toContain('The one array here that IS parallel to PANELS')
+    expect(ts).toContain('falls back to the shipped default on hydrate')
+  })
+
+  it('writes the pattern an author picked, under its panel label comment', () => {
+    const ts = serializeConfig(patchPattern(seedConfig(), 0, 'sunburst'))
+    expect(ts).toContain("  'sunburst', // Logo\n")
+    expect(ts).not.toContain("'halftone-gradient'")
+  })
+
+  // The patterns block iterates PANELS, not the config: the array is parallel by
+  // contract, so a slot the working copy never carried serializes as its default
+  // rather than as `undefined`.
+  it('serializes the shipped default for a pattern slot the config never carried', () => {
+    const cfg = seedConfig()
+    cfg.patterns = cfg.patterns.slice(0, 3)
+    const ts = serializeConfig(cfg)
+    expect(patternCount(ts)).toBe(PANELS.length)
+    expect(ts).not.toContain('undefined')
+    expect(ts).toContain("  'radial-dots', // Logo 2\n")
   })
 
   it('reproduces the default values verbatim', () => {
@@ -158,9 +196,9 @@ describe('serializeConfig', () => {
 
   it('rounds vertex noise out of the grids without flattening the shape', () => {
     const cfg = seedConfig()
-    const grid = cfg.grids.landscape
+    const grid = cfg.grids.classic.landscape
     // What a drag actually produces: a pointer pixel divided by the frame width.
-    cfg.grids.landscape = moveVertex(grid, 2, [0.2448979591836, 0.4171428571428])
+    cfg.grids.classic.landscape = moveVertex(grid, 2, [0.2448979591836, 0.4171428571428])
     const ts = serializeConfig(cfg)
     expect(ts).toContain('[0.2449, 0.4171]')
     expect(ts.slice(ts.indexOf('export const PANEL_GRIDS'))).not.toMatch(/\d\.\d{5,}/)
@@ -229,6 +267,13 @@ describe('serializeConfig', () => {
     expect(parsed.images[index]).toEqual(config.images[index])
     expect(parsed.images.filter(t => t.panel === 3)).toHaveLength(2)
   })
+
+  it('round-trips an edited pattern back to the same style name', () => {
+    const cfg = patchPattern(seedConfig(), 9, 'vignette')
+    const parsed = reparse(serializeConfig(cfg))
+    expect(parsed.patterns).toHaveLength(PANEL_PATTERNS.length)
+    expect(parsed.patterns[9]).toBe('vignette')
+  })
 })
 
 describe('serializeConfig chains', () => {
@@ -286,12 +331,14 @@ describe('serializeConfig chains', () => {
 })
 
 describe('serializeConfigFile', () => {
-  it('prepends the type import header to the two const blocks', () => {
+  it('prepends the import header to the const blocks', () => {
     const file = serializeConfigFile(seedConfig())
-    expect(file.startsWith(IMPORT_LINE)).toBe(true)
+    expect(file.startsWith("import type { PanelBgStyle } from '../panelPatterns'")).toBe(true)
+    expect(file).toContain(IMPORT_LINE)
     expect(file).toContain('export const PANEL_IMG_TRANSFORMS: ImgTransform[] = [')
     expect(file).toContain('export const PANEL_BUBBLE_TRANSFORMS: BubbleTransform[] = [')
-    expect(file).toContain('export const PANEL_GRIDS: PanelGrids = {')
+    expect(file).toContain('export const PANEL_PATTERNS: PanelBgStyle[] = [')
+    expect(file).toContain('export const PANEL_GRIDS: PageGrids = {')
   })
 
   it('produces a body whose literals re-evaluate to the source config', () => {

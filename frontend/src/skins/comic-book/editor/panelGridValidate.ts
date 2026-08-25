@@ -1,4 +1,5 @@
-import type { NormPt, PanelGrid, PanelGrids } from '../panelGeometry'
+import type { NormPt, PageGrids, PanelGrid, PanelGrids } from '../panelGeometry'
+import { PANEL_PAGES } from '../panels'
 
 // Is this thing a grid, and is it a grid that can be drawn? Two questions with two
 // answers, on purpose.
@@ -19,7 +20,12 @@ function isPoint(v: unknown): v is NormPt {
   return Array.isArray(v) && v.length === 2 && v.every(n => typeof n === 'number' && Number.isFinite(n))
 }
 
-/** Structural guard: shaped like a grid, with every index in range and every ring closed. */
+/**
+ * Structural guard: shaped like a grid, with every index in range and every ring
+ * closed. A ring may also be *empty* — that is how a grid says "this panel sits on
+ * the other page" while staying PANELS-length — but never one or two vertices long,
+ * which is a polygon nothing could draw.
+ */
 export function isPanelGrid(value: unknown, panelCount: number): value is PanelGrid {
   if (!value || typeof value !== 'object') return false
   const grid = value as Partial<PanelGrid>
@@ -28,16 +34,23 @@ export function isPanelGrid(value: unknown, panelCount: number): value is PanelG
   return grid.panels.every(
     ring =>
       Array.isArray(ring) &&
-      ring.length >= 3 &&
+      (ring.length === 0 || ring.length >= 3) &&
       ring.every(i => Number.isInteger(i) && i >= 0 && i < (grid.vertices?.length ?? 0)),
   )
 }
 
-/** The same guard for the three-breakpoint record the config carries. */
+/** The same guard for the three-breakpoint record each page carries. */
 export function isPanelGrids(value: unknown, panelCount: number): value is PanelGrids {
   if (!value || typeof value !== 'object') return false
   const grids = value as Record<string, unknown>
   return LAYOUT_KINDS.every(kind => isPanelGrid(grids[kind], panelCount))
+}
+
+/** And once more for the whole per-page record the config carries. */
+export function isPageGrids(value: unknown, panelCount: number): value is PageGrids {
+  if (!value || typeof value !== 'object') return false
+  const pages = value as Record<string, unknown>
+  return PANEL_PAGES.every(page => isPanelGrids(pages[page], panelCount))
 }
 
 function onSameFrameEdge(a: NormPt, b: NormPt): boolean {
@@ -91,6 +104,7 @@ export function gridProblems(grid: PanelGrid, panelCount: number): string[] {
   const { vertices, panels } = grid
 
   panels.forEach((ring, p) => {
+    if (ring.length === 0) return // the panel lives on the other page
     if (new Set(ring).size !== ring.length) problems.push(`panel ${p} names a vertex twice`)
     if (ringArea(ring, vertices) < 1e-6) problems.push(`panel ${p} has no area`)
   })

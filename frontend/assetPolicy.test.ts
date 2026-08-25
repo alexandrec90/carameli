@@ -21,6 +21,7 @@ import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 import { PANEL_IMG_TRANSFORMS } from './src/skins/comic-book/editor/layoutConfig'
+import { PANELS } from './src/skins/comic-book/panels'
 import { DEFAULT_SKIN, SKIN_NAMES } from './src/skins/registry'
 import {
   ASSETS_SRC_DIR,
@@ -31,6 +32,7 @@ import {
   MAX_PRELOAD_BYTES,
   MAX_PUBLIC_BYTES,
   PUBLIC_DIR,
+  findGuardedPanelPages,
   findGuardedPanels,
   findGuardedSkins,
   findPreloadedImages,
@@ -166,19 +168,33 @@ describe('findPreloadedImages', () => {
     // and reported a 0 KB critical path as comfortably inside a 2.1 MB budget. A check
     // that silently starts measuring nothing is worse than no check, because it goes on
     // reporting green.
-    const html = `<script>var PANELS = ['/comic-book/logo.webp', '/a/b%20c.webp'];</script>`
+    const html = `<script>var PANELS = { classic: ['/comic-book/logo.webp', '/a/b%20c.webp'] };</script>`
     expect(findGuardedPanels(html)).toEqual(['/comic-book/logo.webp', '/a/b c.webp'])
     expect(findPreloadedImages(html)).toEqual(['/comic-book/logo.webp', '/a/b c.webp'])
+  })
+
+  it('keys the guard lists by page and keeps them apart', () => {
+    const html = `<script>var PANELS = {
+      classic: ['/comic-book/logo.webp'],
+      home: ['/comic-book/logo2.webp', '/comic-book/logo.webp'],
+    };</script>`
+    expect(findGuardedPanelPages(html)).toEqual({
+      classic: ['/comic-book/logo.webp'],
+      home: ['/comic-book/logo2.webp', '/comic-book/logo.webp'],
+    })
+    // Flattened, an image shared by both pages counts once.
+    expect(findGuardedPanels(html)).toEqual(['/comic-book/logo.webp', '/comic-book/logo2.webp'])
   })
 
   it('counts an image once when both spellings name it', () => {
     const html = `
       <link rel="preload" as="image" href="/comic-book/logo.webp" />
-      <script>var PANELS = ['/comic-book/logo.webp'];</script>`
+      <script>var PANELS = { classic: ['/comic-book/logo.webp'] };</script>`
     expect(findPreloadedImages(html)).toEqual(['/comic-book/logo.webp'])
   })
 
   it('returns nothing for a page with no guard, rather than throwing', () => {
+    expect(findGuardedPanelPages('<html></html>')).toEqual({})
     expect(findGuardedPanels('<html></html>')).toEqual([])
     expect(findGuardedSkins('<html></html>')).toEqual({ skins: [], fallback: undefined })
   })
@@ -211,16 +227,23 @@ describe('the skin guard in index.html', () => {
     ).toBe(DEFAULT_SKIN)
   })
 
-  it('preloads exactly the panels the layout draws, in the order it draws them', () => {
-    const drawn = [...new Set(PANEL_IMG_TRANSFORMS.map(transform => safeDecode(transform.src)))]
+  it('preloads, per page, exactly the panels that page draws, in the order it draws them', () => {
+    const drawn: Record<string, string[]> = {}
+    for (const transform of PANEL_IMG_TRANSFORMS) {
+      const page = PANELS[transform.panel].page
+      const url = safeDecode(transform.src)
+      const urls = (drawn[page] ??= [])
+      if (!urls.includes(url)) urls.push(url)
+    }
 
     expect(
-      findGuardedPanels(html),
-      'The guard PANELS list has drifted from PANEL_IMG_TRANSFORMS in ' +
+      findGuardedPanelPages(html),
+      'The guard PANELS record has drifted from PANEL_IMG_TRANSFORMS in ' +
         'src/skins/comic-book/editor/layoutConfig.ts. A panel dropped from the guard is ' +
         'fetched late, after the chunk that draws it, which is the load this preload list ' +
         'exists to avoid; a panel left in it after the layout stopped drawing it is bytes ' +
-        'nobody sees. Order is the preload priority, so it has to match too.',
+        "nobody sees; one on the wrong page's list loads for a page that never draws it. " +
+        'Order is the preload priority, so it has to match too.',
     ).toEqual(drawn)
   })
 })
@@ -294,9 +317,10 @@ describe('the served tree', () => {
     ).toEqual([])
   })
 
-  it('keeps the preloaded critical path within budget', () => {
+  it('keeps each page\'s preloaded critical path within budget', () => {
     const html = readFileSync(path.join(FRONTEND_ROOT, 'index.html'), 'utf-8')
     const preloaded = findPreloadedImages(html)
+    const pages = findGuardedPanelPages(html)
     const byUrl = new Map(served.map(asset => [asset.url, asset]))
 
     expect(
@@ -308,15 +332,19 @@ describe('the served tree', () => {
     const missing = preloaded.filter(url => !byUrl.has(url))
     expect(missing, 'index.html preloads assets that are not in public/').toEqual([])
 
-    const total = preloaded.reduce((sum, url) => sum + (byUrl.get(url)?.bytes ?? 0), 0)
-    expect(
-      total,
-      `The ${preloaded.length} preloaded images total ${kb(total)}, over the ` +
-        `${kb(MAX_PRELOAD_BYTES)} budget. This is the critical path: the comic-book ` +
-        'layout gates its ready state on the last of them to load, so this number is ' +
-        'roughly what a visitor waits for. Adding a preload without removing one, or ' +
-        'growing a panel, is what puts it over.',
-    ).toBeLessThanOrEqual(MAX_PRELOAD_BYTES)
+    // A visit preloads one page's list, so each list is its own critical path and is
+    // budgeted alone — summing them would budget a download no visitor makes.
+    for (const [page, urls] of Object.entries(pages)) {
+      const total = urls.reduce((sum, url) => sum + (byUrl.get(url)?.bytes ?? 0), 0)
+      expect(
+        total,
+        `The ${urls.length} images preloaded for the ${page} page total ${kb(total)}, ` +
+          `over the ${kb(MAX_PRELOAD_BYTES)} budget. This is the critical path: the ` +
+          'comic-book layout gates its ready state on the last of them to load, so this ' +
+          'number is roughly what a visitor waits for. Adding a preload without removing ' +
+          'one, or growing a panel, is what puts it over.',
+      ).toBeLessThanOrEqual(MAX_PRELOAD_BYTES)
+    }
   })
 
   it('keeps the whole served tree within budget', () => {

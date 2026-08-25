@@ -1,11 +1,14 @@
 import { logger } from '../../../lib/logger'
 import { isTailDir } from '../bubbleBox'
+import { isBubbleContentKind } from '../bubbleContent'
 import { PANELS } from '../panels'
-import { isBubbleContentKind } from '../wheelPicker'
+import { isPanelBgStyle } from '../panelPatterns'
+import type { PanelBgStyle } from '../panelPatterns'
 import { isBubbleType } from './bubbleTypes'
 import { hydrateChains, normalizeChainId, syncChains } from './chainOps'
 import { CONFIG_KEY, cloneGrids, NEW_BUBBLE, NEW_IMAGE, seedConfig } from './configSeed'
-import { isPanelGrids } from './panelGridValidate'
+import { PANEL_PATTERNS } from './layoutConfig'
+import { isPageGrids } from './panelGridValidate'
 import type { BubbleTransform, EditorConfig, ImgTransform } from './types'
 
 // Reading a persisted working copy back. Everything here exists because a payload
@@ -91,6 +94,31 @@ function coerceBubbleEnums(b: BubbleTransform): BubbleTransform {
 }
 
 /**
+ * The pattern array a payload carries, coerced back to one style per panel slot.
+ *
+ * Parallel to PANELS, so the length is not the author's: a short array (saved before a
+ * panel existed) backfills from the shipped defaults, a long one is cut, and a slot
+ * naming a style that has since been retired — or was never one — falls back to its
+ * shipped default rather than failing the draw. The style name is the whole entry, so
+ * unlike a bubble there is nothing else to save around it.
+ */
+export function normalizePatterns(raw: unknown): PanelBgStyle[] {
+  const list = Array.isArray(raw) ? raw : []
+  const dropped: Record<number, unknown> = {}
+  const out = PANEL_PATTERNS.map((shipped, i) => {
+    const candidate = list[i]
+    if (candidate === undefined) return shipped
+    if (isPanelBgStyle(candidate)) return candidate
+    dropped[i] = candidate
+    return shipped
+  })
+  if (Object.keys(dropped).length > 0) {
+    logger.warn('Dropped retired comic-book pattern styles', { key: CONFIG_KEY, dropped })
+  }
+  return out
+}
+
+/**
  * Pull an entry's `panel` back into the panel list. A panel index from an older
  * payload — or from a config hand-edited against a different grid — can outrun it, and
  * clamping beats an entry that renders nowhere and so cannot be selected to be fixed.
@@ -145,7 +173,8 @@ export function hydrateConfig(raw: string | null): EditorConfig {
       ),
     )
     return {
-      grids: isPanelGrids(parsed.grids, PANELS.length) ? cloneGrids(parsed.grids) : seed.grids,
+      grids: isPageGrids(parsed.grids, PANELS.length) ? cloneGrids(parsed.grids) : seed.grids,
+      patterns: normalizePatterns(parsed.patterns),
       images: parsed.images.map((t, i) => {
         // Typed as possibly-absent because the payload may be longer than the seed:
         // a ninth picture the author added has no shipped entry to recover from, and
