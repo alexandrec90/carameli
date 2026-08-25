@@ -1,4 +1,7 @@
-import { CHAIN_STEP_MS, DEFAULT_CHAIN_STEP_MS, isBubbleChain } from '../bubbleChain'
+import {
+  CHAIN_ROWS, CHAIN_STEP_MS, DEFAULT_CHAIN_ROWS, DEFAULT_CHAIN_STEP_MS, isBubbleChain,
+  OUT_PREFIX,
+} from '../bubbleChain'
 import type { BubbleChain } from '../bubbleChain'
 
 // The chain list's lifecycle, and the linkage the list is derived *through*. It sits
@@ -14,8 +17,8 @@ import type { BubbleChain } from '../bubbleChain'
 
 /**
  * A chain the author has just ticked the box on. `grow` defaults *on*: asking for a chain
- * is asking for the balloons to behave like a thread, and a column that arrives whole is
- * indistinguishable from the loose bubbles it was a moment ago. There is no `scroll`
+ * is asking for the balloons to behave like a conversation, and a table that arrives whole
+ * is indistinguishable from the loose bubbles it was a moment ago. There is no `scroll`
  * counterpart — a chain is a window over a transcript, so the wheel always moves it, and
  * the checkbox that created the chain is that promise.
  *
@@ -27,6 +30,7 @@ import type { BubbleChain } from '../bubbleChain'
 export const NEW_CHAIN: Omit<BubbleChain, 'id'> = {
   grow: true,
   stepMs: DEFAULT_CHAIN_STEP_MS,
+  rows: DEFAULT_CHAIN_ROWS,
   messages: [],
 }
 
@@ -156,6 +160,16 @@ export function clampStepMs(ms: number): number {
 }
 
 /**
+ * Pull a row cap into the range the inspector offers. A table of one row is a single
+ * balloon and not a conversation, and one of fifty is a wall of lettering nobody can read
+ * at panel size, so both ends are held rather than trusted.
+ */
+export function clampRows(rows: number): number {
+  if (!Number.isFinite(rows)) return DEFAULT_CHAIN_ROWS
+  return Math.min(Math.max(Math.round(rows), CHAIN_ROWS.min), CHAIN_ROWS.max)
+}
+
+/**
  * Patch-merge one chain by id, returning a new list. A patch for an id that is not
  * there is a no-op rather than an insert: the list is the bubbles' to grow, and an
  * inspector editing a chain nobody is in has nothing to show the result on.
@@ -172,6 +186,7 @@ export function patchChainIn(
     // bubble pointing at it, and the rename that *does* work is on the bubble's field.
     next.id = c.id
     next.stepMs = clampStepMs(next.stepMs)
+    next.rows = clampRows(next.rows)
     return next
   })
 }
@@ -182,15 +197,25 @@ export function patchChainIn(
  * answer as a payload written before chains existed — {@link syncChains} then rebuilds
  * the list from the bubbles, so the only thing an old payload loses is settings it
  * never had.
+ *
+ * The row cap is defaulted *before* the guard rather than after it, so a payload saved
+ * when a chain was a hand-drawn column and had no `rows` keeps its transcript instead of
+ * being dropped as malformed and rebuilt empty.
  */
 export function hydrateChains(raw: unknown): BubbleChain[] {
   if (!Array.isArray(raw)) return []
   const out: BubbleChain[] = []
   const seen = new Set<string>()
-  for (const entry of raw) {
+  for (const stored of raw) {
+    const entry =
+      stored && typeof stored === 'object'
+        ? { rows: DEFAULT_CHAIN_ROWS, ...(stored as object) }
+        : stored
     if (!isBubbleChain(entry) || seen.has(entry.id)) continue
     seen.add(entry.id)
-    out.push(cloneChain({ ...entry, stepMs: clampStepMs(entry.stepMs) }))
+    out.push(
+      cloneChain({ ...entry, stepMs: clampStepMs(entry.stepMs), rows: clampRows(entry.rows) }),
+    )
   }
   return out
 }
@@ -207,13 +232,21 @@ export function normalizeChainId(value: string): string {
 }
 
 /**
- * The author's `messages` textarea, one message per line. Blank lines are dropped: they
- * are the author laying the box out, and an empty balloon is not a message. An empty
- * result is the meaningful "speak the balloons' own text" state (see chainTranscript).
+ * The author's `messages` textarea, one message per line, written the way a chat log is
+ * written: a line starting with `>` is the *sender's* — the right column, the one the
+ * composer is at the foot of — and everything else is the recipient's.
+ *
+ * The marker is normalised to exactly {@link OUT_PREFIX} here, so `>Yeah`, `> Yeah` and
+ * `>   Yeah` are one message and not three spellings of one. Blank lines are dropped: they
+ * are the author laying the box out, and an empty balloon is not a message. An empty result
+ * is the meaningful "speak the balloons' own text" state (see chainTranscript).
  */
 export function parseMessages(text: string): string[] {
   return text
     .split('\n')
     .map(s => s.trim())
     .filter(s => s.length > 0)
+    .map(s => (s.startsWith('>') ? `${OUT_PREFIX}${s.slice(1).trim()}` : s))
+    // A bare `>` is a marker with nothing after it — still not a message.
+    .filter(s => s !== OUT_PREFIX)
 }

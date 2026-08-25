@@ -4,7 +4,7 @@ import {
   NEW_BUBBLE,
   NEW_CHAIN,
   addBubble,
-  addChainBubble,
+  addChainColumn,
   cloneConfig,
   hydrateConfig,
   linkCandidates,
@@ -162,62 +162,62 @@ describe('chains in a config', () => {
   })
 })
 
-describe('addChainBubble', () => {
+describe('addChainColumn', () => {
+  /** A chain of one balloon: the sender's column, drawn 5% in from the right edge. */
   const withChain = () => {
     const { config, index } = addBubble({ ...seedConfig(), bubbles: [] }, 6)
-    const placed = patchBubble(config, index, { top: -20, right: 5, width: 40 })
+    const placed = patchBubble(config, index, {
+      top: -20, right: 5, width: 40, tail: 'down-left', content: 'input', text: 'Say something',
+    })
     return setChained(placed, index, true)
   }
 
-  it('joins the new slot to the named chain on the named panel', () => {
-    const { config, index } = addChainBubble(withChain(), 6, 'chain-1')
+  it('joins the new column to the named chain on the named panel', () => {
+    const { config, index } = addChainColumn(withChain(), 6, 'chain-1')
     expect(config.bubbles[index]).toMatchObject({ panel: 6, chain: 'chain-1' })
   })
 
-  // The id is derived from the linkage, so the new slot has to be linked into the column
-  // or it would be a group of its own and lose the id the moment anything reconciles.
-  it('links it to the slot it was stacked on', () => {
-    const { config, index } = addChainBubble(withChain(), 6, 'chain-1')
+  // The id is derived from the linkage, so the new column has to be linked to the one it
+  // mirrors or it would be a group of its own and lose the id the moment anything
+  // reconciles.
+  it('links it to the column it mirrors', () => {
+    const { config, index } = addChainColumn(withChain(), 6, 'chain-1')
     expect(config.bubbles[index].linkTo).toBe(0)
   })
 
-  // The column runs upward in time, so a new slot belongs above the current top one —
-  // aligned with it, because a thread is a column and not a scatter.
-  it('places it above the chain’s current top slot, inheriting its column', () => {
-    const { config, index } = addChainBubble(withChain(), 6, 'chain-1')
-    expect(config.bubbles[index].top).toBeLessThan(-20)
-    expect(config.bubbles[index].right).toBe(5)
-    expect(config.bubbles[index].width).toBe(40)
+  // The two sides of an SMS conversation are the same balloon on opposite edges: 5% in from
+  // the right, 40 wide, becomes 5% in from the left.
+  it('places it mirrored across the panel, at the same size and height', () => {
+    const { config, index } = addChainColumn(withChain(), 6, 'chain-1')
+    expect(config.bubbles[index]).toMatchObject({ top: -20, right: 55, width: 40 })
   })
 
-  // Only the root speaks: it is the balloon the tail comes out of, and a stack of
-  // tails would read as several people talking at once.
-  it('gives it no tail', () => {
-    const { config, index } = addChainBubble(withChain(), 6, 'chain-1')
-    expect(config.bubbles[index].tail).toBe('none')
+  it('turns the tail back the other way, so it points across the panel and not off it', () => {
+    const { config, index } = addChainColumn(withChain(), 6, 'chain-1')
+    expect(config.bubbles[index].tail).toBe('down-right')
   })
 
-  it('stacks each further slot above the last', () => {
-    const one = addChainBubble(withChain(), 6, 'chain-1')
-    const two = addChainBubble(one.config, 6, 'chain-1')
-    expect(two.config.bubbles[two.index].top).toBeLessThan(one.config.bubbles[one.index].top)
-    expect(two.config.bubbles[two.index].linkTo).toBe(one.index)
+  // The composer belongs to the sender alone: the recipient's column holds messages that
+  // have already been sent, and cloning the field would put the reader on both sides.
+  it('takes no content or lettering from the balloon it mirrors', () => {
+    const { config, index } = addChainColumn(withChain(), 6, 'chain-1')
+    expect(config.bubbles[index]).toMatchObject({ content: 'text', text: '' })
   })
 
   it('starts a chain that has no members yet at the default placement', () => {
-    const { config, index } = addChainBubble({ ...seedConfig(), bubbles: [] }, 6, 'new')
+    const { config, index } = addChainColumn({ ...seedConfig(), bubbles: [] }, 6, 'new')
     expect(config.bubbles[index]).toEqual({ ...NEW_BUBBLE, panel: 6, chain: 'new' })
     expect(config.chains.map(c => c.id)).toEqual(['new'])
   })
 
   it('normalises the chain id it is given', () => {
-    const { config, index } = addChainBubble({ ...seedConfig(), bubbles: [] }, 6, ' new  name ')
+    const { config, index } = addChainColumn({ ...seedConfig(), bubbles: [] }, 6, ' new  name ')
     expect(config.bubbles[index].chain).toBe('new name')
   })
 
   it('does not mutate the input config', () => {
     const before = withChain()
-    addChainBubble(before, 6, 'chain-1')
+    addChainColumn(before, 6, 'chain-1')
     expect(before.bubbles).toHaveLength(1)
   })
 })

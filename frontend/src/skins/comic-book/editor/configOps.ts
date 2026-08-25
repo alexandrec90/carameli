@@ -1,4 +1,5 @@
-import { chainSlots } from '../bubbleChain'
+import { mirrorTailDir } from '../bubbleBox'
+import { chainMembers, mirrorColumn } from '../bubbleChain'
 import {
   linkGroups, nextChainId, normalizeChainId, patchChainIn, propagateChains, syncChains,
 } from './chainOps'
@@ -38,12 +39,6 @@ function reconcile(config: EditorConfig): EditorConfig {
   return config
 }
 
-/**
- * Vertical gap, in % of the panel box, between one chain slot and the next when the
- * editor adds one. A starting point for a drag, not a layout rule — the slots are the
- * author's drawing, and nothing re-spaces them afterwards.
- */
-const CHAIN_SLOT_GAP = 28
 
 /**
  * Set one panel slot's background pattern, returning a new config. `patterns` is
@@ -159,37 +154,45 @@ export function addBubble(
 }
 
 /**
- * Append a bubble as the far end of `chain` on `panel` — one column-height higher than
- * the chain's current top, so it lands where the next balloon of that thread goes rather
- * than on top of the root. A chain with no members yet gets the plain new-bubble
- * placement, and only the root carries a tail: every later slot is the same speaker
- * still talking, and a column of tails reads as a crowd.
+ * Append the *other* column of `chain` on `panel`: the balloon the conversation's rows are
+ * stamped from on the side that has none yet.
  *
- * It is **linked** to the slot it was placed above, not merely given the same id. Linkage
- * is what a chain is made of, so a slot added any other way would come apart the next time
+ * A conversation is two templates and no more, so this is the one add a chain has, and it
+ * mirrors rather than invents. The new balloon is the existing one flipped across the panel
+ * — same width, same height, same shape, its tail pointing back the way it came — because
+ * an SMS conversation's two sides are the same balloon on opposite edges, and an author who
+ * wanted them different can drag either afterwards. A chain with no members yet gets the
+ * plain new-bubble placement; one that already has both gets a third balloon that
+ * {@link chainColumns} will ignore, which is the honest answer to being asked twice.
+ *
+ * It is **linked** to the member it mirrors, not merely given the same id. Linkage is what
+ * a chain is made of, so a column added any other way would come apart the next time
  * `reconcile` settled the ids from the graph.
  */
-export function addChainBubble(
+export function addChainColumn(
   config: EditorConfig,
   panel: number,
   chain: string,
 ): { config: EditorConfig; index: number } {
   const next = cloneConfig(config)
   const id = normalizeChainId(chain)
-  const slots = chainSlots(next.bubbles, id, panel)
-  const topIndex = slots.length > 0 ? slots[slots.length - 1] : null
-  const top = topIndex == null ? null : next.bubbles[topIndex]
+  const members = chainMembers(next.bubbles, id, panel)
+  const fromIndex = members.length > 0 ? members[0] : null
+  const from = fromIndex == null ? null : next.bubbles[fromIndex]
   next.bubbles.push({
     ...NEW_BUBBLE,
     panel,
     chain: id,
-    ...(top
+    ...(from
       ? {
-        top: top.top - CHAIN_SLOT_GAP,
-        right: top.right,
-        width: top.width,
-        tail: 'none',
-        linkTo: topIndex,
+        ...mirrorColumn(from),
+        tail: mirrorTailDir(from.tail),
+        // The mirror is a *template*, not a copy of the message: its own text is the
+        // recipient's opening line at most, and cloning a composer's initial value onto
+        // the other side would put the sender's words in the recipient's mouth.
+        content: 'text',
+        text: '',
+        linkTo: fromIndex,
       }
       : {}),
   })

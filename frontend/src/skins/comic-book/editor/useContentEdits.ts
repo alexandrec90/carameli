@@ -2,7 +2,8 @@ import { useCallback, useMemo } from 'react'
 
 import type { PanelBgStyle } from '../panelPatterns'
 import {
-  addBubble, addChainBubble, addImg, patchBubble, patchChain, patchImg, patchPattern,
+  addBubble, addChainColumn as addChainColumnIn, addImg, patchBubble, patchChain, patchImg,
+  patchPattern,
   removeBubble, removeImg, resetOneIn, setChained as setChainedIn,
 } from './configOps'
 import type { SetSelection } from './selection'
@@ -35,8 +36,8 @@ export interface ContentEdits {
   addImgOn(panel: number): void
   deleteImg(index: number): void
   addBubbleOn(panel: number): void
-  /** Append a slot to `chain` on `panel` and select it. */
-  addChainSlot(panel: number, chain: string): void
+  /** Append the other column of `chain` on `panel` and select it. */
+  addChainColumn(panel: number, chain: string): void
   deleteBubble(index: number): void
   resetOne(kind: 'img' | 'bubble', index: number): void
 }
@@ -108,16 +109,16 @@ export function useContentEdits(apply: ApplyOp, setSelected: SetSelection): Cont
     [apply, setSelected],
   )
 
-  const addChainSlot = useCallback(
+  const addChainColumn = useCallback(
     (panel: number, chain: string) => {
       let added = -1
       apply(prev => {
-        const { config: next, index } = addChainBubble(prev, panel, chain)
+        const { config: next, index } = addChainColumnIn(prev, panel, chain)
         added = index
         return next
       })
-      // Selected for the same reason a plain add is: the new slot lands offset from the
-      // one below it, and the author's next move is to drag it where it belongs.
+      // Selected for the same reason a plain add is: the new column lands mirrored across
+      // the panel, and the author's next move is to letter it or drag it where it belongs.
       if (added >= 0) setSelected({ kind: 'bubble', index: added })
     },
     [apply, setSelected],
@@ -141,11 +142,11 @@ export function useContentEdits(apply: ApplyOp, setSelected: SetSelection): Cont
   return useMemo(
     () => ({
       setImg, setBubble, setChained, setChain, setPattern, addImgOn, deleteImg,
-      addBubbleOn, addChainSlot, deleteBubble, resetOne,
+      addBubbleOn, addChainColumn, deleteBubble, resetOne,
     }),
     [
       setImg, setBubble, setChained, setChain, setPattern, addImgOn, deleteImg,
-      addBubbleOn, addChainSlot, deleteBubble, resetOne,
+      addBubbleOn, addChainColumn, deleteBubble, resetOne,
     ],
   )
 }

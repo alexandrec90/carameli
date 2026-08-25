@@ -78,6 +78,25 @@ export function ringTheta(i: number): number {
 
 export type TailDir = keyof typeof TAIL_DIRS
 
+/** Left/right pairs, for {@link mirrorTailDir}. Vertical and absent tails are their own. */
+const MIRRORED_TAILS: Partial<Record<TailDir, TailDir>> = {
+  'down-left': 'down-right',
+  'down-right': 'down-left',
+  left: 'right',
+  right: 'left',
+  'up-left': 'up-right',
+  'up-right': 'up-left',
+}
+
+/**
+ * The same tail pointing the other way across the panel. What a balloon flipped to the
+ * opposite side needs: a left-hand balloon leaning its tail left points off the panel,
+ * where the right-hand one it was copied from was pointing at the character between them.
+ */
+export function mirrorTailDir(dir: TailDir): TailDir {
+  return MIRRORED_TAILS[dir] ?? dir
+}
+
 /** All tail directions in display order — for the editor dropdown. */
 export const TAIL_DIR_KEYS = Object.keys(TAIL_DIRS) as TailDir[]
 

@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest'
 
-import { CHAIN_STEP_MS, DEFAULT_CHAIN_STEP_MS } from '../../skins/comic-book/bubbleChain'
+import {
+  CHAIN_ROWS, CHAIN_STEP_MS, DEFAULT_CHAIN_ROWS, DEFAULT_CHAIN_STEP_MS, OUT_PREFIX,
+} from '../../skins/comic-book/bubbleChain'
 import type { BubbleChain } from '../../skins/comic-book/bubbleChain'
 import {
   NEW_CHAIN,
+  clampRows,
   clampStepMs,
   cloneChain,
   hydrateChains,
@@ -20,6 +23,7 @@ const chain = (id: string, over: Partial<BubbleChain> = {}): BubbleChain => ({
   id,
   grow: true,
   stepMs: DEFAULT_CHAIN_STEP_MS,
+  rows: DEFAULT_CHAIN_ROWS,
   messages: [],
   ...over,
 })
@@ -170,6 +174,24 @@ describe('clampStepMs', () => {
   })
 })
 
+describe('clampRows', () => {
+  it('passes a row cap inside the range through, rounded to a whole row', () => {
+    expect(clampRows(4.4)).toBe(4)
+  })
+
+  // A table of one row is a balloon, not a conversation; one of fifty is unreadable at
+  // panel size. Both ends are held rather than trusted.
+  it('clamps to the ends of the range the inspector offers', () => {
+    expect(clampRows(0)).toBe(CHAIN_ROWS.min)
+    expect(clampRows(999)).toBe(CHAIN_ROWS.max)
+  })
+
+  it('falls back to the default rather than laying out a NaN rows’ worth of balloons', () => {
+    expect(clampRows(Number.NaN)).toBe(DEFAULT_CHAIN_ROWS)
+    expect(clampRows(Number.POSITIVE_INFINITY)).toBe(DEFAULT_CHAIN_ROWS)
+  })
+})
+
 describe('patchChainIn', () => {
   it('merges the patch into the named chain only', () => {
     const out = patchChainIn([chain('left'), chain('right')], 'left', { grow: false })
@@ -179,6 +201,11 @@ describe('patchChainIn', () => {
 
   it('clamps a delay typed into the inspector', () => {
     expect(patchChainIn([chain('left')], 'left', { stepMs: 5 })[0].stepMs).toBe(CHAIN_STEP_MS.min)
+  })
+
+  it('clamps a row cap typed into the inspector', () => {
+    expect(patchChainIn([chain('left')], 'left', { rows: 99 })[0].rows).toBe(CHAIN_ROWS.max)
+    expect(patchChainIn([chain('left')], 'left', { rows: 0 })[0].rows).toBe(CHAIN_ROWS.min)
   })
 
   // The id is the join key the bubbles point at, and nothing renames one: it is generated
@@ -227,6 +254,25 @@ describe('hydrateChains', () => {
   it('clamps a hand-edited delay', () => {
     expect(hydrateChains([chain('left', { stepMs: 1 })])[0].stepMs).toBe(CHAIN_STEP_MS.min)
   })
+
+  it('clamps a hand-edited row cap', () => {
+    expect(hydrateChains([chain('left', { rows: 400 })])[0].rows).toBe(CHAIN_ROWS.max)
+  })
+
+  // A chain saved before the table had a row cap was a hand-drawn column of balloons. Its
+  // transcript is the part worth keeping, so the cap is defaulted in rather than the whole
+  // entry being read as malformed and rebuilt empty.
+  it('gives an entry saved without a row cap the default, keeping its transcript', () => {
+    const old: Partial<BubbleChain> = chain('left', { messages: ['hi', '> yes'] })
+    delete old.rows
+    expect(hydrateChains([old])).toEqual([
+      chain('left', { rows: DEFAULT_CHAIN_ROWS, messages: ['hi', '> yes'] }),
+    ])
+  })
+
+  it('still drops an entry whose row cap is not a number at all', () => {
+    expect(hydrateChains([{ ...chain('left'), rows: 'six' }])).toEqual([])
+  })
 })
 
 describe('normalizeChainId', () => {
@@ -256,5 +302,23 @@ describe('parseMessages', () => {
   it('answers [] for an empty box, which is the "speak the balloons\' own text" state', () => {
     expect(parseMessages('')).toEqual([])
     expect(parseMessages('\n\n')).toEqual([])
+  })
+
+  // A chat log is written with `>` on the sender's lines and nothing on the recipient's.
+  it('reads a leading > as the sender’s side', () => {
+    expect(parseMessages('hey\n> just picked up')).toEqual(['hey', `${OUT_PREFIX}just picked up`])
+  })
+
+  // Three spellings of one marker are one message, so the author never has to count spaces.
+  it('normalises however the marker was spaced', () => {
+    expect(parseMessages('>Yeah\n> Yeah\n>   Yeah')).toEqual([
+      `${OUT_PREFIX}Yeah`,
+      `${OUT_PREFIX}Yeah`,
+      `${OUT_PREFIX}Yeah`,
+    ])
+  })
+
+  it('drops a bare > — a marker with nothing after it is still not a message', () => {
+    expect(parseMessages('hey\n>\n>  ')).toEqual(['hey'])
   })
 })
