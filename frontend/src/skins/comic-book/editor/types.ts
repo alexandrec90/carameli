@@ -1,4 +1,5 @@
 import type { TailDir } from '../bubbleBox'
+import type { BubbleContentKind } from '../bubbleContent'
 import type { PanelGrids } from '../panelGeometry'
 import type { BubbleType } from './bubbleTypes'
 
@@ -6,7 +7,7 @@ import type { BubbleType } from './bubbleTypes'
 // the renderer needs it too and this module is the editor's. Re-exported here so
 // layoutConfig.ts — which the editor overwrites whole — keeps naming exactly one module
 // for its types.
-export type { LayoutKind, NormPt, PanelGrid, PanelGrids } from '../panelGeometry'
+export type { LayoutKind, PanelGrid, PanelGrids } from '../panelGeometry'
 
 /**
  * One picture on the page: which panel it belongs to, which file it shows, the frame
@@ -76,7 +77,12 @@ export interface BubbleTransform {
   type: BubbleType
   /** Which way the tail points, or 'none' (see TAIL_DIRS in bubbleBox.ts). */
   tail: TailDir
-  /** Bubble caption text. */
+  /**
+   * How `text` is presented: lettering, a wheel picker, a text input, or a
+   * region-aware phone input (see bubbleContent.ts).
+   */
+  content: BubbleContentKind
+  /** Caption/options, or the initial value of an editable input. */
   text: string
   /**
    * Bubble to join with a connector tube, by index into the bubble array; null when

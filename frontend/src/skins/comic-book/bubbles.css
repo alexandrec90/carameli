@@ -1,6 +1,7 @@
+@import './bubbleInputs.css';
+
 /* Speech bubbles and their connector tubes.
-   Split out of comic-book.css to keep both files under the skin's 250-line ceiling
-   (see .claude/rules/skin-comic-book.md). Imported by Layout.tsx directly after
+   Split out to stay under the skin's 250-line ceiling; imported by Layout.tsx after
    comic-book.css, preserving the cascade order the rules had while they lived there —
    though every selector here is unique to bubbles, so nothing depends on it. */
 
@@ -153,6 +154,56 @@
   font-size: clamp(0.75rem, 2vw, 1.125rem);
   color: #111;
   line-height: 1.2;
+}
+
+/* ─── In-bubble wheel picker ───────────────────────────────────────────────────
+   The 'wheel' content kind (see wheelPicker.ts): a drum of options behind a window.
+   The window is inset tighter than the plain-text block and clips overflow, so the
+   faded neighbours never poke past the ellipse ink. Placed after
+   .cb-panel-bubble-text on purpose — the wheel reuses that class and this inset
+   must win at equal specificity. */
+.cb-bubble-wheel {
+  inset: 24% 18% 36%;
+  overflow: hidden;
+}
+
+/* The drum. Anchored at the window's vertical centre; the translateY (set inline
+   from wheelOffsetEm) slides the picked row onto that centre line. */
+.cb-wheel-track {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  transition: transform 160ms ease-out;
+}
+
+/* Row height must match WHEEL_ROW_EM in wheelPicker.ts — the offset arithmetic
+   there assumes exactly this many em per row. */
+.cb-wheel-option {
+  height: 1.25em;
+  line-height: 1.25em;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  opacity: 0;
+  transform: scale(0.82);
+  transition: opacity 180ms ease-out, transform 180ms ease-out;
+}
+
+/* At rest only the picked option is inked, so the bubble reads as plain text. */
+.cb-wheel-option.is-selected {
+  opacity: 1;
+  transform: scale(1);
+}
+
+/* Hovering the bubble (is-open, React-driven) fades the unpicked options in above
+   and below the picked one, iOS-picker style. */
+.cb-bubble-wheel.is-open .cb-wheel-option {
+  opacity: 0.35;
+}
+
+.cb-bubble-wheel.is-open .cb-wheel-option.is-selected {
+  opacity: 1;
 }
 
 /* ─── Bubble connector tubes ─────────────────────────────────────────────────── */

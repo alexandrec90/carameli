@@ -1,5 +1,6 @@
 import { logger } from '../../../lib/logger'
 import { isTailDir } from '../bubbleBox'
+import { isBubbleContentKind } from '../bubbleContent'
 import { PANELS } from '../panels'
 import { isBubbleType } from './bubbleTypes'
 import { CONFIG_KEY, cloneGrids, NEW_BUBBLE, NEW_IMAGE, seedConfig } from './configSeed'
@@ -44,8 +45,10 @@ export function sanitizeLinks(bubbles: BubbleTransform[]): BubbleTransform[] {
  * plain ellipse is the one that asserts least about what the author meant. A retired
  * `hoverType`/`clickType` becomes `null`, which those fields already spell as "stay as
  * you are", so the bubble simply stops morphing on that event. A retired `tail` becomes
- * `'none'`, its own no-op. In each case the words, the placement and every other
- * property survive: the author loses the one attribute that no longer has a meaning.
+ * `'none'`, its own no-op. A retired `content` kind becomes `'text'` — the words are
+ * still there, just lettered plainly. In each case the words, the placement and every
+ * other property survive: the author loses the one attribute that no longer has a
+ * meaning.
  */
 function coerceBubbleEnums(b: BubbleTransform): BubbleTransform {
   const dropped: Record<string, unknown> = {}
@@ -63,6 +66,10 @@ function coerceBubbleEnums(b: BubbleTransform): BubbleTransform {
   if (!isTailDir(next.tail)) {
     dropped.tail = next.tail
     next.tail = 'none'
+  }
+  if (!isBubbleContentKind(next.content)) {
+    dropped.content = next.content
+    next.content = 'text'
   }
   if (Object.keys(dropped).length > 0) {
     logger.warn('Dropped retired comic-book bubble attributes', { key: CONFIG_KEY, dropped })

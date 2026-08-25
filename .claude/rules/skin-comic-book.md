@@ -320,8 +320,9 @@ The Ben-Day dots are still per-panel canvases, clipped to the same polygon.
 offsetX / offsetY / anchor / spill, with `src` drawn from the `PANEL_ASSETS` manifest
 in `editor/assets.ts`) and speech-bubble
 placement and behaviour (`PANEL_BUBBLE_TRANSFORMS`: panel / top / right / width /
-rotate / spill / type / tail / text, plus `hoverType` / `clickType` event morph
-targets and the `linkTo` tube partner). The renderer in `Layout.tsx` reads from these
+rotate / spill / type / tail / content / text, plus `hoverType` / `clickType` event
+morph targets and the `linkTo` tube partner; content may be lettering, a wheel picker,
+a text input or a locale-formatted phone input). The renderer in `Layout.tsx` reads from these
 arrays — there are **no magic framing numbers** in `Layout.tsx` or the CSS for
 images/bubbles, and no bubble text. To retune them, use the editor rather than
 hand-editing scattered values.
@@ -349,7 +350,7 @@ not the bubble a tube pointed at.
 | Adjust | drag / wheel / handles / arrows | Move the frame or bubble, resize (bottom-right grip), pan the picture inside its frame (top-left grip, picture only), rotate (top-right grip, bubble only), nudge (⇧×10); for a picture **Alt** swaps the two framings |
 | Add / remove | **+ Image** / **+ Bubble** toolbar buttons, **Delete image** / **Delete bubble** in the inspector | Adds to the selected panel; deleting a bubble clears any link naming it |
 | Picture fields | inspector selects | panel, picture (`PANEL_ASSETS`), alt (empty = decorative), anchor, spill |
-| Bubble fields | inspector selects | panel, type, **tail** (nine options incl. **No tail**), text, hover/click morph, link |
+| Bubble fields | inspector selects | panel, type, **tail** (nine options incl. **No tail**), **content** (Text / Wheel picker / Text input / Phone input), authored text or initial value, hover/click morph, link |
 | Pages | **Page** dropdown in toolbar | Switch route in edit mode (replays the wash); "Loading screen" entry previews the loading overlay + its exit wash |
 | Mode | **Content** / **Panel shapes** toggle | Content places pictures and bubbles; shapes drags the lines between panels. Content click targets are not rendered in shapes mode — a panel-sized target would swallow every drag aimed at a line crossing it |
 | Reshape | drag a **line** or a **vertex** | A frame vertex slides along its own edge; the four corners are locked; the frame itself has no handle. Arrows nudge (⇧×10) |

@@ -367,6 +367,7 @@ describe('bubbleStyle', () => {
       spill: true,
       type: 'soft',
       tail: 'down-left',
+      content: 'text',
       text: 'hi',
       linkTo: null,
       hoverType: null,

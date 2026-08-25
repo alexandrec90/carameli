@@ -285,6 +285,28 @@ describe('hydrateConfig', () => {
     expect(hydrateConfig(raw).bubbles[0].tail).toBe('none')
   })
 
+  // A working copy saved before the wheel picker existed has no `content` field at
+  // all; the NEW_BUBBLE merge backfills it as plain text.
+  it('backfills a pre-wheel bubble as plain text', () => {
+    const preWheel: Record<string, unknown> = { ...NEW_BUBBLE, text: 'Number please!' }
+    delete preWheel.content
+    const raw = JSON.stringify({ images: [], bubbles: [preWheel] })
+    const [b] = hydrateConfig(raw).bubbles
+    expect(b.content).toBe('text')
+    expect(b.text).toBe('Number please!')
+  })
+
+  it('replaces a retired content kind with plain text', () => {
+    const raw = JSON.stringify({
+      images: [],
+      bubbles: [{ ...NEW_BUBBLE, content: 'spinner', text: 'One, Two' }],
+    })
+    const [b] = hydrateConfig(raw).bubbles
+    // The words are still there, just lettered plainly rather than on a wheel.
+    expect(b.content).toBe('text')
+    expect(b.text).toBe('One, Two')
+  })
+
   it('leaves every live type and direction exactly as authored', () => {
     const bubbles = BUBBLE_TYPE_KEYS.flatMap(type =>
       TAIL_DIR_KEYS.map(tail => ({ ...NEW_BUBBLE, panel: 0, type, tail, hoverType: type })),
