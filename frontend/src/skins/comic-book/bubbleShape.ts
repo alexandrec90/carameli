@@ -14,8 +14,8 @@
 // puffs instead); the direction, including having none at all, is the author's.
 
 import { boltMod } from './boltShape'
-import { RING_POINTS, ELLIPSE, ringTheta, tailRingIndex, tailTip } from './bubbleBox'
-import type { TailDir } from './bubbleBox'
+import { RING_POINTS, ELLIPSE, cloudPuffs, ringTheta, tailRingIndex, tailTip } from './bubbleBox'
+import type { Puff, TailDir } from './bubbleBox'
 import type { BubbleType } from './editor/bubbleTypes'
 
 const TAU = Math.PI * 2
@@ -95,6 +95,12 @@ function r2(n: number): number {
  */
 export function ringPoints(type: BubbleType, tail: TailDir = 'none'): number[] {
   const { mod, tail: reach } = SHAPES[type]
+  return buildRing(mod, reach, tail)
+}
+
+/** Sample one ring from a modulation and a tail reach — the body of `ringPoints`,
+ *  shared with the hit region, which is built from a modulation no type owns. */
+function buildRing(mod: (i: number) => number, reach: number, tail: TailDir): number[] {
   const { cx, cy, rx, ry } = ELLIPSE
   const tailIdx = tailRingIndex(tail)
   const [tipX, tipY] = tailTip(tail)
@@ -151,10 +157,105 @@ export function puffOpacity(type: BubbleType): number {
  * unset `hoverType`/`clickType` means "stay as you are", not "become soft".
  */
 export function resolveBubbleShape(
-  b: { type: BubbleType; hoverType: BubbleType | null; clickType: BubbleType | null },
+  b: BubbleShapes,
   state: { hover: boolean; pulsing: boolean },
 ): BubbleType {
   if (state.pulsing && b.clickType) return b.clickType
   if (state.hover && b.hoverType) return b.hoverType
   return b.type
+}
+
+/** The shape-bearing fields of a bubble — all `resolveBubbleShape` reads. */
+interface BubbleShapes {
+  type: BubbleType
+  hoverType: BubbleType | null
+  clickType: BubbleType | null
+}
+
+/**
+ * Every shape `b` can resolve to, resting one first. The counterpart of
+ * {@link resolveBubbleShape}: it enumerates exactly the branches that function can
+ * take, so a new state-driven shape has to be added to both or the hit region below
+ * stops covering one of them.
+ */
+export function bubbleShapeCandidates(b: BubbleShapes): BubbleType[] {
+  return [...new Set([b.type, b.hoverType, b.clickType].filter((t): t is BubbleType => !!t))]
+}
+
+/**
+ * How far the hit region reaches past the geometry it stands in for, in view units.
+ *
+ * Two things need the slack. The painted outline is stroked, so its ink — and the
+ * `visiblePainted` area that used to be the hit target — already sits half a stroke
+ * *outside* the path. And the union below is exact only where the shapes are radial
+ * modulations of the base ellipse, which the displaced tail vertex is not. A hit
+ * region a hair too large is harmless; one a hair too small is the flicker again.
+ */
+const HIT_PAD = 4
+
+/** Move (x, y) `pad` units further along the direction (dx, dy), which need not be unit. */
+function pushOut(x: number, y: number, dx: number, dy: number, pad: number): [number, number] {
+  const d = Math.hypot(dx, dy)
+  return d === 0 ? [x, y] : [x + (dx / d) * pad, y + (dy / d) * pad]
+}
+
+/**
+ * One shape's outline, grown by {@link HIT_PAD}: the region that takes pointer events
+ * on behalf of `type`.
+ *
+ * A bubble's hit region is one of these **per shape it can take** (see
+ * {@link bubbleShapeCandidates}), overlaid — overlapping siblings in one group hit-test
+ * as their union, so the region is the union of the shapes without anything here
+ * having to compute one. That matters because the alternative, a single ring taking
+ * the largest radius at each vertex, is a true union only where the shapes are radial
+ * modulations of the base ellipse, and the displaced tail vertex is not: an authored
+ * spike sitting on the tail index has no vertex left to be widest at.
+ *
+ * Why a union at all: a hit region that morphs with the shape feeds back into itself.
+ * Hover a soft balloon whose `hoverType` is a thought cloud, with the cursor over one
+ * of the places the cloud's concave cusps cut inside the ellipse — the hover lands,
+ * the outline pulls away from the cursor, `pointerleave` fires, the shape returns to
+ * soft, the cursor is inside it again, and the two trade places for as long as the
+ * pointer sits still. No shape can leave the union, so the union cannot do that.
+ *
+ * The tail vertex is padded along its own wedge rather than along the ellipse ray. A
+ * tail is a long thin triangle whose axis, on a squashed ellipse, is nowhere near the
+ * ray its tip sits on, so a radial pad slides the tip sideways out of that triangle
+ * and leaves the drawn tip outside the region meant to cover it.
+ */
+export function hitRingPoints(type: BubbleType, tail: TailDir = 'none'): number[] {
+  const { mod, tail: reach } = SHAPES[type]
+  const ring = buildRing(mod, reach, tail)
+  const out: number[] = []
+  for (let i = 0; i < ring.length; i += 2) {
+    out.push(
+      ...pushOut(ring[i], ring[i + 1], ring[i] - ELLIPSE.cx, ring[i + 1] - ELLIPSE.cy, HIT_PAD),
+    )
+  }
+  const idx = reach > 0 ? tailRingIndex(tail) : -1
+  if (idx >= 0) {
+    // Aim away from the midpoint of the tail's two roots — the wedge's own axis.
+    const before = ((idx + RING_POINTS - 1) % RING_POINTS) * 2
+    const after = ((idx + 1) % RING_POINTS) * 2
+    const [tipX, tipY] = [ring[idx * 2], ring[idx * 2 + 1]]
+    const rootX = (out[before] + out[after]) / 2
+    const rootY = (out[before + 1] + out[after + 1]) / 2
+    ;[out[idx * 2], out[idx * 2 + 1]] = pushOut(tipX, tipY, tipX - rootX, tipY - rootY, HIT_PAD)
+  }
+  return out
+}
+
+/**
+ * Hit-target puffs for `b` — the trailing thought puffs, padded to match
+ * {@link hitRingPoints}, or none when no shape it can take grows them.
+ *
+ * They are detached from the ring, so they are a second piece of the hit region and
+ * have to obey the same rule: present for a bubble that only becomes a cloud on
+ * hover, not just for one drawn as a cloud right now. Otherwise the puff that
+ * appears under the cursor on hover has nothing holding the hover, and the fade in
+ * and out is the same oscillation the ring used to have.
+ */
+export function hitPuffs(b: BubbleShapes, tail: TailDir = 'none'): Puff[] {
+  const grows = bubbleShapeCandidates(b).some(t => SHAPES[t].puffs > 0)
+  return grows ? cloudPuffs(tail).map(p => ({ ...p, r: p.r + HIT_PAD })) : []
 }

@@ -88,9 +88,22 @@
   transform: scale(1) rotate(var(--cb-bubble-rot, -5deg));
 }
 
-/* The wrapper stays pointer-transparent even when revealed. PanelBubble opts only
-   its painted SVG outline and visible thought puffs back in with visiblePainted, so
-   the empty rectangle around a tail cannot swallow a panel hover or click. */
+/* The wrapper stays pointer-transparent even when revealed. Two things opt back in —
+   one unpainted overlay shaped like the balloon (.cb-bubble-hit, drawn by
+   PanelBubble) and a real input (.cb-bubble-input, below) — so the empty rectangle
+   around a tail cannot swallow a panel hover or click. The wrapper still *handles*
+   hover: enter and leave are synthesized from whatever in the subtree took the
+   pointer, which is exactly the union of those two. */
+
+/* The hit region, drawn by PanelBubble from hitRingPoints. It paints nothing — with
+   pointer-events: all an element is still a target over its interior "regardless of
+   the value of the fill, stroke and visibility properties", which is exactly the
+   trade wanted here: a hit target with no ink of its own. Whether it is live at all
+   is PanelBubble's inline pointer-events, so nothing here may set that property. */
+.cb-bubble-hit {
+  fill: none;
+  stroke: none;
+}
 
 /* Optional clip wrapper around a bubble (spill off) — mirrors .cb-img-clip so the
    bubble is clipped to the panel polygon (supplied inline) instead of floating.
@@ -152,6 +165,15 @@
   font-size: clamp(0.75rem, 2vw, 1.125rem);
   color: #111;
   line-height: 1.2;
+}
+
+/* The one piece of bubble content that is a real control rather than lettering, so
+   the one that needs the pointer for itself: an input the mouse cannot reach is a
+   text box only a keyboard can fill. Revealed and interactive only — an invisible
+   input would swallow clicks aimed at the panel it floats over, which is the whole
+   reason the wrapper stays transparent. */
+.cb-panel-bubble.is-visible.is-interactive .cb-bubble-input {
+  pointer-events: auto;
 }
 
 /* ─── In-bubble wheel picker ───────────────────────────────────────────────────

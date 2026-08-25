@@ -1,7 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
 
 import { BUBBLE_VIEW, cloudPuffs } from './bubbleBox'
-import { puffOpacity, resolveBubbleShape } from './bubbleShape'
+import {
+  bubbleShapeCandidates,
+  hitPuffs,
+  hitRingPoints,
+  pathD,
+  puffOpacity,
+  resolveBubbleShape,
+} from './bubbleShape'
 import BubbleInput from './BubbleInput'
 import BubbleWheel from './BubbleWheel'
 import { BUBBLE_TYPES } from './editor/bubbleTypes'
@@ -50,8 +57,13 @@ export default function PanelBubble({ bubble, visible, interactive }: PanelBubbl
   // The puffs trail the tail, so a thought bubble with no tail simply has none.
   const puffs = cloudPuffs(bubble.tail)
   const puffsOpacity = puffOpacity(shape)
-  const shapePointerEvents = visible && interactive ? 'visiblePainted' : 'none'
-  const puffsPointerEvents = shape === 'cloud' ? shapePointerEvents : 'none'
+  // The hit region is every shape this bubble can take, overlaid, so it is the same
+  // region whatever `shape` currently is. Deriving it from the drawn outline instead
+  // let a hover shrink the outline out from under the cursor, which un-hovered it,
+  // which restored the outline — a standing cursor flickered between the two forever.
+  const hitShapes = bubbleShapeCandidates(bubble)
+  const hitPuffList = hitPuffs(bubble, bubble.tail)
+  const hitPointerEvents = visible && interactive ? 'all' : 'none'
   // Lettering follows the shape: a shout balloon in the speech font reads wrong,
   // and comics do swap the lettering when the balloon changes character.
   const font = BUBBLE_TYPES[shape].font
@@ -75,6 +87,13 @@ export default function PanelBubble({ bubble, visible, interactive }: PanelBubbl
       className={className}
       aria-hidden={editableKind ? undefined : true}
       style={bubbleStyle(bubble)}
+      // On the wrapper, though the wrapper itself takes no pointer: enter and leave
+      // are synthesized from the subtree, so this is "the pointer is somewhere in the
+      // bubble" — the hit outline or the input — rather than "on this one element".
+      // Hung off the outline instead, stepping from it into the input read as a leave.
+      onPointerEnter={interactive ? () => setHover(true) : undefined}
+      onPointerLeave={interactive ? () => setHover(false) : undefined}
+      onPointerDown={interactive ? pulse : undefined}
       onFocusCapture={editableKind && interactive ? () => setFocused(true) : undefined}
       onBlurCapture={editableKind && interactive ? () => setFocused(false) : undefined}
     >
@@ -84,32 +103,24 @@ export default function PanelBubble({ bubble, visible, interactive }: PanelBubbl
         style={{ aspectRatio: `${BUBBLE_VIEW.w} / ${BUBBLE_VIEW.h}` }}
         aria-hidden="true"
       >
-        <g
-          onPointerEnter={interactive ? () => setHover(true) : undefined}
-          onPointerLeave={interactive ? () => setHover(false) : undefined}
-          onPointerDown={interactive ? pulse : undefined}
-        >
-          {/* No `d` prop by design — useBubbleMorph owns the attribute. */}
-          <path
-            ref={pathRef}
-            className="cb-bubble-shape"
-            pointerEvents={shapePointerEvents}
-          />
-          <g
-            className="cb-bubble-puffs"
-            style={{ opacity: puffsOpacity }}
-            pointerEvents={puffsPointerEvents}
-          >
-            {puffs.map(p => (
-              <circle
-                key={`${p.cx}-${p.cy}`}
-                className="cb-bubble-shape"
-                cx={p.cx}
-                cy={p.cy}
-                r={p.r}
-              />
-            ))}
-          </g>
+        {/* No `d` prop by design — useBubbleMorph owns the attribute. */}
+        <path ref={pathRef} className="cb-bubble-shape" pointerEvents="none" />
+        <g className="cb-bubble-puffs" style={{ opacity: puffsOpacity }} pointerEvents="none">
+          {puffs.map(p => (
+            <circle key={`${p.cx}-${p.cy}`} className="cb-bubble-shape" cx={p.cx} cy={p.cy} r={p.r} />
+          ))}
+        </g>
+        {/* The hit region: unpainted, never morphs, and — with a real input, the only
+            other thing here that takes a pointer — all a hover or a press can land on.
+            `all` rather than `visiblePainted` because it has no paint to be visible;
+            see hitRingPoints for what it covers and why it is a shape per state. */}
+        <g className="cb-bubble-hit" pointerEvents={hitPointerEvents}>
+          {hitShapes.map(t => (
+            <path key={t} d={pathD(hitRingPoints(t, bubble.tail))} />
+          ))}
+          {hitPuffList.map(p => (
+            <circle key={`${p.cx}-${p.cy}`} cx={p.cx} cy={p.cy} r={p.r} />
+          ))}
         </g>
       </svg>
       {editableKind ? (
