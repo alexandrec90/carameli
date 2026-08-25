@@ -412,3 +412,13 @@ export function imgFrameStyle(
   const box = imgFrameBox(bounds, t)
   return { position: 'absolute', left: box.x, top: box.y, width: box.w, height: box.h }
 }
+
+/**
+ * True when a picture's frame is exactly its panel — the shipped default. The ink
+ * layer skips these frames because the panel outline already strokes the same path.
+ */
+export function isFullPanelFrame(
+  t: Pick<ImgTransform, 'left' | 'top' | 'width' | 'height'>,
+): boolean {
+  return t.left === 0 && t.top === 0 && t.width === 100 && t.height === 100
+}

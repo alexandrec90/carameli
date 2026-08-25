@@ -5,7 +5,7 @@ import type { BubbleTransform } from './editor/types'
 import type { PanelPoly } from './panelGeometry'
 
 interface BubbleTubesProps {
-  polys: PanelPoly[]
+  polys: (PanelPoly | null)[]
   bubbles: BubbleTransform[]
   /** Whether bubble `index` is currently revealed. */
   isVisible(index: number): boolean

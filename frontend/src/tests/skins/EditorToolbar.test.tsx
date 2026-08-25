@@ -27,6 +27,7 @@ function editorApi(): EditorModeApi {
     addBubbleOn: vi.fn(),
     setImg: vi.fn(),
     setBubble: vi.fn(),
+    setPattern: vi.fn(),
     deleteImg: vi.fn(),
     deleteBubble: vi.fn(),
     resetOne: vi.fn(),
@@ -43,8 +44,9 @@ describe('EditorToolbar', () => {
           selPanel={null}
           pageSelect={{ navItems: [], previewingLoading: false, onPreviewLoading: vi.fn() }}
           shapes={{
+            page: 'classic',
             kind: 'landscape',
-            grid: config.grids.landscape,
+            grid: config.grids.classic.landscape,
             drag: {} as SeamDragApi,
           }}
         />
