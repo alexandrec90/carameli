@@ -26,10 +26,10 @@
   z-index: 5;
 }
 
-/* A balloon that is a slot of a live chain.
+/* A balloon that is a slot of a bubble chain.
  *
  * `top`/`right`/`width` join the transition list, which is the whole scroll animation:
- * the message keeps its element as it moves down the column (PanelBubbleChain keys by
+ * the message keeps its element as it climbs the column (PanelBubbleChain keys by
  * message, not by slot), so its placement *changes* rather than the balloons swapping
  * text, and CSS carries it. The easing is a decelerating curve rather than the overshoot
  * the pop-in uses — a thread sliding is a physical settle, not a bounce.
@@ -46,7 +46,8 @@
     width 280ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-/* Arrival: a new message rises into place as it fades in.
+/* Arrival: a new message rises into the root balloon as it fades in — from below, the way
+ * a message lands at the bottom of a phone's conversation.
  *
  * An animation and not a transition, because there is nothing to transition *from* — the
  * element mounts already carrying `.is-visible`, and a property that has only ever had

@@ -1,5 +1,7 @@
 import { chainSlots } from '../bubbleChain'
-import { normalizeChainId, patchChainIn, syncChains } from './chainOps'
+import {
+  linkGroups, nextChainId, normalizeChainId, patchChainIn, propagateChains, syncChains,
+} from './chainOps'
 import type { PanelBgStyle } from '../panelPatterns'
 import { cloneConfig, NEW_BUBBLE, NEW_IMAGE, seedConfig } from './configSeed'
 import { sanitizeLinks } from './configHydrate'
@@ -22,13 +24,16 @@ export { hydrateConfig, sanitizeLinks } from './configHydrate'
 export { NEW_CHAIN } from './chainOps'
 
 /**
- * Bring the derived halves of a config back into agreement with its bubbles: links that
- * no longer make sense are nulled, and the chain list is recomputed from the names the
- * bubbles carry. Every op that can touch a bubble runs this, which is what keeps "add a
- * chain" and "delete a chain" from needing to exist as operations at all.
+ * Bring the derived halves of a config back into agreement with its bubbles, in the one
+ * order they can be derived in: links that no longer make sense are nulled, chain ids are
+ * settled from the linkage that survives, and the chain list is recomputed from the ids.
+ *
+ * Every op that can touch a bubble runs this, which is what keeps "add a chain" and
+ * "delete a chain" from needing to exist as operations at all — and what makes linking a
+ * loose balloon onto a chained one enough to make it a slot of that chain.
  */
 function reconcile(config: EditorConfig): EditorConfig {
-  config.bubbles = sanitizeLinks(config.bubbles)
+  config.bubbles = propagateChains(sanitizeLinks(config.bubbles))
   config.chains = syncChains(config.bubbles, config.chains)
   return config
 }
@@ -84,6 +89,30 @@ export function patchBubble(
 }
 
 /**
+ * Make the linked group bubble `index` belongs to a scrollable chain, or take it back to
+ * plain balloons. This is the whole of "is it a chain?" — one checkbox, applied to the
+ * group rather than to the balloon, because a thread is a property of the column and a
+ * single slot of one has no meaning on its own.
+ *
+ * The group keeps an id it already had, so ticking the box on a second member of an
+ * existing chain is a no-op rather than a rename that would strand its settings. A group
+ * with no id yet gets a fresh one; unticking clears the id on every member at once, which
+ * is what turns the column back into the linked balloons it was drawn as — tubes and all.
+ */
+export function setChained(config: EditorConfig, index: number, on: boolean): EditorConfig {
+  const next = cloneConfig(config)
+  if (!next.bubbles[index]) return next
+  const bubbles = sanitizeLinks(next.bubbles)
+  const group = linkGroups(bubbles).find(g => g.includes(index)) ?? [index]
+  const id = on
+    ? (group.map(i => bubbles[i].chain).find(c => c !== '') ?? nextChainId(bubbles))
+    : ''
+  const inGroup = new Set(group)
+  next.bubbles = bubbles.map((b, i) => (inGroup.has(i) ? { ...b, chain: id } : b))
+  return reconcile(next)
+}
+
+/**
  * Patch-merge one chain's settings by id, returning a new config. There is no add or
  * remove counterpart: the list follows the bubbles (see {@link reconcile}).
  */
@@ -130,11 +159,15 @@ export function addBubble(
 }
 
 /**
- * Append a bubble as the newest slot of `chain` on `panel` — one column-height higher
- * than the chain's current top, so it lands where the next balloon of that thread goes
- * rather than on top of the root. A chain with no members yet gets the plain new-bubble
+ * Append a bubble as the far end of `chain` on `panel` — one column-height higher than
+ * the chain's current top, so it lands where the next balloon of that thread goes rather
+ * than on top of the root. A chain with no members yet gets the plain new-bubble
  * placement, and only the root carries a tail: every later slot is the same speaker
  * still talking, and a column of tails reads as a crowd.
+ *
+ * It is **linked** to the slot it was placed above, not merely given the same id. Linkage
+ * is what a chain is made of, so a slot added any other way would come apart the next time
+ * `reconcile` settled the ids from the graph.
  */
 export function addChainBubble(
   config: EditorConfig,
@@ -144,13 +177,20 @@ export function addChainBubble(
   const next = cloneConfig(config)
   const id = normalizeChainId(chain)
   const slots = chainSlots(next.bubbles, id, panel)
-  const top = slots.length > 0 ? next.bubbles[slots[slots.length - 1]] : null
+  const topIndex = slots.length > 0 ? slots[slots.length - 1] : null
+  const top = topIndex == null ? null : next.bubbles[topIndex]
   next.bubbles.push({
     ...NEW_BUBBLE,
     panel,
     chain: id,
     ...(top
-      ? { top: top.top - CHAIN_SLOT_GAP, right: top.right, width: top.width, tail: 'none' }
+      ? {
+        top: top.top - CHAIN_SLOT_GAP,
+        right: top.right,
+        width: top.width,
+        tail: 'none',
+        linkTo: topIndex,
+      }
       : {}),
   })
   return { config: reconcile(next), index: next.bubbles.length - 1 }
@@ -205,14 +245,18 @@ export function indicesOnPanel(entries: { panel: number }[], panel: number): num
 }
 
 /**
- * Bubbles bubble `index` may link to: the unchained others on its own panel, and no
- * more. This is where the same-panel and no-chained-ends rules are enforced for the
- * author — the dropdown simply never offers an invalid partner, so the invalid state is
- * unreachable rather than validated after the fact. A chained bubble has no candidates
- * at all, which greys the picker out; `sanitizeLinks` says why.
+ * Bubbles bubble `index` may link to: the others on its own panel, and no more. This is
+ * where the same-panel rule is enforced for the author — the dropdown simply never offers
+ * an invalid partner, so the invalid state is unreachable rather than validated after the
+ * fact.
+ *
+ * Chained bubbles are offered like any other, because linkage is now how a chain is
+ * built: the picker is the control that joins one balloon's thread to the next, and what
+ * the linked group *is* — welded pair or scrollable thread — is the checkbox's answer,
+ * not this one's.
  */
-export function linkCandidates(bubbles: { panel: number; chain: string }[], index: number): number[] {
+export function linkCandidates(bubbles: { panel: number }[], index: number): number[] {
   const self = bubbles[index]
-  if (!self || self.chain) return []
-  return indicesOnPanel(bubbles, self.panel).filter(i => i !== index && !bubbles[i].chain)
+  if (!self) return []
+  return indicesOnPanel(bubbles, self.panel).filter(i => i !== index)
 }

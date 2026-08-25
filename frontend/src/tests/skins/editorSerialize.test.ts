@@ -282,10 +282,10 @@ describe('serializeConfig chains', () => {
     let cfg = seedConfig()
     cfg = patchBubble(cfg, 0, { chain: 'her side' })
     cfg = patchBubble(cfg, 1, { chain: 'her side' })
-    return patchChain(cfg, 'her side', { grow: true, scroll: false, stepMs: 450, messages: ['Hi', 'You up?'] })
+    return patchChain(cfg, 'her side', { grow: true, stepMs: 450, messages: ['Hi', 'You up?'] })
   }
 
-  it('writes the chain’s name on every bubble that carries one', () => {
+  it('writes the chain’s id on every bubble that carries one', () => {
     const ts = serializeConfig(threaded())
     expect((ts.match(/chain: 'her side'/g) ?? [])).toHaveLength(2)
   })
@@ -294,8 +294,7 @@ describe('serializeConfig chains', () => {
     const ts = serializeConfig(threaded())
     expect(ts).toContain('export const PANEL_BUBBLE_CHAINS: BubbleChain[] = [')
     expect(ts).toContain(
-      "  { id: 'her side', grow: true, scroll: false, stepMs: 450, " +
-        "messages: ['Hi', 'You up?'] },",
+      "  { id: 'her side', grow: true, stepMs: 450, messages: ['Hi', 'You up?'] },",
     )
   })
 
@@ -311,6 +310,10 @@ describe('serializeConfig chains', () => {
     const ts = serializeConfig(seedConfig())
     expect(ts).toContain('the lowest is the root that carries the tail')
     expect(ts).toContain('the list is derived from them, not')
+    // The two things a hand-editor cannot infer from the data: which end is newest, and
+    // that a composer is spelled as a content kind on the root.
+    expect(ts).toContain('holds the *newest* message')
+    expect(ts).toContain("content: 'input'")
   })
 
   it('escapes an apostrophe an author typed into a message', () => {

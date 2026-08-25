@@ -3,7 +3,7 @@ import { useCallback, useMemo } from 'react'
 import type { PanelBgStyle } from '../panelPatterns'
 import {
   addBubble, addChainBubble, addImg, patchBubble, patchChain, patchImg, patchPattern,
-  removeBubble, removeImg, resetOneIn,
+  removeBubble, removeImg, resetOneIn, setChained as setChainedIn,
 } from './configOps'
 import type { SetSelection } from './selection'
 import type { BubbleChain, BubbleTransform, EditorConfig, ImgTransform } from './types'
@@ -19,6 +19,12 @@ export type ApplyOp = (op: (prev: EditorConfig) => EditorConfig) => void
 export interface ContentEdits {
   setImg(index: number, patch: Partial<ImgTransform>): void
   setBubble(index: number, patch: Partial<BubbleTransform>): void
+  /**
+   * Make the linked group holding bubble `index` a chain, or take it back to plain
+   * balloons. Takes a bubble index rather than a chain id precisely because the id may
+   * not exist yet: this is the call that creates one.
+   */
+  setChained(index: number, on: boolean): void
   /**
    * Patch one chain's settings. Keyed by name rather than by index because the chain
    * list is derived from the bubbles — an edit that renames a chain reorders it, and an
@@ -44,6 +50,11 @@ export function useContentEdits(apply: ApplyOp, setSelected: SetSelection): Cont
   const setBubble = useCallback(
     (index: number, patch: Partial<BubbleTransform>) =>
       apply(prev => patchBubble(prev, index, patch)),
+    [apply],
+  )
+
+  const setChained = useCallback(
+    (index: number, on: boolean) => apply(prev => setChainedIn(prev, index, on)),
     [apply],
   )
 
@@ -129,11 +140,11 @@ export function useContentEdits(apply: ApplyOp, setSelected: SetSelection): Cont
 
   return useMemo(
     () => ({
-      setImg, setBubble, setChain, setPattern, addImgOn, deleteImg,
+      setImg, setBubble, setChained, setChain, setPattern, addImgOn, deleteImg,
       addBubbleOn, addChainSlot, deleteBubble, resetOne,
     }),
     [
-      setImg, setBubble, setChain, setPattern, addImgOn, deleteImg,
+      setImg, setBubble, setChained, setChain, setPattern, addImgOn, deleteImg,
       addBubbleOn, addChainSlot, deleteBubble, resetOne,
     ],
   )

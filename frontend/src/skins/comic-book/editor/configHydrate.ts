@@ -5,7 +5,7 @@ import { PANELS } from '../panels'
 import { isPanelBgStyle } from '../panelPatterns'
 import type { PanelBgStyle } from '../panelPatterns'
 import { isBubbleType } from './bubbleTypes'
-import { hydrateChains, normalizeChainId, syncChains } from './chainOps'
+import { hydrateChains, normalizeChainId, propagateChains, syncChains } from './chainOps'
 import { CONFIG_KEY, cloneGrids, NEW_BUBBLE, NEW_IMAGE, seedConfig } from './configSeed'
 import { PANEL_PATTERNS } from './layoutConfig'
 import { isPageGrids } from './panelGridValidate'
@@ -16,21 +16,21 @@ import type { BubbleTransform, EditorConfig, ImgTransform } from './types'
 // config has to come back as a page either way.
 
 /**
- * Drop every link that can no longer be drawn: out of range, to itself, across panels,
- * or with either end in a bubble chain. Run after any edit that can invalidate one — a
- * delete renumbers the array, moving a bubble to another panel strands whatever it was
- * joined to, and naming a chain turns a fixed balloon into a slot that different
- * messages pass through.
- *
- * The chain rule is the same rule as the panel one, one step on. A tube is a weld
- * between two balloons that are on screen together and stay put; a chain slot holds
- * whatever has scrolled into it, so a tube anchored there would be joining a different
- * sentence every time the reader turned the wheel.
+ * Drop every link that can no longer mean anything: out of range, to itself, or across
+ * panels. Run after any edit that can invalidate one — a delete renumbers the array, and
+ * moving a bubble to another panel strands whatever it was joined to.
  *
  * It nulls rather than repairs, because there is no repair: the author's intent was
- * to join two specific balloons, and once they are on different panels no tube
+ * to join two specific balloons, and once they are on different panels nothing
  * expresses it. Leaving the stale index would have BubbleTubes silently skip it,
- * which looks like a rendering bug rather than a config the editor undid.
+ * which looks like a rendering bug rather than a config the editor undid — and would
+ * leave `propagateChains` joining two panels' balloons into one column.
+ *
+ * A link with an end in a chain used to be nulled here too, back when a chain was a name
+ * typed on a balloon and a tube was the only thing a link could mean. Linkage is now what
+ * *builds* a chain, so nulling those is exactly backwards; what the two readings of a
+ * link share is this function's rule that both ends be real and on one panel, and they
+ * are told apart downstream — `linkedPairs` draws no tube across a chained group.
  */
 export function sanitizeLinks(bubbles: BubbleTransform[]): BubbleTransform[] {
   return bubbles.map((b, i) => {
@@ -38,7 +38,6 @@ export function sanitizeLinks(bubbles: BubbleTransform[]): BubbleTransform[] {
     if (j == null) return b
     const partner = bubbles[j]
     if (j === i || !partner || partner.panel !== b.panel) return { ...b, linkTo: null }
-    if (b.chain || partner.chain) return { ...b, linkTo: null }
     return b
   })
 }
@@ -160,7 +159,7 @@ export function hydrateConfig(raw: string | null): EditorConfig {
     // one — so a payload that fails the structural guard falls back to the shipped
     // grids and the author's pictures and words survive around them.
     const seed = seedConfig()
-    const bubbles = sanitizeLinks(
+    const bubbles = propagateChains(sanitizeLinks(
       parsed.bubbles.map(b =>
         // Cast because a persisted payload predates whatever fields were added since,
         // whatever the declared type says it holds. `coerceBubbleEnums` is the other
@@ -171,7 +170,7 @@ export function hydrateConfig(raw: string | null): EditorConfig {
           clampPanel({ panel: 0, ...NEW_BUBBLE, ...(b as Partial<BubbleTransform>) }),
         ),
       ),
-    )
+    ))
     return {
       grids: isPageGrids(parsed.grids, PANELS.length) ? cloneGrids(parsed.grids) : seed.grids,
       patterns: normalizePatterns(parsed.patterns),

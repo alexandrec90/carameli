@@ -9,6 +9,8 @@ import {
   defaultChain,
   growTarget,
   isBubbleChain,
+  isComposerContent,
+  messageSlots,
   stepHead,
   visibleWindow,
 } from '../../skins/comic-book/bubbleChain'
@@ -19,7 +21,6 @@ const member = (chain: string, panel: number, top: number) => ({ chain, panel, t
 const chain = (over: Partial<BubbleChain> = {}): BubbleChain => ({
   id: 'left',
   grow: true,
-  scroll: true,
   stepMs: 900,
   messages: [],
   ...over,
@@ -28,7 +29,7 @@ const chain = (over: Partial<BubbleChain> = {}): BubbleChain => ({
 describe('chainSlots', () => {
   it('orders slots bottom-to-top, so slot 0 is the root that carries the tail', () => {
     const bubbles = [
-      member('left', 0, -40), // highest on screen, so the newest message's slot
+      member('left', 0, -40), // highest on screen, so the oldest message's slot
       member('left', 0, 10),
       member('left', 0, -15),
     ]
@@ -71,7 +72,7 @@ describe('chainIdsOn / chainIds', () => {
     expect(chainIdsOn(bubbles, 2)).toEqual([])
   })
 
-  it('lists every chain on the page for the editor’s completions', () => {
+  it('lists every chain on the page, whatever panel each is drawn on', () => {
     expect(chainIds(bubbles)).toEqual(['right', 'left', 'other'])
   })
 })
@@ -118,18 +119,49 @@ describe('growTarget', () => {
   })
 })
 
+describe('messageSlots', () => {
+  // The whole of requirement "a chain of 3 shows between 1 and 3": three drawn slots hold
+  // three messages, unless the root is a composer, in which case it holds the field and
+  // two messages — still three balloons on screen.
+  it('is every drawn slot on a chain with no composer', () => {
+    expect(messageSlots(3, false)).toBe(3)
+  })
+
+  it('is one fewer on a live chain, because the root is the field', () => {
+    expect(messageSlots(3, true)).toBe(2)
+  })
+
+  it('never goes negative, so a lone composer simply holds no messages', () => {
+    expect(messageSlots(1, true)).toBe(0)
+    expect(messageSlots(0, true)).toBe(0)
+  })
+})
+
+describe('isComposerContent', () => {
+  it('is true for the two content kinds that are real fields', () => {
+    expect(isComposerContent('input')).toBe(true)
+    expect(isComposerContent('phone')).toBe(true)
+  })
+
+  it('is false for content the reader cannot type into', () => {
+    expect(isComposerContent('text')).toBe(false)
+    expect(isComposerContent('wheel')).toBe(false)
+  })
+})
+
 describe('visibleWindow', () => {
   it('is short while the chain is still growing, so empty slots go unrendered', () => {
     expect(visibleWindow(0, 3)).toEqual([0])
-    expect(visibleWindow(1, 3)).toEqual([0, 1])
+    expect(visibleWindow(1, 3)).toEqual([1, 0])
   })
 
-  it('fills the column once there are enough messages, oldest in the root slot', () => {
-    expect(visibleWindow(2, 3)).toEqual([0, 1, 2])
+  // result[0] is the root slot, and the root holds the newest message the window reaches.
+  it('fills the column once there are enough messages, newest in the root slot', () => {
+    expect(visibleWindow(2, 3)).toEqual([2, 1, 0])
   })
 
-  it('slides the window so the newest message is always in the top slot', () => {
-    expect(visibleWindow(4, 3)).toEqual([2, 3, 4])
+  it('slides the window so the head is always in the root slot', () => {
+    expect(visibleWindow(4, 3)).toEqual([4, 3, 2])
   })
 
   it('is empty with nothing to show or nothing drawn', () => {
@@ -137,29 +169,35 @@ describe('visibleWindow', () => {
     expect(visibleWindow(2, 0)).toEqual([])
   })
 
-  it('moves each message down exactly one slot per step of the head', () => {
+  it('moves each message up exactly one slot per step of the head', () => {
     const before = visibleWindow(4, 3)
     const after = visibleWindow(5, 3)
-    // Message 4 was in the top slot and is now one below it: the slide, in numbers.
-    expect(before.indexOf(4)).toBe(2)
+    // Message 4 was in the root slot and is now one above it: the slide, in numbers.
+    expect(before.indexOf(4)).toBe(0)
     expect(after.indexOf(4)).toBe(1)
+  })
+
+  // Ten messages through three balloons is three on screen, never ten.
+  it('never shows more balloons than the author drew', () => {
+    expect(visibleWindow(9, 3)).toHaveLength(3)
   })
 })
 
 describe('stepHead', () => {
-  // Wheel-up gives a negative `steps` (see wheelSteps), and the column runs upward in
-  // time, so up has to advance the thread or it reads backwards.
-  it('advances the thread on a wheel-up', () => {
-    expect(stepHead(2, -1, 10)).toBe(3)
+  // Wheel-up gives a negative `steps` (see wheelSteps). Older messages are *above* the
+  // newest, so up walks back through the transcript — the ordinary direction, because the
+  // column is laid out the ordinary way.
+  it('goes back through the thread on a wheel-up', () => {
+    expect(stepHead(2, -1, 10)).toBe(1)
   })
 
-  it('goes back on a wheel-down', () => {
-    expect(stepHead(5, 2, 10)).toBe(3)
+  it('advances on a wheel-down', () => {
+    expect(stepHead(5, 2, 10)).toBe(7)
   })
 
   it('stops at both ends rather than wrapping', () => {
-    expect(stepHead(0, 3, 10)).toBe(0)
-    expect(stepHead(9, -3, 10)).toBe(9)
+    expect(stepHead(0, -3, 10)).toBe(0)
+    expect(stepHead(9, 3, 10)).toBe(9)
   })
 })
 
@@ -168,7 +206,6 @@ describe('defaultChain', () => {
     const c = defaultChain('left')
     expect(c.id).toBe('left')
     expect(c.grow).toBe(false)
-    expect(c.scroll).toBe(false)
     expect(c.messages).toEqual([])
   })
 })

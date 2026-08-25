@@ -1,30 +1,121 @@
 import { CHAIN_STEP_MS, DEFAULT_CHAIN_STEP_MS, isBubbleChain } from '../bubbleChain'
 import type { BubbleChain } from '../bubbleChain'
 
-// The chain list's lifecycle. It sits apart from configOps.ts because a chain is not
-// edited the way a picture or a bubble is: there is no add button and no delete button
-// for one. The list is *derived* — `syncChains` recomputes it from whatever names the
-// bubbles carry — and the only direct edit is patching a chain that already exists.
+// The chain list's lifecycle, and the linkage the list is derived *through*. It sits
+// apart from configOps.ts because a chain is not edited the way a picture or a bubble is:
+// there is no add button and no delete button for one. The list is *derived* —
+// `syncChains` recomputes it from whatever ids the bubbles carry, and `propagateChains`
+// decides those ids from how the bubbles are linked — and the only direct edit is
+// patching a chain that already exists.
 //
 // That is deliberate. A chain with no members would render nothing and still sit in the
-// inspector offering settings, and a bubble naming a chain with no entry would be a
+// inspector offering settings, and a bubble carrying a chain id with no entry would be a
 // silent no-op; both states are unreachable if the list is a function of the bubbles.
 
 /**
- * A chain the author has just named on a bubble. Both behaviours default *on*: naming a
- * chain is the act of asking for one, and a chain that arrives whole and refuses to
- * scroll is indistinguishable from the loose bubbles it was a moment ago.
+ * A chain the author has just ticked the box on. `grow` defaults *on*: asking for a chain
+ * is asking for the balloons to behave like a thread, and a column that arrives whole is
+ * indistinguishable from the loose bubbles it was a moment ago. There is no `scroll`
+ * counterpart — a chain is a window over a transcript, so the wheel always moves it, and
+ * the checkbox that created the chain is that promise.
  *
- * Note this is the opposite of `defaultChain` in ../bubbleChain.ts, which is what a name
+ * Note this is the opposite of `defaultChain` in ../bubbleChain.ts, which is what an id
  * with no entry falls back to at render time. The two differ because they answer
  * different questions: this one is "the author asked for a chain", that one is "a
  * hand-edited file forgot to say", and quietly animating the second would be a surprise.
  */
 export const NEW_CHAIN: Omit<BubbleChain, 'id'> = {
   grow: true,
-  scroll: true,
   stepMs: DEFAULT_CHAIN_STEP_MS,
   messages: [],
+}
+
+/** Prefix of a generated chain id. Never shown to the author — see {@link nextChainId}. */
+const CHAIN_ID_PREFIX = 'chain-'
+
+/**
+ * A chain id nothing on the page is using. Chains are named by the editor rather than by
+ * the author, because the author's way of saying "these balloons are one thread" is to
+ * link them and tick the box; a name would be a second, redundant way to say it that
+ * could disagree with the first.
+ *
+ * The id still exists because the chain's *settings* need somewhere to live that survives
+ * bubbles being added, deleted and renumbered — see {@link syncChains}.
+ */
+export function nextChainId(bubbles: readonly { chain: string }[]): string {
+  const used = new Set(bubbles.map(b => b.chain))
+  for (let n = 1; ; n += 1) {
+    const id = `${CHAIN_ID_PREFIX}${n}`
+    if (!used.has(id)) return id
+  }
+}
+
+/**
+ * The bubbles reachable from one another through `linkTo`, as index lists — one list per
+ * group, in first-appearance order, and a bubble nothing links to is a group of one.
+ *
+ * The link is symmetric: declaring it on either end joins the pair, so this is a plain
+ * union over both directions and a run of `a -> b -> c` is one group of three. That is
+ * how a column of any length gets built out of a field that holds a single partner.
+ *
+ * Cross-panel and out-of-range links are skipped rather than followed. `sanitizeLinks`
+ * has normally nulled them already, but this runs on raw payloads too and a group
+ * spanning two panels is not a thing that can be on screen at once.
+ */
+export function linkGroups(
+  bubbles: readonly { panel: number; linkTo: number | null }[],
+): number[][] {
+  const parent = bubbles.map((_, i) => i)
+  const find = (start: number): number => {
+    let i = start
+    while (parent[i] !== i) {
+      parent[i] = parent[parent[i]]
+      i = parent[i]
+    }
+    return i
+  }
+  bubbles.forEach((b, i) => {
+    const j = b.linkTo
+    if (j == null || j === i || !bubbles[j] || bubbles[j].panel !== b.panel) return
+    const [ra, rb] = [find(i), find(j)]
+    // Always parent to the lower index, so a group's root is its first member and the
+    // grouping below comes out in first-appearance order.
+    if (ra !== rb) parent[Math.max(ra, rb)] = Math.min(ra, rb)
+  })
+  const groups = new Map<number, number[]>()
+  bubbles.forEach((_, i) => {
+    const root = find(i)
+    const found = groups.get(root)
+    if (found) found.push(i)
+    else groups.set(root, [i])
+  })
+  return [...groups.values()]
+}
+
+/**
+ * Settle every bubble's `chain` id from the linkage: one id per linked group, or '' for a
+ * group no member is chained in.
+ *
+ * This is what makes linkage the single source of truth. Ticking the box on one balloon
+ * chains the whole group it is linked into; linking a loose balloon onto a chained one
+ * makes it a slot of that chain without the author naming anything; and unlinking one
+ * leaves it a group of its own, still chained — a one-slot chain, which is exactly the
+ * lone composer a live thread starts as.
+ *
+ * A group holding two ids — reachable by linking two separate chains together — keeps the
+ * first, so the settings of the chain the author started from survive the merge.
+ */
+export function propagateChains<
+  T extends { panel: number; linkTo: number | null; chain: string },
+>(bubbles: readonly T[]): T[] {
+  const out = [...bubbles]
+  for (const group of linkGroups(bubbles)) {
+    const id = group.map(i => bubbles[i].chain).find(c => c !== '') ?? ''
+    for (const i of group) {
+      if (bubbles[i].chain !== id) out[i] = { ...bubbles[i], chain: id }
+    }
+  }
+  return out
 }
 
 /** Deep clone of one chain (its `messages` array is copied, not shared). */
@@ -34,12 +125,13 @@ export function cloneChain(c: BubbleChain): BubbleChain {
 
 /**
  * Reconcile the chain list against the bubbles: one entry per distinct non-empty
- * `chain` name, in first-appearance order, keeping whatever settings an existing entry
- * already had and creating {@link NEW_CHAIN} for a name that has just appeared. Names no
+ * `chain` id, in first-appearance order, keeping whatever settings an existing entry
+ * already had and creating {@link NEW_CHAIN} for an id that has just appeared. Ids no
  * bubble carries any more are dropped.
  *
- * Run after every edit that can touch a bubble's `chain`, its `panel` or its existence —
- * which is the same set of edits `sanitizeLinks` runs after, and for the same reason.
+ * Run after every edit that can touch a bubble's `chain`, its `linkTo`, its `panel` or
+ * its existence — which is the same set of edits `sanitizeLinks` and
+ * {@link propagateChains} run after, and for the same reason.
  */
 export function syncChains(
   bubbles: readonly { chain: string }[],
@@ -104,9 +196,11 @@ export function hydrateChains(raw: unknown): BubbleChain[] {
 }
 
 /**
- * An author-typed chain name, normalised. Trimmed because trailing whitespace makes two
- * visually identical names two different chains, and collapsed to single spaces for the
- * same reason. Empty is the valid "not in a chain" answer.
+ * A chain id, normalised. The editor generates its own ids and never needs this, but a
+ * hand-edited `layoutConfig.ts` is written by a person: trailing whitespace would make
+ * two visually identical ids two different chains, and inner runs of space the same. It
+ * is also what keeps {@link nextChainId}'s "is this id taken" check honest. Empty is the
+ * valid "not in a chain" answer.
  */
 export function normalizeChainId(value: string): string {
   return value.trim().replace(/\s+/g, ' ')
