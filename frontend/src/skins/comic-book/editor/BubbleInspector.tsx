@@ -1,5 +1,6 @@
 import { TAIL_DIRS, TAIL_DIR_KEYS } from '../bubbleBox'
 import type { TailDir } from '../bubbleBox'
+import { chainIds } from '../bubbleChain'
 import type { BubbleContentKind } from '../bubbleContent'
 import { PANELS } from '../panels'
 import { BUBBLE_TYPES, BUBBLE_TYPE_KEYS } from './bubbleTypes'
@@ -150,6 +151,26 @@ export default function BubbleInspector({ api, index, bubble }: BubbleInspectorP
         </select>
       </label>
 
+      {/* Chain membership. A free-text name rather than a picker: naming a chain is how
+          one comes into existence, so there is nothing to pick from until there is. The
+          list of names already in use is offered as completions so the second balloon of
+          a thread is one keystroke, not a chance to typo the first one's name. */}
+      <label className="cb-ed-field">
+        <span>chain</span>
+        <input
+          className="cb-ed-input"
+          list="cb-ed-chain-names"
+          value={bubble.chain}
+          placeholder="— none —"
+          onChange={e => api.setBubble(index, { chain: e.target.value })}
+        />
+      </label>
+      <datalist id="cb-ed-chain-names">
+        {chainIds(api.config.bubbles).map(id => (
+          <option key={id} value={id} />
+        ))}
+      </datalist>
+
       {/* Connector tube. Symmetric, so it only needs declaring at one end; the
           tube redraws live as either bubble is dragged. */}
       <label className="cb-ed-field">
@@ -172,8 +193,12 @@ export default function BubbleInspector({ api, index, bubble }: BubbleInspectorP
       </label>
       {candidates.length === 0 && (
         <div className="cb-ed-hint">
-          Add a second bubble to {PANELS[bubble.panel]?.label ?? `panel ${bubble.panel}`} to
-          link this one — a tube joins two bubbles on the same panel.
+          {bubble.chain
+            ? `A chained bubble takes no tube: its slot holds whatever message has scrolled
+               into it, so a tube would join a different sentence each time. Clear the chain
+               name to link it.`
+            : `Add a second bubble to ${PANELS[bubble.panel]?.label ?? `panel ${bubble.panel}`}
+               to link this one — a tube joins two bubbles on the same panel.`}
         </div>
       )}
     </>

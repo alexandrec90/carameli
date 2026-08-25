@@ -3,6 +3,7 @@ import { PATTERN_STYLES, PATTERN_STYLE_KEYS } from '../panelPatterns'
 import type { PanelBgStyle } from '../panelPatterns'
 import { assetLabel } from './assets'
 import BubbleInspector from './BubbleInspector'
+import ChainInspector from './ChainInspector'
 import ImageInspector from './ImageInspector'
 import { indicesOnPanel } from './configOps'
 import type { EditorModeApi } from './useEditorMode'
@@ -95,6 +96,12 @@ export default function InspectorPanel({ api, panel }: InspectorPanelProps) {
 
       {selImg && <ImageInspector api={api} index={selected.index} image={selImg} />}
       {selBubble && <BubbleInspector api={api} index={selected.index} bubble={selBubble} />}
+      {/* The thread this balloon is a slot of, when it is one. Below the balloon's own
+          fields because it is a wider scope than the selection: editing it changes every
+          balloon in the column, not the one that happens to be selected. */}
+      {selBubble?.chain && (
+        <ChainInspector api={api} index={selected.index} bubble={selBubble} />
+      )}
 
       {/* Spill toggle — shared by pictures and bubbles */}
       <label className="cb-ed-check">
