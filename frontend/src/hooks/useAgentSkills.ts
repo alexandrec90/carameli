@@ -20,7 +20,7 @@ function toRow(s: AgentSkill): Record<string, string> {
 }
 
 /**
- * Data hook for the Agent Skills management page (cloudli spec §37). Lists all
+ * Data hook for the Agent Skills management page (legacy feature spec §37). Lists all
  * skill records across a customer's agents and provides full CRUD via DataPage.
  */
 export function useAgentSkills(): DataPageProps {

@@ -8,7 +8,7 @@ import httpx
 import pytest
 
 from app.core.config import settings
-from app.services import call_sync, vanillasoft_notify
+from app.services import call_sync, crm_notify
 from app.services.call_sync import _run_scheduled_job, retry_unposted_events
 from tests.conftest import notify_payload
 
@@ -57,8 +57,8 @@ def _mock_session() -> AsyncMock:
 
 
 async def test_retry_skips_when_no_webhook_url(monkeypatch) -> None:
-    """Early return when VANILLASOFT_WEBHOOK_URL is not configured."""
-    monkeypatch.setattr(settings, "vanillasoft_webhook_url", None)
+    """Early return when CRM_WEBHOOK_URL is not configured."""
+    monkeypatch.setattr(settings, "crm_webhook_url", None)
     with patch("app.services.call_sync.async_session_factory") as mock_factory:
         await retry_unposted_events(_CTX)
         mock_factory.assert_not_called()
@@ -66,7 +66,7 @@ async def test_retry_skips_when_no_webhook_url(monkeypatch) -> None:
 
 async def test_retry_skips_when_no_unposted_events(monkeypatch) -> None:
     """No HTTP calls made when get_unposted returns empty list."""
-    monkeypatch.setattr(settings, "vanillasoft_webhook_url", "http://vs.example.com/voip")
+    monkeypatch.setattr(settings, "crm_webhook_url", "http://vs.example.com/voip")
     mock_repo = AsyncMock()
     mock_repo.get_unposted.return_value = []
 
@@ -82,8 +82,8 @@ async def test_retry_skips_when_no_unposted_events(monkeypatch) -> None:
 
 async def test_retry_posts_incoming_call_contract_and_marks_posted(monkeypatch) -> None:
     """A completed event is POSTed as the IncomingCall shape with Carameli HMAC auth."""
-    monkeypatch.setattr(settings, "vanillasoft_webhook_url", "http://vs.example.com/voip")
-    monkeypatch.setattr(settings, "vanillasoft_webhook_secret", "cloudli-secret")
+    monkeypatch.setattr(settings, "crm_webhook_url", "http://vs.example.com/voip")
+    monkeypatch.setattr(settings, "crm_webhook_secret", "legacy-secret")
     monkeypatch.setattr(settings, "carameli_notify_secret", "carameli-secret")
     event = _make_event(status="completed")
 
@@ -97,7 +97,7 @@ async def test_retry_posts_incoming_call_contract_and_marks_posted(monkeypatch) 
         patch("app.services.call_sync.async_session_factory", return_value=_mock_session()),
         patch("app.services.call_sync.CallEventRepo", return_value=mock_repo),
         patch("app.services.call_sync.CustomerRepo", return_value=mock_customer_repo),
-        patch("app.services.vanillasoft_notify.httpx.AsyncClient", return_value=mock_http),
+        patch("app.services.crm_notify.httpx.AsyncClient", return_value=mock_http),
     ):
         await retry_unposted_events(_CTX)
 
@@ -105,8 +105,8 @@ async def test_retry_posts_incoming_call_contract_and_marks_posted(monkeypatch) 
     call = mock_http.post.call_args
     assert call.args[0] == "http://vs.example.com/voip/notify/IncomingCall"
     assert call.kwargs["headers"]["Content-Type"] == "application/json"
-    assert "X-Cloudli-Auth" not in call.kwargs["headers"]
-    assert vanillasoft_notify.SIGNATURE_HEADER in call.kwargs["headers"]
+    assert settings.legacy_log_auth_header not in call.kwargs["headers"]
+    assert crm_notify.SIGNATURE_HEADER in call.kwargs["headers"]
     payload = notify_payload(call)
     assert payload["callId"] == "CA001"
     assert payload["eventName"] == "callHungup"
@@ -116,9 +116,9 @@ async def test_retry_posts_incoming_call_contract_and_marks_posted(monkeypatch) 
 
 @pytest.mark.parametrize("status", ["no-answer", "busy", "failed", "canceled"])
 async def test_retry_posts_all_terminal_statuses(monkeypatch, status: str) -> None:
-    """All terminal statuses trigger a VanillaSoft POST (mapped to callHungup)."""
-    monkeypatch.setattr(settings, "vanillasoft_webhook_url", "http://vs.example.com/voip")
-    monkeypatch.setattr(settings, "vanillasoft_webhook_secret", None)
+    """All terminal statuses trigger a CRM POST (mapped to callHungup)."""
+    monkeypatch.setattr(settings, "crm_webhook_url", "http://vs.example.com/voip")
+    monkeypatch.setattr(settings, "crm_webhook_secret", None)
     event = _make_event(status=status)
 
     mock_repo = AsyncMock()
@@ -131,7 +131,7 @@ async def test_retry_posts_all_terminal_statuses(monkeypatch, status: str) -> No
         patch("app.services.call_sync.async_session_factory", return_value=_mock_session()),
         patch("app.services.call_sync.CallEventRepo", return_value=mock_repo),
         patch("app.services.call_sync.CustomerRepo", return_value=mock_customer_repo),
-        patch("app.services.vanillasoft_notify.httpx.AsyncClient", return_value=mock_http),
+        patch("app.services.crm_notify.httpx.AsyncClient", return_value=mock_http),
     ):
         await retry_unposted_events(_CTX)
 
@@ -142,7 +142,7 @@ async def test_retry_posts_all_terminal_statuses(monkeypatch, status: str) -> No
 
 async def test_retry_skips_non_terminal_status(monkeypatch) -> None:
     """Events with non-terminal status (e.g. 'in-progress') are not POSTed."""
-    monkeypatch.setattr(settings, "vanillasoft_webhook_url", "http://vs.example.com/voip")
+    monkeypatch.setattr(settings, "crm_webhook_url", "http://vs.example.com/voip")
     event = _make_event(status="in-progress")
 
     mock_repo = AsyncMock()
@@ -151,7 +151,7 @@ async def test_retry_skips_non_terminal_status(monkeypatch) -> None:
     with (
         patch("app.services.call_sync.async_session_factory", return_value=_mock_session()),
         patch("app.services.call_sync.CallEventRepo", return_value=mock_repo),
-        patch("app.services.vanillasoft_notify.httpx.AsyncClient") as mock_http_cls,
+        patch("app.services.crm_notify.httpx.AsyncClient") as mock_http_cls,
     ):
         await retry_unposted_events(_CTX)
 
@@ -192,8 +192,8 @@ async def test_worker_shutdown_closes_both_providers() -> None:
 
 async def test_retry_warns_on_non_2xx_and_does_not_mark_posted(monkeypatch) -> None:
     """A non-2xx response does not mark the event as posted."""
-    monkeypatch.setattr(settings, "vanillasoft_webhook_url", "http://vs.example.com/voip")
-    monkeypatch.setattr(settings, "vanillasoft_webhook_secret", None)
+    monkeypatch.setattr(settings, "crm_webhook_url", "http://vs.example.com/voip")
+    monkeypatch.setattr(settings, "crm_webhook_secret", None)
     event = _make_event(status="completed")
 
     mock_repo = AsyncMock()
@@ -206,7 +206,7 @@ async def test_retry_warns_on_non_2xx_and_does_not_mark_posted(monkeypatch) -> N
         patch("app.services.call_sync.async_session_factory", return_value=_mock_session()),
         patch("app.services.call_sync.CallEventRepo", return_value=mock_repo),
         patch("app.services.call_sync.CustomerRepo", return_value=mock_customer_repo),
-        patch("app.services.vanillasoft_notify.httpx.AsyncClient", return_value=mock_http),
+        patch("app.services.crm_notify.httpx.AsyncClient", return_value=mock_http),
     ):
         await retry_unposted_events(_CTX)
 

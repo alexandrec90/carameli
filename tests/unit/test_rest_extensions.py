@@ -410,7 +410,7 @@ async def test_webphone_credential_unknown_id_returns_404(client) -> None:
 
 
 async def test_legacy_vsapi_extension_route_still_works(client) -> None:
-    """`/vsapi` is not retired by this change — VanillaSoft still calls it."""
+    """`/vsapi` is not retired by this change — CRM still calls it."""
     await _create_customer(client, 7340)
     resp = await client.post(
         "/vsapi/1.0.0/VsExtension/Add",

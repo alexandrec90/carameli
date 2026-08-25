@@ -15,6 +15,7 @@
 // {@link OUTER_M}, and the gutter is `insetPolygon` shrinking every panel by the same
 // {@link HALF_GUTTER} whatever shape or angle it has.
 
+import type { PanelPage } from './panels'
 import { insetPolygon, polyBounds } from './polygonInset'
 
 // The gutter inset and the box maths live in ./polygonInset.ts and are re-exported
@@ -55,8 +56,16 @@ export interface PanelGrid {
 /** Which of the three shapes the viewport is, and so which grid it draws. */
 export type LayoutKind = 'landscape' | 'portrait' | 'square'
 
-/** The three grids an author tunes; the viewport picks one per resize. */
+/** The three grids an author tunes per page; the viewport picks one per resize. */
 export type PanelGrids = Record<LayoutKind, PanelGrid>
+
+/**
+ * Every page's grids. Which member the route decides (`pageForPath`), which grid
+ * inside it the viewport does (`layoutKindFor`). Each grid's ring table is still
+ * PANELS-length: a panel that sits on the *other* page holds an empty ring, so a
+ * panel keeps one index everywhere and a grid stays checkable against PANELS.
+ */
+export type PageGrids = Record<PanelPage, PanelGrids>
 
 /** A single panel, ready to draw: its gutter-inset polygon and that polygon's box. */
 export interface PanelPoly {

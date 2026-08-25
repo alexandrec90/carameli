@@ -15,7 +15,7 @@ This satisfies the guardrail: jambonz.py is never imported directly here.
 
 Clarity API field mapping
 --------------------------
-VanillaLand polled two Clarity endpoints:
+LegacyCRM polled two Clarity endpoints:
   (a) HUD Phones  → per-agent callState / presence / idle
   (b) Device Status → SIP registration (state == "AUTHENTICATED")
 

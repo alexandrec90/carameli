@@ -31,8 +31,8 @@ Fill these in `.env` before enabling live-provider and webhook suites.
 | `JWT_SECRET` | Jambonz auth internals / local stack | Keep non-default outside local-only setups |
 | `NGROK_URL` | Webhook E2E tests (`test_webhook_e2e.py`) | Auto-populated by ngrok helper script/task |
 | `S3_ENDPOINT`, `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_REGION` | S3/MinIO recording integration tests | Use MinIO defaults locally or real S3 values |
-| `VANILLASOFT_WEBHOOK_URL` | `retry_unposted_events` ARQ job | URL where completed call events are POSTed to VanillaSoft |
-| `VANILLASOFT_WEBHOOK_SECRET` | Outbound call event HMAC signing | Must match VanillaSoft portal configuration |
+| `CRM_WEBHOOK_URL` | `retry_unposted_events` ARQ job | URL where completed call events are POSTed to CRM |
+| `CRM_WEBHOOK_SECRET` | Outbound call event HMAC signing | Must match CRM portal configuration |
 | `SESSION_SECRET` | Session cookie signing (`POST /session`) | Must be non-default outside local-only setups |
 
 > **Note:** `ENCRYPTION_SECRET` and `JWT_SECRET` are Jambonz stack variables — set them in `docker-compose.yml`, not `.env`. They are not loaded by `app/core/config.py`.
@@ -196,7 +196,7 @@ Notes:
 - [ ] Mobile viewport smoke matrix
 - [ ] Browser-specific behavior parity checks
 
-### J. Legacy Contract Parity (VanillaLand)
+### J. Legacy Contract Parity (LegacyCRM)
 
 - [ ] Golden request/response snapshots for compatibility endpoints
 - [ ] Endpoint-by-endpoint behavioral parity checks
@@ -219,7 +219,7 @@ Notes:
 
 Modules in `app/` with no test file or no checklist entry as of the initial roadmap.
 
-- [ ] **ARQ background jobs — `call_sync.py`**: `retry_unposted_events` happy path, VanillaSoft 4xx/5xx responses, partial-failure record marking, and retry counter behavior
+- [ ] **ARQ background jobs — `call_sync.py`**: `retry_unposted_events` happy path, CRM 4xx/5xx responses, partial-failure record marking, and retry counter behavior
 - [ ] **ARQ background jobs — `agent_status_sync.py`**: `poll_agent_status` logic, `_map_call_status` mapping, startup/shutdown hooks
 - [ ] **Provider factory (`factory.py`)**: correct provider instantiated per `CARRIER_PROVIDER` / `CALL_ENGINE_PROVIDER` env var; unknown value raises a clear error
 - [ ] **Frontend log ingestion (`vg/frontend_logs.py`)**: auth required, batch accepted, individual log levels routed correctly, oversized batch rejected

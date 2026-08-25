@@ -4,7 +4,7 @@ Revision ID: 007
 Revises: 006
 Create Date: 2026-06-25 00:00:00.000000
 
-Sibling config tables per extension variant (cloudli spec §10, §14-16, §24):
+Sibling config tables per extension variant (legacy feature spec §10, §14-16, §24):
 group_extensions, intercom_groups, multicast_groups, conferences, parking_lots.
 The core ``extensions`` table is intentionally left untouched (no polymorphic kind).
 

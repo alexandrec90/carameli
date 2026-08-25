@@ -1,4 +1,4 @@
-"""Preflight: is the plumbing between remote Carameli and local VanillaLand even up?
+"""Preflight: is the plumbing between remote Carameli and local LegacyCRM even up?
 
 Every test here is a cheap, non-mutating reachability or wiring check. They are numbered
 ``00`` so they run first: when the plumbing is broken, the contract suites downstream
@@ -67,7 +67,7 @@ async def test_ngrok_interstitial_is_bypassed(config: LocalE2EConfig) -> None:
         assert "html" in browserish.headers.get("content-type", "").lower()
 
 
-async def test_local_vanillaland_notify_route_is_deployed(config: LocalE2EConfig) -> None:
+async def test_local_legacy_crm_notify_route_is_deployed(config: LocalE2EConfig) -> None:
     """The local VoipApi serves ``carameli/notify/*`` and its auth filter is active.
 
     An *unsigned* POST must be rejected with 401. Two failure modes this separates:
@@ -89,7 +89,7 @@ async def test_local_vanillaland_notify_route_is_deployed(config: LocalE2EConfig
 
     assert response.status_code != 404, (
         "carameli/notify/IncomingCall is not deployed on the local VoipApi — "
-        f"rebuild the VanillaSoft.VoipApi project into the IIS app. {describe(response)}"
+        f"rebuild the CRM VoIP API project into the IIS app. {describe(response)}"
     )
     assert response.status_code == 401, (
         "an unsigned notify must be rejected with 401 by CarameliSignatureAttribute; "
@@ -119,7 +119,7 @@ async def test_notify_secret_is_configured_on_the_receiver(config: LocalE2EConfi
     assert response.status_code != 401, (
         "a correctly signed notify was rejected — VS_CARAMELI_NOTIFY_SECRET does not "
         "match the CarameliNotifySecret appSetting in "
-        "AppCode/VanillaSoft.VoipApi/Web.config (an empty appSetting rejects "
+        "AppCode/<legacy-voip-api>/Web.config (an empty appSetting rejects "
         f"everything). {describe(response)}"
     )
 
@@ -146,17 +146,17 @@ async def test_public_tunnel_reaches_the_same_local_receiver(public_vs_base_url:
 
 
 async def test_local_elasticsearch_is_reachable(config: LocalE2EConfig) -> None:
-    """The local Elasticsearch that NLog ships VanillaSoft logs into is up.
+    """The local Elasticsearch that NLog ships CRM logs into is up.
 
     This is the only channel through which a coding agent on this machine can read
-    VanillaSoft-side errors, so its absence is a diagnosis blackout rather than a
+    CRM-side errors, so its absence is a diagnosis blackout rather than a
     cosmetic problem.
     """
     async with httpx.AsyncClient(timeout=20.0) as client:
         response = await client.get(f"{config.es_url}/_cluster/health")
     assert response.status_code == 200, (
         f"local Elasticsearch unreachable at {config.es_url} — "
-        f"'docker start vanillasoft-es'. {describe(response)}"
+        f"'docker start crm-es'. {describe(response)}"
     )
     body = assert_json(response, "elasticsearch /_cluster/health")
     assert body.get("status") in {"green", "yellow"}, f"Elasticsearch unhealthy: {body}"

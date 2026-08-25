@@ -20,7 +20,7 @@ function toRow(sd: SpeedDial): Record<string, string> {
 }
 
 /**
- * Data hook for the Speed Dials page (cloudli spec §28). Full CRUD —
+ * Data hook for the Speed Dials page (legacy feature spec §28). Full CRUD —
  * create form + per-row Deactivate.
  */
 export function useSpeedDials(): DataPageProps {

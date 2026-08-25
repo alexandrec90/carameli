@@ -12,7 +12,7 @@ from app.core.database import Base
 
 
 class ExpansionModule(Base):
-    """A receptionist expansion module config for a customer (cloudli spec §12)."""
+    """A receptionist expansion module config for a customer (legacy feature spec §12)."""
 
     __tablename__ = "expansion_modules"
 

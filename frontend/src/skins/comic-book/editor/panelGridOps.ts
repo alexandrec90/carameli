@@ -175,10 +175,3 @@ export function removeVertex(grid: PanelGrid, index: number): PanelGrid | null {
     panels: grid.panels.map(ring => ring.filter(v => v !== index).map(remap)),
   }
 }
-
-// `pointOnSegment` and `seamAt` — a point-to-segment distance and the hit test built on
-// it — used to live here. Nothing ever called them: the seam pointer handling in
-// useSeamDrag.ts hit-tests against the rendered SVG elements instead, so the geometric
-// version was dead from the commit that added it and knip reported it as such. Deleted
-// rather than kept for a future caller; a hit test with no caller has no test either, and
-// git has it if the SVG approach is ever replaced.

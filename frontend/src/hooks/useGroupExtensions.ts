@@ -21,7 +21,7 @@ function toRow(g: GroupExtension): Record<string, string> {
 }
 
 /**
- * Data hook for the Group Extension page (cloudli spec §14). Lists a customer's
+ * Data hook for the Group Extension page (legacy feature spec §14). Lists a customer's
  * group extensions and returns a DataPageProps so every skin renders the same
  * behaviour. Full CRUD: the create form calls Add and the per-row Deactivate
  * action calls Deactivate, both re-fetching on success.

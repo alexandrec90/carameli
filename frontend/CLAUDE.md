@@ -1,6 +1,6 @@
 # Frontend
 
-Vite serves on `:5173` and proxies `/vsapi`, `/vg`, and `/health` to the backend.
+Vite serves on `:5173` and proxies `/auth`, `/vsapi`, `/vg`, and `/health` to the backend.
 Browser authentication uses the HttpOnly session cookie from `/auth/session`; never put
 an API key or provider credential in the bundle.
 

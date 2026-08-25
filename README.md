@@ -1,6 +1,7 @@
 # Carameli — Local Development Guide
 
-Self-hosted VoIP microservice powered by Telnyx + Jambonz. Drop-in replacement for Cloudli/CMV.
+Self-hosted VoIP microservice powered by Telnyx + Jambonz. Drop-in replacement for the
+legacy carrier integration it supersedes.
 
 ---
 
@@ -429,7 +430,7 @@ that prints a warning and exits 0 is the failure mode this rule exists to preven
 Your `.env` already has provider placeholders. To test live calls and SMS:
 
 Before enabling live traffic, run the two-sided
-[VanillaSoft connectivity preflight](docs/operations/vanillasoft-connectivity-preflight.md)
+[CRM connectivity preflight](docs/operations/crm-connectivity-preflight.md)
 to identify which HTTPS, SQL Server, Event Log, and file-log channels are actually
 reachable and readable.
 
@@ -498,14 +499,14 @@ All API routes are prefixed with `/vsapi/1.0.0/`.
 
 ## What's Not Yet Wired Up
 
-See [docs/prototype-roadmap.md](docs/prototype-roadmap.md) for the full VanillaSoft-prototype
+See [docs/prototype-roadmap.md](docs/prototype-roadmap.md) for the full CRM-prototype
 gap analysis and workstreams.
 
 | Feature | Status |
 | --- | --- |
-| VanillaSoft write-back on call events | HTTP POST + ARQ retry exist, but the payload/auth don't match VanillaSoft's `CloudliController` contract yet; skipped when `VANILLASOFT_WEBHOOK_URL` is blank |
+| CRM write-back on call events | HTTP POST + ARQ retry exist, but the payload/auth don't match CRM's `legacy notify controller` contract yet; skipped when `CRM_WEBHOOK_URL` is blank |
 | Inbound routing orchestration (SCI / pointers) | Inbound calls are answered but nothing routes them to an extension; SCI rules are stored, never consulted; `dtmf-result` handler missing |
-| Inbound SMS | `message.received` webhook only logs — not persisted, not forwarded to VanillaSoft |
+| Inbound SMS | `message.received` webhook only logs — not persisted, not forwarded to CRM |
 | DID provisioning (live) | `/PhoneLine/Add` reads `result["sid"]` but the Telnyx provider returns `provider_sid` — live purchases 502 after buying the number |
 | SMS, Call Events, Settings pages | UI placeholders — API endpoints are fully functional |
 | Recording → S3 storage | Dev: recording URLs stored from call-status callbacks, no S3 copy |
@@ -520,7 +521,7 @@ gap analysis and workstreams.
 | `MCP_DOCKER` | `docker mcp gateway run` (Docker Desktop built-in) | USER (`~/.claude.json`) | Configured |
 | `github` | `ghcr.io/github/github-mcp-server` (Docker) | USER (`~/.claude.json`) | Configured |
 | `redis` | `@modelcontextprotocol/server-redis` | USER (`~/.claude.json`) | Configured — requires Redis port on localhost (see `docker-compose.override.yml`) |
-| `azure-devops` | `@azure-devops/mcp` | USER (`~/.claude.json`) | Configured — org `VanillaSoftCollection` (VanillaLand's ADO project), `azcli` auth |
+| `azure-devops` | `@azure-devops/mcp` | USER (`~/.claude.json`) | Configured — org `CRMCollection` (LegacyCRM's ADO project), `azcli` auth |
 
 ### Installation gotchas (VS Code extension + Windows)
 
@@ -535,4 +536,4 @@ gap analysis and workstreams.
 
 - `MCP_DOCKER` uses Docker Desktop's built-in MCP gateway (`docker mcp gateway run`) — no npm package needed. `docker` is a real binary so the `cmd.exe /c` wrapper is **not** required.
 - Both servers are local-session-only (require Docker Desktop running).
-- `azure-devops` uses `azcli` authentication (no token stored in config) — requires `az login --allow-no-subscriptions` once per session/token-expiry, since the VanillaSoft AAD tenant has no accessible Azure subscriptions (Azure DevOps org access doesn't need one). Re-run that command if the server starts returning auth errors.
+- `azure-devops` uses `azcli` authentication (no token stored in config) — requires `az login --allow-no-subscriptions` once per session/token-expiry, since the CRM AAD tenant has no accessible Azure subscriptions (Azure DevOps org access doesn't need one). Re-run that command if the server starts returning auth errors.

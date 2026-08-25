@@ -1,4 +1,4 @@
-"""Tests for the /webhooks/vs-log ingest endpoint (phase 03 — VanillaSoft log
+"""Tests for the /webhooks/vs-log ingest endpoint (phase 03 — CRM log
 shipping). Records are authenticated by the shared secret, re-emitted under a
 ``vs.``-prefixed logger, and never persisted."""
 
@@ -40,9 +40,11 @@ def _entry(
 
 
 async def test_happy_path_emits_under_vs_logger(client, caplog, monkeypatch):
-    monkeypatch.setattr(settings, "vanillasoft_webhook_secret", _SECRET)
+    monkeypatch.setattr(settings, "crm_webhook_secret", _SECRET)
     with caplog.at_level(logging.DEBUG):
-        resp = await client.post(_WEBHOOK, json=_entry(), headers={"X-Cloudli-Auth": _SECRET})
+        resp = await client.post(
+            _WEBHOOK, json=_entry(), headers={settings.legacy_log_auth_header: _SECRET}
+        )
 
     assert resp.status_code == 204
     recs = [r for r in caplog.records if r.name == "vs.Carameli.Client"]
@@ -54,22 +56,24 @@ async def test_happy_path_emits_under_vs_logger(client, caplog, monkeypatch):
 
 
 async def test_wrong_secret_returns_403(client, caplog, monkeypatch):
-    monkeypatch.setattr(settings, "vanillasoft_webhook_secret", _SECRET)
+    monkeypatch.setattr(settings, "crm_webhook_secret", _SECRET)
     with caplog.at_level(logging.DEBUG):
-        resp = await client.post(_WEBHOOK, json=_entry(), headers={"X-Cloudli-Auth": "wrong"})
+        resp = await client.post(
+            _WEBHOOK, json=_entry(), headers={settings.legacy_log_auth_header: "wrong"}
+        )
     assert resp.status_code == 403
     assert not [r for r in caplog.records if r.name.startswith("vs.")]
 
 
 async def test_secret_via_body_auth_field_accepted(client, monkeypatch):
-    monkeypatch.setattr(settings, "vanillasoft_webhook_secret", _SECRET)
-    # No X-Cloudli-Auth header — old NLog builds ship the secret in the body.
+    monkeypatch.setattr(settings, "crm_webhook_secret", _SECRET)
+    # No X-Log-Auth header — old NLog builds ship the secret in the body.
     resp = await client.post(_WEBHOOK, json=_entry(auth=_SECRET))
     assert resp.status_code == 204
 
 
 async def test_secret_unconfigured_accepts_without_auth(client, monkeypatch):
-    monkeypatch.setattr(settings, "vanillasoft_webhook_secret", None)
+    monkeypatch.setattr(settings, "crm_webhook_secret", None)
     resp = await client.post(_WEBHOOK, json=_entry())
     assert resp.status_code == 204
 
@@ -82,7 +86,7 @@ async def test_non_json_body_returns_400(client):
 
 
 async def test_malformed_payload_returns_400(client, monkeypatch):
-    monkeypatch.setattr(settings, "vanillasoft_webhook_secret", None)
+    monkeypatch.setattr(settings, "crm_webhook_secret", None)
     # Missing the required 'message' field.
     resp = await client.post(
         _WEBHOOK, json={"time": "t", "level": "ERROR", "logger": "Carameli.Client"}
@@ -91,7 +95,7 @@ async def test_malformed_payload_returns_400(client, monkeypatch):
 
 
 async def test_oversized_message_and_exception_truncated(client, caplog, monkeypatch):
-    monkeypatch.setattr(settings, "vanillasoft_webhook_secret", None)
+    monkeypatch.setattr(settings, "crm_webhook_secret", None)
     with caplog.at_level(logging.DEBUG):
         resp = await client.post(
             _WEBHOOK,
@@ -107,7 +111,7 @@ async def test_oversized_message_and_exception_truncated(client, caplog, monkeyp
 
 
 async def test_unknown_level_maps_to_warning(client, caplog, monkeypatch):
-    monkeypatch.setattr(settings, "vanillasoft_webhook_secret", None)
+    monkeypatch.setattr(settings, "crm_webhook_secret", None)
     with caplog.at_level(logging.DEBUG):
         resp = await client.post(_WEBHOOK, json=_entry(level="BOGUS"))
     assert resp.status_code == 204
@@ -116,7 +120,7 @@ async def test_unknown_level_maps_to_warning(client, caplog, monkeypatch):
 
 
 async def test_warn_level_maps_to_warning(client, caplog, monkeypatch):
-    monkeypatch.setattr(settings, "vanillasoft_webhook_secret", None)
+    monkeypatch.setattr(settings, "crm_webhook_secret", None)
     with caplog.at_level(logging.DEBUG):
         resp = await client.post(_WEBHOOK, json=_entry(level="WARN"))
     assert resp.status_code == 204

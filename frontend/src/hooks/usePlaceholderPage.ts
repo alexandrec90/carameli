@@ -12,8 +12,8 @@ export interface PlaceholderPageConfig {
 
 /**
  * Shared data hook for "structural placeholder" pages — pages whose Carameli backend
- * isn't built yet, or whose data is owned by another system (VanillaSoft CRM). It renders
- * the real cloudli columns/filters/actions through DataPage but holds no rows and makes no
+ * isn't built yet, or whose data is owned by another system (CRM). It renders
+ * the real legacy vendor columns/filters/actions through DataPage but holds no rows and makes no
  * API call, so the page reaches structural parity now and a fetching hook can replace it
  * later without touching the skin layer. Search updates filter state (a no-op over the
  * empty set); Export writes the current rows to CSV.

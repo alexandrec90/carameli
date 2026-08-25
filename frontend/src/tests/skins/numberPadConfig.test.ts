@@ -24,8 +24,9 @@ function reparseConfig(source: string): EditorConfig {
   const body = source
     .replace(/export const PANEL_IMG_TRANSFORMS: ImgTransform\[\] =/, 'const images =')
     .replace(/export const PANEL_BUBBLE_TRANSFORMS: BubbleTransform\[\] =/, 'const bubbles =')
-    .replace(/export const PANEL_GRIDS: PanelGrids =/, 'const grids =')
-  return new Function(`${body}\nreturn { images, bubbles, grids }`)() as EditorConfig
+    .replace(/export const PANEL_PATTERNS: PanelBgStyle\[\] =/, 'const patterns =')
+    .replace(/export const PANEL_GRIDS: PageGrids =/, 'const grids =')
+  return new Function(`${body}\nreturn { images, bubbles, grids, patterns }`)() as EditorConfig
 }
 
 describe('number-pad config', () => {

@@ -35,7 +35,7 @@ async def prepare_sci_call(
     session: Annotated[AsyncSession, Depends(get_session)],
     auth: Annotated[AuthContext, Depends(get_auth_context)],
 ) -> PrecallResponse:
-    """Select and persist the caller ID for one imminent VanillaSoft call."""
+    """Select and persist the caller ID for one imminent CRM call."""
     enforce_customer_scope(auth, body.vs_customer_id)
     customer = await customer_service.get_by_vs_id(session, body.vs_customer_id)
     if not customer:

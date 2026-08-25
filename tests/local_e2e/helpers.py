@@ -1,8 +1,8 @@
 """Pure helpers for the local integration suite (``tests/local_e2e/``).
 
 This suite exists for the *inverted* topology: **Carameli runs remotely** (reached over
-an ngrok tunnel) and **VanillaLand runs locally** in IIS. That is the mirror image of
-``tests/live_e2e/``, which assumes Carameli is local and VanillaSoft is remote staging,
+an ngrok tunnel) and **LegacyCRM runs locally** in IIS. That is the mirror image of
+``tests/live_e2e/``, which assumes Carameli is local and CRM is remote staging,
 tails ``logs/runtime/carameli.log`` on the local box, and spends real telephony money.
 
 Design constraints that follow from the topology:
@@ -14,10 +14,10 @@ Design constraints that follow from the topology:
   this suite places a call or sends an SMS, so it is *not* marked ``paid`` and can be run
   as often as you like.
 - **The signing algorithm is duplicated, on purpose.** ``sign_payload`` below is a
-  byte-for-byte reimplementation of ``app.services.vanillasoft_notify.sign_payload``. If
+  byte-for-byte reimplementation of ``app.services.crm_notify.sign_payload``. If
   it were imported, a bug that changed both sides at once would go unnoticed; as an
   independent implementation it also cross-checks the C# verifier
-  (``CarameliSignatureVerifier``) in the VanillaLand repo. ``tests/unit/
+  (``CarameliSignatureVerifier``) in the LegacyCRM repo. ``tests/unit/
   test_local_e2e_helpers.py`` pins it against a fixed vector so the duplicate cannot
   silently drift.
 
@@ -33,9 +33,9 @@ Environment contract (see ``.env.local-e2e.example`` and
 | ``VS_LOCAL_BASE_URL`` | yes | Local VoIP-receiver base, e.g. ``http://localhost:8021/voip`` |
 | ``VS_CARAMELI_NOTIFY_SECRET`` | yes | Must equal the remote's ``CARAMELI_NOTIFY_SECRET`` |
 | ``VS_PUBLIC_BASE_URL`` | no | Public tunnel to the *same* local VoipApi; reverse-direction tests skip without it |
-| ``VS_WEBHOOK_SECRET`` | no | The remote's ``VANILLASOFT_WEBHOOK_SECRET``; enables the ``/webhooks/vs-log`` test |
+| ``VS_WEBHOOK_SECRET`` | no | The remote's ``CRM_WEBHOOK_SECRET``; enables the ``/webhooks/vs-log`` test |
 | ``ES_URL`` | no | Local Elasticsearch (default ``http://localhost:9200``) |
-| ``ES_INDEX`` | no | NLog index (default ``vanillasoft_dev.events``) |
+| ``ES_INDEX`` | no | NLog index (default ``crm_dev.events``) |
 """
 
 from __future__ import annotations
@@ -62,7 +62,7 @@ NGROK_SKIP_HEADER = {"ngrok-skip-browser-warning": "1"}
 
 SIGNATURE_HEADER = "X-Carameli-Signature"
 
-# Mirrors SIGNATURE_TOLERANCE_SECONDS in app/services/vanillasoft_notify.py and the
+# Mirrors SIGNATURE_TOLERANCE_SECONDS in app/services/crm_notify.py and the
 # 5-minute ReplayWindow in CarameliSignatureAttribute.cs. Kept as a literal because the
 # point of this suite is to catch the two drifting apart.
 SIGNATURE_TOLERANCE_SECONDS = 300
@@ -78,7 +78,7 @@ REQUIRED_ENV = (
 VSAPI_PREFIX = "/vsapi/1.0.0"
 NATIVE_PREFIX = "/api/v1"
 
-# The prefix Carameli posts notifies under once VANILLASOFT_NOTIFY_PREFIX is flipped off
+# The prefix Carameli posts notifies under once CRM_NOTIFY_PREFIX is flipped off
 # its "notify" default. The whole point of the honest receiver is that these routes are
 # Carameli-only, so the suite always drives them and never the legacy ones.
 NOTIFY_PREFIX = "carameli/notify"
@@ -120,6 +120,7 @@ class LocalE2EConfig:
     notify_secret: str
     vs_public_base_url: str | None
     vs_webhook_secret: str | None
+    log_auth_header: str
     es_url: str
     es_index: str
 
@@ -145,8 +146,11 @@ class LocalE2EConfig:
             notify_secret=values["VS_CARAMELI_NOTIFY_SECRET"] or "",
             vs_public_base_url=(os.getenv("VS_PUBLIC_BASE_URL") or "").rstrip("/") or None,
             vs_webhook_secret=os.getenv("VS_WEBHOOK_SECRET") or None,
+            # Must match the remote deployment's LEGACY_LOG_AUTH_HEADER: the header
+            # name is deployment configuration, not a constant this repo carries.
+            log_auth_header=os.getenv("LEGACY_LOG_AUTH_HEADER") or "X-Log-Auth",
             es_url=(os.getenv("ES_URL") or "http://localhost:9200").rstrip("/"),
-            es_index=os.getenv("ES_INDEX") or "vanillasoft_dev.events",
+            es_index=os.getenv("ES_INDEX") or "crm_dev.events",
         )
 
 
@@ -177,7 +181,7 @@ def canonical_body(payload: dict[str, Any]) -> bytes:
 
     ``json.dumps(..., separators=(",", ":"))`` and posting those same bytes is what makes
     the MAC reproducible on the receiver. Re-serializing an equal dict with different
-    separators produces a signature VanillaSoft cannot verify, which is the single
+    separators produces a signature CRM cannot verify, which is the single
     easiest way to break this integration — so the bytes are built once, here.
     """
     return json.dumps(payload, separators=(",", ":")).encode()
@@ -208,7 +212,7 @@ def signed_headers(body: bytes, secret: str, timestamp: int | None = None) -> di
 # notify payload builders — the shapes Carameli actually sends
 # --------------------------------------------------------------------------------------
 #
-# These mirror app/services/vanillasoft_notify.py but take primitives instead of ORM
+# These mirror app/services/crm_notify.py but take primitives instead of ORM
 # models, because no database or model layer is available on this machine. Keys and
 # casing must match the C# binding targets (IncomingCall.cs, SmsMessage.cs,
 # CallRecording.cs) — a renamed key binds to null and the receiver answers 400.
@@ -340,11 +344,11 @@ def nlog_record(
     """Build the JSON object NLog's ``WebService`` target posts to ``/webhooks/vs-log``.
 
     Every ``<parameter>`` in the shipped snippet
-    (``docs/plans/active/airtight-vanillasoft/nlog-snippet.md``) is present, because
+    (``docs/plans/active/airtight-crm/nlog-snippet.md``) is present, because
     ``app/schemas/vs_log.py::VsLogEntry`` requires ``time``/``level``/``logger``/
     ``message`` and a payload missing any of them is a 422 that says nothing about the
     channel. ``auth`` is deliberately absent: the suite authenticates with the
-    ``X-Cloudli-Auth`` header, which is what an NLog build new enough for ``<header>``
+    ``X-Log-Auth`` header, which is what an NLog build new enough for ``<header>``
     does, and the body fallback is a separate concern.
     """
     return {
@@ -403,7 +407,7 @@ async def post_notify(
     timestamp: int | None = None,
     signature_override: str | None = None,
 ) -> httpx.Response:
-    """POST a signed notify to a VanillaSoft VoipApi base, exactly as Carameli does.
+    """POST a signed notify to a CRM VoipApi base, exactly as Carameli does.
 
     *base_url* is the VoipApi application root (local or tunnelled);
     ``carameli/notify/`` and *path* are appended. ``signature_override`` replaces the
@@ -457,7 +461,7 @@ def describe(response: httpx.Response) -> str:
 
 
 async def es_search(es_url: str, index: str, query: dict[str, Any]) -> dict[str, Any]:
-    """Run a search against the local Elasticsearch that NLog ships VanillaSoft logs to."""
+    """Run a search against the local Elasticsearch that NLog ships CRM logs to."""
     async with httpx.AsyncClient(timeout=20.0) as client:
         response = await client.post(f"{es_url}/{index}/_search", json=query)
         response.raise_for_status()

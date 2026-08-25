@@ -12,7 +12,7 @@ from app.core.database import Base
 
 
 class AgentSkill(Base):
-    """A skill record for a contact-centre agent (cloudli spec §37)."""
+    """A skill record for a contact-centre agent (legacy feature spec §37)."""
 
     __tablename__ = "agent_skills"
 

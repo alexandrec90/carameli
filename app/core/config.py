@@ -47,7 +47,7 @@ class Settings(BaseSettings):
     sip_wss_port: int = 8443
     sip_wss_url: str = ""
 
-    # Per-call SCI context is intentionally short-lived. VanillaSoft posts it
+    # Per-call SCI context is intentionally short-lived. CRM posts it
     # immediately before originating the corresponding call.
     sci_preparation_ttl_seconds: int = Field(default=300, ge=30, le=3600)
 
@@ -92,23 +92,32 @@ class Settings(BaseSettings):
         description="Comma-separated list of allowed CORS origins",
     )
 
-    vanillasoft_webhook_url: str | None = Field(
+    crm_webhook_url: str | None = Field(
         default=None,
         description=(
-            "Base URL of the VanillaSoft.VoipApi staging site; Carameli POSTs "
+            "Base URL of the CRM VoIP API staging site; Carameli POSTs "
             "IncomingCall, CallRecording, IncomingSmsMessage and "
             "IncomingSmsMessageDeliveryReceipt under it, behind "
-            "VANILLASOFT_NOTIFY_PREFIX"
+            "CRM_NOTIFY_PREFIX"
         ),
     )
-    vanillasoft_webhook_secret: str | None = None
+    crm_webhook_secret: str | None = None
+    legacy_log_auth_header: str = Field(
+        default="X-Log-Auth",
+        description=(
+            "Header the legacy log shipper puts the shared secret in on POSTs to "
+            "/webhooks/vs-log. The vendor's own NLog target uses a vendor-branded "
+            "name; set this to whatever that deployment sends. Requests may also "
+            "carry the secret in the body's 'auth' field, which needs no header"
+        ),
+    )
     carameli_notify_secret: str | None = Field(
         default=None,
         description=(
             "Carameli's own HMAC-SHA256 signing key for outbound notify POSTs, sent as "
             "X-Carameli-Signature. Deliberately separate from "
-            "VANILLASOFT_WEBHOOK_SECRET: that value is the legacy vendor's static "
-            "shared header (the CloudliAuthValue appSetting), so reusing it would mean "
+            "CRM_WEBHOOK_SECRET: that value is the legacy vendor's static "
+            "shared-secret appSetting, so reusing it would mean "
             "rotating one vendor rotates both. Unset = no "
             "signature header (the pre-signing behaviour)"
         ),
@@ -118,12 +127,12 @@ class Settings(BaseSettings):
     # catch webhooks that never arrived. Default-off — needs live provider credentials.
     reconciliation_enabled: bool = False
     reconciliation_lookback_minutes: int = 60
-    vanillasoft_notify_prefix: str = Field(
+    crm_notify_prefix: str = Field(
         default="notify",
         description=(
             "Path prefix inserted between the webhook base URL and the notify "
             "suffixes (IncomingCall, CallRecording, ...). 'notify' targets the "
-            "legacy fire-and-forget CloudliController; flip to 'carameli/notify' "
+            "legacy fire-and-forget notify controller; flip to 'carameli/notify' "
             "once staging runs the honest CarameliNotifyController"
         ),
     )

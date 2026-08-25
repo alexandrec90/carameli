@@ -123,8 +123,13 @@ export const MAX_CONTENT_IMAGE_EDGE = 2816
  */
 export const MAX_PRELOAD_BYTES = 2_100 * 1024
 
-/** The whole served tree, images and all. */
-export const MAX_PUBLIC_BYTES = 2_850 * 1024
+/**
+ * The whole served tree, images and all. Raised from 2 850 KB when the home page
+ * brought four panels of its own art; only one page's set is ever on the critical
+ * path ({@link MAX_PRELOAD_BYTES} guards that), so the other page's panels sit
+ * here as cold weight.
+ */
+export const MAX_PUBLIC_BYTES = 3_500 * 1024
 
 /**
  * Source trees scanned for references to served assets, relative to the frontend.
@@ -365,11 +370,25 @@ export function findPreloadedImages(html: string): string[] {
   return [...new Set(out)]
 }
 
-/** The `PANELS` list the skin guard preloads, or `[]` if the guard is not there. */
+/**
+ * The per-page `PANELS` lists the skin guard preloads, keyed by page, or `{}` if the
+ * guard is not there. The guard preloads one page's list per visit, so the budget
+ * check has to see the split — flattening it would sum two critical paths that never
+ * share a load.
+ */
+export function findGuardedPanelPages(html: string): Record<string, string[]> {
+  const block = /\bvar\s+PANELS\s*=\s*\{([\s\S]*?)\}/.exec(html)
+  if (!block) return {}
+  const pages: Record<string, string[]> = {}
+  for (const [, key, arr] of block[1].matchAll(/(\w+)\s*:\s*\[([\s\S]*?)\]/g)) {
+    pages[key] = [...arr.matchAll(/['"]([^'"]+)['"]/g)].map(match => safeDecode(match[1]))
+  }
+  return pages
+}
+
+/** Every image the skin guard may preload, across pages, in declaration order. */
 export function findGuardedPanels(html: string): string[] {
-  const block = /\bvar\s+PANELS\s*=\s*\[([\s\S]*?)\]/.exec(html)
-  if (!block) return []
-  return [...block[1].matchAll(/['"]([^'"]+)['"]/g)].map(match => safeDecode(match[1]))
+  return [...new Set(Object.values(findGuardedPanelPages(html)).flat())]
 }
 
 /** The skin list and default the inline guard resolves against. */

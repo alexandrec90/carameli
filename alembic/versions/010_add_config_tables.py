@@ -4,7 +4,7 @@ Revision ID: 010
 Revises: 009
 Create Date: 2026-06-27 00:00:00.000000
 
-CRUD config tables for the B5 Config vertical (cloudli spec §11, §12, §28).
+CRUD config tables for the B5 Config vertical (legacy feature spec §11, §12, §28).
 No call-engine wiring; these are pure config surfaces.
 
 """

@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
-"""Probe which Carameli <-> VanillaSoft communication channels are actually open.
+"""Probe which Carameli <-> CRM communication channels are actually open.
 
 Answers one question before any integration work gets designed: which paths
-between this machine and the VanillaSoft host exist. Every probe is **read-only**
+between this machine and the CRM host exist. Every probe is **read-only**
 at the application layer -- TCP connects and HTTP GETs, never a POST -- so a run
 inserts no application rows. HTTP GETs may still appear in remote access logs.
 
 Channels probed (each result carries the design decision it settles):
 
-  app-https   HTTPS to the VanillaSoft app     -> notify POSTs; pull-based diagnostics
+  app-https   HTTPS to the CRM app     -> notify POSTs; pull-based diagnostics
   app-route   the carameli/notify route        -> has staging deployed the honest receiver?
   sql         TCP 1433 on the SQL Server host  -> direct DB verification / MSSQL MCP
   winrm       TCP 5985/5986                    -> remote Get-WinEvent, no new .NET code
@@ -16,12 +16,12 @@ Channels probed (each result carries the design decision it settles):
   smb         TCP 445                          -> file-share access to logs
   ngrok       the local ngrok agent            -> is a reverse path even possible
 
-The reverse direction (VanillaSoft -> Carameli) cannot be probed from this side.
+The reverse direction (CRM -> Carameli) cannot be probed from this side.
 The run ends by printing a one-line PowerShell handshake to run on the
-VanillaSoft host, and reports any resulting hit it can see in the ngrok inspector.
+CRM host, and reports any resulting hit it can see in the ngrok inspector.
 
-Config is read from the environment, falling back to `.env`: `VANILLASOFT_WEBHOOK_URL`
-and `VANILLASOFT_NOTIFY_PREFIX` are reused as-is. Probe-only overrides are
+Config is read from the environment, falling back to `.env`: `CRM_WEBHOOK_URL`
+and `CRM_NOTIFY_PREFIX` are reused as-is. Probe-only overrides are
 `VS_PROBE_HOST` (defaults to the webhook URL's host) and `VS_PROBE_DB_HOST`
 (defaults to the app host -- set it when SQL Server lives on a separate box).
 
@@ -60,22 +60,21 @@ DEFAULT_TIMEOUT = 6.0
 # the design consequence is.
 IMPLICATIONS: dict[str, tuple[str, str]] = {
     "app-https": (
-        "Carameli -> VanillaSoft works. Notify POSTs and any pull-based diagnostics "
-        "endpoint are viable.",
+        "Carameli -> CRM works. Notify POSTs and any pull-based diagnostics endpoint are viable.",
         "REQUIRED CHANNEL. Nothing in the integration can work without it -- fix this "
         "before designing anything else.",
     ),
     "app-route": (
-        "The carameli/notify routes are deployed. Flip VANILLASOFT_NOTIFY_PREFIX to "
+        "The carameli/notify routes are deployed. Flip CRM_NOTIFY_PREFIX to "
         "'carameli/notify' to start using the honest receiver.",
-        "Routes not deployed (or the app path is wrong). Keep VANILLASOFT_NOTIFY_PREFIX="
+        "Routes not deployed (or the app path is wrong). Keep CRM_NOTIFY_PREFIX="
         "'notify' until staging deploys CarameliNotifyController.",
     ),
     "sql": (
         "Direct DB verification is possible: skip the diag read endpoints, and an MSSQL "
         "MCP server becomes viable for 'see the row in Vanilla'.",
         "No direct DB read. VS-side verification needs a read endpoint on the app "
-        "(carameli/diag/...) or the VanillaSoft web UI.",
+        "(carameli/diag/...) or the CRM web UI.",
     ),
     "winrm": (
         "Remote Event Log read works: 'Get-WinEvent -ComputerName <host>' replaces the "
@@ -159,7 +158,7 @@ def notify_probe_url(base_url: str, prefix: str) -> str:
 def classify_route_status(status: int | None) -> tuple[bool, str]:
     """Decide whether a GET against the notify route proves the route exists.
 
-    The route is POST-only and sits behind CloudliHeaderAttribute, so an
+    The route is POST-only and sits behind legacy auth-header filter, so an
     unauthenticated GET can never return 200 -- 401/403/405 all mean "the route is
     there", and only 404 means it is not deployed. Pure: this is the one piece of
     inference in the script worth testing directly.
@@ -188,7 +187,7 @@ def build_artifact(probes: list[Probe], now: str) -> str:
     'blocked' lines are the deliverable, not noise to be filtered out."""
     lines = [
         "# source: scripts/probe-connectivity.py",
-        "# Carameli <-> VanillaSoft channel probe. Application-read-only: TCP connects",
+        "# Carameli <-> CRM channel probe. Application-read-only: TCP connects",
         "# and HTTP GETs only. GETs may appear in remote access logs.",
         f"# generated: {now}",
         "",
@@ -211,7 +210,7 @@ def build_artifact(probes: list[Probe], now: str) -> str:
 
 
 def handshake_command(ngrok_url: str) -> str:
-    """The one-liner to run on the VanillaSoft host to prove the reverse path."""
+    """The one-liner to run on the CRM host to prove the reverse path."""
     target = ngrok_url.rstrip("/") if ngrok_url else "https://<your-ngrok-domain>"
     return f"Invoke-WebRequest {target}/health -UseBasicParsing | Select-Object StatusCode"
 
@@ -269,14 +268,14 @@ def ngrok_health_hits(timeout: float = 2.0) -> tuple[bool, str]:
 
 def run_probes(config: dict[str, str], timeout: float) -> list[Probe]:
     """Run every channel probe and return the results in report order."""
-    base_url = config.get("VANILLASOFT_WEBHOOK_URL", "").strip()
+    base_url = config.get("CRM_WEBHOOK_URL", "").strip()
     if not base_url:
         return []
 
     app_host, app_port = host_port_from_url(base_url)
     app_host = config.get("VS_PROBE_HOST", "").strip() or app_host
     db_host = config.get("VS_PROBE_DB_HOST", "").strip() or app_host
-    prefix = config.get("VANILLASOFT_NOTIFY_PREFIX", "notify").strip() or "notify"
+    prefix = config.get("CRM_NOTIFY_PREFIX", "notify").strip() or "notify"
 
     status, detail = http_probe(base_url, timeout)
     probes = [
@@ -284,7 +283,7 @@ def run_probes(config: dict[str, str], timeout: float) -> list[Probe]:
     ]
 
     # The question is whether the *honest receiver* is deployed, so probe its route
-    # even while VANILLASOFT_NOTIFY_PREFIX still points at the legacy controller.
+    # even while CRM_NOTIFY_PREFIX still points at the legacy controller.
     route_prefix = "carameli/notify" if prefix == "notify" else prefix
     route_url = notify_probe_url(base_url, route_prefix)
     route_status, route_detail = http_probe(route_url, timeout)
@@ -308,7 +307,7 @@ def run_probes(config: dict[str, str], timeout: float) -> list[Probe]:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="probe-connectivity.py",
-        description="Probe which Carameli <-> VanillaSoft channels are open (read-only).",
+        description="Probe which Carameli <-> CRM channels are open (read-only).",
     )
     parser.add_argument(
         "--timeout", type=float, default=DEFAULT_TIMEOUT, help="per-probe timeout in seconds"
@@ -331,7 +330,7 @@ def main(argv: list[str] | None = None) -> int:
         return script_common.emit_report(
             noun="PROBE",
             artifact_path=ARTIFACT,
-            statuses=[(SKIP, "no VANILLASOFT_WEBHOOK_URL in environment or .env")],
+            statuses=[(SKIP, "no CRM_WEBHOOK_URL in environment or .env")],
             artifact_text="",
             failed=True,
         )
@@ -355,7 +354,7 @@ def main(argv: list[str] | None = None) -> int:
         counts=summarize(probes),
         unit="channels",
     )
-    print("To test the reverse path (VanillaSoft -> Carameli), run this on the VS host:")
+    print("To test the reverse path (CRM -> Carameli), run this on the VS host:")
     print("  " + handshake_command(config.get("NGROK_URL", "")))
     print("then re-run this probe and look for a /health hit on the ngrok channel.\n")
     return code

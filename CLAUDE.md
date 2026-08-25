@@ -1,7 +1,7 @@
 # Carameli
 
 Self-hosted VoIP service for phone lines, extensions, SMS, call control, recordings,
-and VanillaSoft-compatible APIs.
+and CRM-compatible APIs.
 
 ## Stack
 
@@ -56,29 +56,30 @@ All backend and ingested frontend activity goes through the configured logging s
 do not create ad-hoc log files or log credentials, API keys, message bodies, or raw
 webhook payloads.
 
-## VanillaSoft compatibility
+## CRM compatibility
 
-`../VanillaLand/` is the legacy contract reference. Inspect it when implementing or
+`../legacy-crm/` is the legacy contract reference. Inspect it when implementing or
 changing a compatibility endpoint; do not copy its architecture into Carameli.
 
 | Legacy area | Carameli location |
 | --- | --- |
-| ConnectMeVoice / CloudLi providers | `app/services/providers/` |
+| Legacy carrier providers | `app/services/providers/` |
 | Phone numbers and extensions | models/repos/services for `phone_line` and `extension` |
 | Call history | `call_events` |
 | SMS ASMX contract | `app/api/vsapi/sms.py` |
 | Call-status callbacks | `app/api/webhooks/call_status.py` |
 | SCI routing | `app/api/vsapi/sci.py` |
 
-Useful legacy roots include `VanillaSoft.Backend/ConnectMeVoice`, `CMVClarity`,
-`SMS`, `PhoneNumber`, `Recording`, `VanillaSoft.Model/VoIP`,
-`Vanillasoft.Webservice`, and `VanillaSoft.VoipApi` under `../VanillaLand/AppCode/`.
+The useful roots under `../legacy-crm/AppCode/` are the VoIP backend, the clarity API,
+and the SMS, phone-number, recording, VoIP-model, web-service and VoIP-API projects.
+The rest of that tree is CRM surface with no VoIP content, so it is a large codebase
+with a thin relevant slice — read narrowly.
 
-`docs/reference/vanillaland-scope.md` maps the whole tree — which subtrees are worth
-reading and which are CRM surface with no VoIP content. Read it before going in; it is
-a large codebase and the relevant slice is thin.
+That checkout is a third party's licensed source. Read it to match a contract; never
+copy its code, its file layout, or its internal type names into this repository, and
+keep its identifiers out of commits, comments and documentation here.
 
-When Carameli is remote and VanillaLand runs locally in IIS, the log locations and the
+When Carameli is remote and LegacyCRM runs locally in IIS, the log locations and the
 usable test suite both change: `docs/operations/local-integration-testing.md` and the free
 `tests/local_e2e/` suite, not `tests/live_e2e/`.
 

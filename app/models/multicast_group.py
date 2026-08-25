@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 class MulticastGroup(Base):
-    """A multi-cast intercom: one source broadcasts to subscriber extensions (cloudli spec §16)."""
+    """A multi-cast intercom: one source broadcasts to subscriber extensions (legacy feature spec §16)."""
 
     __tablename__ = "multicast_groups"
 

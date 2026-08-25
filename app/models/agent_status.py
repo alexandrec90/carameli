@@ -16,8 +16,8 @@ logger = logging.getLogger(__name__)
 class AgentStatus(Base):
     """One row per SIP username; upserted on every 30-second poll.
 
-    Mirrors the per-agent presence record that VanillaLand maintained via the
-    Clarity API (CMVClarityAPI.cs HUD Phones + Device Status endpoints).
+    Mirrors the per-agent presence record that LegacyCRM maintained via the
+    Clarity API (the legacy clarity API client HUD Phones + Device Status endpoints).
     Jambonz equivalents:
       - call_state  ← GET /v1/Accounts/{sid}/Calls  (active call list)
       - sip_registered ← GET /v1/Accounts/{sid}/registrations (SIP reg list)

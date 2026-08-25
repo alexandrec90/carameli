@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 _TERMINAL_CALL_STATUSES = {"completed", "no-answer", "busy", "failed", "canceled"}
 
-# Grouping dimensions supported by the CDR summary report (cloudli spec sections 30-34).
+# Grouping dimensions supported by the CDR summary report (legacy feature spec sections 30-34).
 SUMMARY_GROUP_BY = ("extension", "number")
 _DELETE_BATCH_SIZE = 10_000
 
@@ -237,7 +237,7 @@ class CallEventRepo:
         return list(result.scalars().all())
 
     async def get_unposted(self) -> list[CallEvent]:
-        """Return events not yet posted to VanillaSoft, created more than 1 minute ago."""
+        """Return events not yet posted to CRM, created more than 1 minute ago."""
         cutoff = _utcnow_naive() - timedelta(minutes=1)
         result = await self.session.execute(
             select(CallEvent)

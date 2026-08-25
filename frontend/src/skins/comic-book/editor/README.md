@@ -13,8 +13,14 @@ bubbles; **Panel shapes** drags the lines between panels.
 `PANEL_BUBBLE_TRANSFORMS` — picture placement **and content** (panel / src / alt /
 left / top / width / height / scale / offsetX / offsetY / anchor / spill) and bubble
 placement **and content** (panel / top / right / width / rotate / spill / type / tail /
-text), plus each bubble's event morph targets (`hoverType`, `clickType`) and its
-connector-tube partner (`linkTo`). A picture's `src` is a public URL, offered in the
+content / text — lettering, a comma-delimited wheel picker, a text input, or a phone
+input formatted from the browser locale), plus each bubble's event morph targets
+(`hoverType`, `clickType`) and its
+connector-tube partner (`linkTo`). It also holds `PANEL_PATTERNS` — each panel's
+Ben-Day background style, the one array here that **is** parallel to `PANELS`; the
+per-panel palette and dot metrics stay tuned in
+[`../panelPatterns.ts`](../panelPatterns.ts) (`PANEL_BG_CONFIGS`), so switching a
+panel's pattern keeps its colors. A picture's `src` is a public URL, offered in the
 editor by the static manifest in [`assets.ts`](./assets.ts) (`PANEL_ASSETS`). The
 bubble `type` resolves to a lettering font via [`bubbleTypes.ts`](./bubbleTypes.ts)
 (`BUBBLE_TYPES`); the outline itself is generated vector geometry in
@@ -22,9 +28,14 @@ bubble `type` resolves to a lettering font via [`bubbleTypes.ts`](./bubbleTypes.
 modules — there are no more magic framing numbers, and no bubble text lives in
 `Layout.tsx`.
 
-[`layoutConfig.ts`](./layoutConfig.ts) also holds `PANEL_GRIDS` — one panel
-subdivision per window shape (`landscape` / `portrait` / `square`, chosen by
-`layoutKindFor`). A grid is a **shared-vertex planar subdivision**: one table of
+[`layoutConfig.ts`](./layoutConfig.ts) also holds `PANEL_GRIDS` — a `PageGrids`
+record: for each **page** (`classic` / `home`, chosen from the route by
+`pageForPath`), one panel subdivision per window shape (`landscape` / `portrait` /
+`square`, chosen by `layoutKindFor`). Every grid's ring table is `PANELS`-length: a
+panel that lives on the *other* page keeps its slot as an **empty ring**, which
+`gridPolys` hands back as a vertex-less polygon and `Layout.tsx` maps to `null`, so a
+panel index means the same thing everywhere. A grid is a **shared-vertex planar
+subdivision**: one table of
 normalised `[x, y]` points and one ring of indices per panel. The two panels either
 side of a line name the *same* indices for it, so moving a vertex moves both sides at
 once and they cannot come apart. `../panelGeometry.ts` turns a grid into viewport
@@ -86,7 +97,9 @@ different images can only crossfade. A new bubble type belongs in `bubbleShape.t
    bubble is shown without hover so it can be selected.) A picture wins the click over
    the panel under it, and a bubble over both. Selecting the panel itself is how you
    reach one that has nothing on it yet, and it is what **+ Image** / **+ Bubble** add
-   to; a panel has nothing to drag, so it is only outlined.
+   to; a panel has nothing to drag, so it is only outlined. With a panel selected,
+   the inspector offers its background **pattern** style — the palette stays the
+   panel's own, so switching styles keeps its colors.
    - The overlay blocks the panels' own click navigation, so use the **Page**
      dropdown in the toolbar to move between pages (each switch replays the
      Ben-Day wash transition). The **Loading screen** entry previews the loading
@@ -130,7 +143,12 @@ different images can only crossfade. A new bubble type belongs in `bubbleShape.t
      bleed past (default for bubbles).
    - For bubbles: pick the **panel** it belongs to, a resting **type** (sets shape +
      lettering font), which way the **tail** points (**No tail** is one of the nine
-     options), edit the **text** inline, choose the shapes to morph to **on hover**
+     options), pick the **content** presentation (**Text**, **Wheel picker**, **Text
+     input**, or **Phone input**). Wheel text is comma-delimited options: hover the
+     bubble outside edit mode and scroll to turn it. Input text is its initial value;
+     phone input formats live using the browser locale, while a leading `+` selects an
+     international calling code. Edit the **text** or **initial value**, choose the shapes to
+     morph to **on hover**
      and **on click** (`— no change —` keeps the resting shape), and pick a **link
      to** partner to join with a connector tube. Turning or removing a tail morphs
      like any other shape change, because the tail is one ring vertex pulled out.
@@ -162,14 +180,15 @@ different images can only crossfade. A new bubble type belongs in `bubbleShape.t
    - The gutter between panels stays the same width at every angle — it is measured
      perpendicular to each edge, not per axis — and every panel stays inside the outer
      frame. Neither is a rule applied afterwards; both fall out of the geometry.
-   - **Reset shapes** in the inspector restores the current window shape's grid. The
-     three grids are edited independently: resize the window to reach another one.
+   - **Reset shapes** in the inspector restores the current window shape's grid, for
+     the current page. Each page's three grids are edited independently: resize the
+     window to reach another shape, switch pages to reach the other page's grids.
 6. Click **Save** to write the change straight back to `layoutConfig.ts` (a dev-only
    Vite endpoint, `POST /__comic-editor/save`); HMR reloads it. **Reset** discards
    unsaved edits and reverts to the last saved file.
 7. Reload **without** `?edit=1` — your saved change is now the baseline.
 
-**Copy config** / **.ts** remain as fallbacks: Copy puts the two paste-ready
+**Copy config** / **.ts** remain as fallbacks: Copy puts the paste-ready
 `export const` blocks on the clipboard; **.ts** downloads a complete `layoutConfig.ts`.
 Both are used automatically if the Save endpoint or clipboard is unavailable.
 
@@ -189,13 +208,16 @@ in a prod build.
 types.ts            ImgTransform, BubbleTransform, EditorConfig
 assets.ts           PANEL_ASSETS: the pictures a frame may point at (static manifest)
 bubbleTypes.ts      BubbleType + BUBBLE_TYPES (lettering font per type) — ships in prod
-../panels.ts        PANELS: the grid slots — label, isLogo, route (what `panel` indexes)
+../panels.ts        PANELS: the grid slots — label, isLogo, route, page (what `panel` indexes)
 ../PanelImages.tsx  one panel's pictures: filters the array by panel, frames and clips each
 ../bubbleBox.ts     PURE authoring box: viewBox, base ellipse, TAIL_DIRS + tail geometry
 ../bubbleShape.ts   PURE outline geometry: the shared vertex ring, per-type modulation, morph lerp
 ../bubbleTube.ts    PURE connector-tube geometry + link/reveal semantics
 ../useBubbleMorph.ts  rAF morph driver — writes `d` to the DOM, not through React
-../PanelBubble.tsx  one bubble: outline SVG + text + hover/press morph state
+../PanelBubble.tsx  one bubble: outline SVG + content + hover/press morph state
+../BubbleInput.tsx  real text/phone input; isolates its events from panel navigation
+../phoneInput.ts    PURE locale detection, live phone formatting + caret/deletion math
+../bubbleContent.ts content-kind registry and persisted-value guard
 ../PanelBubbles.tsx one panel's bubbles: filters the array by panel, clips the non-spilling ones
 ../BubbleTubes.tsx  viewport-level tube layer for every linked pair
 ../tableProjection.ts PURE: the corner quad -> homography -> `matrix3d`, and the layout box
@@ -205,10 +227,11 @@ bubbleTypes.ts      BubbleType + BUBBLE_TYPES (lettering font per type) — ship
 ../ProjectedNumberPad.tsx fixed 3 × 4 telephone keys on a projected surface
 ../number-pad.css   number-pad lettering and surface layout
 ../panelGeometry.ts PURE grid -> polygon geometry: frame, normalised space, vertex constraints
+../panelPatterns.ts pattern style registry + per-panel palette/dot tuning (PANEL_BG_CONFIGS)
 ../polygonInset.ts  PURE polygon maths: the perpendicular gutter inset, bounding box
 panelGridOps.ts     PURE grid edits: move vertex, insert/remove bend, seam listing
 panelGridValidate.ts PURE structural guard: rings, ranges, no T-junctions
-layoutConfig.ts     PANEL_IMG_TRANSFORMS, PANEL_BUBBLE_TRANSFORMS, PANEL_GRIDS — source of truth
+layoutConfig.ts     PANEL_IMG_TRANSFORMS, PANEL_BUBBLE_TRANSFORMS, PANEL_PATTERNS, PANEL_GRIDS — source of truth
 configOps.ts        PURE config edits: re-exports configSeed + configHydrate, patch/add/remove, links
 configSeed.ts       PURE: the working copy's seed, clone, and per-breakpoint grid set/reset
 configHydrate.ts    PURE: parse a persisted payload back into a config, falling back per field
@@ -235,7 +258,7 @@ EditorOverlay.tsx   overlay UI: click targets, outlines, seams (dev-only, dynami
 EditorToolbar.tsx   toolbar chrome: mode toggle, page select, inspector slot, save/reset/export
 InspectorPanel.tsx  selection inspector: read-outs, spill, per-element reset, delete
 ImageInspector.tsx  picture-only controls: panel, picture, alt, anchor
-BubbleInspector.tsx bubble-only controls: panel, type, tail, text, hover/click, link
+BubbleInspector.tsx bubble-only controls: panel, type, tail, content, text, hover/click, link
 PageSelect.tsx      toolbar dropdown: switch page / preview the loading screen
 pageSelection.ts    PURE helpers behind PageSelect (sentinel value, selection resolution)
 editor.css          overlay chrome styles
@@ -253,4 +276,4 @@ All math/serialization is pure and unit-tested under
 `frontend/src/tests/skins/` (`comicBookTransforms`, `editorTransformsMath`,
 `editorMode`, `editorConfigOps`, `editorSerialize`, `pageSelection`,
 `editorToolbarDrag`, `bubbleShape`, `bubbleTube`, `panelGeometry`, `panelGridOps`,
-`tableProjection`, `tableData`, `tableConfig`, `ProjectedTable`).
+`panelLayouts`, `tableProjection`, `tableData`, `tableConfig`, `ProjectedTable`).

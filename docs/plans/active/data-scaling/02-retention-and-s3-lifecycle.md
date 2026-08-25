@@ -13,7 +13,7 @@ same clock. Phase 01's indexes are assumed (the purge filters on `created_at`).
 - **Default OFF.** `retention_days: int = 0` (0 = disabled). Silently deleting history on
   self-hosted installs is worse than growth; the operator opts in via `.env`.
   Recommended production value: 450 (~15 months) — say so in `.env.example`.
-- **Never delete unposted rows.** A row with `posted = false` still owes VanillaSoft a
+- **Never delete unposted rows.** A row with `posted = false` still owes CRM a
   notification; the purge must add `posted IS TRUE` to its predicate regardless of age.
 - **One shared window** for both tables and recordings. Two knobs can come later if needed.
 
