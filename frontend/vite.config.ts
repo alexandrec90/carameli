@@ -3,12 +3,13 @@ import { writeFile } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import { defineConfig, loadEnv } from 'vite'
+import { createLogger, defineConfig, loadEnv } from 'vite'
 import type { Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import { configDefaults } from 'vitest/config'
 
 import { resolveDevWatch } from './devWatchPolicy'
+import { quietProxyErrors } from './proxyErrorPolicy'
 
 const rootDir = dirname(fileURLToPath(import.meta.url))
 
@@ -70,6 +71,10 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react(), comicEditorSavePlugin()],
+
+    // A down backend logs one concise line instead of a stack trace per proxied
+    // request — the normal state for host-Vite branch previews. ./proxyErrorPolicy.ts.
+    customLogger: quietProxyErrors(createLogger()),
     server: {
       port: 5173,
 
