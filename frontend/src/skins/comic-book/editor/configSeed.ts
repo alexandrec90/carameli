@@ -1,6 +1,13 @@
 import { PANEL_ASSETS } from './assets'
 import { PANEL_PAGES } from '../panels'
-import { PANEL_IMG_TRANSFORMS, PANEL_BUBBLE_TRANSFORMS, PANEL_GRIDS, PANEL_PATTERNS } from './layoutConfig'
+import { cloneChain } from './chainOps'
+import {
+  PANEL_BUBBLE_CHAINS,
+  PANEL_IMG_TRANSFORMS,
+  PANEL_BUBBLE_TRANSFORMS,
+  PANEL_GRIDS,
+  PANEL_PATTERNS,
+} from './layoutConfig'
 import { cloneTable } from './tableValidate'
 import type {
   BubbleTransform,
@@ -54,6 +61,7 @@ export const NEW_BUBBLE: Omit<BubbleTransform, 'panel'> = {
   linkTo: null,
   hoverType: null,
   clickType: null,
+  chain: '',
 }
 
 export const LAYOUT_KINDS: LayoutKind[] = ['landscape', 'portrait', 'square']
@@ -100,6 +108,7 @@ export function seedConfig(): EditorConfig {
   return {
     images: PANEL_IMG_TRANSFORMS.map(cloneImg),
     bubbles: PANEL_BUBBLE_TRANSFORMS.map(b => ({ ...b })),
+    chains: PANEL_BUBBLE_CHAINS.map(cloneChain),
     grids: cloneGrids(PANEL_GRIDS),
     patterns: [...PANEL_PATTERNS],
   }
@@ -110,6 +119,7 @@ export function cloneConfig(c: EditorConfig): EditorConfig {
   return {
     images: c.images.map(cloneImg),
     bubbles: c.bubbles.map(b => ({ ...b })),
+    chains: c.chains.map(cloneChain),
     grids: cloneGrids(c.grids),
     patterns: [...c.patterns],
   }

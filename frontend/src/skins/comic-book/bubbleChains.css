@@ -1,0 +1,89 @@
+/* Bubble chains — a column of balloons played as one SMS thread.
+ *
+ * Its own file rather than more of bubbles.css, which is at the size limit. The seam is
+ * clean: everything here is about a balloon *moving between slots* or *arriving*, and
+ * nothing here restyles a balloon. A chained bubble is an ordinary `.cb-panel-bubble`
+ * with one extra class.
+ */
+
+/* The chain's own positioning context and, more importantly, its wheel target.
+ *
+ * `pointer-events: none` keeps the layer from swallowing clicks meant for the panel
+ * underneath — it covers the whole panel box. It does *not* stop the wheel listener from
+ * firing: pointer-events decides which element a gesture targets, not how far the event
+ * bubbles, and a revealed balloon inside is `pointer-events: auto`, so a wheel over one
+ * still arrives here on the way up.
+ *
+ * Inset to the panel box exactly as `.cb-bubble-clip` is, so the % placements the author
+ * dragged out resolve against the same box whether or not a chain wraps them. No
+ * `overflow`: the column spills into the gutter like any other bubble, and a chain that
+ * shouldn't gets wrapped in `.cb-bubble-clip` by PanelBubbles instead.
+ */
+.cb-chain-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 5;
+}
+
+/* A balloon that is a slot of a live chain.
+ *
+ * `top`/`right`/`width` join the transition list, which is the whole scroll animation:
+ * the message keeps its element as it moves down the column (PanelBubbleChain keys by
+ * message, not by slot), so its placement *changes* rather than the balloons swapping
+ * text, and CSS carries it. The easing is a decelerating curve rather than the overshoot
+ * the pop-in uses — a thread sliding is a physical settle, not a bounce.
+ *
+ * Only on chained balloons: the editor drags an ordinary bubble by writing `top`/`right`
+ * every pointermove, and a transition there would have the balloon trailing the cursor.
+ */
+.cb-chain-bubble {
+  transition:
+    opacity 180ms ease-out,
+    transform 200ms cubic-bezier(0.34, 1.56, 0.64, 1),
+    top 280ms cubic-bezier(0.22, 1, 0.36, 1),
+    right 280ms cubic-bezier(0.22, 1, 0.36, 1),
+    width 280ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Arrival: a new message rises into place as it fades in.
+ *
+ * An animation and not a transition, because there is nothing to transition *from* — the
+ * element mounts already carrying `.is-visible`, and a property that has only ever had
+ * one value does not animate. Gated on `.is-visible` so it plays when the chain is
+ * revealed rather than on page load behind a panel nobody has hovered yet.
+ *
+ * The rotation is carried through every keyframe. Leaving it out of one would reset the
+ * balloon to square for the length of the animation, since a `transform` list replaces
+ * the whole of the one it overrides rather than merging with it.
+ */
+@keyframes cb-chain-in {
+  from {
+    opacity: 0;
+    transform: translateY(18%) scale(0.82) rotate(var(--cb-bubble-rot, -5deg));
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1) rotate(var(--cb-bubble-rot, -5deg));
+  }
+}
+
+.cb-chain-bubble.is-visible {
+  animation: cb-chain-in 320ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+/* Reduced motion: the thread still grows and still scrolls — that is content arriving,
+ * not decoration — but it does so by appearing rather than by travelling. The opacity
+ * fade is kept: it is what distinguishes a new message from one that was always there,
+ * and it moves nothing.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .cb-chain-bubble {
+    transition: opacity 180ms ease-out;
+  }
+
+  .cb-chain-bubble.is-visible {
+    animation: none;
+  }
+}

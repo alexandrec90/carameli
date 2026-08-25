@@ -1,4 +1,5 @@
 import { useNavigate } from 'react-router-dom'
+import type { BubbleChain } from './bubbleChain'
 import PanelBubbles from './PanelBubbles'
 import PanelImages from './PanelImages'
 import { toClipPath } from './editor/transforms'
@@ -15,6 +16,8 @@ interface ComicPanelProps {
     images: ImgTransform[]
     /** Every bubble on the page; this panel renders the ones that name it. */
     bubbles: BubbleTransform[]
+    /** Per-chain behavior for the chain names carried by bubbles. */
+    chains: BubbleChain[]
     natSizes: Record<string, { w: number; h: number }>
     editorActive: boolean
     hovered: boolean
@@ -34,7 +37,7 @@ interface ComicPanelProps {
  * overflow stays visible so pictures and bubbles can spill into the gutters.
  */
 export default function ComicPanel({
-    index, info, poly, images, bubbles, natSizes,
+    index, info, poly, images, bubbles, chains, natSizes,
     editorActive, hovered, onHover, isRevealed, isBubbleVisible,
     dotRef, onSettled, onNatSize,
 }: ComicPanelProps) {
@@ -109,10 +112,12 @@ export default function ComicPanel({
                 always in edit mode. */}
             <PanelBubbles
                 bubbles={bubbles}
+                chains={chains}
                 panel={index}
                 clip={dotClip}
                 isVisible={isBubbleVisible}
                 interactive={!editorActive}
+                editing={editorActive}
             />
         </div>
     )

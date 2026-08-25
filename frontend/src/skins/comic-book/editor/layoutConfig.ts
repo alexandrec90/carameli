@@ -1,5 +1,5 @@
 import type { PanelBgStyle } from '../panelPatterns'
-import type { ImgTransform, BubbleTransform, PageGrids } from './types'
+import type { ImgTransform, BubbleTransform, BubbleChain, PageGrids } from './types'
 
 // Not parallel to PANELS: each picture names its `panel`, so a panel may own several or
 // none, and the array is ordered by panel only for readability. `src`/`alt` are the
@@ -44,6 +44,8 @@ export const PANEL_IMG_TRANSFORMS: ImgTransform[] = [
 // current look where bubbles float into the gutter. `content` picks how `text` reads:
 // 'text' letters it as-is; 'wheel' splits it into comma-delimited options; 'input'
 // makes it editable; and 'phone' makes it an editable, region-formatted phone number.
+// `chain` joins this balloon to a column of them read as one SMS thread ('' = alone);
+// a chained balloon takes no tube, since a slot holds whatever message scrolled into it.
 //
 // Two pairs ship linked — the logo's and the mechanic's — each pair being one speaker's
 // line continuing across two balloons, so the second of each carries no tail and the
@@ -53,21 +55,35 @@ export const PANEL_IMG_TRANSFORMS: ImgTransform[] = [
 // landscape layout; the portrait and square layouts reshape the panels, so a pair may
 // end up close enough there to drop its tube. Retune per layout in the editor.
 export const PANEL_BUBBLE_TRANSFORMS: BubbleTransform[] = [
-  { panel: 0, top: -35, right: -12, width: 55, rotate: -5, spill: true, type: 'soft', tail: 'down-left', content: 'text', text: "It's Carameli!", linkTo: 1, hoverType: 'cloud', clickType: 'lightning' },
-  { panel: 0, top: 30, right: 45, width: 45, rotate: -5, spill: true, type: 'soft', tail: 'none', content: 'text', text: '...at your service!', linkTo: null, hoverType: 'cloud', clickType: 'lightning' },
-  { panel: 1, top: -35, right: -12, width: 55, rotate: -5, spill: true, type: 'soft', tail: 'down-right', content: 'text', text: 'Number please!', linkTo: null, hoverType: 'cloud', clickType: 'lightning' },
-  { panel: 2, top: -35, right: -12, width: 55, rotate: -5, spill: true, type: 'cloud', tail: 'down-left', content: 'text', text: 'I wonder...', linkTo: null, hoverType: 'soft', clickType: 'lightning' },
-  { panel: 3, top: -35, right: -12, width: 55, rotate: -5, spill: true, type: 'lightning', tail: 'down-left', content: 'text', text: 'FIXED!', linkTo: 5, hoverType: 'cloud', clickType: 'soft' },
-  { panel: 3, top: 30, right: 45, width: 45, rotate: -5, spill: true, type: 'soft', tail: 'none', content: 'text', text: '...for now.', linkTo: null, hoverType: 'cloud', clickType: 'lightning' },
-  { panel: 4, top: -30, right: 30, width: 45, rotate: -5, spill: true, type: 'soft', tail: 'down-right', content: 'text', text: 'One moment please!', linkTo: null, hoverType: 'cloud', clickType: 'lightning' },
-  { panel: 5, top: -35, right: -12, width: 55, rotate: -5, spill: true, type: 'lightning', tail: 'down-left', content: 'text', text: 'RING RING!', linkTo: null, hoverType: 'cloud', clickType: 'soft' },
-  { panel: 6, top: -35, right: -12, width: 55, rotate: -5, spill: true, type: 'lightning', tail: 'down-left', content: 'text', text: 'Ka-POW!', linkTo: null, hoverType: 'soft', clickType: 'cloud' },
-  { panel: 7, top: -35, right: -12, width: 55, rotate: -5, spill: true, type: 'cloud', tail: 'down-left', content: 'text', text: 'Delivering dreams...', linkTo: null, hoverType: 'soft', clickType: 'lightning' },
-  { panel: 8, top: -35, right: -12, width: 55, rotate: -5, spill: true, type: 'soft', tail: 'down-left', content: 'text', text: "It's Carameli!", linkTo: null, hoverType: 'cloud', clickType: 'lightning' },
-  { panel: 9, top: -35, right: -12, width: 55, rotate: -5, spill: true, type: 'soft', tail: 'down-right', content: 'text', text: 'Taking notes!', linkTo: null, hoverType: 'cloud', clickType: 'lightning' },
-  { panel: 10, top: -35, right: -12, width: 55, rotate: -5, spill: true, type: 'lightning', tail: 'down-left', content: 'text', text: 'RING RING!', linkTo: null, hoverType: 'cloud', clickType: 'soft' },
-  { panel: 11, top: -35, right: -12, width: 55, rotate: -5, spill: true, type: 'cloud', tail: 'down-left', content: 'text', text: 'Hello?', linkTo: null, hoverType: 'soft', clickType: 'lightning' },
+  { panel: 0, top: -35, right: -12, width: 55, rotate: -5, spill: true, type: 'soft', tail: 'down-left', content: 'text', text: "It's Carameli!", linkTo: 1, hoverType: 'cloud', clickType: 'lightning', chain: '' },
+  { panel: 0, top: 30, right: 45, width: 45, rotate: -5, spill: true, type: 'soft', tail: 'none', content: 'text', text: '...at your service!', linkTo: null, hoverType: 'cloud', clickType: 'lightning', chain: '' },
+  { panel: 1, top: -35, right: -12, width: 55, rotate: -5, spill: true, type: 'soft', tail: 'down-right', content: 'text', text: 'Number please!', linkTo: null, hoverType: 'cloud', clickType: 'lightning', chain: '' },
+  { panel: 2, top: -35, right: -12, width: 55, rotate: -5, spill: true, type: 'cloud', tail: 'down-left', content: 'text', text: 'I wonder...', linkTo: null, hoverType: 'soft', clickType: 'lightning', chain: '' },
+  { panel: 3, top: -35, right: -12, width: 55, rotate: -5, spill: true, type: 'lightning', tail: 'down-left', content: 'text', text: 'FIXED!', linkTo: 5, hoverType: 'cloud', clickType: 'soft', chain: '' },
+  { panel: 3, top: 30, right: 45, width: 45, rotate: -5, spill: true, type: 'soft', tail: 'none', content: 'text', text: '...for now.', linkTo: null, hoverType: 'cloud', clickType: 'lightning', chain: '' },
+  { panel: 4, top: -30, right: 30, width: 45, rotate: -5, spill: true, type: 'soft', tail: 'down-right', content: 'text', text: 'One moment please!', linkTo: null, hoverType: 'cloud', clickType: 'lightning', chain: '' },
+  { panel: 5, top: -35, right: -12, width: 55, rotate: -5, spill: true, type: 'lightning', tail: 'down-left', content: 'text', text: 'RING RING!', linkTo: null, hoverType: 'cloud', clickType: 'soft', chain: '' },
+  { panel: 6, top: -35, right: -12, width: 55, rotate: -5, spill: true, type: 'lightning', tail: 'down-left', content: 'text', text: 'Ka-POW!', linkTo: null, hoverType: 'soft', clickType: 'cloud', chain: '' },
+  { panel: 7, top: -35, right: -12, width: 55, rotate: -5, spill: true, type: 'cloud', tail: 'down-left', content: 'text', text: 'Delivering dreams...', linkTo: null, hoverType: 'soft', clickType: 'lightning', chain: '' },
+  { panel: 8, top: -35, right: -12, width: 55, rotate: -5, spill: true, type: 'soft', tail: 'down-left', content: 'text', text: "It's Carameli!", linkTo: null, hoverType: 'cloud', clickType: 'lightning', chain: '' },
+  { panel: 9, top: -35, right: -12, width: 55, rotate: -5, spill: true, type: 'soft', tail: 'down-right', content: 'text', text: 'Taking notes!', linkTo: null, hoverType: 'cloud', clickType: 'lightning', chain: '' },
+  { panel: 10, top: -35, right: -12, width: 55, rotate: -5, spill: true, type: 'lightning', tail: 'down-left', content: 'text', text: 'RING RING!', linkTo: null, hoverType: 'cloud', clickType: 'soft', chain: '' },
+  { panel: 11, top: -35, right: -12, width: 55, rotate: -5, spill: true, type: 'cloud', tail: 'down-left', content: 'text', text: 'Hello?', linkTo: null, hoverType: 'soft', clickType: 'lightning', chain: '' },
 ]
+
+// One entry per chain name the bubbles above carry — the list is derived from them, not
+// authored beside them, so naming a chain on a balloon creates its entry and renaming the
+// last member away removes it. A chain is a vertical column of balloons read as one
+// speaker's SMS thread: the lowest is the root that carries the tail, and each one above
+// it is a later message.
+//
+// `grow` reveals the column one balloon at a time instead of all at once, `stepMs` apart.
+// `scroll` lets the mouse wheel move a window over a thread longer than the column, each
+// message sliding into the slot below the one it was in. `messages` is that thread; empty
+// means the chain speaks its own balloons' `text`, in slot order, which is what a chain
+// that only wants the growth animation wants. Both toggles are per chain: a page can want
+// a live thread beside a plain multi-balloon utterance. See ../bubbleChain.ts.
+export const PANEL_BUBBLE_CHAINS: BubbleChain[] = []
 
 // The one array here that IS parallel to PANELS: a pattern belongs to the panel slot
 // itself, not to a picture or a bubble on it, so entry `i` is the Ben-Day background

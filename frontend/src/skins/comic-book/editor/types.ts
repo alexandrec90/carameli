@@ -1,4 +1,5 @@
 import type { TailDir } from '../bubbleBox'
+import type { BubbleChain } from '../bubbleChain'
 import type { BubbleContentKind } from '../bubbleContent'
 import type { PageGrids } from '../panelGeometry'
 import type { PanelBgStyle } from '../panelPatterns'
@@ -10,6 +11,11 @@ import type { BubbleType } from './bubbleTypes'
 // for its types.
 export type { LayoutKind, PageGrids, PanelGrid } from '../panelGeometry'
 export type { PanelPage } from '../panels'
+
+// Same bargain for chains: the renderer owns the behaviour (../bubbleChain.ts), the
+// editor owns the field on the bubble that joins one, and layoutConfig.ts imports both
+// names from here.
+export type { BubbleChain } from '../bubbleChain'
 
 /** One column of a projected table. */
 export interface TableColumn {
@@ -62,6 +68,7 @@ export interface TableProjection {
   /** Ink colour for the lettering and, in the editor, the band guides. */
   ink: string
 }
+
 /**
  * One picture on the page: which panel it belongs to, which file it shows, the frame
  * it is cropped to, and how the picture is framed *inside* that crop.
@@ -163,12 +170,33 @@ export interface BubbleTransform {
   hoverType: BubbleType | null
   /** Shape to pulse to when the bubble is pressed; null = stay put. */
   clickType: BubbleType | null
+  /**
+   * Name of the bubble chain this balloon is a slot of; '' when it stands alone.
+   *
+   * Bubbles sharing a name on the same panel form one vertical column — an SMS thread —
+   * ordered bottom-to-top by `top`, so the lowest is the root that carries the tail. The
+   * column's behaviour (does it grow in, does it scroll) is one entry in
+   * {@link EditorConfig.chains}, not a per-bubble flag, because it is a property of the
+   * thread rather than of any one balloon. See ../bubbleChain.ts.
+   *
+   * A chained bubble takes no connector tube. A tube joins two balloons that are on
+   * screen together and stay put; a chain slot holds a *different message* from one
+   * moment to the next, so a tube welded to it would be joining whatever happened to
+   * scroll into place. `sanitizeLinks` drops such a link the way it drops a cross-panel
+   * one, and the link picker never offers one.
+   */
+  chain: string
 }
 
 /**
  * The editor's working document. Neither array is parallel to PANELS: each entry names
  * its own panel, so both are free-length and adding one is an append that has to line
  * up with nothing.
+ *
+ * `chains` is derived rather than authored: its entries are exactly the names the
+ * bubbles carry, kept in step by `syncChains` after every edit. Naming a chain on a
+ * bubble creates the entry; renaming the last member away removes it. That is what stops
+ * a config accumulating settings for threads that no longer exist.
  *
  * `grids` is the exception and is *keyed* rather than listed — per page, then one panel
  * subdivision per viewport shape, because the three reshape the page differently and a
@@ -182,6 +210,7 @@ export interface BubbleTransform {
 export interface EditorConfig {
   images: ImgTransform[]
   bubbles: BubbleTransform[]
+  chains: BubbleChain[]
   grids: PageGrids
   patterns: PanelBgStyle[]
 }
