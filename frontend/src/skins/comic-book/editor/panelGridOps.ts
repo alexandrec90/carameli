@@ -175,27 +175,3 @@ export function removeVertex(grid: PanelGrid, index: number): PanelGrid | null {
     panels: grid.panels.map(ring => ring.filter(v => v !== index).map(remap)),
   }
 }
-
-/** Distance from `p` to segment `a→b`, plus where along it the closest point falls. */
-export function pointOnSegment(p: VpPt, a: VpPt, b: VpPt): { dist: number; t: number } {
-  const vx = b[0] - a[0]
-  const vy = b[1] - a[1]
-  const len2 = vx * vx + vy * vy
-  if (len2 === 0) return { dist: Math.hypot(p[0] - a[0], p[1] - a[1]), t: 0 }
-  const t = Math.min(Math.max(((p[0] - a[0]) * vx + (p[1] - a[1]) * vy) / len2, 0), 1)
-  return { dist: Math.hypot(p[0] - (a[0] + t * vx), p[1] - (a[1] + t * vy)), t }
-}
-
-/** The seam nearest a viewport point, within `tolerance` px — or null. */
-export function seamAt(
-  seams: SeamGeometry[],
-  point: VpPt,
-  tolerance: number,
-): { seam: SeamGeometry; t: number } | null {
-  let best: { seam: SeamGeometry; t: number; dist: number } | null = null
-  for (const seam of seams) {
-    const { dist, t } = pointOnSegment(point, seam.from, seam.to)
-    if (dist <= tolerance && (!best || dist < best.dist)) best = { seam, t, dist }
-  }
-  return best ? { seam: best.seam, t: best.t } : null
-}

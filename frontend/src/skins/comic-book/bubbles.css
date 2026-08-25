@@ -87,11 +87,9 @@
   transform: scale(1) rotate(var(--cb-bubble-rot, -5deg));
 }
 
-/* Only a revealed bubble takes the pointer. An invisible one that did would swallow
-   hovers and clicks aimed at whatever it happens to be floating over. */
-.cb-panel-bubble.is-visible.is-interactive {
-  pointer-events: auto;
-}
+/* The wrapper stays pointer-transparent even when revealed. PanelBubble opts only
+   its painted SVG outline and visible thought puffs back in with visiblePainted, so
+   the empty rectangle around a tail cannot swallow a panel hover or click. */
 
 /* Optional clip wrapper around a bubble (spill off) — mirrors .cb-img-clip so the
    bubble is clipped to the panel polygon (supplied inline) instead of floating.

@@ -45,6 +45,9 @@ export default function PanelBubble({ bubble, visible, interactive }: PanelBubbl
   const pathRef = useBubbleMorph(shape, bubble.tail)
   // The puffs trail the tail, so a thought bubble with no tail simply has none.
   const puffs = cloudPuffs(bubble.tail)
+  const puffsOpacity = puffOpacity(shape)
+  const shapePointerEvents = visible && interactive ? 'visiblePainted' : 'none'
+  const puffsPointerEvents = shape === 'cloud' ? shapePointerEvents : 'none'
   // Lettering follows the shape: a shout balloon in the speech font reads wrong,
   // and comics do swap the lettering when the balloon changes character.
   const font = BUBBLE_TYPES[shape].font
@@ -62,9 +65,6 @@ export default function PanelBubble({ bubble, visible, interactive }: PanelBubbl
       className={className}
       aria-hidden="true"
       style={bubbleStyle(bubble)}
-      onPointerEnter={interactive ? () => setHover(true) : undefined}
-      onPointerLeave={interactive ? () => setHover(false) : undefined}
-      onPointerDown={interactive ? pulse : undefined}
     >
       <svg
         className="cb-panel-bubble-svg"
@@ -72,12 +72,32 @@ export default function PanelBubble({ bubble, visible, interactive }: PanelBubbl
         style={{ aspectRatio: `${BUBBLE_VIEW.w} / ${BUBBLE_VIEW.h}` }}
         aria-hidden="true"
       >
-        {/* No `d` prop by design — useBubbleMorph owns the attribute. */}
-        <path ref={pathRef} className="cb-bubble-shape" />
-        <g className="cb-bubble-puffs" style={{ opacity: puffOpacity(shape) }}>
-          {puffs.map(p => (
-            <circle key={`${p.cx}-${p.cy}`} className="cb-bubble-shape" cx={p.cx} cy={p.cy} r={p.r} />
-          ))}
+        <g
+          onPointerEnter={interactive ? () => setHover(true) : undefined}
+          onPointerLeave={interactive ? () => setHover(false) : undefined}
+          onPointerDown={interactive ? pulse : undefined}
+        >
+          {/* No `d` prop by design — useBubbleMorph owns the attribute. */}
+          <path
+            ref={pathRef}
+            className="cb-bubble-shape"
+            pointerEvents={shapePointerEvents}
+          />
+          <g
+            className="cb-bubble-puffs"
+            style={{ opacity: puffsOpacity }}
+            pointerEvents={puffsPointerEvents}
+          >
+            {puffs.map(p => (
+              <circle
+                key={`${p.cx}-${p.cy}`}
+                className="cb-bubble-shape"
+                cx={p.cx}
+                cy={p.cy}
+                r={p.r}
+              />
+            ))}
+          </g>
         </g>
       </svg>
       <span className="cb-panel-bubble-text" style={{ fontFamily: `'${font}', cursive` }}>

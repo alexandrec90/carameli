@@ -6,7 +6,7 @@ import type { BubbleType } from './bubbleTypes'
 // the renderer needs it too and this module is the editor's. Re-exported here so
 // layoutConfig.ts — which the editor overwrites whole — keeps naming exactly one module
 // for its types.
-export type { LayoutKind, NormPt, PanelGrid, PanelGrids } from '../panelGeometry'
+export type { LayoutKind, PanelGrid, PanelGrids } from '../panelGeometry'
 
 /**
  * One picture on the page: which panel it belongs to, which file it shows, the frame
