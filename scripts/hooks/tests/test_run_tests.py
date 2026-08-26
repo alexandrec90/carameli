@@ -331,6 +331,140 @@ def test_addopts_excludes_paid_by_default():
     assert '-m "not paid"' in rt._ADDOPTS
 
 
+def test_addopts_mirrors_every_ignore_in_pytest_ini():
+    # `_ADDOPTS` is documented as mirroring pytest.ini's addopts, and the override
+    # REPLACES that value -- so an ignore present there and missing here is silently
+    # re-admitted. `--ignore=tests/local_e2e` was exactly that: the free local-e2e
+    # suite, which needs a LegacyCRM IIS host, got collected by every testmon run.
+    ini = (REPO_ROOT / "pytest.ini").read_text(encoding="utf-8")
+    line = next(ln for ln in ini.splitlines() if ln.startswith("addopts"))
+    ignores = {tok for tok in line.split() if tok.startswith("--ignore=")}
+    assert ignores, "pytest.ini declares no --ignore; this test is asserting nothing"
+    assert ignores <= {tok for tok in rt._ADDOPTS.split() if tok.startswith("--ignore=")}
+
+
+def test_webhook_e2e_target_demands_a_live_tunnel():
+    # The suite skips itself when NGROK_URL names a tunnel that does not answer --
+    # that is what keeps a worktree box's inherited NGROK_URL out of the free
+    # changed-scope. The DEDICATED reachability run must not inherit that mercy, or
+    # it reports an all-skipped green pass.
+    argv = rt._LOCAL_WEBHOOK_E2E_ARGV
+    assert ("-e", "CARAMELI_REQUIRE_NGROK=1") in itertools.pairwise(argv)
+    assert argv.index("-e") < argv.index("app"), "the -e flag must precede the service name"
+
+
+# ---------------------------------------------------------------------------
+# Host fallback tier -- db+redis up, no app container (the ephemeral-box shape)
+# ---------------------------------------------------------------------------
+
+
+def test_parse_host_port_variants():
+    assert rt.parse_host_port("0.0.0.0:5432") == "5432"
+    assert rt.parse_host_port("[::]:5433\n") == "5433"
+    assert rt.parse_host_port("127.0.0.1:15432") == "15432"
+    assert rt.parse_host_port("") is None
+    assert rt.parse_host_port("no ports published") is None
+
+
+def test_host_argv_reuses_this_interpreter():
+    argv = rt.host_argv("pytest -v -o addopts='-m \"not paid\"' tests/unit")
+    assert argv[:3] == [rt.sys.executable, "-m", "pytest"]
+    assert argv[-1] == "tests/unit"
+    # shlex keeps `-o addopts=...` as one token, quotes and all -- the paid-tier
+    # exclusion must survive the host tier or a fallback run collects paid tests.
+    assert 'addopts=-m "not paid"' in argv
+
+
+def test_host_db_fallback_declines_while_the_app_container_is_up(monkeypatch):
+    monkeypatch.setattr(rt, "_compose_running_services", lambda root=None: {"app", "db", "redis"})
+    monkeypatch.setattr(rt, "host_db_env", lambda root=None: {"DATABASE_URL": "x"})
+    assert rt.host_db_fallback() is None
+
+
+def test_host_db_fallback_declines_when_the_database_is_down(monkeypatch):
+    # No app container AND no database is not a tier to fall back to -- the
+    # container's own error is the more useful failure.
+    monkeypatch.setattr(rt, "_compose_running_services", lambda root=None: set())
+    monkeypatch.setattr(rt, "host_db_env", lambda root=None: {"DATABASE_URL": "x"})
+    assert rt.host_db_fallback() is None
+
+
+def test_host_db_fallback_takes_over_when_only_the_app_is_missing(monkeypatch):
+    # The ephemeral-box shape the report describes: db+redis up, no app container, and
+    # the run used to end at `docker compose exec`'s "No such container".
+    monkeypatch.setattr(rt, "_compose_running_services", lambda root=None: {"db", "redis"})
+    monkeypatch.setattr(rt, "host_db_env", lambda root=None: {"DATABASE_URL": "postgres://x"})
+    assert rt.host_db_fallback() == {"DATABASE_URL": "postgres://x"}
+
+
+def test_host_db_env_points_at_the_published_ports(monkeypatch):
+    monkeypatch.setattr(rt, "_compose_host_port", lambda svc, port, root=None: "15432")
+    env = rt.host_db_env()
+    for name in rt.CFG.db.url_env:
+        assert env[name].endswith(f"@localhost:15432/{rt.CFG.db.name}")
+    assert env[rt.CFG.db.redis_env] == "redis://localhost:15432"
+
+
+def test_host_db_env_is_none_when_a_port_cannot_be_resolved(monkeypatch):
+    monkeypatch.setattr(rt, "_compose_host_port", lambda svc, port, root=None: None)
+    assert rt.host_db_env() is None
+
+
+def test_run_local_uses_the_host_tier_without_testmon(monkeypatch):
+    # testmon's index lives inside the container's tree, so a host run must not claim
+    # a changed-only selection off somebody else's timings.
+    monkeypatch.setattr(rt, "host_db_fallback", lambda root=None: {"DATABASE_URL": "postgres://x"})
+    monkeypatch.setattr(
+        rt, "pick_fast_command", lambda: pytest.fail("testmon probe on the host tier")
+    )
+    seen: dict = {}
+    monkeypatch.setattr(
+        rt,
+        "run_argv",
+        lambda argv, extra_env=None: (seen.update(argv=argv, env=extra_env), ([], 0))[1],
+    )
+
+    rt.run_local(changed=True)
+
+    assert seen["env"] == {"DATABASE_URL": "postgres://x"}
+    assert "docker" not in seen["argv"]
+    assert "--testmon" not in seen["argv"]
+
+
+def test_run_scoped_uses_the_host_tier(monkeypatch):
+    # The tier only exists off-CI: on a runner the app code runs on the runner itself.
+    monkeypatch.setattr(rt, "IS_CI", False)
+    monkeypatch.setattr(rt, "host_db_fallback", lambda root=None: {"DATABASE_URL": "postgres://x"})
+    seen: dict = {}
+    monkeypatch.setattr(
+        rt,
+        "run_argv",
+        lambda argv, extra_env=None: (seen.update(argv=argv, env=extra_env), ([], 0))[1],
+    )
+
+    rt.run_scoped(["tests/unit/test_x.py"])
+
+    assert seen["env"] == {"DATABASE_URL": "postgres://x"}
+    assert seen["argv"][:3] == [rt.sys.executable, "-m", "pytest"]
+    assert "tests/unit/test_x.py" in seen["argv"]
+
+
+def test_run_local_stays_in_the_container_by_default(monkeypatch):
+    monkeypatch.setattr(rt, "host_db_fallback", lambda root=None: None)
+    monkeypatch.setattr(rt, "pick_fast_command", lambda: "pytest --testmon")
+    seen: dict = {}
+    monkeypatch.setattr(
+        rt,
+        "run_argv",
+        lambda argv, extra_env=None: (seen.update(argv=argv, env=extra_env), ([], 0))[1],
+    )
+
+    rt.run_local(changed=True)
+
+    assert seen["argv"][:3] == ["docker", "compose", "exec"]
+    assert seen["env"] is None
+
+
 # ---------------------------------------------------------------------------
 # critical_skip_lines -- a skipped backend suite must fail the run, not pass it
 # ---------------------------------------------------------------------------

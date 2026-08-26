@@ -41,8 +41,8 @@ IS_CI = bool(os.environ.get("CI"))
 # value, so the paid-tier exclusion (-m "not paid") and the dir ignores must be
 # repeated here or testmon fast-mode would silently collect paid tests.
 _ADDOPTS = (
-    "--ignore=tests/e2e --ignore=tests/live_e2e --ignore=tests/load "
-    '--ignore=tests/quarantine -m "not paid"'
+    "--ignore=tests/e2e --ignore=tests/live_e2e --ignore=tests/local_e2e "
+    '--ignore=tests/load --ignore=tests/quarantine -m "not paid"'
 )
 _PYTEST_FULL = "pytest -v --tb=short --no-header --color=no --durations=20 -n auto --dist=worksteal"
 _PYTEST_TESTMON = (
@@ -79,6 +79,13 @@ _LOCAL_WEBHOOK_E2E_ARGV = [
     "compose",
     "exec",
     "-T",
+    # The dedicated target is the one run that must NOT tolerate a dead tunnel:
+    # `tests/integration/test_webhook_e2e.py` skips itself when NGROK_URL names a
+    # tunnel that does not answer, which is what keeps a worktree box's inherited
+    # NGROK_URL out of the free changed-scope. Here that skip would be an
+    # all-skipped green pass, so this flag turns it back into a failure.
+    "-e",
+    "CARAMELI_REQUIRE_NGROK=1",
     "app",
     "pytest",
     "tests/integration/test_webhook_e2e.py",
@@ -253,6 +260,107 @@ def _in_container(bash_cmd: str) -> list[str]:
     return ["docker", "compose", "exec", "-T", "app", "bash", "-c", bash_cmd]
 
 
+# ---------------------------------------------------------------------------
+# Host fallback tier. The app container is the normal home for pytest, but an
+# ephemeral worktree box routinely has db+redis up and no app container -- and the
+# run then ended at `docker compose exec`'s "No such container", which
+# `diagnostics.get_skip_reason` classifies as an environmental skip. The suite is
+# perfectly runnable there: `.devkit.toml [db]` already describes how to reach db and
+# redis over their published compose ports, which is what the stop hook's own DB tier
+# uses. Try that before giving up.
+# ---------------------------------------------------------------------------
+
+sys.path.insert(0, str(REPO_ROOT / "scripts" / "hooks"))
+import harness_config  # noqa: E402 -- needs the sys.path line above
+
+CFG = harness_config.load(REPO_ROOT)
+
+
+def _compose_running_services(repo_root: Path = REPO_ROOT) -> set[str]:
+    try:
+        result = subprocess.run(
+            ["docker", "compose", "ps", "--services", "--status", "running"],
+            cwd=repo_root,
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return set()
+    return set(result.stdout.split()) if result.returncode == 0 else set()
+
+
+def parse_host_port(output: str) -> str | None:
+    """Host port from `docker compose port` output ('0.0.0.0:5432', '[::]:5432'). Pure."""
+    line = next((ln for ln in reversed(output.splitlines()) if ln.strip()), "")
+    if ":" not in line:
+        return None
+    port = line.rsplit(":", 1)[1].strip()
+    return port if port.isdigit() else None
+
+
+def _compose_host_port(
+    service: str, container_port: int, repo_root: Path = REPO_ROOT
+) -> str | None:
+    try:
+        result = subprocess.run(
+            ["docker", "compose", "port", service, str(container_port)],
+            cwd=repo_root,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    return parse_host_port(result.stdout) if result.returncode == 0 else None
+
+
+def host_db_env(repo_root: Path = REPO_ROOT) -> dict[str, str] | None:
+    """Env pointing host pytest at db+redis over their published ports, or None when
+    a port cannot be resolved (the containers are not actually up)."""
+    db = CFG.db
+    db_port = _compose_host_port(db.db_service, db.db_port, repo_root)
+    redis_port = _compose_host_port(db.redis_service, db.redis_port, repo_root)
+    if not db_port or not redis_port:
+        return None
+    db_url = f"{db.url_scheme}://{db.user}:{db.password}@localhost:{db_port}/{db.name}"
+    env: dict[str, str] = {name: db_url for name in db.url_env}
+    env[db.redis_env] = f"redis://localhost:{redis_port}"
+    # `[db].name` is a disposable database on purpose -- the suite TRUNCATEs every
+    # table in whatever DATABASE_URL names.
+    for name, default in db.test_env.items():
+        env[name] = os.environ.get(name, default)
+    return env
+
+
+def host_db_fallback(repo_root: Path = REPO_ROOT) -> dict[str, str] | None:
+    """The env for the host tier, or None to stay with the app container.
+
+    None whenever the container tier is the right answer -- the app service is up, the
+    project has no `[db]` tier, or db/redis are not both running. Never guesses: with
+    no reachable database the container's own error is the more useful failure.
+    """
+    if not CFG.db.enabled:
+        return None
+    running = _compose_running_services(repo_root)
+    if "app" in running or not set(CFG.db.services).issubset(running):
+        return None
+    return host_db_env(repo_root)
+
+
+def host_argv(bash_cmd: str) -> list[str]:
+    """The in-container `pytest ...` command as host argv. Pure.
+
+    `sys.executable -m pytest`, not a bare `pytest`: the box's venv is not on PATH
+    (provisioning does not activate it), so the interpreter running this script is the
+    only reliable way back to the project's own pytest.
+    """
+    parts = shlex.split(bash_cmd)
+    if parts and parts[0] == "pytest":
+        return [sys.executable, "-m", "pytest", *parts[1:]]
+    return parts
+
+
 def parse_testmon_selection(dual_out: str) -> tuple[int, int]:
     """Parse `SEL=<x>|TOT=<y>` collect output into (selected, total) counts.
 
@@ -389,10 +497,30 @@ def run_scoped(paths: list[str]) -> dict[str, tuple[list[str], int]]:
     print(f"\nRunning pytest -- scoped ({len(paths)} target(s)) ...")
     if IS_CI:
         return {"pytest": run_argv(ci_scoped_argv(paths))}
-    return {"pytest": run_argv(_in_container(scoped_pytest_command(paths)))}
+    cmd = scoped_pytest_command(paths)
+    host_env = host_db_fallback()
+    if host_env is not None:
+        print(_HOST_TIER_NOTE)
+        return {"pytest": run_argv(host_argv(cmd), extra_env=host_env)}
+    return {"pytest": run_argv(_in_container(cmd))}
+
+
+_HOST_TIER_NOTE = (
+    "  no app container -- running on the host against db+redis over their published ports"
+)
 
 
 def run_local(changed: bool) -> dict[str, tuple[list[str], int]]:
+    host_env = host_db_fallback()
+    if host_env is not None:
+        # Always the full free suite here, never testmon: `.testmondata` is written
+        # inside the container's tree, so a host run would select against a database
+        # of somebody else's timings -- and "changed-only" off a stale index is the
+        # one failure that reports green having run the wrong tests.
+        print("\nRunning pytest -- full (parallel, xdist) ...")
+        print(_HOST_TIER_NOTE)
+        lines, code = run_argv(host_argv(_PYTEST_FULL), extra_env=host_env)
+        return {"pytest": (lines, code)}
     pytest_cmd = pick_fast_command() if changed else _PYTEST_FULL
     mode = "changed-only (testmon)" if changed else "full (parallel, xdist)"
     print(f"\nRunning pytest -- {mode} ...")
@@ -412,7 +540,8 @@ def run_named_target(target: str) -> dict[str, tuple[list[str], int]]:
         return {"bundle-budgets": run_argv(_BUNDLE_BUDGETS_ARGV)}
     if target == "webhook-e2e":
         argv = _CI_WEBHOOK_E2E_ARGV if IS_CI else _LOCAL_WEBHOOK_E2E_ARGV
-        return {"webhook-e2e": run_argv(argv)}
+        env = {"CARAMELI_REQUIRE_NGROK": "1"} if IS_CI else None
+        return {"webhook-e2e": run_argv(argv, extra_env=env)}
     if target == "telnyx-sandbox":
         argv = _CI_TELNYX_SANDBOX_ARGV if IS_CI else _LOCAL_TELNYX_SANDBOX_ARGV
         env = {"TELNYX_SANDBOX": "1"} if IS_CI else None

@@ -355,3 +355,43 @@ class TestSeed:
         result = script.seed_fixture_rows("1", {})
         assert result.status == script.SKIPPED
         assert "docker" in result.detail
+
+
+class TestMainUnconfigured:
+    """``main``'s one branch that runs on a machine with neither side installed.
+
+    Everything past the gate shells out to LegacyCRM, Docker and pytest, so this is as
+    far as a unit test can honestly go — but it is the branch almost every machine
+    takes, and it is the one that must not be silent: the runners read a missing
+    artifact as a clean run, so the unconfigured exit has to write one saying otherwise.
+    """
+
+    def _isolate(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
+        artifact = tmp_path / "logs" / "local-e2e.log"
+        monkeypatch.setattr(script, "ENV_FILE", tmp_path / ".env.local-e2e")
+        monkeypatch.setattr(script, "ARTIFACT", artifact)
+        return artifact
+
+    def test_a_missing_env_file_exits_unconfigured(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        self._isolate(monkeypatch, tmp_path)
+        assert script.main([]) == script.EXIT_UNCONFIGURED
+
+    def test_the_gate_reaches_the_artifact(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        artifact = self._isolate(monkeypatch, tmp_path)
+        script.main([])
+        assert ".env.local-e2e not found" in artifact.read_text(encoding="utf-8")
+
+    def test_a_configured_file_still_gates_on_the_opt_in(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        """The file existing is not consent; ``RUN_LOCAL_E2E=1`` is."""
+        artifact = self._isolate(monkeypatch, tmp_path)
+        script.ENV_FILE.write_text("CARAMELI_BASE_URL=http://localhost:8000\n", encoding="utf-8")
+        monkeypatch.delenv("RUN_LOCAL_E2E", raising=False)
+
+        assert script.main([]) == script.EXIT_UNCONFIGURED
+        assert "RUN_LOCAL_E2E is not 1" in artifact.read_text(encoding="utf-8")

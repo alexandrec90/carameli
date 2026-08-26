@@ -3,10 +3,12 @@
 
 import json
 import re
+from types import SimpleNamespace
 
 from conftest import load_module
 
 la = load_module("scripts/lint-all.py")
+diag = load_module("scripts/diagnostics.py")
 
 
 def test_ci_excludes_only_detect_secrets():
@@ -114,6 +116,43 @@ def test_vulture_scans_the_whole_package_even_in_changed_mode(monkeypatch):
     assert "base.py" not in seen[0]
 
 
+def test_markdownlint_fixes_only_the_changed_files(monkeypatch):
+    # Regression: this tool gates on the changed set but used to hand markdownlint the
+    # whole-repo glob -- with `--fix`. One edited README therefore rewrote every
+    # markdown file in the tree, and the ship-time lint left a dirty tree it had just
+    # created, in files the change never touched.
+    seen = []
+    monkeypatch.setattr(la, "run", lambda cmd: seen.append(cmd) or ([], 0))
+
+    la.t_markdownlint(["docs/operations/softphone-demo.md", "app/main.py"])
+
+    assert len(seen) == 1
+    assert '"docs/operations/softphone-demo.md"' in seen[0]
+    assert "**/*.md" not in seen[0]
+    assert "--fix" in seen[0]
+
+
+def test_markdownlint_scans_the_whole_tree_in_full_mode(monkeypatch):
+    seen = []
+    monkeypatch.setattr(la, "run", lambda cmd: seen.append(cmd) or ([], 0))
+
+    la.t_markdownlint(None)
+
+    assert len(seen) == 1
+    assert '"**/*.md"' in seen[0]
+
+
+def test_markdownlint_skips_when_only_a_transcript_changed(monkeypatch):
+    # Transcripts are excluded from the full-mode glob; the scoped command has no glob
+    # to exclude them from, so the selection has to drop them -- otherwise editing one
+    # would lint the very file the exclusion exists for.
+    monkeypatch.setattr(la, "run", lambda cmd: (_ for _ in ()).throw(AssertionError(cmd)))
+
+    assert la.t_markdownlint(["artifacts/transcripts/fixer-run-transcript.md"]) == {
+        "markdownlint": ([], 0)
+    }
+
+
 def test_gated_tools_skip_when_no_relevant_change():
     py_only = ["app/services/x.py"]
     assert la.t_eslint(py_only) == {"eslint": ([], 0)}
@@ -126,6 +165,56 @@ def test_gated_tools_skip_when_no_relevant_change():
     assert la.t_actionlint(py_only) == {"actionlint": ([], 0)}
     assert la.t_dotenv(py_only) == {"dotenv-linter": ([], 0)}
     assert la.t_detect_secrets([".secrets.baseline"]) == {"detect-secrets": ([], 0)}
+
+
+# --- t_dotenv must never report success having checked nothing ---------------
+
+
+def test_git_tracked_root_files_is_none_when_git_cannot_run(monkeypatch):
+    monkeypatch.setattr(
+        la.subprocess, "run", lambda *a, **k: (_ for _ in ()).throw(OSError("no git"))
+    )
+    assert la._git_tracked_root_files() is None
+
+
+def test_git_tracked_root_files_is_none_when_git_errors(monkeypatch):
+    monkeypatch.setattr(
+        la.subprocess,
+        "run",
+        lambda *a, **k: SimpleNamespace(returncode=128, stdout="", stderr="not a repository"),
+    )
+    assert la._git_tracked_root_files() is None
+
+
+def test_dotenv_fails_loudly_when_git_cannot_be_asked(monkeypatch):
+    # Regression: `git ls-files` raising OSError -- which is exactly what happens
+    # inside the app container, where pytest runs and git is absent -- returned an
+    # empty set, indistinguishable from "git tracks no .env template". t_dotenv then
+    # linted zero files and reported success: green having checked nothing.
+    monkeypatch.setattr(la, "_git_tracked_root_files", lambda: None)
+    monkeypatch.setattr(la, "run", lambda cmd: (_ for _ in ()).throw(AssertionError(cmd)))
+
+    (lines, code) = la.t_dotenv(None)["dotenv-linter"]
+
+    assert code != 0
+    assert lines and "NOTHING was linted" in lines[0]
+
+
+def test_dotenv_failure_is_not_reclassified_as_an_environmental_skip():
+    # `diagnostics.get_skip_reason` keeps "not installed" / "command not found"
+    # failures out of the artifact entirely. This finding has to stay in it, so its
+    # wording must avoid every phrase that classifier matches.
+    assert diag.get_skip_reason([la._GIT_UNAVAILABLE_LINE]) is None
+
+
+def test_dotenv_lints_the_tracked_templates(monkeypatch):
+    monkeypatch.setattr(la, "_git_tracked_root_files", lambda: {".env.example"})
+    monkeypatch.setattr(la, "tracked_dotenv_files", lambda root, tracked: sorted(tracked))
+    seen = []
+    monkeypatch.setattr(la, "run", lambda cmd: seen.append(cmd) or ([], 0))
+
+    assert la.t_dotenv(None) == {"dotenv-linter": ([], 0)}
+    assert seen == ["dotenv-linter check .env.example"]
 
 
 # The pip-audit gate triggers on both the compiled locks and the .in floor files.

@@ -2,7 +2,8 @@
 
 These tests verify that Telnyx and Jambonz can reach Carameli's webhook
 endpoints through an ngrok tunnel. They are skipped unless NGROK_URL is set
-(the start-ngrok.py script sets this automatically in .env).
+(the start-ngrok.py script sets this automatically in .env) *and* that URL is
+actually serving -- see `tunnel_serves_a_stack`.
 
 Prerequisites:
   - ngrok running with a tunnel to localhost:8000
@@ -15,6 +16,7 @@ Run:
 
 from __future__ import annotations
 
+import functools
 import os
 
 import httpx
@@ -28,6 +30,51 @@ skip_no_ngrok = pytest.mark.skipif(
     not _NGROK_URL,
     reason="Webhook tests disabled (set NGROK_URL to the ngrok HTTPS tunnel URL)",
 )
+
+
+@functools.cache
+def tunnel_serves_a_stack(url: str) -> bool:
+    """True when `url` answers /health with 200 -- i.e. a tunnel really is up.
+
+    NGROK_URL being *set* is not the same question. The domain is reserved, so a
+    worktree box seeds its `.env` from the source checkout and inherits a URL that
+    resolves whether or not anything is listening; with the tunnel down ngrok itself
+    answers 404. These five tests were therefore collected by the free changed-scope
+    inside a box and failed there on every branch, for a reason no branch caused.
+    """
+    try:
+        return httpx.get(f"{url}/health", timeout=10.0).status_code == 200
+    except httpx.HTTPError:
+        return False
+
+
+def tunnel_gate(url: str, require: bool) -> None:
+    """Skip unless `url` is actually serving; fail instead when `require`.
+
+    `require` is the dedicated reachability run (`scripts/run-tests.py --target
+    webhook-e2e`), where a quiet skip would be an all-skipped green pass. Everywhere
+    else -- notably the free changed-scope inside a worktree box -- a dead tunnel is
+    an environment fact, not a defect in the branch under test.
+    """
+    if tunnel_serves_a_stack(url):
+        return
+    message = (
+        f"NGROK_URL ({url}) is set but its /health does not answer 200 -- "
+        "no tunnel is serving this stack."
+    )
+    if require:
+        pytest.fail(message)
+    pytest.skip(message)
+
+
+@pytest.fixture(autouse=True)
+def _live_tunnel() -> None:
+    """Apply `tunnel_gate` to every test here.
+
+    Probed lazily (and once), so collection stays free and an unset NGROK_URL never
+    reaches the network -- `skip_no_ngrok` has already skipped by then.
+    """
+    tunnel_gate(_NGROK_URL, os.environ.get("CARAMELI_REQUIRE_NGROK") == "1")
 
 
 # ---------------------------------------------------------------------------

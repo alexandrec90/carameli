@@ -15,6 +15,8 @@ import sys
 from pathlib import Path
 from typing import Any
 
+import pytest
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT_PATH = REPO_ROOT / "scripts" / "lint-all.py"
 
@@ -69,7 +71,15 @@ class TestTrackedDotenvFiles:
 
     def test_this_repos_templates_are_selected(self) -> None:
         """Guards the other direction: the fix must not stop linting anything real."""
-        selected = script.tracked_dotenv_files(REPO_ROOT, script._git_tracked_root_files())
+        tracked = script._git_tracked_root_files()
+        if tracked is None:
+            # Not a green pass dressed up as one: `t_dotenv` fails loudly on this same
+            # None (see scripts/hooks/tests/test_lint_all.py), so the behaviour is
+            # covered where it can be. What cannot be checked without git is which
+            # files git tracks -- and pytest runs in the app container, which has no
+            # git executable.
+            pytest.skip("needs `git ls-files`; the app container ships no git")
+        selected = script.tracked_dotenv_files(REPO_ROOT, tracked)
         assert ".env.example" in selected
         assert ".env.local-e2e.example" in selected
         assert ".env" not in selected
