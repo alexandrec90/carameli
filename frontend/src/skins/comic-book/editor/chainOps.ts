@@ -32,6 +32,10 @@ export const NEW_CHAIN: Omit<BubbleChain, 'id'> = {
   stepMs: DEFAULT_CHAIN_STEP_MS,
   rows: DEFAULT_CHAIN_ROWS,
   messages: [],
+  // Off, unlike `grow`. Binding a chain to a real thread means what is drawn in the panel
+  // is somebody's actual messages and Enter sends one — that is not something ticking the
+  // chain box can be taken to have asked for.
+  sms: false,
 }
 
 /** Prefix of a generated chain id. Never shown to the author — see {@link nextChainId}. */
@@ -200,7 +204,9 @@ export function patchChainIn(
  *
  * The row cap is defaulted *before* the guard rather than after it, so a payload saved
  * when a chain was a hand-drawn column and had no `rows` keeps its transcript instead of
- * being dropped as malformed and rebuilt empty.
+ * being dropped as malformed and rebuilt empty. `sms` is backfilled the same way and for
+ * the same reason — and to `false`, which is the only safe reading of a file that predates
+ * the flag: a chain nobody said to bind must not start sending.
  */
 export function hydrateChains(raw: unknown): BubbleChain[] {
   if (!Array.isArray(raw)) return []
@@ -209,7 +215,7 @@ export function hydrateChains(raw: unknown): BubbleChain[] {
   for (const stored of raw) {
     const entry =
       stored && typeof stored === 'object'
-        ? { rows: DEFAULT_CHAIN_ROWS, ...(stored as object) }
+        ? { rows: DEFAULT_CHAIN_ROWS, sms: false, ...(stored as object) }
         : stored
     if (!isBubbleChain(entry) || seen.has(entry.id)) continue
     seen.add(entry.id)

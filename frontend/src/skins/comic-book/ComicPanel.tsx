@@ -5,6 +5,7 @@ import { toClipPath } from './editor/transforms'
 import type { BubbleTransform, ImgTransform } from './editor/types'
 import type { PanelPoly } from './panelGeometry'
 import type { Panel } from './panels'
+import type { UseSmsConversationsResult } from '../../hooks/useSmsConversations'
 
 interface ComicPanelProps {
     /** This panel's index into PANELS — what pictures and bubbles name. */
@@ -17,6 +18,8 @@ interface ComicPanelProps {
     bubbles: BubbleTransform[]
     /** Per-chain behavior for the chain names carried by bubbles. */
     chains: BubbleChain[]
+    /** Passed straight to PanelBubbles, which is where a chain binds to a real thread. */
+    sms: UseSmsConversationsResult
     natSizes: Record<string, { w: number; h: number }>
     editorActive: boolean
     hovered: boolean
@@ -26,6 +29,8 @@ interface ComicPanelProps {
     isBubbleVisible(i: number): boolean
     /** Makes a number pad projected onto one of this panel's pictures a working keypad. */
     onNumberPadKey?(key: string): void
+    /** Dials the number typed into one of this panel's `phone` balloons. */
+    onPhoneSubmit?(value: string): void
     /** Mounts the Ben-Day dot canvas into Layout's animation loop. */
     dotRef(el: HTMLCanvasElement | null): void
     onSettled(): void
@@ -38,9 +43,9 @@ interface ComicPanelProps {
  * overflow stays visible so pictures and bubbles can spill into the gutters.
  */
 export default function ComicPanel({
-    index, info, poly, images, bubbles, chains, natSizes,
+    index, info, poly, images, bubbles, chains, sms, natSizes,
     editorActive, hovered, onHover, isRevealed, isBubbleVisible, onNumberPadKey,
-    dotRef, onSettled, onNatSize,
+    onPhoneSubmit, dotRef, onSettled, onNatSize,
 }: ComicPanelProps) {
     const { bounds, vp } = poly
 
@@ -108,6 +113,8 @@ export default function ComicPanel({
                 isVisible={isBubbleVisible}
                 interactive={!editorActive}
                 editing={editorActive}
+                sms={sms}
+                onPhoneSubmit={onPhoneSubmit}
             />
         </div>
     )

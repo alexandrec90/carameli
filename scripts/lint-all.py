@@ -354,7 +354,7 @@ def t_actionlint(changed: list[str] | None = None) -> dict:
     return {"actionlint": run("actionlint")}
 
 
-def tracked_dotenv_files(root: Path, tracked: set[str]) -> list[str]:
+def tracked_dotenv_files(root: Path, tracked: set[str] | None) -> list[str]:
     """Root-level ``.env*`` files that git tracks, sorted.
 
     Git-ignored dotenv files are excluded on purpose. ``.env`` and ``.env.local-e2e``
@@ -364,19 +364,29 @@ def tracked_dotenv_files(root: Path, tracked: set[str]) -> list[str]:
     which is the population most likely to read a red lint run as their own doing. Only
     the committed templates (``.env.example``, ``.env.local-e2e.example``) are shared
     artifacts whose ordering anyone else can be asked to keep.
+
+    ``tracked`` is ``None`` when git could not answer. That is not hypothetical: the
+    app image ships no git, and ``scripts/run-tests.py`` runs pytest **inside** it, so
+    every containerised run took that path. It used to arrive here as an empty set,
+    which selected nothing, and ``t_dotenv`` then linted zero files and reported
+    success — a clean run that checked nothing, which is the one outcome worth
+    failing over. Fall back to the naming rule instead: the committed templates are
+    exactly the root ``.env*`` files whose names end in ``.example``, and that
+    holds without asking git anything.
     """
-    return sorted(p.name for p in root.glob(".env*") if p.is_file() and p.name in tracked)
+    names = [p.name for p in root.glob(".env*") if p.is_file()]
+    if tracked is None:
+        return sorted(n for n in names if n.endswith(".example"))
+    return sorted(n for n in names if n in tracked)
 
 
 def _git_tracked_root_files() -> set[str] | None:
-    """Names of the repo-root files git tracks, or None when git cannot be asked.
+    """Names of the repo-root files git tracks; ``None`` when git cannot answer.
 
-    The two answers used to be the same empty set, and that is a defect rather than a
-    detail: pytest runs inside the app container, where git is not installed, so
-    ``git ls-files`` raised OSError, ``t_dotenv`` selected zero templates and reported
-    success. That is the "reports green having checked nothing" failure mode
-    ``CLAUDE.md`` warns about -- the caller cannot distinguish it from a clean pass
-    unless this function says which of the two happened.
+    ``None`` rather than an empty set, because the two mean opposite things to the
+    caller: an empty set is "git looked and this repo tracks no root files", while
+    ``None`` is "nobody looked". See ``tracked_dotenv_files`` for what the difference
+    was costing.
     """
     try:
         proc = subprocess.run(

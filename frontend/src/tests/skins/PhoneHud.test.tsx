@@ -2,7 +2,10 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 
 import type { UseSoftphoneResult } from '../../hooks/useSoftphone'
-import PhoneHud, { hudIsVisible } from '../../skins/comic-book/PhoneHud'
+import PhoneHud, { hudIsVisible, pageCanDial } from '../../skins/comic-book/PhoneHud'
+import { NEW_BUBBLE, NEW_IMAGE } from '../../skins/comic-book/editor/configSeed'
+import { newNumberPad } from '../../skins/comic-book/editor/numberPadValidate'
+import type { BubbleTransform, ImgTransform } from '../../skins/comic-book/editor/types'
 
 function makePhone(over: Partial<UseSoftphoneResult> = {}): UseSoftphoneResult {
   return {
@@ -42,6 +45,46 @@ describe('hudIsVisible', () => {
   })
 })
 
+describe('pageCanDial', () => {
+  // Panel 0 is on the classic page, panel 8 on the home page (see panels.ts).
+  const img = (over: Partial<ImgTransform> = {}): ImgTransform => ({
+    ...NEW_IMAGE,
+    panel: 0,
+    ...over,
+  })
+  const bubble = (over: Partial<BubbleTransform> = {}): BubbleTransform => ({
+    ...NEW_BUBBLE,
+    panel: 0,
+    ...over,
+  })
+
+  it('is false for a page with neither a projected pad nor a phone balloon', () => {
+    expect(pageCanDial([img()], [bubble({ content: 'text' })], 'classic')).toBe(false)
+  })
+
+  it('is true for a projected pad on the page', () => {
+    expect(pageCanDial([img({ numberPad: newNumberPad() })], [], 'classic')).toBe(true)
+  })
+
+  it('is true for a phone balloon on the page, which is the pad’s fallback', () => {
+    expect(pageCanDial([], [bubble({ content: 'phone' })], 'classic')).toBe(true)
+  })
+
+  it('ignores a phone balloon that is a chain slot, since it dials nothing', () => {
+    expect(pageCanDial([], [bubble({ content: 'phone', chain: 'chain-1' })], 'classic')).toBe(
+      false,
+    )
+  })
+
+  it('ignores both when they sit on the other page', () => {
+    const elsewhere = [
+      img({ panel: 0, numberPad: newNumberPad() }),
+    ]
+    expect(pageCanDial(elsewhere, [bubble({ panel: 0, content: 'phone' })], 'home')).toBe(false)
+    expect(pageCanDial([], [bubble({ panel: 8, content: 'phone' })], 'home')).toBe(true)
+  })
+})
+
 describe('PhoneHud', () => {
   it('groups the composed digits for reading without changing what is dialled', () => {
     const phone = makePhone({ dialTarget: '4155550123' })
@@ -57,6 +100,9 @@ describe('PhoneHud', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Call' }))
     expect(phone.autoDial).toHaveBeenCalledTimes(1)
+    // With no arguments: `autoDial` takes an optional number for callers that hold one
+    // of their own, and a click event handed over as one would not be dialable.
+    expect(phone.autoDial).toHaveBeenCalledWith()
     expect(phone.dial).not.toHaveBeenCalled()
   })
 

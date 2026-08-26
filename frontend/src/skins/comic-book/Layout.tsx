@@ -6,7 +6,7 @@ import BubbleTubes from './BubbleTubes'
 import ComicPanel from './ComicPanel'
 import { LoadingOverlay, useLoadingScreen } from './LoadingOverlay'
 import PanelInk from './PanelInk'
-import PhoneHud, { hudIsVisible } from './PhoneHud'
+import PhoneHud, { hudIsVisible, pageCanDial } from './PhoneHud'
 import { gridPolys, layoutKindFor } from './panelGeometry'
 import { PANELS, pageForPath } from './panels'
 import { usePanelDots } from './usePanelDots'
@@ -15,6 +15,7 @@ import {
     PANEL_GRIDS, PANEL_PATTERNS,
 } from './editor/layoutConfig'
 import { shouldRevealImg, useEditorMode } from './editor/useEditorMode'
+import { useLiveTableImages } from './useLiveTableImages'
 import { usePageWash } from './usePageWash'
 import './comic-book.css'
 import './bubbles.css'
@@ -59,13 +60,17 @@ const EditorOverlay = import.meta.env.DEV
 
 // children intentionally not rendered — panels-only foundation phase. navItems
 // only feeds the dev editor's page selector (no in-page nav chrome yet).
-export function Layout({ navItems, softphone }: LayoutProps) {
+export function Layout({ navItems, sms, softphone }: LayoutProps) {
     const location = useLocation()
     const editor = useEditorMode()
     const page = pageForPath(location.pathname)
 
     // Source transforms from the editor's working copy when active, else constants.
-    const imgT = editor.active ? editor.config.images : PANEL_IMG_TRANSFORMS
+    const authoredImgs = editor.active ? editor.config.images : PANEL_IMG_TRANSFORMS
+    // A picture whose surface names a live feed gets its cells from the records rather
+    // than from the config. Applied here, between the working copy and the panels, so the
+    // editor keeps holding — and saving — the authored surface with no rows in it.
+    const imgT = useLiveTableImages(authoredImgs)
     const bubbleT = editor.active ? editor.config.bubbles : PANEL_BUBBLE_TRANSFORMS
     const chainT = editor.active ? editor.config.chains : PANEL_BUBBLE_CHAINS
     const grids = editor.active ? editor.config.grids : PANEL_GRIDS
@@ -126,10 +131,19 @@ export function Layout({ navItems, softphone }: LayoutProps) {
         setNatSizes(prev => (prev[src] ? prev : { ...prev, [src]: size }))
     }, [])
 
-    // A page showing a projected pad gets the rest of the telephone: the display and the
-    // call keys a photographed pad has no room for. Pages without one show no furniture.
-    const padOnPage = imgT.some(t => t.numberPad && PANELS[t.panel]?.page === page)
-    const showPhoneHud = padOnPage && !editor.active && hudIsVisible(softphone)
+    // Enter in a `phone` balloon places the call. The balloon holds the number in its own
+    // field rather than in `dialTarget`, so it is handed over here; the promise is the
+    // call being set up, and anything that goes wrong with it surfaces through `error`.
+    const { autoDial } = softphone
+    const dialFromBubble = useCallback((value: string) => {
+        void autoDial(value)
+    }, [autoDial])
+
+    // A page carrying either way of dialling gets the rest of the telephone: the display
+    // and the call keys neither a photographed pad nor a balloon has room for. Pages with
+    // no way to dial show no furniture.
+    const showPhoneHud =
+        pageCanDial(imgT, bubbleT, page) && !editor.active && hudIsVisible(softphone)
 
     const accent = accentForPath(location.pathname)
     const washRef = usePageWash(location.pathname, accent)
@@ -175,6 +189,7 @@ export function Layout({ navItems, softphone }: LayoutProps) {
                             images={imgT}
                             bubbles={bubbleT}
                             chains={chainT}
+                            sms={sms}
                             natSizes={natSizes}
                             editorActive={editor.active}
                             hovered={hovered === i}
@@ -184,6 +199,7 @@ export function Layout({ navItems, softphone }: LayoutProps) {
                             isRevealed={k => shouldRevealImg(editor.active, editor.selected, k)}
                             isBubbleVisible={bubbleVisible}
                             onNumberPadKey={softphone.pressDigit}
+                            onPhoneSubmit={dialFromBubble}
                             dotRef={dotRefs[i]}
                             onSettled={markSettled}
                             onNatSize={recordNatSize}

@@ -341,3 +341,148 @@ async def test_list_sms_messages_customer_not_found(client) -> None:
     resp = await client.get(f"{_SMS_BASE}/List/699999", headers=AUTH_HEADERS)
     assert resp.status_code == 404
     assert resp.json()["detail"] == "Customer not found"
+
+
+# ---------------------------------------------------------------------------
+# List SMS messages scoped to one conversation (?peer=)
+# ---------------------------------------------------------------------------
+
+
+async def _seed_between(
+    db_session,
+    customer_id: uuid.UUID,
+    message_sid: str,
+    *,
+    direction: str,
+    from_number: str,
+    to_number: str,
+) -> None:
+    """Seed one message with explicit endpoints, so a conversation can be built."""
+    await SmsMessageRepo(db_session).create(
+        customer_id=customer_id,
+        phone_line_id=None,
+        message_sid=message_sid,
+        direction=direction,
+        from_number=from_number,
+        to_number=to_number,
+        body="hi",
+        delivery_status="delivered",
+    )
+
+
+async def test_list_sms_messages_peer_returns_both_directions(client, db_session) -> None:
+    """`peer` is one conversation: what we sent them and what they sent us."""
+    customer_id = await _create_customer(client, 6110)
+    mine = "+14155550000"
+    theirs = "+14155551111"
+    await _seed_between(
+        db_session,
+        customer_id,
+        "SMpeer6110out",
+        direction="outbound",
+        from_number=mine,
+        to_number=theirs,
+    )
+    await _seed_between(
+        db_session,
+        customer_id,
+        "SMpeer6110in",
+        direction="inbound",
+        from_number=theirs,
+        to_number=mine,
+    )
+
+    resp = await client.get(f"{_SMS_BASE}/List/6110", params={"peer": theirs}, headers=AUTH_HEADERS)
+    assert resp.status_code == 200
+    assert {m["message_sid"] for m in resp.json()["messages"]} == {
+        "SMpeer6110out",
+        "SMpeer6110in",
+    }
+
+
+async def test_list_sms_messages_peer_excludes_other_conversations(client, db_session) -> None:
+    """A second thread on the same customer must not leak into the first."""
+    customer_id = await _create_customer(client, 6111)
+    mine = "+14155550000"
+    await _seed_between(
+        db_session,
+        customer_id,
+        "SMpeer6111a",
+        direction="outbound",
+        from_number=mine,
+        to_number="+14155551111",
+    )
+    await _seed_between(
+        db_session,
+        customer_id,
+        "SMpeer6111b",
+        direction="outbound",
+        from_number=mine,
+        to_number="+14155552222",
+    )
+
+    resp = await client.get(
+        f"{_SMS_BASE}/List/6111", params={"peer": "+14155551111"}, headers=AUTH_HEADERS
+    )
+    assert resp.status_code == 200
+    assert {m["message_sid"] for m in resp.json()["messages"]} == {"SMpeer6111a"}
+
+
+async def test_list_sms_messages_peer_stays_customer_scoped(client, db_session) -> None:
+    """`peer` narrows the customer-scoped query; it never widens it.
+
+    Two customers texting the same number are two conversations, and asking for one of
+    them by number must not reach the other's history.
+    """
+    customer_a = await _create_customer(client, 6112)
+    await _create_customer(client, 6113)
+    shared = "+14155553333"
+    await _seed_between(
+        db_session,
+        customer_a,
+        "SMpeer6112a",
+        direction="outbound",
+        from_number="+14155550000",
+        to_number=shared,
+    )
+
+    resp = await client.get(f"{_SMS_BASE}/List/6113", params={"peer": shared}, headers=AUTH_HEADERS)
+    assert resp.status_code == 200
+    assert resp.json()["messages"] == []
+
+
+async def test_list_sms_messages_peer_rejects_non_e164(client) -> None:
+    """A number that is not E.164 is rejected rather than matched literally."""
+    await _create_customer(client, 6114)
+    resp = await client.get(
+        f"{_SMS_BASE}/List/6114", params={"peer": "(415) 555-1111"}, headers=AUTH_HEADERS
+    )
+    assert resp.status_code == 422
+
+
+async def test_list_sms_messages_without_peer_is_unchanged(client, db_session) -> None:
+    """Omitting `peer` still returns the customer's whole history."""
+    customer_id = await _create_customer(client, 6115)
+    await _seed_between(
+        db_session,
+        customer_id,
+        "SMpeer6115a",
+        direction="outbound",
+        from_number="+14155550000",
+        to_number="+14155551111",
+    )
+    await _seed_between(
+        db_session,
+        customer_id,
+        "SMpeer6115b",
+        direction="outbound",
+        from_number="+14155550000",
+        to_number="+14155552222",
+    )
+
+    resp = await client.get(f"{_SMS_BASE}/List/6115", headers=AUTH_HEADERS)
+    assert resp.status_code == 200
+    assert {m["message_sid"] for m in resp.json()["messages"]} == {
+        "SMpeer6115a",
+        "SMpeer6115b",
+    }

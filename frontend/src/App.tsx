@@ -2,6 +2,7 @@ import { Suspense, useEffect, useState } from 'react'
 import { Routes, Route } from 'react-router-dom'
 import { useSkin } from './skins/context'
 import { useAuth } from './hooks/useAuth'
+import { useSmsConversations } from './hooks/useSmsConversations'
 import { SoftphoneProvider, useSharedSoftphone } from './hooks/softphoneContext'
 import { ROUTES, NAV_ITEMS } from './routes'
 import { skinLoadingConfigs, resolveSkinName, DEFAULT_SKIN } from './skins/registry'
@@ -54,13 +55,16 @@ export default function App() {
 
 function AuthenticatedApp() {
   const { Layout } = useSkin()
+  // Skin chrome cannot fetch, and a bubble chain lives in the Layout rather than in a
+  // view, so its data has to arrive as a Layout prop. Idle until a skin subscribes.
+  const sms = useSmsConversations()
   // The layout gets the phone because a skin may put one *in* the page — the comic-book
   // skin projects a number pad onto a photographed telephone — and a layout-level
   // control has to be the same device as the one the /softphone page drives.
   const softphone = useSharedSoftphone()
   return (
     <>
-      <Layout navItems={NAV_ITEMS} softphone={softphone}>
+      <Layout navItems={NAV_ITEMS} sms={sms} softphone={softphone}>
         <Suspense>
           <Routes>
             {ROUTES.map(({ path, element: Element }) => (

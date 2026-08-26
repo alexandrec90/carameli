@@ -11,21 +11,7 @@ carried ~24 MB of PNG that no page ever requested — `layoutConfig.ts` and the
 and have since the WebPs were encoded.
 
 Keep them. They are the only lossless copies, and re-encoding a `.webp` from a
-`.webp` compounds the loss. Re-encode from here when a panel needs a new size:
-
-```bash
-# one panel, at the width it is actually displayed at
-npx sharp-cli -i "assets-src/comic-book/switchboard.png" \
-              -o "public/comic-book" \
-              -f webp -q 82 \
-              resize 1408
-```
-
-**`-o` is a directory, not a filename**, and the format is a flag rather than a
-trailing sub-command — the export keeps the master's basename and takes its extension
-from `-f`. The line this replaced pointed `-o` at the export itself and passed the
-format as a trailing `-- webp --quality 82`; that is the pre-6 spelling, and it now
-fails with `Unknown argument: webp`, having written nothing.
+`.webp` compounds the loss.
 
 `switchboard.png` is 2816×1536 and the shipped `.webp` still is; no panel is drawn
 anywhere near that wide, so a resize pass on re-encode is the cheap win left in
@@ -33,24 +19,50 @@ this directory. See `.claude/rules/skin-comic-book.md`.
 
 ## Adding a new picture
 
-Two steps, and the second is what makes the first legal:
+Drop the master here, then run, from the repo root:
 
-1. **Encode it into `public/comic-book/`** with the `sharp-cli` line above, at the
-   width it will be displayed at rather than the master's.
+```bash
+python scripts/encode-comic-art.py conversation hand-notepad
+python scripts/encode-comic-art.py            # every master with no export yet
+```
+
+Name the masters when you want `--label` or a different `--max-edge`; name none when
+you have just dropped files in and want them encoded at the defaults. The no-argument
+form is what the *Assets: Encode Comic-Book Art* task in the workspace runs, and it is
+safe to repeat: an export that already exists is skipped unless you pass `--force`.
+
+That does two of the three steps, and the second is what makes the first legal:
+
+1. **Encode it into `public/comic-book/`**, bounded to a long edge of ~1408px rather
+   than the master's — `--max-edge` and `--quality` override the defaults, and
+   `--force` re-encodes over an export that already exists.
 2. **Add a line to `PANEL_ASSETS`** in
    `frontend/src/skins/comic-book/editor/assets.ts`. The dropdown cannot enumerate a
    served directory, so a picture with no line there is unreachable from the editor —
    and, because `frontend/assetPolicy.test.ts` fails on a file in `public/` that no
    source references, an export with no line there also fails the suite as dead weight.
+   The label comes from the file name; `--label "Two agents talking"` names it properly.
 
-Placing it in a panel is a third, separate step, done in the editor and saved into
-`editor/layoutConfig.ts`. Between step 2 and that, the file is selectable art costing
-its own bytes in every build: real, but cold. `MAX_PUBLIC_BYTES` in
-`frontend/assetPolicy.ts` is what keeps that from being free — encoding ahead of a
-layout is a decision about what visitors download, and raising the cap is where it
-reads as one.
+Placing it in a panel is a third, separate step, done in the editor (`?edit=1`, select
+a panel, **+ Image**) and saved into `editor/layoutConfig.ts`. Between step 2 and that,
+the file is selectable art costing its own bytes in every build: real, but cold.
+`MAX_PUBLIC_BYTES` in `frontend/assetPolicy.ts` is what keeps that from being free —
+encoding ahead of a layout is a decision about what visitors download, and raising the
+cap is where it reads as one. The script reports the served tree against that budget
+and refuses to raise it for you.
 
-`conversation.png` and `hand-notepad.png` are at that stage today. `logo2.png`,
+**The encoder call is in the script, not in this file, and that is deliberate.** What
+stood here was a `sharp-cli` invocation in that tool's pre-6 spelling: it passed the
+format as a trailing `-- webp --quality 82` and pointed `-o` at the export rather than
+at a directory, so following it exited with `Unknown argument: webp` having written
+nothing — which reads as a broken image, not as a stale command. Nothing failed when it
+drifted, because nothing ran it. `sharp-cli` was never a dependency here either, so
+each of those calls was an `npx` fetch over the network, while `sharp` itself is in
+`frontend/package.json` already. `scripts/hooks/tests/test_encode_comic_art.py` pins
+the call the script makes.
+
+`conversation.png` and `hand-notepad.png` are at that stage today — they are the two
+the command above names because they are the two it was first run on. `logo2.png`,
 `man-woman-talking.png`, `notepad.png` and `push-button-phone.png` were, until the
 home page's four panels landed and started drawing them. A file leaves this list when
 its layout lands, not when its `.webp` is written; nothing fails if the paragraph is

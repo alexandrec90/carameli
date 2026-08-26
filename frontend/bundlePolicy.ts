@@ -79,13 +79,19 @@ export const MAX_EAGER_BYTES = 300 * 1024
 export const MAX_LAZY_CHUNK_BYTES = 260 * 1024
 
 /**
- * Every `.js` file in `dist/assets/`, summed. Today 923 KB across 46 chunks; the
+ * Every `.js` file in `dist/assets/`, summed. Today 946 KB across 46 chunks; the
  * regional phone formatter lives in the lazy comic-book skin rather than the eager
  * entry graph, and so do the projected surfaces (table and number pad) and the bubble
  * chains — none of them is downloaded by a visitor who never opens that skin, which is
  * why the eager-entry budget above did not move with them.
+ *
+ * The last raise (935 → 950) is a bubble chain bound to real SMS: the conversation hook,
+ * its reconciliation lib and the wheel→number binding. Same trade as the line above —
+ * `useSmsConversations` is reachable from every skin, but the code that *subscribes* to
+ * it is in the comic-book chunk, and a visitor who never opens that skin never pays for
+ * a request either.
  */
-export const MAX_TOTAL_JS_BYTES = 935 * 1024
+export const MAX_TOTAL_JS_BYTES = 950 * 1024
 
 /** Every `.css` file in `dist/assets/`, summed. Today 38 KB across 2 files. */
 export const MAX_TOTAL_CSS_BYTES = 44 * 1024

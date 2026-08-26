@@ -101,6 +101,13 @@ export const PANEL_BUBBLE_TRANSFORMS: BubbleTransform[] = [
 // Give the *sender's* balloon `content: 'input'` (or 'phone') and the conversation goes
 // live: the bottom-right row becomes a composer, Enter sends what is in it as the sender's
 // next message, and the table grows by one row. See ../bubbleChain.ts.
+//
+// `sms` binds the chain to a **real** thread. The transcript above is then ignored and the
+// balloons are messages the carrier actually has; Enter in the composer sends one, for
+// money. Which thread is not stored here — it is whichever number the panel's own
+// wheel-picker balloon (a `content: 'wheel'` bubble outside the chain, its `text` the
+// comma-delimited list of numbers) is turned to, so a panel with `sms` and no picker shows
+// an empty conversation rather than guessing at one.
 export const PANEL_BUBBLE_CHAINS: BubbleChain[] = []
 
 // The one array here that IS parallel to PANELS: a pattern belongs to the panel slot

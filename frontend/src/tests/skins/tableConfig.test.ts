@@ -1,9 +1,18 @@
 import { describe, expect, it } from 'vitest'
 
+import { LIVE_TABLE_FEEDS } from '../../lib/liveTables'
 import { cloneConfig, seedConfig } from '../../skins/comic-book/editor/configSeed'
 import { hydrateConfig } from '../../skins/comic-book/editor/configHydrate'
 import { serializeTable, tableSuffix } from '../../skins/comic-book/editor/serializeTable'
-import { cloneTable, coerceQuad, coerceTable, newTable } from '../../skins/comic-book/editor/tableValidate'
+import {
+  authoredTable,
+  cloneTable,
+  coerceQuad,
+  coerceSource,
+  coerceTable,
+  liveTable,
+  newTable,
+} from '../../skins/comic-book/editor/tableValidate'
 import type { TableProjection } from '../../skins/comic-book/editor/types'
 
 // A projected table is a nested document inside a picture, which is what makes it the one
@@ -192,5 +201,93 @@ describe('tableSuffix', () => {
 
   it('opens with the comma that joins it to the picture line', () => {
     expect(tableSuffix(newTable()).startsWith(', table: {')).toBe(true)
+  })
+})
+
+// ─── A surface pointed at a live feed ────────────────────────────────────────
+// The whole of the live wiring that reaches the config is one optional word. What the
+// config must never carry is the rows themselves: they are real call records, so a save
+// that wrote them would put customer phone numbers into a source file under review.
+
+describe('coerceSource', () => {
+  it('accepts the names the app actually feeds', () => {
+    expect(coerceSource('calls')).toBe('calls')
+    expect(coerceSource('sms')).toBe('sms')
+  })
+
+  it('reads anything else as an authored surface rather than guessing', () => {
+    expect(coerceSource('voicemail')).toBeUndefined()
+    expect(coerceSource('')).toBeUndefined()
+    expect(coerceSource(undefined)).toBeUndefined()
+    expect(coerceSource(7)).toBeUndefined()
+  })
+})
+
+describe('liveTable / authoredTable', () => {
+  it('takes the feed\'s headings, one per cell the mapper emits', () => {
+    const t = liveTable(newTable(), 'calls')
+    expect(t.source).toBe('calls')
+    expect(t.columns).toEqual(LIVE_TABLE_FEEDS.calls.columns)
+    expect(t.data).toEqual([])
+  })
+
+  it('keeps the corners, band count and ink the author already placed', () => {
+    const base: TableProjection = { ...newTable(), rows: 12, ink: '#111111' }
+    const t = liveTable(base, 'sms')
+    expect(t.quad).toEqual(base.quad)
+    expect(t.rows).toBe(12)
+    expect(t.ink).toBe('#111111')
+  })
+
+  it('shares no column object with the feed it was built from', () => {
+    const t = liveTable(newTable(), 'calls')
+    t.columns[0].label = 'changed'
+    expect(LIVE_TABLE_FEEDS.calls.columns[0].label).not.toBe('changed')
+  })
+
+  it('removes the key rather than setting it to undefined, so absence stays absence', () => {
+    const off = authoredTable(liveTable(newTable(), 'calls'))
+    expect('source' in off).toBe(false)
+  })
+})
+
+describe('coerceTable with a source', () => {
+  it('brings a live surface back with its feed', () => {
+    const t = liveTable(newTable(), 'sms')
+    expect(coerceTable(JSON.parse(JSON.stringify(t)))).toEqual(t)
+  })
+
+  it('leaves an authored surface with no source key', () => {
+    expect('source' in coerceTable(JSON.parse(JSON.stringify(newTable())))!).toBe(false)
+  })
+
+  it('reads a source it does not know as an authored surface, keeping the cells', () => {
+    const t = coerceTable({ ...newTable(), source: 'voicemail' })
+    expect('source' in t!).toBe(false)
+    expect(t?.data.length).toBeGreaterThan(0)
+  })
+
+  // Belt and braces on the privacy invariant: whatever a payload claims, a surface that
+  // names a feed comes back empty, because its rows arrive from the API a moment later.
+  it('throws away cells that came in beside a source', () => {
+    const t = coerceTable({ ...newTable(), source: 'calls', data: [['14:30', 'In', '+14155550000']] })
+    expect(t?.data).toEqual([])
+  })
+})
+
+describe('serializeTable with a source', () => {
+  it('re-evaluates to the live surface it was written from', () => {
+    const t = liveTable(newTable(), 'calls')
+    expect(reparseTable(serializeTable(t))).toEqual(t)
+  })
+
+  it('writes the feed name and an empty data block, never a record', () => {
+    const ts = serializeTable(liveTable(newTable(), 'sms'))
+    expect(ts).toContain("source: 'sms',")
+    expect(reparseTable(ts).data).toEqual([])
+  })
+
+  it('writes no source line for an authored surface', () => {
+    expect(serializeTable(newTable())).not.toContain('source:')
   })
 })

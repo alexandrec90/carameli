@@ -19,7 +19,8 @@ interface BubbleInputProps {
    * Called with the trimmed value when Enter is pressed, after which the field clears.
    * Absent — the ordinary case — leaves Enter doing nothing, because a lone input balloon
    * has nowhere to send anything and emptying itself would just lose what was typed. A
-   * chain's composer is what supplies it (see PanelBubbleChain).
+   * chain's composer supplies it (see PanelBubbleChain), and so does a standalone `phone`
+   * balloon, where Enter places the call (see PanelBubbles).
    */
   onSubmit?: (value: string) => void
 }

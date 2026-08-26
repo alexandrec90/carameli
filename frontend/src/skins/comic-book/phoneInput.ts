@@ -1,4 +1,8 @@
-import { formatIncompletePhoneNumber, isSupportedCountry } from 'libphonenumber-js/min'
+import {
+  formatIncompletePhoneNumber,
+  isSupportedCountry,
+  parsePhoneNumberFromString,
+} from 'libphonenumber-js/min'
 import type { CountryCode } from 'libphonenumber-js/min'
 
 /** Infer a numbering region from an ordered browser-language list. */
@@ -20,6 +24,20 @@ export function browserCountry(): CountryCode | undefined {
   if (typeof navigator === 'undefined') return undefined
   const locales = navigator.languages?.length ? navigator.languages : [navigator.language]
   return countryFromLocales(locales)
+}
+
+/**
+ * A written number in the E.164 form an API takes, or null when it is not a valid number.
+ *
+ * This is the join between what an author *writes* and what a request *sends*: a wheel
+ * picker's options are lettering in a comic panel — `(555) 010-4477`, `+1 555 010 4477` —
+ * and the same option has to become one canonical string, or the same conversation is two
+ * conversations depending on how it was typed. Null rather than a throw, because an option
+ * that is a person's name is an ordinary thing for a panel to hold and not an error.
+ */
+export function toE164(value: string, country?: CountryCode): string | null {
+  const parsed = parsePhoneNumberFromString(value, country)
+  return parsed?.isValid() ? parsed.number : null
 }
 
 /** Format a partial number as it is typed, using `country` for national input. */

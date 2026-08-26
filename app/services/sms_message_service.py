@@ -18,8 +18,9 @@ async def list_for_customer(
     start: datetime | None = None,
     end: datetime | None = None,
     limit: int = 100,
+    peer: str | None = None,
 ) -> list[SmsMessage]:
-    return await SmsMessageRepo(session).list_for_customer(customer_id, start, end, limit)
+    return await SmsMessageRepo(session).list_for_customer(customer_id, start, end, limit, peer)
 
 
 async def create_outbound(

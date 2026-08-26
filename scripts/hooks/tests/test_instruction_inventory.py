@@ -23,6 +23,10 @@ def test_instruction_inventory_is_intentional():
         # The reference half of skin-comic-book, split off so neither file crosses
         # the 500-line instruction limit. Not a second opinion about the skin.
         "skin-comic-book-framing",
+        # Same split, same reason: what changes once a bubble chain is bound to
+        # somebody's real SMS thread — money and privacy, not lettering. Scoped to the
+        # files that do the binding, so drawing a chain does not load it.
+        "skin-comic-book-sms",
         "voip-providers",
         "webhooks",
     }

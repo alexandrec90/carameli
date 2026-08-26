@@ -2,6 +2,9 @@ import { useMemo } from 'react'
 
 import type { UseSoftphoneResult } from '../../hooks/useSoftphone'
 import { callLabel, canHangup } from '../../lib/softphone'
+import type { BubbleTransform, ImgTransform } from './editor/types'
+import { PANELS } from './panels'
+import type { PanelPage } from './panels'
 import { browserCountry, formatPhoneInput } from './phoneInput'
 import './phone-hud.css'
 
@@ -19,8 +22,30 @@ export function hudIsVisible(phone: UseSoftphoneResult): boolean {
 }
 
 /**
- * The display and the call keys of the telephone whose number pad is projected onto a
- * picture.
+ * Whether a page offers any way to dial, and so has any use for the handset furniture.
+ *
+ * Two of them, and either is enough: a number pad projected onto one of the page's
+ * pictures, or a `phone` speech balloon someone can type a number into — the fallback for
+ * a page whose art carries no keypad, or when the projected keys are awkward to hit.
+ *
+ * A balloon inside a chain does not count. It is a conversation's composer, so its Enter
+ * is already spoken for and it dials nothing (see PanelBubbles).
+ */
+export function pageCanDial(
+  images: readonly ImgTransform[],
+  bubbles: readonly BubbleTransform[],
+  page: PanelPage,
+): boolean {
+  const projectedPad = images.some(t => t.numberPad && PANELS[t.panel]?.page === page)
+  const phoneBubble = bubbles.some(
+    b => b.content === 'phone' && !b.chain && PANELS[b.panel]?.page === page,
+  )
+  return projectedPad || phoneBubble
+}
+
+/**
+ * The display and the call keys of the page's telephone — the one whose number pad is
+ * projected onto a picture, or whose number is typed into a `phone` balloon.
  *
  * A photographed pad has twelve keys and nothing else: no screen, no send button, no
  * receiver to lift. Those live here, in the page's own furniture, rather than as more
@@ -87,7 +112,9 @@ export default function PhoneHud({ phone }: PhoneHudProps) {
             <button
               type="button"
               className="cb-button cb-phone-hud-go"
-              onClick={autoDial}
+              // Wrapped, not passed: `autoDial` takes an optional number, and a bare
+              // handler would hand it the click event as one.
+              onClick={() => void autoDial()}
               disabled={busy || !dialTarget}
             >
               Call
