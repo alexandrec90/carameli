@@ -141,13 +141,19 @@ def served_url(export_name: str) -> str:
     return f"/comic-book/{quote(export_name)}"
 
 
-def resolve_master(name: str, masters_dir: Path = MASTERS_DIR) -> Master:
+def resolve_master(name: str, masters_dir: Path | None = None) -> Master:
     """Find the master for `name`, with or without an extension.
 
     Refuses a path rather than a name: a master that is not in `assets-src/` is not a
     master, and quietly encoding one from elsewhere is how the only lossless copy ends
     up living in somebody's Downloads folder.
+
+    `masters_dir` defaults late rather than in the signature: a default argument binds
+    at import, so `MASTERS_DIR` in the signature would make a test that patches it
+    reach the real `assets-src/` -- and from there `run` writes real exports and a real
+    manifest line. That is not hypothetical; it happened while writing these tests.
     """
+    masters_dir = masters_dir or MASTERS_DIR
     if "/" in name or "\\" in name:
         raise EncodeError(
             f"{name!r} looks like a path. Name a file in {masters_dir.name}/ instead, "
@@ -168,6 +174,25 @@ def resolve_master(name: str, masters_dir: Path = MASTERS_DIR) -> Master:
         "first -- it is the only copy, and re-encoding a .webp from a .webp compounds "
         "the loss."
     )
+
+
+def all_masters(masters_dir: Path | None = None) -> list[Master]:
+    """Every master in the directory, sorted.
+
+    What a no-argument run acts on, which is what makes a one-click task possible: an
+    existing export is skipped unless `--force`, so "encode everything" costs one node
+    call per *new* picture and nothing for the rest.
+
+    Defaults late, for the reason {@link resolve_master} spells out.
+    """
+    masters_dir = masters_dir or MASTERS_DIR
+    if not masters_dir.is_dir():
+        return []
+    return [
+        Master(path, path.stem)
+        for path in sorted(masters_dir.iterdir())
+        if path.is_file() and path.suffix.lower() in MASTER_EXTENSIONS
+    ]
 
 
 def node_argv(master: Path, export: Path, max_edge: int, quality: int) -> list[str]:
@@ -315,9 +340,10 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "names",
-        nargs="+",
+        nargs="*",
         metavar="MASTER",
-        help="file name in frontend/assets-src/comic-book/, with or without extension",
+        help="file name in frontend/assets-src/comic-book/, with or without extension; "
+        "omit to encode every master that has no export yet",
     )
     parser.add_argument(
         "--max-edge",
@@ -351,14 +377,19 @@ def build_parser() -> argparse.ArgumentParser:
 
 def run(args: argparse.Namespace) -> str:
     """Do the work, returning the report. Raises {@link EncodeError} on failure."""
-    if args.label and len(args.names) > 1:
+    if args.label and len(args.names) != 1:
         raise EncodeError("--label takes a single MASTER; name one, or drop the flag.")
     if not 1 <= args.quality <= 100:
         raise EncodeError(f"--quality must be 1-100, got {args.quality}.")
     if args.max_edge < 1:
         raise EncodeError(f"--max-edge must be positive, got {args.max_edge}.")
 
-    masters = [resolve_master(name) for name in args.names]
+    masters = [resolve_master(name) for name in args.names] if args.names else all_masters()
+    if not masters:
+        raise EncodeError(
+            f"no masters in {MASTERS_DIR}. Put the lossless original there first -- "
+            "it is the only copy, and nothing else in the repo keeps one."
+        )
     EXPORT_DIR.mkdir(parents=True, exist_ok=True)
 
     lines: list[str] = []

@@ -23,7 +23,13 @@ Drop the master here, then run, from the repo root:
 
 ```bash
 python scripts/encode-comic-art.py conversation hand-notepad
+python scripts/encode-comic-art.py            # every master with no export yet
 ```
+
+Name the masters when you want `--label` or a different `--max-edge`; name none when
+you have just dropped files in and want them encoded at the defaults. The no-argument
+form is what the *Assets: Encode Comic-Book Art* task in the workspace runs, and it is
+safe to repeat: an export that already exists is skipped unless you pass `--force`.
 
 That does two of the three steps, and the second is what makes the first legal:
 

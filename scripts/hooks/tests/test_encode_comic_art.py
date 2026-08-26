@@ -250,6 +250,59 @@ class TestArgumentValidation:
         assert args.max_edge == eca.DEFAULT_MAX_EDGE
         assert args.quality == eca.DEFAULT_QUALITY
 
+    def test_parser_accepts_no_master_at_all(self):
+        """A VS Code task passes no argument, so an empty `names` has to parse."""
+        assert eca.build_parser().parse_args([]).names == []
+
+    def test_label_with_no_master_is_refused(self):
+        """`--label` names one picture, and with `names` empty it would silently name
+        every picture the same thing -- the dropdown's whole job is to tell them apart."""
+        with pytest.raises(eca.EncodeError, match="single MASTER"):
+            eca.run(self._args(names=[], label="One name"))
+
+    def test_an_empty_masters_directory_is_reported_not_silently_clean(self, monkeypatch, tmp_path):
+        monkeypatch.setattr(eca, "MASTERS_DIR", tmp_path)
+        with pytest.raises(eca.EncodeError, match="no masters"):
+            eca.run(self._args(names=[]))
+
+
+class TestAllMasters:
+    """What a no-argument run acts on. It is the whole directory rather than a guess at
+    what is new, because `run` already skips an export that exists -- deciding staleness
+    here as well would give two answers to one question."""
+
+    def test_lists_every_supported_extension_sorted(self, tmp_path):
+        for name in ("b.png", "a.jpg", "c.jpeg"):
+            (tmp_path / name).write_bytes(b"x")
+        assert [m.stem for m in eca.all_masters(tmp_path)] == ["a", "b", "c"]
+
+    def test_ignores_files_that_are_not_masters(self, tmp_path):
+        (tmp_path / "keep.png").write_bytes(b"x")
+        (tmp_path / "README.md").write_bytes(b"x")
+        (tmp_path / "already.webp").write_bytes(b"x")
+        assert [m.stem for m in eca.all_masters(tmp_path)] == ["keep"]
+
+    def test_ignores_directories(self, tmp_path):
+        (tmp_path / "nested.png").mkdir()
+        assert eca.all_masters(tmp_path) == []
+
+    def test_a_missing_directory_is_empty_rather_than_a_crash(self, tmp_path):
+        assert eca.all_masters(tmp_path / "nope") == []
+
+    def test_the_real_directory_holds_the_pictures_this_change_added(self):
+        stems = {m.stem for m in eca.all_masters()}
+        assert {"conversation", "hand-notepad"} <= stems
+
+    def test_the_directory_defaults_at_call_time_not_at_import(self, monkeypatch, tmp_path):
+        """Regression: `masters_dir: Path = MASTERS_DIR` binds once, at import, so a
+        test that patched the module attribute got the real `assets-src/` anyway -- and
+        `run` then encoded five real exports and wrote five real manifest lines before
+        the assertion it was meant to make ever ran. Both entry points default late now."""
+        (tmp_path / "only.png").write_bytes(b"x")
+        monkeypatch.setattr(eca, "MASTERS_DIR", tmp_path)
+        assert [m.stem for m in eca.all_masters()] == ["only"]
+        assert eca.resolve_master("only").path == tmp_path / "only.png"
+
 
 class TestArtifact:
     """`logs/` is where a failure has to survive the terminal scrolling away, so both
