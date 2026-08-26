@@ -277,16 +277,14 @@ sent, so one party saying two things in a row simply takes two rows in a row.
 **The members are templates, not slots.** The author draws *one balloon per column* —
 its shape, tail, rotation, lettering and the column's edge — and every row is stamped
 from the template of the side it belongs to. Member 0 is the **sender**: the rightmost
-column, the one the composer sits at the foot of. Rows are laid out bottom-up from it,
-each row's `top` the running sum of the heights below it, so a long message pushes the
-thread up by its own height rather than by a fixed pitch a two-line balloon would
-overlap. Width follows the message (`messageWidth`); the template's own width is the
-widest a balloon on that side gets.
+column, the one the composer sits at the foot of. Rows lay out bottom-up from it, each
+row's `top` the running sum of the heights below it, so a long message pushes the thread
+up by its own height rather than by a fixed pitch a two-line balloon would overlap.
+Width follows the message (`messageWidth`).
 
-**Linkage is what joins the two columns**, not a name: a chain's members are the
-balloons wired together by `linkTo`, and one checkbox on either says which of the two a
-linked group is — a welded pair, or a conversation. The id the group carries is
-generated (`nextChainId`) and never shown.
+How linkage makes a chain, and why the id is generated rather than typed, is the
+editor's own business: `src/skins/comic-book/editor/README.md` owns it, and restating
+it here would be a fork.
 
 `PANEL_BUBBLE_CHAINS` in `layoutConfig.ts` holds one entry per id in use:
 
@@ -297,10 +295,8 @@ generated (`nextChainId`) and never shown.
 | `messages` | the thread, oldest first; a leading `> ` marks the **sender's** side. **Empty means the chain speaks its two balloons' own `text`** |
 | `sms` | binds the conversation to the account's real SMS history — see below |
 
-The list is **derived, not authored**: `syncChains` recomputes it from the ids the
-bubbles carry after every edit that can touch one. There is deliberately no add-chain or
-delete-chain operation — a chain with no members and a member with no chain are both
-unreachable states rather than states to be validated.
+The list is **derived, not authored** (`syncChains`), so a chain with no members and a
+member with no chain are unreachable states rather than states to validate.
 
 Scrolling is not a toggle: a chain *is* a window over a transcript, so the wheel always
 moves it. **Live** is `content: 'input'` (or `'phone'`) on the sender template — the
@@ -319,46 +315,19 @@ These rules hold it together, each enforced where it can be enforced by construc
   layout — it would need a second axis in every one of those functions, not a CSS change.
 
 All of the arithmetic is pure and in `bubbleChain.ts`; `PanelBubbleChain.tsx` adds only
-what cannot be — the growth timer, the wheel listener, the panel's measured aspect and
-what a reader typed. **Keys are message indices, not row indices**: a message keeps its
-DOM node as it moves up the table, which is what lets CSS transition its
-`top`/`right`/`width` rather than flickering text through stationary balloons. The
-arrival effect is a `@keyframes` animation (`bubbleChains.css`) and not a transition,
-because a node that mounts already carrying `is-visible` has no previous value to
-transition from.
+what cannot be — the growth timer, the wheel listener, the measured aspect and what a
+reader typed. **Keys are message indices, not row indices**: a message keeps its DOM node
+as it moves up the table, which is what lets CSS transition its `top`/`right`/`width`
+rather than flickering text through stationary balloons. Arrival is a `@keyframes`
+animation (`bubbleChains.css`), not a transition — a node that mounts already carrying
+`is-visible` has no previous value to transition from.
 
 ### A chain bound to real SMS
 
-`sms: true` stops a chain being a drawing. The transcript then comes from the carrier
-instead of from `messages`, and Enter in the composer **sends for real** — there is no
-safe mode, and the account is billed.
-
-**Which conversation is not stored on the chain.** It is whichever number the panel's
-wheel-picker balloon is turned to: `peerWheelOn` takes the first `content: 'wheel'`
-balloon on the panel **that is not itself in a chain**, because a wheel inside a
-conversation is picking what to *say*, not who to say it to. The option is read through
-`toE164` (`phoneInput.ts`), so the same number written three ways is one thread; an
-option that is a name resolves to null and binds nothing. The two halves are separate
-balloons on purpose — the picker says *who*, the chain says *what* — which is how the
-panel reads as a phone rather than as a form.
-
-The data still obeys the three-layer rule (`.claude/rules/skin-architecture.md`): nothing
-in the skin fetches. `App.tsx` owns `useSmsConversations()` and passes it as
-`LayoutProps.sms`; `PanelBubbles` calls `subscribe(peer)` and reads what comes back. The
-hook polls (`SMS_POLL_MS`) only while somebody is subscribed and shares one request
-between subscribers, so a page whose panels bind nothing costs nothing — which is what
-lets `App` mount it for every skin. A sent message is drawn optimistically and retires
-when its own row returns from the server (`mergeMessages`); until then it carries
-`is-sending`, and a refused send carries `is-failed`.
-
-Two things a bound chain must never do, both asserted in
-`src/tests/skins/PanelBubblesSms.test.tsx`:
-
-- **Never fall back to the authored transcript.** A bound chain that resolved no number
-  shows an empty conversation. The fallback would put the author's words into somebody's
-  real thread.
-- **Never bind in edit mode.** The editor is the author placing balloons; a panel under
-  it must not poll a carrier, and Enter in a composer there must not spend money.
+`sms: true` stops a chain being a drawing: the transcript comes from the carrier instead
+of from `messages`, and Enter in the composer **sends for real**. Which thread it is,
+where the data comes from without the skin fetching, and the two things such a chain must
+never do are `.claude/rules/skin-comic-book-sms.md`.
 
 ### Asset Image (Gemini-generated)
 

@@ -73,3 +73,48 @@ class TestTrackedDotenvFiles:
         assert ".env.example" in selected
         assert ".env.local-e2e.example" in selected
         assert ".env" not in selected
+
+
+class TestDotenvSelectionWithoutGit:
+    """``None`` means nobody looked, and must not read as "nothing to lint".
+
+    ``scripts/run-tests.py`` runs pytest inside the app container, which ships no
+    git — so this was every containerised run, and it linted nothing while
+    reporting success.
+    """
+
+    def _make(self, root: Path, *names: str) -> None:
+        for name in names:
+            (root / name).write_text("A=1\n", encoding="utf-8")
+
+    def test_falls_back_to_the_example_templates(self, tmp_path: Path) -> None:
+        self._make(tmp_path, ".env", ".env.local-e2e", ".env.example", ".env.local-e2e.example")
+        assert script.tracked_dotenv_files(tmp_path, None) == [
+            ".env.example",
+            ".env.local-e2e.example",
+        ]
+
+    def test_the_fallback_still_skips_per_machine_files(self, tmp_path: Path) -> None:
+        """The reason the git filter existed survives losing git."""
+        self._make(tmp_path, ".env", ".env.local-e2e")
+        assert script.tracked_dotenv_files(tmp_path, None) == []
+
+    def test_an_empty_set_is_not_the_same_as_none(self, tmp_path: Path) -> None:
+        """An empty set is git answering "nothing tracked" — honour it literally."""
+        self._make(tmp_path, ".env.example")
+        assert script.tracked_dotenv_files(tmp_path, set()) == []
+        assert script.tracked_dotenv_files(tmp_path, None) == [".env.example"]
+
+    def test_the_fallback_ignores_directories(self, tmp_path: Path) -> None:
+        (tmp_path / ".env.d.example").mkdir()
+        self._make(tmp_path, ".env.example")
+        assert script.tracked_dotenv_files(tmp_path, None) == [".env.example"]
+
+    def test_missing_git_reports_none_rather_than_an_empty_set(self, monkeypatch: Any) -> None:
+        """The producer half: an OSError must not be flattened into "nothing tracked"."""
+
+        def _boom(*_args: Any, **_kwargs: Any) -> Any:
+            raise OSError("git: not found")
+
+        monkeypatch.setattr(script.subprocess, "run", _boom)
+        assert script._git_tracked_root_files() is None
