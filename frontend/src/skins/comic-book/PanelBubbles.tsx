@@ -1,6 +1,6 @@
 import { Fragment } from 'react'
 
-import { chainIdsOn, chainSlots, defaultChain } from './bubbleChain'
+import { chainIdsOn, chainMembers, defaultChain } from './bubbleChain'
 import type { BubbleChain } from './bubbleChain'
 import PanelBubble from './PanelBubble'
 import PanelBubbleChain from './PanelBubbleChain'
@@ -20,10 +20,11 @@ interface PanelBubblesProps {
   /** False in edit mode: the editor overlay owns the pointer there. */
   interactive: boolean
   /**
-   * True in edit mode. Chains are then drawn *flat* — every slot at its own placement,
-   * saying its own words — instead of being played as a thread. The editor selects and
-   * drags a balloon by hit-testing its transform, so a slot the thread had scrolled
-   * somewhere else, or not drawn at all, would be a balloon the author cannot reach.
+   * True in edit mode. Chains are then drawn *flat* — each template at its own placement,
+   * saying its own words — instead of being played as a conversation. The editor selects
+   * and drags a balloon by hit-testing its transform, so a template the conversation had
+   * stamped rows from, and drawn nowhere itself, would be a balloon the author cannot
+   * reach.
    */
   editing: boolean
 }
@@ -38,9 +39,9 @@ interface PanelBubblesProps {
  * is why this is a fragment of siblings and not its own positioned layer.
  *
  * Bubbles naming a `chain` are pulled out of that flat list and handed to
- * PanelBubbleChain as one column — an SMS thread that grows in and scrolls. Everything
- * else renders exactly as it always did, which is what makes chains a per-column opt-in
- * rather than a change to how bubbles work.
+ * PanelBubbleChain as the two templates of one SMS conversation — a table of balloons that
+ * grows in and scrolls. Everything else renders exactly as it always did, which is what
+ * makes chains a per-conversation opt-in rather than a change to how bubbles work.
  */
 export default function PanelBubbles({
   bubbles,
@@ -52,13 +53,13 @@ export default function PanelBubbles({
   editing,
 }: PanelBubblesProps) {
   const ids = editing ? [] : chainIdsOn(bubbles, panel)
-  const columns = ids.map(id => ({
+  const conversations = ids.map(id => ({
     id,
-    slots: chainSlots(bubbles, id, panel),
+    members: chainMembers(bubbles, id, panel),
     chain: chains.find(c => c.id === id) ?? defaultChain(id),
   }))
-  // Indices the columns have claimed, so the flat pass below skips them.
-  const claimed = new Set(columns.flatMap(c => c.slots))
+  // Indices the conversations have claimed, so the flat pass below skips them.
+  const claimed = new Set(conversations.flatMap(c => c.members))
 
   return (
     <>
@@ -76,26 +77,26 @@ export default function PanelBubbles({
           </div>
         )
       })}
-      {columns.map(({ id, slots, chain }) => {
-        const column = (
+      {conversations.map(({ id, members, chain }) => {
+        const table = (
           <PanelBubbleChain
             chain={chain}
-            slots={slots.map(i => bubbles[i])}
-            // Every slot of a chain belongs to this panel, so they reveal and hide
-            // together; the root's answer is the column's.
-            visible={isVisible(slots[0])}
+            members={members.map(i => bubbles[i])}
+            // Every member of a chain belongs to this panel, so they reveal and hide
+            // together; the sender template's answer is the conversation's.
+            visible={isVisible(members[0])}
             interactive={interactive}
           />
         )
-        // Spill is the root's call for the whole column. A thread whose balloons
-        // disagreed would be clipped in the middle, which reads as a rendering fault
-        // rather than as a choice — and the root is the balloon whose tail decides how
-        // far the column may lean off the panel in the first place.
-        return bubbles[slots[0]].spill ? (
-          <Fragment key={id}>{column}</Fragment>
+        // Spill is the sender template's call for the whole conversation. A table whose
+        // balloons disagreed would be clipped down one column, which reads as a rendering
+        // fault rather than as a choice — and that template is the one whose tail decides
+        // how far the conversation may lean off the panel in the first place.
+        return bubbles[members[0]].spill ? (
+          <Fragment key={id}>{table}</Fragment>
         ) : (
           <div key={id} className="cb-bubble-clip" style={{ clipPath: clip }}>
-            {column}
+            {table}
           </div>
         )
       })}

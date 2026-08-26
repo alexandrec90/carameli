@@ -302,15 +302,17 @@ describe('serializeConfig', () => {
 })
 
 describe('serializeConfig chains', () => {
-  /** The seed config with one two-slot chain on panel 6, and settings on it. */
+  /** The seed config with one two-column conversation on panel 6, and settings on it. */
   function threaded(): EditorConfig {
     let cfg = seedConfig()
     cfg = patchBubble(cfg, 0, { chain: 'her side' })
     cfg = patchBubble(cfg, 1, { chain: 'her side' })
-    return patchChain(cfg, 'her side', { grow: true, scroll: false, stepMs: 450, messages: ['Hi', 'You up?'] })
+    return patchChain(cfg, 'her side', {
+      grow: true, stepMs: 450, rows: 4, messages: ['Hi', '> You up?'],
+    })
   }
 
-  it('writes the chain’s name on every bubble that carries one', () => {
+  it('writes the chain’s id on every bubble that carries one', () => {
     const ts = serializeConfig(threaded())
     expect((ts.match(/chain: 'her side'/g) ?? [])).toHaveLength(2)
   })
@@ -319,8 +321,7 @@ describe('serializeConfig chains', () => {
     const ts = serializeConfig(threaded())
     expect(ts).toContain('export const PANEL_BUBBLE_CHAINS: BubbleChain[] = [')
     expect(ts).toContain(
-      "  { id: 'her side', grow: true, scroll: false, stepMs: 450, " +
-        "messages: ['Hi', 'You up?'] },",
+      "  { id: 'her side', grow: true, stepMs: 450, rows: 4, messages: ['Hi', '> You up?'] },",
     )
   })
 
@@ -334,8 +335,14 @@ describe('serializeConfig chains', () => {
 
   it('carries the chain header prose, which is not recoverable from the data', () => {
     const ts = serializeConfig(seedConfig())
-    expect(ts).toContain('the lowest is the root that carries the tail')
     expect(ts).toContain('the list is derived from them, not')
+    // The four things a hand-editor cannot infer from the data: that the two linked
+    // balloons are stamped from rather than drawn, which end is newest, what decides the
+    // column a message lands in, and that a composer is spelled as a content kind.
+    expect(ts).toContain('are *templates*, not slots')
+    expect(ts).toContain('the newest sit at the bottom')
+    expect(ts).toContain('deciding which column a message lands in')
+    expect(ts).toContain("content: 'input'")
   })
 
   it('escapes an apostrophe an author typed into a message', () => {
@@ -347,6 +354,12 @@ describe('serializeConfig chains', () => {
     const cfg = threaded()
     cfg.chains[0].stepMs = 450.6
     expect(serializeConfig(cfg)).toContain('stepMs: 451,')
+  })
+
+  it('rounds the row cap too — half a row is not a row', () => {
+    const cfg = threaded()
+    cfg.chains[0].rows = 4.7
+    expect(serializeConfig(cfg)).toContain('rows: 5,')
   })
 
   it('produces a chain block that re-evaluates back to the same list', () => {

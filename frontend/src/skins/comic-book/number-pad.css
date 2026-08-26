@@ -19,3 +19,35 @@
   min-height: 0;
   line-height: 1;
 }
+
+/* A live key. The cell is already the right shape and the homography already tilts it,
+   so the button contributes no box of its own — only the press feedback and the focus
+   ring, which are drawn inside the projected plane and so tilt with the picture. */
+.cb-number-pad-button {
+  appearance: none;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  transition: background-color 90ms ease-out, transform 90ms ease-out;
+}
+
+.cb-number-pad-button:hover {
+  background: color-mix(in srgb, currentcolor 14%, transparent);
+}
+
+.cb-number-pad-button:active {
+  background: color-mix(in srgb, currentcolor 30%, transparent);
+
+  /* Reads as the key going down into the surface it is painted on. */
+  transform: scale(0.94);
+}
+
+.cb-number-pad-button:focus-visible {
+  outline: 2px solid currentcolor;
+  outline-offset: -2px;
+}

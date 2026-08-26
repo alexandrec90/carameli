@@ -6,6 +6,7 @@ import BubbleTubes from './BubbleTubes'
 import ComicPanel from './ComicPanel'
 import { LoadingOverlay, useLoadingScreen } from './LoadingOverlay'
 import PanelInk from './PanelInk'
+import PhoneHud, { hudIsVisible } from './PhoneHud'
 import { gridPolys, layoutKindFor } from './panelGeometry'
 import { PANEL_BG_CONFIGS, drawPanelBackground } from './panelPatterns'
 import { PANELS, pageForPath } from './panels'
@@ -58,7 +59,7 @@ const EditorOverlay = import.meta.env.DEV
 
 // children intentionally not rendered — panels-only foundation phase. navItems
 // only feeds the dev editor's page selector (no in-page nav chrome yet).
-export function Layout({ navItems }: LayoutProps) {
+export function Layout({ navItems, softphone }: LayoutProps) {
     const location = useLocation()
     const editor = useEditorMode()
     const page = pageForPath(location.pathname)
@@ -136,6 +137,11 @@ export function Layout({ navItems }: LayoutProps) {
         setNatSizes(prev => (prev[src] ? prev : { ...prev, [src]: size }))
     }, [])
 
+    // A page showing a projected pad gets the rest of the telephone: the display and the
+    // call keys a photographed pad has no room for. Pages without one show no furniture.
+    const padOnPage = imgT.some(t => t.numberPad && PANELS[t.panel]?.page === page)
+    const showPhoneHud = padOnPage && !editor.active && hudIsVisible(softphone)
+
     const accent = accentForPath(location.pathname)
     const washRef = usePageWash(location.pathname, accent)
     const loading = useLoadingScreen(ready, accent)
@@ -210,6 +216,7 @@ export function Layout({ navItems }: LayoutProps) {
                             }
                             isRevealed={k => shouldRevealImg(editor.active, editor.selected, k)}
                             isBubbleVisible={bubbleVisible}
+                            onNumberPadKey={softphone.pressDigit}
                             dotRef={el => { panelDotRefs.current[i] = el }}
                             onSettled={markSettled}
                             onNatSize={recordNatSize}
@@ -224,12 +231,16 @@ export function Layout({ navItems }: LayoutProps) {
                 <BubbleTubes polys={panelPolys} bubbles={bubbleT} isVisible={bubbleVisible} />
 
                 {/* Layer 2 — Panel outline SVG (sits above images, below the wash) */}
-                <PanelInk polys={panelPolys} images={imgT} />
+                <PanelInk polys={panelPolys} />
 
                 {/* Layer 3 — Ben-Day wash canvas (page transitions; blank when idle) */}
                 <canvas ref={washRef} className="cb-wash-canvas" aria-hidden="true" />
 
             </div>
+
+            {/* The projected pad's display and call keys — outside cb-root so the page's
+                load fade and the picture frames never hide or crop the live call. */}
+            {showPhoneHud && <PhoneHud phone={softphone} />}
 
             {/* Dev-only editor overlay — never reached in a production build */}
             {EditorOverlay && editor.active && (

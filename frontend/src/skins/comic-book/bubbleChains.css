@@ -1,7 +1,7 @@
-/* Bubble chains — a column of balloons played as one SMS thread.
+/* Bubble chains — two columns of balloons played as one SMS conversation.
  *
  * Its own file rather than more of bubbles.css, which is at the size limit. The seam is
- * clean: everything here is about a balloon *moving between slots* or *arriving*, and
+ * clean: everything here is about a balloon *moving between rows* or *arriving*, and
  * nothing here restyles a balloon. A chained bubble is an ordinary `.cb-panel-bubble`
  * with one extra class.
  */
@@ -16,8 +16,12 @@
  *
  * Inset to the panel box exactly as `.cb-bubble-clip` is, so the % placements the author
  * dragged out resolve against the same box whether or not a chain wraps them. No
- * `overflow`: the column spills into the gutter like any other bubble, and a chain that
+ * `overflow`: the table spills into the gutter like any other bubble, and a chain that
  * shouldn't gets wrapped in `.cb-bubble-clip` by PanelBubbles instead.
+ *
+ * It is also the element the conversation measures itself against: a row's height comes
+ * from its width, and turning one into the other needs the panel's aspect ratio, which
+ * only the box knows. That is what the ResizeObserver in PanelBubbleChain watches.
  */
 .cb-chain-layer {
   position: absolute;
@@ -26,13 +30,15 @@
   z-index: 5;
 }
 
-/* A balloon that is a slot of a live chain.
+/* A balloon that is a row of a bubble chain.
  *
  * `top`/`right`/`width` join the transition list, which is the whole scroll animation:
- * the message keeps its element as it moves down the column (PanelBubbleChain keys by
- * message, not by slot), so its placement *changes* rather than the balloons swapping
- * text, and CSS carries it. The easing is a decelerating curve rather than the overshoot
- * the pop-in uses — a thread sliding is a physical settle, not a bounce.
+ * the message keeps its element as it climbs the table (PanelBubbleChain keys by
+ * message, not by row), so its placement *changes* rather than the balloons swapping
+ * text, and CSS carries it. `width` matters twice over here — a row is as wide as its
+ * message, so the balloons the scroll moves are rarely the same size. The easing is a
+ * decelerating curve rather than the overshoot the pop-in uses — a conversation sliding
+ * is a physical settle, not a bounce.
  *
  * Only on chained balloons: the editor drags an ordinary bubble by writing `top`/`right`
  * every pointermove, and a transition there would have the balloon trailing the cursor.
@@ -46,7 +52,8 @@
     width 280ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-/* Arrival: a new message rises into place as it fades in.
+/* Arrival: a new message rises into its row as it fades in — from below, the way a
+ * message lands at the bottom of a phone's conversation.
  *
  * An animation and not a transition, because there is nothing to transition *from* — the
  * element mounts already carrying `.is-visible`, and a property that has only ever had
@@ -73,7 +80,7 @@
   animation: cb-chain-in 320ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
 }
 
-/* Reduced motion: the thread still grows and still scrolls — that is content arriving,
+/* Reduced motion: the conversation still grows and still scrolls — that is content arriving,
  * not decoration — but it does so by appearing rather than by travelling. The opacity
  * fade is kept: it is what distinguishes a new message from one that was always there,
  * and it moves nothing.

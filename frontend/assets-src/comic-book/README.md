@@ -52,12 +52,16 @@ reads as one.
 
 `conversation.png` and `hand-notepad.png` are at that stage today. `logo2.png`,
 `man-woman-talking.png`, `notepad.png` and `push-button-phone.png` were, until the
-home page's four panels landed and started drawing them.
+home page's four panels landed and started drawing them. A file leaves this list when
+its layout lands, not when its `.webp` is written; nothing fails if the paragraph is
+left stale, which is exactly why it has to be edited by hand in the same change.
 
-All six arrived by the route this directory exists to prevent: generated straight into
-`frontend/public/comic-book/`, masters and exports side by side, in a static checkout
-sitting on `master`. Nothing rendered them, so nothing failed, until the policy test
-read the tree.
+Those four arrived by the route this directory exists to prevent: generated straight
+into `frontend/public/comic-book/`, masters and exports side by side, in a static
+checkout sitting on `master`. Nothing rendered them, so nothing failed, until the
+policy test read the tree. `conversation.png` and `hand-notepad.png` arrived the better
+way — into `assets-src/` first, with the export written from here in the change that
+registered it.
 
 ## The traced references
 

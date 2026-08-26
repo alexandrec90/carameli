@@ -16,8 +16,9 @@ placement **and content** (panel / top / right / width / rotate / spill / type /
 content / text — lettering, a comma-delimited wheel picker, a text input, or a phone
 input formatted from the browser locale), plus each bubble's event morph targets
 (`hoverType`, `clickType`) and its
-connector-tube partner (`linkTo`) and the message thread it is a slot of (`chain`,
-resolved through `PANEL_BUBBLE_CHAINS` — see *Bubble chains* below). It also holds
+linked partner (`linkTo`) and the SMS conversation that linkage makes it a column of (`chain`,
+an editor-generated id resolved through `PANEL_BUBBLE_CHAINS` — see *Bubble chains*
+below). It also holds
 `PANEL_PATTERNS` — each panel's
 Ben-Day background style, the one array here that **is** parallel to `PANELS`; the
 per-panel palette and dot metrics stay tuned in
@@ -52,24 +53,59 @@ the **same panel** — the editor only offers same-panel partners, and the rende
 any cross-panel link it is handed, because half a tube appearing on a different hover
 cannot read as one utterance.
 
-**Bubble chains are a column of balloons read as one message thread.** Give two or more
-bubbles on a panel the same `chain` name and they become that thread's slots, ordered
-bottom-to-top: the lowest is slot 0, the *root*, and it is the only one that keeps a
-tail — the rest are the same speaker still talking. The chain's own settings live in a
-separate list keyed by that name (`PANEL_BUBBLE_CHAINS`): whether it `grow`s one balloon
-at a time, how fast (`stepMs`), whether the reader can `scroll` a longer transcript
-through it, and the `messages` themselves. That list is **derived**, not authored — every
-op that touches a bubble re-runs `syncChains`, so a name that no bubble carries any more
-simply stops existing and there is no add-chain or delete-chain operation to get out of
-step. A chained balloon can never also be a tube end: the tube welds two fixed shapes,
-while a slot holds whatever message has scrolled into it. See `../bubbleChain.ts` for the
-window arithmetic and `chainOps.ts` for the list's lifecycle.
+**A bubble chain is one SMS conversation, drawn as a table of two columns.** **Linkage is
+what makes one.** Link two balloons together with the `link to` picker — the same field
+that declares a connector tube — and tick **scrollable chain** on either: the rightmost of
+the linked balloons becomes the **sender's** column and the leftmost the **recipient's**.
+
+Those two balloons are **templates, not slots**. Neither is drawn where it sits outside
+edit mode; each row of the conversation is *stamped* from the template of its side —
+shape, tail, rotation and lettering — at a width that follows the message and a height
+that follows the width. That is what lets the two columns interleave freely, so one party
+can send two in a row:
+
+```text
+them:  Hey, are you around?
+them:  I have that number for you
+  me:  give me a sec
+them:  555-0134
+  me:  [composer]
+```
+
+Rows stack upward from the sender template's `top`, newest at the bottom. `rows` is how
+many the table holds at once (default 6); past that the wheel moves the window rather than
+the table growing, so ten messages through six rows is six on screen and a scroll to reach
+the rest. There is no per-chain scroll toggle, because a chain *is* that window.
+
+`messages` is the transcript, oldest first, and a line beginning `> ` is the **sender's** —
+that marker is the only thing deciding which column a message lands in. Leave the box empty
+and the conversation speaks the two templates' own `text`.
+
+Give the *sender's* balloon `content: 'input'` or `phone` and the chain goes **live**: the
+bottom-right row becomes a composer, Enter sends what is typed as the sender's next
+message, and the table grows by one row per message until it is full. The composer costs
+one row, so a six-row live chain is the field plus the five newest messages.
+
+The chain's own settings live in a separate list keyed by an id (`PANEL_BUBBLE_CHAINS`):
+how many `rows`, whether it `grow`s one at a time, how fast (`stepMs`), and the `messages`
+themselves. Both the ids and the list are **derived**, not authored — `propagateChains`
+settles one id per linked group and `syncChains` rebuilds the list from those ids, after
+every op that touches a bubble. So the checkbox is the whole of "make a chain" and "unmake
+one": there is no name to type, no add-chain operation and no delete-chain operation to get
+out of step. A chained balloon draws no tube: `linkTo` says *which* balloons belong
+together and `chain` says whether that means a welded pair or a conversation, since a tube
+welds two fixed shapes while a template is a stamp for rows that do not exist yet. See
+`../bubbleChain.ts` for the layout and window arithmetic and `chainOps.ts` for the list's
+lifecycle.
 
 **A picture has two independent framings, which is why it has so many fields.**
 `left`/`top`/`width`/`height` are the *frame*: its own rectangle over the panel box, in
-% of that box, cut to the panel's polygon scaled into it (`imgFramePoly`). A picture
-left at the default `0/0/100/100` therefore crops exactly as a panel image always did,
-and an inset one reads as a small comic panel rather than a rectangle pasted on top.
+% of that box. It stays a rectangle — the **panel** is the window the picture is seen
+through (`imgPanelClip` translates the panel's polygon into the frame's coordinates), so
+a picture left at the default `0/0/100/100` crops exactly as a panel image always did,
+and an inset one is a rectangle of picture rather than a small panel with the grid's
+slant and a black border of its own. **A picture is never inked** — the selection outline
+you drag is the artwork's real rect, and nothing else is drawn around it.
 `scale`/`offsetX`/`offsetY`/`anchor` are the second framing: they move the picture
 *inside* that frame. Before pictures became entities the frame was the panel polygon
 itself, so dragging could only slide the picture under a window that stayed put, and a
@@ -150,9 +186,13 @@ different images can only crossfade. A new bubble type belongs in `bubbleShape.t
      layout: 1–9 over the first three rows, then `*`, `0`, `#`. Drag its magenta corner
      grips or type the corner coordinates to align it with the photographed plane; the
      **Text** and **Ink** controls tune the symbols. Its 3 × 4 grid and outline are
-     visible alignment guides in the editor only. Outside edit mode, readers see the
-     twelve symbols directly on the image. A picture carries either a table or a number
-     pad, so switching either option on replaces the other projected content.
+     visible alignment guides in the editor only. Outside edit mode the twelve symbols
+     are a **working telephone keypad**: each key is a button wired to the app's shared
+     softphone, and the display and call keys appear as a caption box (`../PhoneHud.tsx`)
+     once someone presses one. Inside edit mode the pad takes no pointer input at all,
+     because the corner grips are on the same picture and would lose every drag to it.
+     A picture carries either a table or a number pad, so switching either option on
+     replaces the other projected content.
    - **Allow spill outside panel** checkbox — off (default for pictures) clips the
      element to the frame's polygon (overflow hidden behind its edge); on lets it
      bleed past (default for bubbles).
@@ -172,15 +212,22 @@ different images can only crossfade. A new bubble type belongs in `bubbleShape.t
      declare it at one end only — and the **link to** dropdown lists only the other
      bubbles on the same panel (it is disabled when there are none). Changing a
      bubble's panel clears a link that would have crossed one.
-   - Also for bubbles: the **chain** field (free text, completing on the names already
-     in use) makes this balloon a slot of that message thread. Naming one clears its
-     tube and greys the **link to** picker out, and the chain's own controls appear
-     below: **grow one at a time** with its **step ms**, **scroll** to let the reader
-     wheel a longer transcript through the column, the **messages** box (one per line —
-     leave it empty and the drawn balloons' own text is the transcript), and
-     **+ Balloon in chain**, which adds a slot above the current top one, in the same
-     column and with no tail. Chained balloons render flat and all-visible in edit
-     mode, so you are always drawing the whole column rather than chasing an animation.
+   - Also for bubbles: the **scrollable chain** checkbox, directly under **link to**,
+     turns the balloons linked to this one into an SMS conversation — and unticking it
+     turns them back into tube-joined balloons. It applies to the whole linked group,
+     because a conversation is a property of the pair: link first, then tick either end.
+     There is no chain name to type; the id in the exported config is the editor's
+     bookkeeping. Ticking it drops the group's tubes, and the chain's own controls appear
+     below: **rows** (how many the table holds at once), **grow one at a time** with its
+     **step ms**, and the **messages** box — one per line, oldest first, a leading `>`
+     marking the sender's side, and an empty box meaning the two drawn balloons' own text
+     is the transcript. **+ Other column** appears while the chain has only one balloon
+     and adds its partner mirrored across the panel, tail flipped, linked back to it. Set
+     the **sender's** balloon (the rightmost) to **Text input** or **Phone input** to make
+     the chain live — it then starts as just that field at the bottom right and grows by
+     one row each time Enter is pressed outside edit mode. In edit mode the two templates
+     render flat, all-visible and at their own placements, so you are always dragging the
+     columns themselves rather than chasing a row an animation put somewhere.
    - **+ Image** / **+ Bubble** (toolbar) append a new picture or bubble to the
      selected panel — select the panel, a picture on it or a bubble on it first, so
      there is a panel to add to — and select what they added. **Delete image** /
@@ -237,21 +284,23 @@ bubbleTypes.ts      BubbleType + BUBBLE_TYPES (lettering font per type) — ship
 ../bubbleBox.ts     PURE authoring box: viewBox, base ellipse, TAIL_DIRS + tail geometry
 ../bubbleShape.ts   PURE outline geometry: the shared vertex ring, per-type modulation, morph lerp
 ../bubbleTube.ts    PURE connector-tube geometry + link/reveal semantics
-../bubbleChain.ts   PURE chain arithmetic: slot order, transcript, head clamp, visible window
+../bubbleChain.ts   PURE chain arithmetic: columns, row layout, transcript, head clamp, window
 ../useBubbleMorph.ts  rAF morph driver — writes `d` to the DOM, not through React
 ../PanelBubble.tsx  one bubble: outline SVG + content + hover/press morph state
 ../BubbleInput.tsx  real text/phone input; isolates its events from panel navigation
 ../phoneInput.ts    PURE locale detection, live phone formatting + caret/deletion math
 ../bubbleContent.ts content-kind registry and persisted-value guard
 ../PanelBubbles.tsx one panel's bubbles: filters the array by panel, clips the non-spilling ones
-../PanelBubbleChain.tsx  one chain: which slot holds which message, growth timer, wheel scroll
+../PanelBubbleChain.tsx  one conversation: rows from templates, growth timer, wheel scroll, composer
 ../BubbleTubes.tsx  viewport-level tube layer for every linked pair
 ../tableProjection.ts PURE: the corner quad -> homography -> `matrix3d`, and the layout box
 ../tableData.ts     PURE: rows visible at an offset, wheel-to-rows, column widths, cell text
 ../ProjectedTable.tsx one picture's surface: the projected table, its wheel and its keys
 ../table.css        surface + cell styles, and the editor-only band guides
-../ProjectedNumberPad.tsx fixed 3 × 4 telephone keys on a projected surface
-../number-pad.css   number-pad lettering and surface layout
+../ProjectedNumberPad.tsx fixed 3 × 4 telephone keys on a projected surface; live buttons outside edit mode
+../number-pad.css   number-pad lettering, surface layout, and the live key's press states
+../PhoneHud.tsx     the display and call keys a photographed pad has no room for
+../phone-hud.css    the caption box that holds them
 ../panelGeometry.ts PURE grid -> polygon geometry: frame, normalised space, vertex constraints
 ../panelPatterns.ts pattern style registry + per-panel palette/dot tuning (PANEL_BG_CONFIGS)
 ../polygonInset.ts  PURE polygon maths: the perpendicular gutter inset, bounding box
@@ -261,7 +310,7 @@ layoutConfig.ts     PANEL_IMG_TRANSFORMS, PANEL_BUBBLE_TRANSFORMS, PANEL_PATTERN
 configOps.ts        PURE config edits: re-exports configSeed + configHydrate, patch/add/remove, links
 configSeed.ts       PURE: the working copy's seed, clone, and per-breakpoint grid set/reset
 configHydrate.ts    PURE: parse a persisted payload back into a config, falling back per field
-chainOps.ts         PURE chain-list lifecycle: derive from the bubbles, patch, clamp, hydrate
+chainOps.ts         PURE chain-list lifecycle: linked groups -> ids, derive the list, patch, clamp, hydrate
 useSeamDrag.ts      hook: which gesture a pointer means, and the grid edit it maps to
 PanelSeams.tsx      the draggable line + vertex handles (shapes mode)
 ShapeInspector.tsx  shapes-mode inspector: vertex read-out, straighten, reset grid
@@ -285,11 +334,11 @@ EditorOverlay.tsx   overlay UI: click targets, outlines, seams (dev-only, dynami
 EditorToolbar.tsx   toolbar chrome: mode toggle, page select, inspector slot, save/reset/export
 InspectorPanel.tsx  selection inspector: read-outs, spill, per-element reset, delete
 ImageInspector.tsx  picture-only controls: panel, picture, alt, anchor
-BubbleInspector.tsx bubble-only controls: panel, type, tail, content, text, hover/click, link, chain
-ChainInspector.tsx  the chain half of that inspector: grow, step ms, scroll, messages, + slot
+BubbleInspector.tsx bubble-only controls: panel, type, tail, content, text, hover/click, link, chain toggle
+ChainInspector.tsx  the chain half of that inspector: rows, grow, step ms, messages, + column
 PageSelect.tsx      toolbar dropdown: switch page / preview the loading screen
 pageSelection.ts    PURE helpers behind PageSelect (sentinel value, selection resolution)
-../bubbleChains.css chain slot placement + the arrival/scroll animations (ships in prod)
+../bubbleChains.css chain row placement + the arrival/scroll animations (ships in prod)
 editor.css          overlay chrome styles
 editor-shapes.css   seam and vertex handle styles
 ```
