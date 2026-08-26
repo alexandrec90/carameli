@@ -2,6 +2,7 @@ import { Suspense, useEffect, useState } from 'react'
 import { Routes, Route } from 'react-router-dom'
 import { useSkin } from './skins/context'
 import { useAuth } from './hooks/useAuth'
+import { SoftphoneProvider, useSharedSoftphone } from './hooks/softphoneContext'
 import { ROUTES, NAV_ITEMS } from './routes'
 import { skinLoadingConfigs, resolveSkinName, DEFAULT_SKIN } from './skins/registry'
 
@@ -44,14 +45,22 @@ export default function App() {
     )
   }
 
-  return <AuthenticatedApp />
+  return (
+    <SoftphoneProvider>
+      <AuthenticatedApp />
+    </SoftphoneProvider>
+  )
 }
 
 function AuthenticatedApp() {
   const { Layout } = useSkin()
+  // The layout gets the phone because a skin may put one *in* the page — the comic-book
+  // skin projects a number pad onto a photographed telephone — and a layout-level
+  // control has to be the same device as the one the /softphone page drives.
+  const softphone = useSharedSoftphone()
   return (
     <>
-      <Layout navItems={NAV_ITEMS}>
+      <Layout navItems={NAV_ITEMS} softphone={softphone}>
         <Suspense>
           <Routes>
             {ROUTES.map(({ path, element: Element }) => (

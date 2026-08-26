@@ -282,6 +282,66 @@ describe('useSoftphone', () => {
     expect(result.current.error).toMatch(/socket closed/)
   })
 
+  it('autoDial registers an offline phone and then places the call', async () => {
+    const { result } = await readyPhone()
+    act(() => {
+      result.current.setDialTarget('+14155550123')
+    })
+
+    await act(async () => {
+      await result.current.autoDial()
+    })
+
+    // One touch: a projected number pad has no Register button to press first.
+    expect(credentialMock).toHaveBeenCalledWith('ext-1', false)
+    expect(managers).toHaveLength(1)
+    expect(managers[0].call).toHaveBeenCalledWith('sip:+14155550123@sip.test')
+    expect(result.current.callStatus).toBe('dialing')
+    expect(result.current.error).toBe('')
+  })
+
+  it('autoDial reuses the registration an already-registered phone has', async () => {
+    const { result } = await registered()
+    act(() => {
+      result.current.setDialTarget('101')
+    })
+
+    await act(async () => {
+      await result.current.autoDial()
+    })
+
+    expect(managers).toHaveLength(1)
+    expect(credentialMock).toHaveBeenCalledTimes(1)
+    expect(managers[0].call).toHaveBeenCalledWith('sip:101@sip.test')
+  })
+
+  it('autoDial keeps the registration failure rather than replacing it', async () => {
+    credentialMock.mockRejectedValueOnce(new Error('no SIP credential'))
+    const { result } = await readyPhone()
+    act(() => {
+      result.current.setDialTarget('101')
+    })
+
+    await act(async () => {
+      await result.current.autoDial()
+    })
+
+    expect(managers).toHaveLength(0)
+    expect(result.current.error).toMatch(/no SIP credential/)
+    expect(result.current.callStatus).toBe('idle')
+  })
+
+  it('autoDial says what is missing when no digits have been pressed', async () => {
+    const { result } = await readyPhone()
+
+    await act(async () => {
+      await result.current.autoDial()
+    })
+
+    expect(credentialMock).not.toHaveBeenCalled()
+    expect(result.current.error).toMatch(/Enter a number/)
+  })
+
   it('unregisters and forgets the session', async () => {
     const { result } = await registered()
     await act(async () => {

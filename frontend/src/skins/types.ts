@@ -44,6 +44,11 @@ export interface SkinViews {
 export interface LayoutProps {
   children: React.ReactNode
   navItems: NavItem[]
+  /**
+   * The app's single softphone, for a skin that puts a telephone in the page furniture
+   * rather than only on the /softphone route. Presentation-only skins ignore it.
+   */
+  softphone: UseSoftphoneResult
 }
 
 export interface Skin {
