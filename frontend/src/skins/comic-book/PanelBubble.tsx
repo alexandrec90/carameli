@@ -35,8 +35,9 @@ interface PanelBubbleProps {
   chained?: boolean
   /**
    * Passed through to an `input`/`phone` balloon: Enter sends the field's contents here
-   * and clears it. Only a chain's composer supplies one; every other input balloon keeps
-   * what is typed in it.
+   * and clears it. A chain's composer supplies one, and so does a standalone `phone`
+   * balloon, whose Enter places the call. Every other input balloon keeps what is typed
+   * in it.
    */
   onSubmit?: (value: string) => void
 }
