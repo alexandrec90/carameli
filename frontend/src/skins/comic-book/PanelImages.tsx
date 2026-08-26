@@ -25,6 +25,8 @@ interface PanelImagesProps {
   isRevealed(index: number): boolean
   /** Editor active: projected content draws alignment guides and takes no pointer input. */
   editing: boolean
+  /** Makes every projected number pad on this panel a working keypad. */
+  onNumberPadKey?: (key: string) => void
   /** Called once per picture element when it has loaded or failed. */
   onSettled(): void
   /** Called with a source's natural size the first time it loads. */
@@ -54,6 +56,7 @@ export default function PanelImages({
   natSizes,
   isRevealed,
   editing,
+  onNumberPadKey,
   onSettled,
   onNatSize,
 }: PanelImagesProps) {
@@ -117,6 +120,7 @@ export default function PanelImages({
                 numberPad={img.numberPad}
                 frame={frame}
                 editing={editing}
+                onKey={onNumberPadKey}
               />
             )}
           </div>
