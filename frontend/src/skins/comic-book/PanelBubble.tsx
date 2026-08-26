@@ -26,6 +26,12 @@ interface PanelBubbleProps {
    * and off in the editor, where a drag has to track the pointer exactly.
    */
   chained?: boolean
+  /**
+   * Passed through to an `input`/`phone` balloon: Enter sends the field's contents here
+   * and clears it. Only a chain's composer supplies one; every other input balloon keeps
+   * what is typed in it.
+   */
+  onSubmit?: (value: string) => void
 }
 
 /**
@@ -41,6 +47,7 @@ export default function PanelBubble({
   visible,
   interactive,
   chained = false,
+  onSubmit,
 }: PanelBubbleProps) {
   const [hover, setHover] = useState(false)
   const [focused, setFocused] = useState(false)
@@ -112,6 +119,7 @@ export default function PanelBubble({
           initialValue={bubble.text}
           font={font}
           enabled={interactive}
+          onSubmit={onSubmit}
         />
       ) : bubble.content === 'wheel' ? (
         <BubbleWheel options={splitOptions(bubble.text)} font={font} open={hover} hostRef={rootRef} />

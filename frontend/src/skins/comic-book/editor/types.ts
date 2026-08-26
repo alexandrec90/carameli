@@ -186,19 +186,25 @@ export interface BubbleTransform {
   /** Shape to pulse to when the bubble is pressed; null = stay put. */
   clickType: BubbleType | null
   /**
-   * Name of the bubble chain this balloon is a slot of; '' when it stands alone.
+   * Id of the bubble chain this balloon is a slot of; '' when it is not in one.
    *
-   * Bubbles sharing a name on the same panel form one vertical column — an SMS thread —
-   * ordered bottom-to-top by `top`, so the lowest is the root that carries the tail. The
-   * column's behaviour (does it grow in, does it scroll) is one entry in
-   * {@link EditorConfig.chains}, not a per-bubble flag, because it is a property of the
-   * thread rather than of any one balloon. See ../bubbleChain.ts.
+   * **Not typed by the author.** The editor generates it and never shows it: the author
+   * says "these balloons are one thread" by linking them and ticking one checkbox, and
+   * `propagateChains` then gives every balloon in that linked group the same id. The id
+   * exists so the chain's *settings* have a stable place to live while bubbles are added,
+   * deleted and renumbered around them — see {@link EditorConfig.chains}.
    *
-   * A chained bubble takes no connector tube. A tube joins two balloons that are on
+   * Bubbles sharing an id on the same panel form one vertical column, ordered by `top`,
+   * so the lowest is the root: it carries the tail and holds the newest message, and each
+   * balloon above it is older. The column's behaviour (does it grow in, how fast, what
+   * transcript) is one entry in the chain list, not a per-bubble flag, because it is a
+   * property of the thread rather than of any one balloon. See ../bubbleChain.ts.
+   *
+   * A chained bubble takes no connector tube — this field is what tells `linkedPairs`
+   * which of the two meanings a `linkTo` has. A tube joins two balloons that are on
    * screen together and stay put; a chain slot holds a *different message* from one
    * moment to the next, so a tube welded to it would be joining whatever happened to
-   * scroll into place. `sanitizeLinks` drops such a link the way it drops a cross-panel
-   * one, and the link picker never offers one.
+   * scroll into place.
    */
   chain: string
 }
@@ -208,10 +214,12 @@ export interface BubbleTransform {
  * its own panel, so both are free-length and adding one is an append that has to line
  * up with nothing.
  *
- * `chains` is derived rather than authored: its entries are exactly the names the
- * bubbles carry, kept in step by `syncChains` after every edit. Naming a chain on a
- * bubble creates the entry; renaming the last member away removes it. That is what stops
- * a config accumulating settings for threads that no longer exist.
+ * `chains` is derived rather than authored: its entries are exactly the ids the bubbles
+ * carry, kept in step by `syncChains` after every edit — and those ids are themselves
+ * derived, from the linkage, by `propagateChains`. Ticking the chain box on a linked group
+ * creates the entry; unticking it removes it. That is what stops a config accumulating
+ * settings for threads that no longer exist, and what makes "add a chain" and "delete a
+ * chain" operations that never had to be written.
  *
  * `grids` is the exception and is *keyed* rather than listed — per page, then one panel
  * subdivision per viewport shape, because the three reshape the page differently and a
