@@ -438,6 +438,37 @@ while the editor is open, and is drawn *through the same projection as the rows*
 the point: a guide that lines up with the picture's ruling is a guide the rows line up with
 too.
 
+**A surface can show live records instead of authored cells.** `table.source` names a feed
+— `'calls'` or `'sms'`, the members of `TABLE_SOURCES` in `lib/liveTables.ts` — and is
+**absent** on a surface whose cells the author typed, the same way `table` itself is absent
+on a picture that is not a surface. The skin names a feed and is handed rows; it does not
+fetch. `hooks/useLiveTables.ts` is the only module in the chain that touches the API, and
+`lib/liveTables.ts` owns the column list and the record-to-row mapping, so neither the
+customer id nor an endpoint appears anywhere under `skins/`.
+
+The rows are injected in `Layout.tsx`, between the editor's working copy and the panels
+(`useLiveTableImages`), which is what keeps every component below it — `ComicPanel`,
+`PanelImages`, `ProjectedTable` — unchanged and renderable from a plain config in a test.
+It also keeps the *editor* holding the authored surface: the working copy never sees a
+record, so **Save** writes `data: []`.
+
+Three consequences worth stating, because each one is a bug the obvious implementation has:
+
+- **`data` stays empty for a live surface, and that is a privacy invariant, not tidiness.**
+  The feed is call and message history; rows saved beside it would put real phone numbers
+  into `layoutConfig.ts` on the first save. It is enforced three times — the injection is
+  downstream of the editor's config, `coerceTable` empties `data` when a source is set, and
+  the inspector's feed switch replaces the cells.
+- **A live surface's columns are the feed's**, because the mapper emits cells positionally.
+  Widths, alignment and heading wording stay the author's — that is how a feed is fitted to
+  the ruling in the photograph — but the editor hides **+ Column** and **−** while a feed is
+  on, since removing the second column would slide every value one heading left.
+- **Live means polling** — there is no push transport in this frontend. `useLiveTables`
+  re-asks every `LIVE_TABLE_POLL_MS`, skips a hidden tab and refreshes on `visibilitychange`,
+  and returns the *identical* row array when nothing changed, so a quiet poll does not
+  repaint every Ben-Day canvas on the page. A failed refresh keeps the rows already on the
+  surface rather than blanking the notepad.
+
 ### Dev-only visual editor
 
 | Property | Value | Notes |
@@ -452,7 +483,8 @@ too.
 | Bubble fields | inspector selects | panel, type, **tail** (nine options incl. **No tail**), **content** (Text / Wheel picker / Text input / Phone input), authored text or initial value, hover/click morph, **chain** (free text, completing on the names already in use), link |
 | Chain fields | inspector, below the bubble's own, when the bubble names a chain | **grow** / **step ms**, **scroll**, **messages** (one per line; empty = speak the balloons' own text), **+ Balloon in chain** — they edit the whole column, not the selected balloon. Chained balloons render flat in edit mode so each stays selectable |
 | Table on / off | **Project a table onto this image** checkbox (picture inspector) | Switching on seeds a starter surface; switching off deletes the table and its cells, leaving the picture |
-| Table fields | inspector controls | rows visible, text size, ink, headings on/off, the four corner X/Y pairs, **Reset corners**, and a columns list (heading / width weight / alignment) plus the cell text, one row per line, tab- or `\|`-separated |
+| Table source | **shows** select (table inspector) | *Cells typed below* or a live feed (**Call records**, **SMS messages**). Picking a feed takes its columns and empties the cells; going back seeds a fresh authored surface, since five empty feed-shaped columns would leave nothing on the notepad to see |
+| Table fields | inspector controls | rows visible, text size, ink, headings on/off, the four corner X/Y pairs, **Reset corners**, and a columns list (heading / width weight / alignment) plus the cell text, one row per line, tab- or `\|`-separated. A live surface has no cell block, and no **+ Column** / **−** |
 | Table corners | drag the four **square grips** | Only on the selected picture, only in content mode. The band guides move with them, so align the guides to the ruling in the photograph |
 | Pages | **Page** dropdown in toolbar | Switch route in edit mode (replays the wash); "Loading screen" entry previews the loading overlay + its exit wash |
 | Mode | **Content** / **Panel shapes** toggle | Content places pictures and bubbles; shapes drags the lines between panels. Content click targets are not rendered in shapes mode — a panel-sized target would swallow every drag aimed at a line crossing it |
@@ -489,3 +521,4 @@ editor math, config editing and serialization is pure and unit-tested in
 16. **Never key a chain's balloons by slot** — keying by message index is what makes a scroll animate, because the node moves and CSS transitions its position. Keyed by slot the nodes stand still and their text flickers
 17. **Never express a projected table's tilt as rotation angles, and never scroll it by pixels** — the tilt is four corners solved into one `matrix3d` (`tableProjection.ts`), and the scroll offset is an integer row index. Angles cannot be dragged onto a photograph, and a pixel offset puts the lettering between two ruled lines
 18. **Never give a projected table a scroll container, a scrollbar, or any chrome outside edit mode** — rows past the window are not rendered at all, and the guides, outline and corner grips exist only while the editor is open
+19. **Never fetch from a skin, and never save a live surface's rows** — a surface names a feed (`table.source`) and `hooks/useLiveTables.ts` does the asking; `data` stays `[]` while a feed is on, because those rows are real call and message records and saving them writes customer phone numbers into `layoutConfig.ts`

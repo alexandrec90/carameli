@@ -36,6 +36,11 @@ export function serializeTable(t: TableProjection, indent = '  '): string {
     `${i2}quad: [${quad}],`,
     `${i2}rows: ${Math.round(t.rows)}, header: ${t.header}, ` +
       `fontScale: ${round(t.fontScale, 2)}, ink: ${strLiteral(t.ink)},`,
+    // Absent, not `source: undefined`, on an authored surface — the same spelling the
+    // type and the hydrator use, so a config that went out without a feed comes back
+    // without one. A live surface's `data` is empty by construction, so the block below
+    // emits `data: []` and no call record is ever written into the repository.
+    ...(t.source ? [`${i2}source: '${t.source}',`] : []),
     `${i2}columns: [`,
     columns,
     `${i2}],`,
