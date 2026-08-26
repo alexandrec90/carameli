@@ -15,6 +15,7 @@ import {
     PANEL_GRIDS, PANEL_PATTERNS,
 } from './editor/layoutConfig'
 import { shouldRevealImg, useEditorMode } from './editor/useEditorMode'
+import { useLiveTableImages } from './useLiveTableImages'
 import { usePageWash } from './usePageWash'
 import './comic-book.css'
 import './bubbles.css'
@@ -65,7 +66,11 @@ export function Layout({ navItems, softphone }: LayoutProps) {
     const page = pageForPath(location.pathname)
 
     // Source transforms from the editor's working copy when active, else constants.
-    const imgT = editor.active ? editor.config.images : PANEL_IMG_TRANSFORMS
+    const authoredImgs = editor.active ? editor.config.images : PANEL_IMG_TRANSFORMS
+    // A picture whose surface names a live feed gets its cells from the records rather
+    // than from the config. Applied here, between the working copy and the panels, so the
+    // editor keeps holding — and saving — the authored surface with no rows in it.
+    const imgT = useLiveTableImages(authoredImgs)
     const bubbleT = editor.active ? editor.config.bubbles : PANEL_BUBBLE_TRANSFORMS
     const chainT = editor.active ? editor.config.chains : PANEL_BUBBLE_CHAINS
     const grids = editor.active ? editor.config.grids : PANEL_GRIDS
