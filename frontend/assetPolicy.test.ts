@@ -16,10 +16,11 @@
  * or the `chrome-devtools` MCP performance trace, both run against something real.
  */
 
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 
+import { PANEL_ASSETS } from './src/skins/comic-book/editor/assets'
 import { PANEL_IMG_TRANSFORMS } from './src/skins/comic-book/editor/layoutConfig'
 import { PANELS } from './src/skins/comic-book/panels'
 import { DEFAULT_SKIN, SKIN_NAMES } from './src/skins/registry'
@@ -245,6 +246,54 @@ describe('the skin guard in index.html', () => {
         "nobody sees; one on the wrong page's list loads for a page that never draws it. " +
         'Order is the preload priority, so it has to match too.',
     ).toEqual(drawn)
+  })
+})
+
+describe("the editor's picture manifest", () => {
+  // `PANEL_ASSETS` is a hand-written list standing in for a directory listing the browser
+  // cannot make. Nothing in the app renders an entry until an author picks it, so a typo
+  // or a file that never got encoded surfaces as a picture that silently fails to load,
+  // in dev, only for whoever opens the dropdown. The reference checks below catch the
+  // opposite direction — an export nothing names — but they say nothing about an entry
+  // naming nothing.
+
+  it('offers only pictures that exist in the served tree', () => {
+    const missing = PANEL_ASSETS.filter(
+      asset => !existsSync(path.join(PUBLIC_DIR, safeDecode(asset.src).replace(/^\//, ''))),
+    ).map(asset => `${asset.label}: ${asset.src}`)
+
+    expect(
+      missing,
+      'These PANEL_ASSETS entries name a file that is not under public/. Encode the ' +
+        'master from assets-src/comic-book/ before adding the line, or fix the URL — a ' +
+        'picked entry that 404s leaves the panel blank with nothing said anywhere.',
+    ).toEqual([])
+  })
+
+  it('offers content-directory .webp only, like every other served picture', () => {
+    const offenders = PANEL_ASSETS.filter(asset => {
+      const rel = safeDecode(asset.src).replace(/^\//, '')
+      return !isContentImage(rel) || path.extname(rel).toLowerCase() !== '.webp'
+    }).map(asset => asset.src)
+
+    expect(
+      offenders,
+      `The dropdown may only offer .webp under ${CONTENT_IMAGE_DIRS.join(', ')}. A master ` +
+        'or an off-format export reachable from the editor is a master one save away from ' +
+        'being drawn by the layout, which is how PNG got into public/ the last time.',
+    ).toEqual([])
+  })
+
+  it('names each picture once, under one label', () => {
+    const srcs = PANEL_ASSETS.map(asset => safeDecode(asset.src))
+    const labels = PANEL_ASSETS.map(asset => asset.label)
+
+    expect([...new Set(srcs)], 'Two entries name the same picture.').toHaveLength(srcs.length)
+    expect(
+      [...new Set(labels)],
+      'Two pictures share a label, so the dropdown offers the same word twice and the ' +
+        'author cannot tell which one they picked.',
+    ).toHaveLength(labels.length)
   })
 })
 
