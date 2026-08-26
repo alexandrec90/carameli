@@ -20,6 +20,9 @@ def test_instruction_inventory_is_intentional():
         "skin-candy-shop",
         "skin-carameli",
         "skin-comic-book",
+        # The reference half of skin-comic-book, split off so neither file crosses
+        # the 500-line instruction limit. Not a second opinion about the skin.
+        "skin-comic-book-framing",
         "voip-providers",
         "webhooks",
     }
