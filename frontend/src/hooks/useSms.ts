@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { api, type SmsMessage } from '../api/client'
 import { DEMO_VS_CUSTOMER_ID } from '../lib/constants'
 import { logger } from '../lib/logger'
+import { smsSenders } from '../lib/smsConversation'
 import type { DataColumn, DataPageProps } from '../lib/dataPage'
 
 const COLUMNS: DataColumn[] = [
@@ -72,7 +73,7 @@ export function useSms(): DataPageProps {
       try {
         const lines = await api.customers.getPhoneLines(DEMO_VS_CUSTOMER_ID)
         if (cancelled) return
-        setSenders(lines.filter((l) => l.active && l.sms_enabled).map((l) => l.phone_number))
+        setSenders(smsSenders(lines))
       } catch (e) {
         logger.warn('Failed to load SMS-capable phone lines', { error: String(e) })
       }

@@ -80,6 +80,34 @@
   animation: cb-chain-in 320ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
 }
 
+/* Delivery state, for a chain bound to a real thread (PanelBubbleChain's `conversation`).
+ *
+ * Ink rather than words. A six-row chain has six rows, and a status *line* would want a
+ * seventh — so the balloon itself carries how far its message has got: a sending one is
+ * drawn faint, as though it has not finished being printed, and a failed one is struck
+ * through in the skin's red. Both are on `.cb-panel-bubble`, so they compose with the
+ * scroll transition above rather than replacing it, and a message that goes from sending
+ * to sent simply loses the class and inks in.
+ *
+ * The fade goes on the balloon's *contents* and never on `.cb-panel-bubble` itself. The
+ * arrival animation above is `both`-filled and ends at `opacity: 1`, so a rule on the root
+ * would be overridden by the animation's retained value the moment the message landed —
+ * which is exactly when it is still sending.
+ */
+.cb-panel-bubble.is-sending .cb-bubble-shape,
+.cb-panel-bubble.is-sending .cb-panel-bubble-text {
+  opacity: 0.5;
+}
+
+.cb-panel-bubble.is-failed .cb-bubble-shape {
+  stroke: var(--cb-red);
+}
+
+.cb-panel-bubble.is-failed .cb-panel-bubble-text {
+  color: var(--cb-red);
+  text-decoration: line-through;
+}
+
 /* Reduced motion: the conversation still grows and still scrolls — that is content arriving,
  * not decoration — but it does so by appearing rather than by travelling. The opacity
  * fade is kept: it is what distinguishes a new message from one that was always there,

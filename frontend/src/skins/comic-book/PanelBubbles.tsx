@@ -1,10 +1,20 @@
-import { Fragment } from 'react'
+import { Fragment, useCallback, useEffect, useState } from 'react'
 
-import { chainIdsOn, chainMembers, defaultChain } from './bubbleChain'
+import { chainIdsOn, chainMembers, defaultChain, peerWheelOn } from './bubbleChain'
 import type { BubbleChain } from './bubbleChain'
 import PanelBubble from './PanelBubble'
 import PanelBubbleChain from './PanelBubbleChain'
 import type { BubbleTransform } from './editor/types'
+import { browserCountry, toE164 } from './phoneInput'
+import type { UseSmsConversationsResult } from '../../hooks/useSmsConversations'
+import type { SmsConversationMessage } from '../../lib/smsConversation'
+
+/**
+ * One shared "nothing yet" array. A chain whose first poll has not landed is handed this
+ * rather than a fresh `[]` per render, so its transcript keeps the same identity and the
+ * balloons do not remount underneath a conversation that has not changed.
+ */
+const NO_MESSAGES: readonly SmsConversationMessage[] = []
 
 interface PanelBubblesProps {
   /** Every bubble on the page — `panel` decides which ones this panel draws. */
@@ -27,6 +37,13 @@ interface PanelBubblesProps {
    * reach.
    */
   editing: boolean
+  /**
+   * The page's live SMS, from the hook App owns. Nothing here fetches: this panel says
+   * which conversation it is showing and reads what comes back, which is the skin rule
+   * (`.claude/rules/skin-architecture.md`) applied to chrome that has no view to get
+   * props from.
+   */
+  sms: UseSmsConversationsResult
   /**
    * Dials what a reader typed into a `phone` balloon and pressed Enter on, making that
    * balloon the number pad's fallback: somewhere to type a number on a page whose picture
@@ -52,6 +69,13 @@ interface PanelBubblesProps {
  * PanelBubbleChain as the two templates of one SMS conversation — a table of balloons that
  * grows in and scrolls. Everything else renders exactly as it always did, which is what
  * makes chains a per-conversation opt-in rather than a change to how bubbles work.
+ *
+ * **This is also where a chain stops being a drawing.** A chain whose `sms` flag is set is
+ * bound to the number the panel's wheel picker is turned to (`peerWheelOn`), and from then
+ * on its balloons are messages the carrier has: what the author typed into the templates is
+ * not shown, and Enter in the composer sends. The two halves are deliberately separate
+ * bubbles — the picker says *who*, the chain says *what* — because that is how the panel
+ * reads as a phone rather than as a form.
  */
 export default function PanelBubbles({
   bubbles,
@@ -61,6 +85,7 @@ export default function PanelBubbles({
   isVisible,
   interactive,
   editing,
+  sms,
   onPhoneSubmit,
 }: PanelBubblesProps) {
   const ids = editing ? [] : chainIdsOn(bubbles, panel)
@@ -72,6 +97,39 @@ export default function PanelBubbles({
   // Indices the conversations have claimed, so the flat pass below skips them.
   const claimed = new Set(conversations.flatMap(c => c.members))
 
+  // The balloon whose options are phone numbers, or -1 on a panel with no picker.
+  const wheelIndex = peerWheelOn(bubbles, panel)
+  // Whichever option the drum is showing. Reported by BubbleWheel on mount as well as on
+  // every turn, so this is populated before the reader touches anything.
+  const [picked, setPicked] = useState('')
+  // Stable, because BubbleWheel reports through an effect and would re-report on every
+  // render of this panel otherwise — which is a render of this panel, forever.
+  const onWheelSelect = useCallback((value: string) => setPicked(value), [])
+
+  // Whether anything on this panel actually wants a thread. A picker is an ordinary
+  // balloon on most panels, and resolving a number off one is not a reason to poll a
+  // carrier — only a chain asking to be bound is.
+  const wanted = conversations.some(c => c.chain.sms)
+
+  // The option as an API takes it. Null when nothing asked, when the panel has no picker,
+  // when the editor is up, or when the option is not a phone number at all — a picker
+  // whose options are names is an ordinary comic balloon and binds nothing.
+  //
+  // Deliberately not memoized: the value is a string or null, so it is stable *by value*
+  // and the effect below re-runs only when the number really changes. A `useMemo` here
+  // bought nothing and the compiler could not preserve it anyway, because `browserCountry`
+  // reads `navigator` rather than a tracked dependency.
+  const peer = !wanted || editing || !picked ? null : toE164(picked, browserCountry())
+
+  // Declaring interest is the whole of what a skin does about data. The hook polls while
+  // somebody is subscribed and stops when the last one leaves, so turning the wheel to
+  // another number drops the old conversation on the same tick it picks up the new one.
+  const { subscribe } = sms
+  useEffect(() => {
+    if (!peer) return
+    return subscribe(peer)
+  }, [peer, subscribe])
+
   return (
     <>
       {bubbles.map((bubble, i) => {
@@ -81,6 +139,7 @@ export default function PanelBubbles({
             bubble={bubble}
             visible={isVisible(i)}
             interactive={interactive}
+            onWheelSelect={i === wheelIndex ? onWheelSelect : undefined}
             onSubmit={bubble.content === 'phone' ? onPhoneSubmit : undefined}
           />
         )
@@ -94,6 +153,10 @@ export default function PanelBubbles({
         )
       })}
       {conversations.map(({ id, members, chain }) => {
+        // Bound only when the author asked for it *and* the panel resolved a number. A
+        // chain that asked and got nothing shows an empty conversation rather than falling
+        // back to the authored transcript: the fallback would put words in a real thread.
+        const live = chain.sms && peer !== null
         const table = (
           <PanelBubbleChain
             chain={chain}
@@ -102,6 +165,14 @@ export default function PanelBubbles({
             // together; the sender template's answer is the conversation's.
             visible={isVisible(members[0])}
             interactive={interactive}
+            conversation={
+              live && peer
+                ? {
+                    messages: sms.conversations[peer] ?? NO_MESSAGES,
+                    onSend: (text: string) => void sms.send(peer, text),
+                  }
+                : undefined
+            }
           />
         )
         // Spill is the sender template's call for the whole conversation. A table whose

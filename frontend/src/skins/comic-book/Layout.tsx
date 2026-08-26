@@ -60,7 +60,7 @@ const EditorOverlay = import.meta.env.DEV
 
 // children intentionally not rendered — panels-only foundation phase. navItems
 // only feeds the dev editor's page selector (no in-page nav chrome yet).
-export function Layout({ navItems, softphone }: LayoutProps) {
+export function Layout({ navItems, sms, softphone }: LayoutProps) {
     const location = useLocation()
     const editor = useEditorMode()
     const page = pageForPath(location.pathname)
@@ -189,6 +189,7 @@ export function Layout({ navItems, softphone }: LayoutProps) {
                             images={imgT}
                             bubbles={bubbleT}
                             chains={chainT}
+                            sms={sms}
                             natSizes={natSizes}
                             editorActive={editor.active}
                             hovered={hovered === i}

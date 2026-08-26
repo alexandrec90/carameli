@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 import PanelBubbles from '../../skins/comic-book/PanelBubbles'
 import { NEW_BUBBLE } from '../../skins/comic-book/editor/configSeed'
 import type { BubbleTransform } from '../../skins/comic-book/editor/types'
+import { idleSms } from './smsStub'
 
 // Which balloons on a panel dial, and which only look like they might. A `phone` balloon
 // is the number pad's fallback — a page whose picture carries no keypad still has somewhere
@@ -27,6 +28,7 @@ function draw(bubbles: BubbleTransform[], onPhoneSubmit?: (value: string) => voi
       isVisible={() => true}
       interactive
       editing={false}
+      sms={idleSms()}
       onPhoneSubmit={onPhoneSubmit}
     />,
   )

@@ -16,6 +16,18 @@ interface BubbleWheelProps {
    * rather than only over the text region.
    */
   hostRef: RefObject<HTMLDivElement | null>
+  /**
+   * Called with the picked option whenever it changes, and once on mount with the option
+   * the drum starts on.
+   *
+   * The selection stays *here* rather than being lifted into a controlled prop: a picker
+   * is turned by the reader and by nothing else, so there is no second writer for local
+   * state to disagree with, and every wheel balloon on the page would otherwise pay for
+   * the one that drives something. Reporting it upward is the whole of what a consumer
+   * needs — see PanelBubbles, where the panel's wheel picks the number its bubble chain is
+   * a conversation with. Must be stable, since it is an effect dependency.
+   */
+  onSelect?: (value: string) => void
 }
 
 /**
@@ -30,7 +42,9 @@ interface BubbleWheelProps {
  * no focusable element), and it takes no pointer handler of its own beyond the wheel,
  * so a press still reaches the panel and navigates.
  */
-export default function BubbleWheel({ options, font, open, hostRef }: BubbleWheelProps) {
+export default function BubbleWheel({
+  options, font, open, hostRef, onSelect,
+}: BubbleWheelProps) {
   const [index, setIndex] = useState(0)
   // Sub-step wheel travel carried between events (see wheelSteps). A ref, not state:
   // its value changes on every trackpad tick and must not re-render anything.
@@ -41,6 +55,17 @@ export default function BubbleWheel({ options, font, open, hostRef }: BubbleWhee
   useEffect(() => {
     setIndex(i => clampIndex(i, Math.max(count, 1)))
   }, [count])
+
+  // Derived rather than stored, so the reported option and the inked one are the same
+  // value and cannot drift apart while `index` is briefly out of range after an edit.
+  const selected = count > 0 ? options[clampIndex(index, count)] : ''
+
+  // Reported from an effect rather than from the wheel handler: the option the drum
+  // *starts* on is a selection too, and a consumer that only heard about turns would show
+  // nothing until the reader touched it.
+  useEffect(() => {
+    onSelect?.(selected)
+  }, [onSelect, selected])
 
   useEffect(() => {
     const host = hostRef.current

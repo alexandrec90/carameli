@@ -169,15 +169,29 @@ async def list_sms_messages(
     start: Annotated[datetime | None, Query()] = None,
     end: Annotated[datetime | None, Query()] = None,
     limit: Annotated[int, Query(ge=1, le=500)] = 100,
+    peer: Annotated[str | None, Query(pattern=r"^\+[1-9]\d{7,14}$")] = None,
 ) -> SmsMessageListResponse:
-    """List a customer's SMS messages, newest first, with an optional created_at date range."""
+    """List a customer's SMS messages, newest first, with an optional created_at date range.
+
+    `peer` narrows the result to the conversation with one E.164 number — both directions,
+    so a client rendering a thread makes one request per poll instead of paging the
+    customer's whole history and grouping it itself.
+    """
     enforce_customer_scope(auth, customerId)
-    logger.info("Listing SMS messages vs_customer_id=%s start=%s end=%s", customerId, start, end)
+    logger.info(
+        "Listing SMS messages vs_customer_id=%s start=%s end=%s scoped=%s",
+        customerId,
+        start,
+        end,
+        peer is not None,
+    )
     customer = await customer_service.get_by_vs_id(session, customerId)
     if not customer:
         logger.warning("Customer not found vs_customer_id=%s", customerId)
         raise HTTPException(status_code=404, detail="Customer not found")
-    messages = await sms_message_service.list_for_customer(session, customer.id, start, end, limit)
+    messages = await sms_message_service.list_for_customer(
+        session, customer.id, start, end, limit, peer
+    )
     return SmsMessageListResponse(
         messages=[SmsMessageResponse.model_validate(m) for m in messages],
         vs_customer_id=customerId,

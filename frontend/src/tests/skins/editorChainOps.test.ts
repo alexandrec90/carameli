@@ -24,6 +24,7 @@ const chain = (id: string, over: Partial<BubbleChain> = {}): BubbleChain => ({
   grow: true,
   stepMs: DEFAULT_CHAIN_STEP_MS,
   rows: DEFAULT_CHAIN_ROWS,
+  sms: false,
   messages: [],
   ...over,
 })

@@ -90,7 +90,14 @@ const CHAIN_HEADER = `// One entry per chain id the bubbles above carry — the 
 //
 // Give the *sender's* balloon \`content: 'input'\` (or 'phone') and the conversation goes
 // live: the bottom-right row becomes a composer, Enter sends what is in it as the sender's
-// next message, and the table grows by one row. See ../bubbleChain.ts.`
+// next message, and the table grows by one row. See ../bubbleChain.ts.
+//
+// \`sms\` binds the chain to a **real** thread. The transcript above is then ignored and the
+// balloons are messages the carrier actually has; Enter in the composer sends one, for
+// money. Which thread is not stored here — it is whichever number the panel's own
+// wheel-picker balloon (a \`content: 'wheel'\` bubble outside the chain, its \`text\` the
+// comma-delimited list of numbers) is turned to, so a panel with \`sms\` and no picker shows
+// an empty conversation rather than guessing at one.`
 
 const PATTERN_HEADER = `// The one array here that IS parallel to PANELS: a pattern belongs to the panel slot
 // itself, not to a picture or a bubble on it, so entry \`i\` is the Ben-Day background
@@ -163,6 +170,7 @@ export function serializeChains(chains: BubbleChain[]): string {
       c =>
         `  { id: ${strLiteral(c.id)}, grow: ${c.grow}, ` +
         `stepMs: ${Math.round(c.stepMs)}, rows: ${Math.round(c.rows)}, ` +
+        `sms: ${c.sms}, ` +
         `messages: [${c.messages.map(strLiteral).join(', ')}] },`,
     )
     .join('\n')

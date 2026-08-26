@@ -3,6 +3,7 @@ import { MemoryRouter, useLocation } from 'react-router-dom'
 import { describe, expect, it, vi } from 'vitest'
 
 import ComicPanel from '../../skins/comic-book/ComicPanel'
+import { idleSms } from './smsStub'
 
 function CurrentPath() {
   return <output data-testid="current-path">{useLocation().pathname}</output>
@@ -29,6 +30,7 @@ describe('ComicPanel', () => {
           images={[]}
           bubbles={[]}
           chains={[]}
+          sms={idleSms()}
           natSizes={{}}
           editorActive={false}
           hovered={false}

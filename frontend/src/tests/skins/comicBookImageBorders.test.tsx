@@ -34,6 +34,7 @@ import ComicPanel from '../../skins/comic-book/ComicPanel'
 import PanelInk from '../../skins/comic-book/PanelInk'
 import type { ImgTransform } from '../../skins/comic-book/editor/types'
 import type { Panel } from '../../skins/comic-book/panels'
+import { idleSms } from './smsStub'
 
 // A slanted quad, like the real panel polygons — the gutters are not square, which is
 // what makes a scaled copy of this shape distinguishable from a translated one.
@@ -78,6 +79,7 @@ function renderPanel(images: ImgTransform[]): HTMLElement {
         images={images}
         bubbles={[]}
         chains={[]}
+        sms={idleSms()}
         natSizes={{}}
         editorActive={false}
         hovered={false}

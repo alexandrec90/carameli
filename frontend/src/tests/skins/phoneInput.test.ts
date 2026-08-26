@@ -6,6 +6,7 @@ import {
   deleteAdjacentDigit,
   digitsBefore,
   formatPhoneInput,
+  toE164,
 } from '../../skins/comic-book/phoneInput'
 
 describe('countryFromLocales', () => {
@@ -30,6 +31,36 @@ describe('formatPhoneInput', () => {
 
   it('normalizes author-typed punctuation instead of preserving it literally', () => {
     expect(formatPhoneInput('(234).567--9999', 'US')).toBe('(234) 567-9999')
+  })
+})
+
+describe('toE164', () => {
+  // What an author writes in a wheel picker becomes what a request sends. The same
+  // number written three ways has to collapse to one string, or the same thread is
+  // three threads depending on the lettering.
+  it('rewrites a nationally written number into E.164 for the detected region', () => {
+    expect(toE164('(415) 555-1111', 'US')).toBe('+14155551111')
+    expect(toE164('415 555 1111', 'US')).toBe('+14155551111')
+  })
+
+  it('leaves an already international number alone, region or no region', () => {
+    expect(toE164('+1 415 555 1111')).toBe('+14155551111')
+    expect(toE164('+44 20 7183 8750', 'US')).toBe('+442071838750')
+  })
+
+  it('returns null for an option that is not a number at all', () => {
+    // A picker of names is an ordinary comic balloon, so this is not an error path.
+    expect(toE164('Gwen', 'US')).toBeNull()
+    expect(toE164('', 'US')).toBeNull()
+  })
+
+  it('returns null for digits that do not make a valid number', () => {
+    expect(toE164('415 555', 'US')).toBeNull()
+    expect(toE164('+1 000', 'US')).toBeNull()
+  })
+
+  it('returns null for a national number with no region to read it against', () => {
+    expect(toE164('4155551111')).toBeNull()
   })
 })
 
