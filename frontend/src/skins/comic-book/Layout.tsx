@@ -224,7 +224,7 @@ export function Layout({ navItems }: LayoutProps) {
                 <BubbleTubes polys={panelPolys} bubbles={bubbleT} isVisible={bubbleVisible} />
 
                 {/* Layer 2 — Panel outline SVG (sits above images, below the wash) */}
-                <PanelInk polys={panelPolys} images={imgT} />
+                <PanelInk polys={panelPolys} />
 
                 {/* Layer 3 — Ben-Day wash canvas (page transitions; blank when idle) */}
                 <canvas ref={washRef} className="cb-wash-canvas" aria-hidden="true" />
