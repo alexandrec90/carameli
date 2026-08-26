@@ -120,6 +120,19 @@ converge with it, which three rotation sliders cannot do. The field is **absent*
 null, on a picture that is not a surface; that absence is what "not a surface" is spelled
 as everywhere the config is cloned, hydrated or serialized.
 
+**A surface can show live records instead.** The **shows** select points it at a feed —
+`table.source` is `'calls'` or `'sms'`, and absent when the author typed the cells — and
+the rows then come from the database, refreshing on their own: a call placed or a message
+sent appears on the notepad without the page being reloaded. The editor still owns the
+placement (corners, bands, ink, widths, alignment, headings) and the feed owns the cells,
+so **`data` stays empty in the config for a live surface**. That is deliberate and
+enforced on the way in and the way out: the rows are call and message history, and saving
+them would write real phone numbers into `layoutConfig.ts`. The **+ Column** and **−**
+buttons disappear while a feed is on, because a feed's cells are positional and cutting a
+column would slide every value one heading to the left. Nothing under `skins/` fetches:
+`hooks/useLiveTables.ts` asks, `lib/liveTables.ts` maps a record to a row, and
+`Layout.tsx` drops the rows in between the working copy and the panels.
+
 The surface divides into `rows` equal bands, and the scroll offset is an **integer index
 into the data**, never a pixel position: band *k* lands in exactly the same place at every
 offset, which is what keeps the lettering on the ruling drawn in the picture. Rows outside
@@ -180,6 +193,10 @@ different images can only crossfade. A new bubble type belongs in `bubbleShape.t
      - **Drag the four square corner grips** onto the surface in the photograph — the
        band guides are drawn *through* the same projection, so once they sit on the
        ruled lines the rows do too. **Reset corners** puts them back.
+     - **shows** picks what fills the bands: *Cells typed below*, **Call records** or
+       **SMS messages**. A feed brings its own columns and takes the cell box away — the
+       rows are live and refresh themselves. Going back to typed cells seeds a fresh
+       starter table, because the feed's five empty columns would leave nothing to see.
      - Switching the checkbox off deletes the table, including the cells; the picture
        itself is untouched.
    - **Project a number pad on this picture** (picture only) adds the fixed telephone
@@ -202,7 +219,12 @@ different images can only crossfade. A new bubble type belongs in `bubbleShape.t
      input**, or **Phone input**). Wheel text is comma-delimited options: hover the
      bubble outside edit mode and scroll to turn it. Input text is its initial value;
      phone input formats live using the browser locale, while a leading `+` selects an
-     international calling code. Edit the **text** or **initial value**, choose the shapes to
+     international calling code. A **Phone input** balloon that is not in a chain is the
+     projected pad's fallback: Enter places the call, on the same shared softphone and
+     with the same caption box (`../PhoneHud.tsx`) reporting it, so a page whose art
+     carries no keypad still has somewhere to dial from. In a chain that same content
+     is the conversation's composer instead and dials nothing.
+     Edit the **text** or **initial value**, choose the shapes to
      morph to **on hover**
      and **on click** (`— no change —` keeps the resting shape), and pick a **link
      to** partner to join with a connector tube. Turning or removing a tail morphs
@@ -297,6 +319,9 @@ bubbleTypes.ts      BubbleType + BUBBLE_TYPES (lettering font per type) — ship
 ../tableData.ts     PURE: rows visible at an offset, wheel-to-rows, column widths, cell text
 ../ProjectedTable.tsx one picture's surface: the projected table, its wheel and its keys
 ../table.css        surface + cell styles, and the editor-only band guides
+../useLiveTableImages.ts hook + PURE: which feeds a page needs, and the rows dropped onto its surfaces
+../../../lib/liveTables.ts PURE: the feeds, their columns, and record -> row (shared, no fetching)
+../../../hooks/useLiveTables.ts hook: the only place a surface's rows are fetched, and the poll
 ../ProjectedNumberPad.tsx fixed 3 × 4 telephone keys on a projected surface; live buttons outside edit mode
 ../number-pad.css   number-pad lettering, surface layout, and the live key's press states
 ../PhoneHud.tsx     the display and call keys a photographed pad has no room for
@@ -321,9 +346,9 @@ serializeNumberPad.ts PURE: a number pad as the nested block on a picture's line
 tsLiteral.ts        PURE: quoting and number rounding shared by the two serializers
 useTableCornerDrag.ts hook: dragging a corner grip, and the clamped single-corner edit
 TableCorners.tsx    the four corner grips shared by both projected content types
-TableInspector.tsx  table controls: the on/off switch, rows, text, ink, headings, corners
+TableInspector.tsx  table controls: the on/off switch, the live-feed select, rows, text, ink, headings, corners
 NumberPadInspector.tsx number-pad on/off, text, ink, and corner controls
-TableColumnsInspector.tsx  the columns list and the cell-text box
+TableColumnsInspector.tsx  the columns list, and the cell-text box an authored surface has
 editor-table.css    corner grip and table-inspector styles
 serialize.ts        PURE serialization back to layoutConfig.ts (headers included)
 transforms.ts       PURE helpers: CSS builders, frame/drag/scale math, clamp
@@ -355,4 +380,6 @@ All math/serialization is pure and unit-tested under
 `editorMode`, `editorConfigOps`, `editorChainConfig`, `editorChainOps`,
 `editorSerialize`, `pageSelection`, `editorToolbarDrag`, `bubbleShape`, `bubbleTube`,
 `bubbleChain`, `panelGeometry`, `panelGridOps`, `panelLayouts`, `tableProjection`,
-`tableData`, `tableConfig`, `ProjectedTable`).
+`tableData`, `tableConfig`, `ProjectedTable`, `liveTableImages`,
+`TableSourceInspector`) — and the live feed itself in `frontend/src/tests/lib/liveTables`
+and `frontend/src/tests/useLiveTables`.

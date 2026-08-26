@@ -342,6 +342,33 @@ describe('useSoftphone', () => {
     expect(result.current.error).toMatch(/Enter a number/)
   })
 
+  it('autoDial dials a number handed to it and adopts it as the readout', async () => {
+    const { result } = await registered()
+
+    // What a phone-input balloon submits: formatted as typed, and held in the balloon's
+    // own field rather than in dialTarget.
+    await act(async () => {
+      await result.current.autoDial('(514) 555-0100')
+    })
+
+    expect(managers[0].call).toHaveBeenCalledWith('sip:5145550100@sip.test')
+    expect(result.current.dialTarget).toBe('5145550100')
+  })
+
+  it('autoDial does not fall back to the previous number when handed an empty one', async () => {
+    const { result } = await registered()
+    act(() => {
+      result.current.setDialTarget('101')
+    })
+
+    await act(async () => {
+      await result.current.autoDial('   ')
+    })
+
+    expect(managers[0].call).not.toHaveBeenCalled()
+    expect(result.current.error).toMatch(/Enter a number/)
+  })
+
   it('unregisters and forgets the session', async () => {
     const { result } = await registered()
     await act(async () => {

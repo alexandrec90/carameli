@@ -1,3 +1,4 @@
+import { LIVE_TABLE_FEEDS, TABLE_SOURCES, type TableSource } from '../../../lib/liveTables'
 import { DEFAULT_QUAD, QUAD_RANGE } from '../tableProjection'
 import type { Quad } from '../tableProjection'
 import { fitColumns, FONT_SCALE, ROW_COUNT } from '../tableData'
@@ -65,6 +66,35 @@ function coerceColumn(v: unknown): TableColumn {
   return { label: str(c.label, ''), width: num(c.width, 1, 0.1, 100), align }
 }
 
+/** A persisted `source`, or undefined for an authored surface (including a bad value). */
+export function coerceSource(v: unknown): TableSource | undefined {
+  return TABLE_SOURCES.includes(v as TableSource) ? (v as TableSource) : undefined
+}
+
+/**
+ * A surface wired to `source`: the feed's headings, and no cells.
+ *
+ * The columns are replaced rather than merged because a feed's cells are positional — the
+ * mapper in `lib/liveTables.ts` emits them in the order the headings are declared — so a
+ * surface that kept the author's old headings would label every column with the previous
+ * feed's word for a different value.
+ */
+export function liveTable(t: TableProjection, source: TableSource): TableProjection {
+  return {
+    ...t,
+    source,
+    columns: LIVE_TABLE_FEEDS[source].columns.map(c => ({ ...c })),
+    data: [],
+  }
+}
+
+/** The same surface with its feed removed — the key absent, not set to undefined. */
+export function authoredTable(t: TableProjection): TableProjection {
+  const next = { ...t, columns: t.columns.map(c => ({ ...c })), data: t.data.map(r => [...r]) }
+  delete next.source
+  return next
+}
+
 function coerceData(v: unknown, colCount: number): string[][] {
   if (!Array.isArray(v)) return []
   const rows = v.map(row => (Array.isArray(row) ? row.map(cell => str(cell, String(cell ?? ''))) : []))
@@ -88,14 +118,19 @@ export function coerceTable(v: unknown): TableProjection | undefined {
   const quad = coerceQuad(t.quad)
   if (!quad) return undefined
   const columns = Array.isArray(t.columns) && t.columns.length > 0 ? t.columns.map(coerceColumn) : newTable().columns
+  const source = coerceSource(t.source)
   return {
     quad,
     rows: Math.round(num(t.rows, 8, ROW_COUNT.min, ROW_COUNT.max)),
     header: t.header !== false,
     columns,
-    data: coerceData(t.data, columns.length),
+    // A live surface comes back with no cells whatever the working copy held, so the
+    // invariant is enforced on the way in as well as on the way out: nothing downstream —
+    // the editor, the serializer, the renderer — ever has to ask which set is real.
+    data: source ? [] : coerceData(t.data, columns.length),
     fontScale: num(t.fontScale, 0.5, FONT_SCALE.min, FONT_SCALE.max),
     ink: str(t.ink, '#1b3a8f'),
+    ...(source ? { source } : {}),
   }
 }
 

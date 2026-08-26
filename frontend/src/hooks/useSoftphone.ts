@@ -35,10 +35,14 @@ export interface UseSoftphoneResult {
    * Dial, registering first when the phone is offline.
    *
    * `dial` refuses on an unregistered phone because its callers put a Register
-   * button next to it. A projected number pad has no such chrome â€” it is a picture
-   * of a telephone â€” so the first key press has to do what lifting a receiver does.
+   * button next to it. A projected number pad has no such chrome — it is a picture
+   * of a telephone — so the first key press has to do what lifting a receiver does.
+   *
+   * `target` is for a caller that holds the number in a field of its own rather than
+   * in `dialTarget`, such as a phone-input speech bubble. Passing it also adopts it as
+   * `dialTarget`, so the readout agrees with what is ringing.
    */
-  autoDial: () => Promise<void>
+  autoDial: (target?: string) => Promise<void>
   answer: () => Promise<void>
   decline: () => Promise<void>
   hangup: () => Promise<void>
@@ -279,19 +283,25 @@ export function useSoftphone(): UseSoftphoneResult {
     await placeCall(target)
   }, [dialTarget, placeCall, status])
 
-  const autoDial = useCallback(async () => {
-    const target = normalizeTarget(dialTarget)
-    if (!target) {
-      setError('Enter a number to dial')
-      return
-    }
-    if (!managerRef.current || status !== 'registered') {
-      // `start` has already reported why it could not come up; a second, vaguer
-      // message here would replace the useful one.
-      if (!(await start(false))) return
-    }
-    await placeCall(target)
-  }, [dialTarget, placeCall, start, status])
+  const autoDial = useCallback(
+    async (target?: string) => {
+      const number = normalizeTarget(target ?? dialTarget)
+      if (!number) {
+        setError('Enter a number to dial')
+        return
+      }
+      // A number that arrived as an argument was composed somewhere else — a bubble's
+      // own field — so adopt it, or the readout would report the previous call.
+      if (target !== undefined) setDialTarget(number)
+      if (!managerRef.current || status !== 'registered') {
+        // `start` has already reported why it could not come up; a second, vaguer
+        // message here would replace the useful one.
+        if (!(await start(false))) return
+      }
+      await placeCall(number)
+    },
+    [dialTarget, placeCall, start, status]
+  )
 
   const answer = useCallback(async () => {
     const manager = managerRef.current

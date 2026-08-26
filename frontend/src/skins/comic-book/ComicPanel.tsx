@@ -29,6 +29,8 @@ interface ComicPanelProps {
     isBubbleVisible(i: number): boolean
     /** Makes a number pad projected onto one of this panel's pictures a working keypad. */
     onNumberPadKey?(key: string): void
+    /** Dials the number typed into one of this panel's `phone` balloons. */
+    onPhoneSubmit?(value: string): void
     /** Mounts the Ben-Day dot canvas into Layout's animation loop. */
     dotRef(el: HTMLCanvasElement | null): void
     onSettled(): void
@@ -43,7 +45,7 @@ interface ComicPanelProps {
 export default function ComicPanel({
     index, info, poly, images, bubbles, chains, sms, natSizes,
     editorActive, hovered, onHover, isRevealed, isBubbleVisible, onNumberPadKey,
-    dotRef, onSettled, onNatSize,
+    onPhoneSubmit, dotRef, onSettled, onNatSize,
 }: ComicPanelProps) {
     const { bounds, vp } = poly
 
@@ -112,6 +114,7 @@ export default function ComicPanel({
                 interactive={!editorActive}
                 editing={editorActive}
                 sms={sms}
+                onPhoneSubmit={onPhoneSubmit}
             />
         </div>
     )
