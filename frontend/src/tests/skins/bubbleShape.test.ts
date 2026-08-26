@@ -14,7 +14,10 @@ import {
 } from '../../skins/comic-book/bubbleBox'
 import type { TailDir } from '../../skins/comic-book/bubbleBox'
 import {
+  bubbleShapeCandidates,
   easeOutCubic,
+  hitPuffs,
+  hitRingPoints,
   lerpPoints,
   pathD,
   puffOpacity,
@@ -386,6 +389,107 @@ describe('resolveBubbleShape', () => {
   it('falls through a missing click shape to the hover shape', () => {
     const hoverOnly = { type: 'soft' as BubbleType, hoverType: 'cloud' as BubbleType, clickType: null }
     expect(resolveBubbleShape(hoverOnly, { hover: true, pulsing: true })).toBe('cloud')
+  })
+})
+
+describe('bubbleShapeCandidates', () => {
+  it('lists every shape resolveBubbleShape could return, resting one first', () => {
+    expect(
+      bubbleShapeCandidates({ type: 'soft', hoverType: 'cloud', clickType: 'lightning' }),
+    ).toEqual(['soft', 'cloud', 'lightning'])
+  })
+
+  it('drops the events that have no shape of their own', () => {
+    expect(bubbleShapeCandidates({ type: 'cloud', hoverType: null, clickType: null })).toEqual([
+      'cloud',
+    ])
+  })
+
+  it('names a shape once however many events reach it', () => {
+    expect(
+      bubbleShapeCandidates({ type: 'soft', hoverType: 'soft', clickType: 'lightning' }),
+    ).toEqual(['soft', 'lightning'])
+  })
+})
+
+describe('hitRingPoints', () => {
+  /**
+   * Ray-cast point-in-polygon over a flat ring. The hit region is concave wherever a
+   * cloud cusp survives the union, so "further from the centre at the same index" is
+   * not enough on its own — containment has to be tested as containment.
+   */
+  function inside([x, y]: [number, number], ring: number[]): boolean {
+    const v = pairs(ring)
+    let hit = false
+    for (let i = 0, j = v.length - 1; i < v.length; j = i++) {
+      const [xi, yi] = v[i]
+      const [xj, yj] = v[j]
+      if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) hit = !hit
+    }
+    return hit
+  }
+
+  it('emits the same ring the shapes do, so it is one closed outline like them', () => {
+    BUBBLE_TYPE_KEYS.forEach(type =>
+      expect(hitRingPoints(type, 'down-left')).toHaveLength(RING_POINTS * 2),
+    )
+  })
+
+  /**
+   * The property the whole hit region rests on: overlay one of these per shape a
+   * bubble can take and a pointer resting on any of those shapes is on the region,
+   * whichever one is drawn. Where that fails the hover cancels itself and the two
+   * shapes trade places under a still cursor forever.
+   */
+  it('contains the shape it stands in for, for every tail', () => {
+    BUBBLE_TYPE_KEYS.forEach(type => {
+      TAIL_DIR_KEYS.forEach(dir => {
+        const region = hitRingPoints(type, dir)
+        pairs(ringPoints(type, dir)).forEach(p => {
+          expect(inside(p, region)).toBe(true)
+        })
+      })
+    })
+  })
+
+  it('reaches past the outline it covers, since the ink is stroked outside the path', () => {
+    BUBBLE_TYPE_KEYS.forEach(type => {
+      const drawn = pairs(ringPoints(type, 'none')).map(ellipseRadius)
+      pairs(hitRingPoints(type, 'none'))
+        .map(ellipseRadius)
+        .forEach((r, i) => expect(r).toBeGreaterThan(drawn[i]))
+    })
+  })
+
+  it('keeps the tail, so a bubble stays grabbable by the one part that leaves the box', () => {
+    const [tipX, tipY] = pairs(hitRingPoints('soft', 'up'))[tailRingIndex('up')]
+
+    expect(tipY).toBeLessThan(ELLIPSE.cy - ELLIPSE.ry)
+    expect(tipX).toBeCloseTo(ELLIPSE.cx, 6)
+  })
+})
+
+describe('hitPuffs', () => {
+  it('covers the puffs of a shape the bubble only reaches on hover', () => {
+    const b = { type: 'soft' as BubbleType, hoverType: 'cloud' as BubbleType, clickType: null }
+    const drawn = cloudPuffs('down-left')
+
+    expect(hitPuffs(b, 'down-left')).toHaveLength(drawn.length)
+    hitPuffs(b, 'down-left').forEach((p, i) => {
+      expect(p.cx).toBe(drawn[i].cx)
+      expect(p.cy).toBe(drawn[i].cy)
+      expect(p.r).toBeGreaterThan(drawn[i].r)
+    })
+  })
+
+  it('grows none for a bubble no state turns into a cloud', () => {
+    const b = { type: 'soft' as BubbleType, hoverType: 'lightning' as BubbleType, clickType: null }
+    expect(hitPuffs(b, 'down-left')).toEqual([])
+  })
+
+  it('grows none where there is no tail for them to trail', () => {
+    const b = { type: 'cloud' as BubbleType, hoverType: null, clickType: null }
+    expect(hitPuffs(b, 'none')).toEqual([])
   })
 })
 
