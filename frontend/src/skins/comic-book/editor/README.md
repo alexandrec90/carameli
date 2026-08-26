@@ -100,9 +100,12 @@ lifecycle.
 
 **A picture has two independent framings, which is why it has so many fields.**
 `left`/`top`/`width`/`height` are the *frame*: its own rectangle over the panel box, in
-% of that box, cut to the panel's polygon scaled into it (`imgFramePoly`). A picture
-left at the default `0/0/100/100` therefore crops exactly as a panel image always did,
-and an inset one reads as a small comic panel rather than a rectangle pasted on top.
+% of that box. It stays a rectangle — the **panel** is the window the picture is seen
+through (`imgPanelClip` translates the panel's polygon into the frame's coordinates), so
+a picture left at the default `0/0/100/100` crops exactly as a panel image always did,
+and an inset one is a rectangle of picture rather than a small panel with the grid's
+slant and a black border of its own. **A picture is never inked** — the selection outline
+you drag is the artwork's real rect, and nothing else is drawn around it.
 `scale`/`offsetX`/`offsetY`/`anchor` are the second framing: they move the picture
 *inside* that frame. Before pictures became entities the frame was the panel polygon
 itself, so dragging could only slide the picture under a window that stayed put, and a
@@ -200,9 +203,13 @@ different images can only crossfade. A new bubble type belongs in `bubbleShape.t
      layout: 1–9 over the first three rows, then `*`, `0`, `#`. Drag its magenta corner
      grips or type the corner coordinates to align it with the photographed plane; the
      **Text** and **Ink** controls tune the symbols. Its 3 × 4 grid and outline are
-     visible alignment guides in the editor only. Outside edit mode, readers see the
-     twelve symbols directly on the image. A picture carries either a table or a number
-     pad, so switching either option on replaces the other projected content.
+     visible alignment guides in the editor only. Outside edit mode the twelve symbols
+     are a **working telephone keypad**: each key is a button wired to the app's shared
+     softphone, and the display and call keys appear as a caption box (`../PhoneHud.tsx`)
+     once someone presses one. Inside edit mode the pad takes no pointer input at all,
+     because the corner grips are on the same picture and would lose every drag to it.
+     A picture carries either a table or a number pad, so switching either option on
+     replaces the other projected content.
    - **Allow spill outside panel** checkbox — off (default for pictures) clips the
      element to the frame's polygon (overflow hidden behind its edge); on lets it
      bleed past (default for bubbles).
@@ -310,8 +317,10 @@ bubbleTypes.ts      BubbleType + BUBBLE_TYPES (lettering font per type) — ship
 ../useLiveTableImages.ts hook + PURE: which feeds a page needs, and the rows dropped onto its surfaces
 ../../../lib/liveTables.ts PURE: the feeds, their columns, and record -> row (shared, no fetching)
 ../../../hooks/useLiveTables.ts hook: the only place a surface's rows are fetched, and the poll
-../ProjectedNumberPad.tsx fixed 3 × 4 telephone keys on a projected surface
-../number-pad.css   number-pad lettering and surface layout
+../ProjectedNumberPad.tsx fixed 3 × 4 telephone keys on a projected surface; live buttons outside edit mode
+../number-pad.css   number-pad lettering, surface layout, and the live key's press states
+../PhoneHud.tsx     the display and call keys a photographed pad has no room for
+../phone-hud.css    the caption box that holds them
 ../panelGeometry.ts PURE grid -> polygon geometry: frame, normalised space, vertex constraints
 ../panelPatterns.ts pattern style registry + per-panel palette/dot tuning (PANEL_BG_CONFIGS)
 ../polygonInset.ts  PURE polygon maths: the perpendicular gutter inset, bounding box

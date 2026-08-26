@@ -31,6 +31,14 @@ export interface UseSoftphoneResult {
   rotateCredential: () => Promise<void>
   disconnect: () => Promise<void>
   dial: () => Promise<void>
+  /**
+   * Dial, registering first when the phone is offline.
+   *
+   * `dial` refuses on an unregistered phone because its callers put a Register
+   * button next to it. A projected number pad has no such chrome â€” it is a picture
+   * of a telephone â€” so the first key press has to do what lifting a receiver does.
+   */
+  autoDial: () => Promise<void>
   answer: () => Promise<void>
   decline: () => Promise<void>
   hangup: () => Promise<void>
@@ -128,12 +136,13 @@ export function useSoftphone(): UseSoftphoneResult {
     return audioRef.current
   }
 
+  /** Registers the selected extension; resolves true once the phone can place a call. */
   const start = useCallback(
-    async (rotate: boolean) => {
+    async (rotate: boolean): Promise<boolean> => {
       const ext = extensions.find((item) => item.id === selectedId)
       if (!ext) {
         setError('Select an extension first')
-        return
+        return false
       }
       setError('')
       setBusy(true)
@@ -196,10 +205,12 @@ export function useSoftphone(): UseSoftphoneResult {
           extension: credential.extension_number,
           rotated: rotate,
         })
+        return true
       } catch (e) {
         setStatus('failed')
         setError(message(e))
         logger.error('Softphone registration failed', { error: String(e) })
+        return false
       } finally {
         setBusy(false)
       }
@@ -207,8 +218,14 @@ export function useSoftphone(): UseSoftphoneResult {
     [applyCallStatus, extensions, selectedId]
   )
 
-  const connect = useCallback(() => start(false), [start])
-  const rotateCredential = useCallback(() => start(true), [start])
+  // Wrapped rather than returned directly: `start` reports whether the phone came up,
+  // which only the one-touch dial path below has any use for.
+  const connect = useCallback(async () => {
+    await start(false)
+  }, [start])
+  const rotateCredential = useCallback(async () => {
+    await start(true)
+  }, [start])
 
   const disconnect = useCallback(async () => {
     const manager = managerRef.current
@@ -226,9 +243,31 @@ export function useSoftphone(): UseSoftphoneResult {
     }
   }, [applyCallStatus])
 
+  // Reads the manager and realm through their refs, so it is correct immediately after
+  // `start` resolves — the state `start` sets is not visible until the next render.
+  const placeCall = useCallback(
+    async (target: string) => {
+      const manager = managerRef.current
+      if (!manager) {
+        setError('Register the softphone before dialling')
+        return
+      }
+      setError('')
+      applyCallStatus('dialing')
+      setRemoteParty(target)
+      try {
+        await manager.call(`sip:${target}@${realmRef.current}`)
+      } catch (e) {
+        applyCallStatus('idle')
+        setRemoteParty('')
+        setError(message(e))
+      }
+    },
+    [applyCallStatus]
+  )
+
   const dial = useCallback(async () => {
-    const manager = managerRef.current
-    if (!manager || status !== 'registered') {
+    if (!managerRef.current || status !== 'registered') {
       setError('Register the softphone before dialling')
       return
     }
@@ -237,17 +276,22 @@ export function useSoftphone(): UseSoftphoneResult {
       setError('Enter a number to dial')
       return
     }
-    setError('')
-    applyCallStatus('dialing')
-    setRemoteParty(target)
-    try {
-      await manager.call(`sip:${target}@${realmRef.current}`)
-    } catch (e) {
-      applyCallStatus('idle')
-      setRemoteParty('')
-      setError(message(e))
+    await placeCall(target)
+  }, [dialTarget, placeCall, status])
+
+  const autoDial = useCallback(async () => {
+    const target = normalizeTarget(dialTarget)
+    if (!target) {
+      setError('Enter a number to dial')
+      return
     }
-  }, [applyCallStatus, dialTarget, status])
+    if (!managerRef.current || status !== 'registered') {
+      // `start` has already reported why it could not come up; a second, vaguer
+      // message here would replace the useful one.
+      if (!(await start(false))) return
+    }
+    await placeCall(target)
+  }, [dialTarget, placeCall, start, status])
 
   const answer = useCallback(async () => {
     const manager = managerRef.current
@@ -324,6 +368,7 @@ export function useSoftphone(): UseSoftphoneResult {
     rotateCredential,
     disconnect,
     dial,
+    autoDial,
     answer,
     decline,
     hangup,

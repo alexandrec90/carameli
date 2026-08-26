@@ -6,9 +6,10 @@ import BubbleTubes from './BubbleTubes'
 import ComicPanel from './ComicPanel'
 import { LoadingOverlay, useLoadingScreen } from './LoadingOverlay'
 import PanelInk from './PanelInk'
+import PhoneHud, { hudIsVisible } from './PhoneHud'
 import { gridPolys, layoutKindFor } from './panelGeometry'
-import { PANEL_BG_CONFIGS, drawPanelBackground } from './panelPatterns'
 import { PANELS, pageForPath } from './panels'
+import { usePanelDots } from './usePanelDots'
 import {
     PANEL_BUBBLE_CHAINS, PANEL_IMG_TRANSFORMS, PANEL_BUBBLE_TRANSFORMS,
     PANEL_GRIDS, PANEL_PATTERNS,
@@ -59,7 +60,7 @@ const EditorOverlay = import.meta.env.DEV
 
 // children intentionally not rendered — panels-only foundation phase. navItems
 // only feeds the dev editor's page selector (no in-page nav chrome yet).
-export function Layout({ navItems }: LayoutProps) {
+export function Layout({ navItems, softphone }: LayoutProps) {
     const location = useLocation()
     const editor = useEditorMode()
     const page = pageForPath(location.pathname)
@@ -74,18 +75,7 @@ export function Layout({ navItems }: LayoutProps) {
     const chainT = editor.active ? editor.config.chains : PANEL_BUBBLE_CHAINS
     const grids = editor.active ? editor.config.grids : PANEL_GRIDS
     const patterns = editor.active ? editor.config.patterns : PANEL_PATTERNS
-    // The dot loop is a useCallback([]) that outlives any one render; it reads the
-    // current patterns through this ref so an editor pattern change repaints on the
-    // next frame instead of being trapped in a stale closure. Written from an effect
-    // (never during render) — commit lands before the next rAF frame, which is the
-    // earliest the loop can look.
-    const patternsRef = useRef(patterns)
-    useEffect(() => {
-        patternsRef.current = patterns
-    }, [patterns])
 
-    const panelDotRefs = useRef<(HTMLCanvasElement | null)[]>([])
-    const rafRef = useRef<number>(0)
     const settledCountRef = useRef(0)
 
     // The viewport, not the polygons. The shapes are *derived* from it, the page and
@@ -141,32 +131,19 @@ export function Layout({ navItems }: LayoutProps) {
         setNatSizes(prev => (prev[src] ? prev : { ...prev, [src]: size }))
     }, [])
 
+    // A page showing a projected pad gets the rest of the telephone: the display and the
+    // call keys a photographed pad has no room for. Pages without one show no furniture.
+    const padOnPage = imgT.some(t => t.numberPad && PANELS[t.panel]?.page === page)
+    const showPhoneHud = padOnPage && !editor.active && hudIsVisible(softphone)
+
     const accent = accentForPath(location.pathname)
     const washRef = usePageWash(location.pathname, accent)
     const loading = useLoadingScreen(ready, accent)
 
-    // ── Ben-Day dot animation loop ────────────────────────────────────────────
-    const animatePanelDots = useCallback(() => {
-        const t = performance.now() / 1000
-        for (let i = 0; i < PANELS.length; i++) {
-            const canvas = panelDotRefs.current[i]
-            if (!canvas) continue
-            const ctx = canvas.getContext('2d')
-            if (!ctx) continue
-            const ow = canvas.offsetWidth
-            const oh = canvas.offsetHeight
-            if (ow > 0 && oh > 0 && (canvas.width !== ow || canvas.height !== oh)) {
-                canvas.width = ow
-                canvas.height = oh
-            }
-            if (canvas.width === 0 || canvas.height === 0) continue
-            drawPanelBackground(
-                ctx, canvas.width, canvas.height,
-                patternsRef.current[i] ?? PANEL_PATTERNS[i], PANEL_BG_CONFIGS[i], t,
-            )
-        }
-        rafRef.current = requestAnimationFrame(animatePanelDots)
-    }, [])
+    // ── Ben-Day dot canvases ──────────────────────────────────────────────────
+    // One rAF loop for every panel, but only the hovered panel's pattern moves —
+    // the rest hold the frame they froze on. See usePanelDots / panelDotAnim.
+    const dotRefs = usePanelDots(patterns, hovered)
 
     // ── Resize handler — record the viewport; the polygons follow ─────────────
     const handleResize = useCallback(() => {
@@ -179,12 +156,8 @@ export function Layout({ navItems }: LayoutProps) {
 
     useEffect(() => {
         window.addEventListener('resize', handleResize)
-        rafRef.current = requestAnimationFrame(animatePanelDots)
-        return () => {
-            window.removeEventListener('resize', handleResize)
-            cancelAnimationFrame(rafRef.current)
-        }
-    }, [handleResize, animatePanelDots])
+        return () => { window.removeEventListener('resize', handleResize) }
+    }, [handleResize])
 
     return (
         <>
@@ -215,7 +188,8 @@ export function Layout({ navItems }: LayoutProps) {
                             }
                             isRevealed={k => shouldRevealImg(editor.active, editor.selected, k)}
                             isBubbleVisible={bubbleVisible}
-                            dotRef={el => { panelDotRefs.current[i] = el }}
+                            onNumberPadKey={softphone.pressDigit}
+                            dotRef={dotRefs[i]}
                             onSettled={markSettled}
                             onNatSize={recordNatSize}
                         />
@@ -229,12 +203,16 @@ export function Layout({ navItems }: LayoutProps) {
                 <BubbleTubes polys={panelPolys} bubbles={bubbleT} isVisible={bubbleVisible} />
 
                 {/* Layer 2 — Panel outline SVG (sits above images, below the wash) */}
-                <PanelInk polys={panelPolys} images={imgT} />
+                <PanelInk polys={panelPolys} />
 
                 {/* Layer 3 — Ben-Day wash canvas (page transitions; blank when idle) */}
                 <canvas ref={washRef} className="cb-wash-canvas" aria-hidden="true" />
 
             </div>
+
+            {/* The projected pad's display and call keys — outside cb-root so the page's
+                load fade and the picture frames never hide or crop the live call. */}
+            {showPhoneHud && <PhoneHud phone={softphone} />}
 
             {/* Dev-only editor overlay — never reached in a production build */}
             {EditorOverlay && editor.active && (

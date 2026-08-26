@@ -125,11 +125,13 @@ export const MAX_PRELOAD_BYTES = 2_100 * 1024
 
 /**
  * The whole served tree, images and all. Raised from 2 850 KB when the home page
- * brought four panels of its own art; only one page's set is ever on the critical
- * path ({@link MAX_PRELOAD_BYTES} guards that), so the other page's panels sit
- * here as cold weight.
+ * brought four panels of its own art, and from 3 500 KB when `conversation.webp` and
+ * `hand-notepad.webp` were encoded for the editor's picture dropdown; only one page's
+ * set is ever on the critical path ({@link MAX_PRELOAD_BYTES} guards that), so the
+ * other page's panels — and any picture no layout has placed yet — sit here as cold
+ * weight.
  */
-export const MAX_PUBLIC_BYTES = 3_500 * 1024
+export const MAX_PUBLIC_BYTES = 3_850 * 1024
 
 /**
  * Source trees scanned for references to served assets, relative to the frontend.

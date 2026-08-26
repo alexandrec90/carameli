@@ -1,7 +1,10 @@
 import {
-    drawColorBlock, drawConcentricRings, drawCornerBurst, drawDiagonalStripes,
-    drawHalftoneGradient, drawRadialDots, drawSunburst, drawVignette,
-} from './patternDraw'
+    drawColorBlock, drawDiagonalStripes, drawHalftoneGradient, drawRadialDots,
+    drawVignette,
+} from './patternDrawFields'
+import {
+    drawConcentricRings, drawCornerBurst, drawSunburst,
+} from './patternDrawRadial'
 
 // ─── Pattern style registry ──────────────────────────────────────────────────
 // The editable half of a panel background. Which style each panel *shows* is the
@@ -141,6 +144,12 @@ export const PANEL_BG_CONFIGS: PanelBgConfig[] = [
 
 // ─── Dispatch ────────────────────────────────────────────────────────────────
 
+/**
+ * Paint one panel's background at clock `t` (seconds). `t` is the *panel's* clock,
+ * not wall time: it advances only while the panel is active, so a panel at rest
+ * holds the frame it stopped on (panelDotAnim.ts). Every style moves with it —
+ * there is no style whose output is the same at two different `t`.
+ */
 export function drawPanelBackground(
     ctx: CanvasRenderingContext2D,
     w: number, h: number,
@@ -153,7 +162,7 @@ export function drawPanelBackground(
     switch (style) {
         case 'halftone-gradient':
             drawHalftoneGradient(ctx, w, h, cfg.dotColor, cfg.bg,
-                cfg.baseSpacing, cfg.baseRadius, cfg.angleDeg ?? 225, breathe)
+                cfg.baseSpacing, cfg.baseRadius, cfg.angleDeg ?? 225, breathe, t)
             break
         case 'sunburst':
             drawSunburst(ctx, w, h, cfg.dotColor, cfg.bg, cfg.rayColor ?? cfg.dotColor,
@@ -163,20 +172,20 @@ export function drawPanelBackground(
         case 'color-block':
             drawColorBlock(ctx, w, h, cfg.dotColor, cfg.bg,
                 cfg.dotColor2 ?? cfg.dotColor, cfg.bg2 ?? cfg.bg,
-                cfg.baseSpacing, cfg.baseRadius, cfg.splitY ?? 0.5, breathe)
+                cfg.baseSpacing, cfg.baseRadius, cfg.splitY ?? 0.5, breathe, t)
             break
         case 'vignette':
             drawVignette(ctx, w, h, cfg.dotColor, cfg.bg,
-                cfg.baseSpacing, cfg.baseRadius, breathe)
+                cfg.baseSpacing, cfg.baseRadius, breathe, t)
             break
         case 'radial-dots':
             drawRadialDots(ctx, w, h, cfg.dotColor, cfg.bg,
                 cfg.baseSpacing, cfg.baseRadius,
-                cfg.focalX ?? 0.5, cfg.focalY ?? 0.5, breathe)
+                cfg.focalX ?? 0.5, cfg.focalY ?? 0.5, breathe, t)
             break
         case 'diagonal-stripes':
             drawDiagonalStripes(ctx, w, h, cfg.dotColor, cfg.bg,
-                cfg.baseSpacing, cfg.baseRadius, cfg.angleDeg ?? 45, breathe)
+                cfg.baseSpacing, cfg.baseRadius, cfg.angleDeg ?? 45, breathe, t)
             break
         case 'concentric-rings':
             drawConcentricRings(ctx, w, h, cfg.dotColor, cfg.bg,
@@ -186,7 +195,7 @@ export function drawPanelBackground(
         case 'corner-burst':
             drawCornerBurst(ctx, w, h, cfg.dotColor, cfg.bg, cfg.rayColor ?? cfg.dotColor,
                 cfg.baseSpacing, cfg.baseRadius,
-                cfg.cornerX ?? 0, cfg.cornerY ?? 0, cfg.rayCount ?? 16, breathe)
+                cfg.cornerX ?? 0, cfg.cornerY ?? 0, cfg.rayCount ?? 16, breathe, t)
             break
     }
 }

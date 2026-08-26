@@ -36,10 +36,11 @@ export type {
  * `height`, in % of the panel box — is the picture's own, exactly as a bubble's
  * placement is. It used to be the panel polygon itself, which meant dragging an image
  * only slid the picture under a window that stayed put, and a second picture on the
- * same panel had nowhere to be. The frame takes the panel's shape scaled into it (see
- * `imgFramePoly`), so a picture left at the default 0/0/100/100 crops exactly as the
- * panel always did, and an inset one reads as a small comic panel rather than as a
- * rectangle pasted on top.
+ * same panel had nowhere to be. The frame is a plain rectangle and stays one: the panel
+ * is the window the picture is seen through (`imgPanelClip`), so a picture left at the
+ * default 0/0/100/100 crops exactly as the panel always did, while an inset one is a
+ * rectangle of picture and not a small panel — no shape of its own, and no ink of its
+ * own either.
  *
  * `scale`/`offsetX`/`offsetY`/`anchor` are the second, independent framing: they move
  * the picture *within* its frame, which is what dragging used to do to the whole image.

@@ -231,10 +231,22 @@ up drawn on each.
 
 A picture carries **two independent framings**, and conflating them is the mistake to
 avoid: `left`/`top`/`width`/`height` are its frame over the panel box (in % of that
-box, cut to the panel's polygon scaled into it by `imgFramePoly`), while
-`scale`/`offsetX`/`offsetY`/`anchor` move the picture *within* that frame. The frame
-used to be the panel polygon itself, so dragging a picture could only slide it under a
-window that stayed put; a frame left at `0/0/100/100` still crops exactly as it did.
+box), while `scale`/`offsetX`/`offsetY`/`anchor` move the picture *within* that frame.
+The frame used to be the panel polygon itself, so dragging a picture could only slide it
+under a window that stayed put; a frame left at `0/0/100/100` still crops exactly as it
+did.
+
+**A picture is not a panel, and the renderer must never make one look like one.** The
+frame is a plain rectangle; the *panel* is the window, applied as the panel's own
+polygon translated into the frame's coordinates (`imgPanelClip`), so what shows is the
+intersection of the two — the picture keeps its own square edges and is cut only where
+the panel's ink actually runs. Two earlier spellings did make a picture a panel and both
+were wrong in the same way: the clip scaled the panel polygon *into* the frame, giving an
+inset picture the grid's slanted gutters, and `PanelInk` stroked a second 5 px black
+polygon around any frame that was not the whole panel. In the editor that black shape
+sat over the selection outline, which traces the artwork's real rect (`imgVisibleRect`),
+so the two disagreed on screen about where the picture was. Pictures get no ink of their
+own; `PanelInk` takes `polys` and nothing else.
 
 ### Connector tubes
 
@@ -333,9 +345,61 @@ Fonts loaded from Google Fonts in `index.html`: `Bangers` (400) and `Comic Neue`
 
 ## Motion & Animation
 
-### Ben-Day dot breathing
+### Ben-Day dot motion — only on the active panel
 
-The dot canvas animates continuously with `requestAnimationFrame`, slowly shifting dot radius ± 0.5 px over a 3-second sine cycle. This is always running — never paused.
+One `requestAnimationFrame` loop drives every panel's dot canvas (`usePanelDots.ts`),
+but a panel is repainted only while it is **active** — hovered, which is also when its
+picture colorizes. A resting panel keeps the frame it stopped on.
+
+**Each panel owns its clock, and the clock is what stops** (`panelDotAnim.ts`). Drawing
+from a shared wall clock is the version to avoid: the pattern would jump forward by
+however long the pointer had been away the moment it returned, so every departure and
+return would land as a cut instead of a pause and a resume. Panels are seeded from
+their shipped `phase`, so a page at rest is not eight copies of one frame. An inactive
+panel is repainted for exactly one reason — its canvas went blank (resize, remount, or
+a pattern switch in the editor) — and then at the clock it froze on, not a fresh one.
+
+This is why eight simultaneous patterns cost one panel's worth of drawing, and why the
+eye is not pulled off the panel the pointer is on.
+
+Every style in `PATTERN_STYLES` moves, and every one is tuned far slower than the
+3-second breathe cycle — the drift should be noticed after watching, never read as a
+moving image. The renderers are split by *what* moves: `patternDrawFields.ts` drifts
+the field the dots are sized from, `patternDrawRadial.ts` turns a focal pattern.
+
+**`concentric-rings` is the reference motion, and `patternWave.ts` is where it lives.**
+A wave travels through the dot field; dots swell and ink up as its crest arrives, then
+shrink and fade as it leaves. Every style is built from that same `travellingWave`
+term rather than its own drift — which is what keeps eight patterns reading as one
+page. Two rates and a spin are the whole vocabulary: `WAVE_RATE` for a wave expanding
+from a point, `SWEEP_RATE` (half of it) for one crossing the panel in a straight line,
+`SPIN_RATE` for a ray fan.
+
+A slow drift of a whole field is the shape to avoid, and three styles shipped it
+before 2026-08-25: slow enough to read as calm is slow enough to look static, and fast
+enough to see is the entire picture sliding. A wave through a still field is legible
+at a slow pace because the eye tracks its crest instead of the field.
+
+| Style | What moves |
+| --- | --- |
+| `halftone-gradient` | a wave sweeps down the gradient axis; the dense end also drifts along it |
+| `sunburst` | the ray fan turns, one revolution in ~6 minutes |
+| `color-block` | a swell travels along the zone boundary, on a slower tide |
+| `vignette` | rings run out through the dark edge; the clear middle opens and closes like an aperture |
+| `radial-dots` | rings run out from a focal point that wanders an open loop (two rates, so it never quite retraces) |
+| `diagonal-stripes` | a wave sweeps across the panel at the band angle, one band per ~14 s |
+| `concentric-rings` | ring waves travel outward from the focal point |
+| `corner-burst` | the same wheel of rays as `sunburst`, turning at the same rate, seen from a corner |
+
+`corner-burst`'s fan covers the **whole circle** even though a corner shows a quarter
+of it. A fan spanning only the visible quarter cannot turn — rotate it and it swings
+off the panel — so it rocked about a fixed axis instead, which reads as a twitch. Its
+`rayCount` keeps sunburst's meaning of wedges *across the panel*, and the wheel is
+built with four times that many.
+
+Dot radius also breathes ± 0.35 px on a 3-second sine, shared by every style —
+which is why `panelPatternMotion.test.ts` leaves radius out of the frame signature it
+compares. A style that only breathed would otherwise pass a test for animating.
 
 ### Hover colorization
 
@@ -374,132 +438,20 @@ The Ben-Day dots are still per-panel canvases, clipped to the same polygon.
 
 ## Per-Panel Image & Bubble Framing
 
-`editor/layoutConfig.ts` is the **source of truth** for the panel shapes themselves
-(`PANEL_GRIDS`, above), for picture placement and framing
-(`PANEL_IMG_TRANSFORMS`: panel / src / alt / left / top / width / height / scale /
-offsetX / offsetY / anchor / spill, with `src` drawn from the `PANEL_ASSETS` manifest
-in `editor/assets.ts`) and speech-bubble
-placement and behaviour (`PANEL_BUBBLE_TRANSFORMS`: panel / top / right / width /
-rotate / spill / type / tail / content / text, plus `hoverType` / `clickType` event
-morph targets, the `linkTo` tube partner and the `chain` this balloon is a slot of;
-content may be lettering, a wheel picker, a text input or a locale-formatted phone
-input) and the chain settings those names resolve to (`PANEL_BUBBLE_CHAINS`, above),
-plus each panel's background pattern style
-(`PANEL_PATTERNS`, the one array parallel to `PANELS`; the per-panel palette and dot
-metrics stay in `PANEL_BG_CONFIGS` in `panelPatterns.ts`). The renderer in
-`Layout.tsx` reads from these arrays — there are **no magic framing numbers** in
-`Layout.tsx` or the CSS for images/bubbles, and no bubble text. To retune them, use
-the editor rather than hand-editing scattered values.
+`editor/layoutConfig.ts` is the **source of truth** for the panel shapes
+(`PANEL_GRIDS`, above), for picture placement and framing (`PANEL_IMG_TRANSFORMS`),
+for speech-bubble placement and behaviour (`PANEL_BUBBLE_TRANSFORMS`), for the chain
+settings those balloons name (`PANEL_BUBBLE_CHAINS`, above) and for each panel's
+background pattern style (`PANEL_PATTERNS`). The renderer in `Layout.tsx` reads from
+those arrays — there are **no magic framing numbers** in `Layout.tsx` or the CSS for
+images and bubbles, and no bubble text. To retune them, use the editor rather than
+hand-editing scattered values.
 
-**Save overwrites `layoutConfig.ts` verbatim** with what `serialize.ts` emits, so
-anything that module does not write is deleted on the first save. That is why the
-file's explanatory comments are emitted as headers by `serialize.ts`, and why nothing
-else — a `NEW_IMAGE` or `NEW_BUBBLE` default, a helper — may live in `layoutConfig.ts`.
-Config edits themselves live in `configOps.ts` (React-free: seed/hydrate/patch,
-add/remove picture or bubble, pattern switch, link sanitation), which re-exports
-`configSeed.ts` and `configHydrate.ts` (backfill, enum coercion, pattern fallback);
-grid edits live in `panelGridOps.ts` and the chain list's own lifecycle in
-`chainOps.ts`.
-
-The bubble box's on-screen geometry comes from `bubbleRect` in `transforms.ts`, used
-by **both** the renderer (to aim tubes) and the editor (hit target and selection
-outline). Keep it shared: when those two disagreed, the bubble you could click was
-not the bubble a tube pointed at.
-
-### A picture can be a projected table surface
-
-Any picture may carry an optional `table`, which draws an HTML table onto the surface the
-picture depicts — a notepad's ruling, a whiteboard, a screen. The field is **absent** on a
-picture that is not a surface; absence is how that is spelled in `configSeed.ts`,
-`configHydrate.ts` and `serializeTable.ts` alike, so `'table' in img` is a reliable
-question. Nothing about the feature is skin chrome: it is per-picture data, so the same
-switch turns any picture into a surface.
-
-**The tilt is a projective map, not a rotation.** `tableProjection.ts` takes the author's
-four corners (`quad`, in % of the picture's frame), solves the homography carrying the
-unit square onto them, and emits one `matrix3d`. Matching a plane in a photograph with
-`rotateX`/`rotateY`/`perspective` is a three-way search where each axis undoes the last;
-four corners dragged onto the four corners in the picture are a unique answer and need no
-search. The table is laid out at `quadSourceBox` — the mean of the quad's opposite edges —
-rather than at the frame, because a 3D-transformed element is rasterised once at its
-layout size and a table laid out four times too large is downsampled lettering.
-
-**Rows snap because the offset is an index, not a position.** The surface divides into
-`rows` equal bands in un-projected space, and scrolling advances an integer index into
-`data`, so band *k* renders in exactly the same place at every offset and stays on the line
-drawn in the picture. Rows outside the window are never rendered, which is also why there
-is no scrollbar to hide — there is no scroll container. The wheel accumulates sub-row
-travel (`wheelRows` carries the remainder) so a trackpad's dozen small deltas still move a
-row. Two off-screen buttons and an `aria-live` row count are the keyboard's version of the
-wheel; without them the rows past the first window are reachable by exactly one device.
-
-Editor chrome — the dashed outline, the per-band guides, the corner grips — is drawn only
-while the editor is open, and is drawn *through the same projection as the rows*, which is
-the point: a guide that lines up with the picture's ruling is a guide the rows line up with
-too.
-
-**A surface can show live records instead of authored cells.** `table.source` names a feed
-— `'calls'` or `'sms'`, the members of `TABLE_SOURCES` in `lib/liveTables.ts` — and is
-**absent** on a surface whose cells the author typed, the same way `table` itself is absent
-on a picture that is not a surface. The skin names a feed and is handed rows; it does not
-fetch. `hooks/useLiveTables.ts` is the only module in the chain that touches the API, and
-`lib/liveTables.ts` owns the column list and the record-to-row mapping, so neither the
-customer id nor an endpoint appears anywhere under `skins/`.
-
-The rows are injected in `Layout.tsx`, between the editor's working copy and the panels
-(`useLiveTableImages`), which is what keeps every component below it — `ComicPanel`,
-`PanelImages`, `ProjectedTable` — unchanged and renderable from a plain config in a test.
-It also keeps the *editor* holding the authored surface: the working copy never sees a
-record, so **Save** writes `data: []`.
-
-Three consequences worth stating, because each one is a bug the obvious implementation has:
-
-- **`data` stays empty for a live surface, and that is a privacy invariant, not tidiness.**
-  The feed is call and message history; rows saved beside it would put real phone numbers
-  into `layoutConfig.ts` on the first save. It is enforced three times — the injection is
-  downstream of the editor's config, `coerceTable` empties `data` when a source is set, and
-  the inspector's feed switch replaces the cells.
-- **A live surface's columns are the feed's**, because the mapper emits cells positionally.
-  Widths, alignment and heading wording stay the author's — that is how a feed is fitted to
-  the ruling in the photograph — but the editor hides **+ Column** and **−** while a feed is
-  on, since removing the second column would slide every value one heading left.
-- **Live means polling** — there is no push transport in this frontend. `useLiveTables`
-  re-asks every `LIVE_TABLE_POLL_MS`, skips a hidden tab and refreshes on `visibilitychange`,
-  and returns the *identical* row array when nothing changed, so a quiet poll does not
-  repaint every Ben-Day canvas on the page. A failed refresh keeps the rows already on the
-  surface rather than blanking the notepad.
-
-### Dev-only visual editor
-
-| Property | Value | Notes |
-| --- | --- | --- |
-| Enable / disable | `?edit=1` / `?edit=0` in dev | Flag persists in `localStorage['comic-book:edit']`; `?edit=0` clears it |
-| Gate | `import.meta.env.DEV && (?edit=1 \|\| flag)` | Never ships — `?edit=1` is inert in prod |
-| Select | click a **panel**, a **picture** or a **bubble** | A picture wins over the panel under it, a bubble over both; a panel is only outlined — it is the slot the **+** buttons add to, and where its background pattern is picked |
-| Adjust | drag / wheel / handles / arrows | Move the frame or bubble, resize (bottom-right grip), pan the picture inside its frame (top-left grip, picture only), rotate (top-right grip, bubble only), nudge (⇧×10); for a picture **Alt** swaps the two framings |
-| Add / remove | **+ Image** / **+ Bubble** toolbar buttons, **Delete image** / **Delete bubble** in the inspector | Adds to the selected panel; deleting a bubble clears any link naming it |
-| Panel fields | inspector select | background **pattern** style (`PATTERN_STYLE_KEYS`; palette stays per panel) |
-| Picture fields | inspector selects | panel, picture (`PANEL_ASSETS`), alt (empty = decorative), anchor, spill |
-| Bubble fields | inspector selects | panel, type, **tail** (nine options incl. **No tail**), **content** (Text / Wheel picker / Text input / Phone input), authored text or initial value, hover/click morph, **chain** (free text, completing on the names already in use), link |
-| Chain fields | inspector, below the bubble's own, when the bubble names a chain | **grow** / **step ms**, **scroll**, **messages** (one per line; empty = speak the balloons' own text), **+ Balloon in chain** — they edit the whole column, not the selected balloon. Chained balloons render flat in edit mode so each stays selectable |
-| Table on / off | **Project a table onto this image** checkbox (picture inspector) | Switching on seeds a starter surface; switching off deletes the table and its cells, leaving the picture |
-| Table source | **shows** select (table inspector) | *Cells typed below* or a live feed (**Call records**, **SMS messages**). Picking a feed takes its columns and empties the cells; going back seeds a fresh authored surface, since five empty feed-shaped columns would leave nothing on the notepad to see |
-| Table fields | inspector controls | rows visible, text size, ink, headings on/off, the four corner X/Y pairs, **Reset corners**, and a columns list (heading / width weight / alignment) plus the cell text, one row per line, tab- or `\|`-separated. A live surface has no cell block, and no **+ Column** / **−** |
-| Table corners | drag the four **square grips** | Only on the selected picture, only in content mode. The band guides move with them, so align the guides to the ruling in the photograph |
-| Pages | **Page** dropdown in toolbar | Switch route in edit mode (replays the wash); "Loading screen" entry previews the loading overlay + its exit wash |
-| Mode | **Content** / **Panel shapes** toggle | Content places pictures and bubbles; shapes drags the lines between panels. Content click targets are not rendered in shapes mode — a panel-sized target would swallow every drag aimed at a line crossing it |
-| Reshape | drag a **line** or a **vertex** | A frame vertex slides along its own edge; the four corners are locked; the frame itself has no handle. Arrows nudge (⇧×10) |
-| Bend | **double-click a line**, drag the bend; **Delete** / **Straighten** removes it | Repeat for lightning bolts. A junction of three lines, or a vertex on the frame, is not a bend and is refused |
-| Reset shapes | **Reset shapes** in the shapes inspector | Restores the current window shape's grid only — the three are edited independently |
-| Save | **Save** button | `POST /__comic-editor/save` writes `layoutConfig.ts` (dev server only); **Copy config** / **.ts** are the fallbacks |
-| Reset all | clears working copy | Removes `localStorage['comic-book:editConfig']`, re-seeds from source |
-
-`EditorOverlay.tsx` is dynamically `import()`-ed behind the DEV gate so Rollup
-tree-shakes it (and `editor.css`) out of the production bundle. Only `layoutConfig.ts`
-(data), `bubbleTypes.ts` (data) and `transforms.ts` (pure CSS/math) ship in prod. All
-editor math, config editing and serialization is pure and unit-tested in
-`frontend/src/tests/skins/` (`editorConfigOps`, `editorSerialize`, …). See
-`frontend/src/skins/comic-book/editor/README.md` for the quick-start.
+Every field of those arrays, the rule that **save overwrites `layoutConfig.ts`
+verbatim**, the projected-table surface a picture may carry, and the dev-only visual
+editor's full control reference live in
+[skin-comic-book-framing.md](skin-comic-book-framing.md) — split out of this file so
+neither grows past the instruction-size limit.
 
 ## Hard Rules Summary
 
@@ -511,7 +463,7 @@ editor math, config editing and serialization is pure and unit-tested in
 6. **Never render panel separator lines with CSS `border`** — a panel's ink is its own SVG polygon, so it follows the shape the grid gives it
 7. **Never use cold/neutral fonts** — only Bangers (display) and Comic Neue (body)
 8. **All text in nav/headings must be UPPERCASE** — enforce at CSS level with `text-transform: uppercase`
-9. **Ben-Day dot canvas must always be running** (never frozen on a static frame) even when no interaction is happening
+9. **A panel's Ben-Day pattern animates only while that panel is active** — hovered and colorized. At rest it holds the frame its own clock froze on; it never restarts, and it never runs off a shared wall clock. Until 2026-08-25 this rule said the opposite ("must always be running … even when no interaction is happening"), which is how eight panels came to drift at once and pull the eye off the one being pointed at
 10. **Served Gemini assets live exclusively in `public/comic-book/`, and are `.webp`** — no inline base64, no external URLs, and no PNG. The lossless masters belong in `frontend/assets-src/comic-book/`, which is not copied into the build; re-encode from there rather than from a `.webp`. **`frontend/assetPolicy.ts` is where this stops being advice**: it holds the format rule, the per-image and whole-tree byte budgets and the dimension ratchet as exported constants, and `frontend/assetPolicy.test.ts` checks the served tree against them both ways — an asset nothing references fails as dead weight, and a path named in a comment or in this file fails once the file it names has moved. Change a budget by editing the constant, so the diff says what a visitor now downloads. **Panel art is fetched only by this skin**, through the guard script in `index.html`: its `SKINS`/`DEFAULT` must match `src/skins/registry.ts` and its `PANELS` must match `editor/layoutConfig.ts`, both asserted by that same test file. As static `<link rel="preload">` tags the panels were fetched by all four skins — 1.94 MB of art `barebone` never painted — which no static check can catch, because the references were real; `tests/e2e/test_asset_usage.py` catches it in a browser instead, by comparing what each skin fetched against what it drew
 11. Files over 250 lines (TS/TSX/CSS) must be split before commit.
 12. **Never link two bubbles across panels** — a tube's two ends share one `panel`, or there is no tube
@@ -520,5 +472,6 @@ editor math, config editing and serialization is pure and unit-tested in
 15. **Never tube a chained bubble, and never give a chain more than one tail** — a slot holds whatever message has scrolled into it, so a tube would join a different sentence on each turn of the wheel; the tail belongs to the root alone, and a stack of them reads as several people talking at once
 16. **Never key a chain's balloons by slot** — keying by message index is what makes a scroll animate, because the node moves and CSS transitions its position. Keyed by slot the nodes stand still and their text flickers
 17. **Never express a projected table's tilt as rotation angles, and never scroll it by pixels** — the tilt is four corners solved into one `matrix3d` (`tableProjection.ts`), and the scroll offset is an integer row index. Angles cannot be dragged onto a photograph, and a pixel offset puts the lettering between two ruled lines
-18. **Never give a projected table a scroll container, a scrollbar, or any chrome outside edit mode** — rows past the window are not rendered at all, and the guides, outline and corner grips exist only while the editor is open
-19. **Never fetch from a skin, and never save a live surface's rows** — a surface names a feed (`table.source`) and `hooks/useLiveTables.ts` does the asking; `data` stays `[]` while a feed is on, because those rows are real call and message records and saving them writes customer phone numbers into `layoutConfig.ts`
+18. **Never ink a picture, and never give a picture's frame the panel's shape** — only panels are stroked, and a frame is a rectangle windowed by its panel. A black outline in the grid's slant around something that is not a panel is the mistake this rule exists to stop repeating; the editor's selection outline traces the artwork's own rect, and a second, differently-shaped border beside it is a renderer contradicting the author
+19. **Never give a projected table a scroll container, a scrollbar, or any chrome outside edit mode** — rows past the window are not rendered at all, and the guides, outline and corner grips exist only while the editor is open
+20. **Never fetch from a skin, and never save a live surface's rows** — a surface names a feed (`table.source`) and `hooks/useLiveTables.ts` does the asking; `data` stays `[]` while a feed is on, because those rows are real call and message records and saving them writes customer phone numbers into `layoutConfig.ts`
