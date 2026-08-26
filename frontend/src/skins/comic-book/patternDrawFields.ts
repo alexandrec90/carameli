@@ -1,19 +1,27 @@
 import { parseCssColor } from './benDayWash'
+import { SWEEP_RATE, WAVE_RATE, travellingWave } from './patternWave'
 
 // ─── Ben-Day dot renderers: dot fields ───────────────────────────────────────
-// One canvas-painting function per pattern style whose motion is a slow drift of
-// the *field* the dots are sized from — the gradient axis, the zone boundary, the
+// One canvas-painting function per pattern style whose motion is carried by the
+// *field* the dots are sized from — the gradient axis, the zone boundary, the
 // stripe phase. The styles built around a focal point live in patternDrawRadial.ts;
 // the style registry and per-panel tuning live in panelPatterns.ts.
 //
 // Every renderer takes `t`, the panel's own clock in seconds, and every one moves
 // with it. A panel that sits on a still frame does so because its clock stopped
-// (panelDotAnim.ts) — never because its style has nothing to animate. Rates are
-// deliberately far below the 3-second breathe cycle: the drift should be noticed
-// only after watching, not read as a moving image.
+// (panelDotAnim.ts) — never because its style has nothing to animate.
+//
+// **Where the motion actually lives is a wave, not a drift** (patternWave.ts). A
+// slow drift of a whole field is the version that failed review: at a rate low
+// enough to read as calm it is not visible at all, and at a rate high enough to be
+// visible the entire picture slides. A wave passing *through* a still field is
+// legible at a slow pace, because the eye tracks its crest rather than the field.
+// Each style keeps a slow field drift on top, so the panel is never quite where it
+// was a minute ago either.
 
 // Dots grow small to large along a directional gradient (halftone fade effect).
-// The dense end drifts back and forth along that axis, so the fade sweeps.
+// The dense end drifts back and forth along that axis, and a wave runs down the
+// same axis, so the fade sweeps and swells at once.
 export function drawHalftoneGradient(
     ctx: CanvasRenderingContext2D, w: number, h: number,
     dotHex: string, bgHex: string, spacing: number, baseR: number,
@@ -30,9 +38,13 @@ export function drawHalftoneGradient(
             const nx = x / w - 0.5, ny = y / h - 0.5
             const proj = nx * cc + ny * ss
             const t01 = Math.max(0, Math.min(1, proj * 0.95 + 0.5 + drift))
-            const radius = baseR * 0.2 + baseR * 1.7 * t01 + breathe
+            const wave = travellingWave(
+                (x - w / 2) * cc + (y - h / 2) * ss, spacing * 4, t, SWEEP_RATE)
+            const radius = baseR * 0.32 + baseR * 1.25 * t01
+                + baseR * 0.42 * wave + breathe
             if (radius < 0.4) continue
-            ctx.fillStyle = `rgba(${r},${g},${b},${0.35 + t01 * 0.55})`
+            ctx.fillStyle =
+                `rgba(${r},${g},${b},${(0.30 + t01 * 0.50) * (0.55 + wave * 0.45)})`
             ctx.beginPath()
             ctx.arc(x, y, radius, 0, Math.PI * 2)
             ctx.fill()
@@ -91,7 +103,8 @@ export function drawColorBlock(
 }
 
 // Large dense dots at edges fade to clear center — ink vignette. The clear middle
-// widens and closes again, like an aperture.
+// widens and closes again like an aperture, and rings run out through the dark
+// edge so the frame is never a still band of ink.
 export function drawVignette(
     ctx: CanvasRenderingContext2D, w: number, h: number,
     dotHex: string, bgHex: string, spacing: number, baseR: number,
@@ -105,10 +118,14 @@ export function drawVignette(
     for (let x = spacing / 2; x < w; x += spacing) {
         for (let y = spacing / 2; y < h; y += spacing) {
             const dx = x - cx, dy = y - cy
-            const t01 = Math.min(1, Math.sqrt(dx * dx + dy * dy) / maxDist)
-            const radius = baseR * 0.1 + baseR * 2.1 * t01 * t01 + breathe
+            const dist = Math.sqrt(dx * dx + dy * dy)
+            const t01 = Math.min(1, dist / maxDist)
+            const wave = travellingWave(dist, spacing * 3.8, t, WAVE_RATE)
+            const radius = baseR * 0.30 + baseR * 1.60 * t01 * t01
+                + baseR * 0.35 * wave + breathe
             if (radius < 0.4) continue
-            ctx.fillStyle = `rgba(${r},${g},${b},${0.08 + t01 * 0.75})`
+            ctx.fillStyle =
+                `rgba(${r},${g},${b},${(0.10 + t01 * 0.70) * (0.60 + wave * 0.40)})`
             ctx.beginPath()
             ctx.arc(x, y, radius, 0, Math.PI * 2)
             ctx.fill()
@@ -117,8 +134,8 @@ export function drawVignette(
 }
 
 // Dots grow from tiny near focal point to large far away — radial halftone. The
-// focal point wanders a slow open loop: the two axes are at different rates, so it
-// never quite retraces itself.
+// focal point wanders a slow open loop (the two axes are at different rates, so it
+// never quite retraces itself) while ring waves run outward from wherever it is.
 export function drawRadialDots(
     ctx: CanvasRenderingContext2D, w: number, h: number,
     dotHex: string, bgHex: string, spacing: number, baseR: number,
@@ -133,10 +150,14 @@ export function drawRadialDots(
     for (let x = spacing / 2; x < w; x += spacing) {
         for (let y = spacing / 2; y < h; y += spacing) {
             const dx = x - fx, dy = y - fy
-            const t01 = Math.min(1, Math.sqrt(dx * dx + dy * dy) / maxDist)
-            const radius = baseR * 0.15 + baseR * 1.7 * t01 + breathe
+            const dist = Math.sqrt(dx * dx + dy * dy)
+            const t01 = Math.min(1, dist / maxDist)
+            const wave = travellingWave(dist, spacing * 3.8, t, WAVE_RATE)
+            const radius = baseR * 0.30 + baseR * 1.35 * t01
+                + baseR * 0.40 * wave + breathe
             if (radius < 0.3) continue
-            ctx.fillStyle = `rgba(${r},${g},${b},${0.12 + t01 * 0.68})`
+            ctx.fillStyle =
+                `rgba(${r},${g},${b},${(0.15 + t01 * 0.60) * (0.55 + wave * 0.45)})`
             ctx.beginPath()
             ctx.arc(x, y, radius, 0, Math.PI * 2)
             ctx.fill()
@@ -144,8 +165,16 @@ export function drawRadialDots(
     }
 }
 
-// Alternating dense / sparse bands at a diagonal angle, crawling sideways across
-// the panel — one band width every ~11 seconds.
+/**
+ * Bands running at a diagonal angle, sweeping sideways across the panel: dots
+ * swell and ink up as a band arrives, then shrink and fade as it leaves.
+ *
+ * Until 2026-08-25 the bands had hard edges and slid as a block, which read as
+ * fast and mechanical however low the rate went — a dot at a boundary snapped
+ * between two sizes every pass. Concentric rings is the pattern this is now built
+ * from: same wave, straight instead of circular, at half the rate because a
+ * straight sweep reads faster than an expanding ring (patternWave.ts).
+ */
 export function drawDiagonalStripes(
     ctx: CanvasRenderingContext2D, w: number, h: number,
     dotHex: string, bgHex: string, spacing: number, baseR: number,
@@ -155,18 +184,14 @@ export function drawDiagonalStripes(
     ctx.fillStyle = bgHex
     ctx.fillRect(0, 0, w, h)
     const rad = angleDeg * Math.PI / 180
-    const period = spacing * 3.2
-    const slide = t * spacing * 0.28
+    const cc = Math.cos(rad), ss = Math.sin(rad)
+    const period = spacing * 3.6
     for (let x = spacing / 2; x < w; x += spacing) {
         for (let y = spacing / 2; y < h; y += spacing) {
-            const proj = x * Math.cos(rad) + y * Math.sin(rad) - slide
-            const stripe = ((proj % period) + period) % period
-            const inDense = stripe < period * 0.55
-            const radius = inDense
-                ? baseR * 1.3 + breathe
-                : baseR * 0.4 + breathe * 0.3
+            const wave = travellingWave(x * cc + y * ss, period, t, SWEEP_RATE)
+            const radius = baseR * 0.40 + baseR * 1.20 * wave + breathe
             if (radius < 0.3) continue
-            ctx.fillStyle = `rgba(${r},${g},${b},${inDense ? 0.68 : 0.2})`
+            ctx.fillStyle = `rgba(${r},${g},${b},${0.18 + wave * 0.60})`
             ctx.beginPath()
             ctx.arc(x, y, radius, 0, Math.PI * 2)
             ctx.fill()

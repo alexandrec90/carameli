@@ -306,19 +306,37 @@ eye is not pulled off the panel the pointer is on.
 Every style in `PATTERN_STYLES` moves, and every one is tuned far slower than the
 3-second breathe cycle — the drift should be noticed after watching, never read as a
 moving image. The renderers are split by *what* moves: `patternDrawFields.ts` drifts
-the field the dots are sized from, `patternDrawRadial.ts` turns or rocks a focal
-pattern.
+the field the dots are sized from, `patternDrawRadial.ts` turns a focal pattern.
+
+**`concentric-rings` is the reference motion, and `patternWave.ts` is where it lives.**
+A wave travels through the dot field; dots swell and ink up as its crest arrives, then
+shrink and fade as it leaves. Every style is built from that same `travellingWave`
+term rather than its own drift — which is what keeps eight patterns reading as one
+page. Two rates and a spin are the whole vocabulary: `WAVE_RATE` for a wave expanding
+from a point, `SWEEP_RATE` (half of it) for one crossing the panel in a straight line,
+`SPIN_RATE` for a ray fan.
+
+A slow drift of a whole field is the shape to avoid, and three styles shipped it
+before 2026-08-25: slow enough to read as calm is slow enough to look static, and fast
+enough to see is the entire picture sliding. A wave through a still field is legible
+at a slow pace because the eye tracks its crest instead of the field.
 
 | Style | What moves |
 | --- | --- |
-| `halftone-gradient` | the dense end of the fade drifts along the gradient axis |
+| `halftone-gradient` | a wave sweeps down the gradient axis; the dense end also drifts along it |
 | `sunburst` | the ray fan turns, one revolution in ~6 minutes |
 | `color-block` | a swell travels along the zone boundary, on a slower tide |
-| `vignette` | the clear middle opens and closes like an aperture |
-| `radial-dots` | the focal point wanders an open loop (two rates, so it never quite retraces) |
-| `diagonal-stripes` | the bands crawl sideways, one band width per ~11 s |
+| `vignette` | rings run out through the dark edge; the clear middle opens and closes like an aperture |
+| `radial-dots` | rings run out from a focal point that wanders an open loop (two rates, so it never quite retraces) |
+| `diagonal-stripes` | a wave sweeps across the panel at the band angle, one band per ~14 s |
 | `concentric-rings` | ring waves travel outward from the focal point |
-| `corner-burst` | the fan rocks about its axis and opens and closes |
+| `corner-burst` | the same wheel of rays as `sunburst`, turning at the same rate, seen from a corner |
+
+`corner-burst`'s fan covers the **whole circle** even though a corner shows a quarter
+of it. A fan spanning only the visible quarter cannot turn — rotate it and it swings
+off the panel — so it rocked about a fixed axis instead, which reads as a twitch. Its
+`rayCount` keeps sunburst's meaning of wedges *across the panel*, and the wheel is
+built with four times that many.
 
 Dot radius also breathes ± 0.35 px on a 3-second sine, shared by every style —
 which is why `panelPatternMotion.test.ts` leaves radius out of the frame signature it

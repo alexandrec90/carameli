@@ -1,14 +1,47 @@
 import { parseCssColor } from './benDayWash'
+import { SPIN_RATE, WAVE_RATE, travellingWave } from './patternWave'
 
 // ─── Ben-Day dot renderers: focal patterns ───────────────────────────────────
 // The styles built around a focal point or a corner — rays that turn, rings that
-// travel outward, a fan that rocks. The styles whose motion is a drifting dot
-// field live in patternDrawFields.ts; the style registry and per-panel tuning live
-// in panelPatterns.ts.
+// travel outward. The styles whose motion is a drifting dot field live in
+// patternDrawFields.ts; the style registry and per-panel tuning live in
+// panelPatterns.ts, and the shared motion terms in patternWave.ts.
 //
 // Every renderer takes `t`, the panel's own clock in seconds. A panel that sits on
 // a still frame does so because its clock stopped (panelDotAnim.ts) — never
 // because its style has nothing to animate.
+
+/**
+ * A fan of rays about (`fx`, `fy`), turning at the shared spin rate.
+ *
+ * The wedges cover the **whole circle** even when the focus sits in a corner and
+ * three quarters of them fall outside the panel. A fan spanning only the visible
+ * quarter cannot turn — rotate it and it swings off the panel altogether — and
+ * turning is the whole motion, so the fan is a wheel and the panel is a window
+ * onto part of it.
+ *
+ * Only the inked wedges are drawn, hence the step of two: the gaps between them
+ * are the background showing through, and painting them at zero alpha was work
+ * with no pixels to show for it.
+ */
+function drawRayFan(
+    ctx: CanvasRenderingContext2D, fx: number, fy: number, reach: number,
+    wedges: number, rayHex: string, alpha: number, t: number,
+) {
+    const [rr, rg, rb] = parseCssColor(rayHex)
+    const spin = t * SPIN_RATE
+    ctx.fillStyle = `rgba(${rr},${rg},${rb},${alpha})`
+    for (let i = 0; i < wedges; i += 2) {
+        const a1 = (i / wedges) * Math.PI * 2 + spin
+        const a2 = ((i + 0.42) / wedges) * Math.PI * 2 + spin
+        ctx.beginPath()
+        ctx.moveTo(fx, fy)
+        ctx.lineTo(fx + Math.cos(a1) * reach, fy + Math.sin(a1) * reach)
+        ctx.lineTo(fx + Math.cos(a2) * reach, fy + Math.sin(a2) * reach)
+        ctx.closePath()
+        ctx.fill()
+    }
+}
 
 // Slowly rotating rays from a focal point + uniform Ben-Day dots on top
 export function drawSunburst(
@@ -18,25 +51,10 @@ export function drawSunburst(
     focalX: number, focalY: number, rayCount: number, breathe: number, t: number,
 ) {
     const [r, g, b] = parseCssColor(dotHex)
-    const [rr, rg, rb] = parseCssColor(rayHex)
     ctx.fillStyle = bgHex
     ctx.fillRect(0, 0, w, h)
-    const fx = focalX * w, fy = focalY * h
     const maxDist = Math.sqrt(w * w + h * h)
-    const spin = t * 0.018
-    for (let i = 0; i < rayCount; i++) {
-        const a1 = (i / rayCount) * Math.PI * 2 + spin
-        const a2 = ((i + 0.42) / rayCount) * Math.PI * 2 + spin
-        ctx.beginPath()
-        ctx.moveTo(fx, fy)
-        ctx.lineTo(fx + Math.cos(a1) * maxDist, fy + Math.sin(a1) * maxDist)
-        ctx.lineTo(fx + Math.cos(a2) * maxDist, fy + Math.sin(a2) * maxDist)
-        ctx.closePath()
-        ctx.fillStyle = i % 2 === 0
-            ? `rgba(${rr},${rg},${rb},0.18)`
-            : `rgba(${rr},${rg},${rb},0.0)`
-        ctx.fill()
-    }
+    drawRayFan(ctx, focalX * w, focalY * h, maxDist, rayCount, rayHex, 0.18, t)
     ctx.fillStyle = `rgba(${r},${g},${b},0.30)`
     for (let x = spacing / 2; x < w; x += spacing) {
         for (let y = spacing / 2; y < h; y += spacing) {
@@ -62,7 +80,7 @@ export function drawConcentricRings(
         for (let y = spacing / 2; y < h; y += spacing) {
             const dx = x - fx, dy = y - fy
             const dist = Math.sqrt(dx * dx + dy * dy)
-            const wave = (Math.sin((dist / ringPeriod) * Math.PI * 2 - t * 0.9) + 1) / 2
+            const wave = travellingWave(dist, ringPeriod, t, WAVE_RATE)
             const radius = baseR * 0.25 + baseR * 1.55 * wave + breathe
             if (radius < 0.3) continue
             ctx.fillStyle = `rgba(${r},${g},${b},${0.15 + wave * 0.65})`
@@ -73,9 +91,16 @@ export function drawConcentricRings(
     }
 }
 
-// Fan of rays from one corner + radial halftone dots (smaller near corner). The
-// fan cannot turn the whole way round — it is pinned to a corner — so it rocks
-// about its axis and opens and closes instead, on two rates that do not line up.
+/**
+ * Rays from one corner + radial halftone dots, smaller near the corner.
+ *
+ * The fan turns exactly as sunburst's does — it is the same wheel, seen from a
+ * corner instead of the middle. `rayCount` therefore keeps its sunburst meaning of
+ * wedges *across the panel*, which from a corner is a quarter of the circle, and
+ * the wheel is built with four times that many so the count a panel is tuned to is
+ * the count it shows. Until 2026-08-25 this rocked about a fixed axis and opened
+ * and closed instead, which read as a twitch rather than a rotation.
+ */
 export function drawCornerBurst(
     ctx: CanvasRenderingContext2D, w: number, h: number,
     dotHex: string, bgHex: string, rayHex: string,
@@ -83,28 +108,12 @@ export function drawCornerBurst(
     cornerX: number, cornerY: number, rayCount: number, breathe: number, t: number,
 ) {
     const [r, g, b] = parseCssColor(dotHex)
-    const [rr, rg, rb] = parseCssColor(rayHex)
     ctx.fillStyle = bgHex
     ctx.fillRect(0, 0, w, h)
     const fx = cornerX * w, fy = cornerY * h
     const maxDist = Math.sqrt(w * w + h * h)
-    const cAngle = Math.atan2(cornerY > 0.5 ? -1 : 1, cornerX > 0.5 ? -1 : 1)
-        + Math.sin(t * 0.09) * 0.14
-    const spread = Math.PI * 0.85 * (1 + Math.sin(t * 0.13) * 0.07)
-    for (let i = 0; i < rayCount; i++) {
-        const a1 = cAngle - spread / 2 + (i / rayCount) * spread
-        const a2 = cAngle - spread / 2 + ((i + 0.45) / rayCount) * spread
-        ctx.beginPath()
-        ctx.moveTo(fx, fy)
-        ctx.lineTo(fx + Math.cos(a1) * maxDist, fy + Math.sin(a1) * maxDist)
-        ctx.lineTo(fx + Math.cos(a2) * maxDist, fy + Math.sin(a2) * maxDist)
-        ctx.closePath()
-        ctx.fillStyle = i % 2 === 0
-            ? `rgba(${rr},${rg},${rb},0.20)`
-            : `rgba(${rr},${rg},${rb},0.0)`
-        ctx.fill()
-    }
-    const maxR = Math.sqrt(w * w + h * h) * 0.7
+    drawRayFan(ctx, fx, fy, maxDist, rayCount * 4, rayHex, 0.20, t)
+    const maxR = maxDist * 0.7
     for (let x = spacing / 2; x < w; x += spacing) {
         for (let y = spacing / 2; y < h; y += spacing) {
             const dx = x - fx, dy = y - fy
