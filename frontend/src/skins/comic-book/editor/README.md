@@ -202,7 +202,12 @@ different images can only crossfade. A new bubble type belongs in `bubbleShape.t
      input**, or **Phone input**). Wheel text is comma-delimited options: hover the
      bubble outside edit mode and scroll to turn it. Input text is its initial value;
      phone input formats live using the browser locale, while a leading `+` selects an
-     international calling code. Edit the **text** or **initial value**, choose the shapes to
+     international calling code. A **Phone input** balloon that is not in a chain is the
+     projected pad's fallback: Enter places the call, on the same shared softphone and
+     with the same caption box (`../PhoneHud.tsx`) reporting it, so a page whose art
+     carries no keypad still has somewhere to dial from. In a chain that same content
+     is the conversation's composer instead and dials nothing.
+     Edit the **text** or **initial value**, choose the shapes to
      morph to **on hover**
      and **on click** (`— no change —` keeps the resting shape), and pick a **link
      to** partner to join with a connector tube. Turning or removing a tail morphs
