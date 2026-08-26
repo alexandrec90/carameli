@@ -186,9 +186,13 @@ different images can only crossfade. A new bubble type belongs in `bubbleShape.t
      layout: 1–9 over the first three rows, then `*`, `0`, `#`. Drag its magenta corner
      grips or type the corner coordinates to align it with the photographed plane; the
      **Text** and **Ink** controls tune the symbols. Its 3 × 4 grid and outline are
-     visible alignment guides in the editor only. Outside edit mode, readers see the
-     twelve symbols directly on the image. A picture carries either a table or a number
-     pad, so switching either option on replaces the other projected content.
+     visible alignment guides in the editor only. Outside edit mode the twelve symbols
+     are a **working telephone keypad**: each key is a button wired to the app's shared
+     softphone, and the display and call keys appear as a caption box (`../PhoneHud.tsx`)
+     once someone presses one. Inside edit mode the pad takes no pointer input at all,
+     because the corner grips are on the same picture and would lose every drag to it.
+     A picture carries either a table or a number pad, so switching either option on
+     replaces the other projected content.
    - **Allow spill outside panel** checkbox — off (default for pictures) clips the
      element to the frame's polygon (overflow hidden behind its edge); on lets it
      bleed past (default for bubbles).
@@ -293,8 +297,10 @@ bubbleTypes.ts      BubbleType + BUBBLE_TYPES (lettering font per type) — ship
 ../tableData.ts     PURE: rows visible at an offset, wheel-to-rows, column widths, cell text
 ../ProjectedTable.tsx one picture's surface: the projected table, its wheel and its keys
 ../table.css        surface + cell styles, and the editor-only band guides
-../ProjectedNumberPad.tsx fixed 3 × 4 telephone keys on a projected surface
-../number-pad.css   number-pad lettering and surface layout
+../ProjectedNumberPad.tsx fixed 3 × 4 telephone keys on a projected surface; live buttons outside edit mode
+../number-pad.css   number-pad lettering, surface layout, and the live key's press states
+../PhoneHud.tsx     the display and call keys a photographed pad has no room for
+../phone-hud.css    the caption box that holds them
 ../panelGeometry.ts PURE grid -> polygon geometry: frame, normalised space, vertex constraints
 ../panelPatterns.ts pattern style registry + per-panel palette/dot tuning (PANEL_BG_CONFIGS)
 ../polygonInset.ts  PURE polygon maths: the perpendicular gutter inset, bounding box

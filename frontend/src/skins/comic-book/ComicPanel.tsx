@@ -27,6 +27,8 @@ interface ComicPanelProps {
     /** True when picture `k` (index into `images`) is the editor's full-reveal selection. */
     isRevealed(k: number): boolean
     isBubbleVisible(i: number): boolean
+    /** Makes a number pad projected onto one of this panel's pictures a working keypad. */
+    onNumberPadKey?(key: string): void
     /** Mounts the Ben-Day dot canvas into Layout's animation loop. */
     dotRef(el: HTMLCanvasElement | null): void
     onSettled(): void
@@ -40,7 +42,7 @@ interface ComicPanelProps {
  */
 export default function ComicPanel({
     index, info, poly, images, bubbles, chains, sms, natSizes,
-    editorActive, hovered, onHover, isRevealed, isBubbleVisible,
+    editorActive, hovered, onHover, isRevealed, isBubbleVisible, onNumberPadKey,
     dotRef, onSettled, onNatSize,
 }: ComicPanelProps) {
     const { bounds, vp } = poly
@@ -94,6 +96,7 @@ export default function ComicPanel({
                 natSizes={natSizes}
                 isRevealed={isRevealed}
                 editing={editorActive}
+                onNumberPadKey={onNumberPadKey}
                 onSettled={onSettled}
                 onNatSize={onNatSize}
             />

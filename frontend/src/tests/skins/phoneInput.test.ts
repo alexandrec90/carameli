@@ -38,7 +38,7 @@ describe('toE164', () => {
   // What an author writes in a wheel picker becomes what a request sends. The same
   // number written three ways has to collapse to one string, or the same thread is
   // three threads depending on the lettering.
-  it('canonicalises a nationally written number for the detected region', () => {
+  it('rewrites a nationally written number into E.164 for the detected region', () => {
     expect(toE164('(415) 555-1111', 'US')).toBe('+14155551111')
     expect(toE164('415 555 1111', 'US')).toBe('+14155551111')
   })
