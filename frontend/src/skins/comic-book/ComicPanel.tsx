@@ -43,14 +43,13 @@ export default function ComicPanel({
     const { bounds, vp } = poly
 
     // The dots clip tightly to the panel polygon (element-relative px coords). A
-    // picture clips to its own frame instead — the same shape scaled into it —
-    // which PanelImages works out per picture.
+    // picture is windowed by that same polygon, offset into its own frame — which
+    // PanelImages works out per picture.
     const dotClip = toClipPath(vp, bounds.x, bounds.y)
 
     // While editing, the selected picture reveals its full self (clip off) so the
-    // whole of it stays visible for framing; the outline SVG still draws the crop
-    // shape on top. The panel is lifted whenever any of its pictures is the
-    // revealed one.
+    // whole of it stays visible for framing. The panel is lifted whenever any of its
+    // pictures is the revealed one.
     const revealFull = images.some((img, k) => img.panel === index && isRevealed(k))
 
     return (
@@ -80,8 +79,8 @@ export default function ComicPanel({
                 className="cb-dots-panel-canvas"
                 style={{ clipPath: dotClip }}
             />
-            {/* Pictures — however many name this panel, each on its own frame over
-                the panel box, each cut to the panel's shape scaled into that frame.
+            {/* Pictures — however many name this panel, each on its own rectangular
+                frame over the panel box, each seen through the panel's polygon.
                 `spill` (and the editor's full-reveal selection) drops the clip so a
                 picture pops out over the frame lines. */}
             <PanelImages

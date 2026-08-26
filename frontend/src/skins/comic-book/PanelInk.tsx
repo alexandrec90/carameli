@@ -1,18 +1,22 @@
-import { imgFramePoints, isFullPanelFrame } from './editor/transforms'
-import type { ImgTransform } from './editor/types'
 import type { PanelPoly } from './panelGeometry'
 
 interface PanelInkProps {
     /** Sparse, PANELS-length: null slots are panels that live on another page. */
     polys: (PanelPoly | null)[]
-    images: ImgTransform[]
 }
 
 /**
- * The ink layer — every panel outline plus every inset picture frame, on one
- * viewport-level SVG that sits above the images and below the wash.
+ * The ink layer â€” one stroked outline per panel, on a viewport-level SVG that sits
+ * above the images and below the wash.
+ *
+ * **Only panels are inked.** A picture used to get a border of its own here, drawn on
+ * the panel's polygon scaled into the picture's frame, on the theory that an inset
+ * picture reads as a panel-within-a-panel. It does not: a picture is a picture, its
+ * real edges are its own artwork's, and a second black polygon in the panel's shape
+ * around a frame that is not the panel is the thing the editor's selection outline
+ * kept contradicting. Frames and panels are independent â€” this layer draws panels.
  */
-export default function PanelInk({ polys, images }: PanelInkProps) {
+export default function PanelInk({ polys }: PanelInkProps) {
     return (
         <svg className="cb-panel-svg" aria-hidden="true">
             {polys.map((poly, i) => poly && (
@@ -25,28 +29,6 @@ export default function PanelInk({ polys, images }: PanelInkProps) {
                     strokeLinejoin="miter"
                 />
             ))}
-            {/* A picture that has been given its own frame is inked like the panel
-                it sits in — that border is what makes an inset picture read as a
-                panel-within-a-panel rather than as a pasted cut-out. A full-panel
-                frame is skipped: its ink would land on the panel outline already
-                drawn above, doubling the stroke along an identical path. */}
-            {images.map((img, k) => {
-                if (isFullPanelFrame(img)) return null
-                const poly = polys[img.panel]
-                if (!poly) return null
-                const pts = imgFramePoints(poly.vp, poly.bounds, img)
-                if (pts.length === 0) return null
-                return (
-                    <polygon
-                        key={`img-${k}`}
-                        points={pts.map(([x, y]) => `${x},${y}`).join(' ')}
-                        fill="none"
-                        stroke="#111111"
-                        strokeWidth="5"
-                        strokeLinejoin="miter"
-                    />
-                )
-            })}
         </svg>
     )
 }

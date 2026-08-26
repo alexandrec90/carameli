@@ -67,9 +67,12 @@ window arithmetic and `chainOps.ts` for the list's lifecycle.
 
 **A picture has two independent framings, which is why it has so many fields.**
 `left`/`top`/`width`/`height` are the *frame*: its own rectangle over the panel box, in
-% of that box, cut to the panel's polygon scaled into it (`imgFramePoly`). A picture
-left at the default `0/0/100/100` therefore crops exactly as a panel image always did,
-and an inset one reads as a small comic panel rather than a rectangle pasted on top.
+% of that box. It stays a rectangle — the **panel** is the window the picture is seen
+through (`imgPanelClip` translates the panel's polygon into the frame's coordinates), so
+a picture left at the default `0/0/100/100` crops exactly as a panel image always did,
+and an inset one is a rectangle of picture rather than a small panel with the grid's
+slant and a black border of its own. **A picture is never inked** — the selection outline
+you drag is the artwork's real rect, and nothing else is drawn around it.
 `scale`/`offsetX`/`offsetY`/`anchor` are the second framing: they move the picture
 *inside* that frame. Before pictures became entities the frame was the panel polygon
 itself, so dragging could only slide the picture under a window that stayed put, and a

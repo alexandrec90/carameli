@@ -173,9 +173,10 @@ export function fullImgStyle(
 }
 
 /**
- * Style for the .cb-img-clip wrapper around a panel image. The frame's polygon
- * clip-path ({@link imgFramePoly}) is what crops the full-source image
- * ({@link fullImgStyle}) into a comic panel. `spill: true` drops the clip so the
+ * Style for the .cb-img-clip wrapper around a panel image. The wrapper's own box is the
+ * picture's frame, and the clip-path is the *panel's* polygon ({@link imgPanelClip}) —
+ * so the picture is windowed by the panel it sits in and bounded by its frame, and is
+ * never itself cut into a panel shape. `spill: true` drops the clip so the
  * image pops out of its frame —
  * z-index 4 lifts it above the panel-outline SVG (z-index 3) so the frame lines
  * don't cross it (panels themselves are z-index:auto, so children escape into the
@@ -271,46 +272,30 @@ export function imgRect(
 }
 
 /**
- * The frame's crop shape in viewport coordinates: the panel's own polygon, normalised
- * against the panel box and scaled into the frame rect.
+ * The panel's own polygon as a `clip-path` in the frame wrapper's coordinates — the
+ * window a picture is seen through.
  *
- * Taking the panel's shape rather than a plain rectangle is what keeps this a comic.
- * At the default full-panel frame it is the panel polygon exactly — a picture that has
- * not been moved crops as it always did — and an inset picture reads as a small panel
- * of its own, with the same slanted gutters as the grid around it.
+ * The panel is the window; the frame is the picture's box. The wrapper is placed at the
+ * frame and carries `overflow: hidden`, so what shows is the intersection of the two:
+ * the picture keeps its own rectangular edges and is cut only where the panel's ink
+ * actually runs. It is **not scaled into the frame** — doing that made every inset
+ * picture a small panel with the grid's slanted gutters, which is what put a panel's
+ * shape around something that is not a panel.
  *
- * A zero-size panel box (first paint, before layout) has no shape to scale, so this
- * returns no points rather than dividing by zero.
+ * At the shipped full-panel frame the wrapper sits on the panel box, so this is the
+ * panel polygon exactly and a picture nobody has moved crops as it always did.
+ *
+ * A zero-size panel box (first paint, before layout) has no window to describe, so this
+ * returns `'none'` rather than an empty `polygon()`.
  */
-export function imgFramePoints(
-  vp: [number, number][],
-  bounds: { x: number; y: number; w: number; h: number },
-  t: Pick<ImgTransform, 'left' | 'top' | 'width' | 'height'>,
-): [number, number][] {
-  if (bounds.w <= 0 || bounds.h <= 0) return []
-  const rect = imgRect(bounds, t)
-  return vp.map(
-    ([x, y]) =>
-      [
-        rect.x + ((x - bounds.x) / bounds.w) * rect.w,
-        rect.y + ((y - bounds.y) / bounds.h) * rect.h,
-      ] as [number, number],
-  )
-}
-
-/**
- * {@link imgFramePoints} as a `clip-path` relative to the frame wrapper — which is where
- * the wrapper is placed, so the shape lands on the picture rather than beside it.
- */
-export function imgFramePoly(
+export function imgPanelClip(
   vp: [number, number][],
   bounds: { x: number; y: number; w: number; h: number },
   t: Pick<ImgTransform, 'left' | 'top' | 'width' | 'height'>,
 ): string {
-  const pts = imgFramePoints(vp, bounds, t)
-  if (pts.length === 0) return 'none'
+  if (bounds.w <= 0 || bounds.h <= 0 || vp.length === 0) return 'none'
   const rect = imgRect(bounds, t)
-  return toClipPath(pts, rect.x, rect.y)
+  return toClipPath(vp, rect.x, rect.y)
 }
 
 /**
@@ -356,6 +341,10 @@ export function imgVisibleRect(
   if (x2 <= x1 || y2 <= y1) return frame
   return { x: x1, y: y1, w: x2 - x1, h: y2 - y1 }
 }
+
+// There is deliberately no `isFullPanelFrame` any more. Its only caller inked a picture
+// whose frame was not the whole panel, and pictures are not inked at all now — see
+// PanelInk.tsx.
 
 /** Move a picture's frame by a px drag → % of the panel box. */
 export function dragImgFrame(
@@ -413,12 +402,3 @@ export function imgFrameStyle(
   return { position: 'absolute', left: box.x, top: box.y, width: box.w, height: box.h }
 }
 
-/**
- * True when a picture's frame is exactly its panel — the shipped default. The ink
- * layer skips these frames because the panel outline already strokes the same path.
- */
-export function isFullPanelFrame(
-  t: Pick<ImgTransform, 'left' | 'top' | 'width' | 'height'>,
-): boolean {
-  return t.left === 0 && t.top === 0 && t.width === 100 && t.height === 100
-}

@@ -231,10 +231,22 @@ up drawn on each.
 
 A picture carries **two independent framings**, and conflating them is the mistake to
 avoid: `left`/`top`/`width`/`height` are its frame over the panel box (in % of that
-box, cut to the panel's polygon scaled into it by `imgFramePoly`), while
-`scale`/`offsetX`/`offsetY`/`anchor` move the picture *within* that frame. The frame
-used to be the panel polygon itself, so dragging a picture could only slide it under a
-window that stayed put; a frame left at `0/0/100/100` still crops exactly as it did.
+box), while `scale`/`offsetX`/`offsetY`/`anchor` move the picture *within* that frame.
+The frame used to be the panel polygon itself, so dragging a picture could only slide it
+under a window that stayed put; a frame left at `0/0/100/100` still crops exactly as it
+did.
+
+**A picture is not a panel, and the renderer must never make one look like one.** The
+frame is a plain rectangle; the *panel* is the window, applied as the panel's own
+polygon translated into the frame's coordinates (`imgPanelClip`), so what shows is the
+intersection of the two — the picture keeps its own square edges and is cut only where
+the panel's ink actually runs. Two earlier spellings did make a picture a panel and both
+were wrong in the same way: the clip scaled the panel polygon *into* the frame, giving an
+inset picture the grid's slanted gutters, and `PanelInk` stroked a second 5 px black
+polygon around any frame that was not the whole panel. In the editor that black shape
+sat over the selection outline, which traces the artwork's real rect (`imgVisibleRect`),
+so the two disagreed on screen about where the picture was. Pictures get no ink of their
+own; `PanelInk` takes `polys` and nothing else.
 
 ### Connector tubes
 
@@ -488,4 +500,5 @@ editor math, config editing and serialization is pure and unit-tested in
 15. **Never tube a chained bubble, and never give a chain more than one tail** — a slot holds whatever message has scrolled into it, so a tube would join a different sentence on each turn of the wheel; the tail belongs to the root alone, and a stack of them reads as several people talking at once
 16. **Never key a chain's balloons by slot** — keying by message index is what makes a scroll animate, because the node moves and CSS transitions its position. Keyed by slot the nodes stand still and their text flickers
 17. **Never express a projected table's tilt as rotation angles, and never scroll it by pixels** — the tilt is four corners solved into one `matrix3d` (`tableProjection.ts`), and the scroll offset is an integer row index. Angles cannot be dragged onto a photograph, and a pixel offset puts the lettering between two ruled lines
-18. **Never give a projected table a scroll container, a scrollbar, or any chrome outside edit mode** — rows past the window are not rendered at all, and the guides, outline and corner grips exist only while the editor is open
+18. **Never ink a picture, and never give a picture's frame the panel's shape** — only panels are stroked, and a frame is a rectangle windowed by its panel. A black outline in the grid's slant around something that is not a panel is the mistake this rule exists to stop repeating; the editor's selection outline traces the artwork's own rect, and a second, differently-shaped border beside it is a renderer contradicting the author
+19. **Never give a projected table a scroll container, a scrollbar, or any chrome outside edit mode** — rows past the window are not rendered at all, and the guides, outline and corner grips exist only while the editor is open

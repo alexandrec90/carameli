@@ -12,10 +12,8 @@ import {
   fullImgStyle,
   imgClipStyle,
   imgFrameBox,
-  imgFramePoints,
-  imgFramePoly,
   imgFrameStyle,
-  isFullPanelFrame,
+  imgPanelClip,
   imgVisibleRect,
   imgRect,
   renderedImgRect,
@@ -282,7 +280,7 @@ describe('imgFrameBox / imgRect / imgFrameStyle', () => {
   })
 })
 
-describe('imgFramePoints / imgFramePoly', () => {
+describe('imgPanelClip', () => {
   const bounds = { x: 100, y: 200, w: 400, h: 300 }
   // A slanted quad, like the real panel polygons — the gutters are not square.
   const vp: [number, number][] = [
@@ -293,51 +291,45 @@ describe('imgFramePoints / imgFramePoly', () => {
   ]
 
   // This is what keeps an unmoved picture cropping exactly as it always did: the
-  // default frame is the panel, so the frame's shape is the panel's shape.
+  // default frame is the panel box, so the wrapper sits on the panel's own origin.
   it('is the panel polygon itself at the shipped full-panel frame', () => {
-    expect(imgFramePoints(vp, bounds, img())).toEqual(vp)
-    expect(imgFramePoly(vp, bounds, img())).toBe(toClipPath(vp, bounds.x, bounds.y))
+    expect(imgPanelClip(vp, bounds, img())).toBe(toClipPath(vp, bounds.x, bounds.y))
   })
 
-  // Taking the panel's shape rather than a plain rectangle is what keeps this a comic:
-  // an inset picture reads as a smaller panel, with the same slant as the grid around it.
-  it('scales that same shape into an inset frame', () => {
+  // The whole point of the change: an inset frame is a rectangle of picture, windowed
+  // by the panel. The polygon is *translated* into the wrapper's coordinates, never
+  // scaled into the frame — scaling it is what turned a picture into a small panel.
+  it('translates the panel polygon into an inset frame without scaling it', () => {
     const t = { left: 50, top: 0, width: 50, height: 50 }
-    expect(imgFramePoints(vp, bounds, t)).toEqual([
-      [300, 200],
-      [500, 210],
-      [490, 350],
-      [310, 340],
-    ])
-  })
-
-  it('keeps the slant when a frame is inset — it is not squared off to a rectangle', () => {
-    const pts = imgFramePoints(vp, bounds, { left: 20, top: 20, width: 55, height: 55 })
-    expect(pts[0][1]).not.toBe(pts[1][1]) // top edge still slopes
-    expect(pts[0][0]).not.toBe(pts[3][0]) // left edge still leans
-  })
-
-  it('emits the clip relative to the frame, so the shape lands on the picture', () => {
-    const t = { left: 50, top: 0, width: 50, height: 50 }
-    expect(imgFramePoly(vp, bounds, t)).toBe(
-      'polygon(0px 0px, 200px 10px, 190px 150px, 10px 140px)',
+    // Frame origin is (100 + 200, 200 + 0) = (300, 200).
+    expect(imgPanelClip(vp, bounds, t)).toBe(
+      'polygon(-200px 0px, 200px 20px, 180px 300px, -180px 280px)',
     )
   })
 
-  // First paint, before layout has measured anything. Scaling a shape into a zero-size
-  // box is a division by zero, and a NaN in a clip-path hides the picture outright.
-  it('has no shape to scale against a zero-size panel box', () => {
-    expect(imgFramePoints(vp, { x: 0, y: 0, w: 0, h: 300 }, img())).toEqual([])
-    expect(imgFramePoints(vp, { x: 0, y: 0, w: 400, h: 0 }, img())).toEqual([])
-    expect(imgFramePoly(vp, { x: 0, y: 0, w: 0, h: 0 }, img())).toBe('none')
+  // A picture whose frame is well inside the panel is not cut by the panel at all: the
+  // clip's edges fall outside the wrapper, so only `overflow: hidden` on the frame bites
+  // and the picture keeps its own square corners.
+  it('leaves a frame clear of the panel edges uncut — no slant of its own', () => {
+    const t = { left: 30, top: 30, width: 30, height: 30 }
+    const clip = imgPanelClip(vp, bounds, t)
+    const frame = imgRect(bounds, t)
+    const pts = [...clip.matchAll(/(-?[\d.]+)px (-?[\d.]+)px/g)].map(
+      m => [Number(m[1]), Number(m[2])] as const,
+    )
+    expect(pts).toHaveLength(vp.length)
+    // Every clip vertex lies outside the frame box, so nothing of the picture is cut.
+    for (const [x, y] of pts) {
+      expect(x < 0 || x > frame.w || y < 0 || y > frame.h).toBe(true)
+    }
   })
-})
 
-describe('isFullPanelFrame', () => {
-  it('recognizes only the identity frame that duplicates the panel outline', () => {
-    expect(isFullPanelFrame(img())).toBe(true)
-    expect(isFullPanelFrame(img({ width: 99.9 }))).toBe(false)
-    expect(isFullPanelFrame(img({ left: 1 }))).toBe(false)
+  // First paint, before layout has measured anything. A NaN in a clip-path hides the
+  // picture outright, so an unmeasured panel gets no clip rather than a broken one.
+  it('has no window to describe against a zero-size panel box', () => {
+    expect(imgPanelClip(vp, { x: 0, y: 0, w: 0, h: 300 }, img())).toBe('none')
+    expect(imgPanelClip(vp, { x: 0, y: 0, w: 400, h: 0 }, img())).toBe('none')
+    expect(imgPanelClip([], bounds, img())).toBe('none')
   })
 })
 
