@@ -31,12 +31,17 @@ function bubbleLabel(b: BubbleTransform, i: number): string {
 /**
  * The bubble-only half of the selection inspector: which panel it belongs to, its
  * shape and tail, how its text is presented, the text itself, the event morph
- * targets, and its connector link.
+ * targets, its link, and whether the linked group is a chain.
  *
  * The link picker offers only the other bubbles on the same panel — that is where
  * the same-panel rule is enforced, by never presenting the invalid choice. Changing
  * the panel therefore clears a link that no longer makes sense, which `patchBubble`
  * does rather than this component.
+ *
+ * Those two controls are deliberately adjacent, because together they are the whole of
+ * "these balloons are one SMS thread": the picker says *which* balloons, the checkbox says
+ * what the group of them is. A chain used to be a name typed into a third field, which
+ * meant the author could say it twice and disagree with themselves.
  */
 export default function BubbleInspector({ api, index, bubble }: BubbleInspectorProps) {
   const candidates = linkCandidates(api.config.bubbles, index)
@@ -150,8 +155,8 @@ export default function BubbleInspector({ api, index, bubble }: BubbleInspectorP
         </select>
       </label>
 
-      {/* Connector tube. Symmetric, so it only needs declaring at one end; the
-          tube redraws live as either bubble is dragged. */}
+      {/* Connector tube — and, with the checkbox below, the chain. Symmetric, so it only
+          needs declaring at one end; the tube redraws live as either bubble is dragged. */}
       <label className="cb-ed-field">
         <span>link to</span>
         <select
@@ -172,10 +177,31 @@ export default function BubbleInspector({ api, index, bubble }: BubbleInspectorP
       </label>
       {candidates.length === 0 && (
         <div className="cb-ed-hint">
-          Add a second bubble to {PANELS[bubble.panel]?.label ?? `panel ${bubble.panel}`} to
-          link this one — a tube joins two bubbles on the same panel.
+          Add a second bubble to {PANELS[bubble.panel]?.label ?? `panel ${bubble.panel}`}
+          {' '}to link this one — a link joins two bubbles on the same panel.
         </div>
       )}
+
+      {/* The chain toggle. Applied to the whole linked group rather than to this balloon,
+          because a thread is a property of the column: ticking it here chains everything
+          reachable through the links above, and unticking it takes the whole column back
+          to plain balloons. That is why it is a checkbox and not a name — the author has
+          already said which balloons belong together by linking them. */}
+      <label className="cb-ed-check">
+        <input
+          type="checkbox"
+          checked={bubble.chain !== ''}
+          onChange={e => api.setChained(index, e.target.checked)}
+        />
+        <span>Scrollable chain</span>
+      </label>
+      <div className="cb-ed-hint">
+        {bubble.chain
+          ? `The linked balloons are one thread: messages run through them, the wheel moves
+             the window, and no tubes are drawn between them.`
+          : `Link balloons into a column, then tick this on any of them to read the column
+             as one SMS thread instead of as tube-joined balloons.`}
+      </div>
     </>
   )
 }

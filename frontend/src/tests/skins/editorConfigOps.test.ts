@@ -181,6 +181,8 @@ describe('hydrateConfig', () => {
     expect(hydrateConfig(JSON.stringify({ images: [], bubbles: [] }))).toEqual({
       images: [],
       bubbles: [],
+      // Derived from the bubbles, so a page with none has none — nothing to re-seed.
+      chains: [],
       grids: seedConfig().grids,
       // Patterns are the exception: the array is parallel to PANELS by contract, so
       // "nothing" is not a length it can have — absence re-seeds the defaults.

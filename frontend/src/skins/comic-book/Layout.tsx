@@ -10,12 +10,14 @@ import { gridPolys, layoutKindFor } from './panelGeometry'
 import { PANELS, pageForPath } from './panels'
 import { usePanelDots } from './usePanelDots'
 import {
-    PANEL_IMG_TRANSFORMS, PANEL_BUBBLE_TRANSFORMS, PANEL_GRIDS, PANEL_PATTERNS,
+    PANEL_BUBBLE_CHAINS, PANEL_IMG_TRANSFORMS, PANEL_BUBBLE_TRANSFORMS,
+    PANEL_GRIDS, PANEL_PATTERNS,
 } from './editor/layoutConfig'
 import { shouldRevealImg, useEditorMode } from './editor/useEditorMode'
 import { usePageWash } from './usePageWash'
 import './comic-book.css'
 import './bubbles.css'
+import './bubbleChains.css'
 
 // ─── Page-accent map ─────────────────────────────────────────────────────────
 
@@ -64,6 +66,7 @@ export function Layout({ navItems }: LayoutProps) {
     // Source transforms from the editor's working copy when active, else constants.
     const imgT = editor.active ? editor.config.images : PANEL_IMG_TRANSFORMS
     const bubbleT = editor.active ? editor.config.bubbles : PANEL_BUBBLE_TRANSFORMS
+    const chainT = editor.active ? editor.config.chains : PANEL_BUBBLE_CHAINS
     const grids = editor.active ? editor.config.grids : PANEL_GRIDS
     const patterns = editor.active ? editor.config.patterns : PANEL_PATTERNS
 
@@ -165,6 +168,7 @@ export function Layout({ navItems }: LayoutProps) {
                             poly={poly}
                             images={imgT}
                             bubbles={bubbleT}
+                            chains={chainT}
                             natSizes={natSizes}
                             editorActive={editor.active}
                             hovered={hovered === i}

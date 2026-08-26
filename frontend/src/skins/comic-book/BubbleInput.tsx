@@ -15,10 +15,19 @@ interface BubbleInputProps {
   initialValue: string
   font: string
   enabled: boolean
+  /**
+   * Called with the trimmed value when Enter is pressed, after which the field clears.
+   * Absent — the ordinary case — leaves Enter doing nothing, because a lone input balloon
+   * has nowhere to send anything and emptying itself would just lose what was typed. A
+   * chain's composer is what supplies it (see PanelBubbleChain).
+   */
+  onSubmit?: (value: string) => void
 }
 
 /** A real, single-line input fitted inside a speech bubble. */
-export default function BubbleInput({ kind, initialValue, font, enabled }: BubbleInputProps) {
+export default function BubbleInput({
+  kind, initialValue, font, enabled, onSubmit,
+}: BubbleInputProps) {
   const inputRef = useRef<HTMLInputElement>(null)
   const frameRef = useRef(0)
   const country = useMemo(() => browserCountry(), [])
@@ -50,7 +59,19 @@ export default function BubbleInput({ kind, initialValue, font, enabled }: Bubbl
 
   const onKeyDown = (event: KeyboardEvent<HTMLInputElement>): void => {
     event.stopPropagation()
-    if (!phone || event.ctrlKey || event.metaKey || event.altKey) return
+    if (event.ctrlKey || event.metaKey || event.altKey) return
+    if (event.key === 'Enter' && onSubmit) {
+      // Prevented whether or not anything is sent: inside a form this would submit it,
+      // and an empty composer is a keystroke that should do nothing at all rather than
+      // navigate. Trimmed because a message of spaces is an empty balloon.
+      event.preventDefault()
+      const text = value.trim()
+      if (text === '') return
+      onSubmit(text)
+      setValue('')
+      return
+    }
+    if (!phone) return
     if (event.key !== 'Backspace' && event.key !== 'Delete') return
     const start = event.currentTarget.selectionStart
     const end = event.currentTarget.selectionEnd

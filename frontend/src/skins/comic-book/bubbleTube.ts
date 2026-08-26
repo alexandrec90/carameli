@@ -128,9 +128,18 @@ export function tubeBetween(a: Rect, b: Rect): TubeGeometry | null {
  * is not on screen. The editor never offers one, so a link that gets here is stale
  * config (a bubble moved panels by hand), and dropping it beats drawing a rail into
  * empty space.
+ *
+ * **So is a link with either end in a bubble chain.** `linkTo` says two things now — draw
+ * a tube between these balloons, *and* these balloons are one column — and `chain` is
+ * which of the two the author meant: a chain slot is a window a transcript scrolls through
+ * rather than a fixed balloon (see bubbleChain.ts), so a tube welded to one would join a
+ * different sentence every time the reader turned the wheel. That is why ticking the chain
+ * box takes a linked pair's tube away and unticking it gives it back, from the one field.
+ * `chain` is optional here only so a caller with no chains to speak of — a test, or a
+ * synthetic pair — need not invent the field.
  */
 export function linkedPairs(
-  bubbles: { panel: number; linkTo: number | null }[],
+  bubbles: { panel: number; linkTo: number | null; chain?: string }[],
 ): [number, number][] {
   const seen = new Set<string>()
   const pairs: [number, number][] = []
@@ -138,6 +147,7 @@ export function linkedPairs(
     const j = b.linkTo
     if (j == null || j === i || j < 0 || j >= bubbles.length) return
     if (bubbles[j].panel !== b.panel) return
+    if (b.chain || bubbles[j].chain) return
     const lo = Math.min(i, j)
     const hi = Math.max(i, j)
     const key = `${lo}-${hi}`

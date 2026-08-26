@@ -255,6 +255,53 @@ the slice of outline it covers. Both z-indices are load-bearing — above the li
 panel (z 8), below the Ben-Day wash (z 10). Overlapping bubbles draw no tube at all,
 by design; a corridor shorter than its own width reads as a smudge.
 
+### Bubble chains — a column read as an SMS thread
+
+A bubble's `chain` name joins it to a **vertical column** of balloons on the same
+panel that is read as one speaker's message thread (`bubbleChain.ts`, rendered by
+`PanelBubbleChain.tsx`). The balloons are the author's drawing and never move; the
+**messages move through them**, arriving at the top. Slot order is by `top`
+descending, so **slot 0 is the lowest balloon — the root, the one that carries the
+tail**; every slot above it is a later message and should have `tail: 'none'`.
+
+`PANEL_BUBBLE_CHAINS` in `layoutConfig.ts` holds one entry per name in use, with two
+independent toggles and the thread itself:
+
+| Field | Effect |
+| --- | --- |
+| `grow` | reveals the column one balloon at a time, `stepMs` apart, instead of all at once |
+| `scroll` | the mouse wheel moves a window over a thread longer than the column |
+| `messages` | the thread; **empty means the chain speaks its own balloons' `text`**, in slot order |
+
+The list is **derived, not authored**: `syncChains` recomputes it from the names the
+bubbles carry after every edit that can touch one, so naming a chain creates its entry
+and renaming the last member away removes it. There is deliberately no add-chain or
+delete-chain operation — a chain with no members and a member with no chain are both
+unreachable states rather than states to be validated.
+
+Three rules hold this together, each enforced where it can be enforced by construction:
+
+- **A chained balloon takes no tube.** A slot holds whatever message has scrolled into
+  it, so a tube welded to it would join a different sentence each time. Dropped in
+  `sanitizeLinks` (data), never offered by `linkCandidates` (editor), and refused by
+  `linkedPairs` (renderer) — the same three-place pattern as the same-panel rule.
+- **A chain is one panel's.** `chainSlots` filters on panel as well as name, so two
+  panels may reuse a name without their balloons ever being on screen together.
+- **Only up.** The window arithmetic assumes time runs upward: `visibleWindow` puts the
+  oldest visible message in slot 0, and a wheel-up advances the thread. A horizontal
+  chain is not a supported layout — it would need a second axis in every one of those
+  functions, not a CSS change.
+
+Both behaviours are per chain, so a page can hold a live thread beside a plain
+multi-balloon utterance. All of the arithmetic is pure and in `bubbleChain.ts`;
+`PanelBubbleChain.tsx` adds only what cannot be — the growth timer, the wheel
+listener, and the rewind when the panel stops being hovered. **Keys are message
+indices, not slot indices**: a message keeps its DOM node as it moves down the column,
+which is what lets CSS transition its `top`/`right`/`width` rather than flickering
+text through four stationary balloons. The arrival effect is a `@keyframes` animation
+(`bubbleChains.css`) and not a transition, because a node that mounts already carrying
+`is-visible` has no previous value to transition from.
+
 ### Asset Image (Gemini-generated)
 
 ```tsx
@@ -386,8 +433,10 @@ offsetX / offsetY / anchor / spill, with `src` drawn from the `PANEL_ASSETS` man
 in `editor/assets.ts`) and speech-bubble
 placement and behaviour (`PANEL_BUBBLE_TRANSFORMS`: panel / top / right / width /
 rotate / spill / type / tail / content / text, plus `hoverType` / `clickType` event
-morph targets and the `linkTo` tube partner; content may be lettering, a wheel picker,
-a text input or a locale-formatted phone input) and each panel's background pattern style
+morph targets, the `linkTo` tube partner and the `chain` this balloon is a slot of;
+content may be lettering, a wheel picker, a text input or a locale-formatted phone
+input) and the chain settings those names resolve to (`PANEL_BUBBLE_CHAINS`, above),
+plus each panel's background pattern style
 (`PANEL_PATTERNS`, the one array parallel to `PANELS`; the per-panel palette and dot
 metrics stay in `PANEL_BG_CONFIGS` in `panelPatterns.ts`). The renderer in
 `Layout.tsx` reads from these arrays — there are **no magic framing numbers** in
@@ -401,12 +450,45 @@ else — a `NEW_IMAGE` or `NEW_BUBBLE` default, a helper — may live in `layout
 Config edits themselves live in `configOps.ts` (React-free: seed/hydrate/patch,
 add/remove picture or bubble, pattern switch, link sanitation), which re-exports
 `configSeed.ts` and `configHydrate.ts` (backfill, enum coercion, pattern fallback);
-grid edits live in `panelGridOps.ts`.
+grid edits live in `panelGridOps.ts` and the chain list's own lifecycle in
+`chainOps.ts`.
 
 The bubble box's on-screen geometry comes from `bubbleRect` in `transforms.ts`, used
 by **both** the renderer (to aim tubes) and the editor (hit target and selection
 outline). Keep it shared: when those two disagreed, the bubble you could click was
 not the bubble a tube pointed at.
+
+### A picture can be a projected table surface
+
+Any picture may carry an optional `table`, which draws an HTML table onto the surface the
+picture depicts — a notepad's ruling, a whiteboard, a screen. The field is **absent** on a
+picture that is not a surface; absence is how that is spelled in `configSeed.ts`,
+`configHydrate.ts` and `serializeTable.ts` alike, so `'table' in img` is a reliable
+question. Nothing about the feature is skin chrome: it is per-picture data, so the same
+switch turns any picture into a surface.
+
+**The tilt is a projective map, not a rotation.** `tableProjection.ts` takes the author's
+four corners (`quad`, in % of the picture's frame), solves the homography carrying the
+unit square onto them, and emits one `matrix3d`. Matching a plane in a photograph with
+`rotateX`/`rotateY`/`perspective` is a three-way search where each axis undoes the last;
+four corners dragged onto the four corners in the picture are a unique answer and need no
+search. The table is laid out at `quadSourceBox` — the mean of the quad's opposite edges —
+rather than at the frame, because a 3D-transformed element is rasterised once at its
+layout size and a table laid out four times too large is downsampled lettering.
+
+**Rows snap because the offset is an index, not a position.** The surface divides into
+`rows` equal bands in un-projected space, and scrolling advances an integer index into
+`data`, so band *k* renders in exactly the same place at every offset and stays on the line
+drawn in the picture. Rows outside the window are never rendered, which is also why there
+is no scrollbar to hide — there is no scroll container. The wheel accumulates sub-row
+travel (`wheelRows` carries the remainder) so a trackpad's dozen small deltas still move a
+row. Two off-screen buttons and an `aria-live` row count are the keyboard's version of the
+wheel; without them the rows past the first window are reachable by exactly one device.
+
+Editor chrome — the dashed outline, the per-band guides, the corner grips — is drawn only
+while the editor is open, and is drawn *through the same projection as the rows*, which is
+the point: a guide that lines up with the picture's ruling is a guide the rows line up with
+too.
 
 ### Dev-only visual editor
 
@@ -419,7 +501,11 @@ not the bubble a tube pointed at.
 | Add / remove | **+ Image** / **+ Bubble** toolbar buttons, **Delete image** / **Delete bubble** in the inspector | Adds to the selected panel; deleting a bubble clears any link naming it |
 | Panel fields | inspector select | background **pattern** style (`PATTERN_STYLE_KEYS`; palette stays per panel) |
 | Picture fields | inspector selects | panel, picture (`PANEL_ASSETS`), alt (empty = decorative), anchor, spill |
-| Bubble fields | inspector selects | panel, type, **tail** (nine options incl. **No tail**), **content** (Text / Wheel picker / Text input / Phone input), authored text or initial value, hover/click morph, link |
+| Bubble fields | inspector selects | panel, type, **tail** (nine options incl. **No tail**), **content** (Text / Wheel picker / Text input / Phone input), authored text or initial value, hover/click morph, **chain** (free text, completing on the names already in use), link |
+| Chain fields | inspector, below the bubble's own, when the bubble names a chain | **grow** / **step ms**, **scroll**, **messages** (one per line; empty = speak the balloons' own text), **+ Balloon in chain** — they edit the whole column, not the selected balloon. Chained balloons render flat in edit mode so each stays selectable |
+| Table on / off | **Project a table onto this image** checkbox (picture inspector) | Switching on seeds a starter surface; switching off deletes the table and its cells, leaving the picture |
+| Table fields | inspector controls | rows visible, text size, ink, headings on/off, the four corner X/Y pairs, **Reset corners**, and a columns list (heading / width weight / alignment) plus the cell text, one row per line, tab- or `\|`-separated |
+| Table corners | drag the four **square grips** | Only on the selected picture, only in content mode. The band guides move with them, so align the guides to the ruling in the photograph |
 | Pages | **Page** dropdown in toolbar | Switch route in edit mode (replays the wash); "Loading screen" entry previews the loading overlay + its exit wash |
 | Mode | **Content** / **Panel shapes** toggle | Content places pictures and bubbles; shapes drags the lines between panels. Content click targets are not rendered in shapes mode — a panel-sized target would swallow every drag aimed at a line crossing it |
 | Reshape | drag a **line** or a **vertex** | A frame vertex slides along its own edge; the four corners are locked; the frame itself has no handle. Arrows nudge (⇧×10) |
@@ -451,3 +537,7 @@ editor math, config editing and serialization is pure and unit-tested in
 12. **Never link two bubbles across panels** — a tube's two ends share one `panel`, or there is no tube
 13. **Never give a panel bubble its own tail path** — the tail is a ring vertex, so `'none'` and a turn both morph
 14. **Never hard-code a panel polygon or a gutter offset** — panel shapes come from `PANEL_GRIDS` through `gridPolys`, and the gutter is one perpendicular inset. A polygon written anywhere else stops moving when the grid does, and an offset applied per axis is the wrong width on every diagonal
+15. **Never tube a chained bubble, and never give a chain more than one tail** — a slot holds whatever message has scrolled into it, so a tube would join a different sentence on each turn of the wheel; the tail belongs to the root alone, and a stack of them reads as several people talking at once
+16. **Never key a chain's balloons by slot** — keying by message index is what makes a scroll animate, because the node moves and CSS transitions its position. Keyed by slot the nodes stand still and their text flickers
+17. **Never express a projected table's tilt as rotation angles, and never scroll it by pixels** — the tilt is four corners solved into one `matrix3d` (`tableProjection.ts`), and the scroll offset is an integer row index. Angles cannot be dragged onto a photograph, and a pixel offset puts the lettering between two ruled lines
+18. **Never give a projected table a scroll container, a scrollbar, or any chrome outside edit mode** — rows past the window are not rendered at all, and the guides, outline and corner grips exist only while the editor is open

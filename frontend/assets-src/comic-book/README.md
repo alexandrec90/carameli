@@ -26,11 +26,10 @@ this directory. See `.claude/rules/skin-comic-book.md`.
 
 ## Art with no layout
 
-`logo2.png`, `man-woman-talking.png`, `notepad.png` and `push-button-phone.png` are
-newer generations that no layout draws. They are masters on the same terms as the rest
-of this directory — the only lossless copies, kept for that reason — with one
-difference: none has a `.webp` in `public/`, and none should get one until something
-renders it.
+`conversation.png` is a newer generation that no layout draws. It is a master on the
+same terms as the rest of this directory — the only lossless copy, kept for that
+reason — with one difference: it has no `.webp` in `public/`, and should not get one
+until something renders it.
 
 That is not bookkeeping. `public/` is a served tree with a byte budget, and
 `frontend/assetPolicy.test.ts` fails on a file in it that no source references, so an
@@ -38,10 +37,18 @@ export encoded ahead of its layout does not wait quietly for the code to catch u
 fails the suite as dead weight. Encode from here when the layout lands, using the
 `sharp-cli` line above.
 
-They arrived by exactly the route this directory exists to prevent: generated straight
-into `frontend/public/comic-book/`, masters and exports side by side, in a static
-checkout sitting on `master`. Nothing rendered them, so nothing failed, until the
-policy test read the tree.
+This section used to name `logo2.png`, `man-woman-talking.png`, `notepad.png` and
+`push-button-phone.png`. All four have since been encoded and drawn — `layoutConfig.ts`
+and the editor's `assets.ts` reference every one — so the list was describing a state
+that had passed. A file leaves this section when its layout lands, not when its `.webp`
+is written; nothing fails if the paragraph is left stale, which is exactly why it has to
+be edited by hand in the same change.
+
+Those four arrived by exactly the route this directory exists to prevent: generated
+straight into `frontend/public/comic-book/`, masters and exports side by side, in a
+static checkout sitting on `master`. Nothing rendered them, so nothing failed, until the
+policy test read the tree. `conversation.png` arrived the better way — into
+`assets-src/`, with no export — and is committed here waiting for a layout.
 
 ## The traced references
 
