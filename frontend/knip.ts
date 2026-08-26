@@ -37,8 +37,9 @@ const config: KnipConfig = {
     // Installed here because that is where the node_modules is, invoked from Python, so
     // no import anywhere names it.
     'markdownlint-cli',
-    // Required by `scripts/compress-images.js` at the repo root, which reaches into
-    // `frontend/node_modules/sharp` for the same reason.
+    // Required by `scripts/encode-comic-art.py`, which runs a short node program with
+    // `frontend/` as its cwd so `require('sharp')` resolves here. Invoked from Python,
+    // so no import anywhere names it.
     'sharp',
   ],
 

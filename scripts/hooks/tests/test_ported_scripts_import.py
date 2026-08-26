@@ -26,7 +26,6 @@ ORCHESTRATION_SCRIPTS = [
     "scripts/install-pre-commit.py",
     "scripts/extract-log-errors.py",
     "scripts/archive-done-todos.py",
-    "scripts/compress-comic-book-images.py",
     "scripts/sync-codex-context.py",
 ]
 
@@ -35,9 +34,3 @@ ORCHESTRATION_SCRIPTS = [
 def test_script_imports_and_has_main(relpath):
     mod = load_module(relpath)
     assert callable(mod.main)
-
-
-def test_compress_targets_comic_book_dir():
-    mod = load_module("scripts/compress-comic-book-images.py")
-    assert mod.COMIC_BOOK_DIR.parts[-3:] == ("frontend", "public", "comic-book")
-    assert mod.JS_SCRIPT.name == "compress-images.js"
