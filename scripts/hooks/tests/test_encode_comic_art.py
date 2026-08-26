@@ -128,6 +128,20 @@ export const PANEL_ASSETS: PanelAsset[] = [
 """
 
 
+class TestManifestLine:
+    def test_matches_the_formatting_the_file_already_uses(self):
+        line = eca.manifest_line("/comic-book/a.webp", "A picture")
+        assert line == "  { src: '/comic-book/a.webp', label: 'A picture' },"
+        # The array is single-quoted, two-space indented, trailing comma -- prettier
+        # reformats anything else on the next edit, which turns one added picture
+        # into a diff touching the whole list.
+        assert MANIFEST.splitlines()[-2].startswith("  { src: '")
+
+    def test_refuses_a_label_carrying_an_apostrophe(self):
+        with pytest.raises(eca.EncodeError, match="quote"):
+            eca.manifest_line("/comic-book/a.webp", "Alex's phone")
+
+
 class TestRegisterInManifest:
     def test_appends_inside_the_array(self):
         out, changed = eca.register_in_manifest(
@@ -235,6 +249,43 @@ class TestArgumentValidation:
         assert args.names == ["conversation", "hand-notepad"]
         assert args.max_edge == eca.DEFAULT_MAX_EDGE
         assert args.quality == eca.DEFAULT_QUALITY
+
+
+class TestArtifact:
+    """`logs/` is where a failure has to survive the terminal scrolling away, so both
+    halves of that contract get named: written on failure, emptied on success. An
+    artifact left holding an older run's text is worse than none -- the runners read a
+    stale file as current, and the fix that was already applied gets applied again."""
+
+    def test_write_artifact_creates_the_directory_and_returns_the_path(self, monkeypatch, tmp_path):
+        target = tmp_path / "logs"
+        monkeypatch.setattr(eca, "LOG_DIR", target)
+        path = eca.write_artifact("sharp failed for a.png")
+
+        assert path == target / eca.ARTIFACT
+        assert path.read_text(encoding="utf-8") == "sharp failed for a.png"
+
+    def test_write_artifact_overwrites_rather_than_appends(self, monkeypatch, tmp_path):
+        monkeypatch.setattr(eca, "LOG_DIR", tmp_path)
+        eca.write_artifact("first run")
+        eca.write_artifact("second run")
+
+        assert (tmp_path / eca.ARTIFACT).read_text(encoding="utf-8") == "second run"
+
+    def test_clear_artifact_empties_an_existing_file(self, monkeypatch, tmp_path):
+        monkeypatch.setattr(eca, "LOG_DIR", tmp_path)
+        eca.write_artifact("a failure")
+        eca.clear_artifact()
+
+        assert (tmp_path / eca.ARTIFACT).read_text(encoding="utf-8") == ""
+
+    def test_clear_artifact_leaves_the_file_present(self, monkeypatch, tmp_path):
+        # Emptied, never deleted: a missing artifact reads as "clean" to the runners,
+        # so deleting one reports green having checked nothing.
+        monkeypatch.setattr(eca, "LOG_DIR", tmp_path)
+        eca.clear_artifact()
+
+        assert (tmp_path / eca.ARTIFACT).is_file()
 
 
 class TestMain:
