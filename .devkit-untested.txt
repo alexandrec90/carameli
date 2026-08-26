@@ -420,7 +420,6 @@ scripts/hooks/harness_config.py::is_devkit_source
 scripts/hooks/session-sync.py::main
 scripts/hooks/session-sync.py::run_git
 scripts/local-e2e.py::ensure_carameli_up
-scripts/local-e2e.py::main
 scripts/local-e2e.py::probe_health
 scripts/local-e2e.py::run_step
 scripts/local-e2e.py::wait_for_health
@@ -469,8 +468,6 @@ scripts/run-local-e2e.py::stream_lines
 scripts/run-tests.py::pick_fast_command
 scripts/run-tests.py::run_argv
 scripts/run-tests.py::run_ci
-scripts/run-tests.py::run_local
-scripts/run-tests.py::run_scoped
 scripts/script_common.py::print_suite_header
 scripts/ship.py::backoff_delays
 scripts/ship.py::current_branch
