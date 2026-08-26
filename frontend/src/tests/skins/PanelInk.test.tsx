@@ -3,7 +3,23 @@ import type { ReactElement } from 'react'
 import { describe, expect, it } from 'vitest'
 
 import PanelInk from '../../skins/comic-book/PanelInk'
+import type { PanelInkProps } from '../../skins/comic-book/PanelInk'
 import type { PanelPoly } from '../../skins/comic-book/panelGeometry'
+
+/**
+ * The strongest form of "a picture is never inked": the ink layer is never handed one.
+ *
+ * This is a **compile-time** assertion — `lint:types` fails, not vitest — because the
+ * runtime version cannot work. A re-added image loop would read a prop this file does
+ * not pass and quietly draw nothing, so a test that counts polygons would stay green
+ * while the app grew borders again. Widening the prop surface is the moment to fail, and
+ * that moment is only visible to the type checker.
+ *
+ * If this line errors, someone is giving PanelInk knowledge of pictures. Pictures are
+ * not panels: draw them in PanelImages, and leave this layer the panels.
+ */
+type SamePropsAs<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false
+const INK_TAKES_ONLY_PANELS: SamePropsAs<keyof PanelInkProps, 'polys'> = true
 
 const poly = (x: number): PanelPoly => ({
   vp: [[x, 0], [x + 100, 0], [x + 100, 100], [x, 100]],
@@ -40,5 +56,8 @@ describe('PanelInk', () => {
 
     // One panel in, one outline out. Two, and the inset picture has been inked again.
     expect(container.querySelectorAll('polygon')).toHaveLength(1)
+    // Reads the compile-time assertion above so it cannot be dropped as unused. Its
+    // real failure mode is `lint:types`, not this expectation.
+    expect(INK_TAKES_ONLY_PANELS).toBe(true)
   })
 })

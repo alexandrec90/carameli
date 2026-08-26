@@ -1,12 +1,17 @@
 import type { PanelPoly } from './panelGeometry'
 
-interface PanelInkProps {
+/**
+ * Exported so a test can assert this is the *whole* prop surface: `polys` and nothing
+ * else. A picture cannot be inked by a layer that is never handed one, and that is a
+ * stronger guarantee than counting what got drawn — see PanelInk.test.tsx.
+ */
+export interface PanelInkProps {
     /** Sparse, PANELS-length: null slots are panels that live on another page. */
     polys: (PanelPoly | null)[]
 }
 
 /**
- * The ink layer â€” one stroked outline per panel, on a viewport-level SVG that sits
+ * The ink layer — one stroked outline per panel, on a viewport-level SVG that sits
  * above the images and below the wash.
  *
  * **Only panels are inked.** A picture used to get a border of its own here, drawn on
@@ -14,7 +19,7 @@ interface PanelInkProps {
  * picture reads as a panel-within-a-panel. It does not: a picture is a picture, its
  * real edges are its own artwork's, and a second black polygon in the panel's shape
  * around a frame that is not the panel is the thing the editor's selection outline
- * kept contradicting. Frames and panels are independent â€” this layer draws panels.
+ * kept contradicting. Frames and panels are independent — this layer draws panels.
  */
 export default function PanelInk({ polys }: PanelInkProps) {
     return (
