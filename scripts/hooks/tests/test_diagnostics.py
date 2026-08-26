@@ -104,8 +104,51 @@ def test_digest_tests_skips_when_suite_never_ran():
     lines = ['OCI runtime exec failed: exec: "pytest": executable file not found in $PATH']
     failed, text, skips = diag.digest_tests({"telnyx-sandbox": (lines, 1)}, "label")
     assert not failed
-    assert text == ""
     assert skips == [("telnyx-sandbox", "not installed")]
+    assert "# telnyx-sandbox -- DID NOT RUN (not installed)" in text
+
+
+def test_digest_tests_records_a_skipped_target_in_the_artifact():
+    # Regression: an environmental skip wrote NOTHING to logs/test-failures.log, and an
+    # empty artifact is how this project spells "clean" -- so a run whose suite never
+    # started left behind a file saying the opposite of what happened, with nothing to
+    # diagnose from. The skip still must not set `failed`; that stays the runner's call.
+    lines = ["Error response from daemon: No such container: carameli-app-1"]
+    failed, text, skips = diag.digest_tests({"pytest": (lines, 1)}, "label")
+
+    assert not failed
+    assert skips == [("pytest", "environment error")]
+    assert "# pytest -- DID NOT RUN (environment error)" in text
+    assert "No such container: carameli-app-1" in text
+
+
+def test_digest_tests_caps_a_skipped_target_output():
+    lines = [f"line {n}" for n in range(200)]
+    lines[0] = "could not connect to the database"
+    _, text, _ = diag.digest_tests({"pytest": (lines, 1)}, "label")
+
+    body = text.splitlines()
+    assert "could not connect to the database" in body
+    assert f"... ({200 - (diag._SKIP_BODY_MAX - 1)} more line(s) suppressed)" in body
+
+
+def test_skip_body_says_so_when_there_was_no_output():
+    # The section header alone would read as a truncated artifact; say which it is.
+    assert diag._skip_body([]) == ["(the target produced no output at all)"]
+    assert diag._skip_body(["   ", ""]) == ["(the target produced no output at all)"]
+
+
+def test_digest_tests_keeps_failures_and_skips_in_one_artifact():
+    failing = ["FAILED tests/unit/test_x.py::test_y - AssertionError", "==== 1 failed in 1.0s ===="]
+    skipped = ["Error response from daemon: No such container: carameli-app-1"]
+    failed, text, skips = diag.digest_tests(
+        {"pytest": (failing, 1), "webhook-e2e": (skipped, 1)}, "label"
+    )
+
+    assert failed
+    assert skips == [("webhook-e2e", "environment error")]
+    assert "# pytest" in text
+    assert "# webhook-e2e -- DID NOT RUN (environment error)" in text
 
 
 def test_source_header():
@@ -578,5 +621,10 @@ def test_digest_tests_skips_env_error_source():
         "src",
     )
     assert not any_failed
-    assert text == ""
     assert ("frontend-tests", "not installed") in skips
+    # Not a failure, but not silence either: the artifact records which target never
+    # ran and what it printed, so the file cannot be misread as "clean".
+    assert "# frontend-tests -- DID NOT RUN (not installed)" in text
+    assert "npm error could not be found" in text
+    # The target that DID pass contributes nothing.
+    assert "# pytest" not in text

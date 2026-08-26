@@ -529,6 +529,24 @@ FRONTEND_TEST_TARGETS = frozenset({"frontend-tests", "bundle-budgets"})
 BACKEND_TEST_TARGETS = frozenset(name for name, *_ in TEST_SECTIONS) - FRONTEND_TEST_TARGETS
 
 
+# How much of a skipped target's captured output the artifact keeps. The output is
+# an environment error (`No such container`, a refused connection), not a test
+# failure, so a handful of lines names the cause; the cap keeps a runaway stack
+# trace from burying the failures of the targets that DID run.
+_SKIP_BODY_MAX = 30
+
+
+def _skip_body(lines: list[str]) -> list[str]:
+    """The captured output to record for a target that never ran. Pure."""
+    body = last_resort(lines)
+    if not body:
+        return ["(the target produced no output at all)"]
+    if len(body) <= _SKIP_BODY_MAX:
+        return body
+    kept = _SKIP_BODY_MAX - 1
+    return [*body[:kept], f"... ({len(body) - kept} more line(s) suppressed)"]
+
+
 def digest_tests(
     results: dict[str, tuple[list[str], int]],
     source_label: str,
@@ -541,8 +559,14 @@ def digest_tests(
     are considered (the rest are ignored) -- this is how the CI runner writes
     backend failures and frontend failures to separate artifacts from one results
     dict. `include=None` (the default) folds every section into one artifact.
+
+    A target skipped for an environmental reason is reported in `skips` AND recorded
+    in the artifact as a `DID NOT RUN` section carrying its captured output, so the
+    file never says "clean" about a suite that never started. It still does not set
+    `any_failed`: whether a skip fails the run is the caller's call.
     """
     sections: list[str] = []
+    skip_sections: list[str] = []
     skips: list[tuple[str, str]] = []
     any_failed = False
 
@@ -560,6 +584,15 @@ def digest_tests(
         skip = get_skip_reason(lines)
         if skip and not any(count_test_summary(lines)):
             skips.append((name, skip))
+            # A skip stays out of `any_failed` -- the runner decides that from
+            # `_CRITICAL_TARGETS`. It does NOT stay out of the artifact: an empty
+            # `logs/test-failures.log` is how this project spells "clean", so a run
+            # whose suite never started used to leave behind a file that reads as a
+            # green pass and carries nothing to diagnose from.
+            skip_sections.append(f"# {header} -- DID NOT RUN ({skip})")
+            skip_sections.append(f"# fix: {fix_hint}")
+            skip_sections.extend(_skip_body(lines))
+            skip_sections.append("")
             continue
         any_failed = True
         body = parser(lines)
@@ -574,7 +607,8 @@ def digest_tests(
         )
         sections.append("")
 
-    text = "\n".join([source_header(source_label), "", *sections]) if any_failed else ""
+    artifact_body = [*sections, *skip_sections]
+    text = "\n".join([source_header(source_label), "", *artifact_body]) if artifact_body else ""
     return any_failed, text, skips
 
 

@@ -215,13 +215,26 @@ def t_stylelint(changed: list[str] | None = None) -> dict:
 
 
 def t_markdownlint(changed: list[str] | None = None) -> dict:
-    if changed is not None and not _sel(changed, _is_md):
-        return {"markdownlint": ([], 0)}
+    # Captured agent transcripts (e.g. "artifacts/transcripts/fixer-run-transcript.md")
+    # are raw tool output, not prose -- they legitimately carry inline HTML
+    # and fenced code, generating hundreds of unfixable findings that bury
+    # real markdown errors. Exclude any *transcript*.md from the lint.
+    if changed is not None:
+        # Scope the FILES, not just whether the tool runs. This command carries
+        # `--fix`, so gating on the changed set and then handing markdownlint the
+        # whole-repo glob rewrote every markdown file in the tree on the strength of
+        # one edited README -- including files the change never touched. A ship-time
+        # lint then left a dirty tree it had just created and refused its own push.
+        files = [f for f in _sel(changed, _is_md) if "transcript" not in Path(f).name]
+        if not files:
+            return {"markdownlint": ([], 0)}
+        return {
+            "markdownlint": run(
+                f"npm --prefix frontend exec --yes -- markdownlint {_q(files)} "
+                '-c ".markdownlint.json" --fix'
+            )
+        }
     return {
-        # Captured agent transcripts (e.g. "artifacts/transcripts/fixer-run-transcript.md")
-        # are raw tool output, not prose -- they legitimately carry inline HTML
-        # and fenced code, generating hundreds of unfixable findings that bury
-        # real markdown errors. Exclude any *transcript*.md from the lint.
         "markdownlint": run(
             'npm --prefix frontend exec --yes -- markdownlint "**/*.md" '
             '--ignore "**/node_modules/**" --ignore "**/.git/**" --ignore "**/.venv/**" '
@@ -355,8 +368,16 @@ def tracked_dotenv_files(root: Path, tracked: set[str]) -> list[str]:
     return sorted(p.name for p in root.glob(".env*") if p.is_file() and p.name in tracked)
 
 
-def _git_tracked_root_files() -> set[str]:
-    """Names of the repo-root files git tracks; empty when git is unavailable."""
+def _git_tracked_root_files() -> set[str] | None:
+    """Names of the repo-root files git tracks, or None when git cannot be asked.
+
+    The two answers used to be the same empty set, and that is a defect rather than a
+    detail: pytest runs inside the app container, where git is not installed, so
+    ``git ls-files`` raised OSError, ``t_dotenv`` selected zero templates and reported
+    success. That is the "reports green having checked nothing" failure mode
+    ``CLAUDE.md`` warns about -- the caller cannot distinguish it from a clean pass
+    unless this function says which of the two happened.
+    """
     try:
         proc = subprocess.run(
             ["git", "ls-files", "-z", "--", ":(top)*"],
@@ -366,16 +387,30 @@ def _git_tracked_root_files() -> set[str]:
             check=False,
         )
     except OSError:
-        return set()
+        return None
     if proc.returncode != 0:
-        return set()
+        return None
     return {name for name in proc.stdout.split("\0") if name and "/" not in name}
+
+
+# Wording matters here: `diagnostics.get_skip_reason` reclassifies a failure whose
+# output contains "not installed" / "command not found" as an environmental skip and
+# keeps it out of the artifact. This finding must stay a loud failure, so it says what
+# is missing without using any of those phrases.
+_GIT_UNAVAILABLE_LINE = (
+    "cannot list the git-tracked root files (`git ls-files` did not run here), so the "
+    "tracked .env* templates are unknown and NOTHING was linted. Run "
+    "scripts/lint-all.py on the host -- the app container ships no git executable."
+)
 
 
 def t_dotenv(changed: list[str] | None = None) -> dict:
     if changed is not None and not _sel(changed, _is_env):
         return {"dotenv-linter": ([], 0)}
-    envs = tracked_dotenv_files(REPO_ROOT, _git_tracked_root_files())
+    tracked = _git_tracked_root_files()
+    if tracked is None:
+        return {"dotenv-linter": ([_GIT_UNAVAILABLE_LINE], 1)}
+    envs = tracked_dotenv_files(REPO_ROOT, tracked)
     if not envs:
         return {"dotenv-linter": ([], 0)}
     return {"dotenv-linter": run("dotenv-linter check " + " ".join(envs))}
