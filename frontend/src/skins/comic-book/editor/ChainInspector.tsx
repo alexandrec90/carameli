@@ -1,6 +1,6 @@
 import {
   CHAIN_ROWS, CHAIN_STEP_MS, chainMembers, chainTranscript, defaultChain, isComposerContent,
-  messageRows, readTranscript,
+  messageRows, peerWheelOn, readTranscript,
 } from '../bubbleChain'
 import { parseMessages } from './chainOps'
 import type { BubbleTransform } from './types'
@@ -36,6 +36,10 @@ export default function ChainInspector({ api, index, bubble }: ChainInspectorPro
   const lines = readTranscript(chainTranscript(chain, members.map(i => bubbles[i])))
   const total = lines.length
   const out = lines.filter(l => l.out).length
+  // Whether the panel offers a number to bind to. Checked here rather than left to fail
+  // silently at render time: a bound chain with no picker draws an empty table, which
+  // looks like a broken chain and is actually a missing balloon.
+  const hasPicker = peerWheelOn(bubbles, bubble.panel) >= 0
 
   return (
     <>
@@ -88,6 +92,22 @@ export default function ChainInspector({ api, index, bubble }: ChainInspectorPro
             onChange={e => api.setChain(chain.id, { stepMs: Number(e.target.value) })}
           />
         </label>
+      )}
+
+      <label className="cb-ed-check">
+        <input
+          type="checkbox"
+          checked={chain.sms}
+          onChange={e => api.setChain(chain.id, { sms: e.target.checked })}
+        />
+        <span>Live SMS conversation</span>
+      </label>
+      {chain.sms && (
+        <div className="cb-ed-hint">
+          {hasPicker
+            ? 'Bound to whichever number this panel’s wheel picker is turned to. The transcript below is not drawn — the balloons are the real messages — and Enter in the composer sends one for money.'
+            : 'This panel has no wheel-picker balloon, so there is no number to bind to and the conversation renders empty. Add a bubble with `wheel` content, outside the chain, whose text is the numbers separated by commas.'}
+        </div>
       )}
 
       <label className="cb-ed-field">

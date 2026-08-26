@@ -267,52 +267,98 @@ the slice of outline it covers. Both z-indices are load-bearing — above the li
 panel (z 8), below the Ben-Day wash (z 10). Overlapping bubbles draw no tube at all,
 by design; a corridor shorter than its own width reads as a smudge.
 
-### Bubble chains — a column read as an SMS thread
+### Bubble chains — two balloons read as an SMS thread
 
-A bubble's `chain` name joins it to a **vertical column** of balloons on the same
-panel that is read as one speaker's message thread (`bubbleChain.ts`, rendered by
-`PanelBubbleChain.tsx`). The balloons are the author's drawing and never move; the
-**messages move through them**, arriving at the top. Slot order is by `top`
-descending, so **slot 0 is the lowest balloon — the root, the one that carries the
-tail**; every slot above it is a later message and should have `tail: 'none'`.
+A bubble's `chain` id joins it to a **conversation drawn as two columns**
+(`bubbleChain.ts`, rendered by `PanelBubbleChain.tsx`): the recipient speaks down the
+left column, the sender down the right, and the rows run in the order the messages were
+sent, so one party saying two things in a row simply takes two rows in a row.
 
-`PANEL_BUBBLE_CHAINS` in `layoutConfig.ts` holds one entry per name in use, with two
-independent toggles and the thread itself:
+**The members are templates, not slots.** The author draws *one balloon per column* —
+its shape, tail, rotation, lettering and the column's edge — and every row is stamped
+from the template of the side it belongs to. Member 0 is the **sender**: the rightmost
+column, the one the composer sits at the foot of. Rows are laid out bottom-up from it,
+each row's `top` the running sum of the heights below it, so a long message pushes the
+thread up by its own height rather than by a fixed pitch a two-line balloon would
+overlap. Width follows the message (`messageWidth`); the template's own width is the
+widest a balloon on that side gets.
+
+**Linkage is what joins the two columns**, not a name: a chain's members are the
+balloons wired together by `linkTo`, and one checkbox on either says which of the two a
+linked group is — a welded pair, or a conversation. The id the group carries is
+generated (`nextChainId`) and never shown.
+
+`PANEL_BUBBLE_CHAINS` in `layoutConfig.ts` holds one entry per id in use:
 
 | Field | Effect |
 | --- | --- |
-| `grow` | reveals the column one balloon at a time, `stepMs` apart, instead of all at once |
-| `scroll` | the mouse wheel moves a window over a thread longer than the column |
-| `messages` | the thread; **empty means the chain speaks its own balloons' `text`**, in slot order |
+| `grow` | plays the transcript in one message at a time, `stepMs` apart, instead of filling the table at once |
+| `rows` | how many rows are on screen at once, counting the composer's; past that the wheel moves a window |
+| `messages` | the thread, oldest first; a leading `> ` marks the **sender's** side. **Empty means the chain speaks its two balloons' own `text`** |
+| `sms` | binds the conversation to the account's real SMS history — see below |
 
-The list is **derived, not authored**: `syncChains` recomputes it from the names the
-bubbles carry after every edit that can touch one, so naming a chain creates its entry
-and renaming the last member away removes it. There is deliberately no add-chain or
+The list is **derived, not authored**: `syncChains` recomputes it from the ids the
+bubbles carry after every edit that can touch one. There is deliberately no add-chain or
 delete-chain operation — a chain with no members and a member with no chain are both
 unreachable states rather than states to be validated.
 
-Three rules hold this together, each enforced where it can be enforced by construction:
+Scrolling is not a toggle: a chain *is* a window over a transcript, so the wheel always
+moves it. **Live** is `content: 'input'` (or `'phone'`) on the sender template — the
+composer takes the bottom row and messages start one row up.
 
-- **A chained balloon takes no tube.** A slot holds whatever message has scrolled into
-  it, so a tube welded to it would join a different sentence each time. Dropped in
+These rules hold it together, each enforced where it can be enforced by construction:
+
+- **A chained balloon takes no tube.** A row holds whatever message the transcript put
+  there, so a tube welded to it would join a different sentence each time. Dropped in
   `sanitizeLinks` (data), never offered by `linkCandidates` (editor), and refused by
   `linkedPairs` (renderer) — the same three-place pattern as the same-panel rule.
-- **A chain is one panel's.** `chainSlots` filters on panel as well as name, so two
-  panels may reuse a name without their balloons ever being on screen together.
-- **Only up.** The window arithmetic assumes time runs upward: `visibleWindow` puts the
-  oldest visible message in slot 0, and a wheel-up advances the thread. A horizontal
-  chain is not a supported layout — it would need a second axis in every one of those
-  functions, not a CSS change.
+- **A chain is one panel's.** `chainMembers` filters on panel as well as id, so two
+  panels never draw one conversation between them.
+- **Only up.** The window arithmetic assumes time runs upward: the newest message sits
+  where the composer is and older ones climb away. A horizontal chain is not a supported
+  layout — it would need a second axis in every one of those functions, not a CSS change.
 
-Both behaviours are per chain, so a page can hold a live thread beside a plain
-multi-balloon utterance. All of the arithmetic is pure and in `bubbleChain.ts`;
-`PanelBubbleChain.tsx` adds only what cannot be — the growth timer, the wheel
-listener, and the rewind when the panel stops being hovered. **Keys are message
-indices, not slot indices**: a message keeps its DOM node as it moves down the column,
-which is what lets CSS transition its `top`/`right`/`width` rather than flickering
-text through four stationary balloons. The arrival effect is a `@keyframes` animation
-(`bubbleChains.css`) and not a transition, because a node that mounts already carrying
-`is-visible` has no previous value to transition from.
+All of the arithmetic is pure and in `bubbleChain.ts`; `PanelBubbleChain.tsx` adds only
+what cannot be — the growth timer, the wheel listener, the panel's measured aspect and
+what a reader typed. **Keys are message indices, not row indices**: a message keeps its
+DOM node as it moves up the table, which is what lets CSS transition its
+`top`/`right`/`width` rather than flickering text through stationary balloons. The
+arrival effect is a `@keyframes` animation (`bubbleChains.css`) and not a transition,
+because a node that mounts already carrying `is-visible` has no previous value to
+transition from.
+
+### A chain bound to real SMS
+
+`sms: true` stops a chain being a drawing. The transcript then comes from the carrier
+instead of from `messages`, and Enter in the composer **sends for real** — there is no
+safe mode, and the account is billed.
+
+**Which conversation is not stored on the chain.** It is whichever number the panel's
+wheel-picker balloon is turned to: `peerWheelOn` takes the first `content: 'wheel'`
+balloon on the panel **that is not itself in a chain**, because a wheel inside a
+conversation is picking what to *say*, not who to say it to. The option is read through
+`toE164` (`phoneInput.ts`), so the same number written three ways is one thread; an
+option that is a name resolves to null and binds nothing. The two halves are separate
+balloons on purpose — the picker says *who*, the chain says *what* — which is how the
+panel reads as a phone rather than as a form.
+
+The data still obeys the three-layer rule (`.claude/rules/skin-architecture.md`): nothing
+in the skin fetches. `App.tsx` owns `useSmsConversations()` and passes it as
+`LayoutProps.sms`; `PanelBubbles` calls `subscribe(peer)` and reads what comes back. The
+hook polls (`SMS_POLL_MS`) only while somebody is subscribed and shares one request
+between subscribers, so a page whose panels bind nothing costs nothing — which is what
+lets `App` mount it for every skin. A sent message is drawn optimistically and retires
+when its own row returns from the server (`mergeMessages`); until then it carries
+`is-sending`, and a refused send carries `is-failed`.
+
+Two things a bound chain must never do, both asserted in
+`src/tests/skins/PanelBubblesSms.test.tsx`:
+
+- **Never fall back to the authored transcript.** A bound chain that resolved no number
+  shows an empty conversation. The fallback would put the author's words into somebody's
+  real thread.
+- **Never bind in edit mode.** The editor is the author placing balloons; a panel under
+  it must not poll a carrier, and Enter in a composer there must not spend money.
 
 ### Asset Image (Gemini-generated)
 
@@ -417,8 +463,9 @@ neither grows past the instruction-size limit.
 12. **Never link two bubbles across panels** — a tube's two ends share one `panel`, or there is no tube
 13. **Never give a panel bubble its own tail path** — the tail is a ring vertex, so `'none'` and a turn both morph
 14. **Never hard-code a panel polygon or a gutter offset** — panel shapes come from `PANEL_GRIDS` through `gridPolys`, and the gutter is one perpendicular inset. A polygon written anywhere else stops moving when the grid does, and an offset applied per axis is the wrong width on every diagonal
-15. **Never tube a chained bubble, and never give a chain more than one tail** — a slot holds whatever message has scrolled into it, so a tube would join a different sentence on each turn of the wheel; the tail belongs to the root alone, and a stack of them reads as several people talking at once
-16. **Never key a chain's balloons by slot** — keying by message index is what makes a scroll animate, because the node moves and CSS transitions its position. Keyed by slot the nodes stand still and their text flickers
+15. **Never tube a chained bubble, and never give a chain more than one tail** — a row holds whatever message the transcript put there, so a tube would join a different sentence on each turn of the wheel; the tail belongs to each column's template alone, and a stack of them reads as several people talking at once
+16. **Never key a chain's balloons by row** — keying by message index is what makes a scroll animate, because the node moves and CSS transitions its position. Keyed by row the nodes stand still and their text flickers
 17. **Never express a projected table's tilt as rotation angles, and never scroll it by pixels** — the tilt is four corners solved into one `matrix3d` (`tableProjection.ts`), and the scroll offset is an integer row index. Angles cannot be dragged onto a photograph, and a pixel offset puts the lettering between two ruled lines
 18. **Never ink a picture, and never give a picture's frame the panel's shape** — only panels are stroked, and a frame is a rectangle windowed by its panel. A black outline in the grid's slant around something that is not a panel is the mistake this rule exists to stop repeating; the editor's selection outline traces the artwork's own rect, and a second, differently-shaped border beside it is a renderer contradicting the author
 19. **Never give a projected table a scroll container, a scrollbar, or any chrome outside edit mode** — rows past the window are not rendered at all, and the guides, outline and corner grips exist only while the editor is open
+20. **Never let a bound (`sms: true`) chain fall back to its authored `messages`, and never bind one in edit mode** — the first puts the author's lettering into somebody's real thread, the second spends money from the editor

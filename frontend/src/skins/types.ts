@@ -4,6 +4,7 @@ import type { UseDashboardResult } from '../hooks/useDashboard'
 import type { UsePhoneLinesResult } from '../hooks/usePhoneLines'
 import type { UseExtensionsResult } from '../hooks/useExtensions'
 import type { UseSoftphoneResult } from '../hooks/useSoftphone'
+import type { UseSmsConversationsResult } from '../hooks/useSmsConversations'
 import type { DataPageProps } from '../lib/dataPage'
 
 export interface PlaceholderProps {
@@ -44,6 +45,16 @@ export interface SkinViews {
 export interface LayoutProps {
   children: React.ReactNode
   navItems: NavItem[]
+  /**
+   * Live SMS threads for skins whose *chrome* — not one of its views — shows a
+   * conversation. The comic-book skin's bubble chains are that case: they are drawn by
+   * the Layout, so there is no view whose props could carry them.
+   *
+   * It is a subscription rather than a payload because the number being shown is the
+   * skin's to know (a wheel-picker balloon the reader turns), while the fetching stays
+   * in `useSmsConversations`. A skin that subscribes to nothing costs nothing.
+   */
+  sms: UseSmsConversationsResult
 }
 
 export interface Skin {

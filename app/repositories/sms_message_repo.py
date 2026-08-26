@@ -4,7 +4,7 @@ import logging
 import uuid
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import and_, delete, select, update
+from sqlalchemy import and_, delete, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.sms_message import SmsMessage
@@ -71,9 +71,18 @@ class SmsMessageRepo:
         start: datetime | None = None,
         end: datetime | None = None,
         limit: int = 100,
+        peer: str | None = None,
     ) -> list[SmsMessage]:
-        """Return a customer's SMS messages, newest first, with an optional created_at range."""
+        """Return a customer's SMS messages, newest first, with an optional created_at range.
+
+        `peer` narrows the result to one conversation: every message this customer
+        exchanged with that number, in either direction. It is an additional filter on
+        the customer-scoped query rather than a query of its own, so a peer belonging to
+        another customer's history matches nothing here.
+        """
         stmt = select(SmsMessage).where(SmsMessage.customer_id == customer_id)
+        if peer is not None:
+            stmt = stmt.where(or_(SmsMessage.from_number == peer, SmsMessage.to_number == peer))
         if start is not None:
             stmt = stmt.where(SmsMessage.created_at >= start)
         if end is not None:

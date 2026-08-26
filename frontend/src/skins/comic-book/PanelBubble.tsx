@@ -39,6 +39,19 @@ interface PanelBubbleProps {
    * what is typed in it.
    */
   onSubmit?: (value: string) => void
+  /**
+   * Passed through to a `wheel` balloon: the picked option, reported on mount and on every
+   * turn. Only the balloon a panel reads a phone number off supplies one.
+   */
+  onWheelSelect?: (value: string) => void
+  /**
+   * How far a message of a live conversation has got. Absent on every balloon that is not
+   * one, and on one whose message the carrier has acknowledged — a sent message is just a
+   * message. Drawn as ink rather than as words: a sending balloon is pale and a failed one
+   * is struck in red (see bubbleChains.css), because a status *line* would be a seventh row
+   * in a six-row table.
+   */
+  status?: 'sending' | 'failed'
 }
 
 /**
@@ -55,6 +68,8 @@ export default function PanelBubble({
   interactive,
   chained = false,
   onSubmit,
+  onWheelSelect,
+  status,
 }: PanelBubbleProps) {
   const [hover, setHover] = useState(false)
   const [focused, setFocused] = useState(false)
@@ -97,6 +112,7 @@ export default function PanelBubble({
     shown ? 'is-visible' : '',
     interactive ? 'is-interactive' : '',
     chained ? 'cb-chain-bubble' : '',
+    status ? `is-${status}` : '',
   ]
     .filter(Boolean)
     .join(' ')
@@ -153,7 +169,13 @@ export default function PanelBubble({
           onSubmit={onSubmit}
         />
       ) : bubble.content === 'wheel' ? (
-        <BubbleWheel options={splitOptions(bubble.text)} font={font} open={hover} hostRef={rootRef} />
+        <BubbleWheel
+          options={splitOptions(bubble.text)}
+          font={font}
+          open={hover}
+          hostRef={rootRef}
+          onSelect={onWheelSelect}
+        />
       ) : (
         <span className="cb-panel-bubble-text" style={{ fontFamily: `'${font}', cursive` }}>
           {bubble.text}

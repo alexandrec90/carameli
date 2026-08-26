@@ -85,6 +85,18 @@ export interface BubbleChain {
    * the composer alone.
    */
   messages: string[]
+  /**
+   * Bind this conversation to the account's real SMS history. The transcript then comes
+   * from the carrier rather than from {@link BubbleChain.messages}, and the composer sends
+   * for real: Enter posts to `VsMessaging/Sms/Send` and the message reappears from the
+   * server on the next poll.
+   *
+   * **Which conversation is not stored here.** It is whichever number the panel's
+   * wheel-picker balloon is turned to (see {@link peerWheelOn}) — the reader chooses it,
+   * so an authored value would be overwritten the first time they turned the wheel. A
+   * chain with this set and no wheel to read shows nothing rather than guessing.
+   */
+  sms: boolean
 }
 
 /** Bounds for the growth delay, shared by the inspector's number field and hydration. */
@@ -136,6 +148,7 @@ export function defaultChain(id: string): BubbleChain {
     stepMs: DEFAULT_CHAIN_STEP_MS,
     rows: DEFAULT_CHAIN_ROWS,
     messages: [],
+    sms: false,
   }
 }
 
@@ -152,7 +165,8 @@ export function isBubbleChain(value: unknown): value is BubbleChain {
     typeof c.rows === 'number' &&
     Number.isFinite(c.rows) &&
     Array.isArray(c.messages) &&
-    c.messages.every(m => typeof m === 'string')
+    c.messages.every(m => typeof m === 'string') &&
+    typeof c.sms === 'boolean'
   )
 }
 
@@ -278,6 +292,42 @@ export function readTranscript(messages: readonly string[]): ChainLine[] {
       ? { out: true, text: m.slice(OUT_PREFIX.length) }
       : { out: false, text: m },
   )
+}
+
+/**
+ * The balloon on `panel` whose wheel picker names the number a live conversation is with,
+ * or -1 when the panel has none.
+ *
+ * The rule is the whole binding, so it is worth stating plainly: **the first wheel-picker
+ * balloon on the panel that is not itself part of a chain.** Nothing else marks it — no
+ * field on the bubble, no number in the chain — because the author's expression of "this
+ * panel picks a number" is already the balloon they drew and set to `wheel`, in the same
+ * way that linkage plus a checkbox is how they express "these two are a conversation".
+ *
+ * A chain member is excluded because a chain may hold a wheel of its own inside the
+ * conversation, and that one is picking something the conversation says rather than who it
+ * is with.
+ */
+export function peerWheelOn(
+  bubbles: readonly { panel: number; chain: string; content: string }[],
+  panel: number,
+): number {
+  return bubbles.findIndex(b => b.panel === panel && b.chain === '' && b.content === 'wheel')
+}
+
+/**
+ * A carrier transcript in the form the rest of this module reads: oldest first, the
+ * sender's side marked with {@link OUT_PREFIX}.
+ *
+ * Which column a message lands in comes from its `outbound` flag — what the database
+ * recorded when it was sent or received — and never from comparing numbers. A customer
+ * that texts one of its own numbers would otherwise put both halves of the exchange in
+ * the same column.
+ */
+export function smsTranscript(
+  messages: readonly { text: string; outbound: boolean }[],
+): string[] {
+  return messages.map(m => (m.outbound ? `${OUT_PREFIX}${m.text}` : m.text))
 }
 
 /**

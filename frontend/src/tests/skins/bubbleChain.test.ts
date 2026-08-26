@@ -42,6 +42,7 @@ const chain = (over: Partial<BubbleChain> = {}): BubbleChain => ({
   grow: true,
   stepMs: 900,
   rows: 6,
+  sms: false,
   messages: [],
   ...over,
 })

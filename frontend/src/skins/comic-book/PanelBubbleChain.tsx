@@ -2,11 +2,12 @@ import { useEffect, useRef, useState } from 'react'
 
 import {
   chainColumns, chainTranscript, clampHead, conversationRows, growTarget, isComposerContent,
-  messageRows, OUT_PREFIX, readTranscript, stepHead, visibleWindow,
+  messageRows, OUT_PREFIX, readTranscript, smsTranscript, stepHead, visibleWindow,
 } from './bubbleChain'
 import type { BubbleChain } from './bubbleChain'
 import PanelBubble from './PanelBubble'
 import type { BubbleTransform } from './editor/types'
+import type { SmsConversationMessage } from '../../lib/smsConversation'
 import { wheelSteps } from './wheelPicker'
 
 /**
@@ -30,6 +31,25 @@ interface PanelBubbleChainProps {
   visible: boolean
   /** False in edit mode: the editor overlay owns the pointer there. */
   interactive: boolean
+  /**
+   * The real SMS conversation this chain is bound to, when it is bound to one — supplied
+   * by PanelBubbles from the number the panel's wheel picker is turned to.
+   *
+   * Present, it replaces *both* halves of the offline behaviour: the transcript is the
+   * carrier's rather than the author's, and Enter in the composer sends rather than
+   * appending locally. Nothing typed is kept here — a sent message reaches the panel again
+   * by coming back from the server, which is what makes the balloon on screen evidence
+   * that something was actually delivered rather than evidence that it was typed.
+   */
+  conversation?: LiveConversation
+}
+
+/** One live conversation, as far as the chain is concerned. */
+export interface LiveConversation {
+  /** The carrier transcript, oldest first. */
+  messages: readonly SmsConversationMessage[]
+  /** Send as the account, to whoever this conversation is with. */
+  onSend: (text: string) => void
 }
 
 /**
@@ -60,7 +80,7 @@ interface PanelBubbleChainProps {
  * flickering rather than as a conversation moving.
  */
 export default function PanelBubbleChain({
-  chain, members, visible, interactive,
+  chain, members, visible, interactive, conversation,
 }: PanelBubbleChainProps) {
   // What the reader has sent, oldest first, already marked as the sender's side. It lives
   // here rather than in the config because it is not the author's: it is gone on reload,
@@ -79,7 +99,14 @@ export default function PanelBubbleChain({
   // text is the field's initial value, not a message. Its ordinary starting state is a
   // conversation of nothing but a composer.
   const backlog = live ? chain.messages : chainTranscript(chain, members)
-  const messages = typed.length > 0 ? [...backlog, ...typed] : backlog
+  // A bound chain shows the carrier's transcript and nothing else — not the authored
+  // backlog, and not `typed`. Its own messages come back through `conversation.messages`,
+  // so appending them here as well would draw each one twice.
+  const messages = conversation
+    ? smsTranscript(conversation.messages)
+    : typed.length > 0
+      ? [...backlog, ...typed]
+      : backlog
   const total = messages.length
   const full = growTarget(holders, total)
   // Where the conversation sits when it has not been played or scrolled: at the newest
@@ -150,6 +177,18 @@ export default function PanelBubbleChain({
     return () => window.clearTimeout(t)
   }, [visible, live, chain.grow, chain.stepMs, head, full])
 
+  // A bound conversation grows on its own: a message arrives on a poll rather than on a
+  // timer or a keystroke, and nothing in this component asked for it. Follow the newest one
+  // so an incoming reply appears where a phone would put it — unless the reader has
+  // scrolled back through the conversation, which is the same courtesy `grow` gets, and for
+  // the same reason: yanking the window to the bottom under someone reading the start of
+  // the thread is the one thing an arriving message must not do.
+  const bound = conversation != null
+  useEffect(() => {
+    if (!bound || steeredRef.current || total === 0) return
+    setHead(total - 1)
+  }, [bound, total])
+
   // Always listening: a chain *is* a window over a transcript, so the wheel moving it is
   // what a chain means rather than a setting on one. With nothing to scroll to there is
   // nothing to take the wheel away from the page for.
@@ -184,11 +223,26 @@ export default function PanelBubbleChain({
    * index because it is measured before the append.
    */
   const send = (text: string): void => {
+    // Bound: hand it to the carrier and keep nothing. The message is drawn as soon as the
+    // hook shows it pending, and `bound`'s effect above puts the window on it, so there is
+    // no head to set here that the arriving message would not set anyway.
+    if (conversation) {
+      conversation.onSend(text)
+      steeredRef.current = false
+      return
+    }
     setTyped(prev => [...prev, `${OUT_PREFIX}${text}`])
     setHead(total)
   }
 
   if (!cols) return null
+
+  /** How far a message has got, for the balloon's ink. Undefined once it is simply sent. */
+  const statusAt = (key: string): 'sending' | 'failed' | undefined => {
+    if (!conversation || key === 'composer') return undefined
+    const status = conversation.messages[Number(key)]?.status
+    return status === 'sent' || status === undefined ? undefined : status
+  }
 
   const rows = conversationRows(
     visibleWindow(head, holders),
@@ -208,6 +262,7 @@ export default function PanelBubbleChain({
           interactive={interactive}
           chained
           onSubmit={row.key === 'composer' ? send : undefined}
+          status={statusAt(row.key)}
         />
       ))}
     </div>

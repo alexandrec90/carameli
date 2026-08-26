@@ -120,12 +120,15 @@ export const api = {
   sms: {
     list: (
       customerId: number,
-      params: { start?: string; end?: string; limit?: number } = {}
+      params: { start?: string; end?: string; limit?: number; peer?: string } = {}
     ) => {
       const q = new URLSearchParams()
       if (params.start) q.set('start', params.start)
       if (params.end) q.set('end', params.end)
       if (params.limit) q.set('limit', String(params.limit))
+      // One conversation rather than the whole history — see the `peer` param on
+      // GET /VsMessaging/Sms/List. Must be E.164; the backend rejects anything else.
+      if (params.peer) q.set('peer', params.peer)
       const qs = q.toString()
       return request<SmsMessageListResponse>(
         `/vsapi/1.0.0/VsMessaging/Sms/List/${customerId}${qs ? `?${qs}` : ''}`
