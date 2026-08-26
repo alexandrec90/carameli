@@ -26,6 +26,19 @@ interface PanelBubbleProps {
   visible: boolean
   /** False in edit mode: the editor overlay owns the pointer there. */
   interactive: boolean
+  /**
+   * True when this balloon is a slot of a live chain (see PanelBubbleChain). It moves
+   * between slots as the thread scrolls, so its placement animates rather than jumping,
+   * and it eases in on arrival instead of being there from the start. Off by default,
+   * and off in the editor, where a drag has to track the pointer exactly.
+   */
+  chained?: boolean
+  /**
+   * Passed through to an `input`/`phone` balloon: Enter sends the field's contents here
+   * and clears it. Only a chain's composer supplies one; every other input balloon keeps
+   * what is typed in it.
+   */
+  onSubmit?: (value: string) => void
 }
 
 /**
@@ -36,7 +49,13 @@ interface PanelBubbleProps {
  * the panel and navigates. Input content is a real form control instead; it stops its
  * pointer and keyboard events so editing it never triggers the panel underneath.
  */
-export default function PanelBubble({ bubble, visible, interactive }: PanelBubbleProps) {
+export default function PanelBubble({
+  bubble,
+  visible,
+  interactive,
+  chained = false,
+  onSubmit,
+}: PanelBubbleProps) {
   const [hover, setHover] = useState(false)
   const [focused, setFocused] = useState(false)
   const [pulsing, setPulsing] = useState(false)
@@ -77,6 +96,7 @@ export default function PanelBubble({ bubble, visible, interactive }: PanelBubbl
     'cb-panel-bubble',
     shown ? 'is-visible' : '',
     interactive ? 'is-interactive' : '',
+    chained ? 'cb-chain-bubble' : '',
   ]
     .filter(Boolean)
     .join(' ')
@@ -130,6 +150,7 @@ export default function PanelBubble({ bubble, visible, interactive }: PanelBubbl
           initialValue={bubble.text}
           font={font}
           enabled={interactive}
+          onSubmit={onSubmit}
         />
       ) : bubble.content === 'wheel' ? (
         <BubbleWheel options={splitOptions(bubble.text)} font={font} open={hover} hostRef={rootRef} />

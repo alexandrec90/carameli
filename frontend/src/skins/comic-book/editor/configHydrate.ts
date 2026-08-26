@@ -5,9 +5,12 @@ import { PANELS } from '../panels'
 import { isPanelBgStyle } from '../panelPatterns'
 import type { PanelBgStyle } from '../panelPatterns'
 import { isBubbleType } from './bubbleTypes'
+import { hydrateChains, normalizeChainId, propagateChains, syncChains } from './chainOps'
 import { CONFIG_KEY, cloneGrids, NEW_BUBBLE, NEW_IMAGE, seedConfig } from './configSeed'
 import { PANEL_PATTERNS } from './layoutConfig'
+import { coerceNumberPad } from './numberPadValidate'
 import { isPageGrids } from './panelGridValidate'
+import { coerceTable } from './tableValidate'
 import type { BubbleTransform, EditorConfig, ImgTransform } from './types'
 
 // Reading a persisted working copy back. Everything here exists because a payload
@@ -15,14 +18,21 @@ import type { BubbleTransform, EditorConfig, ImgTransform } from './types'
 // config has to come back as a page either way.
 
 /**
- * Drop every link that can no longer be drawn: out of range, to itself, or across
- * panels. Run after any edit that can invalidate one — a delete renumbers the array,
- * and moving a bubble to another panel strands whatever it was joined to.
+ * Drop every link that can no longer mean anything: out of range, to itself, or across
+ * panels. Run after any edit that can invalidate one — a delete renumbers the array, and
+ * moving a bubble to another panel strands whatever it was joined to.
  *
  * It nulls rather than repairs, because there is no repair: the author's intent was
- * to join two specific balloons, and once they are on different panels no tube
+ * to join two specific balloons, and once they are on different panels nothing
  * expresses it. Leaving the stale index would have BubbleTubes silently skip it,
- * which looks like a rendering bug rather than a config the editor undid.
+ * which looks like a rendering bug rather than a config the editor undid — and would
+ * leave `propagateChains` joining two panels' balloons into one column.
+ *
+ * A link with an end in a chain used to be nulled here too, back when a chain was a name
+ * typed on a balloon and a tube was the only thing a link could mean. Linkage is now what
+ * *builds* a chain, so nulling those is exactly backwards; what the two readings of a
+ * link share is this function's rule that both ends be real and on one panel, and they
+ * are told apart downstream — `linkedPairs` draws no tube across a chained group.
  */
 export function sanitizeLinks(bubbles: BubbleTransform[]): BubbleTransform[] {
   return bubbles.map((b, i) => {
@@ -74,6 +84,10 @@ function coerceBubbleEnums(b: BubbleTransform): BubbleTransform {
     dropped.content = next.content
     next.content = 'text'
   }
+  // Not a registry lookup like the others — any name is a valid chain — but a payload
+  // can still carry a non-string here, and one would join no chain while comparing
+  // unequal to '', which reads as a bubble that has vanished from its column.
+  next.chain = typeof next.chain === 'string' ? normalizeChainId(next.chain) : ''
   if (Object.keys(dropped).length > 0) {
     logger.warn('Dropped retired comic-book bubble attributes', { key: CONFIG_KEY, dropped })
   }
@@ -147,6 +161,18 @@ export function hydrateConfig(raw: string | null): EditorConfig {
     // one — so a payload that fails the structural guard falls back to the shipped
     // grids and the author's pictures and words survive around them.
     const seed = seedConfig()
+    const bubbles = propagateChains(sanitizeLinks(
+      parsed.bubbles.map(b =>
+        // Cast because a persisted payload predates whatever fields were added since,
+        // whatever the declared type says it holds. `coerceBubbleEnums` is the other
+        // half of that: the payload also *outlives* names that have since been
+        // retired, and merging over NEW_BUBBLE cannot catch one because the field is
+        // present, just no longer meaningful.
+        coerceBubbleEnums(
+          clampPanel({ panel: 0, ...NEW_BUBBLE, ...(b as Partial<BubbleTransform>) }),
+        ),
+      ),
+    ))
     return {
       grids: isPageGrids(parsed.grids, PANELS.length) ? cloneGrids(parsed.grids) : seed.grids,
       patterns: normalizePatterns(parsed.patterns),
@@ -155,25 +181,34 @@ export function hydrateConfig(raw: string | null): EditorConfig {
         // a ninth picture the author added has no shipped entry to recover from, and
         // the template is then the whole answer.
         const shipped = seed.images[i] as ImgTransform | undefined
-        return clampPanel({
+        const merged = clampPanel({
           panel: 0,
           ...NEW_IMAGE,
           ...shipped,
           ...(t as Partial<ImgTransform>),
         })
+        // Projected content is nested, so a payload written before a field existed — or
+        // with a cell that came back as a number — needs repair inside rather than a
+        // whole-value merge. Each coercer returns undefined for the ordinary case of a
+        // picture that is not that surface, and absent keys stay absent.
+        const table = coerceTable(merged.table)
+        const numberPad = coerceNumberPad(merged.numberPad)
+        const plain = { ...merged }
+        delete plain.table
+        delete plain.numberPad
+        // Existing table payloads win if a hand-edited config names both. The editor
+        // presents one projected-content choice and never writes the ambiguous state.
+        if (table) return { ...plain, table }
+        if (numberPad) return { ...plain, numberPad }
+        return plain
       }),
-      bubbles: sanitizeLinks(
-        parsed.bubbles.map(b =>
-          // Cast because a persisted payload predates whatever fields were added since,
-          // whatever the declared type says it holds. `coerceBubbleEnums` is the other
-          // half of that: the payload also *outlives* names that have since been
-          // retired, and merging over NEW_BUBBLE cannot catch one because the field is
-          // present, just no longer meaningful.
-          coerceBubbleEnums(
-            clampPanel({ panel: 0, ...NEW_BUBBLE, ...(b as Partial<BubbleTransform>) }),
-          ),
-        ),
-      ),
+      bubbles,
+      // Rebuilt from the bubbles rather than trusted: the list is derived, so a payload
+      // written before chains existed, one hand-edited into naming a chain nothing is
+      // in, or one whose last member was renamed away all come back as exactly the
+      // chains the balloons describe — carrying over the settings of every entry that
+      // is still real.
+      chains: syncChains(bubbles, hydrateChains(parsed.chains)),
     }
   } catch (err) {
     logger.warn('Discarding malformed comic-book editor config', {

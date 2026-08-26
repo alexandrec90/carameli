@@ -1,0 +1,80 @@
+/* A table projected onto the surface a picture depicts. Geometry comes from
+   tableProjection.ts as an inline `transform`; everything here is what the surface looks
+   like once it has landed. Loaded by ProjectedTable.tsx, so a page with no surface on it
+   pays nothing. */
+
+.cb-ptable-surface {
+  position: absolute;
+  inset: 0 auto auto 0;
+
+  /* The matrix3d is written against the frame's top-left corner, because that is the
+     origin the quad's percentages are measured from. Any other origin silently offsets
+     every corner by half the box. */
+  transform-origin: 0 0;
+
+  /* The surface is a plane in a 3D transform, and without this the far edge is
+     antialiased against nothing and shows a hairline. */
+  backface-visibility: hidden;
+}
+
+.cb-ptable {
+  width: 100%;
+  height: 100%;
+  border-collapse: collapse;
+
+  /* Column widths come from the author's weights via `<colgroup>`. Auto layout would
+     re-derive them from the cell contents, so a long name in one row would shift every
+     column and the table would jitter as it scrolled. */
+  table-layout: fixed;
+  font-family: 'Comic Neue', cursive;
+  font-weight: 700;
+}
+
+.cb-ptable-cell {
+  /* Bands, not content: every row is exactly one band tall so it stays on the line
+     drawn in the picture, whatever is written in it. */
+  height: var(--cb-ptable-row);
+  padding: 0 0.5em 0.12em;
+
+  /* Sitting the lettering on the bottom of its band is what puts it *on* a ruled line
+     rather than floating between two. */
+  vertical-align: bottom;
+  line-height: 1;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Editor only: the band guides. They are drawn *through* the same projection as the
+   rows, which is the whole point — a guide that lined up with the picture's ruling
+   would be a guide the rows also line up with.
+
+   Ahead of the heading rule below, not after it, because that one is a compound
+   selector deeper: stylelint's no-descending-specificity reads a weaker rule following a
+   stronger one on the same element as the shape a cascade bug takes, whether or not
+   these two happen to set overlapping properties today. */
+.cb-ptable-editing {
+  outline: 1px dashed currentcolor;
+}
+
+.cb-ptable-editing .cb-ptable-cell {
+  border-bottom: 1px solid currentcolor;
+}
+
+.cb-ptable thead .cb-ptable-cell {
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.85;
+}
+
+/* The keyboard's version of the wheel. Off-screen rather than `display: none`, which
+   would take the buttons out of the tab order and defeat the point of having them. */
+.cb-ptable-keys {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

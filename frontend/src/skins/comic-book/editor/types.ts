@@ -1,4 +1,5 @@
 import type { TailDir } from '../bubbleBox'
+import type { BubbleChain } from '../bubbleChain'
 import type { BubbleContentKind } from '../bubbleContent'
 import type { PageGrids } from '../panelGeometry'
 import type { PanelBgStyle } from '../panelPatterns'
@@ -10,6 +11,72 @@ import type { BubbleType } from './bubbleTypes'
 // for its types.
 export type { LayoutKind, PageGrids, PanelGrid } from '../panelGeometry'
 export type { PanelPage } from '../panels'
+
+// Same bargain for chains: the renderer owns the behaviour (../bubbleChain.ts), the
+// editor owns the field on the bubble that joins one, and layoutConfig.ts imports both
+// names from here.
+export type { BubbleChain } from '../bubbleChain'
+
+/** One column of a projected table. */
+export interface TableColumn {
+  /** Heading text, drawn in the first row slot when `header` is on. */
+  label: string
+  /**
+   * Share of the surface's width, as a weight against the other columns — not a
+   * percentage. Adding a fourth column to three that already summed to 100 would
+   * otherwise mean retyping all three.
+   */
+  width: number
+  /** Cell text alignment within the column. */
+  align: 'left' | 'center' | 'right'
+}
+
+/**
+ * Shared placement and lettering for content projected onto a picture.
+ *
+ * **`quad` is the whole of the 3D tilt.** Four corners, clockwise from top-left, in % of
+ * the picture's frame box, and `tableProjection.ts` turns them into the `matrix3d` that
+ * lands the table on them. Corners rather than rotate/perspective angles because the
+ * task is *matching a plane already in the photograph*: three angles describe the same
+ * plane, but only as a three-way search where every axis undoes the last, whereas a
+ * projective map through four point correspondences is unique and is dragged into place
+ * one corner at a time. The convergence of the far edge comes out of the same four
+ * numbers, so ruled lines that converge in the picture are matched rather than
+ * approximated.
+ */
+export interface ProjectedSurface {
+  /** The surface's corners, clockwise from top-left, in % of the picture's frame box. */
+  quad: [[number, number], [number, number], [number, number], [number, number]]
+  /** Lettering height as a fraction of one row's height. */
+  fontScale: number
+  /** Ink colour for the projected content and its editor-only guides. */
+  ink: string
+}
+
+/**
+ * An HTML table projected onto the surface a picture depicts — ruled lines on a notepad,
+ * a whiteboard, the face of a monitor. Optional on every picture, so any of them can be
+ * turned into a surface and none of them is one by default.
+ *
+ * **`rows` is a count of slots, not of data.** The surface is divided into that many
+ * equal bands, which is what a ruled page is; the data scrolls through them a whole row
+ * at a time, so every band stays exactly where it was drawn. `header` spends the first
+ * band on the column labels rather than floating them above the surface, where they
+ * would be the one thing not sitting on a line.
+ */
+export interface TableProjection extends ProjectedSurface {
+  /** Row bands the surface is divided into — match this to the lines in the picture. */
+  rows: number
+  /** Spend the first band on the column headings. */
+  header: boolean
+  /** The columns, left to right. */
+  columns: TableColumn[]
+  /** Cell text, row-major, one inner array per row. Longer than `rows` = scrollable. */
+  data: string[][]
+}
+
+/** A fixed three-column, four-row telephone number pad projected onto a picture. */
+export type NumberPadProjection = ProjectedSurface
 
 /**
  * One picture on the page: which panel it belongs to, which file it shows, the frame
@@ -52,6 +119,24 @@ export interface ImgTransform {
   anchor: string
   /** When true the picture may bleed past its frame; when false it is clipped to it. */
   spill: boolean
+  /**
+   * A table projected onto whatever surface this picture depicts; **absent** on an
+   * ordinary picture. Optional rather than always-present so `layoutConfig.ts` carries
+   * the field only on the pictures that are surfaces — the serializer omits it
+   * otherwise, and eight lines of `table: null` would say nothing.
+   *
+   * Absent rather than `null` for the same reason, and it is load-bearing: the round-trip
+   * guarantee is that re-evaluating a saved file gives back the config it was written
+   * from, and a picture that went out with no `table` key comes back with no `table` key.
+   * A `null` in the working copy would not match it.
+   */
+  table?: TableProjection
+  /**
+   * A telephone number pad projected onto this picture; absent unless selected in the
+   * editor. Mutually exclusive with `table`, so one image has one set of surface
+   * corners and one projected content layer.
+   */
+  numberPad?: NumberPadProjection
 }
 
 /**
@@ -100,12 +185,41 @@ export interface BubbleTransform {
   hoverType: BubbleType | null
   /** Shape to pulse to when the bubble is pressed; null = stay put. */
   clickType: BubbleType | null
+  /**
+   * Id of the bubble chain this balloon is a slot of; '' when it is not in one.
+   *
+   * **Not typed by the author.** The editor generates it and never shows it: the author
+   * says "these balloons are one thread" by linking them and ticking one checkbox, and
+   * `propagateChains` then gives every balloon in that linked group the same id. The id
+   * exists so the chain's *settings* have a stable place to live while bubbles are added,
+   * deleted and renumbered around them — see {@link EditorConfig.chains}.
+   *
+   * Bubbles sharing an id on the same panel form one vertical column, ordered by `top`,
+   * so the lowest is the root: it carries the tail and holds the newest message, and each
+   * balloon above it is older. The column's behaviour (does it grow in, how fast, what
+   * transcript) is one entry in the chain list, not a per-bubble flag, because it is a
+   * property of the thread rather than of any one balloon. See ../bubbleChain.ts.
+   *
+   * A chained bubble takes no connector tube — this field is what tells `linkedPairs`
+   * which of the two meanings a `linkTo` has. A tube joins two balloons that are on
+   * screen together and stay put; a chain slot holds a *different message* from one
+   * moment to the next, so a tube welded to it would be joining whatever happened to
+   * scroll into place.
+   */
+  chain: string
 }
 
 /**
  * The editor's working document. Neither array is parallel to PANELS: each entry names
  * its own panel, so both are free-length and adding one is an append that has to line
  * up with nothing.
+ *
+ * `chains` is derived rather than authored: its entries are exactly the ids the bubbles
+ * carry, kept in step by `syncChains` after every edit — and those ids are themselves
+ * derived, from the linkage, by `propagateChains`. Ticking the chain box on a linked group
+ * creates the entry; unticking it removes it. That is what stops a config accumulating
+ * settings for threads that no longer exist, and what makes "add a chain" and "delete a
+ * chain" operations that never had to be written.
  *
  * `grids` is the exception and is *keyed* rather than listed — per page, then one panel
  * subdivision per viewport shape, because the three reshape the page differently and a
@@ -119,6 +233,7 @@ export interface BubbleTransform {
 export interface EditorConfig {
   images: ImgTransform[]
   bubbles: BubbleTransform[]
+  chains: BubbleChain[]
   grids: PageGrids
   patterns: PanelBgStyle[]
 }

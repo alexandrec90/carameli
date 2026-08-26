@@ -16,7 +16,10 @@ placement **and content** (panel / top / right / width / rotate / spill / type /
 content / text — lettering, a comma-delimited wheel picker, a text input, or a phone
 input formatted from the browser locale), plus each bubble's event morph targets
 (`hoverType`, `clickType`) and its
-connector-tube partner (`linkTo`). It also holds `PANEL_PATTERNS` — each panel's
+linked partner (`linkTo`) and the SMS conversation that linkage makes it a column of (`chain`,
+an editor-generated id resolved through `PANEL_BUBBLE_CHAINS` — see *Bubble chains*
+below). It also holds
+`PANEL_PATTERNS` — each panel's
 Ben-Day background style, the one array here that **is** parallel to `PANELS`; the
 per-panel palette and dot metrics stay tuned in
 [`../panelPatterns.ts`](../panelPatterns.ts) (`PANEL_BG_CONFIGS`), so switching a
@@ -50,6 +53,51 @@ the **same panel** — the editor only offers same-panel partners, and the rende
 any cross-panel link it is handed, because half a tube appearing on a different hover
 cannot read as one utterance.
 
+**A bubble chain is one SMS conversation, drawn as a table of two columns.** **Linkage is
+what makes one.** Link two balloons together with the `link to` picker — the same field
+that declares a connector tube — and tick **scrollable chain** on either: the rightmost of
+the linked balloons becomes the **sender's** column and the leftmost the **recipient's**.
+
+Those two balloons are **templates, not slots**. Neither is drawn where it sits outside
+edit mode; each row of the conversation is *stamped* from the template of its side —
+shape, tail, rotation and lettering — at a width that follows the message and a height
+that follows the width. That is what lets the two columns interleave freely, so one party
+can send two in a row:
+
+```text
+them:  Hey, are you around?
+them:  I have that number for you
+  me:  give me a sec
+them:  555-0134
+  me:  [composer]
+```
+
+Rows stack upward from the sender template's `top`, newest at the bottom. `rows` is how
+many the table holds at once (default 6); past that the wheel moves the window rather than
+the table growing, so ten messages through six rows is six on screen and a scroll to reach
+the rest. There is no per-chain scroll toggle, because a chain *is* that window.
+
+`messages` is the transcript, oldest first, and a line beginning `> ` is the **sender's** —
+that marker is the only thing deciding which column a message lands in. Leave the box empty
+and the conversation speaks the two templates' own `text`.
+
+Give the *sender's* balloon `content: 'input'` or `phone` and the chain goes **live**: the
+bottom-right row becomes a composer, Enter sends what is typed as the sender's next
+message, and the table grows by one row per message until it is full. The composer costs
+one row, so a six-row live chain is the field plus the five newest messages.
+
+The chain's own settings live in a separate list keyed by an id (`PANEL_BUBBLE_CHAINS`):
+how many `rows`, whether it `grow`s one at a time, how fast (`stepMs`), and the `messages`
+themselves. Both the ids and the list are **derived**, not authored — `propagateChains`
+settles one id per linked group and `syncChains` rebuilds the list from those ids, after
+every op that touches a bubble. So the checkbox is the whole of "make a chain" and "unmake
+one": there is no name to type, no add-chain operation and no delete-chain operation to get
+out of step. A chained balloon draws no tube: `linkTo` says *which* balloons belong
+together and `chain` says whether that means a welded pair or a conversation, since a tube
+welds two fixed shapes while a template is a stamp for rows that do not exist yet. See
+`../bubbleChain.ts` for the layout and window arithmetic and `chainOps.ts` for the list's
+lifecycle.
+
 **A picture has two independent framings, which is why it has so many fields.**
 `left`/`top`/`width`/`height` are the *frame*: its own rectangle over the panel box, in
 % of that box, cut to the panel's polygon scaled into it (`imgFramePoly`). A picture
@@ -59,6 +107,23 @@ and an inset one reads as a small comic panel rather than a rectangle pasted on 
 *inside* that frame. Before pictures became entities the frame was the panel polygon
 itself, so dragging could only slide the picture under a window that stayed put, and a
 second picture on the same panel had nowhere to go.
+
+**A picture may also be a *surface*.** Switch **Project a table onto this image** on and
+the picture carries a `table`: four draggable corners (`quad`, in % of the picture's own
+frame), a row count, the columns, and the cell text. The corners are a projective map —
+`tableProjection.ts` solves the homography taking the unit square onto them and emits it
+as one `matrix3d` — so a table can be laid onto a notepad photographed at an angle and
+converge with it, which three rotation sliders cannot do. The field is **absent**, not
+null, on a picture that is not a surface; that absence is what "not a surface" is spelled
+as everywhere the config is cloned, hydrated or serialized.
+
+The surface divides into `rows` equal bands, and the scroll offset is an **integer index
+into the data**, never a pixel position: band *k* lands in exactly the same place at every
+offset, which is what keeps the lettering on the ruling drawn in the picture. Rows outside
+the window are not in the DOM at all, so there is no scroll container and therefore no
+scrollbar to hide. Out of edit mode a reader sees only the values and scrolls with the
+wheel; the guides, the dashed outline and the corner grips exist only while the editor is
+open.
 
 **Bubbles are drawn, not imported.** Every shape is one closed ring of the same 64
 vertices sampled from a shared ellipse, so a shape change interpolates vertex-for-
@@ -102,6 +167,25 @@ different images can only crossfade. A new bubble type belongs in `bubbleShape.t
      `PANEL_ASSETS`), and its **alt** text — empty marks it decorative — plus the
      **anchor**, which decides what survives when the picture's aspect ratio does not
      match the frame's.
+   - **Project a table onto this image** (picture only) turns the picture into a
+     surface. A starter table appears with its corners near the picture's own, plus:
+     **Rows** (how many bands are visible at once — set it to the number of ruled lines
+     you want to fill), **Text** (font size as a fraction of a band), **Ink** (a colour
+     picker), a **Headings** checkbox, the four **corner** X/Y fields, and a **Columns**
+     list where each column gets a heading, a width weight and an alignment. The cell
+     text is one row per line, columns separated by a tab or a `|`.
+     - **Drag the four square corner grips** onto the surface in the photograph — the
+       band guides are drawn *through* the same projection, so once they sit on the
+       ruled lines the rows do too. **Reset corners** puts them back.
+     - Switching the checkbox off deletes the table, including the cells; the picture
+       itself is untouched.
+   - **Project a number pad on this picture** (picture only) adds the fixed telephone
+     layout: 1–9 over the first three rows, then `*`, `0`, `#`. Drag its magenta corner
+     grips or type the corner coordinates to align it with the photographed plane; the
+     **Text** and **Ink** controls tune the symbols. Its 3 × 4 grid and outline are
+     visible alignment guides in the editor only. Outside edit mode, readers see the
+     twelve symbols directly on the image. A picture carries either a table or a number
+     pad, so switching either option on replaces the other projected content.
    - **Allow spill outside panel** checkbox — off (default for pictures) clips the
      element to the frame's polygon (overflow hidden behind its edge); on lets it
      bleed past (default for bubbles).
@@ -121,6 +205,22 @@ different images can only crossfade. A new bubble type belongs in `bubbleShape.t
      declare it at one end only — and the **link to** dropdown lists only the other
      bubbles on the same panel (it is disabled when there are none). Changing a
      bubble's panel clears a link that would have crossed one.
+   - Also for bubbles: the **scrollable chain** checkbox, directly under **link to**,
+     turns the balloons linked to this one into an SMS conversation — and unticking it
+     turns them back into tube-joined balloons. It applies to the whole linked group,
+     because a conversation is a property of the pair: link first, then tick either end.
+     There is no chain name to type; the id in the exported config is the editor's
+     bookkeeping. Ticking it drops the group's tubes, and the chain's own controls appear
+     below: **rows** (how many the table holds at once), **grow one at a time** with its
+     **step ms**, and the **messages** box — one per line, oldest first, a leading `>`
+     marking the sender's side, and an empty box meaning the two drawn balloons' own text
+     is the transcript. **+ Other column** appears while the chain has only one balloon
+     and adds its partner mirrored across the panel, tail flipped, linked back to it. Set
+     the **sender's** balloon (the rightmost) to **Text input** or **Phone input** to make
+     the chain live — it then starts as just that field at the bottom right and grows by
+     one row each time Enter is pressed outside edit mode. In edit mode the two templates
+     render flat, all-visible and at their own placements, so you are always dragging the
+     columns themselves rather than chasing a row an animation put somewhere.
    - **+ Image** / **+ Bubble** (toolbar) append a new picture or bubble to the
      selected panel — select the panel, a picture on it or a bubble on it first, so
      there is a panel to add to — and select what they added. **Delete image** /
@@ -169,7 +269,7 @@ in a prod build.
 ## Layout
 
 ```text
-types.ts            ImgTransform, BubbleTransform, EditorConfig
+types.ts            ImgTransform, BubbleTransform, BubbleChain, EditorConfig
 assets.ts           PANEL_ASSETS: the pictures a frame may point at (static manifest)
 bubbleTypes.ts      BubbleType + BUBBLE_TYPES (lettering font per type) — ships in prod
 ../panels.ts        PANELS: the grid slots — label, isLogo, route, page (what `panel` indexes)
@@ -177,13 +277,21 @@ bubbleTypes.ts      BubbleType + BUBBLE_TYPES (lettering font per type) — ship
 ../bubbleBox.ts     PURE authoring box: viewBox, base ellipse, TAIL_DIRS + tail geometry
 ../bubbleShape.ts   PURE outline geometry: the shared vertex ring, per-type modulation, morph lerp
 ../bubbleTube.ts    PURE connector-tube geometry + link/reveal semantics
+../bubbleChain.ts   PURE chain arithmetic: columns, row layout, transcript, head clamp, window
 ../useBubbleMorph.ts  rAF morph driver — writes `d` to the DOM, not through React
 ../PanelBubble.tsx  one bubble: outline SVG + content + hover/press morph state
 ../BubbleInput.tsx  real text/phone input; isolates its events from panel navigation
 ../phoneInput.ts    PURE locale detection, live phone formatting + caret/deletion math
 ../bubbleContent.ts content-kind registry and persisted-value guard
 ../PanelBubbles.tsx one panel's bubbles: filters the array by panel, clips the non-spilling ones
+../PanelBubbleChain.tsx  one conversation: rows from templates, growth timer, wheel scroll, composer
 ../BubbleTubes.tsx  viewport-level tube layer for every linked pair
+../tableProjection.ts PURE: the corner quad -> homography -> `matrix3d`, and the layout box
+../tableData.ts     PURE: rows visible at an offset, wheel-to-rows, column widths, cell text
+../ProjectedTable.tsx one picture's surface: the projected table, its wheel and its keys
+../table.css        surface + cell styles, and the editor-only band guides
+../ProjectedNumberPad.tsx fixed 3 × 4 telephone keys on a projected surface
+../number-pad.css   number-pad lettering and surface layout
 ../panelGeometry.ts PURE grid -> polygon geometry: frame, normalised space, vertex constraints
 ../panelPatterns.ts pattern style registry + per-panel palette/dot tuning (PANEL_BG_CONFIGS)
 ../polygonInset.ts  PURE polygon maths: the perpendicular gutter inset, bounding box
@@ -193,9 +301,21 @@ layoutConfig.ts     PANEL_IMG_TRANSFORMS, PANEL_BUBBLE_TRANSFORMS, PANEL_PATTERN
 configOps.ts        PURE config edits: re-exports configSeed + configHydrate, patch/add/remove, links
 configSeed.ts       PURE: the working copy's seed, clone, and per-breakpoint grid set/reset
 configHydrate.ts    PURE: parse a persisted payload back into a config, falling back per field
+chainOps.ts         PURE chain-list lifecycle: linked groups -> ids, derive the list, patch, clamp, hydrate
 useSeamDrag.ts      hook: which gesture a pointer means, and the grid edit it maps to
 PanelSeams.tsx      the draggable line + vertex handles (shapes mode)
 ShapeInspector.tsx  shapes-mode inspector: vertex read-out, straighten, reset grid
+tableValidate.ts    PURE: a new table, and the repair of one read back out of a payload
+numberPadValidate.ts PURE: a new number pad, repair, and deep clone
+serializeTable.ts   PURE: a table as the nested block on a picture's line
+serializeNumberPad.ts PURE: a number pad as the nested block on a picture's line
+tsLiteral.ts        PURE: quoting and number rounding shared by the two serializers
+useTableCornerDrag.ts hook: dragging a corner grip, and the clamped single-corner edit
+TableCorners.tsx    the four corner grips shared by both projected content types
+TableInspector.tsx  table controls: the on/off switch, rows, text, ink, headings, corners
+NumberPadInspector.tsx number-pad on/off, text, ink, and corner controls
+TableColumnsInspector.tsx  the columns list and the cell-text box
+editor-table.css    corner grip and table-inspector styles
 serialize.ts        PURE serialization back to layoutConfig.ts (headers included)
 transforms.ts       PURE helpers: CSS builders, frame/drag/scale math, clamp
 useEditorMode.ts    hook: flag detection, working copy, persistence, selection
@@ -205,9 +325,11 @@ EditorOverlay.tsx   overlay UI: click targets, outlines, seams (dev-only, dynami
 EditorToolbar.tsx   toolbar chrome: mode toggle, page select, inspector slot, save/reset/export
 InspectorPanel.tsx  selection inspector: read-outs, spill, per-element reset, delete
 ImageInspector.tsx  picture-only controls: panel, picture, alt, anchor
-BubbleInspector.tsx bubble-only controls: panel, type, tail, content, text, hover/click, link
+BubbleInspector.tsx bubble-only controls: panel, type, tail, content, text, hover/click, link, chain toggle
+ChainInspector.tsx  the chain half of that inspector: rows, grow, step ms, messages, + column
 PageSelect.tsx      toolbar dropdown: switch page / preview the loading screen
 pageSelection.ts    PURE helpers behind PageSelect (sentinel value, selection resolution)
+../bubbleChains.css chain row placement + the arrival/scroll animations (ships in prod)
 editor.css          overlay chrome styles
 editor-shapes.css   seam and vertex handle styles
 ```
@@ -221,6 +343,7 @@ and not the other fails there rather than on the first save.
 
 All math/serialization is pure and unit-tested under
 `frontend/src/tests/skins/` (`comicBookTransforms`, `editorTransformsMath`,
-`editorMode`, `editorConfigOps`, `editorSerialize`, `pageSelection`,
-`editorToolbarDrag`, `bubbleShape`, `bubbleTube`, `panelGeometry`, `panelGridOps`,
-`panelLayouts`).
+`editorMode`, `editorConfigOps`, `editorChainConfig`, `editorChainOps`,
+`editorSerialize`, `pageSelection`, `editorToolbarDrag`, `bubbleShape`, `bubbleTube`,
+`bubbleChain`, `panelGeometry`, `panelGridOps`, `panelLayouts`, `tableProjection`,
+`tableData`, `tableConfig`, `ProjectedTable`).

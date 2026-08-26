@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom'
+import type { BubbleChain } from './bubbleChain'
 import PanelBubbles from './PanelBubbles'
 import PanelImages from './PanelImages'
 import { toClipPath } from './editor/transforms'
@@ -15,6 +15,8 @@ interface ComicPanelProps {
     images: ImgTransform[]
     /** Every bubble on the page; this panel renders the ones that name it. */
     bubbles: BubbleTransform[]
+    /** Per-chain behavior for the chain names carried by bubbles. */
+    chains: BubbleChain[]
     natSizes: Record<string, { w: number; h: number }>
     editorActive: boolean
     hovered: boolean
@@ -34,11 +36,10 @@ interface ComicPanelProps {
  * overflow stays visible so pictures and bubbles can spill into the gutters.
  */
 export default function ComicPanel({
-    index, info, poly, images, bubbles, natSizes,
+    index, info, poly, images, bubbles, chains, natSizes,
     editorActive, hovered, onHover, isRevealed, isBubbleVisible,
     dotRef, onSettled, onNatSize,
 }: ComicPanelProps) {
-    const navigate = useNavigate()
     const { bounds, vp } = poly
 
     // The dots clip tightly to the panel polygon (element-relative px coords). A
@@ -57,14 +58,11 @@ export default function ComicPanel({
             className={[
                 'cb-panel',
                 info.isLogo ? 'logo' : '',
-                info.path ? 'clickable' : '',
                 revealFull ? 'cb-panel-reveal' : '',
                 // Lift the panel over the ink-line SVG while its bubbles show,
                 // so they are not crossed by frame ink.
                 !editorActive && hovered ? 'cb-panel-lift' : '',
             ].filter(Boolean).join(' ')}
-            role={info.path ? 'button' : undefined}
-            tabIndex={info.path ? 0 : undefined}
             style={{
                 position: 'absolute',
                 left: bounds.x,
@@ -75,13 +73,6 @@ export default function ComicPanel({
             }}
             onMouseEnter={() => onHover(true)}
             onMouseLeave={() => onHover(false)}
-            onClick={() => info.path && navigate(info.path)}
-            onKeyDown={e => {
-                if ((e.key === 'Enter' || e.key === ' ') && info.path) {
-                    e.preventDefault()
-                    navigate(info.path)
-                }
-            }}
         >
             {/* Ben-Day dots — clipped to tight panel polygon */}
             <canvas
@@ -100,6 +91,7 @@ export default function ComicPanel({
                 vp={vp}
                 natSizes={natSizes}
                 isRevealed={isRevealed}
+                editing={editorActive}
                 onSettled={onSettled}
                 onNatSize={onNatSize}
             />
@@ -108,10 +100,12 @@ export default function ComicPanel({
                 always in edit mode. */}
             <PanelBubbles
                 bubbles={bubbles}
+                chains={chains}
                 panel={index}
                 clip={dotClip}
                 isVisible={isBubbleVisible}
                 interactive={!editorActive}
+                editing={editorActive}
             />
         </div>
     )

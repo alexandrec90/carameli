@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest'
 
-import { addImg, patchBubble, patchImg, patchPattern, seedConfig } from '../../skins/comic-book/editor/configOps'
+import {
+  addImg,
+  patchBubble,
+  patchChain,
+  patchImg,
+  patchPattern,
+  seedConfig,
+} from '../../skins/comic-book/editor/configOps'
 import {
   PANEL_BUBBLE_TRANSFORMS,
   PANEL_IMG_TRANSFORMS,
@@ -11,8 +18,12 @@ import {
 import layoutConfigSource from '../../skins/comic-book/editor/layoutConfig.ts?raw'
 import { moveVertex } from '../../skins/comic-book/editor/panelGridOps'
 import { serializeConfig, serializeConfigFile } from '../../skins/comic-book/editor/serialize'
+import { newTable } from '../../skins/comic-book/editor/tableValidate'
 import type { EditorConfig } from '../../skins/comic-book/editor/types'
 import { PANELS } from '../../skins/comic-book/panels'
+
+const IMPORT_LINE =
+  "import type { ImgTransform, BubbleTransform, BubbleChain, PageGrids } from './types'"
 
 /** Count `{ ... }` object entries inside the named const's array literal. */
 function entryCount(ts: string, constName: string): number {
@@ -33,22 +44,23 @@ function patternCount(ts: string): number {
   return (arr.match(/'/g) ?? []).length / 2
 }
 
-/** The two transform blocks, without the pattern and grid blocks that follow them. */
+/** The two transform blocks, without the chain, pattern and grid blocks that follow. */
 function transformsOf(ts: string): string {
-  const patterns = ts.indexOf('export const PANEL_PATTERNS')
-  return patterns === -1 ? ts : ts.slice(0, patterns)
+  const chains = ts.indexOf('export const PANEL_BUBBLE_CHAINS')
+  return chains === -1 ? ts : ts.slice(0, chains)
 }
 
 /** Evaluate a serialized block back into a config, as a paste into the file would. */
 function reparse(ts: string): EditorConfig {
   const body = ts
     .replace("import type { PanelBgStyle } from '../panelPatterns'", '')
-    .replace("import type { ImgTransform, BubbleTransform, PageGrids } from './types'", '')
+    .replace(IMPORT_LINE, '')
     .replace(/export const PANEL_IMG_TRANSFORMS: ImgTransform\[\] =/, 'const images =')
     .replace(/export const PANEL_BUBBLE_TRANSFORMS: BubbleTransform\[\] =/, 'const bubbles =')
+    .replace(/export const PANEL_BUBBLE_CHAINS: BubbleChain\[\] =/, 'const chains =')
     .replace(/export const PANEL_PATTERNS: PanelBgStyle\[\] =/, 'const patterns =')
     .replace(/export const PANEL_GRIDS: PageGrids =/, 'const grids =')
-  return new Function(`${body}\nreturn { images, bubbles, grids, patterns }`)() as EditorConfig
+  return new Function(`${body}\nreturn { images, bubbles, chains, grids, patterns }`)() as EditorConfig
 }
 
 describe('serializeConfig', () => {
@@ -109,7 +121,7 @@ describe('serializeConfig', () => {
       '{ panel: 0, top: -35, right: -12, width: 55, rotate: -5, spill: true, ' +
         "type: 'soft', tail: 'down-left', content: 'text', " +
         'text: "It\'s Carameli!", linkTo: 1, ' +
-        "hoverType: 'cloud', clickType: 'lightning' },",
+        "hoverType: 'cloud', clickType: 'lightning', chain: '' },",
     )
   })
 
@@ -156,7 +168,7 @@ describe('serializeConfig', () => {
       clickType: null,
     })
     const ts = serializeConfig(cfg)
-    expect(ts).toContain('linkTo: null, hoverType: null, clickType: null },')
+    expect(ts).toContain("linkTo: null, hoverType: null, clickType: null, chain: '' },")
     expect(ts).not.toContain("'null'")
   })
 
@@ -257,6 +269,30 @@ describe('serializeConfig', () => {
     expect(parsed.images.filter(t => t.panel === 3)).toHaveLength(2)
   })
 
+  // A surface is a nested block on a picture line, and the picture's own fields have to
+  // come through it unchanged: an emitter that closed the brace in the wrong place
+  // produces a file that still parses and has lost the anchor or the spill flag.
+  it('round-trips a picture the author turned into a surface', () => {
+    const cfg = patchImg(seedConfig(), 2, { table: newTable() })
+    const parsed = reparse(serializeConfig(cfg))
+    expect(parsed.images[2]).toEqual(cfg.images[2])
+    expect(parsed.images[2].table?.data).toEqual(newTable().data)
+  })
+
+  /*
+   * The other half of that, and the reason `table` is absent rather than null: a picture
+   * that is not a surface must come back with no `table` key whatsoever. An emitter that
+   * wrote `table: null` would round-trip through this reparse and then fail the
+   * byte-for-byte test below, having already put eight dead keys into the shipped file.
+   */
+  it('writes nothing on the seven pictures that are not surfaces', () => {
+    const cfg = patchImg(seedConfig(), 2, { table: newTable() })
+    const ts = serializeConfig(cfg)
+    expect((ts.match(/ table: \{/g) ?? [])).toHaveLength(1)
+    expect(serializeConfig(seedConfig())).not.toContain('table:')
+    expect(reparse(serializeConfig(seedConfig())).images.every(t => !('table' in t))).toBe(true)
+  })
+
   it('round-trips an edited pattern back to the same style name', () => {
     const cfg = patchPattern(seedConfig(), 9, 'vignette')
     const parsed = reparse(serializeConfig(cfg))
@@ -265,11 +301,78 @@ describe('serializeConfig', () => {
   })
 })
 
+describe('serializeConfig chains', () => {
+  /** The seed config with one two-column conversation on panel 6, and settings on it. */
+  function threaded(): EditorConfig {
+    let cfg = seedConfig()
+    cfg = patchBubble(cfg, 0, { chain: 'her side' })
+    cfg = patchBubble(cfg, 1, { chain: 'her side' })
+    return patchChain(cfg, 'her side', {
+      grow: true, stepMs: 450, rows: 4, messages: ['Hi', '> You up?'],
+    })
+  }
+
+  it('writes the chain’s id on every bubble that carries one', () => {
+    const ts = serializeConfig(threaded())
+    expect((ts.match(/chain: 'her side'/g) ?? [])).toHaveLength(2)
+  })
+
+  it('emits the chain block with the settings and the thread', () => {
+    const ts = serializeConfig(threaded())
+    expect(ts).toContain('export const PANEL_BUBBLE_CHAINS: BubbleChain[] = [')
+    expect(ts).toContain(
+      "  { id: 'her side', grow: true, stepMs: 450, rows: 4, messages: ['Hi', '> You up?'] },",
+    )
+  })
+
+  // No page has a chain until an author draws one, so that is the state the shipped
+  // file is in — an empty multi-line literal would read as something having been deleted.
+  it('emits an empty list on one line', () => {
+    expect(serializeConfig(seedConfig())).toContain(
+      'export const PANEL_BUBBLE_CHAINS: BubbleChain[] = []\n',
+    )
+  })
+
+  it('carries the chain header prose, which is not recoverable from the data', () => {
+    const ts = serializeConfig(seedConfig())
+    expect(ts).toContain('the list is derived from them, not')
+    // The four things a hand-editor cannot infer from the data: that the two linked
+    // balloons are stamped from rather than drawn, which end is newest, what decides the
+    // column a message lands in, and that a composer is spelled as a content kind.
+    expect(ts).toContain('are *templates*, not slots')
+    expect(ts).toContain('the newest sit at the bottom')
+    expect(ts).toContain('deciding which column a message lands in')
+    expect(ts).toContain("content: 'input'")
+  })
+
+  it('escapes an apostrophe an author typed into a message', () => {
+    const cfg = patchChain(threaded(), 'her side', { messages: ["It's me"] })
+    expect(serializeConfig(cfg)).toContain('messages: ["It\'s me"]')
+  })
+
+  it('rounds a delay to whole milliseconds — a timer has no use for a fraction', () => {
+    const cfg = threaded()
+    cfg.chains[0].stepMs = 450.6
+    expect(serializeConfig(cfg)).toContain('stepMs: 451,')
+  })
+
+  it('rounds the row cap too — half a row is not a row', () => {
+    const cfg = threaded()
+    cfg.chains[0].rows = 4.7
+    expect(serializeConfig(cfg)).toContain('rows: 5,')
+  })
+
+  it('produces a chain block that re-evaluates back to the same list', () => {
+    const cfg = threaded()
+    expect(reparse(serializeConfig(cfg)).chains).toEqual(cfg.chains)
+  })
+})
+
 describe('serializeConfigFile', () => {
   it('prepends the import header to the const blocks', () => {
     const file = serializeConfigFile(seedConfig())
     expect(file.startsWith("import type { PanelBgStyle } from '../panelPatterns'")).toBe(true)
-    expect(file).toContain("import type { ImgTransform, BubbleTransform, PageGrids } from './types'")
+    expect(file).toContain(IMPORT_LINE)
     expect(file).toContain('export const PANEL_IMG_TRANSFORMS: ImgTransform[] = [')
     expect(file).toContain('export const PANEL_BUBBLE_TRANSFORMS: BubbleTransform[] = [')
     expect(file).toContain('export const PANEL_PATTERNS: PanelBgStyle[] = [')
