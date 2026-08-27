@@ -13,7 +13,17 @@ import type { NormPt } from './panelGeometry'
 // including the perspective convergence, because a projective map through four point
 // correspondences is unique.
 
-/** The four corners of a projected surface, clockwise from top-left, in % of the frame. */
+/**
+ * The four corners of a projected surface, clockwise from top-left, in % of the
+ * picture's **rendered rect** — the box the artwork's own pixels occupy
+ * (`surfaceBaseRect` in `editor/transforms.ts`), not the frame it hangs in.
+ *
+ * The distinction is what keeps the surface on the photograph. The picture is
+ * contain-fitted inside its frame, so the frame's letterboxing redistributes whenever
+ * the window's aspect ratio changes; corners measured against the frame stay glued to
+ * the frame while the photograph slides underneath them. Corners measured against the
+ * rendered rect ride the picture through a resize, a pan and a zoom alike.
+ */
 export type Quad = [NormPt, NormPt, NormPt, NormPt]
 
 /** A brand-new surface: inset from the frame so all four grips are on screen to grab. */
@@ -27,7 +37,7 @@ export const DEFAULT_QUAD: Quad = [
 /** How far a corner may be dragged outside its frame, in % — enough to hang off an edge. */
 export const QUAD_RANGE = { min: -100, max: 200 }
 
-/** The quad's corners in px inside the frame box. */
+/** The quad's corners in px inside its base rect (a `w` by `h` box at the origin). */
 export function quadPx(quad: Quad, w: number, h: number): [number, number][] {
   return quad.map(([x, y]) => [(x / 100) * w, (y / 100) * h] as [number, number])
 }
@@ -155,15 +165,24 @@ function round(n: number): number {
   return n === 0 || !Number.isFinite(n) ? n : Number(n.toPrecision(12))
 }
 
-/** The surface geometry a renderer needs, in one call. */
+/**
+ * The surface geometry a renderer needs, in one call.
+ *
+ * `base` is the picture's rendered rect in the clip wrapper's coordinates
+ * (`surfaceBaseRect`) — the box the quad's percentages measure. `left`/`top` put the
+ * surface's layout box at the rect's origin, so the homography, solved in the rect's
+ * own space, needs no knowledge of where the picture landed inside its frame.
+ */
 export function surfaceStyle(
   surface: { quad: Quad },
-  frame: { w: number; h: number },
-): { width: number; height: number; transform: string } {
-  const src = quadSourceBox(surface.quad, frame.w, frame.h)
+  base: { x: number; y: number; w: number; h: number },
+): { left: number; top: number; width: number; height: number; transform: string } {
+  const src = quadSourceBox(surface.quad, base.w, base.h)
   return {
+    left: base.x,
+    top: base.y,
     width: src.w,
     height: src.h,
-    transform: quadMatrix3d(surface.quad, frame, src),
+    transform: quadMatrix3d(surface.quad, base, src),
   }
 }

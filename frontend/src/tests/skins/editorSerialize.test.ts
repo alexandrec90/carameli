@@ -25,12 +25,42 @@ import { PANELS } from '../../skins/comic-book/panels'
 const IMPORT_LINE =
   "import type { ImgTransform, BubbleTransform, BubbleChain, PageGrids } from './types'"
 
-/** Count `{ ... }` object entries inside the named const's array literal. */
+/**
+ * Count `{ ... }` object entries inside the named const's array literal, at the
+ * array's own depth.
+ *
+ * A picture that carries a `table` or a `numberPad` nests both braces (the surface
+ * object, its columns) and brackets (the quad, the rows), so neither of the two
+ * one-liners this replaces survives one: slicing to the first `]` stopped inside the
+ * quad and lost every entry after it, and counting every `{` counted the surface's
+ * own objects as pictures. Both were correct only while no surface had been authored
+ * into the seed, which stopped being true the moment one was.
+ */
 function entryCount(ts: string, constName: string): number {
   const after = ts.slice(ts.indexOf(`export const ${constName}`))
-  const start = after.indexOf('= [') + 2 // skip past the `ImgTransform[]` type annotation
-  const arr = after.slice(start, after.indexOf(']', start))
-  return (arr.match(/\{/g) ?? []).length
+  const open = after.indexOf('= [') + 2 // skip past the `ImgTransform[]` type annotation
+  let brackets = 0
+  let braces = 0
+  let quote = ''
+  let entries = 0
+  for (let i = open; i < after.length; i++) {
+    const ch = after[i]
+    if (quote) {
+      if (ch === '\\') i++
+      else if (ch === quote) quote = ''
+      continue
+    }
+    if (ch === "'" || ch === '"' || ch === '`') quote = ch
+    else if (ch === '[') brackets++
+    else if (ch === ']') {
+      brackets--
+      if (brackets === 0) break
+    } else if (ch === '{') {
+      if (brackets === 1 && braces === 0) entries++
+      braces++
+    } else if (ch === '}') braces--
+  }
+  return entries
 }
 
 /**
@@ -87,10 +117,13 @@ describe('serializeConfig', () => {
     expect(ts).toContain('falls back to the shipped default on hydrate')
   })
 
+  // Read the value being replaced off the seed rather than naming it: a bare
+  // `not.toContain('halftone-gradient')` also fails when some *other* slot happens to
+  // ship that style, which is a fact about the art and not about the serializer.
   it('writes the pattern an author picked, under its panel label comment', () => {
     const ts = serializeConfig(patchPattern(seedConfig(), 0, 'sunburst'))
-    expect(ts).toContain("  'sunburst', // Logo\n")
-    expect(ts).not.toContain("'halftone-gradient'")
+    expect(ts).toContain(`  'sunburst', // ${PANELS[0].label}\n`)
+    expect(ts).not.toContain(`  '${PANEL_PATTERNS[0]}', // ${PANELS[0].label}\n`)
   })
 
   // The patterns block iterates PANELS, not the config: the array is parallel by
@@ -102,7 +135,7 @@ describe('serializeConfig', () => {
     const ts = serializeConfig(cfg)
     expect(patternCount(ts)).toBe(PANELS.length)
     expect(ts).not.toContain('undefined')
-    expect(ts).toContain("  'radial-dots', // Logo 2\n")
+    expect(ts).toContain(`  '${PANEL_PATTERNS[8]}', // ${PANELS[8].label}\n`)
   })
 
   it('reproduces the default values verbatim', () => {
@@ -285,12 +318,23 @@ describe('serializeConfig', () => {
    * wrote `table: null` would round-trip through this reparse and then fail the
    * byte-for-byte test below, having already put eight dead keys into the shipped file.
    */
-  it('writes nothing on the seven pictures that are not surfaces', () => {
-    const cfg = patchImg(seedConfig(), 2, { table: newTable() })
-    const ts = serializeConfig(cfg)
+  // Counted against a config with the surfaces stripped rather than against the seed
+  // and a fixed number of plain pictures: the seed ships surfaces of its own now, and
+  // both move whenever an author adds or removes one in the editor.
+  it('writes a surface only on the picture that carries one', () => {
+    const plain = seedConfig()
+    plain.images = plain.images.map(t => {
+      const copy = { ...t }
+      delete copy.table
+      delete copy.numberPad
+      return copy
+    })
+    expect(serializeConfig(plain)).not.toContain('table:')
+    expect(reparse(serializeConfig(plain)).images.every(t => !('table' in t))).toBe(true)
+
+    const ts = serializeConfig(patchImg(plain, 2, { table: newTable() }))
     expect((ts.match(/ table: \{/g) ?? [])).toHaveLength(1)
-    expect(serializeConfig(seedConfig())).not.toContain('table:')
-    expect(reparse(serializeConfig(seedConfig())).images.every(t => !('table' in t))).toBe(true)
+    expect(reparse(ts).images.filter(t => 'table' in t)).toHaveLength(1)
   })
 
   it('round-trips an edited pattern back to the same style name', () => {

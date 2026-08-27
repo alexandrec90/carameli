@@ -10,7 +10,7 @@ interface TableCornersProps {
   index: number
   surface: ProjectedSurface
   kind: 'table' | 'numberPad'
-  /** The picture's frame in viewport px — the box the quad's percentages measure. */
+  /** The picture's rendered rect in viewport px — the box the quad's percentages measure. */
   rect: Rect
 }
 

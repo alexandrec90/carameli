@@ -1,18 +1,50 @@
+import {
+  isBackendOffline,
+  isUnreachableStatus,
+  markBackendOffline,
+} from '../lib/backendReachability'
 import { logger } from '../lib/logger'
 
 const BASE = import.meta.env.VITE_API_BASE_URL ?? ''
 
+/**
+ * Thrown instead of calling a backend already known to be absent. Carries the path
+ * so a rejection still says which call was skipped. See `lib/backendReachability`.
+ */
+export class BackendOfflineError extends Error {
+  constructor(readonly path: string) {
+    super(`Backend not reachable — skipped ${path}`)
+    this.name = 'BackendOfflineError'
+  }
+}
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, {
-    ...options,
-    credentials: 'include',
-    headers: {
-      'Content-Type': 'application/json',
-      ...options.headers,
-    },
-  })
+  // In a UI-only preview every call fails the same way for the same reason, so
+  // after the first one there is nothing to learn from making the rest. Short-
+  // circuiting is what keeps a route change from replaying the whole wall of
+  // failed requests. Only ever armed in DEV — see `lib/backendReachability`.
+  if (isBackendOffline()) throw new BackendOfflineError(path)
+
+  let res: Response
+  try {
+    res = await fetch(`${BASE}${path}`, {
+      ...options,
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        ...options.headers,
+      },
+    })
+  } catch (e) {
+    // A rejected fetch is a transport failure — no server answered at all.
+    markBackendOffline()
+    throw e
+  }
   if (!res.ok) {
     const text = await res.text()
+    // Before the log, so the first failure is already reported as the preview
+    // condition it is rather than as an app fault.
+    if (isUnreachableStatus(res.status)) markBackendOffline()
     logger.error(`API ${options.method ?? 'GET'} ${path} failed`, { status: res.status, body: text })
     throw new Error(`${res.status} ${text}`)
   }

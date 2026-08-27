@@ -9,6 +9,7 @@ import {
   puffOpacity,
   resolveBubbleShape,
 } from './bubbleShape'
+import BubbleActions from './BubbleActions'
 import BubbleDial from './BubbleDial'
 import BubbleInput from './BubbleInput'
 import BubbleWheel from './BubbleWheel'
@@ -16,6 +17,7 @@ import { dialOptions } from './dialPicker'
 import { BUBBLE_TYPES } from './editor/bubbleTypes'
 import { bubbleStyle } from './editor/transforms'
 import type { BubbleTransform } from './editor/types'
+import type { PhoneActionHandlers } from './phoneActions'
 import { useBubbleMorph } from './useBubbleMorph'
 import { splitOptions } from './wheelPicker'
 
@@ -66,6 +68,11 @@ interface PanelBubbleProps {
    */
   dialled?: string[]
   /**
+   * Passed through to an `actions` balloon: what each of the telephone's keys does. Absent
+   * in the editor and on any page with no telephone, where the keys are drawn but inert.
+   */
+  actions?: PhoneActionHandlers
+  /**
    * How far a message of a live conversation has got. Absent on every balloon that is not
    * one, and on one whose message the carrier has acknowledged — a sent message is just a
    * message. Drawn as ink rather than as words: a sending balloon is pale and a failed one
@@ -93,6 +100,7 @@ export default function PanelBubble({
   dialValue = '',
   onDialChange,
   dialled = NOTHING_DIALLED,
+  actions,
   status,
 }: PanelBubbleProps) {
   const [hover, setHover] = useState(false)
@@ -128,8 +136,10 @@ export default function PanelBubble({
   const editableKind =
     bubble.content === 'input' || bubble.content === 'phone' ? bubble.content : null
   // Every kind that puts a real form control in the balloon, which is the question the
-  // wrapper's aria and focus handling actually asks — a dial has one too.
-  const hasField = editableKind !== null || bubble.content === 'dial'
+  // wrapper's aria and focus handling actually asks — a dial has one too, and so do the
+  // action buttons.
+  const hasField =
+    editableKind !== null || bubble.content === 'dial' || bubble.content === 'actions'
   // The dial's drum: what the author listed, then what has been dialled that they did not.
   // Memoized so the filter BubbleDial runs over it survives a hover — this balloon
   // re-renders on every pointer enter and leave. Its re-seat keys on the contents rather
@@ -138,7 +148,7 @@ export default function PanelBubble({
     () => dialOptions(splitOptions(bubble.text), dialled),
     [bubble.text, dialled],
   )
-  // A keyboard user can tab to an otherwise hidden input; focus reveals its bubble
+  // A keyboard user can tab to an otherwise hidden control; focus reveals its bubble
   // immediately and blur returns it to the panel-hover reveal rule.
   const shown = visible || focused
 
@@ -217,6 +227,8 @@ export default function PanelBubble({
           hostRef={rootRef}
           onSubmit={onSubmit}
         />
+      ) : bubble.content === 'actions' ? (
+        <BubbleActions text={bubble.text} font={font} enabled={interactive} actions={actions} />
       ) : bubble.content === 'wheel' ? (
         <BubbleWheel
           options={splitOptions(bubble.text)}

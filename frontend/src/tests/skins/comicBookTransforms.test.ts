@@ -17,12 +17,13 @@ import {
   imgVisibleRect,
   imgRect,
   renderedImgRect,
+  surfaceBaseRect,
   anchorToFractions,
   bubbleRect,
   bubbleStyle,
   toClipPath,
 } from '../../skins/comic-book/editor/transforms'
-import type { ImgTransform } from '../../skins/comic-book/editor/types'
+import type { BubbleTransform, ImgTransform } from '../../skins/comic-book/editor/types'
 import { PANELS } from '../../skins/comic-book/panels'
 
 /** A picture at the shipped default: full-panel frame, identity framing inside it. */
@@ -176,6 +177,52 @@ describe('renderedImgRect', () => {
     expect(r.y + r.h / 2).toBeCloseTo(frame.y + Number(s.top) + nat.h / 2, 10)
     expect(r.w).toBeCloseTo(nat.w * k, 10)
     expect(r.h).toBeCloseTo(nat.h * k, 10)
+  })
+})
+
+describe('surfaceBaseRect', () => {
+  const frame = { x: 0, y: 0, w: 400, h: 300 }
+  // Tall source in the wide frame: fit 0.5 → a 100×300 box, centred and flush with
+  // the floor at the default center-bottom anchor.
+  const nat = { w: 200, h: 600 }
+
+  it("is the picture's rendered rect once the natural size is known", () => {
+    expect(surfaceBaseRect(frame, nat, img())).toEqual(renderedImgRect(frame, nat, img()))
+    expect(surfaceBaseRect(frame, nat, img())).toEqual({ x: 150, y: 0, w: 100, h: 300 })
+  })
+
+  // The whole bug this base exists to fix: the same artwork in two frames of different
+  // aspect ratios letterboxes differently, so a quad measured against the frame slides
+  // off the photograph on the first window resize. Measured against this rect, a quad
+  // corner names the same picture pixel in both frames.
+  it('pins a quad corner to the same picture pixel whatever the frame aspect', () => {
+    const wide = surfaceBaseRect({ x: 0, y: 0, w: 400, h: 300 }, nat, img())
+    const tall = surfaceBaseRect({ x: 0, y: 0, w: 300, h: 400 }, nat, img())
+    // The base always has the artwork's own proportions — the frames do not — so a
+    // percentage of it names a picture pixel, not a letterbox pixel. The frame-based
+    // measure this replaced fails both lines: 400/300 and 300/400 are not 200/600.
+    expect(wide.w / wide.h).toBeCloseTo(nat.w / nat.h, 10)
+    expect(tall.w / tall.h).toBeCloseTo(nat.w / nat.h, 10)
+    // Sanity: the two frames really do letterbox the artwork differently — pillarboxed
+    // at fit 0.5 in the wide frame, at fit ⅔ in the tall one.
+    expect(wide).toEqual({ x: 150, y: 0, w: 100, h: 300 })
+    expect(tall.x).toBeCloseTo(250 / 3, 10)
+    expect(tall.y).toBe(0)
+    expect(tall.w).toBeCloseTo(400 / 3, 10)
+    expect(tall.h).toBeCloseTo(400, 10)
+  })
+
+  it('stays unclamped when a pan overhangs the frame, unlike imgVisibleRect', () => {
+    // offsetX 200 slides the 100-wide box to x 350..450; the frame ends at 400.
+    const panned = img({ offsetX: 200 })
+    expect(surfaceBaseRect(frame, nat, panned)).toEqual({ x: 350, y: 0, w: 100, h: 300 })
+    expect(imgVisibleRect(frame, nat, panned)).toEqual({ x: 350, y: 0, w: 50, h: 300 })
+  })
+
+  it('falls back to the frame before the natural size is known, or on a zero frame', () => {
+    expect(surfaceBaseRect(frame, undefined, img())).toEqual(frame)
+    const flat = { x: 5, y: 5, w: 0, h: 300 }
+    expect(surfaceBaseRect(flat, nat, img())).toEqual(flat)
   })
 })
 
@@ -443,6 +490,13 @@ describe('BUBBLE_TYPES', () => {
 })
 
 describe('default config parity', () => {
+  // A balloon whose `content` is not 'text' is a **field** drawn onto the art — a phone
+  // number typed onto a photographed handset, a wheel of numbers to pick from — not a
+  // line of speech. It is placed where the art puts it, points at nothing, and does not
+  // morph under the pointer, so the three assertions below that describe how a *caption*
+  // behaves do not apply to it.
+  const isField = (b: BubbleTransform) => b.content !== 'text'
+
   it('uses center center only for the logo panels and center bottom for the rest', () => {
     PANEL_IMG_TRANSFORMS.forEach(t => {
       expect(t.anchor).toBe(PANELS[t.panel].isLogo ? 'center center' : 'center bottom')
@@ -474,22 +528,27 @@ describe('default config parity', () => {
     const second = linkedPairs(PANEL_BUBBLE_TRANSFORMS).map(([, j]) => j)
     const nudged = new Set([...second, 6])
     PANEL_BUBBLE_TRANSFORMS.forEach((b, i) => {
-      if (nudged.has(i)) return
+      if (nudged.has(i) || isField(b)) return
       expect(b.top).toBe(-35)
       expect(b.right).toBe(-12)
       expect(b.width).toBe(55)
     })
   })
 
-  it('links two pairs, each declared from exactly one end', () => {
-    expect(linkedPairs(PANEL_BUBBLE_TRANSFORMS)).toEqual([[0, 1], [4, 5]])
+  // Two caption pairs, plus the home page's telephone: the number a reader types and
+  // the buttons that dial it are one instrument, and the tube is what says so.
+  it('links three pairs, each declared from exactly one end', () => {
+    expect(linkedPairs(PANEL_BUBBLE_TRANSFORMS)).toEqual([[0, 1], [4, 5], [10, 11]])
   })
 
-  // Both halves of a linked pair are one speaker's line continuing, so only the first
-  // carries a tail; the tube is what joins the second to it.
-  it('gives each linked pair one tail between the two of them', () => {
+  // Both halves of a linked *caption* pair are one speaker's line continuing, so only
+  // the first carries a tail; the tube is what joins the second to it. A pair of fields
+  // is not an utterance — neither end points at a speaker — so only the shared panel,
+  // which is what makes a tube drawable at all, holds for every pair.
+  it('gives each linked caption pair one tail between the two of them', () => {
     linkedPairs(PANEL_BUBBLE_TRANSFORMS).forEach(([i, j]) => {
       expect(PANEL_BUBBLE_TRANSFORMS[i].panel).toBe(PANEL_BUBBLE_TRANSFORMS[j].panel)
+      if (isField(PANEL_BUBBLE_TRANSFORMS[i]) || isField(PANEL_BUBBLE_TRANSFORMS[j])) return
       expect(PANEL_BUBBLE_TRANSFORMS[i].tail).not.toBe('none')
       expect(PANEL_BUBBLE_TRANSFORMS[j].tail).toBe('none')
     })
@@ -498,14 +557,14 @@ describe('default config parity', () => {
   it('points every other bubble’s tail somewhere', () => {
     const linked = new Set(linkedPairs(PANEL_BUBBLE_TRANSFORMS).map(([, j]) => j))
     PANEL_BUBBLE_TRANSFORMS.forEach((b, i) => {
-      if (linked.has(i)) return
+      if (linked.has(i) || isField(b)) return
       expect(TAIL_DIR_KEYS).toContain(b.tail)
       expect(b.tail).not.toBe('none')
     })
   })
 
-  it('gives every bubble a hover and a click shape distinct from its resting one', () => {
-    PANEL_BUBBLE_TRANSFORMS.forEach(b => {
+  it('gives every caption a hover and a click shape distinct from its resting one', () => {
+    PANEL_BUBBLE_TRANSFORMS.filter(b => !isField(b)).forEach(b => {
       expect(b.hoverType).not.toBeNull()
       expect(b.clickType).not.toBeNull()
       expect(b.hoverType).not.toBe(b.type)
@@ -535,21 +594,25 @@ describe('default config parity', () => {
     })
   })
 
-  // The frame is new, so the shipped values are the compatibility guarantee: every
-  // picture starts on its whole panel and crops exactly as it did before it had one.
-  it('starts every picture on the full-panel frame', () => {
+  // `[0, 0, 100, 100]` was the compatibility guarantee from when the frame was new:
+  // every picture started on its whole panel and cropped as it had before it had one.
+  // Authors reframe pictures in the editor and save them out, so that guarantee is
+  // spent; what has to hold of any saved frame is that it is a real box, since a zero
+  // or negative extent draws nothing at all.
+  it('gives every picture a frame with a real extent', () => {
     PANEL_IMG_TRANSFORMS.forEach(t => {
-      expect([t.left, t.top, t.width, t.height]).toEqual([0, 0, 100, 100])
+      expect(t.width).toBeGreaterThan(0)
+      expect(t.height).toBeGreaterThan(0)
     })
   })
 
-  it('puts every bubble on a real panel, and every panel speaks at least once', () => {
-    const panels = PANEL_BUBBLE_TRANSFORMS.map(b => b.panel)
-    panels.forEach(p => {
-      expect(p).toBeGreaterThanOrEqual(0)
-      expect(p).toBeLessThan(PANELS.length)
+  // Not every panel speaks: one can carry a projected surface — a number pad, a table
+  // of contacts — and say its piece that way, so the count of distinct panels named
+  // here is content. What stays structural is that a balloon names a panel that exists.
+  it('puts every bubble on a real panel', () => {
+    PANEL_BUBBLE_TRANSFORMS.forEach(b => {
+      expect(b.panel).toBeGreaterThanOrEqual(0)
+      expect(b.panel).toBeLessThan(PANELS.length)
     })
-    expect(new Set(panels).size).toBe(PANELS.length)
-    expect(PANEL_BUBBLE_TRANSFORMS.length).toBeGreaterThan(PANELS.length)
   })
 })

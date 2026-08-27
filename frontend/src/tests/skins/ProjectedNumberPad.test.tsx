@@ -7,7 +7,9 @@ import ProjectedNumberPad, {
 import type { Quad } from '../../skins/comic-book/tableProjection'
 import { newNumberPad } from '../../skins/comic-book/editor/numberPadValidate'
 
-const FRAME = { w: 400, h: 300 }
+// The picture's rendered rect — deliberately not at the wrapper's origin, so a test
+// below can pin that the pad is placed at the artwork rather than at the frame.
+const BASE = { x: 12, y: 8, w: 400, h: 300 }
 
 function draw(editing = false, quad?: Quad, onKey?: (key: string) => void) {
   const numberPad = newNumberPad()
@@ -15,7 +17,7 @@ function draw(editing = false, quad?: Quad, onKey?: (key: string) => void) {
   const view = render(
     <ProjectedNumberPad
       numberPad={numberPad}
-      frame={FRAME}
+      base={BASE}
       editing={editing}
       onKey={onKey}
     />,
@@ -60,10 +62,31 @@ describe('ProjectedNumberPad', () => {
     expect((editorKeys[9] as HTMLElement).style.borderBottom).toBe('')
   })
 
+  it('paints no ink outside editor mode, but still carries it for the key glow', () => {
+    const ink = newNumberPad().ink
+
+    const reader = draw()
+    // Invisible on the picture: the glyphs are the accessible name, drawn in nothing.
+    expect(reader.surface!.style.color).toBe('transparent')
+    // The glow is drawn in the authored ink, so it has to survive that.
+    expect(reader.surface!.style.getPropertyValue('--cb-number-pad-ink')).toBe(ink)
+    reader.unmount()
+
+    const editor = draw(true)
+    expect(editor.surface!.style.color).not.toBe('transparent')
+    expect(editor.surface!.style.getPropertyValue('--cb-number-pad-ink')).toBe(ink)
+  })
+
   it('lands the pad on its quad with the shared projective transform', () => {
     const { surface } = draw()
     expect(surface!.style.transform.startsWith('matrix3d(')).toBe(true)
     expect(surface!.style.pointerEvents).toBe('none')
+  })
+
+  it("sits at the rendered rect's origin, so it rides the picture and not the frame", () => {
+    const { surface } = draw()
+    expect(surface!.style.left).toBe('12px')
+    expect(surface!.style.top).toBe('8px')
   })
 
   it('is a picture, not a control, until a key handler is supplied', () => {

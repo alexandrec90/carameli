@@ -1,5 +1,5 @@
 /** The five ways a panel bubble can present its authored text. */
-export type BubbleContentKind = 'text' | 'wheel' | 'input' | 'phone' | 'dial'
+export type BubbleContentKind = 'text' | 'wheel' | 'input' | 'phone' | 'dial' | 'actions'
 
 export const BUBBLE_CONTENT_KINDS: BubbleContentKind[] = [
   'text',
@@ -7,6 +7,7 @@ export const BUBBLE_CONTENT_KINDS: BubbleContentKind[] = [
   'input',
   'phone',
   'dial',
+  'actions',
 ]
 
 /** Runtime guard for persisted payloads, mirroring isBubbleType / isTailDir. */

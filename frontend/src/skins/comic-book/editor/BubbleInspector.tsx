@@ -96,6 +96,7 @@ export default function BubbleInspector({ api, index, bubble }: BubbleInspectorP
           <option value="input">Text input</option>
           <option value="phone">Phone input</option>
           <option value="dial">Dial (wheel + phone input)</option>
+          <option value="actions">Action buttons</option>
         </select>
       </label>
       <label className="cb-ed-field">
@@ -104,7 +105,9 @@ export default function BubbleInspector({ api, index, bubble }: BubbleInspectorP
             ? 'options'
             : bubble.content === 'input' || bubble.content === 'phone'
               ? 'initial value'
-              : 'text'}
+              : bubble.content === 'actions'
+                ? 'buttons'
+                : 'text'}
         </span>
         <textarea
           className="cb-ed-textarea"
@@ -131,6 +134,12 @@ export default function BubbleInspector({ api, index, bubble }: BubbleInspectorP
         <div className="cb-ed-hint">
           This becomes an editable field outside edit mode. Phone input formats while
           typing from the browser locale; a leading + always uses that country code.
+        </div>
+      )}
+      {bubble.content === 'actions' && (
+        <div className="cb-ed-hint">
+          Comma-delimited: each entry is one placeholder button. They press but are
+          wired to nothing yet.
         </div>
       )}
 

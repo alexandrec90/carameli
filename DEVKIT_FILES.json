@@ -1,5 +1,5 @@
 {
-  "devkit_tag": "v0.11.6",
+  "devkit_tag": "v0.11.7",
   "files": {
     ".claude/hooks/session-start.sh": "de052fbeca615c448055f76c85e50db0896229c7724021a9916752dd44671dda",
     ".claude/rules/authoring.md": "55def2e448d71f9f85ab414e7dc58c52713bd5194e80ea5fd57a88eb444c1a1b",
@@ -17,7 +17,7 @@
     "scripts/hooks/lint-fix.py": "2d7a73f43463c1e77897294a470ac4a50014d1285ea154ceffc7cdb3dc003b12",
     "scripts/hooks/report-harness-defect.py": "87e79f548d2a2f1d6cf1c5dcf83232af657f84488c64674c595e90eb4b1ec449",
     "scripts/hooks/session-sync.py": "76c1c2f4b7f774cdacac0752686064c4ebf4a8dc56f76b0fb959a7a2a66233fe",
-    "scripts/hooks/stop.py": "a1792bd0a6f245c15222c00d2d145cc80b58df9ecaa3149748d4b28ffe6b67c1",
+    "scripts/hooks/stop.py": "8f3187ed68745216704f4d81400d579f3a1aca43614b8f9b4e728cc2466d25bd",
     "scripts/hooks/tests/conftest.py": "a5821c89d381843da64dcdfeb57346a11d19d8d524673c5e1005601e23bc16de",
     "scripts/hooks/tests/test_ci_workflow_contract.py": "24e5b7d9878b73ff54accf3cf288bfe9a6ed5b1679fdca7d4cb656d0939d153c",
     "scripts/hooks/tests/test_codex_hook_adapter.py": "c69b78eb6c646a637dc33e3402f1382d6e45c4043c26bdf790c33d82fd7fb73b",
@@ -37,7 +37,7 @@
     "scripts/hooks/tests/test_session_start.py": "ba95b723a4e02d390e9643fe26db1c04ae6b863a60a83e14008fd4846e27f571",
     "scripts/hooks/tests/test_session_sync.py": "a273d5ad0ef813ebd927fd882056c2ad9a05c5340eaa1ecb9c5a51abe1ec4ff4",
     "scripts/hooks/tests/test_ship.py": "2004cd3905ecea4f61c1039be94dd4a4990930c395a9a45a4153b04f1981212a",
-    "scripts/hooks/tests/test_stop.py": "0acae0e6ff7a2a8f2335a434e221e8613e609560aa71c2a690c0c84a781696fe",
+    "scripts/hooks/tests/test_stop.py": "a0b4b9006877eb362cd2bf0dbadbf302343fddc57ba16f6f195b536aae0f5c02",
     "scripts/hooks/tests/test_sync_codex_context.py": "bf93208ed82e5c717f5e1f70c61c4c37b9883812ff266b4c093e1a067adede4d",
     "scripts/hooks/tests/test_sync_codex_hooks.py": "7ba81023d1355708fdf046f371b148dbdb11f815485efdff0e298fac84b26280",
     "scripts/hooks/tests/test_sync_devkit.py": "05e50addfc33753fa766c768b3aa031aae084847af222813b4220b22cadee61c",

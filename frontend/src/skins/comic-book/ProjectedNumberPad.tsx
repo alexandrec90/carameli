@@ -6,7 +6,8 @@ import './number-pad.css'
 
 interface ProjectedNumberPadProps {
   numberPad: NumberPadProjection
-  frame: { w: number; h: number }
+  /** The picture's rendered rect in the clip wrapper's coordinates — the quad's base. */
+  base: { x: number; y: number; w: number; h: number }
   /** Shows the alignment grid and keeps the projected layer out of editor gestures. */
   editing: boolean
   /**
@@ -25,22 +26,29 @@ const KEY_LABELS: Record<string, string> = { '*': 'star', '#': 'hash' }
 /** A fixed telephone number pad laid onto a photographed surface by one homography. */
 export default function ProjectedNumberPad({
   numberPad,
-  frame,
+  base,
   editing,
   onKey,
 }: ProjectedNumberPadProps) {
-  const { width, height, transform } = surfaceStyle(numberPad, frame)
+  const { left, top, width, height, transform } = surfaceStyle(numberPad, base)
   if (transform === 'none') return null
 
   // Editing always wins: the corner grips sit on this same picture, and a pad that took
   // the pointer would swallow the very drags that place its own quad.
   const live = !editing && Boolean(onKey)
 
+  // Outside the editor the pad is not drawn at all: the picture already shows the
+  // surface, and a key is found by pointing at it. The glyphs stay in the DOM — they are
+  // the accessible name — and are painted in nothing. The authored ink rides along as a
+  // custom property because the hover glow is drawn in it.
   const surface: CSSProperties = {
+    left,
+    top,
     width,
     height,
     transform,
-    color: numberPad.ink,
+    color: editing ? numberPad.ink : 'transparent',
+    ['--cb-number-pad-ink' as string]: numberPad.ink,
     fontSize: `${(height / 4) * numberPad.fontScale}px`,
     pointerEvents: live ? 'auto' : 'none',
     gridTemplateColumns: 'repeat(3, 1fr)',

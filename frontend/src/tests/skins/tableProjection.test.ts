@@ -198,9 +198,20 @@ describe('surfaceStyle', () => {
   })
 
   it('lays the table out at the source box and transforms it onto the quad', () => {
-    const style = surfaceStyle(table(DEFAULT_QUAD), FRAME)
-    expect(style).toMatchObject({ width: 320, height: 240 })
+    const style = surfaceStyle(table(DEFAULT_QUAD), { x: 0, y: 0, ...FRAME })
+    expect(style).toMatchObject({ left: 0, top: 0, width: 320, height: 240 })
     expect(style.transform.startsWith('matrix3d(')).toBe(true)
+  })
+
+  // The base rect is the picture's rendered rect, which rarely sits at the wrapper's
+  // origin: the offset is carried by left/top while the homography stays solved in the
+  // rect's own space. Under the old frame-based measure both were implicitly zero, so
+  // reverting to it fails here.
+  it('places the surface at the base rect and keeps the transform rect-local', () => {
+    const at = surfaceStyle(table(DEFAULT_QUAD), { x: 150, y: 40, ...FRAME })
+    const origin = surfaceStyle(table(DEFAULT_QUAD), { x: 0, y: 0, ...FRAME })
+    expect(at).toMatchObject({ left: 150, top: 40, width: 320, height: 240 })
+    expect(at.transform).toBe(origin.transform)
   })
 
   it('reports none for a surface that cannot be drawn', () => {
@@ -210,6 +221,6 @@ describe('surfaceStyle', () => {
       [50, 50],
       [50, 50],
     ]
-    expect(surfaceStyle(table(point), FRAME).transform).toBe('none')
+    expect(surfaceStyle(table(point), { x: 0, y: 0, ...FRAME }).transform).toBe('none')
   })
 })
