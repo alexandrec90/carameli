@@ -204,7 +204,10 @@
   border-color: #2878ff;
 }
 
-.cb-ed-ship-status {
+/* What a write button has to say afterwards — Save's failure as well as Ship's
+   outcome. One style rather than two: the two buttons write the same file, so their
+   reports belong at the same size and in the same place. */
+.cb-ed-status {
   margin: 6px 0 0;
   color: #b8d8b8;
   font-size: 10px;
@@ -212,10 +215,10 @@
   overflow-wrap: anywhere;
 }
 
-.cb-ed-ship-status a {
+.cb-ed-status a {
   color: #7ab8ff;
 }
 
-.cb-ed-ship-status-error {
+.cb-ed-status-error {
   color: #ff9a9a;
 }
