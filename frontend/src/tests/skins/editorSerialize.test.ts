@@ -25,12 +25,16 @@ import { PANELS } from '../../skins/comic-book/panels'
 const IMPORT_LINE =
   "import type { ImgTransform, BubbleTransform, BubbleChain, PageGrids } from './types'"
 
-/** Count `{ ... }` object entries inside the named const's array literal. */
+/**
+ * Count `{ ... }` object entries inside the named const's array literal. An entry with
+ * a projected surface spans lines and nests `{`/`]` (a pad's quad, a table's rows), so
+ * bound at the array's own close bracket in column 0 and count only entry-opening
+ * lines at entry indent.
+ */
 function entryCount(ts: string, constName: string): number {
   const after = ts.slice(ts.indexOf(`export const ${constName}`))
-  const start = after.indexOf('= [') + 2 // skip past the `ImgTransform[]` type annotation
-  const arr = after.slice(start, after.indexOf(']', start))
-  return (arr.match(/\{/g) ?? []).length
+  const arr = after.slice(0, after.indexOf('\n]'))
+  return (arr.match(/^ {2}\{ /gm) ?? []).length
 }
 
 /**
@@ -90,7 +94,8 @@ describe('serializeConfig', () => {
   it('writes the pattern an author picked, under its panel label comment', () => {
     const ts = serializeConfig(patchPattern(seedConfig(), 0, 'sunburst'))
     expect(ts).toContain("  'sunburst', // Logo\n")
-    expect(ts).not.toContain("'halftone-gradient'")
+    // The Logo 2 slot legitimately keeps this style; only the patched slot loses it.
+    expect(ts).not.toContain("  'halftone-gradient', // Logo\n")
   })
 
   // The patterns block iterates PANELS, not the config: the array is parallel by
@@ -102,7 +107,7 @@ describe('serializeConfig', () => {
     const ts = serializeConfig(cfg)
     expect(patternCount(ts)).toBe(PANELS.length)
     expect(ts).not.toContain('undefined')
-    expect(ts).toContain("  'radial-dots', // Logo 2\n")
+    expect(ts).toContain("  'halftone-gradient', // Logo 2\n")
   })
 
   it('reproduces the default values verbatim', () => {
@@ -285,12 +290,15 @@ describe('serializeConfig', () => {
    * wrote `table: null` would round-trip through this reparse and then fail the
    * byte-for-byte test below, having already put eight dead keys into the shipped file.
    */
-  it('writes nothing on the seven pictures that are not surfaces', () => {
+  it('writes a table only on the pictures that are surfaces', () => {
     const cfg = patchImg(seedConfig(), 2, { table: newTable() })
     const ts = serializeConfig(cfg)
-    expect((ts.match(/ table: \{/g) ?? [])).toHaveLength(1)
-    expect(serializeConfig(seedConfig())).not.toContain('table:')
-    expect(reparse(serializeConfig(seedConfig())).images.every(t => !('table' in t))).toBe(true)
+    // The patched picture plus the shipped notepad surface (panel 10).
+    expect((ts.match(/ table: \{/g) ?? [])).toHaveLength(2)
+    expect((serializeConfig(seedConfig()).match(/ table: \{/g) ?? [])).toHaveLength(1)
+    expect(
+      reparse(serializeConfig(seedConfig())).images.filter(t => 'table' in t),
+    ).toHaveLength(1)
   })
 
   it('round-trips an edited pattern back to the same style name', () => {

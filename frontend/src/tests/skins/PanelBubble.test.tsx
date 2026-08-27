@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import PanelBubble from '../../skins/comic-book/PanelBubble'
 import { NEW_BUBBLE } from '../../skins/comic-book/editor/configSeed'
@@ -139,5 +139,74 @@ describe('PanelBubble input content', () => {
     expect(root.getAttribute('aria-hidden')).toBe('true')
     expect(screen.queryByRole('textbox')).toBeNull()
     expect(screen.getByText('Hello!')).toBeTruthy()
+  })
+})
+
+describe('PanelBubble action buttons', () => {
+  it('renders one real button per comma-delimited entry', () => {
+    const { container } = render(
+      <PanelBubble
+        bubble={{ ...NEW_BUBBLE, panel: 0, content: 'actions', text: 'Call, End call' }}
+        visible
+        interactive
+      />,
+    )
+    const root = container.querySelector('.cb-panel-bubble') as HTMLDivElement
+    // Real controls, so the bubble is not hidden from assistive tech.
+    expect(root.getAttribute('aria-hidden')).toBeNull()
+    const buttons = screen.getAllByRole('button')
+    expect(buttons.map(b => b.textContent)).toEqual(['Call', 'End call'])
+  })
+
+  it('keeps a press on a button from reaching the panel underneath', () => {
+    const onClick = vi.fn()
+    const onPointerDown = vi.fn()
+    const onKeyDown = vi.fn()
+    // The panel is an ordinary ancestor of the balloon, so listen outside the React root
+    // and watch the native events: React's stopPropagation stops those too, and an
+    // ancestor listening in the DOM needs no interactive wrapper element to spy with.
+    const panel = document.createElement('div')
+    const root = document.createElement('div')
+    panel.appendChild(root)
+    document.body.appendChild(panel)
+    panel.addEventListener('click', onClick)
+    panel.addEventListener('pointerdown', onPointerDown)
+    panel.addEventListener('keydown', onKeyDown)
+    render(
+      <PanelBubble
+        bubble={{ ...NEW_BUBBLE, panel: 0, content: 'actions', text: 'Call, End call' }}
+        visible
+        interactive
+      />,
+      { container: root },
+    )
+    const button = screen.getByRole('button', { name: 'Call' })
+
+    fireEvent.pointerDown(button)
+    fireEvent.click(button)
+    fireEvent.keyDown(button, { key: 'Enter' })
+
+    expect(onPointerDown).not.toHaveBeenCalled()
+    expect(onClick).not.toHaveBeenCalled()
+    expect(onKeyDown).not.toHaveBeenCalled()
+
+    // …and the same listener does see a press that lands on the balloon itself, so the
+    // three above are the buttons swallowing it rather than the events going nowhere.
+    fireEvent.pointerDown(root.querySelector('.cb-panel-bubble') as HTMLDivElement)
+
+    expect(onPointerDown).toHaveBeenCalled()
+  })
+
+  it('disables the buttons while the editor overlay owns interaction', () => {
+    render(
+      <PanelBubble
+        bubble={{ ...NEW_BUBBLE, panel: 0, content: 'actions', text: 'Call, End call' }}
+        visible
+        interactive={false}
+      />,
+    )
+    screen.getAllByRole('button').forEach(b => {
+      expect(b).toHaveProperty('disabled', true)
+    })
   })
 })

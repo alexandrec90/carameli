@@ -9,6 +9,7 @@ import {
   puffOpacity,
   resolveBubbleShape,
 } from './bubbleShape'
+import BubbleActions from './BubbleActions'
 import BubbleInput from './BubbleInput'
 import BubbleWheel from './BubbleWheel'
 import { BUBBLE_TYPES } from './editor/bubbleTypes'
@@ -104,7 +105,9 @@ export default function PanelBubble({
   const font = BUBBLE_TYPES[shape].font
   const editableKind =
     bubble.content === 'input' || bubble.content === 'phone' ? bubble.content : null
-  // A keyboard user can tab to an otherwise hidden input; focus reveals its bubble
+  // Anything with a real form control in it — an input or the action buttons.
+  const controlKind = editableKind !== null || bubble.content === 'actions'
+  // A keyboard user can tab to an otherwise hidden control; focus reveals its bubble
   // immediately and blur returns it to the panel-hover reveal rule.
   const shown = visible || focused
 
@@ -122,7 +125,7 @@ export default function PanelBubble({
     <div
       ref={rootRef}
       className={className}
-      aria-hidden={editableKind ? undefined : true}
+      aria-hidden={controlKind ? undefined : true}
       style={bubbleStyle(bubble)}
       // On the wrapper, though the wrapper itself takes no pointer: enter and leave
       // are synthesized from the subtree, so this is "the pointer is somewhere in the
@@ -131,8 +134,8 @@ export default function PanelBubble({
       onPointerEnter={interactive ? () => setHover(true) : undefined}
       onPointerLeave={interactive ? () => setHover(false) : undefined}
       onPointerDown={interactive ? pulse : undefined}
-      onFocusCapture={editableKind && interactive ? () => setFocused(true) : undefined}
-      onBlurCapture={editableKind && interactive ? () => setFocused(false) : undefined}
+      onFocusCapture={controlKind && interactive ? () => setFocused(true) : undefined}
+      onBlurCapture={controlKind && interactive ? () => setFocused(false) : undefined}
     >
       <svg
         className="cb-panel-bubble-svg"
@@ -169,6 +172,8 @@ export default function PanelBubble({
           enabled={interactive}
           onSubmit={onSubmit}
         />
+      ) : bubble.content === 'actions' ? (
+        <BubbleActions text={bubble.text} font={font} enabled={interactive} />
       ) : bubble.content === 'wheel' ? (
         <BubbleWheel
           options={splitOptions(bubble.text)}

@@ -74,10 +74,25 @@ describe('seedConfig', () => {
     })
   })
 
-  it('ships every picture on the default full-panel frame', () => {
-    seedConfig().images.forEach(t => {
-      expect([t.left, t.top, t.width, t.height]).toEqual([0, 0, 100, 100])
-    })
+  // The classic page's art fills its panel. The home page's pictures are placed by hand
+  // — a phone and a notepad leant into their frames so the projected keypad and table
+  // land on the drawn surface — so the default frame is a property of that page's seed
+  // rather than of every picture there is.
+  it('ships every classic-page picture on the default full-panel frame', () => {
+    const images = seedConfig().images
+    images
+      .filter(t => PANELS[t.panel].page === 'classic')
+      .forEach(t => {
+        expect([t.left, t.top, t.width, t.height]).toEqual([0, 0, 100, 100])
+      })
+
+    // …and the home page's really are off it, so the filter above is a split rather
+    // than a way for the assertion to stop covering anything.
+    const home = images.filter(t => PANELS[t.panel].page === 'home')
+    expect(home.length).toBeGreaterThan(0)
+    expect(
+      home.some(t => t.left !== 0 || t.top !== 0 || t.width !== 100 || t.height !== 100),
+    ).toBe(true)
   })
 
   // The two arrays parted company when a panel could own several balloons; asserting
@@ -618,10 +633,15 @@ describe('removeBubble', () => {
     const after = removeBubble(before, 0)
     before.bubbles.forEach((b, i) => {
       if (i === 0 || b.linkTo === null || b.linkTo === 0) return
-      // The surviving link still names the same balloon, at its new index.
+      // The surviving link still names the same balloon, at its new index — every index
+      // above the hole shifts down by one.
       const moved = after.bubbles[i - 1]
-      expect(moved.linkTo).not.toBeNull()
-      expect(after.bubbles[moved.linkTo!]).toEqual(before.bubbles[b.linkTo])
+      expect(moved.linkTo).toBe(b.linkTo - 1)
+      // Compare the balloon itself with its own `linkTo` held equal: the partner may be
+      // a link in a chain, and then its link is renumbered by this very shift too.
+      const partner = after.bubbles[moved.linkTo!]
+      const original = before.bubbles[b.linkTo]
+      expect({ ...partner, linkTo: original.linkTo }).toEqual(original)
     })
   })
 

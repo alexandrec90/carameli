@@ -466,7 +466,13 @@ describe('default config parity', () => {
     })
   })
 
-  it('keeps the bubbles that are alone on their panel on the shared placement', () => {
+  // The placement, tail and morph invariants below hold on the classic page, where
+  // they were designed. The home page's balloons are authored freely in the editor
+  // (linked runs, tail-less pairs, no morphs), and that authoring is pinned verbatim
+  // by the serializer's byte-for-byte test instead of re-derived here.
+  const classic = (b: { panel: number }): boolean => PANELS[b.panel].page === 'classic'
+
+  it('keeps the classic bubbles that are alone on their panel on the shared placement', () => {
     // The two linked pairs are deliberately nudged off it so a tube has a gap to
     // span; everything else should still sit where the CSS fallback puts it.
     // Panel 4's bubble is nudged too — it is the one panel whose art reaches the
@@ -474,38 +480,42 @@ describe('default config parity', () => {
     const second = linkedPairs(PANEL_BUBBLE_TRANSFORMS).map(([, j]) => j)
     const nudged = new Set([...second, 6])
     PANEL_BUBBLE_TRANSFORMS.forEach((b, i) => {
-      if (nudged.has(i)) return
+      if (nudged.has(i) || !classic(b)) return
       expect(b.top).toBe(-35)
       expect(b.right).toBe(-12)
       expect(b.width).toBe(55)
     })
   })
 
-  it('links two pairs, each declared from exactly one end', () => {
-    expect(linkedPairs(PANEL_BUBBLE_TRANSFORMS)).toEqual([[0, 1], [4, 5]])
+  it('declares every link from exactly one end', () => {
+    expect(linkedPairs(PANEL_BUBBLE_TRANSFORMS)).toEqual([
+      [0, 1], [4, 5], [11, 12], [12, 13], [13, 14], [15, 16], [16, 17], [17, 18], [10, 19],
+    ])
   })
 
-  // Both halves of a linked pair are one speaker's line continuing, so only the first
-  // carries a tail; the tube is what joins the second to it.
-  it('gives each linked pair one tail between the two of them', () => {
-    linkedPairs(PANEL_BUBBLE_TRANSFORMS).forEach(([i, j]) => {
-      expect(PANEL_BUBBLE_TRANSFORMS[i].panel).toBe(PANEL_BUBBLE_TRANSFORMS[j].panel)
-      expect(PANEL_BUBBLE_TRANSFORMS[i].tail).not.toBe('none')
-      expect(PANEL_BUBBLE_TRANSFORMS[j].tail).toBe('none')
-    })
+  // Both halves of a classic linked pair are one speaker's line continuing, so only
+  // the first carries a tail; the tube is what joins the second to it.
+  it('gives each classic linked pair one tail between the two of them', () => {
+    linkedPairs(PANEL_BUBBLE_TRANSFORMS)
+      .filter(([i]) => classic(PANEL_BUBBLE_TRANSFORMS[i]))
+      .forEach(([i, j]) => {
+        expect(PANEL_BUBBLE_TRANSFORMS[i].panel).toBe(PANEL_BUBBLE_TRANSFORMS[j].panel)
+        expect(PANEL_BUBBLE_TRANSFORMS[i].tail).not.toBe('none')
+        expect(PANEL_BUBBLE_TRANSFORMS[j].tail).toBe('none')
+      })
   })
 
-  it('points every other bubble’s tail somewhere', () => {
+  it('points every other classic bubble’s tail somewhere', () => {
     const linked = new Set(linkedPairs(PANEL_BUBBLE_TRANSFORMS).map(([, j]) => j))
     PANEL_BUBBLE_TRANSFORMS.forEach((b, i) => {
-      if (linked.has(i)) return
+      if (linked.has(i) || !classic(b)) return
       expect(TAIL_DIR_KEYS).toContain(b.tail)
       expect(b.tail).not.toBe('none')
     })
   })
 
-  it('gives every bubble a hover and a click shape distinct from its resting one', () => {
-    PANEL_BUBBLE_TRANSFORMS.forEach(b => {
+  it('gives every classic bubble a hover and a click shape distinct from its resting one', () => {
+    PANEL_BUBBLE_TRANSFORMS.filter(classic).forEach(b => {
       expect(b.hoverType).not.toBeNull()
       expect(b.clickType).not.toBeNull()
       expect(b.hoverType).not.toBe(b.type)
@@ -536,20 +546,24 @@ describe('default config parity', () => {
   })
 
   // The frame is new, so the shipped values are the compatibility guarantee: every
-  // picture starts on its whole panel and crops exactly as it did before it had one.
-  it('starts every picture on the full-panel frame', () => {
-    PANEL_IMG_TRANSFORMS.forEach(t => {
+  // classic picture starts on its whole panel and crops exactly as it did before it
+  // had one. The home page's frames are authored placements, pinned by the serializer.
+  it('starts every classic picture on the full-panel frame', () => {
+    PANEL_IMG_TRANSFORMS.filter(classic).forEach(t => {
       expect([t.left, t.top, t.width, t.height]).toEqual([0, 0, 100, 100])
     })
   })
 
-  it('puts every bubble on a real panel, and every panel speaks at least once', () => {
+  it('puts every bubble on a real panel, and every classic panel speaks at least once', () => {
     const panels = PANEL_BUBBLE_TRANSFORMS.map(b => b.panel)
     panels.forEach(p => {
       expect(p).toBeGreaterThanOrEqual(0)
       expect(p).toBeLessThan(PANELS.length)
     })
-    expect(new Set(panels).size).toBe(PANELS.length)
+    const spoken = new Set(panels)
+    PANELS.forEach((info, i) => {
+      if (info.page === 'classic') expect(spoken.has(i)).toBe(true)
+    })
     expect(PANEL_BUBBLE_TRANSFORMS.length).toBeGreaterThan(PANELS.length)
   })
 })

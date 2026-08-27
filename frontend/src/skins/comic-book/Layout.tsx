@@ -6,7 +6,6 @@ import BubbleTubes from './BubbleTubes'
 import ComicPanel from './ComicPanel'
 import { LoadingOverlay, useLoadingScreen } from './LoadingOverlay'
 import PanelInk from './PanelInk'
-import PhoneHud, { hudIsVisible, pageCanDial } from './PhoneHud'
 import { gridPolys, layoutKindFor } from './panelGeometry'
 import { PANELS, pageForPath } from './panels'
 import { usePanelDots } from './usePanelDots'
@@ -139,12 +138,6 @@ export function Layout({ navItems, sms, softphone }: LayoutProps) {
         void autoDial(value)
     }, [autoDial])
 
-    // A page carrying either way of dialling gets the rest of the telephone: the display
-    // and the call keys neither a photographed pad nor a balloon has room for. Pages with
-    // no way to dial show no furniture.
-    const showPhoneHud =
-        pageCanDial(imgT, bubbleT, page) && !editor.active && hudIsVisible(softphone)
-
     const accent = accentForPath(location.pathname)
     const washRef = usePageWash(location.pathname, accent)
     const loading = useLoadingScreen(ready, accent)
@@ -220,10 +213,6 @@ export function Layout({ navItems, sms, softphone }: LayoutProps) {
                 <canvas ref={washRef} className="cb-wash-canvas" aria-hidden="true" />
 
             </div>
-
-            {/* The projected pad's display and call keys — outside cb-root so the page's
-                load fade and the picture frames never hide or crop the live call. */}
-            {showPhoneHud && <PhoneHud phone={softphone} />}
 
             {/* Dev-only editor overlay — never reached in a production build */}
             {EditorOverlay && editor.active && (

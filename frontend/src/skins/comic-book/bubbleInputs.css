@@ -23,3 +23,48 @@
   color: var(--cb-black);
   opacity: 1;
 }
+
+/* A column of placeholder buttons inside a balloon — the comic button treatment
+   (3px ink border, offset shadow, no radius) at balloon-lettering scale. */
+.cb-bubble-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4em;
+  font-size: clamp(0.75rem, 2vw, 1.125rem);
+}
+
+.cb-bubble-action {
+  margin: 0;
+  padding: 0.1em 0.5em;
+  font: inherit;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--cb-black);
+  background: var(--cb-white);
+  border: 3px solid var(--cb-black);
+  box-shadow: 3px 3px 0 var(--cb-black);
+  cursor: pointer;
+}
+
+/* Inside the editor the buttons are disabled, but a greyed control would read as a
+   drawing mistake in a hand-lettered balloon: keep the ink and drop only the press. */
+.cb-bubble-action:disabled {
+  color: var(--cb-black);
+  opacity: 1;
+}
+
+.cb-bubble-action:hover:enabled {
+  box-shadow: 5px 5px 0 var(--cb-black);
+}
+
+.cb-bubble-action:active:enabled {
+  box-shadow: 1px 1px 0 var(--cb-black);
+  transform: translate(2px, 2px);
+}
+
+/* Same pointer opt-in the input gets (see bubbles.css): only a revealed, interactive
+   balloon lets its buttons take the pointer. */
+.cb-panel-bubble.is-visible.is-interactive .cb-bubble-action {
+  pointer-events: auto;
+}

@@ -205,8 +205,7 @@ different images can only crossfade. A new bubble type belongs in `bubbleShape.t
      **Text** and **Ink** controls tune the symbols. Its 3 × 4 grid and outline are
      visible alignment guides in the editor only. Outside edit mode the twelve symbols
      are a **working telephone keypad**: each key is a button wired to the app's shared
-     softphone, and the display and call keys appear as a caption box (`../PhoneHud.tsx`)
-     once someone presses one. Inside edit mode the pad takes no pointer input at all,
+     softphone. Inside edit mode the pad takes no pointer input at all,
      because the corner grips are on the same picture and would lose every drag to it.
      A picture carries either a table or a number pad, so switching either option on
      replaces the other projected content.
@@ -216,14 +215,16 @@ different images can only crossfade. A new bubble type belongs in `bubbleShape.t
    - For bubbles: pick the **panel** it belongs to, a resting **type** (sets shape +
      lettering font), which way the **tail** points (**No tail** is one of the nine
      options), pick the **content** presentation (**Text**, **Wheel picker**, **Text
-     input**, or **Phone input**). Wheel text is comma-delimited options: hover the
-     bubble outside edit mode and scroll to turn it. Input text is its initial value;
-     phone input formats live using the browser locale, while a leading `+` selects an
-     international calling code. A **Phone input** balloon that is not in a chain is the
-     projected pad's fallback: Enter places the call, on the same shared softphone and
-     with the same caption box (`../PhoneHud.tsx`) reporting it, so a page whose art
-     carries no keypad still has somewhere to dial from. In a chain that same content
-     is the conversation's composer instead and dials nothing.
+     input**, **Phone input**, or **Action buttons**). Wheel text is comma-delimited
+     options: hover the bubble outside edit mode and scroll to turn it. Input text is
+     its initial value; phone input formats live using the browser locale, while a
+     leading `+` selects an international calling code. A **Phone input** balloon that
+     is not in a chain is the projected pad's fallback: Enter places the call on the
+     app's shared softphone, so a page whose art carries no keypad still has somewhere
+     to dial from. In a chain that same content is the conversation's composer instead
+     and dials nothing. **Action buttons** text is comma-delimited too: each entry is
+     lettered as one placeholder button (`../BubbleActions.tsx`), pressable but wired
+     to nothing yet.
      Edit the **text** or **initial value**, choose the shapes to
      morph to **on hover**
      and **on click** (`— no change —` keeps the resting shape), and pick a **link
@@ -324,8 +325,7 @@ bubbleTypes.ts      BubbleType + BUBBLE_TYPES (lettering font per type) — ship
 ../../../hooks/useLiveTables.ts hook: the only place a surface's rows are fetched, and the poll
 ../ProjectedNumberPad.tsx fixed 3 × 4 telephone keys on a projected surface; live buttons outside edit mode
 ../number-pad.css   number-pad lettering, surface layout, and the live key's press states
-../PhoneHud.tsx     the display and call keys a photographed pad has no room for
-../phone-hud.css    the caption box that holds them
+../BubbleActions.tsx placeholder action buttons lettered inside a balloon, one per comma-delimited entry
 ../panelGeometry.ts PURE grid -> polygon geometry: frame, normalised space, vertex constraints
 ../panelPatterns.ts pattern style registry + per-panel palette/dot tuning (PANEL_BG_CONFIGS)
 ../polygonInset.ts  PURE polygon maths: the perpendicular gutter inset, bounding box
