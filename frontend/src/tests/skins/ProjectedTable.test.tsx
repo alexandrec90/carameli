@@ -11,7 +11,9 @@ import type { TableProjection } from '../../skins/comic-book/editor/types'
 // outline, no guides, no bar — and a wheel moves whole rows, so the lettering never lands
 // between the lines drawn in the picture.
 
-const FRAME = { w: 400, h: 300 }
+// The picture's rendered rect — deliberately not at the wrapper's origin, so a test
+// below can pin that the surface is placed at the artwork rather than at the frame.
+const BASE = { x: 12, y: 8, w: 400, h: 300 }
 
 function table(over: Partial<TableProjection> = {}): TableProjection {
   return {
@@ -30,7 +32,7 @@ function table(over: Partial<TableProjection> = {}): TableProjection {
 }
 
 function draw(over: Partial<TableProjection> = {}, editing = false) {
-  const view = render(<ProjectedTable table={table(over)} frame={FRAME} editing={editing} />)
+  const view = render(<ProjectedTable table={table(over)} base={BASE} editing={editing} />)
   const surface = view.container.querySelector('.cb-ptable-surface') as HTMLElement | null
   const names = () =>
     Array.from(view.container.querySelectorAll('tbody tr')).map(
@@ -40,6 +42,12 @@ function draw(over: Partial<TableProjection> = {}, editing = false) {
 }
 
 describe('ProjectedTable', () => {
+  it("sits at the rendered rect's origin, so it rides the picture and not the frame", () => {
+    const { surface } = draw()
+    expect(surface!.style.left).toBe('12px')
+    expect(surface!.style.top).toBe('8px')
+  })
+
   it('fills exactly the bands the author asked for, headings included', () => {
     const { container } = draw()
     expect(container.querySelectorAll('thead tr')).toHaveLength(1)

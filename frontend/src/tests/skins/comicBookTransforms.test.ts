@@ -17,6 +17,7 @@ import {
   imgVisibleRect,
   imgRect,
   renderedImgRect,
+  surfaceBaseRect,
   anchorToFractions,
   bubbleRect,
   bubbleStyle,
@@ -176,6 +177,52 @@ describe('renderedImgRect', () => {
     expect(r.y + r.h / 2).toBeCloseTo(frame.y + Number(s.top) + nat.h / 2, 10)
     expect(r.w).toBeCloseTo(nat.w * k, 10)
     expect(r.h).toBeCloseTo(nat.h * k, 10)
+  })
+})
+
+describe('surfaceBaseRect', () => {
+  const frame = { x: 0, y: 0, w: 400, h: 300 }
+  // Tall source in the wide frame: fit 0.5 → a 100×300 box, centred and flush with
+  // the floor at the default center-bottom anchor.
+  const nat = { w: 200, h: 600 }
+
+  it("is the picture's rendered rect once the natural size is known", () => {
+    expect(surfaceBaseRect(frame, nat, img())).toEqual(renderedImgRect(frame, nat, img()))
+    expect(surfaceBaseRect(frame, nat, img())).toEqual({ x: 150, y: 0, w: 100, h: 300 })
+  })
+
+  // The whole bug this base exists to fix: the same artwork in two frames of different
+  // aspect ratios letterboxes differently, so a quad measured against the frame slides
+  // off the photograph on the first window resize. Measured against this rect, a quad
+  // corner names the same picture pixel in both frames.
+  it('pins a quad corner to the same picture pixel whatever the frame aspect', () => {
+    const wide = surfaceBaseRect({ x: 0, y: 0, w: 400, h: 300 }, nat, img())
+    const tall = surfaceBaseRect({ x: 0, y: 0, w: 300, h: 400 }, nat, img())
+    // The base always has the artwork's own proportions — the frames do not — so a
+    // percentage of it names a picture pixel, not a letterbox pixel. The frame-based
+    // measure this replaced fails both lines: 400/300 and 300/400 are not 200/600.
+    expect(wide.w / wide.h).toBeCloseTo(nat.w / nat.h, 10)
+    expect(tall.w / tall.h).toBeCloseTo(nat.w / nat.h, 10)
+    // Sanity: the two frames really do letterbox the artwork differently — pillarboxed
+    // at fit 0.5 in the wide frame, at fit ⅔ in the tall one.
+    expect(wide).toEqual({ x: 150, y: 0, w: 100, h: 300 })
+    expect(tall.x).toBeCloseTo(250 / 3, 10)
+    expect(tall.y).toBe(0)
+    expect(tall.w).toBeCloseTo(400 / 3, 10)
+    expect(tall.h).toBeCloseTo(400, 10)
+  })
+
+  it('stays unclamped when a pan overhangs the frame, unlike imgVisibleRect', () => {
+    // offsetX 200 slides the 100-wide box to x 350..450; the frame ends at 400.
+    const panned = img({ offsetX: 200 })
+    expect(surfaceBaseRect(frame, nat, panned)).toEqual({ x: 350, y: 0, w: 100, h: 300 })
+    expect(imgVisibleRect(frame, nat, panned)).toEqual({ x: 350, y: 0, w: 50, h: 300 })
+  })
+
+  it('falls back to the frame before the natural size is known, or on a zero frame', () => {
+    expect(surfaceBaseRect(frame, undefined, img())).toEqual(frame)
+    const flat = { x: 5, y: 5, w: 0, h: 300 }
+    expect(surfaceBaseRect(flat, nat, img())).toEqual(flat)
   })
 })
 
