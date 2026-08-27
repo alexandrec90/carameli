@@ -112,8 +112,9 @@ itself, so dragging could only slide the picture under a window that stayed put,
 second picture on the same panel had nowhere to go.
 
 **A picture may also be a *surface*.** Switch **Project a table onto this image** on and
-the picture carries a `table`: four draggable corners (`quad`, in % of the picture's own
-frame), a row count, the columns, and the cell text. The corners are a projective map —
+the picture carries a `table`: four draggable corners (`quad`, in % of the picture's
+rendered rect — the artwork's pixels, so a window resize cannot slide the picture out
+from under the surface), a row count, the columns, and the cell text. The corners are a projective map —
 `tableProjection.ts` solves the homography taking the unit square onto them and emits it
 as one `matrix3d` — so a table can be laid onto a notepad photographed at an angle and
 converge with it, which three rotation sliders cannot do. The field is **absent**, not

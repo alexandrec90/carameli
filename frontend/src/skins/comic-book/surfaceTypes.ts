@@ -24,7 +24,7 @@ export interface TableColumn {
  * Shared placement and lettering for content projected onto a picture.
  *
  * **`quad` is the whole of the 3D tilt.** Four corners, clockwise from top-left, in % of
- * the picture's frame box, and `tableProjection.ts` turns them into the `matrix3d` that
+ * the picture's rendered rect, and `tableProjection.ts` turns them into the `matrix3d` that
  * lands the table on them. Corners rather than rotate/perspective angles because the
  * task is *matching a plane already in the photograph*: three angles describe the same
  * plane, but only as a three-way search where every axis undoes the last, whereas a
@@ -34,7 +34,11 @@ export interface TableColumn {
  * approximated.
  */
 export interface ProjectedSurface {
-  /** The surface's corners, clockwise from top-left, in % of the picture's frame box. */
+  /**
+   * The surface's corners, clockwise from top-left, in % of the picture's rendered
+   * rect — the artwork's own pixels, not the frame it hangs in, so the surface rides
+   * the photograph through a window resize, a pan and a zoom.
+   */
   quad: [[number, number], [number, number], [number, number], [number, number]]
   /** Lettering height as a fraction of one row's height. */
   fontScale: number

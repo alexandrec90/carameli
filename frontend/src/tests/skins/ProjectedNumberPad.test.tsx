@@ -7,7 +7,9 @@ import ProjectedNumberPad, {
 import type { Quad } from '../../skins/comic-book/tableProjection'
 import { newNumberPad } from '../../skins/comic-book/editor/numberPadValidate'
 
-const FRAME = { w: 400, h: 300 }
+// The picture's rendered rect — deliberately not at the wrapper's origin, so a test
+// below can pin that the pad is placed at the artwork rather than at the frame.
+const BASE = { x: 12, y: 8, w: 400, h: 300 }
 
 function draw(editing = false, quad?: Quad, onKey?: (key: string) => void) {
   const numberPad = newNumberPad()
@@ -15,7 +17,7 @@ function draw(editing = false, quad?: Quad, onKey?: (key: string) => void) {
   const view = render(
     <ProjectedNumberPad
       numberPad={numberPad}
-      frame={FRAME}
+      base={BASE}
       editing={editing}
       onKey={onKey}
     />,
@@ -64,6 +66,12 @@ describe('ProjectedNumberPad', () => {
     const { surface } = draw()
     expect(surface!.style.transform.startsWith('matrix3d(')).toBe(true)
     expect(surface!.style.pointerEvents).toBe('none')
+  })
+
+  it("sits at the rendered rect's origin, so it rides the picture and not the frame", () => {
+    const { surface } = draw()
+    expect(surface!.style.left).toBe('12px')
+    expect(surface!.style.top).toBe('8px')
   })
 
   it('is a picture, not a control, until a key handler is supplied', () => {

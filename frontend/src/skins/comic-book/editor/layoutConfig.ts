@@ -12,7 +12,8 @@ import type { ImgTransform, BubbleTransform, BubbleChain, PageGrids } from './ty
 //
 // A picture with a `table` is a **surface**: an HTML table is projected onto it, so a
 // photographed notepad can hold live rows. `quad` is the four corners of that surface in
-// % of the frame, clockwise from top-left, and they are what tilts it — four corners fix
+// % of the picture's rendered rect (its own pixels, so a resize cannot slide the picture
+// out from under it), clockwise from top-left, and they are what tilts it — four corners fix
 // a projective map exactly, which is what a plane in a photograph needs and three
 // rotation angles cannot express. Drag them onto the drawn lines in the editor. `rows` is
 // how many bands the surface is cut into, so a row always lands on the same line however

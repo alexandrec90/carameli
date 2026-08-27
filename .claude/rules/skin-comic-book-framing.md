@@ -57,7 +57,10 @@ question. Nothing about the feature is skin chrome: it is per-picture data, so t
 switch turns any picture into a surface.
 
 **The tilt is a projective map, not a rotation.** `tableProjection.ts` takes the author's
-four corners (`quad`, in % of the picture's frame), solves the homography carrying the
+four corners (`quad`, in % of the picture's **rendered rect** — the artwork's own pixels,
+via `surfaceBaseRect`, so a window resize, pan or zoom carries the surface with the
+photograph instead of leaving it glued to the frame's letterboxing), solves the homography
+carrying the
 unit square onto them, and emits one `matrix3d`. Matching a plane in a photograph with
 `rotateX`/`rotateY`/`perspective` is a three-way search where each axis undoes the last;
 four corners dragged onto the four corners in the picture are a unique answer and need no
