@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { BUBBLE_VIEW, cloudPuffs } from './bubbleBox'
 import {
@@ -9,16 +9,26 @@ import {
   puffOpacity,
   resolveBubbleShape,
 } from './bubbleShape'
+import BubbleActions from './BubbleActions'
+import BubbleDial from './BubbleDial'
 import BubbleInput from './BubbleInput'
 import BubbleWheel from './BubbleWheel'
+import { dialOptions } from './dialPicker'
 import { BUBBLE_TYPES } from './editor/bubbleTypes'
 import { bubbleStyle } from './editor/transforms'
 import type { BubbleTransform } from './editor/types'
+import type { PhoneActionHandlers } from './phoneActions'
 import { useBubbleMorph } from './useBubbleMorph'
 import { splitOptions } from './wheelPicker'
 
 /** How long a press holds its shape before easing back to the resting one. */
 const PULSE_MS = 560
+
+/** A dial with nowhere to report to still draws; it just cannot be changed. */
+const noop = (): void => undefined
+
+/** One shared empty list, so a dial's shortlist is not rebuilt on every render. */
+const NOTHING_DIALLED: string[] = []
 
 interface PanelBubbleProps {
   bubble: BubbleTransform
@@ -36,8 +46,8 @@ interface PanelBubbleProps {
   /**
    * Passed through to an `input`/`phone` balloon: Enter sends the field's contents here
    * and clears it. A chain's composer supplies one, and so does a standalone `phone`
-   * balloon, whose Enter places the call. Every other input balloon keeps what is typed
-   * in it.
+   * balloon, whose Enter places the call. A `dial` balloon's Enter places the call too,
+   * without clearing. Every other input balloon keeps what is typed in it.
    */
   onSubmit?: (value: string) => void
   /**
@@ -45,6 +55,23 @@ interface PanelBubbleProps {
    * turn. Only the balloon a panel reads a phone number off supplies one.
    */
   onWheelSelect?: (value: string) => void
+  /**
+   * A `dial` balloon's number and the way to change it. The pair is the panel's, not this
+   * balloon's — the projected keypad writes to the same value (see ComicPanel) — so both
+   * arrive together or not at all, and a dial rendered without them is an inert display.
+   */
+  dialValue?: string
+  onDialChange?: (value: string) => void
+  /**
+   * Numbers already dialled from this panel. They join the author's own options, so the
+   * drum is the shortlist plus whatever the reader has reached that was not on it.
+   */
+  dialled?: string[]
+  /**
+   * Passed through to an `actions` balloon: what each of the telephone's keys does. Absent
+   * in the editor and on any page with no telephone, where the keys are drawn but inert.
+   */
+  actions?: PhoneActionHandlers
   /**
    * How far a message of a live conversation has got. Absent on every balloon that is not
    * one, and on one whose message the carrier has acknowledged — a sent message is just a
@@ -70,6 +97,10 @@ export default function PanelBubble({
   chained = false,
   onSubmit,
   onWheelSelect,
+  dialValue = '',
+  onDialChange,
+  dialled = NOTHING_DIALLED,
+  actions,
   status,
 }: PanelBubbleProps) {
   const [hover, setHover] = useState(false)
@@ -104,7 +135,20 @@ export default function PanelBubble({
   const font = BUBBLE_TYPES[shape].font
   const editableKind =
     bubble.content === 'input' || bubble.content === 'phone' ? bubble.content : null
-  // A keyboard user can tab to an otherwise hidden input; focus reveals its bubble
+  // Every kind that puts a real form control in the balloon, which is the question the
+  // wrapper's aria and focus handling actually asks — a dial has one too, and so do the
+  // action buttons.
+  const hasField =
+    editableKind !== null || bubble.content === 'dial' || bubble.content === 'actions'
+  // The dial's drum: what the author listed, then what has been dialled that they did not.
+  // Memoized so the filter BubbleDial runs over it survives a hover — this balloon
+  // re-renders on every pointer enter and leave. Its re-seat keys on the contents rather
+  // than on this identity, so a missed memo would be slow, never wrong.
+  const dialList = useMemo(
+    () => dialOptions(splitOptions(bubble.text), dialled),
+    [bubble.text, dialled],
+  )
+  // A keyboard user can tab to an otherwise hidden control; focus reveals its bubble
   // immediately and blur returns it to the panel-hover reveal rule.
   const shown = visible || focused
 
@@ -122,7 +166,7 @@ export default function PanelBubble({
     <div
       ref={rootRef}
       className={className}
-      aria-hidden={editableKind ? undefined : true}
+      aria-hidden={hasField ? undefined : true}
       style={bubbleStyle(bubble)}
       // On the wrapper, though the wrapper itself takes no pointer: enter and leave
       // are synthesized from the subtree, so this is "the pointer is somewhere in the
@@ -131,8 +175,8 @@ export default function PanelBubble({
       onPointerEnter={interactive ? () => setHover(true) : undefined}
       onPointerLeave={interactive ? () => setHover(false) : undefined}
       onPointerDown={interactive ? pulse : undefined}
-      onFocusCapture={editableKind && interactive ? () => setFocused(true) : undefined}
-      onBlurCapture={editableKind && interactive ? () => setFocused(false) : undefined}
+      onFocusCapture={hasField && interactive ? () => setFocused(true) : undefined}
+      onBlurCapture={hasField && interactive ? () => setFocused(false) : undefined}
     >
       <svg
         className="cb-panel-bubble-svg"
@@ -169,6 +213,22 @@ export default function PanelBubble({
           enabled={interactive}
           onSubmit={onSubmit}
         />
+      ) : bubble.content === 'dial' ? (
+        <BubbleDial
+          options={dialList}
+          value={dialValue}
+          onChange={onDialChange ?? noop}
+          font={font}
+          // Open on focus as well as on hover, unlike a plain wheel: typing into a dial
+          // filters its drum, and a filter whose result only appears when the pointer
+          // happens to be over the balloon is a filter nobody can see working.
+          open={hover || focused}
+          enabled={interactive}
+          hostRef={rootRef}
+          onSubmit={onSubmit}
+        />
+      ) : bubble.content === 'actions' ? (
+        <BubbleActions text={bubble.text} font={font} enabled={interactive} actions={actions} />
       ) : bubble.content === 'wheel' ? (
         <BubbleWheel
           options={splitOptions(bubble.text)}

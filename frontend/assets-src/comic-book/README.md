@@ -75,6 +75,28 @@ policy test read the tree. `conversation.png` and `hand-notepad.png` arrived the
 way — into `assets-src/` first, with the export written from here in the change that
 registered it.
 
+## The telephone's keys
+
+`call-button.png` and `end-call-button.png` are the green and red keys an `actions`
+speech balloon draws. They are served — `public/comic-book/call-button.webp` and
+`end-call-button.webp` — but they are **not** panel art, so they are the one kind of
+export that is encoded with `--no-register`:
+
+```bash
+python scripts/encode-comic-art.py call-button end-call-button --max-edge 256 --no-register
+```
+
+Two things follow from that, and both are the reason the flag exists rather than an
+oversight to tidy up later. A line in `PANEL_ASSETS` would put them in the editor's
+**picture** dropdown, where an author could place a button in a panel as though it were
+a photograph. And 256px is a button, not a panel: the shipped pair is ~29 KB against the
+~1408px default's several hundred, which matters because `MAX_PUBLIC_BYTES` in
+`frontend/assetPolicy.ts` has little room left.
+
+`assetPolicy.test.ts` is satisfied either way — the paths are named in
+`frontend/src/skins/comic-book/phoneActions.ts`, which is where the label an author
+types (`Call`, `End call`) is folded onto the artwork and onto what the key does.
+
 ## The traced references
 
 `cloud bubble.png`, `jagged bubble.png`, `lightning bubble.png` and `soft bubble.png`

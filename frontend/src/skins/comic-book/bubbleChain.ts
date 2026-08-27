@@ -91,10 +91,11 @@ export interface BubbleChain {
    * for real: Enter posts to `VsMessaging/Sms/Send` and the message reappears from the
    * server on the next poll.
    *
-   * **Which conversation is not stored here.** It is whichever number the panel's
-   * wheel-picker balloon is turned to (see {@link peerWheelOn}) — the reader chooses it,
-   * so an authored value would be overwritten the first time they turned the wheel. A
-   * chain with this set and no wheel to read shows nothing rather than guessing.
+   * **Which conversation is not stored here.** It is whichever number the panel's picker
+   * balloon carries — a `wheel` turned to a row, or a `dial` typed into (see
+   * {@link peerPickerOn}). The reader chooses it, so an authored value would be
+   * overwritten the first time they turned the wheel. A chain with this set and no picker
+   * to read shows nothing rather than guessing.
    */
   sms: boolean
 }
@@ -294,25 +295,36 @@ export function readTranscript(messages: readonly string[]): ChainLine[] {
   )
 }
 
+/** The content kinds that pick a number: a drum of options, or one you can also type. */
+const PICKER_CONTENT = ['wheel', 'dial']
+
 /**
- * The balloon on `panel` whose wheel picker names the number a live conversation is with,
- * or -1 when the panel has none.
+ * The balloon on `panel` whose picker names the number a live conversation is with, or -1
+ * when the panel has none.
  *
- * The rule is the whole binding, so it is worth stating plainly: **the first wheel-picker
+ * The rule is the whole binding, so it is worth stating plainly: **the first picker
  * balloon on the panel that is not itself part of a chain.** Nothing else marks it — no
  * field on the bubble, no number in the chain — because the author's expression of "this
- * panel picks a number" is already the balloon they drew and set to `wheel`, in the same
- * way that linkage plus a checkbox is how they express "these two are a conversation".
+ * panel picks a number" is already the balloon they drew and set to `wheel` or `dial`, in
+ * the same way that linkage plus a checkbox is how they express "these two are a
+ * conversation".
  *
- * A chain member is excluded because a chain may hold a wheel of its own inside the
+ * A `dial` counts because it *is* a wheel picker — one whose picked option can also be
+ * typed or punched in on the panel's keypad. A conversation bound to a number the reader
+ * dialled is the same conversation as one bound to a number they turned to; that the two
+ * are one balloon rather than two is the point of the kind.
+ *
+ * A chain member is excluded because a chain may hold a picker of its own inside the
  * conversation, and that one is picking something the conversation says rather than who it
  * is with.
  */
-export function peerWheelOn(
+export function peerPickerOn(
   bubbles: readonly { panel: number; chain: string; content: string }[],
   panel: number,
 ): number {
-  return bubbles.findIndex(b => b.panel === panel && b.chain === '' && b.content === 'wheel')
+  return bubbles.findIndex(
+    b => b.panel === panel && b.chain === '' && PICKER_CONTENT.includes(b.content),
+  )
 }
 
 /**

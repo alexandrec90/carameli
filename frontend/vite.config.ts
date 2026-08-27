@@ -11,10 +11,10 @@ import type { Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import { configDefaults } from 'vitest/config'
 
-import { resolveDevWatch } from './devWatchPolicy'
-import { quietProxyErrors } from './proxyErrorPolicy'
-import { shipLayout } from './shipLayout'
-import type { Run } from './shipLayout'
+import { resolveDevWatch } from './devWatchPolicy.ts'
+import { quietProxyErrors } from './proxyErrorPolicy.ts'
+import { shipLayout } from './shipLayout.ts'
+import type { Run } from './shipLayout.ts'
 
 const rootDir = dirname(fileURLToPath(import.meta.url))
 const repoRoot = resolve(rootDir, '..')
@@ -151,6 +151,13 @@ export default defineConfig(({ mode }) => {
       // ./devWatchPolicy.ts.
       watch: resolveDevWatch(process.env),
       proxy: {
+        // `/api` is the app's own REST surface (`/api/v1/...`). It was missing
+        // here for as long as every dev path set VITE_API_BASE_URL to an absolute
+        // backend URL and never used the proxy for it — but a host-Vite branch
+        // preview forces that base empty, so those calls arrived here and Vite,
+        // owning the path, answered its own 404. That reads as a broken endpoint
+        // rather than as the absent backend it is.
+        '/api': backendUrl,
         '/auth': backendUrl,
         '/vsapi': backendUrl,
         '/vg': backendUrl,

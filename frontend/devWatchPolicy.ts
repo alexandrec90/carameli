@@ -63,7 +63,11 @@ export const WATCH_IGNORED: readonly string[] = [
 export interface DevWatchOptions {
   usePolling: true
   interval: number
-  ignored: readonly string[]
+  // Mutable, unlike WATCH_IGNORED itself: this object is handed straight to
+  // `server.watch`, whose chokidar type takes a mutable array, so a `readonly`
+  // one here fails the assignment in vite.config.ts (TS2769) — a compile error
+  // nothing caught while `lint:types` checked only `src/`.
+  ignored: string[]
 }
 
 /**
@@ -78,7 +82,7 @@ export function resolveDevWatch(
     ? {
         usePolling: true,
         interval: DOCKER_POLL_INTERVAL_MS,
-        ignored: WATCH_IGNORED,
+        ignored: [...WATCH_IGNORED],
       }
     : undefined
 }

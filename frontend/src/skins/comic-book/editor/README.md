@@ -13,8 +13,9 @@ bubbles; **Panel shapes** drags the lines between panels.
 `PANEL_BUBBLE_TRANSFORMS` — picture placement **and content** (panel / src / alt /
 left / top / width / height / scale / offsetX / offsetY / anchor / spill) and bubble
 placement **and content** (panel / top / right / width / rotate / spill / type / tail /
-content / text — lettering, a comma-delimited wheel picker, a text input, or a phone
-input formatted from the browser locale), plus each bubble's event morph targets
+content / text — lettering, a comma-delimited wheel picker, a text input, a phone
+input formatted from the browser locale, or a dial, which is the wheel and the phone
+input in one balloon), plus each bubble's event morph targets
 (`hoverType`, `clickType`) and its
 linked partner (`linkTo`) and the SMS conversation that linkage makes it a column of (`chain`,
 an editor-generated id resolved through `PANEL_BUBBLE_CHAINS` — see *Bubble chains*
@@ -206,8 +207,7 @@ different images can only crossfade. A new bubble type belongs in `bubbleShape.t
      **Text** and **Ink** controls tune the symbols. Its 3 × 4 grid and outline are
      visible alignment guides in the editor only. Outside edit mode the twelve symbols
      are a **working telephone keypad**: each key is a button wired to the app's shared
-     softphone, and the display and call keys appear as a caption box (`../PhoneHud.tsx`)
-     once someone presses one. Inside edit mode the pad takes no pointer input at all,
+     softphone. Inside edit mode the pad takes no pointer input at all,
      because the corner grips are on the same picture and would lose every drag to it.
      A picture carries either a table or a number pad, so switching either option on
      replaces the other projected content.
@@ -217,14 +217,38 @@ different images can only crossfade. A new bubble type belongs in `bubbleShape.t
    - For bubbles: pick the **panel** it belongs to, a resting **type** (sets shape +
      lettering font), which way the **tail** points (**No tail** is one of the nine
      options), pick the **content** presentation (**Text**, **Wheel picker**, **Text
-     input**, or **Phone input**). Wheel text is comma-delimited options: hover the
-     bubble outside edit mode and scroll to turn it. Input text is its initial value;
-     phone input formats live using the browser locale, while a leading `+` selects an
-     international calling code. A **Phone input** balloon that is not in a chain is the
-     projected pad's fallback: Enter places the call, on the same shared softphone and
-     with the same caption box (`../PhoneHud.tsx`) reporting it, so a page whose art
-     carries no keypad still has somewhere to dial from. In a chain that same content
-     is the conversation's composer instead and dials nothing.
+     input**, **Phone input**, **Dial**, or **Action buttons**). Wheel text is
+     comma-delimited options: hover the bubble outside edit mode and scroll to turn it.
+     Input text is its initial value; phone input formats live using the browser locale,
+     while a leading `+` selects an international calling code. A **Phone input** balloon
+     that is not in a chain is the projected pad's fallback: Enter places the call on the
+     app's shared softphone, so a page whose art carries no keypad still has somewhere
+     to dial from. In a chain that same content is the conversation's composer instead
+     and dials nothing. **Action buttons** text is comma-delimited too: each entry is
+     one button (`../BubbleActions.tsx`). Two labels name the telephone's own keys and
+     draw as its artwork instead of lettering — `Call` and `End call`, matched on
+     letters alone, so case and hyphens do not matter. Those two are wired to the
+     shared softphone: green dials what the number pad typed and answers a ringing
+     call, red hangs up and declines one, and each is disabled when the phone has
+     nothing for it to do (`../phoneActions.ts`). Any other label is lettered and
+     pressable and does nothing, which is also what both look like in the editor.
+   - **Dial** is those two at once, for the balloon beside a photographed telephone: an
+     autocomplete whose list is the wheel. Its text is the comma-delimited shortlist, and
+     there is only ever **one** window — the drum's centre line is a real phone field
+     rather than lettering, and the rows behind it are the shortlist as the typed number
+     has narrowed it. Typing filters (on the digits, so `+1 234 567 9999` and a keypad
+     punching `234…` find each other); turning the drum (scroll, or ↑/↓ with the field
+     focused) walks the matches and letters each into the field; turning back up off the
+     first match returns the reader's own half-typed number. It starts on the first option,
+     and a number the shortlist does not carry simply empties the drum and stays in the
+     field. **Dialling saves the number**: Enter appends it to that panel's options, so the
+     drum becomes a redial list (`dialOptions` merges it in, ignoring punctuation, so a
+     number the author already listed is not listed twice). **A number pad projected onto a picture in the
+     same panel types into it**, so the phone in the photograph and the balloon are one
+     number rather than two; that is why the value is held by `../ComicPanel.tsx`, the only
+     component that can see both halves. Enter dials and, unlike a composer, keeps the
+     number on the display. A dial also counts as the panel's picker for an SMS chain
+     (`peerPickerOn`), which then binds to whatever the field says.
      Edit the **text** or **initial value**, choose the shapes to
      morph to **on hover**
      and **on click** (`— no change —` keeps the resting shape), and pick a **link
@@ -283,6 +307,11 @@ different images can only crossfade. A new bubble type belongs in `bubbleShape.t
    - **Reset shapes** in the inspector restores the current window shape's grid, for
      the current page. Each page's three grids are edited independently: resize the
      window to reach another shape, switch pages to reach the other page's grids.
+   - **Content holds its place** through every shape edit, reset included: a panel is
+     only the window its pictures and balloons are seen through, so each affected
+     frame and each affected balloon is re-expressed against its new panel box
+     (`gridContentRemap.ts`) and the polygon clip alone follows the seam. A chain
+     needs nothing of its own — it is laid out from the balloons that are its slots.
 6. Click **Save** to write the change straight back to `layoutConfig.ts` (a dev-only
    Vite endpoint, `POST /__comic-editor/save`); HMR reloads it. **Reset** discards
    unsaved edits and reverts to the last saved file.
@@ -356,8 +385,11 @@ bubbleTypes.ts      BubbleType + BUBBLE_TYPES (lettering font per type) — ship
 ../useBubbleMorph.ts  rAF morph driver — writes `d` to the DOM, not through React
 ../PanelBubble.tsx  one bubble: outline SVG + content + hover/press morph state
 ../BubbleInput.tsx  real text/phone input; isolates its events from panel navigation
+../BubbleDial.tsx   the 'dial' kind: an autocomplete drawn as a drum, field on its centre line
+../dialPicker.ts    PURE dial arithmetic: filter, which row, keypad-key append, redial list
+../usePhoneField.ts caret-preserving phone editing, shared by BubbleInput and BubbleDial
 ../phoneInput.ts    PURE locale detection, live phone formatting + caret/deletion math
-../bubbleContent.ts content-kind registry and persisted-value guard
+../bubbleContent.ts content-kind registry, persisted-value guard, the panel's dial balloon
 ../PanelBubbles.tsx one panel's bubbles: filters the array by panel, clips the non-spilling ones
 ../PanelBubbleChain.tsx  one conversation: rows from templates, growth timer, wheel scroll, composer
 ../BubbleTubes.tsx  viewport-level tube layer for every linked pair
@@ -370,8 +402,8 @@ bubbleTypes.ts      BubbleType + BUBBLE_TYPES (lettering font per type) — ship
 ../../../hooks/useLiveTables.ts hook: the only place a surface's rows are fetched, and the poll
 ../ProjectedNumberPad.tsx fixed 3 × 4 telephone keys on a projected surface; live buttons outside edit mode
 ../number-pad.css   number-pad lettering, surface layout, and the live key's press states
-../PhoneHud.tsx     the display and call keys a photographed pad has no room for
-../phone-hud.css    the caption box that holds them
+../BubbleActions.tsx action buttons inside a balloon, one per comma-delimited entry
+../phoneActions.ts  PURE: label -> the telephone key it draws, and the softphone verb it runs
 ../panelGeometry.ts PURE grid -> polygon geometry: frame, normalised space, vertex constraints
 ../panelPatterns.ts pattern style registry + per-panel palette/dot tuning (PANEL_BG_CONFIGS)
 ../polygonInset.ts  PURE polygon maths: the perpendicular gutter inset, bounding box
@@ -381,6 +413,7 @@ panelGridValidate.ts PURE structural guard: rings, ranges, no T-junctions
 layoutConfig.ts     PANEL_IMG_TRANSFORMS, PANEL_BUBBLE_TRANSFORMS, PANEL_PATTERNS, PANEL_GRIDS — source of truth
 configOps.ts        PURE config edits: re-exports configSeed + configHydrate, patch/add/remove, links
 configSeed.ts       PURE: the working copy's seed, clone, and per-breakpoint grid set/reset
+gridContentRemap.ts PURE: grid set/reset with every picture and balloon held still on screen
 configHydrate.ts    PURE: parse a persisted payload back into a config, falling back per field
 chainOps.ts         PURE chain-list lifecycle: linked groups -> ids, derive the list, patch, clamp, hydrate
 useSeamDrag.ts      hook: which gesture a pointer means, and the grid edit it maps to
@@ -426,7 +459,7 @@ All math/serialization is pure and unit-tested under
 `frontend/src/tests/skins/` (`comicBookTransforms`, `editorTransformsMath`,
 `editorMode`, `editorConfigOps`, `editorChainConfig`, `editorChainOps`,
 `editorSerialize`, `pageSelection`, `editorToolbarDrag`, `bubbleShape`, `bubbleTube`,
-`bubbleChain`, `panelGeometry`, `panelGridOps`, `panelLayouts`, `tableProjection`,
+`bubbleChain`, `panelGeometry`, `panelGridOps`, `gridContentRemap`, `panelLayouts`, `tableProjection`,
 `tableData`, `tableConfig`, `ProjectedTable`, `liveTableImages`,
 `TableSourceInspector`) — and the live feed itself in `frontend/src/tests/lib/liveTables`
 and `frontend/src/tests/useLiveTables`.
