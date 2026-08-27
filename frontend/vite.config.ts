@@ -1,5 +1,8 @@
 /// <reference types="vitest" />
+import { execFile } from 'node:child_process'
+import type { ExecFileException } from 'node:child_process'
 import { writeFile } from 'node:fs/promises'
+import type { IncomingMessage } from 'node:http'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -10,50 +13,112 @@ import { configDefaults } from 'vitest/config'
 
 import { resolveDevWatch } from './devWatchPolicy'
 import { quietProxyErrors } from './proxyErrorPolicy'
+import { shipLayout } from './shipLayout'
+import type { Run } from './shipLayout'
 
 const rootDir = dirname(fileURLToPath(import.meta.url))
+const repoRoot = resolve(rootDir, '..')
+
+/** Repo-relative because git wants it that way; the writer resolves it back. */
+const CONFIG_PATH = 'frontend/src/skins/comic-book/editor/layoutConfig.ts'
+
+/** A serialized config is a few tens of KB; anything past this is not one. */
+const MAX_BODY = 4_000_000
+
+function readBody(req: IncomingMessage): Promise<string> {
+  return new Promise((done, fail) => {
+    let body = ''
+    req.on('data', (chunk: Buffer | string) => {
+      body += chunk
+      if (body.length > MAX_BODY) fail(new Error('payload too large'))
+    })
+    req.on('end', () => done(body))
+    req.on('error', fail)
+  })
+}
 
 /**
- * Dev-only middleware for the comic-book layout editor's "Save" button. Overwrites
- * the editor's source-of-truth config file with the verbatim TS body POSTed by the
- * client. Registered via `configureServer`, so it exists only in the dev server and
- * is never part of a production build. Writes a fixed path — client-supplied paths
- * are ignored — so it can't be coerced into writing elsewhere.
+ * The one validation both endpoints share: the body must carry a string that looks like
+ * a serialized layout. A client-supplied *path* is never read, so neither endpoint can
+ * be coerced into writing somewhere else.
  */
-function comicEditorSavePlugin(): Plugin {
-  const target = resolve(rootDir, 'src/skins/comic-book/editor/layoutConfig.ts')
+function parsePayload(body: string): { content: string; summary: string } {
+  const parsed = JSON.parse(body) as { content?: unknown; summary?: unknown }
+  if (typeof parsed.content !== 'string' || !parsed.content.includes('PANEL_IMG_TRANSFORMS')) {
+    throw new Error('Invalid config payload')
+  }
   return {
-    name: 'comic-editor-save',
+    content: parsed.content,
+    summary: typeof parsed.summary === 'string' ? parsed.summary : '',
+  }
+}
+
+/**
+ * Spawns `git`/`gh` at the repo root with a fixed argv and **no shell**, so a typed
+ * summary reaching the commit subject is an argument rather than something a shell
+ * could read as syntax.
+ */
+const runInRepo: Run = (cmd, args) =>
+  new Promise(done => {
+    execFile(
+      cmd,
+      [...args],
+      { cwd: repoRoot, windowsHide: true, maxBuffer: 8 * 1024 * 1024 },
+      (err: ExecFileException | null, stdout: string, stderr: string) => {
+        const code = err ? (typeof err.code === 'number' ? err.code : 1) : 0
+        done({ code, stdout, stderr: stderr || (err ? err.message : '') })
+      },
+    )
+  })
+
+/**
+ * Dev-only middleware behind the comic-book layout editor's two write buttons.
+ * Registered via `configureServer` under `apply: 'serve'`, so it exists only in the dev
+ * server and is never part of a production build.
+ *
+ * - **Save** overwrites the editor's source-of-truth config with the verbatim TS body.
+ * - **Ship** does that and then hands the file to `shipLayout`, which branches, commits,
+ *   pushes and opens or updates a PR — see that module's header for why the browser
+ *   cannot be asked to know which of the three trees it is pointed at.
+ */
+function comicEditorPlugin(): Plugin {
+  const target = resolve(repoRoot, CONFIG_PATH)
+  return {
+    name: 'comic-editor',
     apply: 'serve',
     configureServer(server) {
+      const fail = (res: { statusCode: number; end: (body?: string) => void }, code: number, what: string, err: unknown) => {
+        server.config.logger.error(`[comic-editor] ${what}: ${String(err)}`)
+        res.statusCode = code
+        res.end(what)
+      }
+
       server.middlewares.use('/__comic-editor/save', (req, res, next) => {
         if (req.method !== 'POST') return next()
-        let body = ''
-        req.on('data', chunk => { body += chunk })
-        req.on('end', () => {
-          try {
-            const { content } = JSON.parse(body) as { content?: unknown }
-            if (typeof content !== 'string' || !content.includes('PANEL_IMG_TRANSFORMS')) {
-              res.statusCode = 400
-              res.end('Invalid config payload')
-              return
-            }
-            writeFile(target, content, 'utf8')
-              .then(() => {
-                res.statusCode = 204
-                res.end()
-              })
-              .catch(err => {
-                server.config.logger.error(`[comic-editor] save failed: ${String(err)}`)
-                res.statusCode = 500
-                res.end('Write failed')
-              })
-          } catch (err) {
-            server.config.logger.error(`[comic-editor] bad save body: ${String(err)}`)
-            res.statusCode = 400
-            res.end('Malformed JSON')
-          }
-        })
+        readBody(req)
+          .then(body => writeFile(target, parsePayload(body).content, 'utf8'))
+          .then(() => {
+            res.statusCode = 204
+            res.end()
+          })
+          .catch(err => fail(res, 400, 'save failed', err))
+      })
+
+      server.middlewares.use('/__comic-editor/ship', (req, res, next) => {
+        if (req.method !== 'POST') return next()
+        readBody(req)
+          .then(async body => {
+            const { content, summary } = parsePayload(body)
+            await writeFile(target, content, 'utf8')
+            return shipLayout({ run: runInRepo, file: CONFIG_PATH, now: () => new Date() }, summary)
+          })
+          .then(outcome => {
+            server.config.logger.info(`[comic-editor] ship: ${outcome.message}`)
+            res.statusCode = outcome.ok ? 200 : 500
+            res.setHeader('Content-Type', 'application/json')
+            res.end(JSON.stringify(outcome))
+          })
+          .catch(err => fail(res, 400, 'ship failed', err))
       })
     },
   }
@@ -70,7 +135,7 @@ export default defineConfig(({ mode }) => {
     'http://127.0.0.1:8000'
 
   return {
-    plugins: [react(), comicEditorSavePlugin()],
+    plugins: [react(), comicEditorPlugin()],
 
     // A down backend logs one concise line instead of a stack trace per proxied
     // request — the normal state for host-Vite branch previews. ./proxyErrorPolicy.ts.
