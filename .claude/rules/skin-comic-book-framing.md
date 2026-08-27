@@ -130,7 +130,8 @@ Three consequences worth stating, because each one is a bug the obvious implemen
 | Pages | **Page** dropdown in toolbar | Switch route in edit mode (replays the wash); "Loading screen" entry previews the loading overlay + its exit wash |
 | Mode | **Content** / **Panel shapes** toggle | Content places pictures and bubbles; shapes drags the lines between panels. Content click targets are not rendered in shapes mode — a panel-sized target would swallow every drag aimed at a line crossing it |
 | Reshape | drag a **line** or a **vertex** | A frame vertex slides along its own edge; the four corners are locked; the frame itself has no handle. Arrows nudge (⇧×10) |
-| Bend | **double-click a line**, drag the bend; **Delete** / **Straighten** removes it | Repeat for lightning bolts. A junction of three lines, or a vertex on the frame, is not a bend and is refused |
+| Bend | **double-click a line** (or **Add a corner to this line** on the selected line), drag the bend; **Delete** / **Straighten** removes it | Repeat for lightning bolts. A junction of three lines, or a vertex on the frame, is not a bend and is refused |
+| Merge | drag a corner **onto another corner** and release | Within snap range the target lights up and the dragged corner sits on it; releasing collapses the two into one junction (`panelGridMerge.ts`). Refused — no snap offered — when the merged grid would be invalid or the two corners obey different frame constraints |
 | Reset shapes | **Reset shapes** in the shapes inspector | Restores the current window shape's grid only — the three are edited independently |
 | Save | **Save** button | `POST /__comic-editor/save` writes `layoutConfig.ts` (dev server only); **Copy config** / **.ts** are the fallbacks |
 | Reset all | clears working copy | Removes `localStorage['comic-book:editConfig']`, re-seeds from source |
