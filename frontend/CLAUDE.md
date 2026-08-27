@@ -22,7 +22,11 @@ Run the whole of `lint`, not one of its parts. It chains five checks —
 `lint:eslint`, `lint:types`, `lint:css`, `lint:spelling`, `lint:deadweight` — and
 `lint:spelling` (cspell) rejects unknown words in `.ts`/`.tsx` as readily as in prose,
 so an ordinary identifier can fail CI having passed `lint:types` locally. There is no
-`typecheck` script; type checking is `lint:types` (`tsc --noEmit`).
+`typecheck` script; type checking is `lint:types`, which is **two** `tsc` runs: the app
+(`tsconfig.json`, `src/` only) and then the config project (`tsconfig.node.json` —
+`vite.config.ts` and the policy modules it imports). The second was added because
+nothing checked it: `tsc --noEmit` alone builds no referenced project, so the config
+had accumulated two type errors that only showed to whoever opened it in an editor.
 
 ## What a visitor downloads has three budgets, and they do not overlap
 

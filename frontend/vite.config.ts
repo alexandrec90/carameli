@@ -8,8 +8,8 @@ import type { Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import { configDefaults } from 'vitest/config'
 
-import { resolveDevWatch } from './devWatchPolicy'
-import { quietProxyErrors } from './proxyErrorPolicy'
+import { resolveDevWatch } from './devWatchPolicy.ts'
+import { quietProxyErrors } from './proxyErrorPolicy.ts'
 
 const rootDir = dirname(fileURLToPath(import.meta.url))
 

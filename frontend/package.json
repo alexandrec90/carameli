@@ -13,7 +13,7 @@
     "lint": "npm run lint:eslint && npm run lint:types && npm run lint:css && npm run lint:spelling && npm run lint:deadweight",
     "lint:deadweight": "knip",
     "lint:eslint": "eslint src --ext .js,.jsx,.ts,.tsx --format stylish",
-    "lint:types": "tsc --noEmit --pretty false",
+    "lint:types": "tsc --noEmit --pretty false && tsc -p tsconfig.node.json --pretty false",
     "lint:css": "stylelint \"src/**/*.css\" --formatter unix",
     "lint:spelling": "cspell \"../**/*.md\" \"src/**/*.{ts,tsx,js,jsx,json,yml,yaml}\" --no-progress --relative"
   },
