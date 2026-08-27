@@ -283,6 +283,11 @@ different images can only crossfade. A new bubble type belongs in `bubbleShape.t
    - **Reset shapes** in the inspector restores the current window shape's grid, for
      the current page. Each page's three grids are edited independently: resize the
      window to reach another shape, switch pages to reach the other page's grids.
+   - **Content holds its place** through every shape edit, reset included: a panel is
+     only the window its pictures and balloons are seen through, so each affected
+     frame and each affected balloon is re-expressed against its new panel box
+     (`gridContentRemap.ts`) and the polygon clip alone follows the seam. A chain
+     needs nothing of its own — it is laid out from the balloons that are its slots.
 6. Click **Save** to write the change straight back to `layoutConfig.ts` (a dev-only
    Vite endpoint, `POST /__comic-editor/save`); HMR reloads it. **Reset** discards
    unsaved edits and reverts to the last saved file.
@@ -381,6 +386,7 @@ panelGridValidate.ts PURE structural guard: rings, ranges, no T-junctions
 layoutConfig.ts     PANEL_IMG_TRANSFORMS, PANEL_BUBBLE_TRANSFORMS, PANEL_PATTERNS, PANEL_GRIDS — source of truth
 configOps.ts        PURE config edits: re-exports configSeed + configHydrate, patch/add/remove, links
 configSeed.ts       PURE: the working copy's seed, clone, and per-breakpoint grid set/reset
+gridContentRemap.ts PURE: grid set/reset with every picture and balloon held still on screen
 configHydrate.ts    PURE: parse a persisted payload back into a config, falling back per field
 chainOps.ts         PURE chain-list lifecycle: linked groups -> ids, derive the list, patch, clamp, hydrate
 useSeamDrag.ts      hook: which gesture a pointer means, and the grid edit it maps to
@@ -426,7 +432,7 @@ All math/serialization is pure and unit-tested under
 `frontend/src/tests/skins/` (`comicBookTransforms`, `editorTransformsMath`,
 `editorMode`, `editorConfigOps`, `editorChainConfig`, `editorChainOps`,
 `editorSerialize`, `pageSelection`, `editorToolbarDrag`, `bubbleShape`, `bubbleTube`,
-`bubbleChain`, `panelGeometry`, `panelGridOps`, `panelLayouts`, `tableProjection`,
+`bubbleChain`, `panelGeometry`, `panelGridOps`, `gridContentRemap`, `panelLayouts`, `tableProjection`,
 `tableData`, `tableConfig`, `ProjectedTable`, `liveTableImages`,
 `TableSourceInspector`) — and the live feed itself in `frontend/src/tests/lib/liveTables`
 and `frontend/src/tests/useLiveTables`.
