@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { BUBBLE_VIEW, cloudPuffs } from './bubbleBox'
 import {
@@ -12,6 +12,7 @@ import {
 import BubbleDial from './BubbleDial'
 import BubbleInput from './BubbleInput'
 import BubbleWheel from './BubbleWheel'
+import { dialOptions } from './dialPicker'
 import { BUBBLE_TYPES } from './editor/bubbleTypes'
 import { bubbleStyle } from './editor/transforms'
 import type { BubbleTransform } from './editor/types'
@@ -23,6 +24,9 @@ const PULSE_MS = 560
 
 /** A dial with nowhere to report to still draws; it just cannot be changed. */
 const noop = (): void => undefined
+
+/** One shared empty list, so a dial's shortlist is not rebuilt on every render. */
+const NOTHING_DIALLED: string[] = []
 
 interface PanelBubbleProps {
   bubble: BubbleTransform
@@ -57,6 +61,11 @@ interface PanelBubbleProps {
   dialValue?: string
   onDialChange?: (value: string) => void
   /**
+   * Numbers already dialled from this panel. They join the author's own options, so the
+   * drum is the shortlist plus whatever the reader has reached that was not on it.
+   */
+  dialled?: string[]
+  /**
    * How far a message of a live conversation has got. Absent on every balloon that is not
    * one, and on one whose message the carrier has acknowledged — a sent message is just a
    * message. Drawn as ink rather than as words: a sending balloon is pale and a failed one
@@ -83,6 +92,7 @@ export default function PanelBubble({
   onWheelSelect,
   dialValue = '',
   onDialChange,
+  dialled = NOTHING_DIALLED,
   status,
 }: PanelBubbleProps) {
   const [hover, setHover] = useState(false)
@@ -120,6 +130,14 @@ export default function PanelBubble({
   // Every kind that puts a real form control in the balloon, which is the question the
   // wrapper's aria and focus handling actually asks — a dial has one too.
   const hasField = editableKind !== null || bubble.content === 'dial'
+  // The dial's drum: what the author listed, then what has been dialled that they did not.
+  // Memoized so the filter BubbleDial runs over it survives a hover — this balloon
+  // re-renders on every pointer enter and leave. Its re-seat keys on the contents rather
+  // than on this identity, so a missed memo would be slow, never wrong.
+  const dialList = useMemo(
+    () => dialOptions(splitOptions(bubble.text), dialled),
+    [bubble.text, dialled],
+  )
   // A keyboard user can tab to an otherwise hidden input; focus reveals its bubble
   // immediately and blur returns it to the panel-hover reveal rule.
   const shown = visible || focused
@@ -187,11 +205,14 @@ export default function PanelBubble({
         />
       ) : bubble.content === 'dial' ? (
         <BubbleDial
-          options={splitOptions(bubble.text)}
+          options={dialList}
           value={dialValue}
           onChange={onDialChange ?? noop}
           font={font}
-          open={hover}
+          // Open on focus as well as on hover, unlike a plain wheel: typing into a dial
+          // filters its drum, and a filter whose result only appears when the pointer
+          // happens to be over the balloon is a filter nobody can see working.
+          open={hover || focused}
           enabled={interactive}
           hostRef={rootRef}
           onSubmit={onSubmit}

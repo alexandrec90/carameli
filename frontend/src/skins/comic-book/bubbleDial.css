@@ -1,22 +1,36 @@
 /* ─── In-bubble dial picker ───────────────────────────────────────────────────
-   The 'dial' content kind (BubbleDial.tsx): the wheel picker's drum with a real
-   phone field in its window. Everything about the drum itself — the window inset,
+   The 'dial' content kind (BubbleDial.tsx): one window holding a phone field and the
+   drum of options it filters. Everything about the drum itself — the window inset,
    the track, the row height, the hover fade — is .cb-bubble-wheel in bubbles.css,
-   which this class sits beside rather than replaces. Only the two rules below are
-   the dial's own. */
+   which this class sits beside rather than replaces. Only the rules below are the
+   dial's own. */
 
 /* The field takes the window's centre line, which is where wheelOffsetEm puts the
    picked row. Height and line-height must stay at WHEEL_ROW_EM (wheelPicker.ts): a
-   field taller than a row would show the neighbours through its own box. */
-.cb-dial-field {
+   field taller than a row would show the neighbours through its own box.
+
+   Qualified by .cb-bubble-dial rather than left as a bare class, and that is
+   load-bearing: .cb-bubble-input in bubbleInputs.css sets `width: auto` at the same
+   specificity, so which one won came down to which stylesheet Vite emitted first.
+   When bubbleInputs.css won, the field shrank to an input's intrinsic width at
+   `left: 0` while the drum still spanned the balloon — the field to the left of the
+   numbers, which is two controls in a window that is meant to hold one. */
+.cb-bubble-dial .cb-dial-field {
   position: absolute;
   top: 50%;
   left: 0;
+  right: 0;
   width: 100%;
   height: 1.25em;
   line-height: 1.25em;
   transform: translateY(-50%);
   text-align: center;
+}
+
+/* Row 0 of the drum: the number as typed, which the field is already lettering. Blank,
+   but it must still take a full row — the track offset counts it like any other. */
+.cb-dial-typed-row {
+  height: 1.25em;
 }
 
 /* The picked option is drawn by the field, so the drum must not letter it as well.

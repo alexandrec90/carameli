@@ -16,6 +16,12 @@ import type { SmsConversationMessage } from '../../lib/smsConversation'
  */
 const NO_MESSAGES: readonly SmsConversationMessage[] = []
 
+/**
+ * The same, for a panel with nothing dialled yet: the dial's shortlist is memoized on
+ * this array's identity, so a fresh `[]` per render would rebuild it every time.
+ */
+const EMPTY_DIALLED: string[] = []
+
 interface PanelBubblesProps {
   /** Every bubble on the page — `panel` decides which ones this panel draws. */
   bubbles: BubbleTransform[]
@@ -64,6 +70,12 @@ interface PanelBubblesProps {
    */
   dialValue?: string
   onDialChange?(value: string): void
+  /**
+   * Numbers dialled from this panel, appended to a `dial` balloon's authored shortlist so
+   * the drum grows into a redial list. The panel's, like the value, and for the same
+   * reason: a number punched into the picture is dialled from the panel, not the balloon.
+   */
+  dialled?: string[]
 }
 
 /**
@@ -100,6 +112,7 @@ export default function PanelBubbles({
   onPhoneSubmit,
   dialValue = '',
   onDialChange,
+  dialled = EMPTY_DIALLED,
 }: PanelBubblesProps) {
   const ids = editing ? [] : chainIdsOn(bubbles, panel)
   const conversations = ids.map(id => ({
@@ -164,6 +177,7 @@ export default function PanelBubbles({
                 : undefined
             }
             dialValue={dialValue}
+            dialled={dialled}
             onDialChange={onDialChange}
           />
         )

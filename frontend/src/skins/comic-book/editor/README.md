@@ -225,12 +225,18 @@ different images can only crossfade. A new bubble type belongs in `bubbleShape.t
      with the same caption box (`../PhoneHud.tsx`) reporting it, so a page whose art
      carries no keypad still has somewhere to dial from. In a chain that same content
      is the conversation's composer instead and dials nothing.
-   - **Dial** is those two at once, for the balloon beside a photographed telephone: its
-     text is the wheel's comma-delimited options, and the picked row is a real phone field
-     rather than lettering. It starts on the first option; turning the drum (scroll, or ↑/↓
-     with the field focused) sets the number, typing an option's own digits turns the drum
-     back to it, and typing anything else leaves the drum where it is — the field is free
-     to say something the shortlist cannot. **A number pad projected onto a picture in the
+   - **Dial** is those two at once, for the balloon beside a photographed telephone: an
+     autocomplete whose list is the wheel. Its text is the comma-delimited shortlist, and
+     there is only ever **one** window — the drum's centre line is a real phone field
+     rather than lettering, and the rows behind it are the shortlist as the typed number
+     has narrowed it. Typing filters (on the digits, so `+1 234 567 9999` and a keypad
+     punching `234…` find each other); turning the drum (scroll, or ↑/↓ with the field
+     focused) walks the matches and letters each into the field; turning back up off the
+     first match returns the reader's own half-typed number. It starts on the first option,
+     and a number the shortlist does not carry simply empties the drum and stays in the
+     field. **Dialling saves the number**: Enter appends it to that panel's options, so the
+     drum becomes a redial list (`dialOptions` merges it in, ignoring punctuation, so a
+     number the author already listed is not listed twice). **A number pad projected onto a picture in the
      same panel types into it**, so the phone in the photograph and the balloon are one
      number rather than two; that is why the value is held by `../ComicPanel.tsx`, the only
      component that can see both halves. Enter dials and, unlike a composer, keeps the
@@ -322,8 +328,8 @@ bubbleTypes.ts      BubbleType + BUBBLE_TYPES (lettering font per type) — ship
 ../useBubbleMorph.ts  rAF morph driver — writes `d` to the DOM, not through React
 ../PanelBubble.tsx  one bubble: outline SVG + content + hover/press morph state
 ../BubbleInput.tsx  real text/phone input; isolates its events from panel navigation
-../BubbleDial.tsx   the 'dial' kind: the wheel drum with its picked row as a phone field
-../dialPicker.ts    PURE dial arithmetic: keypad-key append, and value -> which option
+../BubbleDial.tsx   the 'dial' kind: an autocomplete drawn as a drum, field on its centre line
+../dialPicker.ts    PURE dial arithmetic: filter, which row, keypad-key append, redial list
 ../usePhoneField.ts caret-preserving phone editing, shared by BubbleInput and BubbleDial
 ../phoneInput.ts    PURE locale detection, live phone formatting + caret/deletion math
 ../bubbleContent.ts content-kind registry, persisted-value guard, the panel's dial balloon

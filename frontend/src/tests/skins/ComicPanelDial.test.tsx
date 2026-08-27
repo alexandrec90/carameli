@@ -58,6 +58,8 @@ function draw(bubbles: BubbleTransform[], onNumberPadKey = vi.fn(), onPhoneSubmi
     onPhoneSubmit,
     press: (key: string) => fireEvent.pointerDown(screen.getByRole('button', { name: key })),
     field: () => screen.queryByRole('textbox', { name: 'Phone number' }) as HTMLInputElement | null,
+    rows: () =>
+      Array.from(document.querySelectorAll('.cb-wheel-option')).map(r => r.textContent),
   }
 }
 
@@ -113,6 +115,49 @@ describe('a panel holding a dial balloon', () => {
     press('1')
 
     expect(field()!.value).toBe('(555) 000-1111')
+  })
+
+  it('narrows the shortlist as the projected keypad is punched, the way typing does', () => {
+    // The pad and the keyboard are one field, so they are one filter too.
+    const { press, field, rows } = draw(dial('5550001111, 5550002222, 2345679999'))
+
+    // Cleared first: the balloon starts on its first option, and the pad appends.
+    fireEvent.change(field()!, { target: { value: '' } })
+    press('5')
+    press('5')
+
+    expect(rows()).toEqual(['5550001111', '5550002222'])
+  })
+
+  it('saves a dialled number to the shortlist, so the drum becomes a redial list', () => {
+    const { field, rows } = draw(dial('5550001111'))
+
+    fireEvent.change(field()!, { target: { value: '9998887777' } })
+    fireEvent.keyDown(field()!, { key: 'Enter' })
+
+    expect(rows()).toEqual(['5550001111', '(999) 888-7777'])
+    // And the drum lands on it with the filter cleared: the whole list is there again.
+    expect(document.querySelector('.cb-wheel-option.is-selected')?.textContent)
+      .toBe('(999) 888-7777')
+    expect(field()!.value).toBe('(999) 888-7777')
+  })
+
+  it('does not list a dialled number twice, however it was spelled', () => {
+    const { field, rows } = draw(dial('5550001111'))
+
+    fireEvent.change(field()!, { target: { value: '5550001111' } })
+    fireEvent.keyDown(field()!, { key: 'Enter' })
+
+    expect(rows()).toEqual(['5550001111'])
+  })
+
+  it('still places the call, so saving the number is an addition and not a replacement', () => {
+    const { field, onPhoneSubmit } = draw(dial('5550001111'))
+
+    fireEvent.change(field()!, { target: { value: '9998887777' } })
+    fireEvent.keyDown(field()!, { key: 'Enter' })
+
+    expect(onPhoneSubmit).toHaveBeenCalledWith('(999) 888-7777')
   })
 })
 

@@ -24,7 +24,8 @@ placement and behaviour (`PANEL_BUBBLE_TRANSFORMS`: panel / top / right / width 
 rotate / spill / type / tail / content / text, plus `hoverType` / `clickType` event
 morph targets, the `linkTo` tube partner and the `chain` this balloon is a slot of;
 content may be lettering, a wheel picker, a text input, a locale-formatted phone
-input, or a dial — the wheel and the phone input at once) and the chain settings those
+input, or a dial — an autocomplete over that phone input, its list drawn as the wheel)
+and the chain settings those
 names resolve to (`PANEL_BUBBLE_CHAINS`),
 plus each panel's background pattern style
 (`PANEL_PATTERNS`, the one array parallel to `PANELS`; the per-panel palette and dot

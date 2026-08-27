@@ -1,14 +1,25 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { KeyboardEvent, PointerEvent, RefObject } from 'react'
 
-import { dialOptionIndex } from './dialPicker'
+import {
+  dialDigits,
+  dialMatches,
+  dialRowValue,
+  dialSeat,
+  dialTurn,
+  dialTyped,
+} from './dialPicker'
+import type { DialState } from './dialPicker'
 import { browserCountry, formatPhoneInput } from './phoneInput'
 import { usePhoneField } from './usePhoneField'
-import { clampIndex, wheelOffsetEm, wheelSteps } from './wheelPicker'
+import { wheelOffsetEm, wheelSteps } from './wheelPicker'
 import './bubbleDial.css'
 
 interface BubbleDialProps {
-  /** The option list, already split from the bubble's comma-delimited text. */
+  /**
+   * The shortlist, already split from the bubble's comma-delimited text and already
+   * grown by whatever has been dialled on this panel (see `dialOptions`).
+   */
   options: string[]
   /** The dialled number, formatted. Owned by the panel — see ComicPanel. */
   value: string
@@ -16,7 +27,7 @@ interface BubbleDialProps {
   onChange(next: string): void
   /** Lettering font for the current shape, same as the plain-text span uses. */
   font: string
-  /** True while the pointer is over the bubble: the unpicked options fade in. */
+  /** True while the balloon is hovered or its field has focus: the shortlist fades in. */
   open: boolean
   /** False in edit mode: the editor overlay owns the pointer and the keyboard there. */
   enabled: boolean
@@ -30,25 +41,36 @@ interface BubbleDialProps {
 }
 
 /**
- * The 'dial' content kind: a wheel picker whose picked row is a real phone field.
+ * The 'dial' content kind: one window that is a phone field and its own shortlist.
  *
  * A wheel balloon can only offer what the author typed and an input balloon can only be
- * typed into; a phone is both — a shortlist you turn to, and a keypad for everything
- * that is not on it. So the drum draws the options and the field draws the value, one
- * over the other in the same window, and the picked row is hidden behind the field
- * because the two would otherwise letter the same number twice.
+ * typed into; a phone is both. So this is an **autocomplete whose list is a wheel**: the
+ * field letters the balloon's centre line, the options the typed number narrows to hang
+ * off it above and below, and one gesture — a scroll, or an arrow key — moves between
+ * them. There is no second control beside the drum, because a balloon has room for one
+ * thing.
+ *
+ * `dialPicker.ts` holds the model, and the module comment there describes the rows. What
+ * is left here is the wiring, and it is three rules:
+ *
+ * - **Turning reports a row.** `dialTurn` moves the drum, `dialRowValue` says what it
+ *   landed on, and that is the new value.
+ * - **Anything else that changes the value re-filters.** The value can move without the
+ *   drum — a keystroke, or the number pad projected onto a picture in the same panel —
+ *   and whenever it stops being the row the drum is on, that new number becomes the
+ *   filter and the drum returns to the typed row. One rule covers typing, the pad, and
+ *   the author re-seeding the balloon, so none of them is a special case.
+ * - **The shortlist changing re-seats the drum.** Dialling appends the number to the
+ *   options (ComicPanel), so this is what turns the number the reader just called into
+ *   an ordinary row of the drum, with the filter cleared and the whole list back.
  *
  * **The value is not held here.** It belongs to the panel (ComicPanel), because the
  * projected keypad on the *picture* beside this balloon writes to it too — a number
  * punched into the phone in the photograph and a number typed into the balloon are one
- * number, and a component owning its own state could not be told about the first. That
- * is also what keeps the drum honest: turning it reports an option, typing an option's
- * own digits turns the drum to it (`dialOptionIndex`), and neither is a special case of
- * the other.
+ * number, and a component owning its own state could not be told about the first.
  *
  * Turning is `wheelPicker.ts` exactly as BubbleWheel uses it, and editing is
- * `usePhoneField` exactly as BubbleInput uses it. Nothing about either is re-implemented
- * here; what is new is only that they are the same value.
+ * `usePhoneField` exactly as BubbleInput uses it. Neither is re-implemented here.
  */
 export default function BubbleDial({
   options, value, onChange, font, open, enabled, hostRef, onSubmit,
@@ -56,54 +78,54 @@ export default function BubbleDial({
   const inputRef = useRef<HTMLInputElement>(null)
   const country = useMemo(() => browserCountry(), [])
   const field = usePhoneField(inputRef, country, onChange)
-  const count = options.length
 
-  const [index, setIndex] = useState(0)
-  // The drum position as the listeners see it. A ref as well as state because the wheel
-  // handler is registered once and would otherwise read the index of the render that
-  // registered it — which swallows every turn but the first of a fast scroll.
-  const indexRef = useRef(0)
-  // Sub-step wheel travel carried between events (see wheelSteps).
-  const accRef = useRef(0)
+  const [state, setState] = useState<DialState>(() => dialSeat(options, value))
+  const matches = useMemo(() => dialMatches(options, state.query), [options, state.query])
+
+  // Both of the corrections below are made during render rather than from an effect, which
+  // is React's own guidance for state derived from a changed input and what ComicPanel
+  // already does for the seed: an effect would letter the previous row for one frame and
+  // then replace it. The re-render is immediate and nothing below has run yet.
+
+  // The value moved without the drum — a keystroke, a projected keypad press, a re-seed —
+  // so it is now what the reader means, and the shortlist narrows to it. Compared by
+  // dialable digits because a turn reports its row *formatted*, which is a different
+  // string from the author's own spelling of the same number.
+  const [lastValue, setLastValue] = useState(value)
+  if (lastValue !== value) {
+    setLastValue(value)
+    if (dialDigits(value) !== dialDigits(dialRowValue(state, matches))) setState(dialTyped(value))
+  }
+
+  // The shortlist itself changed: the reader dialled a number onto it, or the author
+  // edited the options out from under the drum in the inspector. Either way the drum is
+  // re-seated on the number the field is showing rather than left on a row that has moved.
+  // Keyed on the list's contents, since `options` is rebuilt by the parent every render.
+  const optionKey = JSON.stringify(options)
+  const [lastOptions, setLastOptions] = useState(optionKey)
+  if (lastOptions !== optionKey) {
+    setLastOptions(optionKey)
+    setState(dialSeat(options, value))
+  }
+
   // One turn, defined once and called from both the wheel and the arrow keys. Kept in a
   // ref and refreshed after every commit so the listener below can be registered per
   // host rather than per render, without ever calling a stale `onChange`.
   const turnRef = useRef<(steps: number) => void>(() => undefined)
-
-  // Which option the value *is*, or -1 while it is something the author never listed —
-  // a number part-way typed, or one the reader punched in from the keypad.
-  const matched = dialOptionIndex(options, value)
-
   useEffect(() => {
     turnRef.current = (steps: number) => {
-      if (count === 0) return
-      const next = clampIndex(indexRef.current + steps, count)
-      if (next === indexRef.current) return
-      indexRef.current = next
-      setIndex(next)
-      onChange(formatPhoneInput(options[next] ?? '', country))
+      const next = dialTurn(state, matches.length, steps)
+      if (next === state) return
+      setState(next)
+      onChange(formatPhoneInput(dialRowValue(next, matches), country))
     }
   })
 
-  // The field and the drum are two views of one value: type an option's own number and
-  // the drum turns to it, so it is never showing a different number than the field.
-  useEffect(() => {
-    if (matched >= 0 && matched !== indexRef.current) {
-      indexRef.current = matched
-      setIndex(matched)
-    }
-  }, [matched])
-
-  // The inspector can edit options out from under the drum; keep it in range.
-  useEffect(() => {
-    const next = clampIndex(indexRef.current, Math.max(count, 1))
-    indexRef.current = next
-    setIndex(next)
-  }, [count])
-
+  // Sub-step wheel travel carried between events (see wheelSteps).
+  const accRef = useRef(0)
   useEffect(() => {
     const host = hostRef.current
-    if (!host || count === 0 || !enabled) return
+    if (!host || options.length === 0 || !enabled) return
     const onWheel = (e: WheelEvent) => {
       // Native and non-passive on purpose: React registers its wheel listeners passive,
       // and a passive handler cannot keep the page from scrolling away under the picker.
@@ -114,7 +136,7 @@ export default function BubbleDial({
     }
     host.addEventListener('wheel', onWheel, { passive: false })
     return () => host.removeEventListener('wheel', onWheel)
-  }, [hostRef, count, enabled])
+  }, [hostRef, options.length, enabled])
 
   const onKeyDown = (event: KeyboardEvent<HTMLInputElement>): void => {
     event.stopPropagation()
@@ -123,7 +145,8 @@ export default function BubbleDial({
       event.preventDefault()
       const dialled = value.trim()
       // Kept rather than cleared, unlike a composer: the number stays on the display
-      // after it is dialled, the way it does on the phone in the picture.
+      // after it is dialled, the way it does on the phone in the picture. The panel adds
+      // it to the shortlist, which comes back down as a new `options` and re-seats us.
       if (dialled !== '') onSubmit(dialled)
       return
     }
@@ -144,15 +167,21 @@ export default function BubbleDial({
       className={`cb-panel-bubble-text cb-bubble-wheel cb-bubble-dial${open ? ' is-open' : ''}`}
       style={{ fontFamily: `'${font}', cursive` }}
     >
-      {/* The options behind the window. Decorative: the picked row is hidden under the
-          field, and every other row is a number the field can be turned to. */}
+      {/* The drum. Decorative: every row here is either the field's own (blank, below) or
+          a number the drum can be turned to, and the field letters whichever is picked. */}
       <div
         className="cb-wheel-track"
-        style={{ transform: `translateY(${wheelOffsetEm(index)}em)` }}
+        style={{ transform: `translateY(${wheelOffsetEm(state.index)}em)` }}
         aria-hidden="true"
       >
-        {options.map((opt, i) => (
-          <div key={i} className={`cb-wheel-option${i === index ? ' is-selected' : ''}`}>
+        {/* Row 0 — what the reader typed, drawn by the field. Blank rather than absent:
+            it has to occupy its band or every match above it slides a row too high. */}
+        <div className="cb-dial-typed-row" />
+        {matches.map((opt, i) => (
+          <div
+            key={`${i}:${opt}`}
+            className={`cb-wheel-option${i + 1 === state.index ? ' is-selected' : ''}`}
+          >
             {opt}
           </div>
         ))}

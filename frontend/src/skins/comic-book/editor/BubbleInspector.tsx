@@ -121,9 +121,10 @@ export default function BubbleInspector({ api, index, bubble }: BubbleInspectorP
       )}
       {bubble.content === 'dial' && (
         <div className="cb-ed-hint">
-          Comma-delimited, same as the wheel — but the picked row is a real phone field,
-          so the number can also be typed, or punched into a number pad projected onto a
-          picture on this panel. The first option is what it starts on; Enter dials.
+          Comma-delimited, same as the wheel — but this is an autocomplete: the drum&apos;s
+          centre line is a real phone field, and typing into it (or punching a number pad
+          projected onto a picture on this panel) narrows the rows behind it. The first
+          option is what it starts on; Enter dials, and adds the number to the list.
         </div>
       )}
       {(bubble.content === 'input' || bubble.content === 'phone') && (

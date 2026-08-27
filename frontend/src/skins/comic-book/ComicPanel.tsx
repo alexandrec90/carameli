@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState } from 'react'
 
 import type { BubbleChain } from './bubbleChain'
 import { dialBubbleOn } from './bubbleContent'
-import { appendDialKey } from './dialPicker'
+import { addDialled, appendDialKey } from './dialPicker'
 import PanelBubbles from './PanelBubbles'
 import PanelImages from './PanelImages'
 import { browserCountry, formatPhoneInput } from './phoneInput'
@@ -38,7 +38,11 @@ interface ComicPanelProps {
      * A panel holding a `dial` balloon takes its own keys instead — see below.
      */
     onNumberPadKey?(key: string): void
-    /** Dials the number typed into one of this panel's `phone` balloons. */
+    /**
+     * Dials the number typed into one of this panel's `phone` balloons. On a panel that
+     * holds a `dial` the call goes out through the same prop, after the number has been
+     * added to that balloon's shortlist — see below.
+     */
     onPhoneSubmit?(value: string): void
     /** Mounts the Ben-Day dot canvas into Layout's animation loop. */
     dotRef(el: HTMLCanvasElement | null): void
@@ -101,6 +105,19 @@ export default function ComicPanel({
         (key: string) => setDialValue(current => appendDialKey(current, key, country)),
         [country],
     )
+    // Numbers actually dialled from this panel, which join the dial's shortlist so the
+    // drum becomes a redial list: a number reached once by typing it out or by punching
+    // it into the picture is a row to turn to from then on. Held here for the same reason
+    // the value is — it is the panel's number, however many balloons show it — and reset
+    // when the page unmounts, which is what a comic panel's memory is worth.
+    const [dialled, setDialled] = useState<string[]>([])
+    const onDialSubmit = useCallback(
+        (value: string) => {
+            setDialled(current => addDialled(current, value))
+            onPhoneSubmit?.(value)
+        },
+        [onPhoneSubmit],
+    )
 
     return (
         <div
@@ -157,8 +174,9 @@ export default function ComicPanel({
                 interactive={!editorActive}
                 editing={editorActive}
                 sms={sms}
-                onPhoneSubmit={onPhoneSubmit}
+                onPhoneSubmit={dialIndex >= 0 ? onDialSubmit : onPhoneSubmit}
                 dialValue={dialValue}
+                dialled={dialled}
                 onDialChange={onDialChange}
             />
         </div>
