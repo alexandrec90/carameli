@@ -265,10 +265,16 @@ different images can only crossfade. A new bubble type belongs in `bubbleShape.t
      frame corners do not move at all. There is no handle on the frame itself: a frame
      edge belongs to one panel only, so it is never a line between two, and the
      gesture that would move it does not exist.
-   - **Double-click a line** to put a bend in it, then drag the bend — repeat for the
-     lightning-bolt shapes. **Delete** (or **Straighten** in the inspector) takes a
-     bend back out; a vertex where three lines meet, or one on the frame, is not a
-     bend and is refused.
+   - **Double-click a line** to put a bend in it (or select the line and press **Add a
+     corner to this line**), then drag the bend — repeat for the lightning-bolt shapes.
+     **Delete** (or **Straighten** in the inspector) takes a bend back out; a vertex
+     where three lines meet, or one on the frame, is not a bend and is refused.
+   - **Drop a vertex onto another vertex** to merge the two into one junction. Within
+     snap range the target lights up and the dragged vertex sits exactly on it; no snap
+     is offered when the merged grid would be invalid, or when the two obey different
+     frame constraints. This is the only way two corners can occupy one point — released
+     just short of each other they would be two coincident vertices joined by a
+     zero-length seam, which the validator rejects, so the snap merges them instead.
    - **Arrow keys** nudge the selected vertex (hold **⇧** for x10); **Esc** deselects.
    - The gutter between panels stays the same width at every angle — it is measured
      perpendicular to each edge, not per axis — and every panel stays inside the outer
@@ -330,6 +336,7 @@ bubbleTypes.ts      BubbleType + BUBBLE_TYPES (lettering font per type) — ship
 ../panelPatterns.ts pattern style registry + per-panel palette/dot tuning (PANEL_BG_CONFIGS)
 ../polygonInset.ts  PURE polygon maths: the perpendicular gutter inset, bounding box
 panelGridOps.ts     PURE grid edits: move vertex, insert/remove bend, seam listing
+panelGridMerge.ts   PURE merge: collapse two vertices into one junction, and the snap target
 panelGridValidate.ts PURE structural guard: rings, ranges, no T-junctions
 layoutConfig.ts     PANEL_IMG_TRANSFORMS, PANEL_BUBBLE_TRANSFORMS, PANEL_PATTERNS, PANEL_GRIDS — source of truth
 configOps.ts        PURE config edits: re-exports configSeed + configHydrate, patch/add/remove, links
@@ -338,7 +345,7 @@ configHydrate.ts    PURE: parse a persisted payload back into a config, falling 
 chainOps.ts         PURE chain-list lifecycle: linked groups -> ids, derive the list, patch, clamp, hydrate
 useSeamDrag.ts      hook: which gesture a pointer means, and the grid edit it maps to
 PanelSeams.tsx      the draggable line + vertex handles (shapes mode)
-ShapeInspector.tsx  shapes-mode inspector: vertex read-out, straighten, reset grid
+ShapeInspector.tsx  shapes-mode inspector: vertex read-out, add corner, straighten, reset grid
 tableValidate.ts    PURE: a new table, and the repair of one read back out of a payload
 numberPadValidate.ts PURE: a new number pad, repair, and deep clone
 serializeTable.ts   PURE: a table as the nested block on a picture's line

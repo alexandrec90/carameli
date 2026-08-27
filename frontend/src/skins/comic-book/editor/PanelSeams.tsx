@@ -15,12 +15,13 @@ interface PanelSeamsProps {
 }
 
 /** A frame vertex slides along its edge; a corner does not move; the rest are free. */
-function vertexClass(grid: PanelGrid, index: number, selected: boolean): string {
+function vertexClass(grid: PanelGrid, index: number, selected: boolean, snap: boolean): string {
   const constraint = constraintOf(grid.vertices[index] ?? [0, 0])
   return [
     'cb-ed-vx',
     constraint === 'locked' ? 'cb-ed-vx-locked' : constraint === 'free' ? 'cb-ed-vx-free' : 'cb-ed-vx-edge',
     selected ? 'cb-ed-vx-sel' : '',
+    snap ? 'cb-ed-vx-snap' : '',
   ]
     .filter(Boolean)
     .join(' ')
@@ -73,7 +74,7 @@ export default function PanelSeams({ grid, frame, drag }: PanelSeamsProps) {
             cx={x}
             cy={y}
             r={locked ? 4 : 6}
-            className={vertexClass(grid, i, drag.selectedVertex === i)}
+            className={vertexClass(grid, i, drag.selectedVertex === i, drag.snapVertex === i)}
             onPointerDown={locked ? undefined : e => drag.onVertexDown(e, i)}
             onPointerMove={locked ? undefined : drag.onPointerMove}
             onPointerUp={locked ? undefined : drag.onPointerUp}
