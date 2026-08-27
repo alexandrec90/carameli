@@ -2,14 +2,39 @@
   "compilerOptions": {
     "composite": true,
     "skipLibCheck": true,
+    // Everything in this project runs in Node, never in a browser: without a
+    // target the default is ES5, whose lib has no `matchAll`, no `includes` and
+    // no `Object.entries`.
+    "target": "ES2022",
     "module": "ESNext",
     "moduleResolution": "bundler",
-    "allowSyntheticDefaultImports": true
+    "allowSyntheticDefaultImports": true,
+    // vite.config.ts imports its policy modules with a '.ts' extension, which is
+    // what Vite's `configLoader: 'native'` needs to resolve them (Node strips the
+    // types, it does not resolve extensionless specifiers). TS rejects that
+    // spelling unless this is on, and TS5096 requires it be paired with `noEmit`
+    // or `emitDeclarationOnly`. It has to be the second: `noEmit` in a project
+    // tsconfig.json *references* is TS6310, and dropping the reference to get it
+    // would leave the tsbuildinfo below with nothing pointing at it. Nothing
+    // consumes the declarations, so they go somewhere already ignored.
+    "allowImportingTsExtensions": true,
+    "emitDeclarationOnly": true,
+    "outDir": "node_modules/.tmp/tsconfig-node"
   },
-  // devWatchPolicy + its test live here rather than under src/ on purpose: a
-  // composite project must list every file it pulls in (TS6307), and a file
-  // can't belong to both this project and the referencing `src` one (TS6305).
-  // Keeping the module, its test, and vite.config.ts in one project satisfies
-  // both. Vitest's default include still picks the test up.
-  "include": ["vite.config.ts", "devWatchPolicy.ts", "devWatchPolicy.test.ts"]
+  // The config's policy modules and their tests live here rather than under src/
+  // on purpose: a composite project must list every file it pulls in (TS6307),
+  // and a file can't belong to both this project and the referencing `src` one
+  // (TS6305). Keeping the modules, their tests, and vite.config.ts in one project
+  // satisfies both. Vitest's default include still picks the tests up.
+  "include": [
+    "vite.config.ts",
+    "configImports.test.ts",
+    "devWatchPolicy.ts",
+    "devWatchPolicy.test.ts",
+    "proxyErrorPolicy.ts",
+    "proxyErrorPolicy.test.ts",
+    "shipLayout.ts",
+    "shipLayout.test.ts",
+    "shipLayout.integration.test.ts"
+  ]
 }

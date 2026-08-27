@@ -11,10 +11,10 @@ import type { Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import { configDefaults } from 'vitest/config'
 
-import { resolveDevWatch } from './devWatchPolicy'
-import { quietProxyErrors } from './proxyErrorPolicy'
-import { shipLayout } from './shipLayout'
-import type { Run } from './shipLayout'
+import { resolveDevWatch } from './devWatchPolicy.ts'
+import { quietProxyErrors } from './proxyErrorPolicy.ts'
+import { shipLayout } from './shipLayout.ts'
+import type { Run } from './shipLayout.ts'
 
 const rootDir = dirname(fileURLToPath(import.meta.url))
 const repoRoot = resolve(rootDir, '..')
