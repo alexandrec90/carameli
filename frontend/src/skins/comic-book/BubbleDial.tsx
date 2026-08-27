@@ -12,8 +12,9 @@ import {
 import type { DialState } from './dialPicker'
 import { browserCountry, formatPhoneInput } from './phoneInput'
 import { useDialCaret } from './useDialCaret'
+import { useDialWheel } from './useDialWheel'
 import { usePhoneField } from './usePhoneField'
-import { wheelOffsetEm, wheelSteps } from './wheelPicker'
+import { wheelOffsetEm } from './wheelPicker'
 import './bubbleDial.css'
 
 interface BubbleDialProps {
@@ -159,22 +160,10 @@ export default function BubbleDial({
     if (input && document.activeElement === input) input.select()
   })
 
-  // Sub-step wheel travel carried between events (see wheelSteps).
-  const accRef = useRef(0)
-  useEffect(() => {
-    const host = hostRef.current
-    if (!host || options.length === 0 || !enabled) return
-    const onWheel = (e: WheelEvent) => {
-      // Native and non-passive on purpose: React registers its wheel listeners passive,
-      // and a passive handler cannot keep the page from scrolling away under the picker.
-      e.preventDefault()
-      const { acc, steps } = wheelSteps(accRef.current, e.deltaY)
-      accRef.current = acc
-      if (steps !== 0) turnRef.current(steps)
-    }
-    host.addEventListener('wheel', onWheel, { passive: false })
-    return () => host.removeEventListener('wheel', onWheel)
-  }, [hostRef, options.length, enabled])
+  // The wheel gesture (useDialWheel): over the balloon always, and over the whole
+  // panel while the reveal has the keyboard — the drum turns wherever the pointer
+  // already is, the same reach a keystroke has.
+  useDialWheel(hostRef, revealed, enabled && options.length > 0, turnRef)
 
   const onKeyDown = (event: KeyboardEvent<HTMLInputElement>): void => {
     event.stopPropagation()
@@ -215,12 +204,14 @@ export default function BubbleDial({
         {/* Row 0 — what the reader typed, drawn by the field. Blank rather than absent:
             it has to occupy its band or every match above it slides a row too high. */}
         <div className="cb-dial-typed-row" />
+        {/* Lettered formatted, the way the field letters whichever one the drum lands
+            on; the filter underneath stays on the raw digits (dialMatches). */}
         {matches.map((opt, i) => (
           <div
             key={`${i}:${opt}`}
             className={`cb-wheel-option${i + 1 === state.index ? ' is-selected' : ''}`}
           >
-            {opt}
+            {formatPhoneInput(opt, country)}
           </div>
         ))}
       </div>

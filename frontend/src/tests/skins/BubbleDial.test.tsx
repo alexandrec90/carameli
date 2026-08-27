@@ -69,12 +69,14 @@ function draw(props: HarnessProps = {}) {
 }
 
 describe('BubbleDial as a wheel', () => {
-  it('draws the shortlist behind the field and starts on the value it was given', () => {
+  it('draws the shortlist behind the field, lettered formatted, starting on its value', () => {
+    // Formatted however the author spelled the option: a drum of raw digit strings
+    // beside a formatted field reads as two different kinds of thing.
     const { field, rows, selected } = draw()
 
-    expect(rows()).toEqual(OPTIONS)
+    expect(rows()).toEqual([FIRST, SECOND, THIRD])
     expect(field.value).toBe(FIRST)
-    expect(selected()).toBe(OPTIONS[0])
+    expect(selected()).toBe(FIRST)
   })
 
   it('turns to the next option on a scroll, reporting it formatted', () => {
@@ -85,18 +87,18 @@ describe('BubbleDial as a wheel', () => {
 
     expect(onChange).toHaveBeenCalledWith(SECOND)
     expect(field.value).toBe(SECOND)
-    expect(selected()).toBe(OPTIONS[1])
+    expect(selected()).toBe(SECOND)
   })
 
   it('turns on the arrow keys as well, so the options are reachable without a mouse', () => {
     const { field, selected } = draw()
 
     fireEvent.keyDown(field, { key: 'ArrowDown' })
-    expect(selected()).toBe(OPTIONS[1])
+    expect(selected()).toBe(SECOND)
     expect(field.value).toBe(SECOND)
 
     fireEvent.keyDown(field, { key: 'ArrowUp' })
-    expect(selected()).toBe(OPTIONS[0])
+    expect(selected()).toBe(FIRST)
     expect(field.value).toBe(FIRST)
   })
 
@@ -106,11 +108,11 @@ describe('BubbleDial as a wheel', () => {
     // Up off the first option would be the typed row, which is empty here — nothing has
     // been typed, so there is nothing to go back to and the drum stays put.
     fireEvent.keyDown(field, { key: 'ArrowUp' })
-    expect(selected()).toBe(OPTIONS[0])
+    expect(selected()).toBe(FIRST)
     expect(field.value).toBe(FIRST)
 
     for (let i = 0; i < 5; i += 1) fireEvent.wheel(host, { deltaY: 60 })
-    expect(selected()).toBe(OPTIONS[2])
+    expect(selected()).toBe(THIRD)
   })
 
   it('keeps turning through a fast scroll instead of stopping after the first step', () => {
@@ -121,7 +123,54 @@ describe('BubbleDial as a wheel', () => {
     fireEvent.wheel(host, { deltaY: 60 })
     fireEvent.wheel(host, { deltaY: 60 })
 
-    expect(selected()).toBe(OPTIONS[2])
+    expect(selected()).toBe(THIRD)
+  })
+
+  it('turns from anywhere over the panel while its balloon is revealed', () => {
+    // The reveal hands the dial the panel's keyboard; the wheel gets the same reach,
+    // so the reader does not have to park the pointer on one balloon to turn.
+    render(
+      <div className="cb-panel" data-testid="panel">
+        <Harness revealed />
+      </div>,
+    )
+    const field = screen.getByRole('textbox', { name: 'Phone number' }) as HTMLInputElement
+
+    fireEvent.wheel(screen.getByTestId('panel'), { deltaY: 60 })
+
+    expect(field.value).toBe(SECOND)
+  })
+
+  it('keeps the balloon-only reach while the panel is not revealing it', () => {
+    render(
+      <div className="cb-panel" data-testid="panel">
+        <Harness />
+      </div>,
+    )
+    const field = screen.getByRole('textbox', { name: 'Phone number' }) as HTMLInputElement
+
+    fireEvent.wheel(screen.getByTestId('panel'), { deltaY: 60 })
+
+    expect(field.value).toBe(FIRST)
+  })
+
+  it('leaves a wheel event another balloon on the panel has already taken', () => {
+    // A chain's scrollback and a wheel picker preventDefault on their own roots, which
+    // are descendants of the panel, so their listeners run first. Taken means taken:
+    // the drum must not also turn on the same flick.
+    render(
+      <div className="cb-panel" data-testid="panel">
+        <Harness revealed />
+      </div>,
+    )
+    const field = screen.getByRole('textbox', { name: 'Phone number' }) as HTMLInputElement
+    screen.getByTestId('panel').addEventListener('wheel', e => e.preventDefault(), {
+      capture: true,
+    })
+
+    fireEvent.wheel(screen.getByTestId('host'), { deltaY: 60, cancelable: true })
+
+    expect(field.value).toBe(FIRST)
   })
 
   it('does not turn while the editor overlay owns the balloon', () => {
@@ -151,7 +200,7 @@ describe('BubbleDial as a filter', () => {
 
     fireEvent.change(field, { target: { value: '555' } })
 
-    expect(rows()).toEqual([OPTIONS[1], OPTIONS[2]])
+    expect(rows()).toEqual([SECOND, THIRD])
   })
 
   it('leaves nothing picked while the reader is typing: the field is the row', () => {
@@ -179,13 +228,13 @@ describe('BubbleDial as a filter', () => {
 
     fireEvent.change(field, { target: { value: '555' } })
     fireEvent.keyDown(field, { key: 'ArrowDown' })
-    expect(selected()).toBe(OPTIONS[1])
+    expect(selected()).toBe(SECOND)
 
     fireEvent.keyDown(field, { key: 'ArrowDown' })
-    expect(selected()).toBe(OPTIONS[2])
+    expect(selected()).toBe(THIRD)
 
     fireEvent.keyDown(field, { key: 'ArrowDown' })
-    expect(selected()).toBe(OPTIONS[2])
+    expect(selected()).toBe(THIRD)
   })
 
   it('gives the reader their own number back when the drum is turned up off the list', () => {
@@ -212,7 +261,7 @@ describe('BubbleDial as a filter', () => {
     fireEvent.change(field, { target: { value: '555' } })
     fireEvent.keyDown(field, { key: 'ArrowDown' })
 
-    expect(rows()).toEqual([OPTIONS[1], OPTIONS[2]])
+    expect(rows()).toEqual([SECOND, THIRD])
   })
 
   it('restores the whole shortlist when the number is cleared', () => {
@@ -221,7 +270,7 @@ describe('BubbleDial as a filter', () => {
     fireEvent.change(field, { target: { value: '555' } })
     fireEvent.change(field, { target: { value: '' } })
 
-    expect(rows()).toEqual(OPTIONS)
+    expect(rows()).toEqual([FIRST, SECOND, THIRD])
   })
 
   it('re-seats the drum when a dialled number joins the shortlist', () => {
@@ -232,7 +281,7 @@ describe('BubbleDial as a filter', () => {
     rerender(<Harness options={[...OPTIONS, dialled]} initial={dialled} />)
 
     const rows = Array.from(document.querySelectorAll('.cb-wheel-option')).map(r => r.textContent)
-    expect(rows).toEqual([...OPTIONS, dialled])
+    expect(rows).toEqual([FIRST, SECOND, THIRD, dialled])
     expect(document.querySelector('.cb-wheel-option.is-selected')?.textContent).toBe(dialled)
   })
 })
@@ -338,8 +387,8 @@ describe('BubbleDial as a phone field', () => {
     const { container, field, rerender } = draw({ revealed: true })
     const caret = container.querySelector('.cb-dial-caret') as HTMLElement
 
-    // The reveal selected the number whole, and a selection is a marker swipe
-    // (::selection), not a caret.
+    // The reveal selected the number whole, and a selection is not a caret — it is
+    // also deliberately unpainted (::selection), so the hover shows the number plain.
     expect(caret.style.visibility).toBe('hidden')
 
     // Typing collapses the selection to a caret.

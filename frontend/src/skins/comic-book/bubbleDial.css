@@ -41,10 +41,11 @@
 }
 
 /* A number the drum supplied arrives selected whole (typing over it starts a fresh
-   filter), so the selection is inked like a marker swipe rather than browser blue.
-   The tint is --cb-black at quarter strength. */
+   filter), but the selection itself is silent ink: the reveal makes one on every
+   panel hover, and a highlight there reads as the balloon shouting. Transparent, so
+   the selection changes what the next keystroke does and nothing about the drawing. */
 .cb-bubble-dial .cb-dial-field::selection {
-  background: rgb(17 17 17 / 25%);
+  background: transparent;
   color: inherit;
 }
 

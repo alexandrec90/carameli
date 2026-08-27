@@ -126,7 +126,17 @@ describe('a panel holding a dial balloon', () => {
     press('5')
     press('5')
 
-    expect(rows()).toEqual(['5550001111', '5550002222'])
+    expect(rows()).toEqual(['(555) 000-1111', '(555) 000-2222'])
+  })
+
+  it('turns the drum on a scroll anywhere over the panel, since its bubbles show', () => {
+    // isBubbleVisible is true here, so the balloon is revealed and the dial's wheel
+    // covers the whole panel element — the reach the keyboard already has.
+    const { field } = draw(dial('2345679999, 5550001111'))
+
+    fireEvent.wheel(document.querySelector('.cb-panel')!, { deltaY: 60 })
+
+    expect(field()!.value).toBe('(555) 000-1111')
   })
 
   it('saves a dialled number to the shortlist, so the drum becomes a redial list', () => {
@@ -135,7 +145,7 @@ describe('a panel holding a dial balloon', () => {
     fireEvent.change(field()!, { target: { value: '9998887777' } })
     fireEvent.keyDown(field()!, { key: 'Enter' })
 
-    expect(rows()).toEqual(['5550001111', '(999) 888-7777'])
+    expect(rows()).toEqual(['(555) 000-1111', '(999) 888-7777'])
     // And the drum lands on it with the filter cleared: the whole list is there again.
     expect(document.querySelector('.cb-wheel-option.is-selected')?.textContent)
       .toBe('(999) 888-7777')
@@ -148,7 +158,7 @@ describe('a panel holding a dial balloon', () => {
     fireEvent.change(field()!, { target: { value: '5550001111' } })
     fireEvent.keyDown(field()!, { key: 'Enter' })
 
-    expect(rows()).toEqual(['5550001111'])
+    expect(rows()).toEqual(['(555) 000-1111'])
   })
 
   it('still places the call, so saving the number is an addition and not a replacement', () => {
