@@ -8,6 +8,7 @@ import type { PanelPage } from '../panels'
 import { mergeVertices, snapTarget } from './panelGridMerge'
 import type { SeamGeometry } from './panelGridOps'
 import { insertBend, isRemovableBend, moveVertex, moveVertices, removeVertex, seamGeometry } from './panelGridOps'
+import { snapAligned, tearDrag } from './panelGridSplit'
 import type { EditorModeApi } from './useEditorMode'
 
 // The pointer and keyboard half of the shape editor. Every actual grid edit is a pure
@@ -28,6 +29,9 @@ const NUDGE_FAST = 10
 
 type DragState =
   | { kind: 'vertex'; index: number; offset: NormPt; snap: number | null }
+  // `source` is the grid as it was grabbed: a tear re-derives from it every move, so the
+  // drag direction can keep re-deciding which seams come along until the pointer lets go.
+  | { kind: 'tear'; index: number; source: PanelGrid; offset: NormPt; torn: number | null }
   | { kind: 'seam'; indices: number[]; last: NormPt }
 
 export interface SeamDragApi {
@@ -50,8 +54,8 @@ export interface SeamDragApi {
 
 /**
  * Shape-editing gestures over one grid: drag a corner, drag a whole line, double-click a
- * line to break it, drop a corner onto another to merge the two, arrow-nudge, Delete to
- * straighten.
+ * line to break it, drop a corner onto another to merge the two, Alt-drag a corner to
+ * tear its junction back apart, arrow-nudge, Delete to straighten.
  *
  * `frame` is the page frame in viewport px, which is what makes the pointer maths a
  * two-line affair: the overlay layer is `position: fixed; inset: 0`, so a pointer's
@@ -88,7 +92,10 @@ export function useSeamDrag(
       const p = norm(e)
       // Grab offset rather than a running delta: a pointer that leaves and re-enters the
       // window then still puts the corner where it was picked up, not where it drifted to.
-      drag.current = { kind: 'vertex', index, offset: [v[0] - p[0], v[1] - p[1]], snap: null }
+      const offset: NormPt = [v[0] - p[0], v[1] - p[1]]
+      drag.current = e.altKey
+        ? { kind: 'tear', index, source: grid, offset, torn: null }
+        : { kind: 'vertex', index, offset, snap: null }
       e.currentTarget.setPointerCapture(e.pointerId)
       api.select('vertex', index)
     },
@@ -120,8 +127,21 @@ export function useSeamDrag(
         const target = snapTarget(grid, state.index, desired, frame)
         state.snap = target
         setSnapVertex(target)
-        const at = target === null ? desired : grid.vertices[target] ?? desired
+        // A corner not merging may still align: off any merge target but near the
+        // continuation of a neighbouring seam, it sits exactly on that line.
+        const at =
+          target !== null
+            ? grid.vertices[target] ?? desired
+            : snapAligned(grid, state.index, desired, frame) ?? desired
         api.setGridFor(page, kind, moveVertex(grid, state.index, at))
+        return
+      }
+      if (state.kind === 'tear') {
+        // An invalid tear shows the un-torn grid rather than a broken one, so backing
+        // the pointer off — or dropping the corner where it started — simply cancels.
+        const torn = tearDrag(state.source, state.index, [p[0] + state.offset[0], p[1] + state.offset[1]], frame)
+        state.torn = torn?.index ?? null
+        api.setGridFor(page, kind, torn?.grid ?? state.source)
         return
       }
       api.setGridFor(page, kind, moveVertices(grid, state.indices, p[0] - state.last[0], p[1] - state.last[1]))
@@ -136,6 +156,10 @@ export function useSeamDrag(
       if (!state) return
       drag.current = null
       if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId)
+      if (state.kind === 'tear') {
+        api.select('vertex', state.torn ?? state.index)
+        return
+      }
       if (state.kind !== 'vertex' || state.snap === null) return
       setSnapVertex(null)
       const merged = mergeVertices(grid, state.index, state.snap)

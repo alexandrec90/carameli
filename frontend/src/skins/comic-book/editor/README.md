@@ -300,6 +300,17 @@ different images can only crossfade. A new bubble type belongs in `bubbleShape.t
      frame constraints. This is the only way two corners can occupy one point — released
      just short of each other they would be two coincident vertices joined by a
      zero-length seam, which the validator rejects, so the snap merges them instead.
+   - **Alt-drag a vertex** to tear a junction apart — the inverse of the merge. The
+     seams on the drag side of the corner follow the pointer, the rest stay put, and
+     the two corners are left joined by a new edge; which seams come along is re-read
+     from the live drag direction, so circling the pointer changes what tears off.
+     Near the continuation line of a neighbouring seam the torn corner snaps exactly
+     onto it, which is how a collapsed cross folds back into two junctions sitting on
+     one straight seam. While the torn grid would be invalid nothing tears — the grid
+     stays whole, so dropping the corner back where it started simply cancels.
+   - A plain-dragged vertex snaps onto those **continuation lines** too (only past a
+     seam's end — on its body the result would be a T-junction), so a corner can be
+     placed exactly in line with a seam it does not join.
    - **Arrow keys** nudge the selected vertex (hold **⇧** for x10); **Esc** deselects.
    - The gutter between panels stays the same width at every angle — it is measured
      perpendicular to each edge, not per axis — and every panel stays inside the outer
@@ -409,6 +420,7 @@ bubbleTypes.ts      BubbleType + BUBBLE_TYPES (lettering font per type) — ship
 ../polygonInset.ts  PURE polygon maths: the perpendicular gutter inset, bounding box
 panelGridOps.ts     PURE grid edits: move vertex, insert/remove bend, seam listing
 panelGridMerge.ts   PURE merge: collapse two vertices into one junction, and the snap target
+panelGridSplit.ts   PURE tear: pull one junction apart into two, and the seam-line snap
 panelGridValidate.ts PURE structural guard: rings, ranges, no T-junctions
 layoutConfig.ts     PANEL_IMG_TRANSFORMS, PANEL_BUBBLE_TRANSFORMS, PANEL_PATTERNS, PANEL_GRIDS — source of truth
 configOps.ts        PURE config edits: re-exports configSeed + configHydrate, patch/add/remove, links
