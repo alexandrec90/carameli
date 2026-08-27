@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState } from 'react'
 
 import { CONFIG_KEY, hydrateConfig, seedConfig } from './configOps'
 import { clearStoredConfig, detectActive, persistConfig } from './editorStorage'
-import { resetGridKeepingImages, setGridKeepingImages } from './gridImageRemap'
+import { resetGridKeepingContent, setGridKeepingContent } from './gridContentRemap'
 import type { EditMode, Selection, SelectionKind } from './selection'
 import { useContentEdits } from './useContentEdits'
 import type { ContentEdits } from './useContentEdits'
@@ -29,12 +29,12 @@ export interface EditorModeApi extends ContentEdits {
    * deliberately page-and-kind-addressed: every shape edit is a pure function in
    * ./panelGridOps.ts that takes a grid and returns one, and the caller — which is the
    * thing looking at a route and a window of a known shape — says which grid it just
-   * reshaped. Pictures hold their place on screen: their frames are re-expressed
-   * against the new panel boxes (./gridImageRemap.ts), so a seam drag moves the
-   * window a picture is seen through, never the picture.
+   * reshaped. Pictures and bubbles hold their place on screen: both are re-expressed
+   * against the new panel boxes (./gridContentRemap.ts), so a seam drag moves the
+   * window content is seen through, never the content.
    */
   setGridFor(page: PanelPage, kind: LayoutKind, grid: PanelGrid): void
-  /** Restore one page's grid for one breakpoint to the shipped default, pictures held still. */
+  /** Restore one page's grid for one breakpoint to the shipped default, content held still. */
   resetGridFor(page: PanelPage, kind: LayoutKind): void
 }
 
@@ -54,7 +54,7 @@ export function shouldRevealImg(
 
 /**
  * The viewport a grid edit is being looked at through. Layout.tsx computes panel boxes
- * from `window.innerWidth/innerHeight`, and the remap that holds pictures still while a
+ * from `window.innerWidth/innerHeight`, and the remap that holds content still while a
  * seam is dragged must measure with those same numbers — % of a panel box only names
  * pixels once the box does. Zero (no window) makes the remap a no-op.
  */
@@ -109,13 +109,13 @@ export function useEditorMode(): EditorModeApi {
 
   const setGridFor = useCallback(
     (page: PanelPage, kind: LayoutKind, grid: PanelGrid) =>
-      apply(prev => setGridKeepingImages(prev, page, kind, grid, viewportSize())),
+      apply(prev => setGridKeepingContent(prev, page, kind, grid, viewportSize())),
     [apply],
   )
 
   const resetGridFor = useCallback(
     (page: PanelPage, kind: LayoutKind) => {
-      apply(prev => resetGridKeepingImages(prev, page, kind, viewportSize()))
+      apply(prev => resetGridKeepingContent(prev, page, kind, viewportSize()))
       // The default grid has fewer vertices than a bent one, so a surviving vertex
       // selection would point past the end of the table or at somebody else's corner.
       setSelected(null)
