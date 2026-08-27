@@ -79,7 +79,7 @@ export const MAX_EAGER_BYTES = 300 * 1024
 export const MAX_LAZY_CHUNK_BYTES = 260 * 1024
 
 /**
- * Every `.js` file in `dist/assets/`, summed. Today 946 KB across 46 chunks; the
+ * Every `.js` file in `dist/assets/`, summed. Today 950.6 KB across 46 chunks; the
  * regional phone formatter lives in the lazy comic-book skin rather than the eager
  * entry graph, and so do the projected surfaces (table and number pad) and the bubble
  * chains — none of them is downloaded by a visitor who never opens that skin, which is
@@ -90,8 +90,13 @@ export const MAX_LAZY_CHUNK_BYTES = 260 * 1024
  * `useSmsConversations` is reachable from every skin, but the code that *subscribes* to
  * it is in the comic-book chunk, and a visitor who never opens that skin never pays for
  * a request either.
+ *
+ * This raise (950 → 955) is 2.7 KB, measured against the same build with the new files
+ * removed: the `dial` bubble kind — the picker component, its pure module, and the
+ * caret-preserving edit path lifted out of BubbleInput so both share one. No new
+ * dependency; the regional formatter it leans on was already in this chunk for `phone`.
  */
-export const MAX_TOTAL_JS_BYTES = 950 * 1024
+export const MAX_TOTAL_JS_BYTES = 955 * 1024
 
 /** Every `.css` file in `dist/assets/`, summed. Today 38 KB across 2 files. */
 export const MAX_TOTAL_CSS_BYTES = 44 * 1024
