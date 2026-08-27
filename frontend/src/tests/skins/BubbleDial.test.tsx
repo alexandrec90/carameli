@@ -19,6 +19,7 @@ interface HarnessProps {
   options?: string[]
   initial?: string
   enabled?: boolean
+  revealed?: boolean
   onSubmit?: (value: string) => void
   onChange?: (value: string) => void
 }
@@ -26,9 +27,12 @@ interface HarnessProps {
 /**
  * The panel's half of the arrangement: BubbleDial is fully controlled, and the wheel
  * listener goes on the balloon's root rather than on the picker's own box, so a test
- * has to supply both the value and the host element.
+ * has to supply both the value and the host element. `revealed` defaults off so the
+ * gesture tests exercise the drum, not the keyboard grab that reveal performs.
  */
-function Harness({ options = OPTIONS, initial = FIRST, enabled = true, onSubmit, onChange }: HarnessProps) {
+function Harness({
+  options = OPTIONS, initial = FIRST, enabled = true, revealed = false, onSubmit, onChange,
+}: HarnessProps) {
   const hostRef = useRef<HTMLDivElement>(null)
   const [value, setValue] = useState(initial)
   return (
@@ -42,6 +46,7 @@ function Harness({ options = OPTIONS, initial = FIRST, enabled = true, onSubmit,
         }}
         font="Comic Neue"
         open
+        revealed={revealed}
         enabled={enabled}
         hostRef={hostRef}
         onSubmit={onSubmit}
@@ -239,8 +244,12 @@ describe('BubbleDial as a phone field', () => {
     fireEvent.change(field, { target: { value: '12345679999' } })
 
     expect(field.value).toBe('1 (234) 567-9999')
-    expect(field.type).toBe('tel')
+    // text + inputMode rather than type="tel", and autocomplete off: `tel` invites
+    // Chrome to draw its own phone-number dropdown over the drum. The numeric keyboard
+    // on touch comes from inputMode alone.
+    expect(field.type).toBe('text')
     expect(field.inputMode).toBe('tel')
+    expect(field.autocomplete).toBe('off')
   })
 
   it('backspaces through formatting punctuation by removing the adjacent digit', () => {
@@ -273,6 +282,72 @@ describe('BubbleDial as a phone field', () => {
     fireEvent.keyDown(field, { key: 'Enter', ctrlKey: true })
 
     expect(onSubmit).not.toHaveBeenCalled()
+  })
+
+  it('takes the keyboard when its panel reveals it, with the number selected whole', () => {
+    // The dial is the panel's only input, so hovering the panel is reaching for it: no
+    // click needed. Selected whole because the seeded number is the drum's, not the
+    // reader's — the next keystroke replaces it and filters from scratch, where
+    // appending to a finished number empties the shortlist on the first key.
+    const { field } = draw({ revealed: true })
+
+    expect(document.activeElement).toBe(field)
+    expect(field.selectionStart).toBe(0)
+    expect(field.selectionEnd).toBe(field.value.length)
+  })
+
+  it('gives the keyboard back when the panel hides it', () => {
+    const { field, rerender } = draw({ revealed: true })
+    expect(document.activeElement).toBe(field)
+
+    rerender(<Harness revealed={false} />)
+
+    expect(document.activeElement).not.toBe(field)
+  })
+
+  it('does not grab the keyboard while the editor overlay owns the balloon', () => {
+    const { field } = draw({ revealed: true, enabled: false })
+
+    expect(document.activeElement).not.toBe(field)
+  })
+
+  it('selects a number the drum turns to, so the next keystroke replaces it', () => {
+    const { host, field } = draw({ revealed: true })
+
+    fireEvent.wheel(host, { deltaY: 60 })
+
+    expect(field.value).toBe(SECOND)
+    expect(field.selectionStart).toBe(0)
+    expect(field.selectionEnd).toBe(SECOND.length)
+  })
+
+  it('leaves the caret alone when the drum returns to the reader’s own number', () => {
+    // Row 0 is the reader's half-typed number, not one the drum supplied: selecting it
+    // whole would make the next digit erase what they were in the middle of typing.
+    const { field } = draw({ initial: '', revealed: true })
+
+    fireEvent.change(field, { target: { value: '555' } })
+    fireEvent.keyDown(field, { key: 'ArrowDown' })
+    fireEvent.keyDown(field, { key: 'ArrowUp' })
+
+    expect(field.value).toBe('(555)')
+    expect(field.selectionStart).toBe(field.selectionEnd)
+  })
+
+  it('inks its comic caret for a caret, never for a selection or an idle field', () => {
+    const { container, field, rerender } = draw({ revealed: true })
+    const caret = container.querySelector('.cb-dial-caret') as HTMLElement
+
+    // The reveal selected the number whole, and a selection is a marker swipe
+    // (::selection), not a caret.
+    expect(caret.style.visibility).toBe('hidden')
+
+    // Typing collapses the selection to a caret.
+    fireEvent.change(field, { target: { value: '555' } })
+    expect(caret.style.visibility).toBe('visible')
+
+    rerender(<Harness revealed={false} />)
+    expect(caret.style.visibility).toBe('hidden')
   })
 
   it('does not send its clicks or keys to the navigable panel beneath it', () => {

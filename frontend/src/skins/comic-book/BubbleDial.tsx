@@ -11,6 +11,7 @@ import {
 } from './dialPicker'
 import type { DialState } from './dialPicker'
 import { browserCountry, formatPhoneInput } from './phoneInput'
+import { useDialCaret } from './useDialCaret'
 import { usePhoneField } from './usePhoneField'
 import { wheelOffsetEm, wheelSteps } from './wheelPicker'
 import './bubbleDial.css'
@@ -29,6 +30,13 @@ interface BubbleDialProps {
   font: string
   /** True while the balloon is hovered or its field has focus: the shortlist fades in. */
   open: boolean
+  /**
+   * True while the balloon is revealed by its panel being hovered. The dial is the
+   * panel's only input, so revealing it hands it the keyboard without a click, and
+   * hiding it gives the keyboard back. A separate prop from `open`, which includes the
+   * field's own focus and so could never let go of it.
+   */
+  revealed: boolean
   /** False in edit mode: the editor overlay owns the pointer and the keyboard there. */
   enabled: boolean
   /**
@@ -73,11 +81,29 @@ interface BubbleDialProps {
  * `usePhoneField` exactly as BubbleInput uses it. Neither is re-implemented here.
  */
 export default function BubbleDial({
-  options, value, onChange, font, open, enabled, hostRef, onSubmit,
+  options, value, onChange, font, open, revealed, enabled, hostRef, onSubmit,
 }: BubbleDialProps) {
   const inputRef = useRef<HTMLInputElement>(null)
+  const caretRef = useDialCaret(inputRef)
   const country = useMemo(() => browserCountry(), [])
   const field = usePhoneField(inputRef, country, onChange)
+
+  // Revealing the balloon focuses the field, selected whole so the next keystroke
+  // replaces the finished number the drum put there and filters from scratch —
+  // appending to it instead can only produce a number no option contains, which
+  // empties the shortlist on the first key. Hiding the balloon blurs it.
+  useEffect(() => {
+    const input = inputRef.current
+    if (!input || !enabled) return
+    if (revealed) {
+      if (document.activeElement !== input) {
+        input.focus({ preventScroll: true })
+        input.select()
+      }
+    } else if (document.activeElement === input) {
+      input.blur()
+    }
+  }, [revealed, enabled])
 
   const [state, setState] = useState<DialState>(() => dialSeat(options, value))
   const matches = useMemo(() => dialMatches(options, state.query), [options, state.query])
@@ -112,13 +138,25 @@ export default function BubbleDial({
   // ref and refreshed after every commit so the listener below can be registered per
   // host rather than per render, without ever calling a stale `onChange`.
   const turnRef = useRef<(steps: number) => void>(() => undefined)
+  // Set by a turn that landed on a match, read by the effect below after the commit:
+  // a number the drum supplied is selected whole, for the same reason the reveal
+  // selects — typing over it starts a fresh filter. Landing back on the typed row
+  // (index 0) selects nothing: that is the reader's own half-typed number.
+  const selectPendingRef = useRef(false)
   useEffect(() => {
     turnRef.current = (steps: number) => {
       const next = dialTurn(state, matches.length, steps)
       if (next === state) return
       setState(next)
+      selectPendingRef.current = next.index > 0
       onChange(formatPhoneInput(dialRowValue(next, matches), country))
     }
+  })
+  useEffect(() => {
+    if (!selectPendingRef.current) return
+    selectPendingRef.current = false
+    const input = inputRef.current
+    if (input && document.activeElement === input) input.select()
   })
 
   // Sub-step wheel travel carried between events (see wheelSteps).
@@ -190,9 +228,12 @@ export default function BubbleDial({
         ref={inputRef}
         className="cb-bubble-input cb-dial-field"
         style={{ fontFamily: `'${font}', cursive` }}
-        type="tel"
+        // text, not tel, and autocomplete off: Chrome reads `tel` + `autocomplete="tel"`
+        // as an invitation to draw its own phone-number dropdown over the drum. The
+        // inputMode keeps the numeric keyboard on touch.
+        type="text"
         inputMode="tel"
-        autoComplete="tel"
+        autoComplete="off"
         aria-label="Phone number"
         disabled={!enabled}
         tabIndex={enabled ? 0 : -1}
@@ -201,6 +242,13 @@ export default function BubbleDial({
         onKeyDown={onKeyDown}
         onPointerDown={stopPointer}
         onClick={event => event.stopPropagation()}
+      />
+      {/* The comic caret (useDialCaret): ink, not a control, so it takes no pointer. */}
+      <span
+        ref={caretRef}
+        className="cb-dial-caret"
+        style={{ visibility: 'hidden' }}
+        aria-hidden="true"
       />
     </div>
   )

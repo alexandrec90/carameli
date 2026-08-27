@@ -223,6 +223,10 @@ export default function PanelBubble({
           // filters its drum, and a filter whose result only appears when the pointer
           // happens to be over the balloon is a filter nobody can see working.
           open={hover || focused}
+          // The panel-hover reveal alone: the dial grabs the keyboard while its balloon
+          // shows and lets go when the pointer leaves the panel, so it must not be told
+          // its own focus is a reason to keep it.
+          revealed={visible}
           enabled={interactive}
           hostRef={rootRef}
           onSubmit={onSubmit}
