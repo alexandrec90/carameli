@@ -22,8 +22,29 @@
  * | {@link MAX_CONTENT_IMAGE_BYTES} | one oversized re-export quietly tripling a panel |
  * | {@link MAX_CONTENT_IMAGE_EDGE} | a re-export at source resolution instead of display |
  * | {@link MAX_PRELOAD_BYTES} | growth on the critical path specifically |
- * | {@link MAX_PUBLIC_BYTES} | growth anywhere else in the served tree |
+ * | {@link MAX_PAGE_BYTES} | growth in what one visit downloads |
  * | reference check, both directions | dead weight, and paths left stale by a move |
+ *
+ * ## The budgets are per page, because a download is
+ *
+ * There used to be a `MAX_PUBLIC_BYTES` here capping the whole served tree, and it was
+ * measuring the wrong thing. No visitor ever downloads `public/`: they download one
+ * page's art, the site chrome, and nothing else. A picture the editor offers but no
+ * layout has placed costs a build some disk and costs a visitor nothing at all, so
+ * charging it against the same number as the panels on the home page made adding
+ * artwork read as a payload regression — and the only ways to pass were to shrink art
+ * that was already right, or to raise a cap that then meant even less than before.
+ *
+ * So the caps below are both per page. {@link measurePageLoads} decides what a page
+ * loads, and the rule it applies is that **anything with no stated reason counts**: an
+ * asset is excused only when every source naming it is listed in
+ * {@link NON_LOADING_SOURCES}, is prose, or is a test. A new picture wired up in a way
+ * this file has never seen is charged to every page rather than quietly exempted, which
+ * is the direction an unmaintained check should fail in.
+ *
+ * Aggregate weight is still bounded, just not by one number: {@link MAX_CONTENT_IMAGE_BYTES}
+ * and {@link MAX_CONTENT_IMAGE_EDGE} bound each file, and the reference check deletes
+ * whatever nothing names.
  *
  * ## The numbers are ratchets
  *
@@ -124,14 +145,101 @@ export const MAX_CONTENT_IMAGE_EDGE = 2816
 export const MAX_PRELOAD_BYTES = 2_100 * 1024
 
 /**
- * The whole served tree, images and all. Raised from 2 850 KB when the home page
- * brought four panels of its own art, and from 3 500 KB when `conversation.webp` and
- * `hand-notepad.webp` were encoded for the editor's picture dropdown; only one page's
- * set is ever on the critical path ({@link MAX_PRELOAD_BYTES} guards that), so the
- * other page's panels — and any picture no layout has placed yet — sit here as cold
- * weight.
+ * Every image one page load fetches: that page's panel art plus the chrome each visit
+ * asks for whatever the route. A superset of {@link MAX_PRELOAD_BYTES}, which bounds
+ * only the part that blocks first paint — this one bounds the whole visit, so an image
+ * that renders late without being preloaded still lands on a budget.
+ *
+ * Today's largest is the classic page at roughly 2 213 KB, nearly all of it panel art.
  */
-export const MAX_PUBLIC_BYTES = 3_850 * 1024
+export const MAX_PAGE_BYTES = 2_250 * 1024
+
+/**
+ * Files that name a served asset without any page loading it, each with the reason.
+ * Keyed by path relative to the frontend, forward-slashed.
+ *
+ * This is the whole exemption surface, and it is deliberately a list of two rather than
+ * a rule: "referenced but not loaded" is a claim about runtime that a regex cannot
+ * check, so each one is written down and argued for. Anything not named here counts
+ * against every page — see {@link measurePageLoads}.
+ */
+export const NON_LOADING_SOURCES: Readonly<Record<string, string>> = {
+  'src/skins/comic-book/editor/assets.ts':
+    "the editor's picture dropdown, reachable only under ?edit=1 on a dev server",
+  'public/manifest.json':
+    'PWA icons, fetched when a visitor installs the app rather than when one visits',
+}
+
+/**
+ * True when references found in `relPath` mean a browser fetches the asset on a visit.
+ *
+ * Three kinds of file name an asset without loading it: the two in
+ * {@link NON_LOADING_SOURCES}, prose (a rule file or a README citing artwork), and a
+ * test (which names a URL to assert about it, never to render it).
+ */
+export function isLoadingSource(relPath: string): boolean {
+  if (relPath in NON_LOADING_SOURCES) return false
+  if (relPath.toLowerCase().endsWith('.md')) return false
+  return !/(^|\/)[^/]+\.(?:test|spec)\.[jt]sx?$/i.test(relPath)
+}
+
+/** `absPath` as this file's other paths spell it: relative to the frontend, `/`-joined. */
+export function frontendRelPath(absPath: string, root: string = FRONTEND_ROOT): string {
+  return path.relative(root, absPath).replace(/\\/g, '/')
+}
+
+/** What {@link measurePageLoads} is given: the tree, the layout, and the references. */
+export interface PageLoadInput {
+  /** Every image served from `public/`. */
+  readonly served: readonly ServedAsset[]
+  /** Panel-art URLs the layout draws, keyed by the page that draws them. */
+  readonly art: Readonly<Record<string, readonly string[]>>
+  /** Served URLs named by each reference source, keyed by {@link frontendRelPath}. */
+  readonly references: Readonly<Record<string, readonly string[]>>
+}
+
+/** What each page costs, and what is charged to none of them. */
+export interface PageLoads {
+  /** Bytes fetched by a visit to each page: its own art plus {@link PageLoads.shared}. */
+  readonly bytes: Readonly<Record<string, number>>
+  /** URLs every page fetches — icons and artwork no single layout owns. */
+  readonly shared: readonly string[]
+  /** Served URLs no page fetches, excused by {@link NON_LOADING_SOURCES}. */
+  readonly cold: readonly string[]
+}
+
+/**
+ * Split the served tree into what each page downloads and what none of them do.
+ *
+ * An asset the layout draws is charged to the page that draws it. Anything else a
+ * loading source names is charged to *every* page: `favicon.ico` and the balloon's call
+ * keys are fetched on any route, and a picture referenced from somewhere this file has
+ * not thought about is more likely to be one of those than an exemption nobody wrote
+ * down. Only an asset whose every mention is a non-loading source comes back cold.
+ */
+export function measurePageLoads({ served, art, references }: PageLoadInput): PageLoads {
+  const bytesOf = new Map(served.map(asset => [asset.url, asset.bytes]))
+  const drawn = new Set(Object.values(art).flat())
+
+  const loaded = new Set<string>()
+  for (const [source, urls] of Object.entries(references)) {
+    if (!isLoadingSource(source)) continue
+    for (const url of urls) loaded.add(url)
+  }
+
+  const shared = [...bytesOf.keys()].filter(url => !drawn.has(url) && loaded.has(url)).sort()
+  const sum = (urls: readonly string[]): number =>
+    urls.reduce((total, url) => total + (bytesOf.get(url) ?? 0), 0)
+  const sharedBytes = sum(shared)
+
+  const bytes: Record<string, number> = {}
+  for (const [page, urls] of Object.entries(art)) {
+    bytes[page] = sharedBytes + sum([...new Set(urls)])
+  }
+
+  const charged = new Set([...shared, ...drawn])
+  return { bytes, shared, cold: [...bytesOf.keys()].filter(url => !charged.has(url)).sort() }
+}
 
 /**
  * Source trees scanned for references to served assets, relative to the frontend.

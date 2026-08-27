@@ -30,8 +30,9 @@ import {
   FRONTEND_ROOT,
   MAX_CONTENT_IMAGE_BYTES,
   MAX_CONTENT_IMAGE_EDGE,
+  MAX_PAGE_BYTES,
   MAX_PRELOAD_BYTES,
-  MAX_PUBLIC_BYTES,
+  NON_LOADING_SOURCES,
   PUBLIC_DIR,
   findGuardedPanelPages,
   findGuardedPanels,
@@ -39,9 +40,12 @@ import {
   findPreloadedImages,
   findRepoPathReferences,
   findServedReferences,
+  frontendRelPath,
   isContentImage,
+  isLoadingSource,
   listReferenceSources,
   listServedImages,
+  measurePageLoads,
   rasterExemptionFor,
   safeDecode,
   readImageSize,
@@ -52,6 +56,22 @@ import {
 const KB = 1024
 
 const kb = (bytes: number): string => `${(bytes / KB).toFixed(1)} KB`
+
+/**
+ * The panel art each page draws, from the layout that is its source of truth. Both the
+ * guard check and the page budget need it, and they need the same answer: one measures
+ * `index.html`'s copy against it, the other prices it.
+ */
+function drawnByPage(): Record<string, string[]> {
+  const drawn: Record<string, string[]> = {}
+  for (const transform of PANEL_IMG_TRANSFORMS) {
+    const page = PANELS[transform.panel].page
+    const url = safeDecode(transform.src)
+    const urls = (drawn[page] ??= [])
+    if (!urls.includes(url)) urls.push(url)
+  }
+  return drawn
+}
 
 /** Synthetic headers, so the parser is tested against known dimensions. */
 function pngHeader(width: number, height: number): Buffer {
@@ -201,6 +221,94 @@ describe('findPreloadedImages', () => {
   })
 })
 
+describe('isLoadingSource', () => {
+  it.each(Object.keys(NON_LOADING_SOURCES))('excuses %s, which names without loading', file => {
+    expect(isLoadingSource(file)).toBe(false)
+  })
+
+  it.each([
+    'CLAUDE.md',
+    '../.claude/rules/skin-comic-book.md',
+    'src/tests/skins/assetUsage.test.ts',
+    'src/skins/comic-book/PanelBubble.test.tsx',
+    'src/skins/comic-book/phoneActions.spec.ts',
+  ])('excuses %s, where a URL is asserted about rather than rendered', file => {
+    expect(isLoadingSource(file)).toBe(false)
+  })
+
+  it.each([
+    'index.html',
+    'src/skins/comic-book/phoneActions.ts',
+    'src/skins/comic-book/comic-book.css',
+    'src/skins/comic-book/editor/layoutConfig.ts',
+  ])('counts %s, which a browser acts on', file => {
+    expect(isLoadingSource(file)).toBe(true)
+  })
+
+  it('does not mistake a directory named like a test for a test file', () => {
+    // `src/tests/` holds the suite, but the check is on the file: a source that happens
+    // to live under a directory with `test` in the name still loads what it names.
+    expect(isLoadingSource('src/tests/fixtures/artwork.ts')).toBe(true)
+  })
+})
+
+describe('measurePageLoads', () => {
+  const served = [
+    { relPath: 'a.webp', url: '/a.webp', absPath: '/a.webp', bytes: 100 },
+    { relPath: 'b.webp', url: '/b.webp', absPath: '/b.webp', bytes: 200 },
+    { relPath: 'chrome.webp', url: '/chrome.webp', absPath: '/chrome.webp', bytes: 10 },
+    { relPath: 'cold.webp', url: '/cold.webp', absPath: '/cold.webp', bytes: 999 },
+  ]
+  const references = {
+    'index.html': ['/chrome.webp', '/a.webp'],
+    'src/skins/comic-book/editor/assets.ts': ['/cold.webp'],
+  }
+
+  it('charges a page its own art plus the chrome every page fetches', () => {
+    const loads = measurePageLoads({
+      served,
+      art: { home: ['/a.webp'], classic: ['/b.webp'] },
+      references,
+    })
+    expect(loads.bytes).toEqual({ home: 110, classic: 210 })
+    expect(loads.shared).toEqual(['/chrome.webp'])
+  })
+
+  it("leaves a picture no page draws out of every page's total", () => {
+    // The whole point of the split. `cold.webp` is the editor's dropdown offering a
+    // picture no layout has placed: real bytes in `dist/`, and nobody's download.
+    const loads = measurePageLoads({
+      served,
+      art: { home: ['/a.webp'], classic: ['/b.webp'] },
+      references,
+    })
+    expect(loads.cold).toEqual(['/cold.webp'])
+    expect(loads.bytes.home).toBe(110)
+  })
+
+  it('charges an asset with no stated reason rather than excusing it', () => {
+    // A picture wired up somewhere this policy has never seen counts against every
+    // page. Failing the other way would let a new loader ship unmeasured art.
+    const loads = measurePageLoads({
+      served,
+      art: { home: ['/a.webp'], classic: ['/b.webp'] },
+      references: { ...references, 'src/skins/comic-book/Hero.tsx': ['/cold.webp'] },
+    })
+    expect(loads.shared).toEqual(['/chrome.webp', '/cold.webp'])
+    expect(loads.cold).toEqual([])
+    expect(loads.bytes.home).toBe(1109)
+  })
+
+  it('counts a picture once when a page draws it twice', () => {
+    const loads = measurePageLoads({
+      served,
+      art: { home: ['/a.webp', '/a.webp'] },
+      references,
+    })
+    expect(loads.bytes.home).toBe(110)
+  })
+})
+
 describe('the skin guard in index.html', () => {
   // Three constants are duplicated into an inline script in `index.html`: the skin list,
   // the default, and the panel URLs. The duplication is deliberate — the guard has to run
@@ -229,14 +337,6 @@ describe('the skin guard in index.html', () => {
   })
 
   it('preloads, per page, exactly the panels that page draws, in the order it draws them', () => {
-    const drawn: Record<string, string[]> = {}
-    for (const transform of PANEL_IMG_TRANSFORMS) {
-      const page = PANELS[transform.panel].page
-      const url = safeDecode(transform.src)
-      const urls = (drawn[page] ??= [])
-      if (!urls.includes(url)) urls.push(url)
-    }
-
     expect(
       findGuardedPanelPages(html),
       'The guard PANELS record has drifted from PANEL_IMG_TRANSFORMS in ' +
@@ -245,7 +345,7 @@ describe('the skin guard in index.html', () => {
         'exists to avoid; a panel left in it after the layout stopped drawing it is bytes ' +
         "nobody sees; one on the wrong page's list loads for a page that never draws it. " +
         'Order is the preload priority, so it has to match too.',
-    ).toEqual(drawn)
+    ).toEqual(drawnByPage())
   })
 })
 
@@ -396,16 +496,67 @@ describe('the served tree', () => {
     }
   })
 
-  it('keeps the whole served tree within budget', () => {
-    const total = walkFiles(PUBLIC_DIR).reduce(
-      (sum, rel) => sum + readFileSync(path.join(PUBLIC_DIR, rel)).byteLength,
-      0,
+  describe('what one visit downloads', () => {
+    const references = Object.fromEntries(
+      listReferenceSources().map(file => [
+        frontendRelPath(file),
+        findServedReferences(readFileSync(file, 'utf-8')),
+      ]),
     )
-    expect(
-      total,
-      `public/ is ${kb(total)}, over the ${kb(MAX_PUBLIC_BYTES)} budget. Everything ` +
-        'here is copied into dist/ unexamined, so this is a floor on build size.',
-    ).toBeLessThanOrEqual(MAX_PUBLIC_BYTES)
+    const art = drawnByPage()
+    const loads = measurePageLoads({ served, art, references })
+
+    it('measures every page the layout has, so a page cannot go unbudgeted', () => {
+      expect(Object.keys(loads.bytes).sort()).toEqual(Object.keys(art).sort())
+    })
+
+    it('keeps each page within budget', () => {
+      for (const [page, total] of Object.entries(loads.bytes)) {
+        expect(
+          total,
+          `A visit to the ${page} page fetches ${kb(total)}, over the ` +
+            `${kb(MAX_PAGE_BYTES)} budget: that page's panel art plus the ` +
+            `${loads.shared.length} assets every route asks for. This is the number a ` +
+            'visitor pays, so raising it is a decision about their connection rather ' +
+            'than about this repository. Re-encoding an oversized panel is the usual fix.',
+        ).toBeLessThanOrEqual(MAX_PAGE_BYTES)
+      }
+    })
+
+    it('excuses a cold picture only where a source says why it is cold', () => {
+      // The half of the old whole-tree cap worth keeping. Bytes no page loads are not
+      // free — they sit in `dist/` — but they are not a download either, so what they
+      // need is a stated reason rather than a budget line.
+      const unexplained = loads.cold.filter(url => {
+        const naming = Object.entries(references).filter(([, urls]) => urls.includes(url))
+        return !naming.some(([source]) => source in NON_LOADING_SOURCES)
+      })
+
+      expect(
+        unexplained,
+        'Served, referenced, and reachable from no page — so the only reference to each ' +
+          'is prose or a test. Either wire the asset up, delete it, or list the source ' +
+          'that names it in NON_LOADING_SOURCES with the reason no visit fetches it.',
+      ).toEqual([])
+    })
+
+    it('prices less than the whole tree, which is what this budget changed', () => {
+      // Asserted rather than assumed. If the classification ever charged everything to
+      // every page, each budget above would be the old whole-tree cap under a new name,
+      // and would say so only by failing on the next picture somebody encoded.
+      const tree = walkFiles(PUBLIC_DIR).reduce(
+        (sum, rel) => sum + readFileSync(path.join(PUBLIC_DIR, rel)).byteLength,
+        0,
+      )
+
+      expect(
+        loads.cold.length,
+        'Every served asset is charged to a page, so this budget is the whole tree ' +
+          'again. Either the layout really does draw all of it, or a non-loading source ' +
+          'has been dropped from NON_LOADING_SOURCES.',
+      ).toBeGreaterThan(0)
+      expect(Math.max(...Object.values(loads.bytes))).toBeLessThan(tree)
+    })
   })
 })
 

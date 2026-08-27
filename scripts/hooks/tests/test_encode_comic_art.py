@@ -175,39 +175,47 @@ class TestRegisterInManifest:
             eca.register_in_manifest("export const OTHER = []", "/a.webp", "A")
 
 
-class TestReadMaxPublicBytes:
+class TestReadMaxPageBytes:
     def test_parses_the_underscored_literal(self):
-        source = "export const MAX_PUBLIC_BYTES = 3_850 * 1024\n"
-        assert eca.read_max_public_bytes(source) == 3850 * 1024
+        source = "export const MAX_PAGE_BYTES = 2_250 * 1024\n"
+        assert eca.read_max_page_bytes(source) == 2250 * 1024
 
     def test_reports_a_renamed_constant(self):
-        with pytest.raises(eca.EncodeError, match="MAX_PUBLIC_BYTES"):
-            eca.read_max_public_bytes("export const SOMETHING_ELSE = 1 * 1024")
+        with pytest.raises(eca.EncodeError, match="MAX_PAGE_BYTES"):
+            eca.read_max_page_bytes("export const SOMETHING_ELSE = 1 * 1024")
+
+    def test_does_not_answer_with_the_budget_that_was_replaced(self):
+        # `MAX_PUBLIC_BYTES` capped the whole served tree and was deleted for measuring
+        # something no visitor downloads. A prefix-happy pattern would still match it and
+        # the script would report a per-page budget that is really a tree cap.
+        with pytest.raises(eca.EncodeError, match="MAX_PAGE_BYTES"):
+            eca.read_max_page_bytes("export const MAX_PUBLIC_BYTES = 3_850 * 1024")
 
     def test_tracks_the_real_constant(self):
         # The point of parsing rather than duplicating: this fails if assetPolicy.ts
         # drops or renames the constant, instead of the script reporting a stale cap.
         source = eca.ASSET_POLICY.read_text(encoding="utf-8")
-        assert eca.read_max_public_bytes(source) > 0
+        assert eca.read_max_page_bytes(source) > 0
 
 
 class TestBudgetReport:
-    def test_under_budget_reports_the_headroom(self):
-        text, over = eca.budget_report(3_000 * 1024, 3_850 * 1024)
-        assert not over
-        assert "spare" in text
+    def test_reports_the_tree_without_calling_it_a_download(self):
+        text = eca.budget_report(3_000 * 1024, 2_250 * 1024)
+        assert "3,000.0 KB" in text
+        assert "2,250 KB" in text
 
-    def test_over_budget_names_the_test_that_will_fail(self):
-        text, over = eca.budget_report(4_000 * 1024, 3_850 * 1024)
-        assert over
+    def test_names_where_the_budget_is_enforced(self):
+        text = eca.budget_report(3_000 * 1024, 2_250 * 1024)
+        assert "MAX_PAGE_BYTES" in text
         assert "assetPolicy.test.ts" in text
-        assert "OVER" in text
 
-    def test_over_budget_suggests_a_cap_above_the_current_total(self):
-        total = 4_000 * 1024 + 1
-        text, _ = eca.budget_report(total, 3_850 * 1024)
-        suggested = int(text.split("MAX_PUBLIC_BYTES = ")[1].split(" *")[0].replace("_", ""))
-        assert suggested * 1024 > total
+    def test_a_tree_larger_than_a_page_budget_is_not_an_error(self):
+        # The regression this replaces. The tree exceeding a page's budget is the normal
+        # state -- two pages' art plus a dropdown of unplaced pictures -- and reporting it
+        # as over-budget is what made encoding artwork look like a payload regression.
+        text = eca.budget_report(9_000 * 1024, 2_250 * 1024)
+        assert "OVER" not in text
+        assert isinstance(text, str)
 
 
 class TestPublicTreeBytes:

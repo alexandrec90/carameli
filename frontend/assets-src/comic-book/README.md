@@ -46,10 +46,15 @@ That does two of the three steps, and the second is what makes the first legal:
 Placing it in a panel is a third, separate step, done in the editor (`?edit=1`, select
 a panel, **+ Image**) and saved into `editor/layoutConfig.ts`. Between step 2 and that,
 the file is selectable art costing its own bytes in every build: real, but cold.
-`MAX_PUBLIC_BYTES` in `frontend/assetPolicy.ts` is what keeps that from being free —
-encoding ahead of a layout is a decision about what visitors download, and raising the
-cap is where it reads as one. The script reports the served tree against that budget
-and refuses to raise it for you.
+
+Cold is the operative word, and until 2026-08-27 `frontend/assetPolicy.ts` priced it as
+though it were not. A `MAX_PUBLIC_BYTES` cap weighed the whole of `public/`, so a
+picture in the dropdown that no layout draws counted against the same number as the
+panels on the home page — and adding artwork failed the suite as a payload regression
+against a download nobody makes. The budget is per page now (`MAX_PAGE_BYTES`), so an
+unplaced picture costs nothing until a layout draws it, and then costs exactly the page
+that draws it. What still bounds a cold export is `MAX_CONTENT_IMAGE_BYTES` on the file
+itself and the reference check, which deletes whatever nothing names.
 
 **The encoder call is in the script, not in this file, and that is deliberate.** What
 stood here was a `sharp-cli` invocation in that tool's pre-6 spelling: it passed the
@@ -90,8 +95,9 @@ Two things follow from that, and both are the reason the flag exists rather than
 oversight to tidy up later. A line in `PANEL_ASSETS` would put them in the editor's
 **picture** dropdown, where an author could place a button in a panel as though it were
 a photograph. And 256px is a button, not a panel: the shipped pair is ~29 KB against the
-~1408px default's several hundred, which matters because `MAX_PUBLIC_BYTES` in
-`frontend/assetPolicy.ts` has little room left.
+~1408px default's several hundred, which matters more here than for any other export —
+a balloon draws these on whatever page it sits on, so unlike a panel picture they are
+charged to **every** page's `MAX_PAGE_BYTES` in `frontend/assetPolicy.ts`.
 
 `assetPolicy.test.ts` is satisfied either way — the paths are named in
 `frontend/src/skins/comic-book/phoneActions.ts`, which is where the label an author

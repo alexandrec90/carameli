@@ -246,17 +246,17 @@ def register_in_manifest(source: str, url: str, label: str) -> tuple[str, bool]:
     return source[:end] + "\n" + manifest_line(url, label) + source[end:], True
 
 
-def read_max_public_bytes(source: str) -> int:
-    """`MAX_PUBLIC_BYTES` from `assetPolicy.ts`, in bytes.
+def read_max_page_bytes(source: str) -> int:
+    """`MAX_PAGE_BYTES` from `assetPolicy.ts`, in bytes.
 
     Parsed rather than duplicated. A second copy of a budget is a budget that
     disagrees with itself the first time either is edited, and reporting against the
     real one is this script's last act.
     """
-    match = re.search(r"export const MAX_PUBLIC_BYTES\s*=\s*([\d_]+)\s*\*\s*1024", source)
+    match = re.search(r"export const MAX_PAGE_BYTES\s*=\s*([\d_]+)\s*\*\s*1024", source)
     if not match:
         raise EncodeError(
-            f"no MAX_PUBLIC_BYTES in {ASSET_POLICY.name}; cannot report the served-tree "
+            f"no MAX_PAGE_BYTES in {ASSET_POLICY.name}; cannot report the page-load "
             "budget. Check whether the constant was renamed."
         )
     return int(match.group(1).replace("_", "")) * 1024
@@ -267,25 +267,23 @@ def public_tree_bytes(public_dir: Path) -> int:
     return sum(p.stat().st_size for p in public_dir.rglob("*") if p.is_file())
 
 
-def budget_report(total: int, cap: int) -> tuple[str, bool]:
-    """A line about the served tree against its cap, and whether it is over.
+def budget_report(total: int, cap: int) -> str:
+    """What the export costs today, and what it will cost once it is placed.
 
-    Over-budget is reported, never fixed. Raising `MAX_PUBLIC_BYTES` is a decision
-    about what every visitor downloads, and the reason that constant is a one-line
-    diff in a file full of prose is so the decision reads as one in review. A script
-    that quietly bumped it would delete exactly the signal it exists for.
+    Reported, never enforced. This used to weigh `public/` against a whole-tree cap
+    and refuse to finish when it was over, which made encoding artwork read as a
+    payload regression -- the tree is not a download, and no visitor ever fetches it.
+    The budget that does bind is per page, and this script cannot compute it: which
+    page pays for a picture is decided in the editor, in step 3, by placing it. So the
+    honest report is the size of the tree, the cap the picture will meet when it is
+    drawn, and where that is checked.
     """
-    kb = f"{total / 1024:,.1f} KB against a {cap / 1024:,.0f} KB budget"
-    if total <= cap:
-        return f"public/ is {kb} ({(cap - total) / 1024:,.1f} KB spare).", False
-    need = -(-total // 1024)  # ceil to the next whole KB
     return (
-        f"public/ is {kb} -- OVER.\n"
-        "  frontend/assetPolicy.test.ts will fail. Either re-encode smaller (a lower\n"
-        "  --max-edge or --quality is the cheap fix), or raise the cap deliberately:\n"
-        f"    export const MAX_PUBLIC_BYTES = {need + 50:_} * 1024\n"
-        "  and say in the commit message what the extra bytes buy.",
-        True,
+        f"public/ is {total / 1024:,.1f} KB. None of that is one visitor's download:\n"
+        f"  a picture costs nothing until a layout draws it, and then it counts toward\n"
+        f"  that page's {cap / 1024:,.0f} KB budget (MAX_PAGE_BYTES in "
+        f"frontend/{ASSET_POLICY.name}),\n"
+        "  which frontend/assetPolicy.test.ts enforces one page at a time."
     )
 
 
@@ -414,11 +412,8 @@ def run(args: argparse.Namespace) -> str:
         else:
             lines.append(f"      already in {MANIFEST.name}")
 
-    cap = read_max_public_bytes(ASSET_POLICY.read_text(encoding="utf-8"))
-    report, over = budget_report(public_tree_bytes(PUBLIC_DIR), cap)
-    lines.extend(["", report])
-    if over:
-        raise EncodeError("\n".join(lines))
+    cap = read_max_page_bytes(ASSET_POLICY.read_text(encoding="utf-8"))
+    lines.extend(["", budget_report(public_tree_bytes(PUBLIC_DIR), cap)])
     lines.append("Place it in a panel from the editor: ?edit=1 -> select a panel -> + Image.")
     return "\n".join(lines)
 
