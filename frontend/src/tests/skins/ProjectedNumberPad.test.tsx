@@ -60,6 +60,21 @@ describe('ProjectedNumberPad', () => {
     expect((editorKeys[9] as HTMLElement).style.borderBottom).toBe('')
   })
 
+  it('paints no ink outside editor mode, but still carries it for the key glow', () => {
+    const ink = newNumberPad().ink
+
+    const reader = draw()
+    // Invisible on the picture: the glyphs are the accessible name, drawn in nothing.
+    expect(reader.surface!.style.color).toBe('transparent')
+    // The glow is drawn in the authored ink, so it has to survive that.
+    expect(reader.surface!.style.getPropertyValue('--cb-number-pad-ink')).toBe(ink)
+    reader.unmount()
+
+    const editor = draw(true)
+    expect(editor.surface!.style.color).not.toBe('transparent')
+    expect(editor.surface!.style.getPropertyValue('--cb-number-pad-ink')).toBe(ink)
+  })
+
   it('lands the pad on its quad with the shared projective transform', () => {
     const { surface } = draw()
     expect(surface!.style.transform.startsWith('matrix3d(')).toBe(true)

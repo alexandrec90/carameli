@@ -36,11 +36,16 @@ export default function ProjectedNumberPad({
   // the pointer would swallow the very drags that place its own quad.
   const live = !editing && Boolean(onKey)
 
+  // Outside the editor the pad is not drawn at all: the picture already shows the
+  // surface, and a key is found by pointing at it. The glyphs stay in the DOM — they are
+  // the accessible name — and are painted in nothing. The authored ink rides along as a
+  // custom property because the hover glow is drawn in it.
   const surface: CSSProperties = {
     width,
     height,
     transform,
-    color: numberPad.ink,
+    color: editing ? numberPad.ink : 'transparent',
+    ['--cb-number-pad-ink' as string]: numberPad.ink,
     fontSize: `${(height / 4) * numberPad.fontScale}px`,
     pointerEvents: live ? 'auto' : 'none',
     gridTemplateColumns: 'repeat(3, 1fr)',

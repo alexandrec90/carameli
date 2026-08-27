@@ -33,21 +33,35 @@
   cursor: pointer;
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
-  transition: background-color 90ms ease-out, transform 90ms ease-out;
+  transition: background-color 120ms ease-out, box-shadow 120ms ease-out,
+    transform 90ms ease-out;
 }
 
-.cb-number-pad-button:hover {
-  background: color-mix(in srgb, currentcolor 14%, transparent);
+/* Outside the editor the surface paints its glyphs in `transparent`, so this glow is
+   the *only* thing that says a key is under the pointer. It is drawn in the authored
+   ink (`--cb-number-pad-ink`) rather than `currentcolor`, which is the colour of
+   nothing here — and lands just outside the cell, so it reads as light on the
+   photographed surface rather than as a button that was there all along. */
+.cb-number-pad-button:hover,
+.cb-number-pad-button:focus-visible {
+  background-color: color-mix(in srgb, var(--cb-number-pad-ink, currentcolor) 12%, transparent);
+  box-shadow: 0 0 0.34em 0.05em
+    color-mix(in srgb, var(--cb-number-pad-ink, currentcolor) 45%, transparent);
 }
 
+/* Pressed: the same glow hardened rather than a second effect — the halo pulls in tight
+   and gains an edge, which is what a soft projection does when a key takes the press. */
 .cb-number-pad-button:active {
-  background: color-mix(in srgb, currentcolor 30%, transparent);
+  background-color: color-mix(in srgb, var(--cb-number-pad-ink, currentcolor) 30%, transparent);
+  box-shadow: 0 0 0 0.05em
+      color-mix(in srgb, var(--cb-number-pad-ink, currentcolor) 90%, transparent),
+    0 0 0.14em 0.01em color-mix(in srgb, var(--cb-number-pad-ink, currentcolor) 70%, transparent);
 
   /* Reads as the key going down into the surface it is painted on. */
-  transform: scale(0.94);
+  transform: scale(0.96);
 }
 
 .cb-number-pad-button:focus-visible {
-  outline: 2px solid currentcolor;
+  outline: 2px solid var(--cb-number-pad-ink, currentcolor);
   outline-offset: -2px;
 }
