@@ -24,13 +24,19 @@
   opacity: 1;
 }
 
-/* A column of buttons inside a balloon — the comic button treatment (3px ink border,
+/* A row of buttons inside a balloon — the comic button treatment (3px ink border,
    offset shadow, no radius) at balloon-lettering scale, for a label that letters. A
-   label naming one of the telephone's keys draws its artwork instead; see below. */
+   label naming one of the telephone's keys draws its artwork instead; see below.
+
+   A row, not a column, because the two keys it usually holds are a handset's green and
+   red ones, and those sit side by side on every telephone ever drawn. It does not wrap:
+   wrapping would put them back into a column in exactly the narrow balloon this is meant
+   to fix, so the buttons shrink to fit the line instead (see .cb-bubble-key-art). */
 .cb-bubble-actions {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
+  justify-content: center;
   gap: 0.4em;
   font-size: clamp(0.75rem, 2vw, 1.125rem);
 }
@@ -72,6 +78,10 @@
   background: none;
   border: 0;
   box-shadow: none;
+
+  /* A flex item's floor is its content, so without this a pair of keys wider than the
+     balloon pushes out through its outline instead of shrinking to the line. */
+  min-width: 0;
 }
 
 .cb-bubble-key:hover:enabled {
@@ -87,6 +97,11 @@
 .cb-bubble-key-art {
   display: block;
   width: 2.75em;
+
+  /* The drawn size is a preference, not a floor: in a balloon too narrow for both keys
+     side by side the pair scales down together rather than one of them dropping to a
+     second line. */
+  max-width: 100%;
   height: auto;
 }
 
