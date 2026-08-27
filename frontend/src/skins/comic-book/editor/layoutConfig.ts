@@ -35,10 +35,30 @@ export const PANEL_IMG_TRANSFORMS: ImgTransform[] = [
   { panel: 5, src: '/comic-book/rolodex.webp', alt: 'Rolodex', left: 0, top: 0, width: 100, height: 100, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center bottom', spill: false },
   { panel: 6, src: '/comic-book/rotary%20phone.webp', alt: 'Rotary phone', left: 0, top: 0, width: 100, height: 100, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center bottom', spill: false },
   { panel: 7, src: '/comic-book/mailman2.webp', alt: 'Post office', left: 0, top: 0, width: 100, height: 100, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center bottom', spill: false },
-  { panel: 8, src: '/comic-book/logo2.webp', alt: 'Carameli', left: 0, top: 0, width: 100, height: 100, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center center', spill: false },
-  { panel: 9, src: '/comic-book/notepad.webp', alt: 'Notepad', left: 0, top: 0, width: 100, height: 100, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center bottom', spill: false },
-  { panel: 10, src: '/comic-book/push-button-phone.webp', alt: 'Push-button phone', left: 0, top: 0, width: 100, height: 100, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center bottom', spill: false },
-  { panel: 11, src: '/comic-book/man-woman-talking.webp', alt: 'Phone conversation', left: 0, top: 0, width: 100, height: 100, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center bottom', spill: false },
+  { panel: 8, src: '/comic-book/logo2.webp', alt: 'Carameli', left: -6.2, top: -1.1, width: 104, height: 106.1, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center center', spill: false },
+  { panel: 9, src: '/comic-book/push-button-phone.webp', alt: 'Notepad', left: -38.1, top: 2.6, width: 139.8, height: 121.8, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center bottom', spill: false, numberPad: {
+    quad: [[44.96, 25.44], [52.35, 20.85], [55.84, 50.56], [47.52, 55.36]],
+    fontScale: 0.55, ink: '#1b3a8f',
+  } },
+  { panel: 10, src: '/comic-book/hand-notepad.webp', alt: 'Push-button phone', left: -18.7, top: -0.9, width: 130.5, height: 120.6, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center bottom', spill: false, table: {
+    quad: [[32.03, 9.45], [69.19, 9.31], [70.02, 71.44], [31.57, 72.13]],
+    rows: 12, header: true, fontScale: 0.5, ink: '#1b3a8f',
+    columns: [
+      { label: 'Name', width: 2, align: 'left' },
+      { label: 'Number', width: 1, align: 'right' },
+    ],
+    data: [
+      ['Ada Lovelace', '555-0101'],
+      ['Grace Hopper', '555-0102'],
+      ['Alan Turing', '555-0103'],
+      ['Katherine Johnson', '555-0104'],
+      ['Margaret Hamilton', '555-0105'],
+      ['Claude Shannon', '555-0106'],
+      ['Hedy Lamarr', '555-0107'],
+      ['Vint Cerf', '555-0108'],
+    ],
+  } },
+  { panel: 11, src: '/comic-book/conversation.webp', alt: 'Phone conversation', left: 13.3, top: 40.8, width: 73.1, height: 64, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center bottom', spill: false },
 ]
 
 // Not parallel to PANELS either: each bubble names its `panel`, a panel may own any
@@ -75,10 +95,7 @@ export const PANEL_BUBBLE_TRANSFORMS: BubbleTransform[] = [
   { panel: 5, top: -35, right: -12, width: 55, rotate: -5, spill: true, type: 'lightning', tail: 'down-left', content: 'text', text: 'RING RING!', linkTo: null, hoverType: 'cloud', clickType: 'soft', chain: '' },
   { panel: 6, top: -35, right: -12, width: 55, rotate: -5, spill: true, type: 'lightning', tail: 'down-left', content: 'text', text: 'Ka-POW!', linkTo: null, hoverType: 'soft', clickType: 'cloud', chain: '' },
   { panel: 7, top: -35, right: -12, width: 55, rotate: -5, spill: true, type: 'cloud', tail: 'down-left', content: 'text', text: 'Delivering dreams...', linkTo: null, hoverType: 'soft', clickType: 'lightning', chain: '' },
-  { panel: 8, top: -35, right: -12, width: 55, rotate: -5, spill: true, type: 'soft', tail: 'down-left', content: 'text', text: "It's Carameli!", linkTo: null, hoverType: 'cloud', clickType: 'lightning', chain: '' },
-  { panel: 9, top: -35, right: -12, width: 55, rotate: -5, spill: true, type: 'soft', tail: 'down-right', content: 'text', text: 'Taking notes!', linkTo: null, hoverType: 'cloud', clickType: 'lightning', chain: '' },
-  { panel: 10, top: -35, right: -12, width: 55, rotate: -5, spill: true, type: 'lightning', tail: 'down-left', content: 'text', text: 'RING RING!', linkTo: null, hoverType: 'cloud', clickType: 'soft', chain: '' },
-  { panel: 11, top: -35, right: -12, width: 55, rotate: -5, spill: true, type: 'cloud', tail: 'down-left', content: 'text', text: 'Hello?', linkTo: null, hoverType: 'soft', clickType: 'lightning', chain: '' },
+  { panel: 9, top: 1, right: 8, width: 36, rotate: -5, spill: true, type: 'cloud', tail: 'none', content: 'phone', text: '4388762750', linkTo: null, hoverType: null, clickType: null, chain: '' },
 ]
 
 // One entry per chain id the bubbles above carry — the list is derived from them, not
@@ -126,10 +143,10 @@ export const PANEL_PATTERNS: PanelBgStyle[] = [
   'diagonal-stripes', // Rolodex
   'concentric-rings', // Rotary phone
   'corner-burst', // Mailman 2
-  'radial-dots', // Logo 2
-  'diagonal-stripes', // Notepad
-  'concentric-rings', // Push-button phone
-  'sunburst', // Conversation
+  'halftone-gradient', // Logo 2
+  'corner-burst', // Notepad
+  'sunburst', // Push-button phone
+  'radial-dots', // Conversation
 ]
 
 // The panel shapes themselves: one record per page, one grid per viewport shape inside
@@ -207,7 +224,7 @@ export const PANEL_GRIDS: PageGrids = {
   },
   home: {
     landscape: {
-      vertices: [[0, 0], [1, 0], [1, 1], [0, 1], [0, 0.45], [1, 0.43], [0.33, 0], [0.35, 0.443], [0.47, 0.4405], [0.45, 1]],
+      vertices: [[0, 0], [1, 0], [1, 1], [0, 1], [0, 0.4007], [1, 0.3502], [0.3778, 0], [0.3862, 0.3997], [0.3882, 0.4001], [0.3649, 1]],
       panels: [
         [], // Logo
         [], // Switchboard

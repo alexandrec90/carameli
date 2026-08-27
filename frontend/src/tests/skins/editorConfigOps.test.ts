@@ -74,17 +74,22 @@ describe('seedConfig', () => {
     })
   })
 
-  it('ships every picture on the default full-panel frame', () => {
-    seedConfig().images.forEach(t => {
-      expect([t.left, t.top, t.width, t.height]).toEqual([0, 0, 100, 100])
+  // Asserts the read-back, not the numbers: pictures are reframed in the editor and
+  // saved out, so `[0, 0, 100, 100]` was only ever true while none had been.
+  it('ships every picture on the frame layoutConfig gives it', () => {
+    seedConfig().images.forEach((t, i) => {
+      const src = PANEL_IMG_TRANSFORMS[i]
+      expect([t.left, t.top, t.width, t.height]).toEqual([src.left, src.top, src.width, src.height])
     })
   })
 
   // The two arrays parted company when a panel could own several balloons; asserting
   // they are equal-length again would re-impose the constraint this change removed.
+  // Which way round they differ is content — a panel showing a projected surface
+  // instead of speech leaves fewer balloons than pictures.
   it('does not tie the bubble count to the panel count', () => {
     const cfg = seedConfig()
-    expect(cfg.bubbles.length).toBeGreaterThan(cfg.images.length)
+    expect(cfg.bubbles.length).not.toBe(cfg.images.length)
   })
 
   it('ships every bubble on a real panel', () => {
