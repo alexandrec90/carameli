@@ -44,6 +44,16 @@ type ShipState =
   | { phase: 'done'; message: string; prUrl?: string }
   | { phase: 'error'; message: string }
 
+/**
+ * Save's outcome, as a state rather than a boolean, because the failure has to be
+ * *visible*. A save that cannot write the file falls back to downloading it, and while
+ * that fallback was announced only in the log the button said "Save" again a moment
+ * later — indistinguishable from a save that worked. That is how a broken write target
+ * went unnoticed: every press downloaded a copy of `layoutConfig.ts` and the editor's
+ * work never reached the app outside edit mode.
+ */
+type SaveState = { phase: 'idle' } | { phase: 'done' } | { phase: 'error'; message: string }
+
 interface EditorToolbarProps {
   api: EditorModeApi
   /** The panel a new picture or bubble would go on, or null. */
@@ -68,7 +78,7 @@ export default function EditorToolbar({ api, selPanel, pageSelect, shapes }: Edi
   const toolbarDrag = useToolbarDrag()
   const toolbarColumns = useToolbarColumns(toolbarDrag.rootProps.ref)
   const [copied, setCopied] = useState(false)
-  const [saved, setSaved] = useState(false)
+  const [save, setSave] = useState<SaveState>({ phase: 'idle' })
   const [summary, setSummary] = useState('')
   const [ship, setShip] = useState<ShipState>({ phase: 'idle' })
 
@@ -102,12 +112,16 @@ export default function EditorToolbar({ api, selPanel, pageSelect, shapes }: Edi
     })
       .then(res => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
-        setSaved(true)
+        setSave({ phase: 'done' })
         logger.info('Comic-book editor: config saved to layoutConfig.ts')
-        window.setTimeout(() => setSaved(false), 1500)
+        window.setTimeout(() => setSave({ phase: 'idle' }), 1500)
       })
-      .catch(err => {
-        logger.error('Comic-book editor: save failed, downloading instead', { err: String(err) })
+      .catch((err: unknown) => {
+        const message = err instanceof Error ? err.message : String(err)
+        logger.error('Comic-book editor: save failed, downloading instead', { err: message })
+        // The download stays — it is the only copy of the work when the endpoint is
+        // gone — but it is now announced, so it cannot read as a save that worked.
+        setSave({ phase: 'error', message })
         downloadConfig(content)
       })
   }
@@ -208,7 +222,7 @@ export default function EditorToolbar({ api, selPanel, pageSelect, shapes }: Edi
 
       <div className="cb-ed-actions">
         <button type="button" className="cb-ed-btn cb-ed-btn-primary" onClick={onSave}>
-          {saved ? 'Saved!' : 'Save'}
+          {save.phase === 'done' ? 'Saved!' : 'Save'}
         </button>
         <button
           type="button"
@@ -219,6 +233,12 @@ export default function EditorToolbar({ api, selPanel, pageSelect, shapes }: Edi
           Reset
         </button>
       </div>
+      {save.phase === 'error' && (
+        <p role="status" className="cb-ed-status cb-ed-status-error">
+          Save failed ({save.message}) — the file was downloaded instead, so the app
+          outside edit mode still shows the old layout.
+        </p>
+      )}
       {/* Save writes the file; Ship carries it to a branch and a PR. They are separate
           buttons because Save is the inner loop — pressed every few drags — and Ship is
           the moment the work should stop being local to one tree. */}
@@ -244,7 +264,7 @@ export default function EditorToolbar({ api, selPanel, pageSelect, shapes }: Edi
       {ship.phase !== 'idle' && ship.phase !== 'busy' && (
         <p
           role="status"
-          className={`cb-ed-ship-status${ship.phase === 'error' ? ' cb-ed-ship-status-error' : ''}`}
+          className={`cb-ed-status${ship.phase === 'error' ? ' cb-ed-status-error' : ''}`}
         >
           {ship.message}
           {ship.phase === 'done' && ship.prUrl && (

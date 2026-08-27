@@ -31,6 +31,8 @@
     "configImports.test.ts",
     "devWatchPolicy.ts",
     "devWatchPolicy.test.ts",
+    "editorConfigPath.ts",
+    "editorConfigPath.test.ts",
     "proxyErrorPolicy.ts",
     "proxyErrorPolicy.test.ts",
     "shipLayout.ts",
