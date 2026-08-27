@@ -23,8 +23,9 @@ in `editor/assets.ts`) and speech-bubble
 placement and behaviour (`PANEL_BUBBLE_TRANSFORMS`: panel / top / right / width /
 rotate / spill / type / tail / content / text, plus `hoverType` / `clickType` event
 morph targets, the `linkTo` tube partner and the `chain` this balloon is a slot of;
-content may be lettering, a wheel picker, a text input or a locale-formatted phone
-input) and the chain settings those names resolve to (`PANEL_BUBBLE_CHAINS`),
+content may be lettering, a wheel picker, a text input, a locale-formatted phone
+input, or the telephone's own call/end-call keys) and the chain settings those names
+resolve to (`PANEL_BUBBLE_CHAINS`),
 plus each panel's background pattern style
 (`PANEL_PATTERNS`, the one array parallel to `PANELS`; the per-panel palette and dot
 metrics stay in `PANEL_BG_CONFIGS` in `panelPatterns.ts`). The renderer in
@@ -113,6 +114,32 @@ Three consequences worth stating, because each one is a bug the obvious implemen
   repaint every Ben-Day canvas on the page. A failed refresh keeps the rows already on the
   surface rather than blanking the notepad.
 
+## An `actions` balloon is the telephone's keypad, not a toolbar
+
+A balloon whose content is `actions` letters one button per comma-delimited entry, except
+for the two labels naming the drawn telephone's own keys: `Call` and `End call` render
+their artwork from `public/comic-book/` instead. `phoneActions.ts` owns both halves of
+that — the label→key fold (on letters alone, so `end-call` and `END CALL` are the same
+key) and the softphone verb each key runs — and it is pure, so the mapping is unit-tested
+without a render.
+
+Three properties are the design, not incidental:
+
+- **Two keys, four states.** Green answers a ringing call and otherwise dials
+  `dialTarget`; red declines one and otherwise hangs up. A handset has one green key and
+  one red one whatever the call is doing, so a third and fourth button never appear.
+- **A key with nothing to do is disabled, never hidden.** A control that vanishes off a
+  photographed telephone reads as a fault in the picture. `bubbleInputs.css` greys a
+  disabled key only under `.is-interactive`, so the editor still shows the artwork whole.
+- **The handlers are props, all the way down** — `Layout` → `ComicPanel` → `PanelBubbles`
+  → `PanelBubble` → `BubbleActions`. Nothing under `skins/` reaches for the softphone
+  hook, so every one of those renders from a plain config in a test, and a balloon with no
+  handlers is drawn and inert rather than broken.
+
+The number dialled is `dialTarget`, which the projected number pad types into. A `phone`
+balloon is the other way to place a call and holds its number in a field of its own; the
+two are not the same input, which is why the keys take no argument.
+
 ## Dev-only visual editor
 
 | Property | Value | Notes |
@@ -124,7 +151,7 @@ Three consequences worth stating, because each one is a bug the obvious implemen
 | Add / remove | **+ Image** / **+ Bubble** toolbar buttons, **Delete image** / **Delete bubble** in the inspector | Adds to the selected panel; deleting a bubble clears any link naming it |
 | Panel fields | inspector select | background **pattern** style (`PATTERN_STYLE_KEYS`; palette stays per panel) |
 | Picture fields | inspector selects | panel, picture (`PANEL_ASSETS`), alt (empty = decorative), anchor, spill |
-| Bubble fields | inspector selects | panel, type, **tail** (nine options incl. **No tail**), **content** (Text / Wheel picker / Text input / Phone input), authored text or initial value, hover/click morph, **chain** (free text, completing on the names already in use), link |
+| Bubble fields | inspector selects | panel, type, **tail** (nine options incl. **No tail**), **content** (Text / Wheel picker / Text input / Phone input / Action buttons), authored text or initial value, hover/click morph, **chain** (free text, completing on the names already in use), link |
 | Chain fields | inspector, below the bubble's own, when the bubble names a chain | **grow** / **step ms**, **scroll**, **messages** (one per line; empty = speak the balloons' own text), **+ Balloon in chain** — they edit the whole column, not the selected balloon. Chained balloons render flat in edit mode so each stays selectable |
 | Table on / off | **Project a table onto this image** checkbox (picture inspector) | Switching on seeds a starter surface; switching off deletes the table and its cells, leaving the picture |
 | Table source | **shows** select (table inspector) | *Cells typed below* or a live feed (**Call records**, **SMS messages**). Picking a feed takes its columns and empties the cells; going back seeds a fresh authored surface, since five empty feed-shaped columns would leave nothing on the notepad to see |

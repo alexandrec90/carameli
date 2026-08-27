@@ -535,15 +535,20 @@ describe('default config parity', () => {
     })
   })
 
-  it('links two pairs, each declared from exactly one end', () => {
-    expect(linkedPairs(PANEL_BUBBLE_TRANSFORMS)).toEqual([[0, 1], [4, 5]])
+  // Two caption pairs, plus the home page's telephone: the number a reader types and
+  // the buttons that dial it are one instrument, and the tube is what says so.
+  it('links three pairs, each declared from exactly one end', () => {
+    expect(linkedPairs(PANEL_BUBBLE_TRANSFORMS)).toEqual([[0, 1], [4, 5], [10, 11]])
   })
 
-  // Both halves of a linked pair are one speaker's line continuing, so only the first
-  // carries a tail; the tube is what joins the second to it.
-  it('gives each linked pair one tail between the two of them', () => {
+  // Both halves of a linked *caption* pair are one speaker's line continuing, so only
+  // the first carries a tail; the tube is what joins the second to it. A pair of fields
+  // is not an utterance — neither end points at a speaker — so only the shared panel,
+  // which is what makes a tube drawable at all, holds for every pair.
+  it('gives each linked caption pair one tail between the two of them', () => {
     linkedPairs(PANEL_BUBBLE_TRANSFORMS).forEach(([i, j]) => {
       expect(PANEL_BUBBLE_TRANSFORMS[i].panel).toBe(PANEL_BUBBLE_TRANSFORMS[j].panel)
+      if (isField(PANEL_BUBBLE_TRANSFORMS[i]) || isField(PANEL_BUBBLE_TRANSFORMS[j])) return
       expect(PANEL_BUBBLE_TRANSFORMS[i].tail).not.toBe('none')
       expect(PANEL_BUBBLE_TRANSFORMS[j].tail).toBe('none')
     })

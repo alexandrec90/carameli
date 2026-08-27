@@ -83,13 +83,19 @@ describe('seedConfig', () => {
     })
   })
 
-  // The two arrays parted company when a panel could own several balloons; asserting
-  // they are equal-length again would re-impose the constraint this change removed.
-  // Which way round they differ is content — a panel showing a projected surface
-  // instead of speech leaves fewer balloons than pictures.
-  it('does not tie the bubble count to the panel count', () => {
+  // The two arrays parted company when a panel could own several balloons. Comparing
+  // their lengths is not how that is checked, and this assertion used to: the counts
+  // coincide the moment an author adds one balloon to a page that happens to carry as
+  // many pictures, and the suite then fails on a coincidence rather than on a
+  // regression — which is what adding the home page's action buttons did. What has to
+  // hold is the shape neither array can be read off the other by index: a panel may own
+  // several balloons, and a panel carrying a picture may own none at all.
+  it('lets a panel own several balloons, and a picture none', () => {
     const cfg = seedConfig()
-    expect(cfg.bubbles.length).not.toBe(cfg.images.length)
+    const perPanel = new Map<number, number>()
+    cfg.bubbles.forEach(b => perPanel.set(b.panel, (perPanel.get(b.panel) ?? 0) + 1))
+    expect([...perPanel.values()].some(n => n > 1)).toBe(true)
+    expect(cfg.images.some(t => !perPanel.has(t.panel))).toBe(true)
   })
 
   it('ships every bubble on a real panel', () => {

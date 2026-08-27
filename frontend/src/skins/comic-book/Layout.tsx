@@ -6,9 +6,9 @@ import BubbleTubes from './BubbleTubes'
 import ComicPanel from './ComicPanel'
 import { LoadingOverlay, useLoadingScreen } from './LoadingOverlay'
 import PanelInk from './PanelInk'
-import PhoneHud, { hudIsVisible, pageCanDial } from './PhoneHud'
 import { gridPolys, layoutKindFor } from './panelGeometry'
 import { PANELS, pageForPath } from './panels'
+import { softphoneActions } from './phoneActions'
 import { usePanelDots } from './usePanelDots'
 import {
     PANEL_BUBBLE_CHAINS, PANEL_IMG_TRANSFORMS, PANEL_BUBBLE_TRANSFORMS,
@@ -139,11 +139,10 @@ export function Layout({ navItems, sms, softphone }: LayoutProps) {
         void autoDial(value)
     }, [autoDial])
 
-    // A page carrying either way of dialling gets the rest of the telephone: the display
-    // and the call keys neither a photographed pad nor a balloon has room for. Pages with
-    // no way to dial show no furniture.
-    const showPhoneHud =
-        pageCanDial(imgT, bubbleT, page) && !editor.active && hudIsVisible(softphone)
+    // The two keys of the drawn telephone. Rebuilt every render on purpose rather than
+    // memoised: what each key means moves with the call (`phoneActions.ts`), so a cached
+    // pair would be the previous state's handset for one frame after the phone rang.
+    const phoneActions = softphoneActions(softphone)
 
     const accent = accentForPath(location.pathname)
     const washRef = usePageWash(location.pathname, accent)
@@ -200,6 +199,7 @@ export function Layout({ navItems, sms, softphone }: LayoutProps) {
                             isBubbleVisible={bubbleVisible}
                             onNumberPadKey={softphone.pressDigit}
                             onPhoneSubmit={dialFromBubble}
+                            phoneActions={phoneActions}
                             dotRef={dotRefs[i]}
                             onSettled={markSettled}
                             onNatSize={recordNatSize}
@@ -220,10 +220,6 @@ export function Layout({ navItems, sms, softphone }: LayoutProps) {
                 <canvas ref={washRef} className="cb-wash-canvas" aria-hidden="true" />
 
             </div>
-
-            {/* The projected pad's display and call keys — outside cb-root so the page's
-                load fade and the picture frames never hide or crop the live call. */}
-            {showPhoneHud && <PhoneHud phone={softphone} />}
 
             {/* Dev-only editor overlay — never reached in a production build */}
             {EditorOverlay && editor.active && (

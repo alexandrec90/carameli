@@ -5,6 +5,7 @@ import { toClipPath } from './editor/transforms'
 import type { BubbleTransform, ImgTransform } from './editor/types'
 import type { PanelPoly } from './panelGeometry'
 import type { Panel } from './panels'
+import type { PhoneActionHandlers } from './phoneActions'
 import type { UseSmsConversationsResult } from '../../hooks/useSmsConversations'
 
 interface ComicPanelProps {
@@ -31,6 +32,8 @@ interface ComicPanelProps {
     onNumberPadKey?(key: string): void
     /** Dials the number typed into one of this panel's `phone` balloons. */
     onPhoneSubmit?(value: string): void
+    /** Makes the call/end-call keys of this panel's `actions` balloons a working handset. */
+    phoneActions?: PhoneActionHandlers
     /** Mounts the Ben-Day dot canvas into Layout's animation loop. */
     dotRef(el: HTMLCanvasElement | null): void
     onSettled(): void
@@ -45,7 +48,7 @@ interface ComicPanelProps {
 export default function ComicPanel({
     index, info, poly, images, bubbles, chains, sms, natSizes,
     editorActive, hovered, onHover, isRevealed, isBubbleVisible, onNumberPadKey,
-    onPhoneSubmit, dotRef, onSettled, onNatSize,
+    onPhoneSubmit, phoneActions, dotRef, onSettled, onNatSize,
 }: ComicPanelProps) {
     const { bounds, vp } = poly
 
@@ -115,6 +118,7 @@ export default function ComicPanel({
                 editing={editorActive}
                 sms={sms}
                 onPhoneSubmit={onPhoneSubmit}
+                phoneActions={phoneActions}
             />
         </div>
     )
