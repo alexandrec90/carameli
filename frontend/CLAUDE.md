@@ -37,7 +37,7 @@ tells you which.
 
 | File | Bounds | Run by |
 | --- | --- | --- |
-| `assetPolicy.ts` | `public/`, copied into `dist/` verbatim | `test:run` |
+| `assetPolicy.ts` | what one page fetches out of `public/` | `test:run` |
 | `bundlePolicy.ts` | `dist/` — chunks, CSS, fonts | `test:bundle` |
 | `knip.ts` | code and dependencies nothing imports | `lint:deadweight` |
 
