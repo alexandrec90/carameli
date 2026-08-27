@@ -224,8 +224,13 @@ different images can only crossfade. A new bubble type belongs in `bubbleShape.t
      app's shared softphone, so a page whose art carries no keypad still has somewhere
      to dial from. In a chain that same content is the conversation's composer instead
      and dials nothing. **Action buttons** text is comma-delimited too: each entry is
-     lettered as one placeholder button (`../BubbleActions.tsx`), pressable but wired
-     to nothing yet.
+     one button (`../BubbleActions.tsx`). Two labels name the telephone's own keys and
+     draw as its artwork instead of lettering — `Call` and `End call`, matched on
+     letters alone, so case and hyphens do not matter. Those two are wired to the
+     shared softphone: green dials what the number pad typed and answers a ringing
+     call, red hangs up and declines one, and each is disabled when the phone has
+     nothing for it to do (`../phoneActions.ts`). Any other label is lettered and
+     pressable and does nothing, which is also what both look like in the editor.
      Edit the **text** or **initial value**, choose the shapes to
      morph to **on hover**
      and **on click** (`— no change —` keeps the resting shape), and pick a **link
@@ -371,7 +376,8 @@ bubbleTypes.ts      BubbleType + BUBBLE_TYPES (lettering font per type) — ship
 ../../../hooks/useLiveTables.ts hook: the only place a surface's rows are fetched, and the poll
 ../ProjectedNumberPad.tsx fixed 3 × 4 telephone keys on a projected surface; live buttons outside edit mode
 ../number-pad.css   number-pad lettering, surface layout, and the live key's press states
-../BubbleActions.tsx placeholder action buttons lettered inside a balloon, one per comma-delimited entry
+../BubbleActions.tsx action buttons inside a balloon, one per comma-delimited entry
+../phoneActions.ts  PURE: label -> the telephone key it draws, and the softphone verb it runs
 ../panelGeometry.ts PURE grid -> polygon geometry: frame, normalised space, vertex constraints
 ../panelPatterns.ts pattern style registry + per-panel palette/dot tuning (PANEL_BG_CONFIGS)
 ../polygonInset.ts  PURE polygon maths: the perpendicular gutter inset, bounding box

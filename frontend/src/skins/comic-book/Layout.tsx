@@ -8,6 +8,7 @@ import { LoadingOverlay, useLoadingScreen } from './LoadingOverlay'
 import PanelInk from './PanelInk'
 import { gridPolys, layoutKindFor } from './panelGeometry'
 import { PANELS, pageForPath } from './panels'
+import { softphoneActions } from './phoneActions'
 import { usePanelDots } from './usePanelDots'
 import {
     PANEL_BUBBLE_CHAINS, PANEL_IMG_TRANSFORMS, PANEL_BUBBLE_TRANSFORMS,
@@ -138,6 +139,11 @@ export function Layout({ navItems, sms, softphone }: LayoutProps) {
         void autoDial(value)
     }, [autoDial])
 
+    // The two keys of the drawn telephone. Rebuilt every render on purpose rather than
+    // memoised: what each key means moves with the call (`phoneActions.ts`), so a cached
+    // pair would be the previous state's handset for one frame after the phone rang.
+    const phoneActions = softphoneActions(softphone)
+
     const accent = accentForPath(location.pathname)
     const washRef = usePageWash(location.pathname, accent)
     const loading = useLoadingScreen(ready, accent)
@@ -193,6 +199,7 @@ export function Layout({ navItems, sms, softphone }: LayoutProps) {
                             isBubbleVisible={bubbleVisible}
                             onNumberPadKey={softphone.pressDigit}
                             onPhoneSubmit={dialFromBubble}
+                            phoneActions={phoneActions}
                             dotRef={dotRefs[i]}
                             onSettled={markSettled}
                             onNatSize={recordNatSize}

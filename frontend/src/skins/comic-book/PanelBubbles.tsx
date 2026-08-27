@@ -5,6 +5,7 @@ import type { BubbleChain } from './bubbleChain'
 import PanelBubble from './PanelBubble'
 import PanelBubbleChain from './PanelBubbleChain'
 import type { BubbleTransform } from './editor/types'
+import type { PhoneActionHandlers } from './phoneActions'
 import { browserCountry, toE164 } from './phoneInput'
 import type { UseSmsConversationsResult } from '../../hooks/useSmsConversations'
 import type { SmsConversationMessage } from '../../lib/smsConversation'
@@ -54,6 +55,11 @@ interface PanelBubblesProps {
    * which the claimed-index filter below already guarantees.
    */
   onPhoneSubmit?(value: string): void
+  /**
+   * What the telephone's keys do, for any `actions` balloon on this panel. Absent in the
+   * editor and on a page with no telephone: the keys are drawn there and do nothing.
+   */
+  phoneActions?: PhoneActionHandlers
 }
 
 /**
@@ -87,6 +93,7 @@ export default function PanelBubbles({
   editing,
   sms,
   onPhoneSubmit,
+  phoneActions,
 }: PanelBubblesProps) {
   const ids = editing ? [] : chainIdsOn(bubbles, panel)
   const conversations = ids.map(id => ({
@@ -141,6 +148,7 @@ export default function PanelBubbles({
             interactive={interactive}
             onWheelSelect={i === wheelIndex ? onWheelSelect : undefined}
             onSubmit={bubble.content === 'phone' ? onPhoneSubmit : undefined}
+            actions={bubble.content === 'actions' ? phoneActions : undefined}
           />
         )
         // spill off: a clip wrapper hides the overflow behind the panel edge.

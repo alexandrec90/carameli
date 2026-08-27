@@ -155,7 +155,94 @@ describe('PanelBubble action buttons', () => {
     // Real controls, so the bubble is not hidden from assistive tech.
     expect(root.getAttribute('aria-hidden')).toBeNull()
     const buttons = screen.getAllByRole('button')
-    expect(buttons.map(b => b.textContent)).toEqual(['Call', 'End call'])
+    // Named, not lettered: both of these labels name a key of the drawn telephone, so the
+    // artwork is the button and `aria-label` is the only name it has.
+    expect(buttons.map(b => b.getAttribute('aria-label'))).toEqual(['Call', 'End call'])
+    expect(buttons.map(b => b.querySelector('img')?.getAttribute('src'))).toEqual([
+      '/comic-book/call-button.webp',
+      '/comic-book/end-call-button.webp',
+    ])
+    // The picture carries no name of its own — the button already has one, and a second
+    // would have a screen reader read the key twice.
+    buttons.forEach(b => { expect(b.querySelector('img')?.getAttribute('alt')).toBe('') })
+  })
+
+  it('letters a label that names no key of the telephone', () => {
+    // An author can put any button in an `actions` balloon. Only the two the artwork
+    // exists for are drawn; anything else keeps the hand-lettered treatment rather than
+    // rendering a broken image.
+    render(
+      <PanelBubble
+        bubble={{ ...NEW_BUBBLE, panel: 0, content: 'actions', text: 'Transfer' }}
+        visible
+        interactive
+      />,
+    )
+    const button = screen.getByRole('button', { name: 'Transfer' })
+
+    expect(button.querySelector('img')).toBeNull()
+    expect(button.classList.contains('cb-bubble-key')).toBe(false)
+  })
+
+  it('runs the handler for the key a press lands on, and only that one', () => {
+    const call = vi.fn()
+    const hangup = vi.fn()
+    render(
+      <PanelBubble
+        bubble={{ ...NEW_BUBBLE, panel: 0, content: 'actions', text: 'Call, End call' }}
+        visible
+        interactive
+        actions={{
+          call: { run: call, disabled: false },
+          hangup: { run: hangup, disabled: false },
+        }}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Call' }))
+
+    expect(call).toHaveBeenCalledTimes(1)
+    expect(hangup).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByRole('button', { name: 'End call' }))
+
+    expect(hangup).toHaveBeenCalledTimes(1)
+    expect(call).toHaveBeenCalledTimes(1)
+  })
+
+  it('disables a key its handler says has nothing to do', () => {
+    // Disabled rather than removed: a key that disappears off a photographed telephone
+    // reads as a fault in the picture. See softphoneActions.
+    render(
+      <PanelBubble
+        bubble={{ ...NEW_BUBBLE, panel: 0, content: 'actions', text: 'Call, End call' }}
+        visible
+        interactive
+        actions={{
+          call: { run: vi.fn(), disabled: false },
+          hangup: { run: vi.fn(), disabled: true },
+        }}
+      />,
+    )
+
+    expect(screen.getByRole('button', { name: 'Call' })).toHaveProperty('disabled', false)
+    expect(screen.getByRole('button', { name: 'End call' })).toHaveProperty('disabled', true)
+  })
+
+  it('draws the keys of a balloon with no handset behind it, and leaves them pressable', () => {
+    // The editor, and any page with no telephone: the balloon is a drawing there, and a
+    // press on it must not throw for want of a handler.
+    render(
+      <PanelBubble
+        bubble={{ ...NEW_BUBBLE, panel: 0, content: 'actions', text: 'Call, End call' }}
+        visible
+        interactive
+      />,
+    )
+    const button = screen.getByRole('button', { name: 'Call' })
+
+    expect(button).toHaveProperty('disabled', false)
+    expect(() => fireEvent.click(button)).not.toThrow()
   })
 
   it('keeps a press on a button from reaching the panel underneath', () => {

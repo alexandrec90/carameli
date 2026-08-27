@@ -15,6 +15,7 @@ import BubbleWheel from './BubbleWheel'
 import { BUBBLE_TYPES } from './editor/bubbleTypes'
 import { bubbleStyle } from './editor/transforms'
 import type { BubbleTransform } from './editor/types'
+import type { PhoneActionHandlers } from './phoneActions'
 import { useBubbleMorph } from './useBubbleMorph'
 import { splitOptions } from './wheelPicker'
 
@@ -47,6 +48,11 @@ interface PanelBubbleProps {
    */
   onWheelSelect?: (value: string) => void
   /**
+   * Passed through to an `actions` balloon: what each of the telephone's keys does. Absent
+   * in the editor and on any page with no telephone, where the keys are drawn but inert.
+   */
+  actions?: PhoneActionHandlers
+  /**
    * How far a message of a live conversation has got. Absent on every balloon that is not
    * one, and on one whose message the carrier has acknowledged — a sent message is just a
    * message. Drawn as ink rather than as words: a sending balloon is pale and a failed one
@@ -71,6 +77,7 @@ export default function PanelBubble({
   chained = false,
   onSubmit,
   onWheelSelect,
+  actions,
   status,
 }: PanelBubbleProps) {
   const [hover, setHover] = useState(false)
@@ -173,7 +180,7 @@ export default function PanelBubble({
           onSubmit={onSubmit}
         />
       ) : bubble.content === 'actions' ? (
-        <BubbleActions text={bubble.text} font={font} enabled={interactive} />
+        <BubbleActions text={bubble.text} font={font} enabled={interactive} actions={actions} />
       ) : bubble.content === 'wheel' ? (
         <BubbleWheel
           options={splitOptions(bubble.text)}
