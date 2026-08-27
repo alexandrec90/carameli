@@ -15,10 +15,12 @@ vi.mock('../../lib/logger', () => ({
 
 import {
   api,
+  BackendOfflineError,
   type AddExtensionBody,
   type AddPhoneLineBody,
   type CustomerCreate,
 } from '../../api/client'
+import { resetBackendReachability } from '../../lib/backendReachability'
 
 function mockFetch(status: number, body: unknown) {
   const fetchMock = vi.fn().mockResolvedValue({
@@ -33,10 +35,14 @@ function mockFetch(status: number, body: unknown) {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  // Module-level state in `lib/backendReachability`, so one test's 502 would
+  // otherwise short-circuit every test declared after it.
+  resetBackendReachability()
 })
 
 afterEach(() => {
   vi.unstubAllGlobals()
+  resetBackendReachability()
 })
 
 describe('api.health', () => {
@@ -343,5 +349,58 @@ describe('api.extensions.add', () => {
 
     await expect(api.extensions.add(payload)).rejects.toThrow('400')
     expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('an absent backend', () => {
+  it('stops calling out once a request came back 502', async () => {
+    const fetchMock = mockFetch(502, { detail: 'no backend' })
+
+    await expect(api.health()).rejects.toThrow('502')
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(loggerError).toHaveBeenCalledTimes(1)
+
+    await expect(api.customers.get(1)).rejects.toBeInstanceOf(BackendOfflineError)
+
+    // The second call never reached the network, and reported nothing new.
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(loggerError).toHaveBeenCalledTimes(1)
+  })
+
+  it('names the call it skipped', async () => {
+    mockFetch(502, { detail: 'no backend' })
+    await expect(api.health()).rejects.toThrow('502')
+
+    await expect(api.extensions.list(7)).rejects.toThrow(
+      '/api/v1/extensions?vs_customer_id=7',
+    )
+  })
+
+  it('arms on a rejected fetch, and rethrows the transport error itself', async () => {
+    const fetchMock = vi.fn().mockRejectedValue(new TypeError('Failed to fetch'))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(api.health()).rejects.toThrow('Failed to fetch')
+    await expect(api.health()).rejects.toBeInstanceOf(BackendOfflineError)
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps calling after a 503 — that is a backend, just not ready', async () => {
+    const fetchMock = mockFetch(503, { detail: 'starting up' })
+
+    await expect(api.health()).rejects.toThrow('503')
+    await expect(api.health()).rejects.toThrow('503')
+
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('keeps calling after an ordinary application failure', async () => {
+    const fetchMock = mockFetch(500, { detail: 'unhandled' })
+
+    await expect(api.health()).rejects.toThrow('500')
+    await expect(api.health()).rejects.toThrow('500')
+
+    expect(fetchMock).toHaveBeenCalledTimes(2)
   })
 })
