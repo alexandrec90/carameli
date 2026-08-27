@@ -26,6 +26,13 @@ export const PANEL_ASSETS: PanelAsset[] = [
   { src: '/comic-book/man-woman-talking.webp', label: 'Phone conversation' },
   { src: '/comic-book/conversation.webp', label: 'Two agents talking' },
   { src: '/comic-book/hand-notepad.webp', label: 'Hand with notepad' },
+  { src: '/comic-book/call-button.webp', label: 'Call button' },
+  { src: '/comic-book/cloud%20bubble.webp', label: 'Cloud bubble' },
+  { src: '/comic-book/end-call-button.webp', label: 'End call button' },
+  { src: '/comic-book/jagged%20bubble.webp', label: 'Jagged bubble' },
+  { src: '/comic-book/lightning%20bubble.webp', label: 'Lightning bubble' },
+  { src: '/comic-book/monogram.webp', label: 'Monogram' },
+  { src: '/comic-book/soft%20bubble.webp', label: 'Soft bubble' },
 ]
 
 /**
