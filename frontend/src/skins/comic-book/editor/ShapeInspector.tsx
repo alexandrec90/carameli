@@ -68,7 +68,8 @@ export default function ShapeInspector({ api, page, kind, grid, drag }: ShapeIns
           <div className="cb-ed-hint">
             Drag a line to move it, or a corner to move that end. Double-click a line to
             break it — repeat for a lightning bolt. Drop a corner onto a neighbouring one
-            to merge the two. The outer frame and the gutters are fixed.
+            to merge the two; Alt-drag a corner to tear a junction back apart. The outer
+            frame and the gutters are fixed.
           </div>
           {seam && (
             <button

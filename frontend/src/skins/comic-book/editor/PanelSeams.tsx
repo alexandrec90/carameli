@@ -32,9 +32,9 @@ function vertexTitle(grid: PanelGrid, index: number): string {
     case 'locked':
       return 'Frame corner — fixed'
     case 'free':
-      return 'Drag to move this corner; Delete straightens a bend'
+      return 'Drag to move this corner; Alt-drag tears its junction apart; Delete straightens a bend'
     default:
-      return 'Drag to slide this corner along the frame edge'
+      return 'Drag to slide this corner along the frame edge; Alt-drag tears its junction apart'
   }
 }
 
