@@ -95,12 +95,13 @@ export default function BubbleInspector({ api, index, bubble }: BubbleInspectorP
           <option value="wheel">Wheel picker</option>
           <option value="input">Text input</option>
           <option value="phone">Phone input</option>
+          <option value="dial">Dial (wheel + phone input)</option>
           <option value="actions">Action buttons</option>
         </select>
       </label>
       <label className="cb-ed-field">
         <span>
-          {bubble.content === 'wheel'
+          {bubble.content === 'wheel' || bubble.content === 'dial'
             ? 'options'
             : bubble.content === 'input' || bubble.content === 'phone'
               ? 'initial value'
@@ -119,6 +120,14 @@ export default function BubbleInspector({ api, index, bubble }: BubbleInspectorP
         <div className="cb-ed-hint">
           Comma-delimited: each entry is one option on the wheel. Hover the bubble and
           scroll to turn it — the picker is live outside edit mode.
+        </div>
+      )}
+      {bubble.content === 'dial' && (
+        <div className="cb-ed-hint">
+          Comma-delimited, same as the wheel — but this is an autocomplete: the drum&apos;s
+          centre line is a real phone field, and typing into it (or punching a number pad
+          projected onto a picture on this panel) narrows the rows behind it. The first
+          option is what it starts on; Enter dials, and adds the number to the list.
         </div>
       )}
       {(bubble.content === 'input' || bubble.content === 'phone') && (

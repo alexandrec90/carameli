@@ -13,8 +13,9 @@ bubbles; **Panel shapes** drags the lines between panels.
 `PANEL_BUBBLE_TRANSFORMS` — picture placement **and content** (panel / src / alt /
 left / top / width / height / scale / offsetX / offsetY / anchor / spill) and bubble
 placement **and content** (panel / top / right / width / rotate / spill / type / tail /
-content / text — lettering, a comma-delimited wheel picker, a text input, or a phone
-input formatted from the browser locale), plus each bubble's event morph targets
+content / text — lettering, a comma-delimited wheel picker, a text input, a phone
+input formatted from the browser locale, or a dial, which is the wheel and the phone
+input in one balloon), plus each bubble's event morph targets
 (`hoverType`, `clickType`) and its
 linked partner (`linkTo`) and the SMS conversation that linkage makes it a column of (`chain`,
 an editor-generated id resolved through `PANEL_BUBBLE_CHAINS` — see *Bubble chains*
@@ -216,11 +217,11 @@ different images can only crossfade. A new bubble type belongs in `bubbleShape.t
    - For bubbles: pick the **panel** it belongs to, a resting **type** (sets shape +
      lettering font), which way the **tail** points (**No tail** is one of the nine
      options), pick the **content** presentation (**Text**, **Wheel picker**, **Text
-     input**, **Phone input**, or **Action buttons**). Wheel text is comma-delimited
-     options: hover the bubble outside edit mode and scroll to turn it. Input text is
-     its initial value; phone input formats live using the browser locale, while a
-     leading `+` selects an international calling code. A **Phone input** balloon that
-     is not in a chain is the projected pad's fallback: Enter places the call on the
+     input**, **Phone input**, **Dial**, or **Action buttons**). Wheel text is
+     comma-delimited options: hover the bubble outside edit mode and scroll to turn it.
+     Input text is its initial value; phone input formats live using the browser locale,
+     while a leading `+` selects an international calling code. A **Phone input** balloon
+     that is not in a chain is the projected pad's fallback: Enter places the call on the
      app's shared softphone, so a page whose art carries no keypad still has somewhere
      to dial from. In a chain that same content is the conversation's composer instead
      and dials nothing. **Action buttons** text is comma-delimited too: each entry is
@@ -231,6 +232,23 @@ different images can only crossfade. A new bubble type belongs in `bubbleShape.t
      call, red hangs up and declines one, and each is disabled when the phone has
      nothing for it to do (`../phoneActions.ts`). Any other label is lettered and
      pressable and does nothing, which is also what both look like in the editor.
+   - **Dial** is those two at once, for the balloon beside a photographed telephone: an
+     autocomplete whose list is the wheel. Its text is the comma-delimited shortlist, and
+     there is only ever **one** window — the drum's centre line is a real phone field
+     rather than lettering, and the rows behind it are the shortlist as the typed number
+     has narrowed it. Typing filters (on the digits, so `+1 234 567 9999` and a keypad
+     punching `234…` find each other); turning the drum (scroll, or ↑/↓ with the field
+     focused) walks the matches and letters each into the field; turning back up off the
+     first match returns the reader's own half-typed number. It starts on the first option,
+     and a number the shortlist does not carry simply empties the drum and stays in the
+     field. **Dialling saves the number**: Enter appends it to that panel's options, so the
+     drum becomes a redial list (`dialOptions` merges it in, ignoring punctuation, so a
+     number the author already listed is not listed twice). **A number pad projected onto a picture in the
+     same panel types into it**, so the phone in the photograph and the balloon are one
+     number rather than two; that is why the value is held by `../ComicPanel.tsx`, the only
+     component that can see both halves. Enter dials and, unlike a composer, keeps the
+     number on the display. A dial also counts as the panel's picker for an SMS chain
+     (`peerPickerOn`), which then binds to whatever the field says.
      Edit the **text** or **initial value**, choose the shapes to
      morph to **on hover**
      and **on click** (`— no change —` keeps the resting shape), and pick a **link
@@ -367,8 +385,11 @@ bubbleTypes.ts      BubbleType + BUBBLE_TYPES (lettering font per type) — ship
 ../useBubbleMorph.ts  rAF morph driver — writes `d` to the DOM, not through React
 ../PanelBubble.tsx  one bubble: outline SVG + content + hover/press morph state
 ../BubbleInput.tsx  real text/phone input; isolates its events from panel navigation
+../BubbleDial.tsx   the 'dial' kind: an autocomplete drawn as a drum, field on its centre line
+../dialPicker.ts    PURE dial arithmetic: filter, which row, keypad-key append, redial list
+../usePhoneField.ts caret-preserving phone editing, shared by BubbleInput and BubbleDial
 ../phoneInput.ts    PURE locale detection, live phone formatting + caret/deletion math
-../bubbleContent.ts content-kind registry and persisted-value guard
+../bubbleContent.ts content-kind registry, persisted-value guard, the panel's dial balloon
 ../PanelBubbles.tsx one panel's bubbles: filters the array by panel, clips the non-spilling ones
 ../PanelBubbleChain.tsx  one conversation: rows from templates, growth timer, wheel scroll, composer
 ../BubbleTubes.tsx  viewport-level tube layer for every linked pair

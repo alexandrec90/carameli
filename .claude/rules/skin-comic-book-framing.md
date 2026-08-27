@@ -24,8 +24,9 @@ placement and behaviour (`PANEL_BUBBLE_TRANSFORMS`: panel / top / right / width 
 rotate / spill / type / tail / content / text, plus `hoverType` / `clickType` event
 morph targets, the `linkTo` tube partner and the `chain` this balloon is a slot of;
 content may be lettering, a wheel picker, a text input, a locale-formatted phone
-input, or the telephone's own call/end-call keys) and the chain settings those names
-resolve to (`PANEL_BUBBLE_CHAINS`),
+input, a dial — an autocomplete over that phone input, its list drawn as the wheel — or
+the telephone's own call/end-call keys) and the chain settings those names resolve to
+(`PANEL_BUBBLE_CHAINS`),
 plus each panel's background pattern style
 (`PANEL_PATTERNS`, the one array parallel to `PANELS`; the per-panel palette and dot
 metrics stay in `PANEL_BG_CONFIGS` in `panelPatterns.ts`). The renderer in
@@ -151,7 +152,7 @@ two are not the same input, which is why the keys take no argument.
 | Add / remove | **+ Image** / **+ Bubble** toolbar buttons, **Delete image** / **Delete bubble** in the inspector | Adds to the selected panel; deleting a bubble clears any link naming it |
 | Panel fields | inspector select | background **pattern** style (`PATTERN_STYLE_KEYS`; palette stays per panel) |
 | Picture fields | inspector selects | panel, picture (`PANEL_ASSETS`), alt (empty = decorative), anchor, spill |
-| Bubble fields | inspector selects | panel, type, **tail** (nine options incl. **No tail**), **content** (Text / Wheel picker / Text input / Phone input / Action buttons), authored text or initial value, hover/click morph, **chain** (free text, completing on the names already in use), link |
+| Bubble fields | inspector selects | panel, type, **tail** (nine options incl. **No tail**), **content** (Text / Wheel picker / Text input / Phone input / Dial / Action buttons), authored text or initial value, hover/click morph, **chain** (free text, completing on the names already in use), link |
 | Chain fields | inspector, below the bubble's own, when the bubble names a chain | **grow** / **step ms**, **scroll**, **messages** (one per line; empty = speak the balloons' own text), **+ Balloon in chain** — they edit the whole column, not the selected balloon. Chained balloons render flat in edit mode so each stays selectable |
 | Table on / off | **Project a table onto this image** checkbox (picture inspector) | Switching on seeds a starter surface; switching off deletes the table and its cells, leaving the picture |
 | Table source | **shows** select (table inspector) | *Cells typed below* or a live feed (**Call records**, **SMS messages**). Picking a feed takes its columns and empties the cells; going back seeds a fresh authored surface, since five empty feed-shaped columns would leave nothing on the notepad to see |

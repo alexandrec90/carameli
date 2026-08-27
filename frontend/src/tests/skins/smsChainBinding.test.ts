@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { OUT_PREFIX, peerWheelOn, smsTranscript } from '../../skins/comic-book/bubbleChain'
+import { OUT_PREFIX, peerPickerOn, smsTranscript } from '../../skins/comic-book/bubbleChain'
 import type { BubbleChain } from '../../skins/comic-book/bubbleChain'
 import { hydrateChains } from '../../skins/comic-book/editor/chainOps'
 import { serializeChains } from '../../skins/comic-book/editor/serialize'
@@ -13,7 +13,7 @@ import { serializeChains } from '../../skins/comic-book/editor/serialize'
 // and because the seam is the feature: `bubbleChain.test.ts` is about drawing a chain,
 // this is about a chain that is no longer only a drawing.
 
-/** Just the fields `peerWheelOn` reads, so a case is legible as the rule it tests. */
+/** Just the fields `peerPickerOn` reads, so a case is legible as the rule it tests. */
 const b = (panel: number, chain: string, content: string) => ({ panel, chain, content })
 
 const chain = (over: Partial<BubbleChain> = {}): BubbleChain => ({
@@ -26,33 +26,40 @@ const chain = (over: Partial<BubbleChain> = {}): BubbleChain => ({
   ...over,
 })
 
-describe('peerWheelOn', () => {
+describe('peerPickerOn', () => {
   it('finds the panel’s wheel-picker balloon', () => {
     const bubbles = [b(0, '', 'text'), b(0, '', 'wheel')]
-    expect(peerWheelOn(bubbles, 0)).toBe(1)
+    expect(peerPickerOn(bubbles, 0)).toBe(1)
+  })
+
+  it('finds a dial balloon too', () => {
+    // A dial is a wheel whose picked row is typeable, so it names a counterparty the same
+    // way — a chain beside one must bind rather than draw nothing.
+    expect(peerPickerOn([b(0, '', 'text'), b(0, '', 'dial')], 0)).toBe(1)
   })
 
   it('is -1 on a panel that has no picker', () => {
-    expect(peerWheelOn([b(0, '', 'text')], 0)).toBe(-1)
+    expect(peerPickerOn([b(0, '', 'text')], 0)).toBe(-1)
   })
 
   it('ignores a picker belonging to another panel', () => {
     // Two panels each with their own conversation must not read each other's number.
-    expect(peerWheelOn([b(1, '', 'wheel')], 0)).toBe(-1)
+    expect(peerPickerOn([b(1, '', 'wheel')], 0)).toBe(-1)
   })
 
   it('ignores a picker that is itself part of a chain', () => {
     // A wheel inside a conversation is choosing what to *say*, not who to say it to.
-    expect(peerWheelOn([b(0, 'chain-1', 'wheel')], 0)).toBe(-1)
+    expect(peerPickerOn([b(0, 'chain-1', 'wheel')], 0)).toBe(-1)
+    expect(peerPickerOn([b(0, 'chain-1', 'dial')], 0)).toBe(-1)
   })
 
   it('takes the first free picker when a panel has several', () => {
-    const bubbles = [b(0, 'chain-1', 'wheel'), b(0, '', 'wheel'), b(0, '', 'wheel')]
-    expect(peerWheelOn(bubbles, 0)).toBe(1)
+    const bubbles = [b(0, 'chain-1', 'wheel'), b(0, '', 'dial'), b(0, '', 'wheel')]
+    expect(peerPickerOn(bubbles, 0)).toBe(1)
   })
 
   it('is -1 for an empty page', () => {
-    expect(peerWheelOn([], 0)).toBe(-1)
+    expect(peerPickerOn([], 0)).toBe(-1)
   })
 })
 
