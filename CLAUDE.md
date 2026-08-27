@@ -97,6 +97,20 @@ Avoid destructive or disruptive lifecycle commands without confirmation:
 - `restart` and `up --build` can interrupt the user's active session.
 - use `docker compose exec -T` from scripts and automation.
 
+**The `db-backup` service is not a recovery path for the volumes being lost.** It dumps
+into MinIO, and MinIO's storage is the `carameli_miniodata` *Docker volume* — same
+daemon, same disk as `carameli_pgdata` — so anything that takes one takes the other.
+`scripts/db-snapshot.py` (`save` / `list` / `restore`) is the off-volume copy: it writes
+to `.local/db-snapshots/` on the host, which no prune, `down -v` or box reap reaches.
+Take one before anything that touches the database.
+
+Every snapshot carries a row-count manifest, and `list` prints `(EMPTY)` for a dump that
+holds none. That is the failure this exists to make visible rather than a nicety: on
+2026-08-27 the only dump in MinIO was a valid archive that restored cleanly and contained
+zero rows in every table, because it had been taken just after the database was emptied,
+and nothing about it said so. `restore` refuses such a snapshot unless asked with
+`--allow-empty`.
+
 DB-backed tests read `DATABASE_URL` from `.env` and TRUNCATE every table before each
 run, so the database they are pointed at is destroyed. **`tests/conftest.py` refuses to
 run unless something marks that database disposable**: `CI` is set, the name ends in
