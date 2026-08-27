@@ -112,8 +112,9 @@ itself, so dragging could only slide the picture under a window that stayed put,
 second picture on the same panel had nowhere to go.
 
 **A picture may also be a *surface*.** Switch **Project a table onto this image** on and
-the picture carries a `table`: four draggable corners (`quad`, in % of the picture's own
-frame), a row count, the columns, and the cell text. The corners are a projective map —
+the picture carries a `table`: four draggable corners (`quad`, in % of the picture's
+rendered rect — the artwork's pixels, so a window resize cannot slide the picture out
+from under the surface), a row count, the columns, and the cell text. The corners are a projective map —
 `tableProjection.ts` solves the homography taking the unit square onto them and emits it
 as one `matrix3d` — so a table can be laid onto a notepad photographed at an angle and
 converge with it, which three rotation sliders cannot do. The field is **absent**, not
@@ -205,8 +206,7 @@ different images can only crossfade. A new bubble type belongs in `bubbleShape.t
      **Text** and **Ink** controls tune the symbols. Its 3 × 4 grid and outline are
      visible alignment guides in the editor only. Outside edit mode the twelve symbols
      are a **working telephone keypad**: each key is a button wired to the app's shared
-     softphone, and the display and call keys appear as a caption box (`../PhoneHud.tsx`)
-     once someone presses one. Inside edit mode the pad takes no pointer input at all,
+     softphone. Inside edit mode the pad takes no pointer input at all,
      because the corner grips are on the same picture and would lose every drag to it.
      A picture carries either a table or a number pad, so switching either option on
      replaces the other projected content.
@@ -216,14 +216,21 @@ different images can only crossfade. A new bubble type belongs in `bubbleShape.t
    - For bubbles: pick the **panel** it belongs to, a resting **type** (sets shape +
      lettering font), which way the **tail** points (**No tail** is one of the nine
      options), pick the **content** presentation (**Text**, **Wheel picker**, **Text
-     input**, or **Phone input**). Wheel text is comma-delimited options: hover the
-     bubble outside edit mode and scroll to turn it. Input text is its initial value;
-     phone input formats live using the browser locale, while a leading `+` selects an
-     international calling code. A **Phone input** balloon that is not in a chain is the
-     projected pad's fallback: Enter places the call, on the same shared softphone and
-     with the same caption box (`../PhoneHud.tsx`) reporting it, so a page whose art
-     carries no keypad still has somewhere to dial from. In a chain that same content
-     is the conversation's composer instead and dials nothing.
+     input**, **Phone input**, or **Action buttons**). Wheel text is comma-delimited
+     options: hover the bubble outside edit mode and scroll to turn it. Input text is
+     its initial value; phone input formats live using the browser locale, while a
+     leading `+` selects an international calling code. A **Phone input** balloon that
+     is not in a chain is the projected pad's fallback: Enter places the call on the
+     app's shared softphone, so a page whose art carries no keypad still has somewhere
+     to dial from. In a chain that same content is the conversation's composer instead
+     and dials nothing. **Action buttons** text is comma-delimited too: each entry is
+     one button (`../BubbleActions.tsx`). Two labels name the telephone's own keys and
+     draw as its artwork instead of lettering — `Call` and `End call`, matched on
+     letters alone, so case and hyphens do not matter. Those two are wired to the
+     shared softphone: green dials what the number pad typed and answers a ringing
+     call, red hangs up and declines one, and each is disabled when the phone has
+     nothing for it to do (`../phoneActions.ts`). Any other label is lettered and
+     pressable and does nothing, which is also what both look like in the editor.
      Edit the **text** or **initial value**, choose the shapes to
      morph to **on hover**
      and **on click** (`— no change —` keeps the resting shape), and pick a **link
@@ -282,14 +289,57 @@ different images can only crossfade. A new bubble type belongs in `bubbleShape.t
    - **Reset shapes** in the inspector restores the current window shape's grid, for
      the current page. Each page's three grids are edited independently: resize the
      window to reach another shape, switch pages to reach the other page's grids.
+   - **Content holds its place** through every shape edit, reset included: a panel is
+     only the window its pictures and balloons are seen through, so each affected
+     frame and each affected balloon is re-expressed against its new panel box
+     (`gridContentRemap.ts`) and the polygon clip alone follows the seam. A chain
+     needs nothing of its own — it is laid out from the balloons that are its slots.
 6. Click **Save** to write the change straight back to `layoutConfig.ts` (a dev-only
    Vite endpoint, `POST /__comic-editor/save`); HMR reloads it. **Reset** discards
    unsaved edits and reverts to the last saved file.
 7. Reload **without** `?edit=1` — your saved change is now the baseline.
+8. Click **Ship** when the layout is worth keeping: it saves, then commits, pushes and
+   opens or updates a pull request. The status line under the button carries the branch
+   and a link to the PR.
 
 **Copy config** / **.ts** remain as fallbacks: Copy puts the paste-ready
 `export const` blocks on the clipboard; **.ts** downloads a complete `layoutConfig.ts`.
 Both are used automatically if the Save endpoint or clipboard is unavailable.
+
+## Save writes a file; Ship makes it survive
+
+Save writes into whichever working tree the dev server is serving, and **two of the
+three trees that run this editor hold that file somewhere git is not watching**:
+
+| Where the dev server runs | HEAD | What Save alone leaves you with |
+| --- | --- | --- |
+| An ephemeral box, `.worktrees/<project>--<slug>` | an `agent/…` branch | an uncommitted change on a real branch |
+| A UI preview copy, `.ui-previews/<project>/<ref>` | **detached** | a change git will not let you commit |
+| The static checkout | the default branch | a change the branch policy protects against |
+
+The middle row is the dangerous one. `preview-ui-host.py --clean` removes those copies
+with `git worktree remove --force`, so a layout saved into one lives in exactly one
+place that routine cleanup deletes — which is how an afternoon of panel work came to be
+recovered from a browser download and a dirty preview copy on 2026-08-26.
+
+**Ship** is the answer to that, and it is deliberately one button rather than a
+checklist. `POST /__comic-editor/ship` writes the file and then hands it to
+[`frontend/shipLayout.ts`](../../../../shipLayout.ts), which:
+
+1. cuts an `agent/<slug>-<MMDD>` branch when HEAD is detached or on the default branch,
+   and otherwise **reuses the branch you are on** — so a second Ship updates one PR
+   instead of opening a second beside it;
+2. stages `layoutConfig.ts` **only**, never the rest of a working tree;
+3. commits, then pushes, then asks `gh` for the branch's PR and creates one if there is
+   none.
+
+The push happens before the PR call on purpose: a machine with no working `gh` still
+ends with the work on the remote, and the status line says so. Nothing is silent — a
+blocked commit or a rejected push comes back verbatim in that line, with a reminder that
+**.ts** still downloads a copy.
+
+The summary box is optional. What you type becomes both the branch slug and the commit
+subject; empty falls back to a generic one.
 
 ## Dev-only / zero prod cost
 
@@ -298,8 +348,9 @@ The editor is gated behind `import.meta.env.DEV && (?edit=1 OR localStorage flag
 `import.meta.env.DEV` check, so Rollup tree-shakes it (and `editor.css`) out of the
 production bundle. Only `layoutConfig.ts` (data), `bubbleTypes.ts` (data), and
 `transforms.ts` (pure CSS/math the renderer needs) ship in prod — all tiny. The Save
-endpoint lives only in the dev server (Vite `apply: 'serve'`). `?edit=1` does nothing
-in a prod build.
+and Ship endpoints live only in the dev server (Vite `apply: 'serve'`), so nothing that
+writes a file or spawns a process is reachable from a built bundle. `?edit=1` does
+nothing in a prod build.
 
 ## Layout
 
@@ -330,8 +381,8 @@ bubbleTypes.ts      BubbleType + BUBBLE_TYPES (lettering font per type) — ship
 ../../../hooks/useLiveTables.ts hook: the only place a surface's rows are fetched, and the poll
 ../ProjectedNumberPad.tsx fixed 3 × 4 telephone keys on a projected surface; live buttons outside edit mode
 ../number-pad.css   number-pad lettering, surface layout, and the live key's press states
-../PhoneHud.tsx     the display and call keys a photographed pad has no room for
-../phone-hud.css    the caption box that holds them
+../BubbleActions.tsx action buttons inside a balloon, one per comma-delimited entry
+../phoneActions.ts  PURE: label -> the telephone key it draws, and the softphone verb it runs
 ../panelGeometry.ts PURE grid -> polygon geometry: frame, normalised space, vertex constraints
 ../panelPatterns.ts pattern style registry + per-panel palette/dot tuning (PANEL_BG_CONFIGS)
 ../polygonInset.ts  PURE polygon maths: the perpendicular gutter inset, bounding box
@@ -341,6 +392,7 @@ panelGridValidate.ts PURE structural guard: rings, ranges, no T-junctions
 layoutConfig.ts     PANEL_IMG_TRANSFORMS, PANEL_BUBBLE_TRANSFORMS, PANEL_PATTERNS, PANEL_GRIDS — source of truth
 configOps.ts        PURE config edits: re-exports configSeed + configHydrate, patch/add/remove, links
 configSeed.ts       PURE: the working copy's seed, clone, and per-breakpoint grid set/reset
+gridContentRemap.ts PURE: grid set/reset with every picture and balloon held still on screen
 configHydrate.ts    PURE: parse a persisted payload back into a config, falling back per field
 chainOps.ts         PURE chain-list lifecycle: linked groups -> ids, derive the list, patch, clamp, hydrate
 useSeamDrag.ts      hook: which gesture a pointer means, and the grid edit it maps to
@@ -386,7 +438,7 @@ All math/serialization is pure and unit-tested under
 `frontend/src/tests/skins/` (`comicBookTransforms`, `editorTransformsMath`,
 `editorMode`, `editorConfigOps`, `editorChainConfig`, `editorChainOps`,
 `editorSerialize`, `pageSelection`, `editorToolbarDrag`, `bubbleShape`, `bubbleTube`,
-`bubbleChain`, `panelGeometry`, `panelGridOps`, `panelLayouts`, `tableProjection`,
+`bubbleChain`, `panelGeometry`, `panelGridOps`, `gridContentRemap`, `panelLayouts`, `tableProjection`,
 `tableData`, `tableConfig`, `ProjectedTable`, `liveTableImages`,
 `TableSourceInspector`) — and the live feed itself in `frontend/src/tests/lib/liveTables`
 and `frontend/src/tests/useLiveTables`.

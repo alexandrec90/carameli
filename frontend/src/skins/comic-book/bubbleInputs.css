@@ -23,3 +23,84 @@
   color: var(--cb-black);
   opacity: 1;
 }
+
+/* A column of buttons inside a balloon — the comic button treatment (3px ink border,
+   offset shadow, no radius) at balloon-lettering scale, for a label that letters. A
+   label naming one of the telephone's keys draws its artwork instead; see below. */
+.cb-bubble-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4em;
+  font-size: clamp(0.75rem, 2vw, 1.125rem);
+}
+
+.cb-bubble-action {
+  margin: 0;
+  padding: 0.1em 0.5em;
+  font: inherit;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--cb-black);
+  background: var(--cb-white);
+  border: 3px solid var(--cb-black);
+  box-shadow: 3px 3px 0 var(--cb-black);
+  cursor: pointer;
+}
+
+/* Inside the editor the buttons are disabled, but a greyed control would read as a
+   drawing mistake in a hand-lettered balloon: keep the ink and drop only the press. */
+.cb-bubble-action:disabled {
+  color: var(--cb-black);
+  opacity: 1;
+}
+
+.cb-bubble-action:hover:enabled {
+  box-shadow: 5px 5px 0 var(--cb-black);
+}
+
+.cb-bubble-action:active:enabled {
+  box-shadow: 1px 1px 0 var(--cb-black);
+  transform: translate(2px, 2px);
+}
+
+/* A drawn telephone key: the artwork *is* the button, so the lettered treatment above
+   would paste a second, square button around the picture of a round one. */
+.cb-bubble-key {
+  padding: 0;
+  line-height: 0;
+  background: none;
+  border: 0;
+  box-shadow: none;
+}
+
+.cb-bubble-key:hover:enabled {
+  box-shadow: none;
+  transform: scale(1.08);
+}
+
+.cb-bubble-key:active:enabled {
+  box-shadow: none;
+  transform: translate(1px, 1px) scale(0.94);
+}
+
+.cb-bubble-key-art {
+  display: block;
+  width: 2.75em;
+  height: auto;
+}
+
+/* Greyed only when the *telephone* has nothing for the key to do — no number typed, or
+   no call to hang up. In the editor every control is disabled because the overlay owns
+   the pointer, and greying the artwork there would read as a fault in the drawing, so
+   the rule is scoped to a balloon that really is interactive. */
+.cb-panel-bubble.is-interactive .cb-bubble-key:disabled {
+  opacity: 0.45;
+  filter: grayscale(1);
+}
+
+/* Same pointer opt-in the input gets (see bubbles.css): only a revealed, interactive
+   balloon lets its buttons take the pointer. */
+.cb-panel-bubble.is-visible.is-interactive .cb-bubble-action {
+  pointer-events: auto;
+}

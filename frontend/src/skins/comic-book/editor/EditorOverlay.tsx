@@ -11,7 +11,7 @@ import EditorToolbar from './EditorToolbar'
 import type { PageSelectProps } from './PageSelect'
 import PanelSeams from './PanelSeams'
 import SurfaceCorners from './TableCorners'
-import { bubbleRect, imgRect, imgVisibleRect } from './transforms'
+import { bubbleRect, imgRect, imgVisibleRect, surfaceBaseRect } from './transforms'
 import { useOverlayInteraction } from './useOverlayInteraction'
 import { useSeamDrag } from './useSeamDrag'
 import type { EditorModeApi } from './useEditorMode'
@@ -220,7 +220,7 @@ export default function EditorOverlay({
           index={selected.index}
           surface={selImg.table ?? selImg.numberPad!}
           kind={selImg.table ? 'table' : 'numberPad'}
-          rect={imgRect(selPoly.bounds, selImg)}
+          rect={surfaceBaseRect(imgRect(selPoly.bounds, selImg), natSizes[selImg.src], selImg)}
         />
       )}
 

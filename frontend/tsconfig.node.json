@@ -32,6 +32,9 @@
     "devWatchPolicy.ts",
     "devWatchPolicy.test.ts",
     "proxyErrorPolicy.ts",
-    "proxyErrorPolicy.test.ts"
+    "proxyErrorPolicy.test.ts",
+    "shipLayout.ts",
+    "shipLayout.test.ts",
+    "shipLayout.integration.test.ts"
   ]
 }

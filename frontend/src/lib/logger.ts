@@ -9,6 +9,8 @@
  *   [FRONTEND] <message> | context={...}
  */
 
+import { isBackendOffline } from './backendReachability'
+
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? ''
 
 type LogLevel = 'debug' | 'info' | 'warn' | 'error'
@@ -28,12 +30,30 @@ function scheduleFlush(): void {
   flushTimer = setTimeout(flush, 2000)
 }
 
+/**
+ * A sink that has refused this many posts in a row is down rather than flaky, so
+ * stop posting to it. Without a stop, a page whose backend is absent turns every
+ * log line into another failed request — including the lines *about* failed
+ * requests, which is most of the noise a UI-only preview reports.
+ */
+const MAX_CONSECUTIVE_SHIP_FAILURES = 3
+let shipFailures = 0
+
+function shippingStopped(): boolean {
+  return shipFailures >= MAX_CONSECUTIVE_SHIP_FAILURES || isBackendOffline()
+}
+
 async function flush(): Promise<void> {
   flushTimer = null
   if (queue.length === 0) return
+  if (shippingStopped()) {
+    // Drop rather than accumulate: nothing is going to drain this.
+    queue.length = 0
+    return
+  }
   const batch = queue.splice(0, queue.length)
   try {
-    await fetch(`${API_BASE}/vg/1.0.0/frontend-logs`, {
+    const res = await fetch(`${API_BASE}/vg/1.0.0/frontend-logs`, {
       method: 'POST',
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
@@ -41,8 +61,10 @@ async function flush(): Promise<void> {
       // Use keepalive so logs still ship on page unload
       keepalive: true,
     })
+    shipFailures = res.ok ? 0 : shipFailures + 1
   } catch {
     // Silently swallow — avoid infinite logging loops
+    shipFailures += 1
   }
 }
 
@@ -73,7 +95,15 @@ export const logger = {
   },
 
   error(message: string, context?: Record<string, unknown>): void {
-    console.error(`[ERROR] ${message}`, context ?? '')
+    // Same text, different channel: in a preview with no backend behind the proxy
+    // every load failure has one known cause, and painting each one red buries
+    // anything that is genuinely wrong. Nothing is hidden and nothing is dropped —
+    // and `isBackendOffline()` is never true in a production build.
+    if (isBackendOffline()) {
+      console.warn(`[ERROR] ${message}`, context ?? '')
+    } else {
+      console.error(`[ERROR] ${message}`, context ?? '')
+    }
     record('error', message, context)
   },
 }
