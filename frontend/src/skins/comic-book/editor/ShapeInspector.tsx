@@ -1,7 +1,7 @@
 import type { LayoutKind, PanelGrid } from '../panelGeometry'
 import { constraintOf } from '../panelGeometry'
 import type { PanelPage } from '../panels'
-import { moveVertex } from './panelGridOps'
+import { insertBend, moveVertex } from './panelGridOps'
 import type { EditorModeApi } from './useEditorMode'
 import type { SeamDragApi } from './useSeamDrag'
 
@@ -36,12 +36,25 @@ export default function ShapeInspector({ api, page, kind, grid, drag }: ShapeIns
   const index = drag.selectedVertex
   const vertex = index === null ? null : grid.vertices[index]
   const constraint = vertex ? constraintOf(vertex) : null
+  const seam = api.selected?.kind === 'seam' ? drag.seams[api.selected.index] ?? null : null
 
   const setAxis = (axis: 0 | 1, value: string) => {
     if (index === null || !vertex) return
     const next: [number, number] = [vertex[0], vertex[1]]
     next[axis] = fromPercent(value, vertex[axis])
     api.setGridFor(page, kind, moveVertex(grid, index, next))
+  }
+
+  // The double-click gesture's reachable spelling: break the selected line at its
+  // midpoint, then drag the new corner where it is wanted.
+  const breakSelectedSeam = () => {
+    if (!seam) return
+    const a = grid.vertices[seam.a]
+    const b = grid.vertices[seam.b]
+    if (!a || !b) return
+    const { grid: next, index: bend } = insertBend(grid, seam.a, seam.b, [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2])
+    api.setGridFor(page, kind, next)
+    api.select('vertex', bend)
   }
 
   return (
@@ -51,10 +64,23 @@ export default function ShapeInspector({ api, page, kind, grid, drag }: ShapeIns
       </div>
 
       {!vertex || constraint === null ? (
-        <div className="cb-ed-hint">
-          Drag a line to move it, or a corner to move that end. Double-click a line to
-          break it — repeat for a lightning bolt. The outer frame and the gutters are fixed.
-        </div>
+        <>
+          <div className="cb-ed-hint">
+            Drag a line to move it, or a corner to move that end. Double-click a line to
+            break it — repeat for a lightning bolt. Drop a corner onto a neighbouring one
+            to merge the two. The outer frame and the gutters are fixed.
+          </div>
+          {seam && (
+            <button
+              type="button"
+              className="cb-ed-btn"
+              title="Break this line at its midpoint, adding a corner to drag"
+              onClick={breakSelectedSeam}
+            >
+              Add a corner to this line
+            </button>
+          )}
+        </>
       ) : (
         <>
           <div className="cb-ed-shape-note">{CONSTRAINT_TEXT[constraint]}</div>

@@ -6,7 +6,8 @@ import './number-pad.css'
 
 interface ProjectedNumberPadProps {
   numberPad: NumberPadProjection
-  frame: { w: number; h: number }
+  /** The picture's rendered rect in the clip wrapper's coordinates — the quad's base. */
+  base: { x: number; y: number; w: number; h: number }
   /** Shows the alignment grid and keeps the projected layer out of editor gestures. */
   editing: boolean
   /**
@@ -25,11 +26,11 @@ const KEY_LABELS: Record<string, string> = { '*': 'star', '#': 'hash' }
 /** A fixed telephone number pad laid onto a photographed surface by one homography. */
 export default function ProjectedNumberPad({
   numberPad,
-  frame,
+  base,
   editing,
   onKey,
 }: ProjectedNumberPadProps) {
-  const { width, height, transform } = surfaceStyle(numberPad, frame)
+  const { left, top, width, height, transform } = surfaceStyle(numberPad, base)
   if (transform === 'none') return null
 
   // Editing always wins: the corner grips sit on this same picture, and a pad that took
@@ -37,6 +38,8 @@ export default function ProjectedNumberPad({
   const live = !editing && Boolean(onKey)
 
   const surface: CSSProperties = {
+    left,
+    top,
     width,
     height,
     transform,

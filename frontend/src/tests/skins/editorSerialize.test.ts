@@ -26,15 +26,41 @@ const IMPORT_LINE =
   "import type { ImgTransform, BubbleTransform, BubbleChain, PageGrids } from './types'"
 
 /**
- * Count `{ ... }` object entries inside the named const's array literal. An entry with
- * a projected surface spans lines and nests `{`/`]` (a pad's quad, a table's rows), so
- * bound at the array's own close bracket in column 0 and count only entry-opening
- * lines at entry indent.
+ * Count `{ ... }` object entries inside the named const's array literal, at the
+ * array's own depth.
+ *
+ * A picture that carries a `table` or a `numberPad` nests both braces (the surface
+ * object, its columns) and brackets (the quad, the rows), so neither of the two
+ * one-liners this replaces survives one: slicing to the first `]` stopped inside the
+ * quad and lost every entry after it, and counting every `{` counted the surface's
+ * own objects as pictures. Both were correct only while no surface had been authored
+ * into the seed, which stopped being true the moment one was.
  */
 function entryCount(ts: string, constName: string): number {
   const after = ts.slice(ts.indexOf(`export const ${constName}`))
-  const arr = after.slice(0, after.indexOf('\n]'))
-  return (arr.match(/^ {2}\{ /gm) ?? []).length
+  const open = after.indexOf('= [') + 2 // skip past the `ImgTransform[]` type annotation
+  let brackets = 0
+  let braces = 0
+  let quote = ''
+  let entries = 0
+  for (let i = open; i < after.length; i++) {
+    const ch = after[i]
+    if (quote) {
+      if (ch === '\\') i++
+      else if (ch === quote) quote = ''
+      continue
+    }
+    if (ch === "'" || ch === '"' || ch === '`') quote = ch
+    else if (ch === '[') brackets++
+    else if (ch === ']') {
+      brackets--
+      if (brackets === 0) break
+    } else if (ch === '{') {
+      if (brackets === 1 && braces === 0) entries++
+      braces++
+    } else if (ch === '}') braces--
+  }
+  return entries
 }
 
 /**
@@ -91,11 +117,13 @@ describe('serializeConfig', () => {
     expect(ts).toContain('falls back to the shipped default on hydrate')
   })
 
+  // Read the value being replaced off the seed rather than naming it: a bare
+  // `not.toContain('halftone-gradient')` also fails when some *other* slot happens to
+  // ship that style, which is a fact about the art and not about the serializer.
   it('writes the pattern an author picked, under its panel label comment', () => {
     const ts = serializeConfig(patchPattern(seedConfig(), 0, 'sunburst'))
-    expect(ts).toContain("  'sunburst', // Logo\n")
-    // The Logo 2 slot legitimately keeps this style; only the patched slot loses it.
-    expect(ts).not.toContain("  'halftone-gradient', // Logo\n")
+    expect(ts).toContain(`  'sunburst', // ${PANELS[0].label}\n`)
+    expect(ts).not.toContain(`  '${PANEL_PATTERNS[0]}', // ${PANELS[0].label}\n`)
   })
 
   // The patterns block iterates PANELS, not the config: the array is parallel by
@@ -107,7 +135,7 @@ describe('serializeConfig', () => {
     const ts = serializeConfig(cfg)
     expect(patternCount(ts)).toBe(PANELS.length)
     expect(ts).not.toContain('undefined')
-    expect(ts).toContain("  'halftone-gradient', // Logo 2\n")
+    expect(ts).toContain(`  '${PANEL_PATTERNS[8]}', // ${PANELS[8].label}\n`)
   })
 
   it('reproduces the default values verbatim', () => {
@@ -290,15 +318,23 @@ describe('serializeConfig', () => {
    * wrote `table: null` would round-trip through this reparse and then fail the
    * byte-for-byte test below, having already put eight dead keys into the shipped file.
    */
-  it('writes a table only on the pictures that are surfaces', () => {
-    const cfg = patchImg(seedConfig(), 2, { table: newTable() })
-    const ts = serializeConfig(cfg)
-    // The patched picture plus the shipped notepad surface (panel 10).
-    expect((ts.match(/ table: \{/g) ?? [])).toHaveLength(2)
-    expect((serializeConfig(seedConfig()).match(/ table: \{/g) ?? [])).toHaveLength(1)
-    expect(
-      reparse(serializeConfig(seedConfig())).images.filter(t => 'table' in t),
-    ).toHaveLength(1)
+  // Counted against a config with the surfaces stripped rather than against the seed
+  // and a fixed number of plain pictures: the seed ships surfaces of its own now, and
+  // both move whenever an author adds or removes one in the editor.
+  it('writes a surface only on the picture that carries one', () => {
+    const plain = seedConfig()
+    plain.images = plain.images.map(t => {
+      const copy = { ...t }
+      delete copy.table
+      delete copy.numberPad
+      return copy
+    })
+    expect(serializeConfig(plain)).not.toContain('table:')
+    expect(reparse(serializeConfig(plain)).images.every(t => !('table' in t))).toBe(true)
+
+    const ts = serializeConfig(patchImg(plain, 2, { table: newTable() }))
+    expect((ts.match(/ table: \{/g) ?? [])).toHaveLength(1)
+    expect(reparse(ts).images.filter(t => 'table' in t)).toHaveLength(1)
   })
 
   it('round-trips an edited pattern back to the same style name', () => {

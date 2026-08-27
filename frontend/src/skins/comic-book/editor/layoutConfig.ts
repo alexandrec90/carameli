@@ -12,7 +12,8 @@ import type { ImgTransform, BubbleTransform, BubbleChain, PageGrids } from './ty
 //
 // A picture with a `table` is a **surface**: an HTML table is projected onto it, so a
 // photographed notepad can hold live rows. `quad` is the four corners of that surface in
-// % of the frame, clockwise from top-left, and they are what tilts it — four corners fix
+// % of the picture's rendered rect (its own pixels, so a resize cannot slide the picture
+// out from under it), clockwise from top-left, and they are what tilts it — four corners fix
 // a projective map exactly, which is what a plane in a photograph needs and three
 // rotation angles cannot express. Drag them onto the drawn lines in the editor. `rows` is
 // how many bands the surface is cut into, so a row always lands on the same line however
@@ -97,14 +98,6 @@ export const PANEL_BUBBLE_TRANSFORMS: BubbleTransform[] = [
   { panel: 6, top: -35, right: -12, width: 55, rotate: -5, spill: true, type: 'lightning', tail: 'down-left', content: 'text', text: 'Ka-POW!', linkTo: null, hoverType: 'soft', clickType: 'cloud', chain: '' },
   { panel: 7, top: -35, right: -12, width: 55, rotate: -5, spill: true, type: 'cloud', tail: 'down-left', content: 'text', text: 'Delivering dreams...', linkTo: null, hoverType: 'soft', clickType: 'lightning', chain: '' },
   { panel: 9, top: 1, right: 8, width: 36, rotate: -5, spill: true, type: 'cloud', tail: 'none', content: 'phone', text: '4388762750', linkTo: null, hoverType: null, clickType: null, chain: '' },
-  { panel: 11, top: 24, right: 36, width: 18, rotate: -5, spill: true, type: 'soft', tail: 'down-left', content: 'text', text: 'New bubble', linkTo: null, hoverType: null, clickType: null, chain: '' },
-  { panel: 11, top: 4, right: 25, width: 23, rotate: -5, spill: true, type: 'soft', tail: 'none', content: 'text', text: 'New bubble', linkTo: 11, hoverType: null, clickType: null, chain: '' },
-  { panel: 11, top: -20, right: 28, width: 27, rotate: -5, spill: true, type: 'soft', tail: 'none', content: 'text', text: 'New bubble', linkTo: 12, hoverType: null, clickType: null, chain: '' },
-  { panel: 11, top: -43, right: 18, width: 28, rotate: -5, spill: true, type: 'soft', tail: 'none', content: 'text', text: 'New bubble', linkTo: 13, hoverType: null, clickType: null, chain: '' },
-  { panel: 11, top: 27, right: 66, width: 21, rotate: -5, spill: true, type: 'soft', tail: 'down-right', content: 'text', text: 'New bubble', linkTo: null, hoverType: null, clickType: null, chain: '' },
-  { panel: 11, top: 9, right: 60, width: 20, rotate: -5, spill: true, type: 'soft', tail: 'none', content: 'text', text: 'New bubble', linkTo: 15, hoverType: null, clickType: null, chain: '' },
-  { panel: 11, top: -16, right: 65, width: 23, rotate: -5, spill: true, type: 'soft', tail: 'none', content: 'text', text: 'New bubble', linkTo: 16, hoverType: null, clickType: null, chain: '' },
-  { panel: 11, top: -37, right: 56, width: 22, rotate: -5, spill: true, type: 'soft', tail: 'none', content: 'text', text: 'New bubble', linkTo: 17, hoverType: null, clickType: null, chain: '' },
   { panel: 9, top: 57, right: 13, width: 17, rotate: -5, spill: true, type: 'cloud', tail: 'none', content: 'actions', text: 'Call, End call', linkTo: 10, hoverType: null, clickType: null, chain: '' },
 ]
 
