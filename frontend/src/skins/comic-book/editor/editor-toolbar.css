@@ -180,3 +180,42 @@
   background: #2e2e36;
   border-color: #4a4a54;
 }
+
+/* The Ship row: a summary that becomes the branch slug and the commit subject, and the
+   button that carries the layout out of this tree. */
+.cb-ed-ship-summary {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 4px 6px;
+  background: #1c1c22;
+  color: #f0f0f0;
+  border: 1px solid #4a4a54;
+  border-radius: 4px;
+  font: inherit;
+  font-size: 11px;
+}
+
+.cb-ed-ship-summary::placeholder {
+  color: #8a8a96;
+}
+
+.cb-ed-ship-summary:focus {
+  outline: none;
+  border-color: #2878ff;
+}
+
+.cb-ed-ship-status {
+  margin: 6px 0 0;
+  color: #b8d8b8;
+  font-size: 10px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.cb-ed-ship-status a {
+  color: #7ab8ff;
+}
+
+.cb-ed-ship-status-error {
+  color: #ff9a9a;
+}

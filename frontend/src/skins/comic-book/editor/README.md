@@ -286,10 +286,48 @@ different images can only crossfade. A new bubble type belongs in `bubbleShape.t
    Vite endpoint, `POST /__comic-editor/save`); HMR reloads it. **Reset** discards
    unsaved edits and reverts to the last saved file.
 7. Reload **without** `?edit=1` — your saved change is now the baseline.
+8. Click **Ship** when the layout is worth keeping: it saves, then commits, pushes and
+   opens or updates a pull request. The status line under the button carries the branch
+   and a link to the PR.
 
 **Copy config** / **.ts** remain as fallbacks: Copy puts the paste-ready
 `export const` blocks on the clipboard; **.ts** downloads a complete `layoutConfig.ts`.
 Both are used automatically if the Save endpoint or clipboard is unavailable.
+
+## Save writes a file; Ship makes it survive
+
+Save writes into whichever working tree the dev server is serving, and **two of the
+three trees that run this editor hold that file somewhere git is not watching**:
+
+| Where the dev server runs | HEAD | What Save alone leaves you with |
+| --- | --- | --- |
+| An ephemeral box, `.worktrees/<project>--<slug>` | an `agent/…` branch | an uncommitted change on a real branch |
+| A UI preview copy, `.ui-previews/<project>/<ref>` | **detached** | a change git will not let you commit |
+| The static checkout | the default branch | a change the branch policy protects against |
+
+The middle row is the dangerous one. `preview-ui-host.py --clean` removes those copies
+with `git worktree remove --force`, so a layout saved into one lives in exactly one
+place that routine cleanup deletes — which is how an afternoon of panel work came to be
+recovered from a browser download and a dirty preview copy on 2026-08-26.
+
+**Ship** is the answer to that, and it is deliberately one button rather than a
+checklist. `POST /__comic-editor/ship` writes the file and then hands it to
+[`frontend/shipLayout.ts`](../../../../shipLayout.ts), which:
+
+1. cuts an `agent/<slug>-<MMDD>` branch when HEAD is detached or on the default branch,
+   and otherwise **reuses the branch you are on** — so a second Ship updates one PR
+   instead of opening a second beside it;
+2. stages `layoutConfig.ts` **only**, never the rest of a working tree;
+3. commits, then pushes, then asks `gh` for the branch's PR and creates one if there is
+   none.
+
+The push happens before the PR call on purpose: a machine with no working `gh` still
+ends with the work on the remote, and the status line says so. Nothing is silent — a
+blocked commit or a rejected push comes back verbatim in that line, with a reminder that
+**.ts** still downloads a copy.
+
+The summary box is optional. What you type becomes both the branch slug and the commit
+subject; empty falls back to a generic one.
 
 ## Dev-only / zero prod cost
 
@@ -298,8 +336,9 @@ The editor is gated behind `import.meta.env.DEV && (?edit=1 OR localStorage flag
 `import.meta.env.DEV` check, so Rollup tree-shakes it (and `editor.css`) out of the
 production bundle. Only `layoutConfig.ts` (data), `bubbleTypes.ts` (data), and
 `transforms.ts` (pure CSS/math the renderer needs) ship in prod — all tiny. The Save
-endpoint lives only in the dev server (Vite `apply: 'serve'`). `?edit=1` does nothing
-in a prod build.
+and Ship endpoints live only in the dev server (Vite `apply: 'serve'`), so nothing that
+writes a file or spawns a process is reachable from a built bundle. `?edit=1` does
+nothing in a prod build.
 
 ## Layout
 
