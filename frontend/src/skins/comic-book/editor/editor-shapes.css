@@ -70,6 +70,13 @@
   fill: #16c8a0;
 }
 
+/* The corner a dragged corner is snapped onto: release here and the two merge. */
+.cb-ed-vx-snap {
+  fill: #16c8a0;
+  stroke: #ffe033;
+  stroke-width: 4;
+}
+
 /* Inspector section. */
 .cb-ed-shape {
   display: flex;

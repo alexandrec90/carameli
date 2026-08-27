@@ -315,6 +315,32 @@ export function renderedImgRect(
 }
 
 /**
+ * The box a projected surface's `quad` percentages measure: the picture's rendered
+ * rect ({@link renderedImgRect}), in the same coordinate space as `frame`.
+ *
+ * The frame is the wrong base on purpose. The picture is contain-fitted inside it, so
+ * the frame's letterboxing redistributes whenever the window's aspect ratio changes —
+ * a quad measured against the frame stays glued to the frame while the photograph
+ * slides underneath it, and the projected rows walk off the ruled lines on the first
+ * resize. Measured against the rendered rect, the quad is a property of the artwork
+ * and rides it through a resize, a pan and a zoom alike.
+ *
+ * Deliberately **unclamped**, unlike {@link imgVisibleRect}: a surface keeps its place
+ * on picture pixels the panel clip happens to cut off, so a pan that pushes the notepad
+ * half out of frame carries the rows with it instead of squeezing them into what is
+ * left. The frame is the fallback while the natural size is still loading — the same
+ * geometry the contain-fit `<img>` fallback renders.
+ */
+export function surfaceBaseRect(
+  frame: { x: number; y: number; w: number; h: number },
+  nat: { w: number; h: number } | undefined,
+  t: ImgTransform,
+): { x: number; y: number; w: number; h: number } {
+  if (!nat || frame.w <= 0 || frame.h <= 0) return frame
+  return renderedImgRect(frame, nat, t)
+}
+
+/**
  * The rectangle a picture visibly occupies, in viewport coordinates — the editor's
  * notion of "the image", as opposed to the frame it hangs in ({@link imgRect}).
  *

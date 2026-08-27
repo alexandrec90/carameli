@@ -57,7 +57,10 @@ question. Nothing about the feature is skin chrome: it is per-picture data, so t
 switch turns any picture into a surface.
 
 **The tilt is a projective map, not a rotation.** `tableProjection.ts` takes the author's
-four corners (`quad`, in % of the picture's frame), solves the homography carrying the
+four corners (`quad`, in % of the picture's **rendered rect** — the artwork's own pixels,
+via `surfaceBaseRect`, so a window resize, pan or zoom carries the surface with the
+photograph instead of leaving it glued to the frame's letterboxing), solves the homography
+carrying the
 unit square onto them, and emits one `matrix3d`. Matching a plane in a photograph with
 `rotateX`/`rotateY`/`perspective` is a three-way search where each axis undoes the last;
 four corners dragged onto the four corners in the picture are a unique answer and need no
@@ -130,7 +133,8 @@ Three consequences worth stating, because each one is a bug the obvious implemen
 | Pages | **Page** dropdown in toolbar | Switch route in edit mode (replays the wash); "Loading screen" entry previews the loading overlay + its exit wash |
 | Mode | **Content** / **Panel shapes** toggle | Content places pictures and bubbles; shapes drags the lines between panels. Content click targets are not rendered in shapes mode — a panel-sized target would swallow every drag aimed at a line crossing it |
 | Reshape | drag a **line** or a **vertex** | A frame vertex slides along its own edge; the four corners are locked; the frame itself has no handle. Arrows nudge (⇧×10). Pictures and bubbles hold their on-screen place — each affected frame and balloon is re-expressed against its new panel box (`editor/gridContentRemap.ts`); the polygon clip alone follows the seam |
-| Bend | **double-click a line**, drag the bend; **Delete** / **Straighten** removes it | Repeat for lightning bolts. A junction of three lines, or a vertex on the frame, is not a bend and is refused |
+| Bend | **double-click a line** (or **Add a corner to this line** on the selected line), drag the bend; **Delete** / **Straighten** removes it | Repeat for lightning bolts. A junction of three lines, or a vertex on the frame, is not a bend and is refused |
+| Merge | drag a corner **onto another corner** and release | Within snap range the target lights up and the dragged corner sits on it; releasing collapses the two into one junction (`panelGridMerge.ts`). Refused — no snap offered — when the merged grid would be invalid or the two corners obey different frame constraints |
 | Reset shapes | **Reset shapes** in the shapes inspector | Restores the current window shape's grid only — the three are edited independently. Pictures and bubbles stay where the author put them |
 | Save | **Save** button | `POST /__comic-editor/save` writes `layoutConfig.ts` (dev server only); **Copy config** / **.ts** are the fallbacks |
 | Reset all | clears working copy | Removes `localStorage['comic-book:editConfig']`, re-seeds from source |

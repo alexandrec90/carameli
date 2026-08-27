@@ -17,8 +17,8 @@ import './table.css'
 interface ProjectedTableProps {
   /** The surface: its corners, its bands, its columns and its cells. */
   table: TableProjection
-  /** The picture's frame box in px — the space `table.quad` is measured in. */
-  frame: { w: number; h: number }
+  /** The picture's rendered rect in the clip wrapper's coordinates — the quad's base. */
+  base: { x: number; y: number; w: number; h: number }
   /**
    * Editor mode. Draws the band guides and the surface outline, and takes the table out
    * of the pointer's way: the overlay's own click targets sit over this panel, and a
@@ -63,14 +63,14 @@ function Row({
  * scroll container — the window of rows is sliced out of the data, so there is nothing
  * for a browser to draw a bar against.
  */
-export default function ProjectedTable({ table, frame, editing }: ProjectedTableProps) {
+export default function ProjectedTable({ table, base, editing }: ProjectedTableProps) {
   const [rawOffset, setRawOffset] = useState(0)
   // Carried wheel travel. A ref, not state: a trackpad emits a dozen sub-row deltas
   // where a mouse emits one whole notch, and re-rendering for each of them would be a
   // render per pixel of a scroll that has not moved a row yet.
   const carry = useRef(0)
 
-  const { width, height, transform } = surfaceStyle(table, frame)
+  const { left, top, width, height, transform } = surfaceStyle(table, base)
   if (transform === 'none') return null
 
   // Derived rather than corrected in an effect: the row count and the data both change
@@ -96,6 +96,8 @@ export default function ProjectedTable({ table, frame, editing }: ProjectedTable
   const step = (rows: number) => setRawOffset(prev => clampScroll(table, prev + rows))
 
   const surface: CSSProperties = {
+    left,
+    top,
     width,
     height,
     transform,

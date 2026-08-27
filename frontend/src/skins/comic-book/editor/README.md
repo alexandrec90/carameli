@@ -112,8 +112,9 @@ itself, so dragging could only slide the picture under a window that stayed put,
 second picture on the same panel had nowhere to go.
 
 **A picture may also be a *surface*.** Switch **Project a table onto this image** on and
-the picture carries a `table`: four draggable corners (`quad`, in % of the picture's own
-frame), a row count, the columns, and the cell text. The corners are a projective map —
+the picture carries a `table`: four draggable corners (`quad`, in % of the picture's
+rendered rect — the artwork's pixels, so a window resize cannot slide the picture out
+from under the surface), a row count, the columns, and the cell text. The corners are a projective map —
 `tableProjection.ts` solves the homography taking the unit square onto them and emits it
 as one `matrix3d` — so a table can be laid onto a notepad photographed at an angle and
 converge with it, which three rotation sliders cannot do. The field is **absent**, not
@@ -265,10 +266,16 @@ different images can only crossfade. A new bubble type belongs in `bubbleShape.t
      frame corners do not move at all. There is no handle on the frame itself: a frame
      edge belongs to one panel only, so it is never a line between two, and the
      gesture that would move it does not exist.
-   - **Double-click a line** to put a bend in it, then drag the bend — repeat for the
-     lightning-bolt shapes. **Delete** (or **Straighten** in the inspector) takes a
-     bend back out; a vertex where three lines meet, or one on the frame, is not a
-     bend and is refused.
+   - **Double-click a line** to put a bend in it (or select the line and press **Add a
+     corner to this line**), then drag the bend — repeat for the lightning-bolt shapes.
+     **Delete** (or **Straighten** in the inspector) takes a bend back out; a vertex
+     where three lines meet, or one on the frame, is not a bend and is refused.
+   - **Drop a vertex onto another vertex** to merge the two into one junction. Within
+     snap range the target lights up and the dragged vertex sits exactly on it; no snap
+     is offered when the merged grid would be invalid, or when the two obey different
+     frame constraints. This is the only way two corners can occupy one point — released
+     just short of each other they would be two coincident vertices joined by a
+     zero-length seam, which the validator rejects, so the snap merges them instead.
    - **Arrow keys** nudge the selected vertex (hold **⇧** for x10); **Esc** deselects.
    - The gutter between panels stays the same width at every angle — it is measured
      perpendicular to each edge, not per axis — and every panel stays inside the outer
@@ -285,10 +292,48 @@ different images can only crossfade. A new bubble type belongs in `bubbleShape.t
    Vite endpoint, `POST /__comic-editor/save`); HMR reloads it. **Reset** discards
    unsaved edits and reverts to the last saved file.
 7. Reload **without** `?edit=1` — your saved change is now the baseline.
+8. Click **Ship** when the layout is worth keeping: it saves, then commits, pushes and
+   opens or updates a pull request. The status line under the button carries the branch
+   and a link to the PR.
 
 **Copy config** / **.ts** remain as fallbacks: Copy puts the paste-ready
 `export const` blocks on the clipboard; **.ts** downloads a complete `layoutConfig.ts`.
 Both are used automatically if the Save endpoint or clipboard is unavailable.
+
+## Save writes a file; Ship makes it survive
+
+Save writes into whichever working tree the dev server is serving, and **two of the
+three trees that run this editor hold that file somewhere git is not watching**:
+
+| Where the dev server runs | HEAD | What Save alone leaves you with |
+| --- | --- | --- |
+| An ephemeral box, `.worktrees/<project>--<slug>` | an `agent/…` branch | an uncommitted change on a real branch |
+| A UI preview copy, `.ui-previews/<project>/<ref>` | **detached** | a change git will not let you commit |
+| The static checkout | the default branch | a change the branch policy protects against |
+
+The middle row is the dangerous one. `preview-ui-host.py --clean` removes those copies
+with `git worktree remove --force`, so a layout saved into one lives in exactly one
+place that routine cleanup deletes — which is how an afternoon of panel work came to be
+recovered from a browser download and a dirty preview copy on 2026-08-26.
+
+**Ship** is the answer to that, and it is deliberately one button rather than a
+checklist. `POST /__comic-editor/ship` writes the file and then hands it to
+[`frontend/shipLayout.ts`](../../../../shipLayout.ts), which:
+
+1. cuts an `agent/<slug>-<MMDD>` branch when HEAD is detached or on the default branch,
+   and otherwise **reuses the branch you are on** — so a second Ship updates one PR
+   instead of opening a second beside it;
+2. stages `layoutConfig.ts` **only**, never the rest of a working tree;
+3. commits, then pushes, then asks `gh` for the branch's PR and creates one if there is
+   none.
+
+The push happens before the PR call on purpose: a machine with no working `gh` still
+ends with the work on the remote, and the status line says so. Nothing is silent — a
+blocked commit or a rejected push comes back verbatim in that line, with a reminder that
+**.ts** still downloads a copy.
+
+The summary box is optional. What you type becomes both the branch slug and the commit
+subject; empty falls back to a generic one.
 
 ## Dev-only / zero prod cost
 
@@ -297,8 +342,9 @@ The editor is gated behind `import.meta.env.DEV && (?edit=1 OR localStorage flag
 `import.meta.env.DEV` check, so Rollup tree-shakes it (and `editor.css`) out of the
 production bundle. Only `layoutConfig.ts` (data), `bubbleTypes.ts` (data), and
 `transforms.ts` (pure CSS/math the renderer needs) ship in prod — all tiny. The Save
-endpoint lives only in the dev server (Vite `apply: 'serve'`). `?edit=1` does nothing
-in a prod build.
+and Ship endpoints live only in the dev server (Vite `apply: 'serve'`), so nothing that
+writes a file or spawns a process is reachable from a built bundle. `?edit=1` does
+nothing in a prod build.
 
 ## Layout
 
@@ -335,6 +381,7 @@ bubbleTypes.ts      BubbleType + BUBBLE_TYPES (lettering font per type) — ship
 ../panelPatterns.ts pattern style registry + per-panel palette/dot tuning (PANEL_BG_CONFIGS)
 ../polygonInset.ts  PURE polygon maths: the perpendicular gutter inset, bounding box
 panelGridOps.ts     PURE grid edits: move vertex, insert/remove bend, seam listing
+panelGridMerge.ts   PURE merge: collapse two vertices into one junction, and the snap target
 panelGridValidate.ts PURE structural guard: rings, ranges, no T-junctions
 layoutConfig.ts     PANEL_IMG_TRANSFORMS, PANEL_BUBBLE_TRANSFORMS, PANEL_PATTERNS, PANEL_GRIDS — source of truth
 configOps.ts        PURE config edits: re-exports configSeed + configHydrate, patch/add/remove, links
@@ -344,7 +391,7 @@ configHydrate.ts    PURE: parse a persisted payload back into a config, falling 
 chainOps.ts         PURE chain-list lifecycle: linked groups -> ids, derive the list, patch, clamp, hydrate
 useSeamDrag.ts      hook: which gesture a pointer means, and the grid edit it maps to
 PanelSeams.tsx      the draggable line + vertex handles (shapes mode)
-ShapeInspector.tsx  shapes-mode inspector: vertex read-out, straighten, reset grid
+ShapeInspector.tsx  shapes-mode inspector: vertex read-out, add corner, straighten, reset grid
 tableValidate.ts    PURE: a new table, and the repair of one read back out of a payload
 numberPadValidate.ts PURE: a new number pad, repair, and deep clone
 serializeTable.ts   PURE: a table as the nested block on a picture's line

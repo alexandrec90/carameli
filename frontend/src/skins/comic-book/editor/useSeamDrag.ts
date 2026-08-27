@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { PointerEvent as ReactPointerEvent, MouseEvent as ReactMouseEvent } from 'react'
 
 import { logger } from '../../../lib/logger'
 import type { LayoutKind, NormPt, PanelGrid, Rect, VpPt } from '../panelGeometry'
 import { toNormalized } from '../panelGeometry'
 import type { PanelPage } from '../panels'
+import { mergeVertices, snapTarget } from './panelGridMerge'
 import type { SeamGeometry } from './panelGridOps'
 import { insertBend, isRemovableBend, moveVertex, moveVertices, removeVertex, seamGeometry } from './panelGridOps'
 import type { EditorModeApi } from './useEditorMode'
@@ -26,7 +27,7 @@ const NUDGE_PX = 1
 const NUDGE_FAST = 10
 
 type DragState =
-  | { kind: 'vertex'; index: number; offset: NormPt }
+  | { kind: 'vertex'; index: number; offset: NormPt; snap: number | null }
   | { kind: 'seam'; indices: number[]; last: NormPt }
 
 export interface SeamDragApi {
@@ -34,6 +35,8 @@ export interface SeamDragApi {
   seams: SeamGeometry[]
   /** The vertex currently selected, or null. */
   selectedVertex: number | null
+  /** The vertex the dragged corner is snapped onto — released there, the two merge. */
+  snapVertex: number | null
   /** False when the selected vertex is a junction or on the frame, so Delete is refused. */
   canDeleteSelected: boolean
   onVertexDown(e: ReactPointerEvent, index: number): void
@@ -47,7 +50,8 @@ export interface SeamDragApi {
 
 /**
  * Shape-editing gestures over one grid: drag a corner, drag a whole line, double-click a
- * line to break it, arrow-nudge, Delete to straighten.
+ * line to break it, drop a corner onto another to merge the two, arrow-nudge, Delete to
+ * straighten.
  *
  * `frame` is the page frame in viewport px, which is what makes the pointer maths a
  * two-line affair: the overlay layer is `position: fixed; inset: 0`, so a pointer's
@@ -61,6 +65,7 @@ export function useSeamDrag(
   frame: Rect,
 ): SeamDragApi {
   const drag = useRef<DragState | null>(null)
+  const [snapVertex, setSnapVertex] = useState<number | null>(null)
   const seams = useMemo(() => seamGeometry(grid, frame), [grid, frame])
 
   const selectedVertex =
@@ -83,7 +88,7 @@ export function useSeamDrag(
       const p = norm(e)
       // Grab offset rather than a running delta: a pointer that leaves and re-enters the
       // window then still puts the corner where it was picked up, not where it drifted to.
-      drag.current = { kind: 'vertex', index, offset: [v[0] - p[0], v[1] - p[1]] }
+      drag.current = { kind: 'vertex', index, offset: [v[0] - p[0], v[1] - p[1]], snap: null }
       e.currentTarget.setPointerCapture(e.pointerId)
       api.select('vertex', index)
     },
@@ -108,20 +113,38 @@ export function useSeamDrag(
       e.preventDefault()
       const p = norm(e)
       if (state.kind === 'vertex') {
-        api.setGridFor(page, kind, moveVertex(grid, state.index, [p[0] + state.offset[0], p[1] + state.offset[1]]))
+        // Within snapping range of a corner the merge would survive, the dragged corner
+        // sits exactly on it — so releasing there collapses the two into one instead of
+        // leaving two coincident vertices joined by a zero-length seam.
+        const desired: NormPt = [p[0] + state.offset[0], p[1] + state.offset[1]]
+        const target = snapTarget(grid, state.index, desired, frame)
+        state.snap = target
+        setSnapVertex(target)
+        const at = target === null ? desired : grid.vertices[target] ?? desired
+        api.setGridFor(page, kind, moveVertex(grid, state.index, at))
         return
       }
       api.setGridFor(page, kind, moveVertices(grid, state.indices, p[0] - state.last[0], p[1] - state.last[1]))
       state.last = p
     },
-    [api, grid, kind, norm, page],
+    [api, frame, grid, kind, norm, page],
   )
 
-  const onPointerUp = useCallback((e: ReactPointerEvent) => {
-    if (!drag.current) return
-    drag.current = null
-    if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId)
-  }, [])
+  const onPointerUp = useCallback(
+    (e: ReactPointerEvent) => {
+      const state = drag.current
+      if (!state) return
+      drag.current = null
+      if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId)
+      if (state.kind !== 'vertex' || state.snap === null) return
+      setSnapVertex(null)
+      const merged = mergeVertices(grid, state.index, state.snap)
+      if (!merged) return
+      api.setGridFor(page, kind, merged.grid)
+      api.select('vertex', merged.index)
+    },
+    [api, grid, kind, page],
+  )
 
   const onSeamDoubleClick = useCallback(
     (e: ReactMouseEvent, seam: SeamGeometry) => {
@@ -187,6 +210,7 @@ export function useSeamDrag(
   return {
     seams,
     selectedVertex,
+    snapVertex,
     canDeleteSelected,
     onVertexDown,
     onSeamDown,

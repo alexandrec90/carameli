@@ -60,6 +60,8 @@ words:
   # Possessives / proper nouns
   - Wonka
   # Dev tooling / packaging terms (docs/plans, CLAUDE.md, rules)
+  # mmdd: the date stamp worktree.py puts on every agent/ branch it cuts.
+  - mmdd
   - noqa
   - pyproject
   - tomllib

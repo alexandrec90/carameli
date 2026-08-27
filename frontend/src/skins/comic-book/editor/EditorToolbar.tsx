@@ -21,6 +21,29 @@ import { useToolbarDrag } from './useToolbarDrag'
 /** Dev-only endpoint (Vite middleware) that overwrites editor/layoutConfig.ts. */
 const SAVE_ENDPOINT = '/__comic-editor/save'
 
+/**
+ * Dev-only endpoint that saves *and* then branches, commits, pushes and opens or
+ * updates a PR. Save alone writes into whichever tree the dev server is serving, and
+ * two of the three that run this editor — a detached `.ui-previews/` copy, the static
+ * checkout — hold that file somewhere git is not watching and a cleanup can delete.
+ * See `frontend/shipLayout.ts` for the whole of that reasoning.
+ */
+const SHIP_ENDPOINT = '/__comic-editor/ship'
+
+/** What the ship endpoint answers with; mirrors ShipOutcome in frontend/shipLayout.ts. */
+interface ShipResponse {
+  ok: boolean
+  message: string
+  branch?: string
+  prUrl?: string
+}
+
+type ShipState =
+  | { phase: 'idle' }
+  | { phase: 'busy' }
+  | { phase: 'done'; message: string; prUrl?: string }
+  | { phase: 'error'; message: string }
+
 interface EditorToolbarProps {
   api: EditorModeApi
   /** The panel a new picture or bubble would go on, or null. */
@@ -46,6 +69,29 @@ export default function EditorToolbar({ api, selPanel, pageSelect, shapes }: Edi
   const toolbarColumns = useToolbarColumns(toolbarDrag.rootProps.ref)
   const [copied, setCopied] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [summary, setSummary] = useState('')
+  const [ship, setShip] = useState<ShipState>({ phase: 'idle' })
+
+  const onShip = () => {
+    setShip({ phase: 'busy' })
+    const content = serializeConfigFile(config)
+    fetch(SHIP_ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content, summary }),
+    })
+      .then(res => res.json().then((body: ShipResponse) => ({ res, body })))
+      .then(({ res, body }) => {
+        if (!res.ok || !body.ok) throw new Error(body?.message ?? `HTTP ${res.status}`)
+        setShip({ phase: 'done', message: body.message, prUrl: body.prUrl })
+        logger.info('Comic-book editor: layout shipped', { message: body.message })
+      })
+      .catch((err: unknown) => {
+        const message = err instanceof Error ? err.message : String(err)
+        setShip({ phase: 'error', message })
+        logger.error('Comic-book editor: ship failed', { err: message })
+      })
+  }
 
   const onSave = () => {
     const content = serializeConfigFile(config)
@@ -173,6 +219,45 @@ export default function EditorToolbar({ api, selPanel, pageSelect, shapes }: Edi
           Reset
         </button>
       </div>
+      {/* Save writes the file; Ship carries it to a branch and a PR. They are separate
+          buttons because Save is the inner loop — pressed every few drags — and Ship is
+          the moment the work should stop being local to one tree. */}
+      <div className="cb-ed-actions">
+        <input
+          type="text"
+          className="cb-ed-ship-summary"
+          aria-label="Ship summary"
+          placeholder="What changed (optional)"
+          value={summary}
+          onChange={e => setSummary(e.target.value)}
+        />
+        <button
+          type="button"
+          className="cb-ed-btn cb-ed-btn-primary cb-ed-btn-icon"
+          title="Save, then commit and push this layout and open or update its PR"
+          disabled={ship.phase === 'busy'}
+          onClick={onShip}
+        >
+          {ship.phase === 'busy' ? 'Shipping…' : 'Ship'}
+        </button>
+      </div>
+      {ship.phase !== 'idle' && ship.phase !== 'busy' && (
+        <p
+          role="status"
+          className={`cb-ed-ship-status${ship.phase === 'error' ? ' cb-ed-ship-status-error' : ''}`}
+        >
+          {ship.message}
+          {ship.phase === 'done' && ship.prUrl && (
+            <>
+              {' '}
+              <a href={ship.prUrl} target="_blank" rel="noreferrer">
+                Open PR
+              </a>
+            </>
+          )}
+        </p>
+      )}
+
       <div className="cb-ed-actions">
         <button type="button" className="cb-ed-btn" onClick={onCopyConfig}>
           {copied ? 'Copied!' : 'Copy config'}

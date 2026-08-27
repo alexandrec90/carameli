@@ -30,10 +30,11 @@ export interface TableCornerDragApi {
 /**
  * Corner-dragging over one picture's surface.
  *
- * `rect` is the picture's frame in viewport px — the same box `imgRect` gives the
- * selection outline — and it is what makes the maths two lines: the overlay layer is
- * `position: fixed; inset: 0`, so a pointer's client coordinates are already viewport
- * coordinates and a corner is just their offset into the frame, as a percentage.
+ * `rect` is the picture's rendered rect in viewport px — `surfaceBaseRect`, the same
+ * box the renderer measures the quad against — and it is what makes the maths two
+ * lines: the overlay layer is `position: fixed; inset: 0`, so a pointer's client
+ * coordinates are already viewport coordinates and a corner is just their offset into
+ * the rect, as a percentage.
  *
  * The grab offset is captured on pointer-down rather than a running delta, so a pointer
  * that leaves the window and comes back puts the corner where it was picked up instead of
@@ -50,7 +51,7 @@ export function useSurfaceCornerDrag(
 
   const corners = useMemo(() => quadViewport(rect, surface.quad), [rect, surface.quad])
 
-  /** A pointer position as a percentage of the frame box. */
+  /** A pointer position as a percentage of the picture's rendered rect. */
   const pct = useCallback(
     (e: { clientX: number; clientY: number }): [number, number] => [
       rect.w > 0 ? ((e.clientX - rect.x) / rect.w) * 100 : 0,
