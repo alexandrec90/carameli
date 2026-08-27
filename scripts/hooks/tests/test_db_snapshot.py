@@ -120,6 +120,45 @@ def test_is_valid_dump_rejects_anything_pg_restore_could_not_read(data):
     assert not db.is_valid_dump(data)
 
 
+# --- the subprocess wrappers ------------------------------------------------
+#
+# These two are the only surface that needs a live stack, so what is checked here
+# is the command each one builds, not the database's answer. `-T` on the exec
+# matters enough to assert: without it the subprocess handle can outlive the
+# command and hang the caller.
+
+
+def test_read_row_counts_asks_psql_for_machine_readable_output(monkeypatch):
+    calls = []
+
+    def fake_run(argv, **kwargs):
+        calls.append((argv, kwargs))
+        return subprocess.CompletedProcess(argv, 0, stdout="customers|1\nextensions|0\n")
+
+    monkeypatch.setattr(db.subprocess, "run", fake_run)
+    assert db.read_row_counts() == {"customers": 1, "extensions": 0}
+    argv, kwargs = calls[0]
+    assert argv[:5] == ["docker", "compose", "-p", db.project_name(), "exec"]
+    assert argv[5] == "-T" and argv[6] == db.DB_SERVICE
+    assert "psql" in argv and "-At" in argv and db.ROW_COUNT_SQL in argv
+    assert kwargs["text"] is True and kwargs["check"] is True
+
+
+def test_read_dump_asks_pg_dump_for_a_custom_format_archive(monkeypatch):
+    calls = []
+
+    def fake_run(argv, **kwargs):
+        calls.append((argv, kwargs))
+        return subprocess.CompletedProcess(argv, 0, stdout=b"PGDMP\x01binary")
+
+    monkeypatch.setattr(db.subprocess, "run", fake_run)
+    assert db.read_dump() == b"PGDMP\x01binary"
+    argv, kwargs = calls[0]
+    assert "pg_dump" in argv and "-Fc" in argv
+    # No `text=True`: the archive is bytes, and decoding it would corrupt it.
+    assert "text" not in kwargs and kwargs["check"] is True
+
+
 # --- listing ----------------------------------------------------------------
 
 
