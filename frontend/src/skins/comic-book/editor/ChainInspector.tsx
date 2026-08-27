@@ -1,6 +1,6 @@
 import {
   CHAIN_ROWS, CHAIN_STEP_MS, chainMembers, chainTranscript, defaultChain, isComposerContent,
-  messageRows, peerWheelOn, readTranscript,
+  messageRows, peerPickerOn, readTranscript,
 } from '../bubbleChain'
 import { parseMessages } from './chainOps'
 import type { BubbleTransform } from './types'
@@ -39,7 +39,7 @@ export default function ChainInspector({ api, index, bubble }: ChainInspectorPro
   // Whether the panel offers a number to bind to. Checked here rather than left to fail
   // silently at render time: a bound chain with no picker draws an empty table, which
   // looks like a broken chain and is actually a missing balloon.
-  const hasPicker = peerWheelOn(bubbles, bubble.panel) >= 0
+  const hasPicker = peerPickerOn(bubbles, bubble.panel) >= 0
 
   return (
     <>

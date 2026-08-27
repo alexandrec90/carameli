@@ -1,6 +1,12 @@
+import { useCallback, useMemo, useState } from 'react'
+
 import type { BubbleChain } from './bubbleChain'
+import { dialBubbleOn } from './bubbleContent'
+import { appendDialKey } from './dialPicker'
 import PanelBubbles from './PanelBubbles'
 import PanelImages from './PanelImages'
+import { browserCountry, formatPhoneInput } from './phoneInput'
+import { splitOptions } from './wheelPicker'
 import { toClipPath } from './editor/transforms'
 import type { BubbleTransform, ImgTransform } from './editor/types'
 import type { PanelPoly } from './panelGeometry'
@@ -27,7 +33,10 @@ interface ComicPanelProps {
     /** True when picture `k` (index into `images`) is the editor's full-reveal selection. */
     isRevealed(k: number): boolean
     isBubbleVisible(i: number): boolean
-    /** Makes a number pad projected onto one of this panel's pictures a working keypad. */
+    /**
+     * Makes a number pad projected onto one of this panel's pictures a working keypad.
+     * A panel holding a `dial` balloon takes its own keys instead — see below.
+     */
     onNumberPadKey?(key: string): void
     /** Dials the number typed into one of this panel's `phone` balloons. */
     onPhoneSubmit?(value: string): void
@@ -41,6 +50,12 @@ interface ComicPanelProps {
  * One panel of the grid: the Ben-Day dot canvas, the pictures and the bubbles that
  * name this slot, absolutely positioned at the polygon Layout computed for it.
  * overflow stays visible so pictures and bubbles can spill into the gutters.
+ *
+ * **It is also where the panel's dialled number lives**, and that is a placement rather
+ * than a convenience: a `dial` balloon is edited from two places at once — its own field,
+ * and the number pad projected onto a picture in the same panel — and this is the only
+ * component that can see both. The keys come up through PanelImages and the value goes
+ * down through PanelBubbles, so neither half has to know the other exists.
  */
 export default function ComicPanel({
     index, info, poly, images, bubbles, chains, sms, natSizes,
@@ -58,6 +73,34 @@ export default function ComicPanel({
     // whole of it stays visible for framing. The panel is lifted whenever any of its
     // pictures is the revealed one.
     const revealFull = images.some((img, k) => img.panel === index && isRevealed(k))
+
+    const country = useMemo(() => browserCountry(), [])
+    // This panel's dial balloon, and the number it starts on: its first option, the way a
+    // wheel starts on its first row. Empty on a panel with no dial, which is most of them.
+    const dialIndex = dialBubbleOn(bubbles, index)
+    const dialSeed = dialIndex >= 0 ? splitOptions(bubbles[dialIndex].text)[0] ?? '' : ''
+    const [dialValue, setDialValue] = useState(() => formatPhoneInput(dialSeed, country))
+    // Re-seeded only when the author's own text changes — which is what makes the editor
+    // show what was just typed, and what keeps a reader who cleared the field looking at
+    // an empty one instead of watching it refill itself.
+    //
+    // Adjusted during render rather than from an effect: an effect would letter the old
+    // number for one frame and then replace it, and React's own guidance is that state
+    // derived from a changed input is corrected here. The re-render is immediate and
+    // nothing below it has run yet, so the panel never commits the stale value.
+    const [seeded, setSeeded] = useState(dialSeed)
+    if (seeded !== dialSeed) {
+        setSeeded(dialSeed)
+        setDialValue(formatPhoneInput(dialSeed, country))
+    }
+    const onDialChange = useCallback((next: string) => setDialValue(next), [])
+    // A press on the projected keypad appends to the dialled number, formatted, exactly as
+    // a typed digit would. Only on a panel that has a dial: everywhere else the pad keeps
+    // going wherever it went before, and `undefined` still means the keys are dead.
+    const onDialPadKey = useCallback(
+        (key: string) => setDialValue(current => appendDialKey(current, key, country)),
+        [country],
+    )
 
     return (
         <div
@@ -98,7 +141,7 @@ export default function ComicPanel({
                 natSizes={natSizes}
                 isRevealed={isRevealed}
                 editing={editorActive}
-                onNumberPadKey={onNumberPadKey}
+                onNumberPadKey={dialIndex >= 0 ? onDialPadKey : onNumberPadKey}
                 onSettled={onSettled}
                 onNatSize={onNatSize}
             />
@@ -115,6 +158,8 @@ export default function ComicPanel({
                 editing={editorActive}
                 sms={sms}
                 onPhoneSubmit={onPhoneSubmit}
+                dialValue={dialValue}
+                onDialChange={onDialChange}
             />
         </div>
     )

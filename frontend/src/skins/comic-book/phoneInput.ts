@@ -40,8 +40,21 @@ export function toE164(value: string, country?: CountryCode): string | null {
   return parsed?.isValid() ? parsed.number : null
 }
 
-/** Format a partial number as it is typed, using `country` for national input. */
+/** Anything a telephone keypad has that a written number does not. */
+const KEYPAD_SYMBOL = /[*#]/
+
+/**
+ * Format a partial number as it is typed, using `country` for national input.
+ *
+ * A value carrying `*` or `#` is passed through untouched. `formatIncompletePhoneNumber`
+ * *silently deletes* both — they are not part of any numbering plan — so a reader
+ * pressing the `*` key on a projected keypad watched the press do nothing at all, which
+ * reads as a broken key rather than as a formatter with an opinion. Those two are real
+ * keys on the phone in the picture, and a value holding one has stopped being a number
+ * to format anyway.
+ */
 export function formatPhoneInput(value: string, country?: CountryCode): string {
+  if (KEYPAD_SYMBOL.test(value)) return value
   return formatIncompletePhoneNumber(value, country)
 }
 

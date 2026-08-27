@@ -1,0 +1,27 @@
+/* ─── In-bubble dial picker ───────────────────────────────────────────────────
+   The 'dial' content kind (BubbleDial.tsx): the wheel picker's drum with a real
+   phone field in its window. Everything about the drum itself — the window inset,
+   the track, the row height, the hover fade — is .cb-bubble-wheel in bubbles.css,
+   which this class sits beside rather than replaces. Only the two rules below are
+   the dial's own. */
+
+/* The field takes the window's centre line, which is where wheelOffsetEm puts the
+   picked row. Height and line-height must stay at WHEEL_ROW_EM (wheelPicker.ts): a
+   field taller than a row would show the neighbours through its own box. */
+.cb-dial-field {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 100%;
+  height: 1.25em;
+  line-height: 1.25em;
+  transform: translateY(-50%);
+  text-align: center;
+}
+
+/* The picked option is drawn by the field, so the drum must not letter it as well.
+   visibility rather than display: the row still occupies its band, or the track
+   offset would slide the rows above it down into the window. */
+.cb-bubble-dial .cb-wheel-option.is-selected {
+  visibility: hidden;
+}

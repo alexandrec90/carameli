@@ -1,6 +1,6 @@
 import { Fragment, useCallback, useEffect, useState } from 'react'
 
-import { chainIdsOn, chainMembers, defaultChain, peerWheelOn } from './bubbleChain'
+import { chainIdsOn, chainMembers, defaultChain, peerPickerOn } from './bubbleChain'
 import type { BubbleChain } from './bubbleChain'
 import PanelBubble from './PanelBubble'
 import PanelBubbleChain from './PanelBubbleChain'
@@ -52,8 +52,18 @@ interface PanelBubblesProps {
    * `input` balloons are free text and never dial. A balloon inside a chain never dials
    * either — its Enter belongs to the conversation's composer (see PanelBubbleChain) —
    * which the claimed-index filter below already guarantees.
+   *
+   * A `dial` balloon dials on Enter too, and for the same reason: it is a phone field
+   * with a shortlist behind it.
    */
   onPhoneSubmit?(value: string): void
+  /**
+   * The panel's dialled number and the way to change it, both owned by ComicPanel — the
+   * one place that can see this panel's `dial` balloons *and* the keypad projected onto
+   * its pictures, which write to the same value. Absent on a panel with no dial.
+   */
+  dialValue?: string
+  onDialChange?(value: string): void
 }
 
 /**
@@ -71,7 +81,8 @@ interface PanelBubblesProps {
  * makes chains a per-conversation opt-in rather than a change to how bubbles work.
  *
  * **This is also where a chain stops being a drawing.** A chain whose `sms` flag is set is
- * bound to the number the panel's wheel picker is turned to (`peerWheelOn`), and from then
+ * bound to the number the panel's picker balloon carries (`peerPickerOn`) — a wheel turned
+ * to a row, or a dial typed into — and from then
  * on its balloons are messages the carrier has: what the author typed into the templates is
  * not shown, and Enter in the composer sends. The two halves are deliberately separate
  * bubbles — the picker says *who*, the chain says *what* — because that is how the panel
@@ -87,6 +98,8 @@ export default function PanelBubbles({
   editing,
   sms,
   onPhoneSubmit,
+  dialValue = '',
+  onDialChange,
 }: PanelBubblesProps) {
   const ids = editing ? [] : chainIdsOn(bubbles, panel)
   const conversations = ids.map(id => ({
@@ -98,7 +111,11 @@ export default function PanelBubbles({
   const claimed = new Set(conversations.flatMap(c => c.members))
 
   // The balloon whose options are phone numbers, or -1 on a panel with no picker.
-  const wheelIndex = peerWheelOn(bubbles, panel)
+  const pickerIndex = peerPickerOn(bubbles, panel)
+  // A dial picker reports nothing: its number is the panel's, because the keypad in the
+  // picture writes to it too. So the number a chain binds to comes from the prop rather
+  // than from the local selection below, and the two are never both in play.
+  const dialPicker = pickerIndex >= 0 && bubbles[pickerIndex].content === 'dial'
   // Whichever option the drum is showing. Reported by BubbleWheel on mount as well as on
   // every turn, so this is populated before the reader touches anything.
   const [picked, setPicked] = useState('')
@@ -119,7 +136,8 @@ export default function PanelBubbles({
   // and the effect below re-runs only when the number really changes. A `useMemo` here
   // bought nothing and the compiler could not preserve it anyway, because `browserCountry`
   // reads `navigator` rather than a tracked dependency.
-  const peer = !wanted || editing || !picked ? null : toE164(picked, browserCountry())
+  const chosen = dialPicker ? dialValue : picked
+  const peer = !wanted || editing || !chosen ? null : toE164(chosen, browserCountry())
 
   // Declaring interest is the whole of what a skin does about data. The hook polls while
   // somebody is subscribed and stops when the last one leaves, so turning the wheel to
@@ -139,8 +157,14 @@ export default function PanelBubbles({
             bubble={bubble}
             visible={isVisible(i)}
             interactive={interactive}
-            onWheelSelect={i === wheelIndex ? onWheelSelect : undefined}
-            onSubmit={bubble.content === 'phone' ? onPhoneSubmit : undefined}
+            onWheelSelect={i === pickerIndex ? onWheelSelect : undefined}
+            onSubmit={
+              bubble.content === 'phone' || bubble.content === 'dial'
+                ? onPhoneSubmit
+                : undefined
+            }
+            dialValue={dialValue}
+            onDialChange={onDialChange}
           />
         )
         // spill off: a clip wrapper hides the overflow behind the panel edge.

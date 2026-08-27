@@ -70,6 +70,14 @@ describe('pageCanDial', () => {
     expect(pageCanDial([], [bubble({ content: 'phone' })], 'classic')).toBe(true)
   })
 
+  it('is true for a dial balloon, which is that field with a shortlist behind it', () => {
+    expect(pageCanDial([], [bubble({ content: 'dial' })], 'classic')).toBe(true)
+  })
+
+  it('ignores a dial balloon that is a chain slot', () => {
+    expect(pageCanDial([], [bubble({ content: 'dial', chain: 'chain-1' })], 'classic')).toBe(false)
+  })
+
   it('ignores a phone balloon that is a chain slot, since it dials nothing', () => {
     expect(pageCanDial([], [bubble({ content: 'phone', chain: 'chain-1' })], 'classic')).toBe(
       false,

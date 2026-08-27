@@ -22,9 +22,11 @@ safe mode, and the account is billed.
 
 ## Which conversation is not stored on the chain
 
-It is whichever number the panel's wheel-picker balloon is turned to: `peerWheelOn` takes
-the first `content: 'wheel'` balloon on the panel **that is not itself in a chain**,
-because a wheel inside a conversation is picking what to *say*, not who to say it to. The
+It is whichever number the panel's picker balloon carries: `peerPickerOn` takes the first
+`content: 'wheel'` **or** `content: 'dial'` balloon on the panel **that is not itself in a
+chain**, because a picker inside a conversation is choosing what to *say*, not who to say
+it to. A `dial` contributes the number in its field rather than the row it is parked on,
+since that field is the one the reader has been typing into. The
 option is read through `toE164` (`phoneInput.ts`), so the same number written three ways
 is one thread; an option that is a name resolves to null and binds nothing. The two
 halves are separate balloons on purpose — the picker says *who*, the chain says *what* —
@@ -41,7 +43,7 @@ bind nothing costs nothing — which is what lets `App` mount it for every skin.
 A chain is drawn by the Layout rather than by a view, which is why this arrives as a
 subscription on a Layout prop instead of as a hook result on a view's props: skin chrome
 has no view whose props could carry it, and only the skin knows which number the reader
-turned the wheel to.
+chose on the picker.
 
 A sent message is drawn optimistically and retires when its own row returns from the
 server (`mergeMessages`); until then it carries `is-sending`, and a refused send carries

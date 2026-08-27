@@ -20,8 +20,8 @@ describe('interactive bubble content persistence', () => {
     expect(hydrateConfig(JSON.stringify({ images: [], bubbles })).bubbles).toEqual(bubbles)
   })
 
-  it('serializes text and phone inputs so an editor save preserves them', () => {
-    for (const content of ['input', 'phone'] as const) {
+  it('serializes text, phone and dial inputs so an editor save preserves them', () => {
+    for (const content of ['input', 'phone', 'dial'] as const) {
       const ts = serializeConfig(
         patchBubble(seedConfig(), 0, { content, text: 'Authored value' }),
       )

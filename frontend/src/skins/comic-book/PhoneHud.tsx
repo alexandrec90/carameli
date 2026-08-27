@@ -25,8 +25,9 @@ export function hudIsVisible(phone: UseSoftphoneResult): boolean {
  * Whether a page offers any way to dial, and so has any use for the handset furniture.
  *
  * Two of them, and either is enough: a number pad projected onto one of the page's
- * pictures, or a `phone` speech balloon someone can type a number into — the fallback for
- * a page whose art carries no keypad, or when the projected keys are awkward to hit.
+ * pictures, or a balloon someone can type a number into — `phone`, or `dial`, which is
+ * that field with the author's shortlist behind it. The balloon is the fallback for a page
+ * whose art carries no keypad, or when the projected keys are awkward to hit.
  *
  * A balloon inside a chain does not count. It is a conversation's composer, so its Enter
  * is already spoken for and it dials nothing (see PanelBubbles).
@@ -38,7 +39,10 @@ export function pageCanDial(
 ): boolean {
   const projectedPad = images.some(t => t.numberPad && PANELS[t.panel]?.page === page)
   const phoneBubble = bubbles.some(
-    b => b.content === 'phone' && !b.chain && PANELS[b.panel]?.page === page,
+    b =>
+      (b.content === 'phone' || b.content === 'dial') &&
+      !b.chain &&
+      PANELS[b.panel]?.page === page,
   )
   return projectedPad || phoneBubble
 }
