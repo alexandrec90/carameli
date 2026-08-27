@@ -22,7 +22,7 @@ import {
   bubbleStyle,
   toClipPath,
 } from '../../skins/comic-book/editor/transforms'
-import type { ImgTransform } from '../../skins/comic-book/editor/types'
+import type { BubbleTransform, ImgTransform } from '../../skins/comic-book/editor/types'
 import { PANELS } from '../../skins/comic-book/panels'
 
 /** A picture at the shipped default: full-panel frame, identity framing inside it. */
@@ -443,6 +443,13 @@ describe('BUBBLE_TYPES', () => {
 })
 
 describe('default config parity', () => {
+  // A balloon whose `content` is not 'text' is a **field** drawn onto the art — a phone
+  // number typed onto a photographed handset, a wheel of numbers to pick from — not a
+  // line of speech. It is placed where the art puts it, points at nothing, and does not
+  // morph under the pointer, so the three assertions below that describe how a *caption*
+  // behaves do not apply to it.
+  const isField = (b: BubbleTransform) => b.content !== 'text'
+
   it('uses center center only for the logo panels and center bottom for the rest', () => {
     PANEL_IMG_TRANSFORMS.forEach(t => {
       expect(t.anchor).toBe(PANELS[t.panel].isLogo ? 'center center' : 'center bottom')
@@ -474,7 +481,7 @@ describe('default config parity', () => {
     const second = linkedPairs(PANEL_BUBBLE_TRANSFORMS).map(([, j]) => j)
     const nudged = new Set([...second, 6])
     PANEL_BUBBLE_TRANSFORMS.forEach((b, i) => {
-      if (nudged.has(i)) return
+      if (nudged.has(i) || isField(b)) return
       expect(b.top).toBe(-35)
       expect(b.right).toBe(-12)
       expect(b.width).toBe(55)
@@ -498,14 +505,14 @@ describe('default config parity', () => {
   it('points every other bubble’s tail somewhere', () => {
     const linked = new Set(linkedPairs(PANEL_BUBBLE_TRANSFORMS).map(([, j]) => j))
     PANEL_BUBBLE_TRANSFORMS.forEach((b, i) => {
-      if (linked.has(i)) return
+      if (linked.has(i) || isField(b)) return
       expect(TAIL_DIR_KEYS).toContain(b.tail)
       expect(b.tail).not.toBe('none')
     })
   })
 
-  it('gives every bubble a hover and a click shape distinct from its resting one', () => {
-    PANEL_BUBBLE_TRANSFORMS.forEach(b => {
+  it('gives every caption a hover and a click shape distinct from its resting one', () => {
+    PANEL_BUBBLE_TRANSFORMS.filter(b => !isField(b)).forEach(b => {
       expect(b.hoverType).not.toBeNull()
       expect(b.clickType).not.toBeNull()
       expect(b.hoverType).not.toBe(b.type)
@@ -535,21 +542,25 @@ describe('default config parity', () => {
     })
   })
 
-  // The frame is new, so the shipped values are the compatibility guarantee: every
-  // picture starts on its whole panel and crops exactly as it did before it had one.
-  it('starts every picture on the full-panel frame', () => {
+  // `[0, 0, 100, 100]` was the compatibility guarantee from when the frame was new:
+  // every picture started on its whole panel and cropped as it had before it had one.
+  // Authors reframe pictures in the editor and save them out, so that guarantee is
+  // spent; what has to hold of any saved frame is that it is a real box, since a zero
+  // or negative extent draws nothing at all.
+  it('gives every picture a frame with a real extent', () => {
     PANEL_IMG_TRANSFORMS.forEach(t => {
-      expect([t.left, t.top, t.width, t.height]).toEqual([0, 0, 100, 100])
+      expect(t.width).toBeGreaterThan(0)
+      expect(t.height).toBeGreaterThan(0)
     })
   })
 
-  it('puts every bubble on a real panel, and every panel speaks at least once', () => {
-    const panels = PANEL_BUBBLE_TRANSFORMS.map(b => b.panel)
-    panels.forEach(p => {
-      expect(p).toBeGreaterThanOrEqual(0)
-      expect(p).toBeLessThan(PANELS.length)
+  // Not every panel speaks: one can carry a projected surface — a number pad, a table
+  // of contacts — and say its piece that way, so the count of distinct panels named
+  // here is content. What stays structural is that a balloon names a panel that exists.
+  it('puts every bubble on a real panel', () => {
+    PANEL_BUBBLE_TRANSFORMS.forEach(b => {
+      expect(b.panel).toBeGreaterThanOrEqual(0)
+      expect(b.panel).toBeLessThan(PANELS.length)
     })
-    expect(new Set(panels).size).toBe(PANELS.length)
-    expect(PANEL_BUBBLE_TRANSFORMS.length).toBeGreaterThan(PANELS.length)
   })
 })
