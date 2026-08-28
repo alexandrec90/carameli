@@ -48,7 +48,7 @@ export function browserCountry(): CountryCode | undefined {
  * keeps out what is genuinely not a destination — a name, a half-typed number — and lets
  * every number-shaped thing be its own conversation. Whether a carrier will *accept* it is
  * the carrier's answer to give, on a message that visibly fails, rather than something to
- * pre-empt by silently pretending the number was never dialled.
+ * settle here by silently pretending the number was never dialled.
  */
 export function toE164(value: string, country?: CountryCode): string | null {
   const parsed = parsePhoneNumberFromString(value, country)

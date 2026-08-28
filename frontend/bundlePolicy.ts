@@ -100,8 +100,15 @@ export const MAX_LAZY_CHUNK_BYTES = 260 * 1024
  * This raise (958 → 959) is 0.8 KB: the SMS composer now shares that caret and keyboard
  * handoff, while its conversation draws per-column links and a fixed recipient stem.
  * It remains isolated to the same lazy comic-book chunk and adds no dependency or chunk.
+ *
+ * This raise (959 → 960) is 0.2 KB: a number the reader texts is now reported back to the
+ * panel so it joins the dial's shortlist, and a chain that asked to be bound to a number
+ * and was not now declines to answer its own composer. Both are a few lines in components
+ * the comic-book chunk already held; the chunk count is unchanged at 46, which is the
+ * check that matters here — the budget's own note says a jump with the eager set unchanged
+ * means a new dependency, and there is none.
  */
-export const MAX_TOTAL_JS_BYTES = 959 * 1024
+export const MAX_TOTAL_JS_BYTES = 960 * 1024
 
 /**
  * Every `.css` file in `dist/assets/`, summed. Today 44.2 KB across 2 files.
@@ -109,8 +116,16 @@ export const MAX_TOTAL_JS_BYTES = 959 * 1024
  * This raise (44 → 45) is the chain's typing-dots row — the bounce, its stagger, and the
  * reduced-motion pulse that replaces it. The build was already within 0.3 KB of the
  * ceiling before those rules, so most of the headroom this buys is theirs only on paper.
+ *
+ * This raise (45 → 46) is the chain's connector tubes: the SVG layer they are drawn on,
+ * the `d` transition that makes a tube follow its balloons as the conversation scrolls,
+ * and the reduced-motion rule that switches that off. About 0.2 KB, against a build that
+ * had 0.1 KB of room — the same story as the raise above, one line further along. What
+ * this does *not* pay for is the lettered caret, which arrived twice: once on this branch
+ * as a field's caret shared by the dial and the SMS composer, once on master as the
+ * dial's own. Deduplicating it in the merge is what kept this raise to a single KB.
  */
-export const MAX_TOTAL_CSS_BYTES = 45 * 1024
+export const MAX_TOTAL_CSS_BYTES = 46 * 1024
 
 /**
  * Every webfont in `dist/assets/`, summed. Today 231 KB: five weights of Outfit, each
