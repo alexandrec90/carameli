@@ -416,18 +416,49 @@ describe('BubbleDial as a phone field', () => {
     expect(field.value).toBe('(555)')
   })
 
-  it('inks its comic caret for a caret, never for a selection or an idle field', () => {
+  it('inks its comic caret only where typing would append, never over a drum number', () => {
     const { container, field, rerender } = draw({ revealed: true })
     const caret = container.querySelector('.cb-dial-caret') as HTMLElement
 
-    // The reveal parked a collapsed caret at the end of the number: caret ink.
+    // The reveal focused a fresh, drum-supplied number: the next key replaces it
+    // whole, so there is no insertion point for a caret to promise.
+    expect(caret.style.visibility).toBe('hidden')
+
+    // Typing makes the number the reader's own — appending now, so the caret shows.
+    fireEvent.change(field, { target: { value: '555' } })
     expect(caret.style.visibility).toBe('visible')
 
-    // A selection the reader makes themselves (Ctrl+A) is not a caret.
-    field.setSelectionRange(0, 4)
+    // Turning the drum letters one of its numbers again: fresh, caret back out.
+    fireEvent.keyDown(field, { key: 'ArrowDown' })
     expect(caret.style.visibility).toBe('hidden')
 
     rerender(<Harness revealed={false} />)
+    expect(caret.style.visibility).toBe('hidden')
+  })
+
+  it('inks the caret again when the panel re-reveals a half-typed number', () => {
+    // Leaving the panel and coming back does not finish the number: it is still the
+    // reader's own, typing still appends, so the caret comes back with the focus.
+    const { container, field, rerender } = draw({ revealed: true })
+    const caret = container.querySelector('.cb-dial-caret') as HTMLElement
+
+    fireEvent.change(field, { target: { value: '555' } })
+    rerender(<Harness revealed={false} />)
+    expect(caret.style.visibility).toBe('hidden')
+
+    rerender(<Harness revealed />)
+
+    expect(caret.style.visibility).toBe('visible')
+  })
+
+  it('hides the caret across a selection the reader makes themselves', () => {
+    const { container, field } = draw({ initial: '', revealed: true })
+    const caret = container.querySelector('.cb-dial-caret') as HTMLElement
+    fireEvent.change(field, { target: { value: '555' } })
+
+    // Ctrl+A: a selection paints itself, so a block caret on it is a second highlight.
+    field.setSelectionRange(0, 4)
+
     expect(caret.style.visibility).toBe('hidden')
   })
 

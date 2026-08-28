@@ -7,20 +7,25 @@ import { dialCaretLeft, dialCaretShown } from '../../skins/comic-book/dialCaret'
 // is useDialCaret.ts, exercised through BubbleDial.test.tsx.
 
 describe('dialCaretShown', () => {
-  it('shows for a focused field whose selection is a collapsed caret', () => {
-    expect(dialCaretShown(true, 3, 3)).toBe(true)
+  it('shows for a focused field lettering the reader’s own number, caret collapsed', () => {
+    expect(dialCaretShown(true, false, 3, 3)).toBe(true)
+  })
+
+  it('hides over a fresh, drum-supplied number, which the next key replaces whole', () => {
+    // A caret promises an insertion; over a finished number there is none to promise.
+    expect(dialCaretShown(true, true, 3, 3)).toBe(false)
   })
 
   it('hides when the field is not focused, wherever the caret sits', () => {
-    expect(dialCaretShown(false, 3, 3)).toBe(false)
+    expect(dialCaretShown(false, false, 3, 3)).toBe(false)
   })
 
   it('hides across a range selection, whose ink is the marker swipe instead', () => {
-    expect(dialCaretShown(true, 0, 5)).toBe(false)
+    expect(dialCaretShown(true, false, 0, 5)).toBe(false)
   })
 
   it('hides when the control reports no selection at all', () => {
-    expect(dialCaretShown(true, null, null)).toBe(false)
+    expect(dialCaretShown(true, false, null, null)).toBe(false)
   })
 })
 

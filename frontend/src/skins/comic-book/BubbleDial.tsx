@@ -97,7 +97,9 @@ export default function BubbleDial({
   options, value, fresh, onChange, font, open, revealed, enabled, hostRef, onSubmit,
 }: BubbleDialProps) {
   const inputRef = useRef<HTMLInputElement>(null)
-  const caretRef = useDialCaret(inputRef)
+  // The comic caret shows only where typing would append — never over a fresh,
+  // drum-supplied number, which the next keystroke replaces whole.
+  const caretRef = useDialCaret(inputRef, fresh)
   const country = useMemo(() => browserCountry(), [])
   // Anything typed is the reader's own number, however far along it is.
   const field = usePhoneField(inputRef, country, next => onChange(next, false))

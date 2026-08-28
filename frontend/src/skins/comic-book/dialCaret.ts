@@ -4,15 +4,20 @@
 // The arithmetic is here, pure, so it can be tested without a canvas or a layout.
 
 /**
- * Shown only for a collapsed selection in a focused field. A range selection paints
- * itself (::selection ink), so a block caret on top of it would be a second highlight.
+ * Shown exactly where typing would append: a collapsed selection in a focused field
+ * whose number is the reader's own. A caret is a promise about the next keystroke, and
+ * over a fresh, drum-supplied number that promise is false — the next key replaces the
+ * number whole (see BubbleDial's `fresh`), so blinking mid-number there would point at
+ * an insertion that can never happen. A range selection paints itself (::selection
+ * ink), so a block caret on top of it would be a second highlight.
  */
 export function dialCaretShown(
   focused: boolean,
+  fresh: boolean,
   start: number | null,
   end: number | null,
 ): boolean {
-  return focused && start !== null && start === end
+  return focused && !fresh && start !== null && start === end
 }
 
 /**

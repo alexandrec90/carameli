@@ -15,10 +15,13 @@ import { dialCaretLeft, dialCaretShown } from './dialCaret'
  * (`dialCaret.ts`). Where a canvas cannot measure (jsdom), the caret still shows and
  * hides — it just stays at the left edge, which no test asserts against.
  */
-export function useDialCaret(inputRef: RefObject<HTMLInputElement | null>) {
+export function useDialCaret(inputRef: RefObject<HTMLInputElement | null>, fresh: boolean) {
   const caretRef = useRef<HTMLSpanElement>(null)
   const measureRef = useRef<CanvasRenderingContext2D | null>(null)
 
+  // No dependency array, deliberately: the effect re-runs on every render, so `place`
+  // always closes over the current `fresh` — a turn flips it without any selection
+  // event, and the re-registration is what repaints the caret for it.
   useEffect(() => {
     const input = inputRef.current
     const caret = caretRef.current
@@ -26,6 +29,7 @@ export function useDialCaret(inputRef: RefObject<HTMLInputElement | null>) {
     const place = (): void => {
       const shown = dialCaretShown(
         document.activeElement === input,
+        fresh,
         input.selectionStart,
         input.selectionEnd,
       )
