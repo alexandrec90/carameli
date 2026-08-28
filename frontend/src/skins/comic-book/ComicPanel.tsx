@@ -91,6 +91,12 @@ export default function ComicPanel({
     const dialIndex = dialBubbleOn(bubbles, index)
     const dialSeed = dialIndex >= 0 ? splitOptions(bubbles[dialIndex].text)[0] ?? '' : ''
     const [dialValue, setDialValue] = useState(() => formatPhoneInput(dialSeed, country))
+    // Whether that number is the drum's rather than the reader's — seeded, turned to, or
+    // just dialled. A fresh number is finished: the next key, from the keyboard or the
+    // projected pad, starts a new number instead of appending to it. Held here beside
+    // the value because the pad writes through this component and never sees the
+    // balloon's own state.
+    const [dialFresh, setDialFresh] = useState(() => dialSeed !== '')
     // Re-seeded only when the author's own text changes — which is what makes the editor
     // show what was just typed, and what keeps a reader who cleared the field looking at
     // an empty one instead of watching it refill itself.
@@ -103,14 +109,23 @@ export default function ComicPanel({
     if (seeded !== dialSeed) {
         setSeeded(dialSeed)
         setDialValue(formatPhoneInput(dialSeed, country))
+        setDialFresh(dialSeed !== '')
     }
-    const onDialChange = useCallback((next: string) => setDialValue(next), [])
-    // A press on the projected keypad appends to the dialled number, formatted, exactly as
-    // a typed digit would. Only on a panel that has a dial: everywhere else the pad keeps
-    // going wherever it went before, and `undefined` still means the keys are dead.
+    const onDialChange = useCallback((next: string, fresh: boolean) => {
+        setDialValue(next)
+        setDialFresh(fresh)
+    }, [])
+    // A press on the projected keypad types into the dialled number exactly as the
+    // keyboard does: appended to a number the reader was already typing, but starting a
+    // new number over one the drum supplied. Only on a panel that has a dial: everywhere
+    // else the pad keeps going wherever it went before, and `undefined` still means the
+    // keys are dead.
     const onDialPadKey = useCallback(
-        (key: string) => setDialValue(current => appendDialKey(current, key, country)),
-        [country],
+        (key: string) => {
+            setDialValue(current => appendDialKey(dialFresh ? '' : current, key, country))
+            setDialFresh(false)
+        },
+        [country, dialFresh],
     )
     // Numbers actually dialled from this panel, which join the dial's shortlist so the
     // drum becomes a redial list: a number reached once by typing it out or by punching
@@ -121,6 +136,9 @@ export default function ComicPanel({
     const onDialSubmit = useCallback(
         (value: string) => {
             setDialled(current => addDialled(current, value))
+            // The dialled number stays on the display, finished — the next key starts a
+            // new call rather than growing a number that has already been placed.
+            setDialFresh(true)
             onPhoneSubmit?.(value)
         },
         [onPhoneSubmit],
@@ -181,6 +199,7 @@ export default function ComicPanel({
                 sms={sms}
                 onPhoneSubmit={dialIndex >= 0 ? onDialSubmit : onPhoneSubmit}
                 dialValue={dialValue}
+                dialFresh={dialFresh}
                 dialled={dialled}
                 onDialChange={onDialChange}
                 phoneActions={phoneActions}
