@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { BUBBLE_ASPECT, TAIL_DIR_KEYS } from '../../skins/comic-book/bubbleBox'
 import { linkedPairs } from '../../skins/comic-book/bubbleTube'
 import { BUBBLE_TYPES, BUBBLE_TYPE_KEYS } from '../../skins/comic-book/editor/bubbleTypes'
+import { layoutViolations, violationLines } from '../../skins/comic-book/editor/configParity'
 import {
   PANEL_IMG_TRANSFORMS,
   PANEL_BUBBLE_TRANSFORMS,
@@ -502,6 +503,33 @@ describe('default config parity', () => {
   // floating in the gutter, and morphing one copy of it under the pointer would say
   // nothing about the message inside it.
   const isThread = (b: BubbleTransform) => b.chain !== ''
+
+  // Declared first so it is the first failure read, because it is the one that says what
+  // happened. Everything below pins a property of *this* layout — where the balloons sit,
+  // which pairs are tubed — and reads as a broken branch when it goes red. This one asks
+  // only whether the file is a finished layout at all, which is the question worth asking
+  // first: the dev server rewrites `layoutConfig.ts` on every Save, so a browser tab left
+  // open mid-design in any tree leaves a half-built one behind, and the next person to run
+  // the suite there cannot otherwise tell it from their own work.
+  it('is a finished layout — no unfinished balloons or pictures', () => {
+    const violations = layoutViolations({
+      images: PANEL_IMG_TRANSFORMS,
+      bubbles: PANEL_BUBBLE_TRANSFORMS,
+    })
+    expect(
+      violations,
+      [
+        'layoutConfig.ts is not a finished layout:',
+        ...violationLines(violations).map(line => `  - ${line}`),
+        '',
+        'If you did not edit this file, this is an unsaved export from the ?edit=1 editor,',
+        'left by a dev server running in this tree — not a fault in your branch. Set it',
+        'aside (git stash push -- frontend/src/skins/comic-book/editor/layoutConfig.ts)',
+        'rather than filling in the missing tails and morph targets by hand, which quietly',
+        "overwrites somebody's in-flight design.",
+      ].join('\n'),
+    ).toEqual([])
+  })
 
   it('uses center center only for the logo panels and center bottom for the rest', () => {
     PANEL_IMG_TRANSFORMS.forEach(t => {

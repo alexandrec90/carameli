@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import EditorToolbar from '../../skins/comic-book/editor/EditorToolbar'
 import { seedConfig } from '../../skins/comic-book/editor/configSeed'
+import type { EditorConfig } from '../../skins/comic-book/editor/types'
 import type { EditorModeApi } from '../../skins/comic-book/editor/useEditorMode'
 import type { SeamDragApi } from '../../skins/comic-book/editor/useSeamDrag'
 
@@ -15,10 +16,10 @@ vi.mock('../../lib/logger', () => ({
   logger: { info: vi.fn(), error: vi.fn(), warn: vi.fn() },
 }))
 
-function editorApi(): EditorModeApi {
+function editorApi(config: EditorConfig): EditorModeApi {
   return {
     active: true,
-    config: seedConfig(),
+    config,
     selected: null,
     mode: 'content',
     setMode: vi.fn(),
@@ -43,12 +44,11 @@ function editorApi(): EditorModeApi {
   }
 }
 
-function renderToolbar() {
-  const config = seedConfig()
+function renderToolbar(config: EditorConfig = seedConfig()) {
   return render(
     <MemoryRouter>
       <EditorToolbar
-        api={editorApi()}
+        api={editorApi(config)}
         selPanel={null}
         pageSelect={{ navItems: [], previewingLoading: false, onPreviewLoading: vi.fn() }}
         shapes={{
@@ -60,6 +60,38 @@ function renderToolbar() {
       />
     </MemoryRouter>,
   )
+}
+
+/**
+ * The balloon `+ Bubble` leaves behind: on a panel, but with no tail and neither morph
+ * target chosen. Copied from a real stranded export rather than invented — the same
+ * fixture configParity.test.ts uses — so the gate is held against what actually strands
+ * a tree, not against a tidy imagining of it.
+ */
+function withUnfinishedBubble(): EditorConfig {
+  const config = seedConfig()
+  return {
+    ...config,
+    bubbles: [
+      ...config.bubbles,
+      {
+        panel: 11,
+        top: -20,
+        right: 28,
+        width: 27,
+        rotate: -5,
+        spill: true,
+        type: 'soft',
+        tail: 'none',
+        content: 'text',
+        text: 'New bubble',
+        linkTo: null,
+        hoverType: null,
+        clickType: null,
+        chain: '',
+      },
+    ],
+  }
 }
 
 /** Stands in for the dev-only ship middleware. */
@@ -166,5 +198,32 @@ describe('EditorToolbar', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1)
 
     release?.({ ok: true, status: 200, json: () => Promise.resolve({ ok: true, message: 'done' }) })
+  })
+
+  it('names what is unfinished and holds Ship until it is finished', () => {
+    renderToolbar(withUnfinishedBubble())
+
+    const warnings = screen.getByRole('status', { name: 'Unfinished layout' })
+    expect(warnings.textContent).toContain('no tail')
+    expect(warnings.textContent).toContain('no hover shape')
+    expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Ship' }).disabled).toBe(true)
+  })
+
+  it('still saves while a balloon is unfinished — mid-design is when Save matters most', async () => {
+    const fetchMock = stubFetch(200, {})
+    renderToolbar(withUnfinishedBubble())
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1))
+    const [url] = fetchMock.mock.calls[0] as [string]
+    expect(url).toBe('/__comic-editor/save')
+  })
+
+  it('says nothing and leaves Ship alone on the shipped layout', () => {
+    renderToolbar()
+
+    expect(screen.queryByRole('status', { name: 'Unfinished layout' })).toBeNull()
+    expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Ship' }).disabled).toBe(false)
   })
 })

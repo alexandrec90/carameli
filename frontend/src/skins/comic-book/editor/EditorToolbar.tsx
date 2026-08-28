@@ -1,9 +1,11 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 
 import { logger } from '../../../lib/logger'
 import type { LayoutKind, PanelGrid } from '../panelGeometry'
 import type { PanelPage } from '../panels'
+import { layoutViolations } from './configParity'
 import InspectorPanel from './InspectorPanel'
+import LayoutWarnings from './LayoutWarnings'
 import PageSelect from './PageSelect'
 import type { PageSelectProps } from './PageSelect'
 import { serializeConfig, serializeConfigFile } from './serialize'
@@ -81,6 +83,11 @@ export default function EditorToolbar({ api, selPanel, pageSelect, shapes }: Edi
   const [summary, setSummary] = useState('')
   const [ship, setShip] = useState<ShipState>({ phase: 'idle' })
 
+  // Derived from the working copy rather than checked on the way out, so a balloon
+  // finished mid-session stops being reported the moment it is finished. See
+  // ./configParity.ts for which rules are structural and which belong to today's layout.
+  const violations = useMemo(() => layoutViolations(config), [config])
+
   const onShip = () => {
     setShip({ phase: 'busy' })
     const content = serializeConfigFile(config)
@@ -112,7 +119,12 @@ export default function EditorToolbar({ api, selPanel, pageSelect, shapes }: Edi
       .then(res => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
         setSave({ phase: 'done' })
-        logger.info('Comic-book editor: config saved to layoutConfig.ts')
+        // The count goes in the log because it is the record of what the *file* now
+        // holds: the author sees the list in the toolbar, but whoever finds this tree
+        // afterwards sees only the file.
+        logger.info('Comic-book editor: config saved to layoutConfig.ts', {
+          unfinished: violations.length,
+        })
         window.setTimeout(() => setSave({ phase: 'idle' }), 1500)
       })
       .catch((err: unknown) => {
@@ -238,9 +250,16 @@ export default function EditorToolbar({ api, selPanel, pageSelect, shapes }: Edi
           outside edit mode still shows the old layout.
         </p>
       )}
+      <LayoutWarnings violations={violations} />
       {/* Save writes the file; Ship carries it to a branch and a PR. They are separate
           buttons because Save is the inner loop — pressed every few drags — and Ship is
-          the moment the work should stop being local to one tree. */}
+          the moment the work should stop being local to one tree.
+
+          Which is also why only Ship is held while something is unfinished. Refusing to
+          Save would take the inner loop away from an author who is mid-design — the exact
+          moment a layout is *meant* to be half-built — and the work would go nowhere but
+          a download. A PR carrying a half-built balloon is a different thing: it fails the
+          parity test for a reason nobody on the review can act on. */}
       <div className="cb-ed-actions">
         <input
           type="text"
@@ -253,8 +272,12 @@ export default function EditorToolbar({ api, selPanel, pageSelect, shapes }: Edi
         <button
           type="button"
           className="cb-ed-btn cb-ed-btn-primary cb-ed-btn-icon"
-          title="Save, then commit and push this layout and open or update its PR"
-          disabled={ship.phase === 'busy'}
+          title={
+            violations.length > 0
+              ? 'Finish the balloons listed above first — a PR carrying one of these fails the layout tests'
+              : 'Save, then commit and push this layout and open or update its PR'
+          }
+          disabled={ship.phase === 'busy' || violations.length > 0}
           onClick={onShip}
         >
           {ship.phase === 'busy' ? 'Shipping…' : 'Ship'}

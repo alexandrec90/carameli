@@ -46,6 +46,17 @@ add/remove picture or bubble, pattern switch, link sanitation), which re-exports
 grid edits live in `panelGridOps.ts` and the chain list's own lifecycle in
 `chainOps.ts`.
 
+**A `layoutConfig.ts` you did not edit is somebody's unsaved design, not a broken
+branch.** Because Save writes the served tree directly, a browser tab left open mid-
+design plants half-built balloons in whatever worktree the dev server was running in,
+uncommitted and belonging to no PR. That has stranded four trees so far, each costing a
+fresh session a diagnosis, because the parity failures it produces read as a fault in
+whatever branch happened to be checked out. The first assertion in `default config
+parity` now says so in its own failure message, and the answer it gives is the right
+one: `git stash push -- frontend/src/skins/comic-book/editor/layoutConfig.ts`, never
+filling in the missing tails by hand — that silently overwrites work someone is still
+doing.
+
 The bubble box's on-screen geometry comes from `bubbleRect` in `transforms.ts`, used
 by **both** the renderer (to aim tubes) and the editor (hit target and selection
 outline). Keep it shared: when those two disagreed, the bubble you could click was
@@ -168,7 +179,9 @@ two are not the same input, which is why the keys take no argument.
 | Tear | **Alt-drag a corner** | The inverse of the merge: the seams on the drag side follow the pointer, the rest stay, and the two corners end up joined by a new edge (`panelGridSplit.ts`). The torn corner snaps onto a neighbouring seam's continuation line, so a collapsed cross folds back into two junctions on one straight seam. While the result would be invalid nothing tears |
 | New panel | select a **panel**, then **Split top / bottom** or **Split left / right** in the shapes inspector | A straight cut through the middle of the panel's box, in all three grids of its page at once (`configPanels.ts` over `panelGridCut.ts`). The parent keeps its index, name, pattern and the upper/left half; the new panel is appended to `PANELS` with a numbered name and the parent's pattern, the other page's grids gain an empty ring, and on the grid on screen pictures and bubbles hold their place (`gridContentRemap.ts`). Refused whole, with a note, when any grid cannot take the cut. There is no delete |
 | Reset shapes | **Reset shapes** in the shapes inspector | Restores the current window shape's grid only — the three are edited independently. Pictures and bubbles stay where the author put them. A panel added since shipping has no shipped ring, so it is left empty on that window shape until split off again |
-| Save | **Save** button | `POST /__comic-editor/save` writes `layoutConfig.ts` (dev server only); **Copy config** / **.ts** are the fallbacks |
+| Save | **Save** button | `POST /__comic-editor/save` writes `layoutConfig.ts` (dev server only); **Copy config** / **.ts** are the fallbacks. Never refused — mid-design is when it matters most |
+| Ship | **Ship** button + summary | `POST /__comic-editor/ship` saves, then branches, commits, pushes and opens or updates a PR (`frontend/shipLayout.ts`). **Disabled while anything is unfinished** |
+| Unfinished | amber list above the Ship row | `editor/configParity.ts` — the structural rules a layout must satisfy whoever authored it: every caption needs a tail and both morph targets, every link must resolve within its panel, every picture needs extent and a `/comic-book/` source |
 | Reset all | clears working copy | Removes `localStorage['comic-book:editConfig']`, re-seeds from source |
 
 `EditorOverlay.tsx` is dynamically `import()`-ed behind the DEV gate so Rollup
