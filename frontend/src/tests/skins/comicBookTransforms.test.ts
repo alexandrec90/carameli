@@ -515,6 +515,7 @@ describe('default config parity', () => {
     const violations = layoutViolations({
       images: PANEL_IMG_TRANSFORMS,
       bubbles: PANEL_BUBBLE_TRANSFORMS,
+      panels: PANELS,
     })
     expect(
       violations,

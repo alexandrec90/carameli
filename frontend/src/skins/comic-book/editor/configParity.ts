@@ -1,5 +1,5 @@
 import { linkedPairs } from '../bubbleTube'
-import { PANELS } from '../panels'
+import type { Panel } from '../panels'
 import type { BubbleTransform, ImgTransform } from './types'
 
 // What has to be true of *any* layout, as opposed to what happens to be true of the one
@@ -51,12 +51,16 @@ function isCaption(b: BubbleTransform): boolean {
   return b.content === 'text' && b.chain === ''
 }
 
-function panelProblem(panel: number): string | null {
-  if (Number.isInteger(panel) && panel >= 0 && panel < PANELS.length) return null
-  return `sits on panel ${panel}, which is not one of the ${PANELS.length} panels`
+// The panel count comes from the layout being judged rather than from the shipped
+// `PANELS`: splitting a panel appends one to the working copy, and reading the count off
+// the shipped constant would report every balloon on the new panel as sitting on a panel
+// that does not exist.
+function panelProblem(panel: number, panelCount: number): string | null {
+  if (Number.isInteger(panel) && panel >= 0 && panel < panelCount) return null
+  return `sits on panel ${panel}, which is not one of the ${panelCount} panels`
 }
 
-function bubbleViolations(bubbles: BubbleTransform[]): LayoutViolation[] {
+function bubbleViolations(bubbles: BubbleTransform[], panelCount: number): LayoutViolation[] {
   const out: LayoutViolation[] = []
 
   // Only the *second* end of a linked pair may go without a tail: a tube is one
@@ -68,7 +72,7 @@ function bubbleViolations(bubbles: BubbleTransform[]): LayoutViolation[] {
     const where = b.text ? `bubble ${i} (“${b.text}”)` : `bubble ${i}`
     const add = (problem: string) => out.push({ where, problem })
 
-    const panel = panelProblem(b.panel)
+    const panel = panelProblem(b.panel, panelCount)
     if (panel) add(panel)
     if (!(b.width > 0)) add('has no width, so it draws nothing')
 
@@ -98,14 +102,14 @@ function bubbleViolations(bubbles: BubbleTransform[]): LayoutViolation[] {
   return out
 }
 
-function pictureViolations(images: ImgTransform[]): LayoutViolation[] {
+function pictureViolations(images: ImgTransform[], panelCount: number): LayoutViolation[] {
   const out: LayoutViolation[] = []
 
   images.forEach((t, i) => {
     const where = `picture ${i} (${t.src})`
     const add = (problem: string) => out.push({ where, problem })
 
-    const panel = panelProblem(t.panel)
+    const panel = panelProblem(t.panel, panelCount)
     if (panel) add(panel)
 
     // The frame and the framing *inside* it are two independent transforms, and a zero
@@ -123,15 +127,22 @@ function pictureViolations(images: ImgTransform[]): LayoutViolation[] {
 }
 
 /**
- * Everything unfinished about a layout, pictures first. Takes the two arrays rather than
- * an `EditorConfig` so the parity test can hand it the two shipped constants directly and
- * the editor can hand it the working copy, with neither having to build the other's shape.
+ * Everything unfinished about a layout, pictures first. Takes the three arrays rather than
+ * an `EditorConfig` so the parity test can hand it the shipped constants directly and the
+ * editor can hand it the working copy, with neither having to build the other's shape.
+ * `panels` is only read for its length — it is what "panel 12 does not exist" is measured
+ * against, and it is the working copy's own list because a panel can be split in two.
  */
 export function layoutViolations(config: {
   images: ImgTransform[]
   bubbles: BubbleTransform[]
+  panels: Panel[]
 }): LayoutViolation[] {
-  return [...pictureViolations(config.images), ...bubbleViolations(config.bubbles)]
+  const panelCount = config.panels.length
+  return [
+    ...pictureViolations(config.images, panelCount),
+    ...bubbleViolations(config.bubbles, panelCount),
+  ]
 }
 
 /** One line per violation — for a test failure message, a log line, or the toolbar. */
