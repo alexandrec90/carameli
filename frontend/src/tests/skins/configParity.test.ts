@@ -19,6 +19,7 @@ const caption = (over: Partial<BubbleTransform> = {}): BubbleTransform => ({
   linkTo: null,
   hoverType: 'cloud',
   clickType: 'lightning',
+  hoverBold: false,
   chain: '',
   ...over,
 })
@@ -56,7 +57,7 @@ describe('layoutViolations — the state the editor drops on the page', () => {
   const placeholder: BubbleTransform = {
     panel: 11, top: -20, right: 28, width: 27, rotate: -5, spill: true, type: 'soft',
     tail: 'none', content: 'text', text: 'New bubble', linkTo: null,
-    hoverType: null, clickType: null, chain: '',
+    hoverType: null, clickType: null, hoverBold: false, chain: '',
   }
 
   it('names the tail, the hover and the click, and nothing else', () => {

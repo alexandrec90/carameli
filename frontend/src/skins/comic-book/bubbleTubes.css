@@ -5,7 +5,7 @@
    is unique to tubes. */
 
 /* One viewport-level layer. Its z-index is load-bearing at both ends: above a lifted
-   panel (z:8) so each tube's white fill erases the slice of bubble outline it covers
+   balloon (z:8) so each tube's white fill erases the slice of bubble outline it covers
    — that erasure IS the weld, there is no path union — and below the Ben-Day wash
    (z:10) so a page transition still covers the tubes. No viewBox: path coordinates
    are viewport pixels, and overflow:visible lets a tube follow a bubble that floats
