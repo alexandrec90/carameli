@@ -79,29 +79,25 @@ export const MAX_EAGER_BYTES = 300 * 1024
 export const MAX_LAZY_CHUNK_BYTES = 260 * 1024
 
 /**
- * Every `.js` file in `dist/assets/`, summed. Today 950.6 KB across 46 chunks; the
+ * Every `.js` file in `dist/assets/`, summed. Today 956.6 KB across 46 chunks; the
  * regional phone formatter lives in the lazy comic-book skin rather than the eager
  * entry graph, and so do the projected surfaces (table and number pad) and the bubble
  * chains — none of them is downloaded by a visitor who never opens that skin, which is
  * why the eager-entry budget above did not move with them.
  *
- * The last raise (935 → 950) is a bubble chain bound to real SMS: the conversation hook,
- * its reconciliation lib and the wheel→number binding. Same trade as the line above —
- * `useSmsConversations` is reachable from every skin, but the code that *subscribes* to
- * it is in the comic-book chunk, and a visitor who never opens that skin never pays for
- * a request either.
+ * The last raise (950 → 955) is the `dial` bubble kind — the picker component, its pure
+ * module, and the caret-preserving edit path lifted out of BubbleInput so both share
+ * one. Same trade as the line above: the regional formatter it leans on was already in
+ * the comic-book chunk for `phone`, and a visitor who never opens that skin pays for
+ * none of it.
  *
- * The raise before (950 → 955) is 2.7 KB, measured against the same build with the new
- * files removed: the `dial` bubble kind — the picker component, its pure module, and the
- * caret-preserving edit path lifted out of BubbleInput so both share one. No new
- * dependency; the regional formatter it leans on was already in this chunk for `phone`.
- *
- * This raise (955 → 956) covers ~0.2 KB the build was already leaning over the line:
- * the chain-hover handoff in the comic-book chunk — the `overInk` probe that measures
- * drawn balloons and the `cb-panel-hot` wiring that replaced the stylesheet's `:hover`.
- * No new dependency, and nothing eager moved.
+ * This raise (955 → 958) is 1.6 KB: the dial's keyboard grab on panel reveal and its
+ * lettered caret — `dialCaret.ts`'s pure measurement math, the `useDialCaret` DOM hook
+ * that positions the ink block per keystroke, and the fresh-number flag both keyboards
+ * read. All of it lands in the same lazy comic-book chunk; `package.json` is untouched
+ * and the chunk count is unchanged at 46, so nothing new was pulled in.
  */
-export const MAX_TOTAL_JS_BYTES = 956 * 1024
+export const MAX_TOTAL_JS_BYTES = 958 * 1024
 
 /**
  * Every `.css` file in `dist/assets/`, summed. Today 44.2 KB across 2 files.

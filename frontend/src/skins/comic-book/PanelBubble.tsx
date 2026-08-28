@@ -62,7 +62,9 @@ interface PanelBubbleProps {
    * arrive together or not at all, and a dial rendered without them is an inert display.
    */
   dialValue?: string
-  onDialChange?: (value: string) => void
+  /** Whether that number is drum-supplied and so replaced, not appended to, by the next key. */
+  dialFresh?: boolean
+  onDialChange?: (value: string, fresh: boolean) => void
   /**
    * Numbers already dialled from this panel. They join the author's own options, so the
    * drum is the shortlist plus whatever the reader has reached that was not on it.
@@ -100,6 +102,7 @@ export default function PanelBubble({
   onSubmit,
   onWheelSelect,
   dialValue = '',
+  dialFresh = false,
   onDialChange,
   dialled = NOTHING_DIALLED,
   actions,
@@ -219,12 +222,17 @@ export default function PanelBubble({
         <BubbleDial
           options={dialList}
           value={dialValue}
+          fresh={dialFresh}
           onChange={onDialChange ?? noop}
           font={font}
           // Open on focus as well as on hover, unlike a plain wheel: typing into a dial
           // filters its drum, and a filter whose result only appears when the pointer
           // happens to be over the balloon is a filter nobody can see working.
           open={hover || focused}
+          // The panel-hover reveal alone: the dial grabs the keyboard while its balloon
+          // shows and lets go when the pointer leaves the panel, so it must not be told
+          // its own focus is a reason to keep it.
+          revealed={visible}
           enabled={interactive}
           hostRef={rootRef}
           onSubmit={onSubmit}

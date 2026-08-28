@@ -70,7 +70,9 @@ interface PanelBubblesProps {
    * its pictures, which write to the same value. Absent on a panel with no dial.
    */
   dialValue?: string
-  onDialChange?(value: string): void
+  /** Whether that number is drum-supplied and so replaced, not appended to, by the next key. */
+  dialFresh?: boolean
+  onDialChange?(value: string, fresh: boolean): void
   /**
    * Numbers dialled from this panel, appended to a `dial` balloon's authored shortlist so
    * the drum grows into a redial list. The panel's, like the value, and for the same
@@ -117,6 +119,7 @@ export default function PanelBubbles({
   sms,
   onPhoneSubmit,
   dialValue = '',
+  dialFresh = false,
   onDialChange,
   dialled = EMPTY_DIALLED,
   phoneActions,
@@ -184,6 +187,7 @@ export default function PanelBubbles({
                 : undefined
             }
             dialValue={dialValue}
+            dialFresh={dialFresh}
             dialled={dialled}
             onDialChange={onDialChange}
             actions={bubble.content === 'actions' ? phoneActions : undefined}
