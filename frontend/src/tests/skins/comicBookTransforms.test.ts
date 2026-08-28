@@ -25,7 +25,7 @@ import {
   toClipPath,
 } from '../../skins/comic-book/editor/transforms'
 import type { BubbleTransform, ImgTransform } from '../../skins/comic-book/editor/types'
-import { PANELS } from '../../skins/comic-book/panels'
+import { PANELS } from '../../skins/comic-book/editor/layoutConfig'
 
 /** A picture at the shipped default: full-panel frame, identity framing inside it. */
 const img = (over: Partial<ImgTransform> = {}): ImgTransform => ({
@@ -516,6 +516,7 @@ describe('default config parity', () => {
     const violations = layoutViolations({
       images: PANEL_IMG_TRANSFORMS,
       bubbles: PANEL_BUBBLE_TRANSFORMS,
+      panels: PANELS,
     })
     expect(
       violations,

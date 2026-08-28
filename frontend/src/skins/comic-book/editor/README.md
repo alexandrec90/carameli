@@ -22,10 +22,13 @@ linked partner (`linkTo`) and the SMS conversation that linkage makes it a colum
 an editor-generated id resolved through `PANEL_BUBBLE_CHAINS` — see *Bubble chains*
 below). It also holds
 `PANEL_PATTERNS` — each panel's
-Ben-Day background style, the one array here that **is** parallel to `PANELS`; the
-per-panel palette and dot metrics stay tuned in
-[`../panelPatterns.ts`](../panelPatterns.ts) (`PANEL_BG_CONFIGS`), so switching a
-panel's pattern keeps its colors. A picture's `src` is a public URL, offered in the
+Ben-Day background style, the one array here that **is** parallel to `PANELS` — and
+`PANELS` itself, the list of slots (label, `isLogo`, page), which lives here rather
+than in [`../panels.ts`](../panels.ts) because the editor appends to it when a panel
+is split. The per-panel palette and dot metrics stay tuned in
+[`../panelPatterns.ts`](../panelPatterns.ts) (`PANEL_BG_CONFIGS`, read through
+`panelBgConfig`, which wraps for a panel past its end), so switching a panel's pattern
+keeps its colors. A picture's `src` is a public URL, offered in the
 editor by the static manifest in [`assets.ts`](./assets.ts) (`PANEL_ASSETS`). The
 bubble `type` resolves to a lettering font via [`bubbleTypes.ts`](./bubbleTypes.ts)
 (`BUBBLE_TYPES`); the outline itself is generated vector geometry in
@@ -317,6 +320,21 @@ different images can only crossfade. A new bubble type belongs in `bubbleShape.t
    - A plain-dragged vertex snaps onto those **continuation lines** too (only past a
      seam's end — on its body the result would be a T-junction), so a corner can be
      placed exactly in line with a seam it does not join.
+   - **Click a panel, then Split top / bottom or Split left / right** to make a new
+     panel: a straight cut through the middle of the panel's box, on all three window
+     shapes of its page at once. The upper or left half keeps the panel's name,
+     pattern, pictures and bubbles; the other half is appended to `PANELS` as a new
+     panel with a numbered copy of the name (`Mechanic` → `Mechanic 2`) and the same
+     pattern, and is selected. The new line is an ordinary seam — drag it, bend it,
+     merge its corners. What was on screen holds its place, so a picture that filled
+     the parent now hangs over the cut; move it onto whichever half it belongs to, or
+     re-assign it in the inspector. The cut is refused whole, with a note in the
+     inspector, when any of the three grids cannot take it — a panel whose outline
+     bends back across its own middle; straighten it first. A panel made this way has
+     no shipped shape, so **Reset shapes** leaves it with an empty ring on that window
+     shape until it is split off again; and there is no delete — merge its seams away
+     and it keeps its slot.
+   - Rename a panel from the **name** field of its inspector, in either mode.
    - **Arrow keys** nudge the selected vertex (hold **⇧** for x10); **Esc** deselects.
    - The gutter between panels stays the same width at every angle — it is measured
      perpendicular to each edge, not per axis — and every panel stays inside the outer
@@ -393,7 +411,11 @@ nothing in a prod build.
 types.ts            ImgTransform, BubbleTransform, BubbleChain, EditorConfig
 assets.ts           PANEL_ASSETS: the pictures a frame may point at (static manifest)
 bubbleTypes.ts      BubbleType + BUBBLE_TYPES (lettering font per type) — ships in prod
-../panels.ts        PANELS: the grid slots — label, isLogo, route, page (what `panel` indexes)
+../panels.ts        Panel, PANEL_PAGES, pageForPath: the slot type and the route → page rule
+layoutConfig.ts     PANELS (the slots `panel` indexes — label, isLogo, page) beside the framing data
+serializePanels.ts  the PANELS block of layoutConfig.ts, prose and all
+configPanels.ts     PURE: split a panel — list, patterns and all six grids together — and rename one
+panelGridCut.ts     PURE: cut one ring in two along a straight line, inserting the crossings
 ../PanelImages.tsx  one panel's pictures: filters the array by panel, frames and clips each
 ../bubbleBox.ts     PURE authoring box: viewBox, base ellipse, TAIL_DIRS + tail geometry
 ../bubbleShape.ts   PURE outline geometry: the shared vertex ring, per-type modulation, morph lerp

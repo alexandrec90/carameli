@@ -91,13 +91,19 @@ export const MAX_LAZY_CHUNK_BYTES = 260 * 1024
  * the comic-book chunk for `phone`, and a visitor who never opens that skin pays for
  * none of it.
  *
- * This raise (955 → 958) is 1.6 KB: the dial's keyboard grab on panel reveal and its
- * lettered caret — `dialCaret.ts`'s pure measurement math, the `useDialCaret` DOM hook
- * that positions the ink block per keystroke, and the fresh-number flag both keyboards
- * read. All of it lands in the same lazy comic-book chunk; `package.json` is untouched
- * and the chunk count is unchanged at 46, so nothing new was pulled in.
+ * The raise before (955 → 958) is 1.6 KB: the dial's keyboard grab on panel reveal and
+ * its lettered caret — `dialCaret.ts`'s pure measurement math, the `useDialCaret` DOM
+ * hook that positions the ink block per keystroke, and the fresh-number flag both
+ * keyboards read. All of it lands in the same lazy comic-book chunk; `package.json` is
+ * untouched and the chunk count is unchanged at 46, so nothing new was pulled in.
+ *
+ * This raise (958 → 964) is 5.7 KB: making a panel from the editor. `panelGridCut.ts`
+ * cuts a ring in two along a straight line, `configPanels.ts` grows the panel list,
+ * the pattern per panel and every grid together, and the panel list itself moved into
+ * the editor-owned `layoutConfig.ts` so it is serialized and hydrated with the rest.
+ * Same lazy comic-book chunk, same 46 chunks, `package.json` untouched.
  */
-export const MAX_TOTAL_JS_BYTES = 958 * 1024
+export const MAX_TOTAL_JS_BYTES = 964 * 1024
 
 /**
  * Every `.css` file in `dist/assets/`, summed. Today 44.2 KB across 2 files.

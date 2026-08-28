@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { layoutViolations, violationLines } from '../../skins/comic-book/editor/configParity'
-import type { BubbleTransform, ImgTransform } from '../../skins/comic-book/editor/types'
+import type { BubbleTransform, ImgTransform, Panel } from '../../skins/comic-book/editor/types'
 
 // A finished caption: it says something, it points at a speaker, and it answers both a
 // hover and a press. Every bubble case below is this one with a field taken away.
@@ -40,12 +40,30 @@ const picture = (over: Partial<ImgTransform> = {}): ImgTransform => ({
   ...over,
 })
 
+// Only the length is read, so the cases below name panels 0–11 the way the shipped
+// layout does without restating any of it.
+const panels: Panel[] = Array.from({ length: 12 }, (_, i) => ({
+  label: `Panel ${i}`,
+  isLogo: i === 0,
+  page: 'classic',
+}))
+
 const of = (bubbles: BubbleTransform[], images: ImgTransform[] = []) =>
-  violationLines(layoutViolations({ images, bubbles }))
+  violationLines(layoutViolations({ images, bubbles, panels }))
 
 describe('layoutViolations — a finished layout', () => {
   it('finds nothing wrong with a caption that is done', () => {
-    expect(layoutViolations({ images: [picture()], bubbles: [caption()] })).toEqual([])
+    expect(layoutViolations({ images: [picture()], bubbles: [caption()], panels })).toEqual([])
+  })
+
+  // A panel split in two appends one to the working copy, so the count that decides
+  // "panel 12 does not exist" has to be this layout's own, not the shipped constant's.
+  it('accepts a balloon on a panel the layout has and the shipped file does not', () => {
+    const grown = [...panels, { label: 'Panel 12', isLogo: false, page: 'classic' as const }]
+    expect(layoutViolations({ images: [], bubbles: [caption({ panel: 12 })], panels: grown })).toEqual([])
+    expect(of([caption({ panel: 12 })])).toEqual([
+      'bubble 0 (“Hello”) sits on panel 12, which is not one of the 12 panels',
+    ])
   })
 })
 

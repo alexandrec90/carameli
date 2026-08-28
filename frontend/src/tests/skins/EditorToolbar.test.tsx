@@ -36,6 +36,8 @@ function editorApi(config: EditorConfig): EditorModeApi {
     setChain: vi.fn(),
     addChainColumn: vi.fn(),
     setPattern: vi.fn(),
+    splitPanel: vi.fn(),
+    setPanelLabel: vi.fn(),
     deleteImg: vi.fn(),
     deleteBubble: vi.fn(),
     resetOne: vi.fn(),
