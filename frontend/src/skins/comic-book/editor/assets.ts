@@ -41,6 +41,7 @@ export const PANEL_ASSETS: PanelAsset[] = [
   { src: '/comic-book/wait.webp', label: 'Wait' },
   { src: '/comic-book/cheating-man.webp', label: 'Cheating man' },
   { src: '/comic-book/despondent-wife.webp', label: 'Despondent wife' },
+  { src: '/comic-book/ringing-phone.webp', label: 'Ringing phone' },
 ]
 
 /**
