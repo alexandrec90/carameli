@@ -91,12 +91,17 @@ export const MAX_LAZY_CHUNK_BYTES = 260 * 1024
  * it is in the comic-book chunk, and a visitor who never opens that skin never pays for
  * a request either.
  *
- * This raise (950 → 955) is 2.7 KB, measured against the same build with the new files
- * removed: the `dial` bubble kind — the picker component, its pure module, and the
+ * The raise before (950 → 955) is 2.7 KB, measured against the same build with the new
+ * files removed: the `dial` bubble kind — the picker component, its pure module, and the
  * caret-preserving edit path lifted out of BubbleInput so both share one. No new
  * dependency; the regional formatter it leans on was already in this chunk for `phone`.
+ *
+ * This raise (955 → 956) covers ~0.2 KB the build was already leaning over the line:
+ * the chain-hover handoff in the comic-book chunk — the `overInk` probe that measures
+ * drawn balloons and the `cb-panel-hot` wiring that replaced the stylesheet's `:hover`.
+ * No new dependency, and nothing eager moved.
  */
-export const MAX_TOTAL_JS_BYTES = 955 * 1024
+export const MAX_TOTAL_JS_BYTES = 956 * 1024
 
 /**
  * Every `.css` file in `dist/assets/`, summed. Today 44.2 KB across 2 files.
