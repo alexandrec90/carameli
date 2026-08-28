@@ -36,12 +36,12 @@ export const PANEL_IMG_TRANSFORMS: ImgTransform[] = [
   { panel: 5, src: '/comic-book/rolodex.webp', alt: 'Rolodex', left: 0, top: 0, width: 100, height: 100, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center bottom', spill: false },
   { panel: 6, src: '/comic-book/rotary%20phone.webp', alt: 'Rotary phone', left: 0, top: 0, width: 100, height: 100, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center bottom', spill: false },
   { panel: 7, src: '/comic-book/mailman2.webp', alt: 'Post office', left: 0, top: 0, width: 100, height: 100, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center bottom', spill: false },
-  { panel: 8, src: '/comic-book/logo2.webp', alt: 'Carameli', left: -6.2, top: -1.1, width: 104, height: 106.1, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center center', spill: false },
-  { panel: 9, src: '/comic-book/push-button-phone.webp', alt: 'Notepad', left: -38.1, top: 2.6, width: 139.8, height: 121.8, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center bottom', spill: false, numberPad: {
+  { panel: 8, src: '/comic-book/logo2.webp', alt: 'Carameli', left: -4.7, top: -1, width: 77.7, height: 91.7, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center center', spill: false },
+  { panel: 9, src: '/comic-book/push-button-phone.webp', alt: 'Notepad', left: -50.3, top: 2.3, width: 152.1, height: 108.1, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center bottom', spill: false, numberPad: {
     quad: [[44.96, 25.44], [52.35, 20.85], [55.84, 50.56], [47.52, 55.36]],
     fontScale: 0.55, ink: '#1b3a8f',
   } },
-  { panel: 10, src: '/comic-book/hand-notepad.webp', alt: 'Push-button phone', left: -18.7, top: -0.9, width: 130.5, height: 120.6, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center bottom', spill: false, table: {
+  { panel: 10, src: '/comic-book/hand-notepad.webp', alt: 'Push-button phone', left: -17.2, top: -1.2, width: 119.8, height: 120.9, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center bottom', spill: false, table: {
     quad: [[32.03, 9.45], [69.19, 9.31], [70.02, 71.44], [31.57, 72.13]],
     rows: 12, header: true, fontScale: 0.5, ink: '#1b3a8f',
     columns: [
@@ -59,7 +59,7 @@ export const PANEL_IMG_TRANSFORMS: ImgTransform[] = [
       ['Vint Cerf', '555-0108'],
     ],
   } },
-  { panel: 11, src: '/comic-book/conversation.webp', alt: 'Phone conversation', left: 13.3, top: 40.8, width: 73.1, height: 64, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center bottom', spill: false },
+  { panel: 11, src: '/comic-book/conversation.webp', alt: 'Phone conversation', left: 13.1, top: 40.5, width: 73.3, height: 64.4, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center bottom', spill: false },
 ]
 
 // Not parallel to PANELS either: each bubble names its `panel`, a panel may own any
@@ -99,8 +99,16 @@ export const PANEL_BUBBLE_TRANSFORMS: BubbleTransform[] = [
   { panel: 5, top: -35, right: -12, width: 55, rotate: -5, spill: true, type: 'lightning', tail: 'down-left', content: 'text', text: 'RING RING!', linkTo: null, hoverType: 'cloud', clickType: 'soft', chain: '' },
   { panel: 6, top: -35, right: -12, width: 55, rotate: -5, spill: true, type: 'lightning', tail: 'down-left', content: 'text', text: 'Ka-POW!', linkTo: null, hoverType: 'soft', clickType: 'cloud', chain: '' },
   { panel: 7, top: -35, right: -12, width: 55, rotate: -5, spill: true, type: 'cloud', tail: 'down-left', content: 'text', text: 'Delivering dreams...', linkTo: null, hoverType: 'soft', clickType: 'lightning', chain: '' },
-  { panel: 9, top: 1, right: 8, width: 36, rotate: -5, spill: true, type: 'cloud', tail: 'none', content: 'phone', text: '4388762750', linkTo: null, hoverType: null, clickType: null, chain: '' },
-  { panel: 9, top: 57, right: 13, width: 17, rotate: -5, spill: true, type: 'cloud', tail: 'none', content: 'actions', text: 'Call, End call', linkTo: 10, hoverType: null, clickType: null, chain: '' },
+  { panel: 9, top: 1, right: 9, width: 39, rotate: -5, spill: true, type: 'cloud', tail: 'none', content: 'dial', text: '4388762750,1234567890', linkTo: null, hoverType: null, clickType: null, chain: '' },
+  { panel: 11, top: 23, right: 36, width: 18, rotate: -5, spill: true, type: 'soft', tail: 'down-left', content: 'text', text: 'New bubble', linkTo: null, hoverType: null, clickType: null, chain: '' },
+  { panel: 11, top: 4, right: 25, width: 23, rotate: -5, spill: true, type: 'soft', tail: 'none', content: 'text', text: 'New bubble', linkTo: 11, hoverType: null, clickType: null, chain: '' },
+  { panel: 11, top: -20, right: 28, width: 27, rotate: -5, spill: true, type: 'soft', tail: 'none', content: 'text', text: 'New bubble', linkTo: 12, hoverType: null, clickType: null, chain: '' },
+  { panel: 11, top: -44, right: 18, width: 28, rotate: -5, spill: true, type: 'soft', tail: 'none', content: 'text', text: 'New bubble', linkTo: 13, hoverType: null, clickType: null, chain: '' },
+  { panel: 11, top: 26, right: 66, width: 21, rotate: -5, spill: true, type: 'soft', tail: 'down-right', content: 'text', text: 'New bubble', linkTo: null, hoverType: null, clickType: null, chain: '' },
+  { panel: 11, top: 9, right: 60, width: 20, rotate: -5, spill: true, type: 'soft', tail: 'none', content: 'text', text: 'New bubble', linkTo: 15, hoverType: null, clickType: null, chain: '' },
+  { panel: 11, top: -17, right: 65, width: 23, rotate: -5, spill: true, type: 'soft', tail: 'none', content: 'text', text: 'New bubble', linkTo: 16, hoverType: null, clickType: null, chain: '' },
+  { panel: 11, top: -37, right: 56, width: 22, rotate: -5, spill: true, type: 'soft', tail: 'none', content: 'text', text: 'New bubble', linkTo: 17, hoverType: null, clickType: null, chain: '' },
+  { panel: 9, top: 51, right: 14, width: 18, rotate: -5, spill: true, type: 'cloud', tail: 'none', content: 'actions', text: 'call,end call', linkTo: 10, hoverType: null, clickType: null, chain: '' },
 ]
 
 // One entry per chain id the bubbles above carry — the list is derived from them, not
@@ -229,7 +237,7 @@ export const PANEL_GRIDS: PageGrids = {
   },
   home: {
     landscape: {
-      vertices: [[0, 0], [1, 0], [1, 1], [0, 1], [0, 0.4007], [1, 0.3502], [0.3778, 0], [0.3866, 0.3994], [0.3649, 1]],
+      vertices: [[0, 0], [1, 0], [1, 1], [0, 1], [0, 0.4007], [1, 0.3532], [0.4261, 0], [0.4258, 0.4614], [0.3654, 1], [0.5156, 0.4486]],
       panels: [
         [], // Logo
         [], // Switchboard
@@ -239,10 +247,10 @@ export const PANEL_GRIDS: PageGrids = {
         [], // Rolodex
         [], // Rotary phone
         [], // Mailman 2
-        [0, 6, 7, 4], // Logo 2
-        [6, 1, 5, 7], // Notepad
+        [0, 6, 9, 7, 4], // Logo 2
+        [6, 1, 5, 9], // Notepad
         [4, 7, 8, 3], // Push-button phone
-        [7, 5, 2, 8], // Conversation
+        [7, 9, 5, 2, 8], // Conversation
       ],
     },
     portrait: {
