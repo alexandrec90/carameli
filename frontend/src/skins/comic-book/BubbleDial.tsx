@@ -14,6 +14,7 @@ import { browserCountry, formatPhoneInput } from './phoneInput'
 import { useDialCaret } from './useDialCaret'
 import { useDialWheel } from './useDialWheel'
 import { usePhoneField } from './usePhoneField'
+import { useRevealedField } from './useRevealedField'
 import { wheelOffsetEm } from './wheelPicker'
 import './bubbleDial.css'
 
@@ -109,19 +110,7 @@ export default function BubbleDial({
   // keystroke does to the number already lettered is `fresh`'s call (see onKeyDown),
   // not a selection's — a select-all here painted the number in the browser's own
   // highlight ink over the artwork, and the projected keypad never saw it anyway.
-  useEffect(() => {
-    const input = inputRef.current
-    if (!input || !enabled) return
-    if (revealed) {
-      if (document.activeElement !== input) {
-        input.focus({ preventScroll: true })
-        const end = input.value.length
-        input.setSelectionRange(end, end)
-      }
-    } else if (document.activeElement === input) {
-      input.blur()
-    }
-  }, [revealed, enabled])
+  useRevealedField(inputRef, revealed, enabled)
 
   const [state, setState] = useState<DialState>(() => dialSeat(options, value))
   const matches = useMemo(() => dialMatches(options, state.query), [options, state.query])

@@ -1,9 +1,7 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { frameDelta, restClock, stepPanelDots } from './panelDotAnim'
-import { PANEL_BG_CONFIGS, drawPanelBackground } from './panelPatterns'
+import { PATTERN_STYLE_KEYS, drawPanelBackground, panelBgConfig } from './panelPatterns'
 import type { PanelBgStyle } from './panelPatterns'
-import { PANELS } from './panels'
-import { PANEL_PATTERNS } from './editor/layoutConfig'
 
 /**
  * Drives every panel's Ben-Day dot canvas from one rAF loop, and returns the ref
@@ -13,15 +11,20 @@ import { PANEL_PATTERNS } from './editor/layoutConfig'
  * they froze on, which is both the look the skin asks for and the reason this loop
  * costs one panel's worth of drawing rather than eight. What "froze on" means, and
  * why it is not wall time, is panelDotAnim.ts.
+ *
+ * `patterns` is one style per panel, so its length is the panel count — which the
+ * editor can grow by splitting a panel, so every per-panel table here is filled in
+ * lazily rather than sized once on mount.
  */
 export function usePanelDots(
     patterns: PanelBgStyle[], hovered: number | null,
 ): ((el: HTMLCanvasElement | null) => void)[] {
+    const count = patterns.length
     const canvasRefs = useRef<(HTMLCanvasElement | null)[]>([])
-    const clocksRef = useRef<number[]>(PANELS.map((_, i) => restClock(i)))
+    const clocksRef = useRef<number[]>([])
     // A panel is dirty when its canvas shows something other than the frame its
     // clock names: freshly mounted, resized, or handed a different pattern.
-    const dirtyRef = useRef<boolean[]>(PANELS.map(() => true))
+    const dirtyRef = useRef<boolean[]>([])
     const prevMsRef = useRef<number | null>(null)
 
     // The loop outlives any one render, so it reads both of these through refs
@@ -38,13 +41,15 @@ export function usePanelDots(
 
     // Stable per-index callbacks. An inline arrow would be a new function every
     // render, which React answers by detaching and reattaching the canvas — a
-    // remount storm for a loop that keys its work off canvas identity.
+    // remount storm for a loop that keys its work off canvas identity. Rebuilt only
+    // when the panel count changes, which remounts every canvas once; each is marked
+    // dirty on attach, so they all repaint their still frame.
     const dotRefs = useMemo(
-        () => PANELS.map((_, i) => (el: HTMLCanvasElement | null) => {
+        () => Array.from({ length: count }, (_, i) => (el: HTMLCanvasElement | null) => {
             canvasRefs.current[i] = el
             if (el) dirtyRef.current[i] = true
         }),
-        [],
+        [count],
     )
 
     // Everything below reads only refs, so the loop mounts once and never restarts.
@@ -66,22 +71,24 @@ export function usePanelDots(
                 dirtyRef.current[i] = true
             }
             if (canvas.width === 0 || canvas.height === 0) return
+            // First sight of this index: its clock starts at rest and it needs a paint.
+            const clock = clocksRef.current[i] ?? restClock(i)
             const step = stepPanelDots(
-                clocksRef.current[i], hoveredRef.current === i, dt, dirtyRef.current[i],
+                clock, hoveredRef.current === i, dt, dirtyRef.current[i] ?? true,
             )
             clocksRef.current[i] = step.clock
             if (!step.paint) return
             dirtyRef.current[i] = false
             drawPanelBackground(
                 ctx, canvas.width, canvas.height,
-                patternsRef.current[i] ?? PANEL_PATTERNS[i], PANEL_BG_CONFIGS[i], step.clock,
+                patternsRef.current[i] ?? PATTERN_STYLE_KEYS[0], panelBgConfig(i), step.clock,
             )
         }
 
         function frame(nowMs: number) {
             const dt = frameDelta(prevMsRef.current, nowMs)
             prevMsRef.current = nowMs
-            for (let i = 0; i < PANELS.length; i++) paintPanel(i, dt)
+            for (let i = 0; i < patternsRef.current.length; i++) paintPanel(i, dt)
             raf = requestAnimationFrame(frame)
         }
 

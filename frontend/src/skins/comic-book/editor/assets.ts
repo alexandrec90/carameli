@@ -33,6 +33,14 @@ export const PANEL_ASSETS: PanelAsset[] = [
   { src: '/comic-book/lightning%20bubble.webp', label: 'Lightning bubble' },
   { src: '/comic-book/monogram.webp', label: 'Monogram' },
   { src: '/comic-book/soft%20bubble.webp', label: 'Soft bubble' },
+  { src: '/comic-book/call-ended.webp', label: 'Call ended' },
+  { src: '/comic-book/call-failed.webp', label: 'Call failed' },
+  { src: '/comic-book/call-in-progress.webp', label: 'Call in progress' },
+  { src: '/comic-book/pensive-woman.webp', label: 'Pensive woman' },
+  { src: '/comic-book/caret.webp', label: 'Caret' },
+  { src: '/comic-book/click.webp', label: 'Click' },
+  { src: '/comic-book/pointer.webp', label: 'Pointer' },
+  { src: '/comic-book/wait.webp', label: 'Wait' },
 ]
 
 /**

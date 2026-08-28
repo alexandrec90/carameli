@@ -12,8 +12,12 @@ import { idleSms, smsMessage } from './smsStub'
 // the other — this component is the only place that decides they are a pair, so this is
 // the only place the rule can be asserted.
 
-const PEER = '+14155551111'
-const OTHER = '+14155552222'
+// Deliberately numbers no carrier ever assigned. libphonenumber calls both *invalid* while
+// calling them possible, and binding used to demand validity — so every invented number
+// resolved to nothing, left the chain unbound, and shared one local transcript. Testing
+// with real-looking numbers is what hid that: the fixtures bound and the page did not.
+const PEER = '+15550001111'
+const OTHER = '+15550002222'
 
 const tpl = (over: Partial<BubbleTransform> = {}): BubbleTransform => ({
   ...NEW_BUBBLE,
@@ -112,6 +116,83 @@ describe('PanelBubbles, binding a chain to a number', () => {
     expect(sms.send).toHaveBeenCalledWith(PEER, 'hello')
   })
 
+  it('reports the number it sent to, so the panel can keep it on the picker', () => {
+    // The panel's own half of "a thread I started is a row I can turn back to"; what it
+    // does with the number is ComicPanel's (see ComicPanelDial.test.tsx). Reported as the
+    // picker spells it rather than as E.164, because the drum letters what the field does.
+    const sms = idleSms()
+    const onPeerTexted = vi.fn()
+    render(
+      <PanelBubbles
+        bubbles={[picker(), ...chainBubbles()]}
+        chains={[chain()]}
+        panel={0}
+        clip="none"
+        isVisible={() => true}
+        interactive
+        editing={false}
+        sms={sms}
+        onPeerTexted={onPeerTexted}
+      />,
+    )
+
+    const composer = screen.getByRole('textbox', { name: 'Speech bubble text' })
+    fireEvent.change(composer, { target: { value: 'hello' } })
+    fireEvent.keyDown(composer, { key: 'Enter' })
+
+    expect(onPeerTexted).toHaveBeenCalledWith(PEER)
+  })
+
+  it('reports nothing until something is actually sent', () => {
+    // A number that merely resolved is not a conversation: a reader part-way through
+    // typing one passes through other people's numbers, and a drum that collected those
+    // would be a list of near misses.
+    const onPeerTexted = vi.fn()
+    render(
+      <PanelBubbles
+        bubbles={[picker(), ...chainBubbles()]}
+        chains={[chain()]}
+        panel={0}
+        clip="none"
+        isVisible={() => true}
+        interactive
+        editing={false}
+        sms={idleSms()}
+        onPeerTexted={onPeerTexted}
+      />,
+    )
+
+    expect(onPeerTexted).not.toHaveBeenCalled()
+  })
+
+  it('routes keyboard focus to the composer except while the phone thought bubble is hovered', () => {
+    const { container } = render(
+      <div className="cb-panel">
+        <PanelBubbles
+          bubbles={[picker({ content: 'dial', text: PEER }), ...chainBubbles()]}
+          chains={[chain()]}
+          panel={0}
+          clip="none"
+          isVisible={() => true}
+          interactive
+          editing={false}
+          sms={idleSms()}
+          dialValue={PEER}
+        />
+      </div>,
+    )
+    const composer = screen.getByRole('textbox', { name: 'Speech bubble text' })
+    const phone = screen.getByRole('textbox', { name: 'Phone number' })
+    const thought = phone.closest('.cb-panel-bubble') as HTMLElement
+
+    expect(document.activeElement).toBe(composer)
+    fireEvent.pointerEnter(thought)
+    expect(document.activeElement).toBe(phone)
+    fireEvent.pointerLeave(thought)
+    expect(document.activeElement).toBe(composer)
+    expect(container.querySelectorAll('.cb-dial-caret')).toHaveLength(2)
+  })
+
   it('leaves a chain that did not ask to be bound alone', () => {
     const sms = idleSms({
       conversations: { [PEER]: [smsMessage({ id: 'a', text: 'real message' })] },
@@ -139,8 +220,56 @@ describe('PanelBubbles, binding a chain to a number', () => {
   it('normalises a nationally written option before subscribing', () => {
     // The same thread must not become two because the author wrote it differently.
     const sms = idleSms()
-    renderPanel([picker({ text: '(415) 555-1111' }), ...chainBubbles()], [chain()], sms)
+    renderPanel([picker({ text: '(555) 000-1111' }), ...chainBubbles()], [chain()], sms)
     expect(sms.subscribe).toHaveBeenCalledWith(PEER)
+  })
+
+  it('gives two numbers two conversations, however made-up the numbers are', () => {
+    // The reported fault, at its narrowest. Both of these are possible and neither is
+    // assigned, so both used to resolve to nothing — and a chain bound to nothing answered
+    // its own composer from a buffer that belonged to no number at all, which is how a
+    // second made-up number showed the first one's messages.
+    const sms = idleSms({
+      conversations: {
+        [PEER]: [smsMessage({ id: 'a', text: 'first thread' })],
+        [OTHER]: [smsMessage({ id: 'b', text: 'second thread' })],
+      },
+    })
+    const { container } = renderPanel([picker(), ...chainBubbles()], [chain()], sms)
+    expect(screen.getByText('first thread')).toBeTruthy()
+
+    const wheelHost = container.querySelector('.cb-bubble-wheel')?.closest('.cb-panel-bubble')
+    fireEvent.wheel(wheelHost as Element, { deltaY: 200 })
+
+    expect(screen.getByText('second thread')).toBeTruthy()
+    expect(screen.queryByText('first thread')).toBeNull()
+  })
+
+  it('does not answer its own composer while the number is still half-typed', () => {
+    // An unbound chain has nowhere to send, so it draws nothing. It used to keep the
+    // message in a local array shared by every unresolvable number — one "void"
+    // conversation that followed the reader from number to number.
+    const sms = idleSms()
+    render(
+      <PanelBubbles
+        bubbles={[picker({ content: 'dial', text: '' }), ...chainBubbles()]}
+        chains={[chain()]}
+        panel={0}
+        clip="none"
+        isVisible={() => true}
+        interactive
+        editing={false}
+        sms={sms}
+        dialValue="555"
+      />,
+    )
+
+    const composer = screen.getByRole('textbox', { name: 'Speech bubble text' })
+    fireEvent.change(composer, { target: { value: 'into the void' } })
+    fireEvent.keyDown(composer, { key: 'Enter' })
+
+    expect(sms.send).not.toHaveBeenCalled()
+    expect(screen.queryByText('into the void')).toBeNull()
   })
 
   it('never binds in edit mode', () => {

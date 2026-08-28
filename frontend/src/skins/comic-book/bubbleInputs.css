@@ -1,27 +1,45 @@
-/* Real form fields lettered as part of their balloons. The underline is focus ink
-   rather than a box pasted over the illustration. */
+/* Real form fields lettered as part of their balloons. */
+.cb-bubble-field {
+  position: absolute;
+}
+
 .cb-bubble-input {
   box-sizing: border-box;
-  width: auto;
+  width: 100%;
   min-width: 0;
   margin: 0;
   padding: 0.15em 0.25em;
   appearance: none;
   background: transparent;
   border: 0;
-  border-bottom: 3px solid transparent;
   outline: 0;
   font-size: clamp(0.75rem, 2vw, 1.125rem);
   font-weight: 700;
-}
-
-.cb-bubble-input:focus-visible {
-  border-bottom-color: var(--cb-black);
+  text-align: center;
+  cursor: default;
+  caret-color: transparent;
 }
 
 .cb-bubble-input:disabled {
   color: var(--cb-black);
   opacity: 1;
+}
+
+/* The comic caret shared by the phone dial and the SMS composer. */
+.cb-dial-caret {
+  position: absolute;
+  top: 50%;
+  width: 0.3em;
+  height: 1.05em;
+  background: var(--cb-black);
+  transform: translateY(-50%) skewX(-12deg);
+  pointer-events: none;
+  animation: cb-dial-caret-blink 1.1s infinite;
+}
+
+@keyframes cb-dial-caret-blink {
+  0%, 50% { opacity: 1; }
+  50.01%, 100% { opacity: 0; }
 }
 
 /* A row of buttons inside a balloon — the comic button treatment (3px ink border,
@@ -51,7 +69,7 @@
   background: var(--cb-white);
   border: 3px solid var(--cb-black);
   box-shadow: 3px 3px 0 var(--cb-black);
-  cursor: pointer;
+  cursor: var(--cb-cursor-click);
 }
 
 /* Inside the editor the buttons are disabled, but a greyed control would read as a

@@ -39,9 +39,9 @@ export interface Rect {
  * One layout's panel subdivision: a table of shared corners, plus one ring of indices
  * into it per panel, clockwise.
  *
- * Panels are index-parallel to `PANELS` (./panels.ts) — a panel is a fixed slot in the
- * grid — but a ring's *length* is not fixed: it grows by one every time a bend is added
- * to one of its seams.
+ * Panels are index-parallel to `PANELS` (editor/layoutConfig.ts) — a panel is a slot in
+ * the grid, and the editor only ever appends one — but a ring's *length* is not fixed:
+ * it grows by one every time a bend is added to one of its seams.
  *
  * The subdivision must **conform**: a vertex that lies on a panel edge has to be one of
  * that edge's own endpoints, in every panel that touches it. A vertex sitting untracked

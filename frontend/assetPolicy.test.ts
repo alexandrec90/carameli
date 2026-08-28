@@ -22,7 +22,7 @@ import { describe, expect, it } from 'vitest'
 
 import { PANEL_ASSETS } from './src/skins/comic-book/editor/assets'
 import { PANEL_IMG_TRANSFORMS } from './src/skins/comic-book/editor/layoutConfig'
-import { PANELS } from './src/skins/comic-book/panels'
+import { PANELS } from './src/skins/comic-book/editor/layoutConfig'
 import { DEFAULT_SKIN, SKIN_NAMES } from './src/skins/registry'
 import {
   ASSETS_SRC_DIR,
@@ -126,6 +126,80 @@ describe('readImageSize', () => {
     const logo = readImageSizeAt(path.join(PUBLIC_DIR, 'comic-book', 'logo.webp'))
     expect(logo?.width).toBeGreaterThan(0)
     expect(logo?.height).toBeGreaterThan(0)
+  })
+})
+
+describe('comic-book cursors', () => {
+  const stylesheet = readFileSync(
+    path.join(FRONTEND_ROOT, 'src', 'skins', 'comic-book', 'comic-book.css'),
+    'utf-8',
+  )
+
+  /** Export in `public/comic-book/` ← master in `assets-src/comic-book/`. */
+  const CURSORS = {
+    pointer: { export: 'pointer-cursor.webp', master: 'pointer.png' },
+    click: { export: 'click-cursor.webp', master: 'click.png' },
+  } as const
+
+  const sizeOfExport = (which: keyof typeof CURSORS) =>
+    readImageSizeAt(path.join(PUBLIC_DIR, 'comic-book', CURSORS[which].export))
+  const sizeOfMaster = (which: keyof typeof CURSORS) =>
+    readImageSizeAt(path.join(ASSETS_SRC_DIR, 'comic-book', CURSORS[which].master))
+
+  /* A system arrow draws ~19px of ink, so 32 is "the same size, a shade bigger" with
+     room for the ink outline. The 128 the CSS spec allows is not the useful ceiling:
+     these shipped at 64 and read as stickers. */
+  it.each(Object.keys(CURSORS) as (keyof typeof CURSORS)[])(
+    '%s is drawn at pointer scale, not at artwork scale',
+    which => {
+      const size = sizeOfExport(which)
+      expect(size).toBeDefined()
+      expect(Math.max(size?.width ?? Infinity, size?.height ?? Infinity)).toBeLessThanOrEqual(36)
+    },
+  )
+
+  /* The two are one downscale of their own masters, which is what makes the hand look
+     proportionate to the arrow. Fitting each into its own N-px box instead silently
+     rescales them against each other, because the masters are not the same shape --
+     that is how the hand ended up the arrow's height with a wider glyph in it. */
+  it("keeps the hand at the arrow's scale", () => {
+    const pointer = sizeOfExport('pointer')
+    const click = sizeOfExport('click')
+    const pointerMaster = sizeOfMaster('pointer')
+    const clickMaster = sizeOfMaster('click')
+    expect(pointer && click && pointerMaster && clickMaster).toBeTruthy()
+
+    const exportRatio = (click?.height ?? 0) / (pointer?.height ?? 1)
+    const masterRatio = (clickMaster?.height ?? 0) / (pointerMaster?.height ?? 1)
+    expect(exportRatio).toBeCloseTo(masterRatio, 1)
+  })
+
+  it('keeps custom cursor URLs, hotspots, and native fallbacks in the skin stylesheet', () => {
+    expect(stylesheet).toContain(
+      "--cb-cursor-default: url('/comic-book/pointer-cursor.webp') 2 1, default",
+    )
+    expect(stylesheet).toContain(
+      "--cb-cursor-click: url('/comic-book/click-cursor.webp') 9 10, pointer",
+    )
+    expect(stylesheet).toContain('cursor: var(--cb-cursor-default)')
+    expect(stylesheet).toContain('cursor: var(--cb-cursor-click)')
+  })
+
+  /* A hotspot outside the image is silently ignored by the browser and the cursor falls
+     back to the native one -- so a resize that forgets to rescale them looks like the
+     custom cursor simply not loading. */
+  it('keeps every hotspot inside its own image', () => {
+    const hotspots: Record<keyof typeof CURSORS, RegExp> = {
+      pointer: /pointer-cursor\.webp'\) (\d+) (\d+),/,
+      click: /click-cursor\.webp'\) (\d+) (\d+),/,
+    }
+    for (const which of Object.keys(hotspots) as (keyof typeof CURSORS)[]) {
+      const match = stylesheet.match(hotspots[which])
+      expect(match, `no hotspot declared for ${which}`).toBeTruthy()
+      const size = sizeOfExport(which)
+      expect(Number(match?.[1])).toBeLessThan(size?.width ?? 0)
+      expect(Number(match?.[2])).toBeLessThan(size?.height ?? 0)
+    }
   })
 })
 
@@ -346,6 +420,27 @@ describe('the skin guard in index.html', () => {
         "nobody sees; one on the wrong page's list loads for a page that never draws it. " +
         'Order is the preload priority, so it has to match too.',
     ).toEqual(drawnByPage())
+  })
+
+  it('fetches the art with an Image rather than a link preload', () => {
+    // A `<link rel="preload" as="image">` has to be claimed by a consumer within about
+    // three seconds of the load event or Chrome warns, once per file, on every load.
+    // The consumer is the <img> the comic-book chunk renders, and in dev that chunk is
+    // still arriving when the load event fires — so the console filled with warnings
+    // about art the page went on to draw a second later. An Image is its own consumer.
+    expect(
+      /rel\s*=\s*["']preload["']|\.rel\s*=\s*['"]preload['"]/.test(html),
+      'index.html preloads with a <link rel="preload"> again. That is the spelling ' +
+        'that made Chrome warn "was preloaded using link preload but not used within ' +
+        'a few seconds from the window\'s load event" for every panel on every load.',
+    ).toBe(false)
+
+    expect(
+      /new Image\(\)/.test(html),
+      'The guard no longer fetches the panel art at all. Nothing then starts the ' +
+        'download until the comic-book chunk renders, which is the late load the ' +
+        'PANELS list exists to avoid.',
+    ).toBe(true)
   })
 })
 

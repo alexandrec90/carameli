@@ -91,13 +91,27 @@ export const MAX_LAZY_CHUNK_BYTES = 260 * 1024
  * the comic-book chunk for `phone`, and a visitor who never opens that skin pays for
  * none of it.
  *
- * This raise (955 → 958) is 1.6 KB: the dial's keyboard grab on panel reveal and its
- * lettered caret — `dialCaret.ts`'s pure measurement math, the `useDialCaret` DOM hook
- * that positions the ink block per keystroke, and the fresh-number flag both keyboards
- * read. All of it lands in the same lazy comic-book chunk; `package.json` is untouched
- * and the chunk count is unchanged at 46, so nothing new was pulled in.
+ * The raise before (955 → 958) is 1.6 KB: the dial's keyboard grab on panel reveal and
+ * its lettered caret — `dialCaret.ts`'s pure measurement math, the `useDialCaret` DOM
+ * hook that positions the ink block per keystroke, and the fresh-number flag both
+ * keyboards read. All of it lands in the same lazy comic-book chunk; `package.json` is
+ * untouched and the chunk count is unchanged at 46, so nothing new was pulled in.
+ *
+ * The raise before that (958 → 964) is 5.7 KB: making a panel from the editor.
+ * `panelGridCut.ts` cuts a ring in two along a straight line, `configPanels.ts` grows the
+ * panel list, the pattern per panel and every grid together, and the panel list itself
+ * moved into the editor-owned `layoutConfig.ts` so it is serialized and hydrated with the
+ * rest. Same lazy comic-book chunk, same 46 chunks, `package.json` untouched.
+ *
+ * This raise (964 → 965) is the SMS composer, 0.8 KB measured on its own branch against
+ * the 958 that preceded both: its shared caret and keyboard handoff, its per-column links
+ * and fixed recipient stem, plus reporting a texted number back to the panel and the guard
+ * that stops an unbound chain answering its own composer. The two raises were authored in
+ * parallel and neither subsumes the other, so the merge pays for both — 964 was measured
+ * without this branch in the build. Same lazy chunk, still 46 of them, `package.json`
+ * untouched, so nothing new was pulled in by either half.
  */
-export const MAX_TOTAL_JS_BYTES = 958 * 1024
+export const MAX_TOTAL_JS_BYTES = 965 * 1024
 
 /**
  * Every `.css` file in `dist/assets/`, summed. Today 44.2 KB across 2 files.
@@ -105,8 +119,16 @@ export const MAX_TOTAL_JS_BYTES = 958 * 1024
  * This raise (44 → 45) is the chain's typing-dots row — the bounce, its stagger, and the
  * reduced-motion pulse that replaces it. The build was already within 0.3 KB of the
  * ceiling before those rules, so most of the headroom this buys is theirs only on paper.
+ *
+ * This raise (45 → 46) is the chain's connector tubes: the SVG layer they are drawn on,
+ * the `d` transition that makes a tube follow its balloons as the conversation scrolls,
+ * and the reduced-motion rule that switches that off. About 0.2 KB, against a build that
+ * had 0.1 KB of room — the same story as the raise above, one line further along. What
+ * this does *not* pay for is the lettered caret, which arrived twice: once on this branch
+ * as a field's caret shared by the dial and the SMS composer, once on master as the
+ * dial's own. Deduplicating it in the merge is what kept this raise to a single KB.
  */
-export const MAX_TOTAL_CSS_BYTES = 45 * 1024
+export const MAX_TOTAL_CSS_BYTES = 46 * 1024
 
 /**
  * Every webfont in `dist/assets/`, summed. Today 231 KB: five weights of Outfit, each

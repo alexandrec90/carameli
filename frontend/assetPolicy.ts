@@ -461,10 +461,12 @@ export function listReferenceSources(root: string = FRONTEND_ROOT): string[] {
  * Every image `html` preloads, whether by a static tag or through the skin guard.
  *
  * Both spellings have to count. The panel art is preloaded only for the skin that
- * draws it, which means the tags are built by an inline script rather than written
- * out — and a check that read only static tags would have gone from measuring eight
- * images to measuring none the moment that guard landed, reporting a critical path of
- * 0 KB as comfortably inside budget.
+ * draws it, by an inline script rather than by tags written out here — and a check
+ * that read only static tags would have gone from measuring eight images to measuring
+ * none the moment that guard landed, reporting a critical path of 0 KB as comfortably
+ * inside budget. The guard's own spelling is `new Image()` rather than a `<link>` to
+ * avoid Chrome's unused-preload warning; it is read out of its `PANELS` list, so which
+ * of the two it uses does not change what is counted here.
  */
 export function findPreloadedImages(html: string): string[] {
   const out: string[] = []

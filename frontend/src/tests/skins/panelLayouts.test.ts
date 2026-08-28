@@ -1,14 +1,15 @@
 import { describe, expect, it, vi } from 'vitest'
 
-import { PANEL_GRIDS, PANEL_PATTERNS } from '../../skins/comic-book/editor/layoutConfig'
+import { PANEL_GRIDS, PANEL_PATTERNS, PANELS } from '../../skins/comic-book/editor/layoutConfig'
 import { gridPolys } from '../../skins/comic-book/panelGeometry'
 import type { LayoutKind } from '../../skins/comic-book/panelGeometry'
 import {
   PANEL_BG_CONFIGS,
   PATTERN_STYLE_KEYS,
   drawPanelBackground,
+  panelBgConfig,
 } from '../../skins/comic-book/panelPatterns'
-import { PANELS, pageForPath } from '../../skins/comic-book/panels'
+import { pageForPath } from '../../skins/comic-book/panels'
 
 // The page-level behavior on top of the grids: which page a route shows, how a page's
 // grid becomes the sparse poly array Layout renders from, and the per-panel background
@@ -99,9 +100,18 @@ describe('page polys from the grids', () => {
 })
 
 describe('PANELS / PANEL_BG_CONFIGS parallelism', () => {
-  it('tunes a background for every panel slot', () => {
+  it('tunes a background for every shipped panel slot, and a style for each', () => {
     expect(PANEL_BG_CONFIGS).toHaveLength(PANELS.length)
     expect(PANEL_PATTERNS).toHaveLength(PANELS.length)
+  })
+
+  it('wraps the palette for a panel the editor added past its end', () => {
+    const n = PANEL_BG_CONFIGS.length
+    expect(panelBgConfig(0)).toBe(PANEL_BG_CONFIGS[0])
+    expect(panelBgConfig(n - 1)).toBe(PANEL_BG_CONFIGS[n - 1])
+    expect(panelBgConfig(n)).toBe(PANEL_BG_CONFIGS[0])
+    expect(panelBgConfig(n + 3)).toBe(PANEL_BG_CONFIGS[3])
+    expect(panelBgConfig(2 * n + 1)).toBe(PANEL_BG_CONFIGS[1])
   })
 })
 

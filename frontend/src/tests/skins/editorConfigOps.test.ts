@@ -30,7 +30,9 @@ import {
   PANEL_IMG_TRANSFORMS,
   PANEL_BUBBLE_TRANSFORMS,
   PANEL_PATTERNS,
+  PANELS,
 } from '../../skins/comic-book/editor/layoutConfig'
+import { splitPanel } from '../../skins/comic-book/editor/configPanels'
 import {
   RING_POINTS,
   TAIL_DIR_KEYS,
@@ -42,7 +44,6 @@ import {
   PATTERN_STYLE_KEYS,
   isPanelBgStyle,
 } from '../../skins/comic-book/panelPatterns'
-import { PANELS } from '../../skins/comic-book/panels'
 
 /** Index of the first shipped bubble that declares a link, with its partner. */
 const LINKED = PANEL_BUBBLE_TRANSFORMS.findIndex(b => b.linkTo !== null)
@@ -195,6 +196,8 @@ describe('hydrateConfig', () => {
       // Derived from the bubbles, so a page with none has none — nothing to re-seed.
       chains: [],
       grids: seedConfig().grids,
+      // The panel list goes with the grids: absent, both come back shipped.
+      panels: seedConfig().panels,
       // Patterns are the exception: the array is parallel to PANELS by contract, so
       // "nothing" is not a length it can have — absence re-seeds the defaults.
       patterns: [...PANEL_PATTERNS],
@@ -394,6 +397,58 @@ describe('hydrateConfig', () => {
   })
 })
 
+describe('hydrateConfig — the panel list', () => {
+  /** A config one split longer than shipped: 13 panels, 13-ring grids, 13 patterns. */
+  function grown() {
+    const result = splitPanel(seedConfig(), 3, 'across')
+    if (!result) throw new Error('shipped panel 3 refused a cut')
+    return result.config
+  }
+
+  it('keeps a saved panel list whose grids match it, extra panel and all', () => {
+    const cfg = grown()
+    const out = hydrateConfig(JSON.stringify(cfg))
+    expect(out.panels).toHaveLength(PANELS.length + 1)
+    expect(out.panels).toEqual(cfg.panels)
+    expect(out.grids).toEqual(cfg.grids)
+    expect(out.patterns).toHaveLength(PANELS.length + 1)
+  })
+
+  it('falls back to the shipped panels *and* grids together when they disagree', () => {
+    const cfg = grown()
+    // Thirteen-ring grids against the twelve shipped panels: neither can be kept alone.
+    const out = hydrateConfig(JSON.stringify({ ...cfg, panels: PANELS }))
+    expect(out.panels).toEqual(seedConfig().panels)
+    expect(out.grids).toEqual(PANEL_GRIDS)
+    expect(out.patterns).toHaveLength(PANELS.length)
+  })
+
+  it('validates the grids against the shipped list when no list was saved', () => {
+    const withoutList = (cfg: object): string => JSON.stringify({ ...cfg, panels: undefined })
+    // Thirteen-ring grids, no list: the grids fail the shipped count and both fall back.
+    const out = hydrateConfig(withoutList(grown()))
+    expect(out.panels).toEqual(seedConfig().panels)
+    expect(out.grids).toEqual(PANEL_GRIDS)
+
+    expect(hydrateConfig(withoutList(seedConfig())).panels).toEqual(seedConfig().panels)
+  })
+
+  it('rejects a malformed list rather than a panel of it', () => {
+    const cfg = grown()
+    const panels: unknown[] = [...cfg.panels]
+    panels[12] = { label: 'Loose', isLogo: 'yes', page: 'classic' }
+    const out = hydrateConfig(JSON.stringify({ ...cfg, panels }))
+    expect(out.panels).toEqual(seedConfig().panels)
+    expect(out.grids).toEqual(PANEL_GRIDS)
+  })
+
+  it('clamps a picture’s panel against the saved list, not the shipped one', () => {
+    const cfg = grown()
+    cfg.images[0] = { ...cfg.images[0], panel: 12 }
+    expect(hydrateConfig(JSON.stringify(cfg)).images[0].panel).toBe(12)
+  })
+})
+
 describe('normalizePatterns', () => {
   it('returns the shipped defaults for a missing or non-array value', () => {
     expect(normalizePatterns(undefined)).toEqual([...PANEL_PATTERNS])
@@ -415,6 +470,18 @@ describe('normalizePatterns', () => {
     expect(normalizePatterns([...PANEL_PATTERNS, 'sunburst'])).toHaveLength(PANELS.length)
     // A short payload keeps what it had and backfills the rest.
     expect(normalizePatterns([PANEL_PATTERNS[1]])[0]).toBe(PANEL_PATTERNS[1])
+  })
+
+  it('sizes to the given count, backfilling past the shipped list with the first style', () => {
+    const out = normalizePatterns(PANEL_PATTERNS, PANELS.length + 2)
+    expect(out).toHaveLength(PANELS.length + 2)
+    expect(out.slice(0, PANELS.length)).toEqual([...PANEL_PATTERNS])
+    expect(out.slice(PANELS.length)).toEqual([PATTERN_STYLE_KEYS[0], PATTERN_STYLE_KEYS[0]])
+    // A saved style for the extra slot is kept; a dead name there falls back the same way.
+    const last = (raw: unknown): string => normalizePatterns(raw, PANELS.length + 1)[PANELS.length]
+    expect(last([...PANEL_PATTERNS, 'sunburst'])).toBe('sunburst')
+    expect(last([...PANEL_PATTERNS, 'plaid'])).toBe(PATTERN_STYLE_KEYS[0])
+    expect(normalizePatterns(PANEL_PATTERNS, 2)).toEqual(PANEL_PATTERNS.slice(0, 2))
   })
 
   it('passes a fully valid array through unchanged', () => {

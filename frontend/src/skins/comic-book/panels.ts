@@ -1,11 +1,15 @@
-// The page's panels: the slots the comic grid is cut into, and nothing about what is
-// drawn inside them. Pictures live in PANEL_IMG_TRANSFORMS and balloons in
-// PANEL_BUBBLE_TRANSFORMS (editor/layoutConfig.ts), each naming the panel it sits on.
+// What a panel *is*: the slot type the comic grid is cut into, and nothing about what
+// is drawn inside one. The list itself — PANELS — lives in editor/layoutConfig.ts beside
+// the grids it is index-parallel to, because the editor appends to it (splitting a
+// panel makes a new one) and that file is the one the editor's Save button writes.
+// Pictures live in PANEL_IMG_TRANSFORMS and balloons in PANEL_BUBBLE_TRANSFORMS there
+// too, each naming the panel it sits on.
 //
-// It is its own module rather than a const in Layout.tsx because the editor overlay
-// needs the same names, and Layout lazy-imports the overlay — importing a runtime
-// value back out of Layout would close that into a cycle. The panel *shapes* are next
-// door in panelGeometry.ts for the same reason, now that the editor edits them too.
+// The type and the page helpers are their own module rather than consts in Layout.tsx
+// because the editor overlay needs the same names, and Layout lazy-imports the overlay —
+// importing a runtime value back out of Layout would close that into a cycle. The panel
+// *shapes* are next door in panelGeometry.ts for the same reason, now that the editor
+// edits them too.
 
 /** Which page's grid a panel belongs to — the home 2×2 or the classic 8-panel grid. */
 export type PanelPage = 'home' | 'classic'
@@ -22,28 +26,6 @@ export interface Panel {
   /** The page whose grid this panel sits on. */
   page: PanelPage
 }
-
-/**
- * Index-parallel to every grid's ring table — panel `i` is `PANELS[i]`. That
- * parallelism is the one that survives: a panel is a fixed slot, so there are exactly
- * as many of these as there are ring slots, however many pictures or balloons end up
- * on each. Only the panels whose `page` matches the current route carry a ring in
- * that page's grids; the rest hold an empty ring and render nothing.
- */
-export const PANELS: Panel[] = [
-  { label: 'Logo', isLogo: true, page: 'classic' },
-  { label: 'Switchboard', isLogo: false, page: 'classic' },
-  { label: 'Mailman 1', isLogo: false, page: 'classic' },
-  { label: 'Mechanic', isLogo: false, page: 'classic' },
-  { label: 'Receptionist', isLogo: false, page: 'classic' },
-  { label: 'Rolodex', isLogo: false, page: 'classic' },
-  { label: 'Rotary phone', isLogo: false, page: 'classic' },
-  { label: 'Mailman 2', isLogo: false, page: 'classic' },
-  { label: 'Logo 2', isLogo: true, page: 'home' },
-  { label: 'Notepad', isLogo: false, page: 'home' },
-  { label: 'Push-button phone', isLogo: false, page: 'home' },
-  { label: 'Conversation', isLogo: false, page: 'home' },
-]
 
 /**
  * The page a route shows: the 4-panel home grid on '/', the classic 8-panel grid
