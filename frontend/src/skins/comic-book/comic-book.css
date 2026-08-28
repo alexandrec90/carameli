@@ -19,6 +19,8 @@
   --cb-dot-hover-alpha: 0.35;
   --cb-accent:        var(--cb-yellow);   /* overridden per-page */
   --cb-hue-deg:       0deg;
+  --cb-cursor-default: url('/comic-book/pointer-cursor.webp') 6 6, default;
+  --cb-cursor-click: url('/comic-book/click-cursor.webp') 16 18, pointer;
 }
 
 /* ─── Fonts ─────────────────────────────────────────────────────────────────── */
@@ -43,6 +45,7 @@
   font-family: 'Comic Neue', cursive;
   font-weight: 700;
   color: var(--cb-black);
+  cursor: var(--cb-cursor-default);
 }
 
 /* Per-panel Ben-Day dot canvas — clipped to the panel polygon via inline clip-path */
@@ -115,7 +118,7 @@
   letter-spacing: 2px;
   text-transform: uppercase;
   color: var(--cb-black);
-  cursor: pointer;
+  cursor: var(--cb-cursor-click);
   box-shadow: var(--cb-shadow);
   text-align: left;
   transition: box-shadow 80ms ease-out, transform 80ms ease-out;
@@ -142,7 +145,7 @@
 }
 
 .cb-panel.clickable {
-  cursor: pointer;
+  cursor: var(--cb-cursor-click);
 }
 
 /* Editor: the selected panel reveals its full (unclipped) image for framing. z-index 3
@@ -205,7 +208,7 @@
   letter-spacing: 2px;
   text-transform: uppercase;
   color: var(--cb-black);
-  cursor: pointer;
+  cursor: var(--cb-cursor-click);
   transition: box-shadow 80ms ease-out, transform 80ms ease-out, filter 80ms ease-out;
 }
 

@@ -129,6 +129,30 @@ describe('readImageSize', () => {
   })
 })
 
+describe('comic-book cursors', () => {
+  const stylesheet = readFileSync(
+    path.join(FRONTEND_ROOT, 'src', 'skins', 'comic-book', 'comic-book.css'),
+    'utf-8',
+  )
+
+  it.each(['pointer-cursor.webp', 'click-cursor.webp'])('%s fits browser cursor limits', file => {
+    const size = readImageSizeAt(path.join(PUBLIC_DIR, 'comic-book', file))
+    expect(size).toBeDefined()
+    expect(Math.max(size?.width ?? Infinity, size?.height ?? Infinity)).toBeLessThanOrEqual(128)
+  })
+
+  it('keeps custom cursor URLs, hotspots, and native fallbacks in the skin stylesheet', () => {
+    expect(stylesheet).toContain(
+      "--cb-cursor-default: url('/comic-book/pointer-cursor.webp') 6 6, default",
+    )
+    expect(stylesheet).toContain(
+      "--cb-cursor-click: url('/comic-book/click-cursor.webp') 16 18, pointer",
+    )
+    expect(stylesheet).toContain('cursor: var(--cb-cursor-default)')
+    expect(stylesheet).toContain('cursor: var(--cb-cursor-click)')
+  })
+})
+
 describe('findServedReferences', () => {
   it('finds a root-relative asset URL', () => {
     expect(findServedReferences(`src="/comic-book/logo.webp"`)).toEqual([
