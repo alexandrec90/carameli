@@ -25,8 +25,20 @@ interface BubbleDialProps {
   options: string[]
   /** The dialled number, formatted. Owned by the panel — see ComicPanel. */
   value: string
-  /** Called with the new formatted value on every turn, keystroke and keypad press. */
-  onChange(next: string): void
+  /**
+   * True while `value` is a number the drum supplied — the seeded option, a row a turn
+   * landed on, a number just dialled — rather than one the reader typed. A fresh number
+   * is finished: the next character starts a new number instead of appending, which
+   * could only produce a number no option contains and so empties the shortlist on the
+   * first key. Owned by the panel beside the value, because the projected keypad writes
+   * to the same number and must obey the same rule (see ComicPanel).
+   */
+  fresh: boolean
+  /**
+   * Called with the new formatted value on every turn and keystroke, and with what
+   * `fresh` becomes: true from a turn that landed on a row, false for anything typed.
+   */
+  onChange(next: string, fresh: boolean): void
   /** Lettering font for the current shape, same as the plain-text span uses. */
   font: string
   /** True while the balloon is hovered or its field has focus: the shortlist fades in. */
@@ -82,24 +94,27 @@ interface BubbleDialProps {
  * `usePhoneField` exactly as BubbleInput uses it. Neither is re-implemented here.
  */
 export default function BubbleDial({
-  options, value, onChange, font, open, revealed, enabled, hostRef, onSubmit,
+  options, value, fresh, onChange, font, open, revealed, enabled, hostRef, onSubmit,
 }: BubbleDialProps) {
   const inputRef = useRef<HTMLInputElement>(null)
   const caretRef = useDialCaret(inputRef)
   const country = useMemo(() => browserCountry(), [])
-  const field = usePhoneField(inputRef, country, onChange)
+  // Anything typed is the reader's own number, however far along it is.
+  const field = usePhoneField(inputRef, country, next => onChange(next, false))
 
-  // Revealing the balloon focuses the field, selected whole so the next keystroke
-  // replaces the finished number the drum put there and filters from scratch —
-  // appending to it instead can only produce a number no option contains, which
-  // empties the shortlist on the first key. Hiding the balloon blurs it.
+  // Revealing the balloon focuses the field, caret at the end, so the panel's only
+  // input has the keyboard without a click; hiding the balloon blurs it. What the next
+  // keystroke does to the number already lettered is `fresh`'s call (see onKeyDown),
+  // not a selection's — a select-all here painted the number in the browser's own
+  // highlight ink over the artwork, and the projected keypad never saw it anyway.
   useEffect(() => {
     const input = inputRef.current
     if (!input || !enabled) return
     if (revealed) {
       if (document.activeElement !== input) {
         input.focus({ preventScroll: true })
-        input.select()
+        const end = input.value.length
+        input.setSelectionRange(end, end)
       }
     } else if (document.activeElement === input) {
       input.blur()
@@ -139,25 +154,15 @@ export default function BubbleDial({
   // ref and refreshed after every commit so the listener below can be registered per
   // host rather than per render, without ever calling a stale `onChange`.
   const turnRef = useRef<(steps: number) => void>(() => undefined)
-  // Set by a turn that landed on a match, read by the effect below after the commit:
-  // a number the drum supplied is selected whole, for the same reason the reveal
-  // selects — typing over it starts a fresh filter. Landing back on the typed row
-  // (index 0) selects nothing: that is the reader's own half-typed number.
-  const selectPendingRef = useRef(false)
   useEffect(() => {
     turnRef.current = (steps: number) => {
       const next = dialTurn(state, matches.length, steps)
       if (next === state) return
       setState(next)
-      selectPendingRef.current = next.index > 0
-      onChange(formatPhoneInput(dialRowValue(next, matches), country))
+      // A row the turn landed on is the drum's number, so it arrives fresh; row 0 is
+      // the reader's own half-typed number handed back, which stays theirs.
+      onChange(formatPhoneInput(dialRowValue(next, matches), country), next.index > 0)
     }
-  })
-  useEffect(() => {
-    if (!selectPendingRef.current) return
-    selectPendingRef.current = false
-    const input = inputRef.current
-    if (input && document.activeElement === input) input.select()
   })
 
   // The wheel gesture (useDialWheel): over the balloon always, and over the whole
@@ -183,6 +188,22 @@ export default function BubbleDial({
       event.preventDefault()
       turnRef.current(event.key === 'ArrowDown' ? 1 : -1)
       return
+    }
+    // A fresh number — one the drum supplied — is finished: the next character starts a
+    // new number, and Backspace clears the display whole, exactly what the projected
+    // keypad does with the same flag (ComicPanel). A number the reader typed is theirs
+    // and edits normally, one digit at a time.
+    if (fresh) {
+      if (event.key.length === 1) {
+        event.preventDefault()
+        field.commit(event.key, 1, true)
+        return
+      }
+      if (event.key === 'Backspace' || event.key === 'Delete') {
+        event.preventDefault()
+        onChange('', false)
+        return
+      }
     }
     field.onDeleteKey(event, value)
   }

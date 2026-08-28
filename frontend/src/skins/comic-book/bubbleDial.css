@@ -40,15 +40,6 @@
   border-bottom-color: transparent;
 }
 
-/* A number the drum supplied arrives selected whole (typing over it starts a fresh
-   filter), but the selection itself is silent ink: the reveal makes one on every
-   panel hover, and a highlight there reads as the balloon shouting. Transparent, so
-   the selection changes what the next keystroke does and nothing about the drawing. */
-.cb-bubble-dial .cb-dial-field::selection {
-  background: transparent;
-  color: inherit;
-}
-
 /* The comic caret: a black block slanted with the lettering, stood where the native
    caret would blink. `left` is set per keystroke by useDialCaret.ts. */
 .cb-dial-caret {

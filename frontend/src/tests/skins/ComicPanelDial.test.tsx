@@ -118,15 +118,37 @@ describe('a panel holding a dial balloon', () => {
   })
 
   it('narrows the shortlist as the projected keypad is punched, the way typing does', () => {
-    // The pad and the keyboard are one field, so they are one filter too.
-    const { press, field, rows } = draw(dial('5550001111, 5550002222, 2345679999'))
+    // The pad and the keyboard are one field, so they are one filter too. No clearing
+    // first: the balloon starts on its first option, which is the drum's number, and
+    // the first press starts a new number over it.
+    const { press, rows } = draw(dial('5550001111, 5550002222, 2345679999'))
 
-    // Cleared first: the balloon starts on its first option, and the pad appends.
-    fireEvent.change(field()!, { target: { value: '' } })
     press('5')
     press('5')
 
     expect(rows()).toEqual(['(555) 000-1111', '(555) 000-2222'])
+  })
+
+  it('starts a new number when the pad is punched over the seeded option', () => {
+    // The seed is finished, exactly as it is for a keystroke: punching the pad dials
+    // afresh instead of growing a number nobody is composing.
+    const { press, field } = draw(dial('2345679999, 5550001111'))
+
+    press('5')
+
+    expect(field()!.value).toBe('5')
+  })
+
+  it('starts over on the next press after a number is dialled', () => {
+    const { field, press, rows } = draw(dial('5550001111'))
+
+    fireEvent.change(field()!, { target: { value: '9998887777' } })
+    fireEvent.keyDown(field()!, { key: 'Enter' })
+    press('9')
+
+    // A new call, with the number just dialled kept on the drum as a redial row.
+    expect(field()!.value).toBe('9')
+    expect(rows()).toEqual(['(999) 888-7777'])
   })
 
   it('turns the drum on a scroll anywhere over the panel, since its bubbles show', () => {

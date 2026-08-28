@@ -50,8 +50,9 @@ export function useDialCaret(inputRef: RefObject<HTMLInputElement | null>) {
     place()
     input.addEventListener('focus', place)
     input.addEventListener('blur', place)
-    // `select` as well as `selectionchange`: a programmatic select() — the reveal and
-    // the drum both make one — announces itself through the former, and synchronously.
+    // `select` as well as `selectionchange`: a selection made without the pointer —
+    // Ctrl+A, or a setSelectionRange like the reveal's caret placement — announces
+    // itself through the former, and synchronously.
     input.addEventListener('select', place)
     document.addEventListener('selectionchange', place)
     return () => {
