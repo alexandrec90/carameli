@@ -10,6 +10,7 @@ import { gridPolys, layoutKindFor } from './panelGeometry'
 import { PANELS, pageForPath } from './panels'
 import { softphoneActions } from './phoneActions'
 import { usePanelDots } from './usePanelDots'
+import { usePanelHover } from './usePanelHover'
 import {
     PANEL_BUBBLE_CHAINS, PANEL_IMG_TRANSFORMS, PANEL_BUBBLE_TRANSFORMS,
     PANEL_GRIDS, PANEL_PATTERNS,
@@ -109,8 +110,10 @@ export function Layout({ navItems, sms, softphone }: LayoutProps) {
 
     // Which panel the pointer is over, or null. Bubble reveal moved off CSS :hover
     // and into state because the tube layer is a viewport-level sibling of the panels
-    // and needs the same answer, which CSS cannot hand it.
-    const [hovered, setHovered] = useState<number | null>(null)
+    // and needs the same answer, which CSS cannot hand it — and off the panel elements
+    // entirely, because those are overlapping bounding rectangles and the browser's
+    // hit-testing answered for the rectangles, not the polygons (see panelHover.ts).
+    const hovered = usePanelHover(panelPolys, imgT, bubbleT, natSizes)
     const bubbleVisible = (i: number): boolean =>
         isBubbleRevealed(bubbleT, hovered, editor.active, i)
 
@@ -192,9 +195,6 @@ export function Layout({ navItems, sms, softphone }: LayoutProps) {
                             natSizes={natSizes}
                             editorActive={editor.active}
                             hovered={hovered === i}
-                            onHover={over =>
-                                setHovered(prev => (over ? i : prev === i ? null : prev))
-                            }
                             isRevealed={k => shouldRevealImg(editor.active, editor.selected, k)}
                             isBubbleVisible={bubbleVisible}
                             onNumberPadKey={softphone.pressDigit}

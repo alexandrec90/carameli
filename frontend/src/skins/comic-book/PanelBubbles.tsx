@@ -219,6 +219,7 @@ export default function PanelBubbles({
               live && peer
                 ? {
                     messages: sms.conversations[peer] ?? NO_MESSAGES,
+                    typing: sms.typing[peer] === true,
                     onSend: (text: string) => void sms.send(peer, text),
                   }
                 : undefined

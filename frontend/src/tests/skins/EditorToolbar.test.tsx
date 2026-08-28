@@ -73,6 +73,7 @@ function stubFetch(status: number, body: unknown) {
 
 afterEach(() => {
   vi.unstubAllGlobals()
+  vi.restoreAllMocks()
 })
 
 describe('EditorToolbar', () => {
@@ -128,8 +129,25 @@ describe('EditorToolbar', () => {
 
     const status = await screen.findByRole('status')
     expect(status.textContent).toContain('commit blocked on detached HEAD')
-    expect(status.className).toContain('cb-ed-ship-status-error')
+    expect(status.className).toContain('cb-ed-status-error')
     expect(screen.queryByRole('link', { name: 'Open PR' })).toBeNull()
+  })
+
+  it('says so when Save cannot write the file, rather than falling silently back to a download', async () => {
+    stubFetch(400, {})
+    // The fallback clicks a real `<a download>`, which happy-dom answers by navigating.
+    // The announcement beside it is what this test is about.
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+    renderToolbar()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    const status = await screen.findByRole('status')
+    expect(status.textContent).toContain('Save failed')
+    expect(status.textContent).toContain('HTTP 400')
+    expect(status.className).toContain('cb-ed-status-error')
+    // And the button must not claim success alongside the failure.
+    expect(screen.queryByRole('button', { name: 'Saved!' })).toBeNull()
   })
 
   it('disables Ship while one is in flight, so a slow push is not fired twice', async () => {

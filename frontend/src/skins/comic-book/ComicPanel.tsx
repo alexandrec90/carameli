@@ -29,8 +29,12 @@ interface ComicPanelProps {
     sms: UseSmsConversationsResult
     natSizes: Record<string, { w: number; h: number }>
     editorActive: boolean
+    /**
+     * True while Layout's geometric hit test (usePanelHover) says the pointer is on
+     * this panel. Hover is decided there, not here: this element is the polygon's
+     * bounding rectangle, and neighbouring rectangles overlap where a seam slants.
+     */
     hovered: boolean
-    onHover(over: boolean): void
     /** True when picture `k` (index into `images`) is the editor's full-reveal selection. */
     isRevealed(k: number): boolean
     isBubbleVisible(i: number): boolean
@@ -66,7 +70,7 @@ interface ComicPanelProps {
  */
 export default function ComicPanel({
     index, info, poly, images, bubbles, chains, sms, natSizes,
-    editorActive, hovered, onHover, isRevealed, isBubbleVisible, onNumberPadKey,
+    editorActive, hovered, isRevealed, isBubbleVisible, onNumberPadKey,
     onPhoneSubmit, phoneActions, dotRef, onSettled, onNatSize,
 }: ComicPanelProps) {
     const { bounds, vp } = poly
@@ -158,8 +162,6 @@ export default function ComicPanel({
                 height: bounds.h,
                 overflow: 'visible',
             }}
-            onMouseEnter={() => onHover(true)}
-            onMouseLeave={() => onHover(false)}
         >
             {/* Ben-Day dots — clipped to tight panel polygon */}
             <canvas

@@ -12,6 +12,7 @@ import react from '@vitejs/plugin-react'
 import { configDefaults } from 'vitest/config'
 
 import { resolveDevWatch } from './devWatchPolicy.ts'
+import { CONFIG_IN_REPO, editorConfigFile } from './editorConfigPath.ts'
 import { quietProxyErrors } from './proxyErrorPolicy.ts'
 import { shipLayout } from './shipLayout.ts'
 import type { Run } from './shipLayout.ts'
@@ -19,8 +20,8 @@ import type { Run } from './shipLayout.ts'
 const rootDir = dirname(fileURLToPath(import.meta.url))
 const repoRoot = resolve(rootDir, '..')
 
-/** Repo-relative because git wants it that way; the writer resolves it back. */
-const CONFIG_PATH = 'frontend/src/skins/comic-book/editor/layoutConfig.ts'
+/** Repo-relative because git wants it that way — see `editorConfigPath.ts`. */
+const CONFIG_PATH = CONFIG_IN_REPO
 
 /** A serialized config is a few tens of KB; anything past this is not one. */
 const MAX_BODY = 4_000_000
@@ -80,9 +81,14 @@ const runInRepo: Run = (cmd, args) =>
  * - **Ship** does that and then hands the file to `shipLayout`, which branches, commits,
  *   pushes and opens or updates a PR — see that module's header for why the browser
  *   cannot be asked to know which of the three trees it is pointed at.
+ *
+ * The write target comes from `editorConfigFile(rootDir)` — resolved from `frontend/`,
+ * not from `repoRoot` — because the repo root is not mounted in the container that
+ * serves this dev server. `repoRoot` stays the cwd for git, which is only reachable in a
+ * tree that has one.
  */
 function comicEditorPlugin(): Plugin {
-  const target = resolve(repoRoot, CONFIG_PATH)
+  const target = editorConfigFile(rootDir)
   return {
     name: 'comic-editor',
     apply: 'serve',

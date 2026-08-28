@@ -42,7 +42,6 @@ function draw(bubbles: BubbleTransform[], onNumberPadKey = vi.fn(), onPhoneSubmi
         natSizes={{}}
         editorActive={false}
         hovered
-        onHover={() => undefined}
         isRevealed={() => false}
         isBubbleVisible={() => true}
         onNumberPadKey={onNumberPadKey}

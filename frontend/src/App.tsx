@@ -3,7 +3,10 @@ import { Routes, Route } from 'react-router-dom'
 import { useSkin } from './skins/context'
 import { useAuth } from './hooks/useAuth'
 import { useSmsConversations } from './hooks/useSmsConversations'
+import type { UseSmsConversationsResult } from './hooks/useSmsConversations'
+import { useSmsSimulation } from './hooks/useSmsSimulation'
 import { SoftphoneProvider, useSharedSoftphone } from './hooks/softphoneContext'
+import { detectSmsSim } from './lib/smsSimulation'
 import { ROUTES, NAV_ITEMS } from './routes'
 import { skinLoadingConfigs, resolveSkinName, DEFAULT_SKIN } from './skins/registry'
 
@@ -53,11 +56,31 @@ export default function App() {
   )
 }
 
+// Whether this load simulates SMS instead of sending it (`?smsSim=1`, dev only).
+// Resolved once, at module load, like the comic-book editor's own flag — and the inline
+// `import.meta.env.DEV` is what lets a production build fold the test to `false` and
+// tree-shake the simulation branch, and the hook behind it, out of the bundle.
+const SMS_SIM = import.meta.env.DEV && detectSmsSim()
+
+// The two SMS sources are two components rather than one conditional hook call: the
+// rules of hooks forbid the conditional even on a constant, and each component's hook
+// list stays fixed for its life this way.
 function AuthenticatedApp() {
-  const { Layout } = useSkin()
+  return SMS_SIM ? <SimulatedSmsApp /> : <LiveSmsApp />
+}
+
+function LiveSmsApp() {
   // Skin chrome cannot fetch, and a bubble chain lives in the Layout rather than in a
   // view, so its data has to arrive as a Layout prop. Idle until a skin subscribes.
-  const sms = useSmsConversations()
+  return <AppShell sms={useSmsConversations()} />
+}
+
+function SimulatedSmsApp() {
+  return <AppShell sms={useSmsSimulation()} />
+}
+
+function AppShell({ sms }: { sms: UseSmsConversationsResult }) {
+  const { Layout } = useSkin()
   // The layout gets the phone because a skin may put one *in* the page — the comic-book
   // skin projects a number pad onto a photographed telephone — and a layout-level
   // control has to be the same device as the one the /softphone page drives.
