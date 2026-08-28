@@ -110,12 +110,12 @@
   gap: 6px;
   margin-bottom: 8px;
   color: #c8c8d0;
-  cursor: pointer;
+  cursor: var(--cb-cursor-click);
 }
 
 .cb-ed-check input {
   margin: 0;
-  cursor: pointer;
+  cursor: var(--cb-cursor-click);
 }
 
 .cb-ed-actions {
@@ -133,7 +133,7 @@
   border-radius: 4px;
   font: inherit;
   font-size: 11px;
-  cursor: pointer;
+  cursor: var(--cb-cursor-click);
 }
 
 .cb-ed-btn-icon {

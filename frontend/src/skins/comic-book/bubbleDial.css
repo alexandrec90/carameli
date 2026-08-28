@@ -29,7 +29,7 @@
   /* The pointer keeps the panel's own cursor — an I-beam over hand-lettering reads as
      a form pasted onto the artwork — and the native caret goes with it: the slanted
      ink block below (.cb-dial-caret, placed by useDialCaret.ts) blinks instead. */
-  cursor: default;
+  cursor: var(--cb-cursor-default);
   caret-color: transparent;
 }
 
