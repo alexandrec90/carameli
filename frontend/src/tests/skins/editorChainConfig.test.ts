@@ -24,16 +24,26 @@ import {
 describe('chains in a config', () => {
   /** A config holding two bubbles on panel 6, and nothing else. */
   const twoOn6 = () => {
-    const empty = { ...seedConfig(), bubbles: [] }
+    const empty = { ...seedConfig(), bubbles: [], chains: [] }
     const first = addBubble(empty, 6)
     return addBubble(first.config, 6)
+  }
+
+  /**
+   * The shipped page with every chain tie cut. The list is a function of the bubbles, so
+   * a test about the empty case has to say so itself rather than lean on the page
+   * happening to draw no thread today.
+   */
+  const unchained = () => {
+    const seed = seedConfig()
+    return { ...seed, bubbles: seed.bubbles.map(b => ({ ...b, chain: '' })), chains: [] }
   }
 
   /** The same two, linked into one column. */
   const linkedPair = () => patchBubble(twoOn6().config, 0, { linkTo: 1 })
 
   it('has no chains until a bubble is in one', () => {
-    expect(seedConfig().chains).toEqual([])
+    expect(hydrateConfig(JSON.stringify(unchained())).chains).toEqual([])
   })
 
   it('grows the list the moment the box is ticked, under an id the author never types', () => {
@@ -93,7 +103,7 @@ describe('chains in a config', () => {
 
   it('re-derives the list when a reset clears a bubble’s chain', () => {
     // Bubble 6 is drawn unlinked, so resetting it takes the whole group with it.
-    const cfg = setChained(seedConfig(), 6, true)
+    const cfg = setChained(unchained(), 6, true)
     expect(cfg.chains).toHaveLength(1)
     expect(resetOneIn(cfg, 'bubble', 6).chains).toEqual([])
   })
@@ -156,8 +166,11 @@ describe('chains in a config', () => {
   })
 
   it('rebuilds the list for a payload written before chains existed', () => {
+    // Such a payload carries neither the list nor a `chain` on any balloon, so the
+    // rebuild has nothing to find and must say so rather than throw.
     const saved = seedConfig() as unknown as Record<string, unknown>
     delete saved.chains
+    for (const b of saved.bubbles as Record<string, unknown>[]) delete b.chain
     expect(hydrateConfig(JSON.stringify(saved)).chains).toEqual([])
   })
 })

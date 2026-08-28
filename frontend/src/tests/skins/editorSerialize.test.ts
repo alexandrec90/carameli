@@ -370,10 +370,10 @@ describe('serializeConfig chains', () => {
     )
   })
 
-  // No page has a chain until an author draws one, so that is the state the shipped
-  // file is in — an empty multi-line literal would read as something having been deleted.
+  // A page that draws no thread writes the empty literal on one line — a multi-line
+  // one would read as something having been deleted.
   it('emits an empty list on one line', () => {
-    expect(serializeConfig(seedConfig())).toContain(
+    expect(serializeConfig({ ...seedConfig(), chains: [] })).toContain(
       'export const PANEL_BUBBLE_CHAINS: BubbleChain[] = []\n',
     )
   })

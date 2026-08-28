@@ -497,6 +497,12 @@ describe('default config parity', () => {
   // behaves do not apply to it.
   const isField = (b: BubbleTransform) => b.content !== 'text'
 
+  // A balloon in a **chain** is the same exception for the same reason: it is a template
+  // the live thread stamps, drawn where the conversation happens on the art rather than
+  // floating in the gutter, and morphing one copy of it under the pointer would say
+  // nothing about the message inside it.
+  const isThread = (b: BubbleTransform) => b.chain !== ''
+
   it('uses center center only for the logo panels and center bottom for the rest', () => {
     PANEL_IMG_TRANSFORMS.forEach(t => {
       expect(t.anchor).toBe(PANELS[t.panel].isLogo ? 'center center' : 'center bottom')
@@ -528,7 +534,7 @@ describe('default config parity', () => {
     const second = linkedPairs(PANEL_BUBBLE_TRANSFORMS).map(([, j]) => j)
     const nudged = new Set([...second, 6])
     PANEL_BUBBLE_TRANSFORMS.forEach((b, i) => {
-      if (nudged.has(i) || isField(b)) return
+      if (nudged.has(i) || isField(b) || isThread(b)) return
       expect(b.top).toBe(-35)
       expect(b.right).toBe(-12)
       expect(b.width).toBe(55)
@@ -564,7 +570,7 @@ describe('default config parity', () => {
   })
 
   it('gives every caption a hover and a click shape distinct from its resting one', () => {
-    PANEL_BUBBLE_TRANSFORMS.filter(b => !isField(b)).forEach(b => {
+    PANEL_BUBBLE_TRANSFORMS.filter(b => !isField(b) && !isThread(b)).forEach(b => {
       expect(b.hoverType).not.toBeNull()
       expect(b.clickType).not.toBeNull()
       expect(b.hoverType).not.toBe(b.type)
