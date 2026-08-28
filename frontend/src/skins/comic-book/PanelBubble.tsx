@@ -44,6 +44,12 @@ interface PanelBubbleProps {
    * and off in the editor, where a drag has to track the pointer exactly.
    */
   chained?: boolean
+  /** This field owns panel-wide keyboard input while visible. */
+  keyboard?: boolean
+  /** Fixed SVG-space endpoint for a chain row's speech stem. */
+  tailTarget?: [number, number]
+  /** Reports pointer ownership to the panel's keyboard router. */
+  onHoverChange?: (hovered: boolean) => void
   /**
    * Passed through to an `input`/`phone` balloon: Enter sends the field's contents here
    * and clears it. A chain's composer supplies one, and so does a standalone `phone`
@@ -99,6 +105,9 @@ export default function PanelBubble({
   visible,
   interactive,
   chained = false,
+  keyboard,
+  tailTarget,
+  onHoverChange,
   onSubmit,
   onWheelSelect,
   dialValue = '',
@@ -124,7 +133,7 @@ export default function PanelBubble({
   }
 
   const shape = resolveBubbleShape(bubble, { hover, pulsing })
-  const pathRef = useBubbleMorph(shape, bubble.tail)
+  const pathRef = useBubbleMorph(shape, bubble.tail, tailTarget)
   // The puffs trail the tail, so a thought bubble with no tail simply has none.
   const puffs = cloudPuffs(bubble.tail)
   const puffsOpacity = puffOpacity(shape)
@@ -156,6 +165,7 @@ export default function PanelBubble({
   // A keyboard user can tab to an otherwise hidden control; focus reveals its bubble
   // immediately and blur returns it to the panel-hover reveal rule.
   const shown = visible || focused
+  const holdsKeyboard = keyboard ?? bubble.content === 'dial'
 
   const className = [
     'cb-panel-bubble',
@@ -163,6 +173,11 @@ export default function PanelBubble({
     interactive ? 'is-interactive' : '',
     chained ? 'cb-chain-bubble' : '',
     status ? `is-${status}` : '',
+    // The heavier outline, and only ever this balloon's: `hover` is local state on this
+    // component, so a linked partner, the tube between them and the rows above this one
+    // in a chain are all somebody else's render and keep the resting weight. The tail
+    // and the thought puffs do bold, because they are the same ring and the same class.
+    hover && bubble.hoverBold ? 'is-bold' : '',
   ]
     .filter(Boolean)
     .join(' ')
@@ -177,8 +192,14 @@ export default function PanelBubble({
       // are synthesized from the subtree, so this is "the pointer is somewhere in the
       // bubble" — the hit outline or the input — rather than "on this one element".
       // Hung off the outline instead, stepping from it into the input read as a leave.
-      onPointerEnter={interactive ? () => setHover(true) : undefined}
-      onPointerLeave={interactive ? () => setHover(false) : undefined}
+      onPointerEnter={interactive ? () => {
+        setHover(true)
+        onHoverChange?.(true)
+      } : undefined}
+      onPointerLeave={interactive ? () => {
+        setHover(false)
+        onHoverChange?.(false)
+      } : undefined}
       onPointerDown={interactive ? pulse : undefined}
       onFocusCapture={hasField && interactive ? () => setFocused(true) : undefined}
       onBlurCapture={hasField && interactive ? () => setFocused(false) : undefined}
@@ -216,6 +237,7 @@ export default function PanelBubble({
           initialValue={bubble.text}
           font={font}
           enabled={interactive}
+          revealed={visible && holdsKeyboard}
           onSubmit={onSubmit}
         />
       ) : bubble.content === 'dial' ? (
@@ -229,10 +251,9 @@ export default function PanelBubble({
           // filters its drum, and a filter whose result only appears when the pointer
           // happens to be over the balloon is a filter nobody can see working.
           open={hover || focused}
-          // The panel-hover reveal alone: the dial grabs the keyboard while its balloon
-          // shows and lets go when the pointer leaves the panel, so it must not be told
-          // its own focus is a reason to keep it.
-          revealed={visible}
+          // A lone dial owns a revealed panel; beside a composer it takes ownership only
+          // while hovered, then hands focus and wheel reach back to the conversation.
+          revealed={visible && (holdsKeyboard || hover)}
           enabled={interactive}
           hostRef={rootRef}
           onSubmit={onSubmit}

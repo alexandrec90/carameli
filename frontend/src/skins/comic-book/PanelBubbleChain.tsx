@@ -1,14 +1,17 @@
 import { useEffect, useRef, useState } from 'react'
 
 import {
-  chainColumns, chainTranscript, clampHead, conversationRows, growTarget, isComposerContent,
-  messageRows, OUT_PREFIX, readTranscript, smsTranscript, stepHead, TYPING_KEY, visibleWindow,
+  chainColumns, chainRowLinks, chainTranscript, clampHead, conversationRows, growTarget,
+  isComposerContent, messageRows, OUT_PREFIX, readTranscript, recipientStemTarget,
+  smsTranscript, stepHead, TYPING_KEY, visibleWindow,
 } from './bubbleChain'
 import type { BubbleChain } from './bubbleChain'
+import { tubeBetween } from './bubbleTube'
 import PanelBubble from './PanelBubble'
+import { bubbleRect } from './editor/transforms'
 import type { BubbleTransform } from './editor/types'
 import type { SmsConversationMessage } from '../../lib/smsConversation'
-import { wheelSteps } from './wheelPicker'
+import { useDialWheel } from './useDialWheel'
 
 /**
  * How long after a chain is hidden its conversation rewinds to the start. Past the
@@ -31,6 +34,8 @@ interface PanelBubbleChainProps {
   visible: boolean
   /** False in edit mode: the editor overlay owns the pointer there. */
   interactive: boolean
+  /** The composer owns panel-wide keyboard and wheel input. */
+  keyboard?: boolean
   /**
    * The real SMS conversation this chain is bound to, when it is bound to one — supplied
    * by PanelBubbles from the number the panel's wheel picker is turned to.
@@ -86,7 +91,7 @@ export interface LiveConversation {
  * flickering rather than as a conversation moving.
  */
 export default function PanelBubbleChain({
-  chain, members, visible, interactive, conversation,
+  chain, members, visible, interactive, keyboard = false, conversation,
 }: PanelBubbleChainProps) {
   // What the reader has sent, oldest first, already marked as the sender's side. It lives
   // here rather than in the config because it is not the author's: it is gone on reload,
@@ -96,9 +101,19 @@ export default function PanelBubbleChain({
   // of the panel's *height* it occupies. 1 until measured: an unmeasured chain still stacks
   // in the right order, merely spaced as though the panel were square.
   const [aspect, setAspect] = useState(1)
+  const [size, setSize] = useState({ width: 0, height: 0 })
 
   const cols = chainColumns(members)
   const live = cols !== null && isComposerContent(cols.me.content)
+  // A chain that asked to be bound and was not — the panel has no number yet, or has one
+  // half-typed. It must not answer its own composer. `typed` below is a single array on
+  // this component, so it does not belong to any peer and outlives every change of one:
+  // an orphaned chain that kept messages would show the same transcript under every
+  // unresolvable number, which reads as one conversation following the reader around.
+  // Nothing is dropped that was ever going anywhere — an unbound chain has no destination
+  // for the message in the first place, and saying so by doing nothing is better than
+  // drawing a balloon that was never sent.
+  const orphaned = chain.sms && !conversation
   // A live chain spends its bottom row on the composer, so one fewer row holds messages.
   const holders = messageRows(chain.rows, live)
   // A live chain does *not* fall back to the balloons' own words: the sender template's
@@ -132,7 +147,6 @@ export default function PanelBubbleChain({
   // Set once the reader turns the wheel: growth is an opening flourish, and having it
   // resume under someone who has scrolled back through the conversation would fight them.
   const steeredRef = useRef(false)
-  const accRef = useRef(0)
   const hostRef = useRef<HTMLDivElement>(null)
 
   // The layer is inset to the panel box exactly (see bubbleChains.css), so measuring it
@@ -144,7 +158,10 @@ export default function PanelBubbleChain({
     if (!host) return
     const measure = (): void => {
       const { width, height } = host.getBoundingClientRect()
-      if (width > 0 && height > 0) setAspect(width / height)
+      if (width > 0 && height > 0) {
+        setAspect(width / height)
+        setSize({ width, height })
+      }
     }
     measure()
     if (typeof ResizeObserver === 'undefined') return
@@ -164,7 +181,6 @@ export default function PanelBubbleChain({
     if (visible || live) return
     const t = window.setTimeout(() => {
       steeredRef.current = false
-      accRef.current = 0
       setHead(chain.grow ? 0 : full)
     }, REWIND_MS)
     return () => window.clearTimeout(t)
@@ -195,31 +211,14 @@ export default function PanelBubbleChain({
     setHead(total - 1)
   }, [bound, total])
 
-  // Always listening: a chain *is* a window over a transcript, so the wheel moving it is
-  // what a chain means rather than a setting on one. With nothing to scroll to there is
-  // nothing to take the wheel away from the page for.
+  const turnRef = useRef<(steps: number) => void>(() => undefined)
   useEffect(() => {
-    const host = hostRef.current
-    if (!host || total === 0) return
-    const onWheel = (e: WheelEvent) => {
-      // A `content: 'wheel'` balloon inside the chain has its own picker and calls
-      // preventDefault on the same event as it bubbles up. Yield to it: the inner
-      // control is the one under the pointer, and turning both at once would move the
-      // option list out from under the reader's selection.
-      if (e.defaultPrevented) return
-      // Native and non-passive for the reason BubbleWheel gives: React registers wheel
-      // listeners passive, and a passive handler cannot keep the page scrolling away
-      // from under the conversation.
-      e.preventDefault()
-      const { acc, steps } = wheelSteps(accRef.current, e.deltaY)
-      accRef.current = acc
-      if (steps === 0) return
+    turnRef.current = steps => {
       steeredRef.current = true
       setHead(h => stepHead(h, steps, total))
     }
-    host.addEventListener('wheel', onWheel, { passive: false })
-    return () => host.removeEventListener('wheel', onWheel)
   }, [total])
+  useDialWheel(hostRef, keyboard, visible && total > 0, turnRef)
 
   /**
    * Send what the composer holds. It joins the conversation as the *sender's* message —
@@ -237,6 +236,9 @@ export default function PanelBubbleChain({
       steeredRef.current = false
       return
     }
+    // Asked for a carrier and got none: see `orphaned`. The local buffer is for a chain
+    // the author wrote as an offline animation, never for one waiting on a number.
+    if (orphaned) return
     setTyped(prev => [...prev, `${OUT_PREFIX}${text}`])
     setHead(total)
   }
@@ -263,9 +265,31 @@ export default function PanelBubbleChain({
     aspect,
     typing,
   )
+  const tubes = chainRowLinks(rows).flatMap(([below, row]) => {
+    if (size.width === 0) return []
+    const bounds = { x: 0, y: 0, w: size.width, h: size.height }
+    const geo = tubeBetween(
+      bubbleRect(bounds, below.bubble),
+      bubbleRect(bounds, row.bubble),
+    )
+    return geo ? [{ key: `${below.key}-${row.key}`, geo }] : []
+  })
+  const newestRecipient = rows.find(row => row.side === 'in' && row.bubble.tail !== 'none')
 
   return (
     <div ref={hostRef} className="cb-chain-layer">
+      {tubes.length > 0 && (
+        <svg className="cb-chain-tubes" aria-hidden="true">
+          {tubes.map(tube => (
+            <g key={tube.key} className={`cb-tube${visible ? ' is-visible' : ''}`}>
+              <path className="cb-tube-fill cb-chain-tube-path" d={tube.geo.fill} />
+              {tube.geo.rails.map((d, index) => (
+                <path key={index} className="cb-tube-rail cb-chain-tube-path" d={d} />
+              ))}
+            </g>
+          ))}
+        </svg>
+      )}
       {rows.map(row => (
         <PanelBubble
           key={row.key}
@@ -273,6 +297,12 @@ export default function PanelBubbleChain({
           visible={visible}
           interactive={interactive}
           chained
+          keyboard={row.key === 'composer' && keyboard}
+          tailTarget={
+            row === newestRecipient && cols
+              ? recipientStemTarget(cols.them, row.bubble, aspect)
+              : undefined
+          }
           onSubmit={row.key === 'composer' ? send : undefined}
           status={statusAt(row.key)}
         />

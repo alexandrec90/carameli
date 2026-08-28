@@ -22,14 +22,18 @@ offsetX / offsetY / anchor / spill, with `src` drawn from the `PANEL_ASSETS` man
 in `editor/assets.ts`) and speech-bubble
 placement and behaviour (`PANEL_BUBBLE_TRANSFORMS`: panel / top / right / width /
 rotate / spill / type / tail / content / text, plus `hoverType` / `clickType` event
-morph targets, the `linkTo` tube partner and the `chain` this balloon is a slot of;
+morph targets, `hoverBold` for a heavier outline under the pointer — the balloon's own
+only: its tail and puffs bold with it, a tube and the balloon at the far end of one do
+not — the `linkTo` tube partner and the `chain` this balloon is a slot of;
 content may be lettering, a wheel picker, a text input, a locale-formatted phone
 input, a dial — an autocomplete over that phone input, its list drawn as the wheel — or
 the telephone's own call/end-call keys) and the chain settings those names resolve to
 (`PANEL_BUBBLE_CHAINS`),
 plus each panel's background pattern style
-(`PANEL_PATTERNS`, the one array parallel to `PANELS`; the per-panel palette and dot
-metrics stay in `PANEL_BG_CONFIGS` in `panelPatterns.ts`). The renderer in
+(`PANEL_PATTERNS`, the one array parallel to `PANELS` — which lives in the same file,
+since the editor appends to it when a panel is split; the per-panel palette and dot
+metrics stay in `PANEL_BG_CONFIGS` in `panelPatterns.ts`, read through `panelBgConfig`
+so a panel past the palette's end wraps round). The renderer in
 `Layout.tsx` reads from these arrays — there are **no magic framing numbers** in
 `Layout.tsx` or the CSS for images/bubbles, and no bubble text. To retune them, use
 the editor rather than hand-editing scattered values.
@@ -43,6 +47,17 @@ add/remove picture or bubble, pattern switch, link sanitation), which re-exports
 `configSeed.ts` and `configHydrate.ts` (backfill, enum coercion, pattern fallback);
 grid edits live in `panelGridOps.ts` and the chain list's own lifecycle in
 `chainOps.ts`.
+
+**A `layoutConfig.ts` you did not edit is somebody's unsaved design, not a broken
+branch.** Because Save writes the served tree directly, a browser tab left open mid-
+design plants half-built balloons in whatever worktree the dev server was running in,
+uncommitted and belonging to no PR. That has stranded four trees so far, each costing a
+fresh session a diagnosis, because the parity failures it produces read as a fault in
+whatever branch happened to be checked out. The first assertion in `default config
+parity` now says so in its own failure message, and the answer it gives is the right
+one: `git stash push -- frontend/src/skins/comic-book/editor/layoutConfig.ts`, never
+filling in the missing tails by hand — that silently overwrites work someone is still
+doing.
 
 The bubble box's on-screen geometry comes from `bubbleRect` in `transforms.ts`, used
 by **both** the renderer (to aim tubes) and the editor (hit target and selection
@@ -147,10 +162,10 @@ two are not the same input, which is why the keys take no argument.
 | --- | --- | --- |
 | Enable / disable | `?edit=1` / `?edit=0` in dev | Flag persists in `localStorage['comic-book:edit']`; `?edit=0` clears it |
 | Gate | `import.meta.env.DEV && (?edit=1 \|\| flag)` | Never ships — `?edit=1` is inert in prod |
-| Select | click a **panel**, a **picture** or a **bubble** | A picture wins over the panel under it, a bubble over both; a panel is only outlined — it is the slot the **+** buttons add to, and where its background pattern is picked |
+| Select | click a **panel**, a **picture** or a **bubble** | A picture wins over the panel under it, a bubble over both; a panel is only outlined — it is the slot the **+** buttons add to, where its **name** and background pattern are edited, and (in shapes mode) what the split buttons cut. Panels are selectable in both modes |
 | Adjust | drag / wheel / handles / arrows | Move the frame or bubble, resize (bottom-right grip), pan the picture inside its frame (top-left grip, picture only), rotate (top-right grip, bubble only), nudge (⇧×10); for a picture **Alt** swaps the two framings |
 | Add / remove | **+ Image** / **+ Bubble** toolbar buttons, **Delete image** / **Delete bubble** in the inspector | Adds to the selected panel; deleting a bubble clears any link naming it |
-| Panel fields | inspector select | background **pattern** style (`PATTERN_STYLE_KEYS`; palette stays per panel) |
+| Panel fields | inspector controls | **name** (free text) and background **pattern** style (`PATTERN_STYLE_KEYS`; palette stays per panel) |
 | Picture fields | inspector selects | panel, picture (`PANEL_ASSETS`), alt (empty = decorative), anchor, spill |
 | Bubble fields | inspector selects | panel, type, **tail** (nine options incl. **No tail**), **content** (Text / Wheel picker / Text input / Phone input / Dial / Action buttons), authored text or initial value, hover/click morph, **chain** (free text, completing on the names already in use), link |
 | Chain fields | inspector, below the bubble's own, when the bubble names a chain | **grow** / **step ms**, **scroll**, **messages** (one per line; empty = speak the balloons' own text), **+ Balloon in chain** — they edit the whole column, not the selected balloon. Chained balloons render flat in edit mode so each stays selectable |
@@ -159,13 +174,16 @@ two are not the same input, which is why the keys take no argument.
 | Table fields | inspector controls | rows visible, text size, ink, headings on/off, the four corner X/Y pairs, **Reset corners**, and a columns list (heading / width weight / alignment) plus the cell text, one row per line, tab- or `\|`-separated. A live surface has no cell block, and no **+ Column** / **−** |
 | Table corners | drag the four **square grips** | Only on the selected picture, only in content mode. The band guides move with them, so align the guides to the ruling in the photograph |
 | Pages | **Page** dropdown in toolbar | Switch route in edit mode (replays the wash); "Loading screen" entry previews the loading overlay + its exit wash |
-| Mode | **Content** / **Panel shapes** toggle | Content places pictures and bubbles; shapes drags the lines between panels. Content click targets are not rendered in shapes mode — a panel-sized target would swallow every drag aimed at a line crossing it |
+| Mode | **Content** / **Panel shapes** toggle | Content places pictures and bubbles; shapes drags the lines between panels. Picture and bubble click targets are not rendered in shapes mode — a picture-sized target would swallow every drag aimed at a line crossing it. Panel targets stay, painted under the seam layer so a line or corner across one still wins the pointer |
 | Reshape | drag a **line** or a **vertex** | A frame vertex slides along its own edge; the four corners are locked; the frame itself has no handle. Arrows nudge (⇧×10). Pictures and bubbles hold their on-screen place — each affected frame and balloon is re-expressed against its new panel box (`editor/gridContentRemap.ts`); the polygon clip alone follows the seam |
 | Bend | **double-click a line** (or **Add a corner to this line** on the selected line), drag the bend; **Delete** / **Straighten** removes it | Repeat for lightning bolts. A junction of three lines, or a vertex on the frame, is not a bend and is refused |
 | Merge | drag a corner **onto another corner** and release | Within snap range the target lights up and the dragged corner sits on it; releasing collapses the two into one junction (`panelGridMerge.ts`). Refused — no snap offered — when the merged grid would be invalid or the two corners obey different frame constraints |
-| Split | **Alt-drag a corner** | The inverse of the merge: the seams on the drag side follow the pointer, the rest stay, and the two corners end up joined by a new edge (`panelGridSplit.ts`). The torn corner snaps onto a neighbouring seam's continuation line, so a collapsed cross folds back into two junctions on one straight seam. While the result would be invalid nothing tears |
-| Reset shapes | **Reset shapes** in the shapes inspector | Restores the current window shape's grid only — the three are edited independently. Pictures and bubbles stay where the author put them |
-| Save | **Save** button | `POST /__comic-editor/save` writes `layoutConfig.ts` (dev server only); **Copy config** / **.ts** are the fallbacks |
+| Tear | **Alt-drag a corner** | The inverse of the merge: the seams on the drag side follow the pointer, the rest stay, and the two corners end up joined by a new edge (`panelGridSplit.ts`). The torn corner snaps onto a neighbouring seam's continuation line, so a collapsed cross folds back into two junctions on one straight seam. While the result would be invalid nothing tears |
+| New panel | select a **panel**, then **Split top / bottom** or **Split left / right** in the shapes inspector | A straight cut through the middle of the panel's box, in all three grids of its page at once (`configPanels.ts` over `panelGridCut.ts`). The parent keeps its index, name, pattern and the upper/left half; the new panel is appended to `PANELS` with a numbered name and the parent's pattern, the other page's grids gain an empty ring, and on the grid on screen pictures and bubbles hold their place (`gridContentRemap.ts`). Refused whole, with a note, when any grid cannot take the cut. There is no delete |
+| Reset shapes | **Reset shapes** in the shapes inspector | Restores the current window shape's grid only — the three are edited independently. Pictures and bubbles stay where the author put them. A panel added since shipping has no shipped ring, so it is left empty on that window shape until split off again |
+| Save | **Save** button | `POST /__comic-editor/save` writes `layoutConfig.ts` (dev server only); **Copy config** / **.ts** are the fallbacks. Never refused — mid-design is when it matters most |
+| Ship | **Ship** button + summary | `POST /__comic-editor/ship` saves, then branches, commits, pushes and opens or updates a PR (`frontend/shipLayout.ts`). **Disabled while anything is unfinished** |
+| Unfinished | amber list above the Ship row | `editor/configParity.ts` — the structural rules a layout must satisfy whoever authored it: every caption needs a tail and both morph targets, every link must resolve within its panel, every picture needs extent and a `/comic-book/` source |
 | Reset all | clears working copy | Removes `localStorage['comic-book:editConfig']`, re-seeds from source |
 
 `EditorOverlay.tsx` is dynamically `import()`-ed behind the DEV gate so Rollup

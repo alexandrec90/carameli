@@ -87,7 +87,9 @@ Three properties are structural rather than enforced, and should stay that way:
 There are two pages of panels: the **4-panel home page** on `/` and the **classic
 8-panel grid** everywhere else (the old home page set aside, not destroyed).
 `pageForPath` in `panels.ts` picks the page from the route; every panel of both pages
-lives in the one `PANELS` list, each naming its `page`. `PANEL_GRIDS` is a
+lives in the one `PANELS` list (`editor/layoutConfig.ts` — the editor appends to it
+when a panel is split; `panels.ts` keeps the `Panel` type), each naming its `page`.
+`PANEL_GRIDS` is a
 `PageGrids` record — one set of three grids per page — and **every grid's ring table
 is `PANELS`-length**: a panel that lives on the other page keeps its slot as an empty
 ring, which `gridPolys` returns as a vertex-less polygon and `Layout.tsx` maps to
@@ -225,9 +227,10 @@ whole association: placement is measured against that panel's box, and hovering 
 panel is what reveals its bubbles (`isBubbleRevealed` in `bubbleTube.ts` is exactly
 that comparison).
 
-`PANELS` (`panels.ts`) is the one parallelism that survives — a panel is a fixed slot
-in the grid, so there are exactly as many of those as there are polygons, whatever ends
-up drawn on each.
+`PANELS` (`editor/layoutConfig.ts`) is the one parallelism that survives — a panel is a
+slot in the grid, so there are exactly as many of those as there are polygons, whatever
+ends up drawn on each. The editor only ever *appends* a slot (splitting a panel), so
+an index, once given, never moves.
 
 A picture carries **two independent framings**, and conflating them is the mistake to
 avoid: `left`/`top`/`width`/`height` are its frame over the panel box (in % of that
@@ -263,8 +266,8 @@ a delete, an add, a panel change — runs `sanitizeLinks`.
 
 The corridor is **welded by paint order, not by a path union**: it sinks into both
 bubbles and the tube layer paints above them (z-index 9), so its white fill erases
-the slice of outline it covers. Both z-indices are load-bearing — above the lifted
-panel (z 8), below the Ben-Day wash (z 10). Overlapping bubbles draw no tube at all,
+the slice of outline it covers. Both z-indices are load-bearing — above a lifted
+balloon (z 8), below the Ben-Day wash (z 10). Overlapping bubbles draw no tube at all,
 by design; a corridor shorter than its own width reads as a smudge.
 
 ### Bubble chains — two balloons read as an SMS thread

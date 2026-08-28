@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import PanelBubbleChain from '../../skins/comic-book/PanelBubbleChain'
 import type { BubbleChain } from '../../skins/comic-book/bubbleChain'
@@ -53,7 +53,25 @@ const edges = (el: Element) => {
 
 const composer = () => screen.getByRole('textbox', { name: 'Speech bubble text' })
 
+afterEach(() => vi.restoreAllMocks())
+
 describe('PanelBubbleChain', () => {
+  it('draws vertical connector tubes between consecutive rows of each column', () => {
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({
+      x: 0, y: 0, top: 0, left: 0, right: 500, bottom: 500, width: 500, height: 500,
+      toJSON: () => ({}),
+    })
+    const { container } = render(
+      <PanelBubbleChain
+        chain={chain({ rows: 4, messages: ['theirs one', '> mine one', 'theirs two', '> mine two'] })}
+        members={columns()}
+        visible
+        interactive
+      />,
+    )
+    expect(container.querySelectorAll('.cb-chain-tubes .cb-tube')).toHaveLength(2)
+  })
+
   // The author's "at most X rows": five messages through a three-row table is three on
   // screen, and the wheel reaches the rest.
   it('never draws more rows than the table holds', () => {

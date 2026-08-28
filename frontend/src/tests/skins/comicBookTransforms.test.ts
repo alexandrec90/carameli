@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest'
 
 import { BUBBLE_ASPECT, TAIL_DIR_KEYS } from '../../skins/comic-book/bubbleBox'
+import { isComposerContent } from '../../skins/comic-book/bubbleChain'
 import { linkedPairs } from '../../skins/comic-book/bubbleTube'
 import { BUBBLE_TYPES, BUBBLE_TYPE_KEYS } from '../../skins/comic-book/editor/bubbleTypes'
+import { layoutViolations, violationLines } from '../../skins/comic-book/editor/configParity'
 import {
   PANEL_IMG_TRANSFORMS,
   PANEL_BUBBLE_TRANSFORMS,
@@ -24,7 +26,7 @@ import {
   toClipPath,
 } from '../../skins/comic-book/editor/transforms'
 import type { BubbleTransform, ImgTransform } from '../../skins/comic-book/editor/types'
-import { PANELS } from '../../skins/comic-book/panels'
+import { PANELS } from '../../skins/comic-book/editor/layoutConfig'
 
 /** A picture at the shipped default: full-panel frame, identity framing inside it. */
 const img = (over: Partial<ImgTransform> = {}): ImgTransform => ({
@@ -420,6 +422,7 @@ describe('bubbleStyle', () => {
       linkTo: null,
       hoverType: null,
       clickType: null,
+      hoverBold: false,
       chain: '',
     }) as Record<string, string>
     expect(style.top).toBe('-35%')
@@ -503,6 +506,34 @@ describe('default config parity', () => {
   // nothing about the message inside it.
   const isThread = (b: BubbleTransform) => b.chain !== ''
 
+  // Declared first so it is the first failure read, because it is the one that says what
+  // happened. Everything below pins a property of *this* layout — where the balloons sit,
+  // which pairs are tubed — and reads as a broken branch when it goes red. This one asks
+  // only whether the file is a finished layout at all, which is the question worth asking
+  // first: the dev server rewrites `layoutConfig.ts` on every Save, so a browser tab left
+  // open mid-design in any tree leaves a half-built one behind, and the next person to run
+  // the suite there cannot otherwise tell it from their own work.
+  it('is a finished layout — no unfinished balloons or pictures', () => {
+    const violations = layoutViolations({
+      images: PANEL_IMG_TRANSFORMS,
+      bubbles: PANEL_BUBBLE_TRANSFORMS,
+      panels: PANELS,
+    })
+    expect(
+      violations,
+      [
+        'layoutConfig.ts is not a finished layout:',
+        ...violationLines(violations).map(line => `  - ${line}`),
+        '',
+        'If you did not edit this file, this is an unsaved export from the ?edit=1 editor,',
+        'left by a dev server running in this tree — not a fault in your branch. Set it',
+        'aside (git stash push -- frontend/src/skins/comic-book/editor/layoutConfig.ts)',
+        'rather than filling in the missing tails and morph targets by hand, which quietly',
+        "overwrites somebody's in-flight design.",
+      ].join('\n'),
+    ).toEqual([])
+  })
+
   it('uses center center only for the logo panels and center bottom for the rest', () => {
     PANEL_IMG_TRANSFORMS.forEach(t => {
       expect(t.anchor).toBe(PANELS[t.panel].isLogo ? 'center center' : 'center bottom')
@@ -517,11 +548,16 @@ describe('default config parity', () => {
     })
   })
 
+  // A chain's composer is the one balloon authored blank: its `text` is the field's
+  // initial value (PanelBubble hands it to BubbleInput as such), and a composer that
+  // opens with words in it is a message the reader did not write.
+  const isComposer = (b: BubbleTransform) => isThread(b) && isComposerContent(b.content)
+
   it('floats every bubble into the gutter with a caption and a rotation', () => {
     PANEL_BUBBLE_TRANSFORMS.forEach(b => {
       expect(b.spill).toBe(true)
       expect(b.rotate).toBe(-5)
-      expect(b.text.length).toBeGreaterThan(0)
+      if (!isComposer(b)) expect(b.text.length).toBeGreaterThan(0)
       expect(b.width).toBeGreaterThan(0)
     })
   })

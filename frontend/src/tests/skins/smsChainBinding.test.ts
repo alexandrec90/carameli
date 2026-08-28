@@ -1,8 +1,19 @@
 import { describe, expect, it } from 'vitest'
 
-import { OUT_PREFIX, peerPickerOn, smsTranscript } from '../../skins/comic-book/bubbleChain'
+import {
+  OUT_PREFIX,
+  chainColumns,
+  chainMembers,
+  isComposerContent,
+  peerPickerOn,
+  smsTranscript,
+} from '../../skins/comic-book/bubbleChain'
 import type { BubbleChain } from '../../skins/comic-book/bubbleChain'
 import { hydrateChains } from '../../skins/comic-book/editor/chainOps'
+import {
+  PANEL_BUBBLE_CHAINS,
+  PANEL_BUBBLE_TRANSFORMS,
+} from '../../skins/comic-book/editor/layoutConfig'
 import { serializeChains } from '../../skins/comic-book/editor/serialize'
 
 // The pure half of binding a chain to a real thread: which balloon on a panel names the
@@ -24,6 +35,40 @@ const chain = (over: Partial<BubbleChain> = {}): BubbleChain => ({
   sms: false,
   messages: [],
   ...over,
+})
+
+describe('the shipped page’s bound chain', () => {
+  // A chain only grows a composer when its *sender* template is a field, and it only
+  // has a sender and a recipient when both balloons name the same id. The home page
+  // once shipped its two SMS balloons as lettering, one on each of two ids — two
+  // one-column threads and nowhere to type — which read as the simulation being broken
+  // rather than as the page having no input. Every bound chain must be typeable.
+  const bound = PANEL_BUBBLE_CHAINS.filter(c => c.sms)
+
+  it('binds at least one chain to real SMS', () => {
+    expect(bound.length).toBeGreaterThan(0)
+  })
+
+  it('gives each one a blank composer, a recipient template and a picker', () => {
+    for (const { id } of bound) {
+      const panels = new Set(PANEL_BUBBLE_TRANSFORMS.filter(b => b.chain === id).map(b => b.panel))
+      expect(panels.size).toBe(1)
+      const [panel] = panels
+      const members = chainMembers(PANEL_BUBBLE_TRANSFORMS, id, panel).map(i => PANEL_BUBBLE_TRANSFORMS[i])
+      expect(members.length).toBeGreaterThanOrEqual(2)
+      const cols = chainColumns(members)
+      if (cols === null) throw new Error(`${id} has no columns`)
+      expect(isComposerContent(cols.me.content)).toBe(true)
+      expect(cols.me.text).toBe('')
+      expect(cols.them.content).toBe('text')
+      expect(peerPickerOn(PANEL_BUBBLE_TRANSFORMS, panel)).not.toBe(-1)
+    }
+  })
+
+  it('lists exactly the chain ids its balloons name', () => {
+    const named = new Set(PANEL_BUBBLE_TRANSFORMS.map(b => b.chain).filter(id => id !== ''))
+    expect(new Set(PANEL_BUBBLE_CHAINS.map(c => c.id))).toEqual(named)
+  })
 })
 
 describe('peerPickerOn', () => {

@@ -1,7 +1,6 @@
 import { TAIL_DIRS, TAIL_DIR_KEYS } from '../bubbleBox'
 import type { TailDir } from '../bubbleBox'
 import type { BubbleContentKind } from '../bubbleContent'
-import { PANELS } from '../panels'
 import { BUBBLE_TYPES, BUBBLE_TYPE_KEYS } from './bubbleTypes'
 import type { BubbleType } from './bubbleTypes'
 import { linkCandidates } from './configOps'
@@ -30,8 +29,9 @@ function bubbleLabel(b: BubbleTransform, i: number): string {
 
 /**
  * The bubble-only half of the selection inspector: which panel it belongs to, its
- * shape and tail, how its text is presented, the text itself, the event morph
- * targets, its link, and whether the linked group is a chain.
+ * shape and tail, how its text is presented, the text itself, the event responses —
+ * the two morph targets and the hover weight — its link, and whether the linked group
+ * is a chain.
  *
  * The link picker offers only the other bubbles on the same panel — that is where
  * the same-panel rule is enforced, by never presenting the invalid choice. Changing
@@ -55,8 +55,8 @@ export default function BubbleInspector({ api, index, bubble }: BubbleInspectorP
           value={bubble.panel}
           onChange={e => api.setBubble(index, { panel: Number(e.target.value) })}
         >
-          {PANELS.map((p, i) => (
-            <option key={p.label} value={i}>{p.label}</option>
+          {api.config.panels.map((p, i) => (
+            <option key={i} value={i}>{p.label}</option>
           ))}
         </select>
       </label>
@@ -173,6 +173,18 @@ export default function BubbleInspector({ api, index, bubble }: BubbleInspectorP
         </select>
       </label>
 
+      {/* The third event response, and the one that is not a morph: weight is a stroke,
+          so it is a checkbox rather than a fourth entry in the shape list. It bolds this
+          balloon alone — a tube and the balloon at its far end keep their own ink. */}
+      <label className="cb-ed-check">
+        <input
+          type="checkbox"
+          checked={bubble.hoverBold}
+          onChange={e => api.setBubble(index, { hoverBold: e.target.checked })}
+        />
+        <span>Bolder outline on hover</span>
+      </label>
+
       {/* Connector tube — and, with the checkbox below, the chain. Symmetric, so it only
           needs declaring at one end; the tube redraws live as either bubble is dragged. */}
       <label className="cb-ed-field">
@@ -195,7 +207,7 @@ export default function BubbleInspector({ api, index, bubble }: BubbleInspectorP
       </label>
       {candidates.length === 0 && (
         <div className="cb-ed-hint">
-          Add a second bubble to {PANELS[bubble.panel]?.label ?? `panel ${bubble.panel}`}
+          Add a second bubble to {api.config.panels[bubble.panel]?.label ?? `panel ${bubble.panel}`}
           {' '}to link this one — a link joins two bubbles on the same panel.
         </div>
       )}

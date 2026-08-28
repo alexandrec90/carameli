@@ -54,9 +54,20 @@ describe('toE164', () => {
     expect(toE164('', 'US')).toBeNull()
   })
 
-  it('returns null for digits that do not make a valid number', () => {
+  it('returns null for digits too few to be a number in the region', () => {
     expect(toE164('415 555', 'US')).toBeNull()
     expect(toE164('+1 000', 'US')).toBeNull()
+  })
+
+  it('gives an invented number its own identity, rather than none', () => {
+    // These parse and are the right length, and libphonenumber calls them *invalid*
+    // because no carrier was ever assigned that range. That answer is about whether a
+    // message would arrive; this function is asked which conversation a number is. A
+    // reader trying two made-up numbers is trying two conversations, and returning null
+    // for both made them share one — see the note on `toE164`.
+    expect(toE164('(555) 555-5555', 'US')).toBe('+15555555555')
+    expect(toE164('(123) 123-1234', 'US')).toBe('+11231231234')
+    expect(toE164('(555) 555-5555', 'US')).not.toBe(toE164('(123) 123-1234', 'US'))
   })
 
   it('returns null for a national number with no region to read it against', () => {

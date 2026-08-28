@@ -1,4 +1,3 @@
-import { PANELS } from '../panels'
 import { PATTERN_STYLES, PATTERN_STYLE_KEYS } from '../panelPatterns'
 import type { PanelBgStyle } from '../panelPatterns'
 import { assetLabel } from './assets'
@@ -10,7 +9,7 @@ import type { EditorModeApi } from './useEditorMode'
 
 interface InspectorPanelProps {
   api: EditorModeApi
-  /** Index of the panel the selection sits on, into PANELS. */
+  /** Index of the panel the selection sits on, into the config's panel list. */
   panel: number
 }
 
@@ -29,19 +28,28 @@ export default function InspectorPanel({ api, panel }: InspectorPanelProps) {
   const { selected, config } = api
   if (!selected) return null
 
-  const panelName = PANELS[panel]?.label ?? `Panel ${panel}`
+  const panelName = config.panels[panel]?.label ?? `Panel ${panel}`
   const selImg = selected.kind === 'img' ? config.images[selected.index] : null
   const selBubble = selected.kind === 'bubble' ? config.bubbles[selected.index] : null
 
   // A selected panel is a slot, not a drawn thing: it has no transform to read out and
-  // nothing to reset — but the slot does own one editable attribute, its Ben-Day
-  // background pattern. It also exists so "+ Image" / "+ Bubble" have somewhere to add.
+  // nothing to reset — but the slot does own two editable attributes, its name and its
+  // Ben-Day background pattern. It also exists so "+ Image" / "+ Bubble" have somewhere
+  // to add, and (in shapes mode) so a panel can be cut in two.
   if (selected.kind === 'panel') {
     const imgs = indicesOnPanel(config.images, panel).length
     const bubbles = indicesOnPanel(config.bubbles, panel).length
     return (
       <>
         <div className="cb-ed-label">{panelName} panel</div>
+        <label className="cb-ed-field">
+          <span>name</span>
+          <input
+            type="text"
+            value={config.panels[panel]?.label ?? ''}
+            onChange={e => api.setPanelLabel(panel, e.target.value)}
+          />
+        </label>
         <label className="cb-ed-field">
           <span>pattern</span>
           <select
