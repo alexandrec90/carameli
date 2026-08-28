@@ -103,15 +103,22 @@ export const MAX_LAZY_CHUNK_BYTES = 260 * 1024
  * moved into the editor-owned `layoutConfig.ts` so it is serialized and hydrated with the
  * rest. Same lazy comic-book chunk, same 46 chunks, `package.json` untouched.
  *
- * This raise (964 → 965) is the SMS composer, 0.8 KB measured on its own branch against
- * the 958 that preceded both: its shared caret and keyboard handoff, its per-column links
- * and fixed recipient stem, plus reporting a texted number back to the panel and the guard
- * that stops an unbound chain answering its own composer. The two raises were authored in
- * parallel and neither subsumes the other, so the merge pays for both — 964 was measured
- * without this branch in the build. Same lazy chunk, still 46 of them, `package.json`
- * untouched, so nothing new was pulled in by either half.
+ * The raise before this one (964 → 965) is the SMS composer, 0.8 KB measured on its own
+ * branch against the 958 that preceded both: its shared caret and keyboard handoff, its
+ * per-column links and fixed recipient stem, plus reporting a texted number back to the
+ * panel and the guard that stops an unbound chain answering its own composer. The two
+ * raises were authored in parallel and neither subsumes the other, so the merge pays for
+ * both — 964 was measured without this branch in the build. Same lazy chunk, still 46 of
+ * them, `package.json` untouched, so nothing new was pulled in by either half.
+ *
+ * This raise (965 → 966) is handing a chain balloon's hover off at the seam, 1.26 KB
+ * measured as this branch's merge (965.7 KB) against the master it merges (964.4 KB):
+ * `panelHover.ts` hit-tests a balloon by its drawn outline rather than its box, and
+ * `usePanelHover.ts` grew the SVG geometry probe that asks the shape, plus the tube
+ * corridors `BubbleTubes` now labels with the panel they belong to. Same lazy comic-book
+ * chunk, still 46 of them, `package.json` untouched, so nothing new was pulled in.
  */
-export const MAX_TOTAL_JS_BYTES = 965 * 1024
+export const MAX_TOTAL_JS_BYTES = 966 * 1024
 
 /**
  * Every `.css` file in `dist/assets/`, summed. Today 44.2 KB across 2 files.
