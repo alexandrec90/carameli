@@ -19,7 +19,7 @@ const POLYS: (PanelPoly | null)[] = [
 const SPILL_BUBBLE: BubbleTransform = {
   panel: 0, top: 10, right: -20, width: 40, rotate: 0, spill: true, type: 'soft',
   tail: 'none', content: 'text', text: '', linkTo: null, hoverType: null,
-  clickType: null, chain: '',
+  clickType: null, hoverBold: false, chain: '',
 }
 
 // jsdom has no PointerEvent; the listener only reads clientX/clientY, which

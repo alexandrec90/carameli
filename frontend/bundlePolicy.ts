@@ -91,24 +91,24 @@ export const MAX_LAZY_CHUNK_BYTES = 260 * 1024
  * the comic-book chunk for `phone`, and a visitor who never opens that skin pays for
  * none of it.
  *
- * This raise (955 → 958) is 1.6 KB: the dial's keyboard grab on panel reveal and its
- * lettered caret — `dialCaret.ts`'s pure measurement math, the `useDialCaret` DOM hook
- * that positions the ink block per keystroke, and the fresh-number flag both keyboards
- * read. All of it lands in the same lazy comic-book chunk; `package.json` is untouched
- * and the chunk count is unchanged at 46, so nothing new was pulled in.
+ * The raise before (955 → 958) is 1.6 KB: the dial's keyboard grab on panel reveal and
+ * its lettered caret — `dialCaret.ts`'s pure measurement math, the `useDialCaret` DOM
+ * hook that positions the ink block per keystroke, and the fresh-number flag both
+ * keyboards read. All of it lands in the same lazy comic-book chunk; `package.json` is
+ * untouched and the chunk count is unchanged at 46, so nothing new was pulled in.
  *
- * This raise (958 → 959) is 0.8 KB: the SMS composer now shares that caret and keyboard
- * handoff, while its conversation draws per-column links and a fixed recipient stem.
- * It remains isolated to the same lazy comic-book chunk and adds no dependency or chunk.
+ * A raise on the SMS branch (958 → 959, 0.8 KB) is folded in here rather than listed
+ * separately: the composer's shared caret and keyboard handoff, its per-column links and
+ * fixed recipient stem, plus reporting a texted number back to the panel and the guard
+ * that stops an unbound chain answering its own composer. Same chunk, same 46 chunks.
  *
- * This raise (959 → 960) is 0.2 KB: a number the reader texts is now reported back to the
- * panel so it joins the dial's shortlist, and a chain that asked to be bound to a number
- * and was not now declines to answer its own composer. Both are a few lines in components
- * the comic-book chunk already held; the chunk count is unchanged at 46, which is the
- * check that matters here — the budget's own note says a jump with the eager set unchanged
- * means a new dependency, and there is none.
+ * This raise (958 → 964) is 5.7 KB: making a panel from the editor. `panelGridCut.ts`
+ * cuts a ring in two along a straight line, `configPanels.ts` grows the panel list,
+ * the pattern per panel and every grid together, and the panel list itself moved into
+ * the editor-owned `layoutConfig.ts` so it is serialized and hydrated with the rest.
+ * Same lazy comic-book chunk, same 46 chunks, `package.json` untouched.
  */
-export const MAX_TOTAL_JS_BYTES = 960 * 1024
+export const MAX_TOTAL_JS_BYTES = 964 * 1024
 
 /**
  * Every `.css` file in `dist/assets/`, summed. Today 44.2 KB across 2 files.

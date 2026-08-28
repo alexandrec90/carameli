@@ -1,4 +1,3 @@
-import { PANELS } from '../panels'
 import { PANEL_ASSETS } from './assets'
 import NumberPadInspector from './NumberPadInspector'
 import TableInspector from './TableInspector'
@@ -49,8 +48,8 @@ export default function ImageInspector({ api, index, image }: ImageInspectorProp
           value={image.panel}
           onChange={e => set({ panel: Number(e.target.value) })}
         >
-          {PANELS.map((p, i) => (
-            <option key={p.label} value={i}>{p.label}</option>
+          {api.config.panels.map((p, i) => (
+            <option key={i} value={i}>{p.label}</option>
           ))}
         </select>
       </label>

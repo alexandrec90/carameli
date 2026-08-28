@@ -206,6 +206,9 @@ describe('the stylesheet gives a picture no border either', () => {
   // run, and a stylesheet that resolved to nothing is the same silence one level down.
   it('finds the skin\'s stylesheets, with their contents', () => {
     expect(CSS_FILES.length).toBeGreaterThan(5)
+    // Their *contents* too, which the count above does not cover: vitest stubs a CSS
+    // request to an empty string unless the file is in `test.css.include`, and this file
+    // was green on twelve empty strings for as long as it had existed.
     expect(CSS_FILES.filter(f => SKIN_CSS[f].trim() === '')).toEqual([])
   })
 

@@ -174,6 +174,14 @@ export default defineConfig(({ mode }) => {
       environment: 'happy-dom',
       globals: true,
 
+      // Vitest stubs every CSS request to an empty string by default, and its idea of a
+      // CSS request is the extension — so `bubbles.css?raw` was stubbed too, and a test
+      // that reads a stylesheet as source got `''` and asserted nothing while passing.
+      // `comicBookImageBorders.test.tsx` had been green that way since it was written.
+      // Processing the skin's stylesheets for real is what makes those assertions mean
+      // something; `include` keeps it to the files a test actually reads.
+      css: { include: [/src[\\/]skins[\\/]/] },
+
       // `bundlePolicy.test.ts` measures `dist/`, so it only means anything after a
       // build. It fails rather than skips when there is none — see its header — which
       // would make a plain `npm run test:run` red on any tree nobody has built. So it
