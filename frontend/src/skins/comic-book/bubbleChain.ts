@@ -391,6 +391,13 @@ export function bubbleHeightPct(width: number, panelAspect: number): number {
   return width * BUBBLE_ASPECT * panelAspect
 }
 
+/**
+ * The row key of the peer-is-typing balloon. Not a message index on purpose: the typing
+ * row has no place in the transcript, so when the reply lands this row unmounts and the
+ * message mounts as its own node rather than the dots turning into words in place.
+ */
+export const TYPING_KEY = 'typing'
+
 /** One balloon of a rendered conversation. */
 export interface ChainRow {
   /**
@@ -417,6 +424,12 @@ export interface ChainRow {
  * - **One tail per side.** Only the newest balloon of each column keeps its template's
  *   tail — the one still being said. A tail on every balloon reads as a crowd all talking
  *   at once, which is exactly what a thread is not.
+ *
+ * `typing` adds one extra row at the foot of the recipient's column — the peer
+ * mid-composition, drawn as dots by the shell (see {@link TYPING_KEY}). It is the
+ * newest thing on their side, so it takes their template's tail and the messages above
+ * it lose theirs, exactly as a newest message would; the caller shrinks the window by
+ * one row while it is up so the table's height budget still holds.
  */
 export function conversationRows(
   shown: readonly number[],
@@ -424,6 +437,7 @@ export function conversationRows(
   cols: ChainColumns,
   live: boolean,
   panelAspect: number,
+  typing = false,
 ): ChainRow[] {
   const rows: ChainRow[] = []
   // The left column's left edge, which is what its balloons are aligned against.
@@ -439,6 +453,25 @@ export function conversationRows(
     rows.push({ key: 'composer', bubble: { ...cols.me, top } })
     tailed.out = true
     stack(cols.me.width)
+  }
+
+  if (typing) {
+    // As narrow as a balloon gets: dots, not words. messageWidth('') is that floor.
+    const width = messageWidth('', cols.them.width)
+    rows.push({
+      key: TYPING_KEY,
+      bubble: {
+        ...cols.them,
+        top,
+        width,
+        right: 100 - themLeft - width,
+        content: 'text',
+        text: '',
+        linkTo: null,
+      },
+    })
+    tailed.in = true
+    stack(width)
   }
 
   for (const m of shown) {

@@ -38,7 +38,17 @@ export interface UseSmsConversationsResult {
   subscribe: (peer: string) => () => void
   /** Send to `peer` from the account's number, showing the message before it lands. */
   send: (peer: string, text: string) => Promise<void>
+  /**
+   * Peers currently composing a message, for the chain's typing dots. Always empty
+   * here — SMS has no typing signal for a carrier to relay — but part of the contract
+   * so the dev simulation (`useSmsSimulation`) can show one without the skin knowing
+   * which source it is rendering.
+   */
+  typing: Readonly<Record<string, boolean>>
 }
+
+/** The one (empty) typing map the live hook ever returns, so its identity is stable. */
+const NO_TYPING: Readonly<Record<string, boolean>> = {}
 
 /**
  * Live SMS conversations, for views that render a thread rather than a table.
@@ -188,5 +198,5 @@ export function useSmsConversations(): UseSmsConversationsResult {
     [sender, fetchPeer],
   )
 
-  return { conversations, sender, error, subscribe, send }
+  return { conversations, sender, error, subscribe, send, typing: NO_TYPING }
 }

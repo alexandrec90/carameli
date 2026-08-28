@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 
 import {
   chainColumns, chainTranscript, clampHead, conversationRows, growTarget, isComposerContent,
-  messageRows, OUT_PREFIX, readTranscript, smsTranscript, stepHead, visibleWindow,
+  messageRows, OUT_PREFIX, readTranscript, smsTranscript, stepHead, TYPING_KEY, visibleWindow,
 } from './bubbleChain'
 import type { BubbleChain } from './bubbleChain'
 import PanelBubble from './PanelBubble'
@@ -50,6 +50,12 @@ export interface LiveConversation {
   messages: readonly SmsConversationMessage[]
   /** Send as the account, to whoever this conversation is with. */
   onSend: (text: string) => void
+  /**
+   * True while the peer is composing, for the typing-dots row. Only the dev simulation
+   * ever sets it — a carrier has no typing signal to relay — so a live chain simply
+   * never shows the row.
+   */
+  typing?: boolean
 }
 
 /**
@@ -238,18 +244,24 @@ export default function PanelBubbleChain({
   if (!cols) return null
 
   /** How far a message has got, for the balloon's ink. Undefined once it is simply sent. */
-  const statusAt = (key: string): 'sending' | 'failed' | undefined => {
+  const statusAt = (key: string): 'sending' | 'failed' | 'typing' | undefined => {
+    if (key === TYPING_KEY) return 'typing'
     if (!conversation || key === 'composer') return undefined
     const status = conversation.messages[Number(key)]?.status
     return status === 'sent' || status === undefined ? undefined : status
   }
 
+  // The typing row spends a message row while it is up, the way the composer spends one
+  // for good: the table's height budget is the panel's, so the dots displace the oldest
+  // visible message rather than stacking past the top.
+  const typing = conversation?.typing === true
   const rows = conversationRows(
-    visibleWindow(head, holders),
+    visibleWindow(head, holders - (typing ? 1 : 0)),
     readTranscript(messages),
     cols,
     live,
     aspect,
+    typing,
   )
 
   return (

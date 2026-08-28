@@ -15,6 +15,7 @@ import type { SmsConversationMessage } from '../../lib/smsConversation'
 export function idleSms(over: Partial<UseSmsConversationsResult> = {}): UseSmsConversationsResult {
   return {
     conversations: {},
+    typing: {},
     sender: '',
     error: '',
     subscribe: vi.fn(() => () => undefined),

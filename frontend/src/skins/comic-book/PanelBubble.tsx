@@ -12,6 +12,7 @@ import {
 import BubbleActions from './BubbleActions'
 import BubbleDial from './BubbleDial'
 import BubbleInput from './BubbleInput'
+import BubbleTypingDots from './BubbleTypingDots'
 import BubbleWheel from './BubbleWheel'
 import { dialOptions } from './dialPicker'
 import { BUBBLE_TYPES } from './editor/bubbleTypes'
@@ -77,9 +78,10 @@ interface PanelBubbleProps {
    * one, and on one whose message the carrier has acknowledged — a sent message is just a
    * message. Drawn as ink rather than as words: a sending balloon is pale and a failed one
    * is struck in red (see bubbleChains.css), because a status *line* would be a seventh row
-   * in a six-row table.
+   * in a six-row table. `typing` is the peer's balloon before there are words: no text,
+   * animated dots.
    */
-  status?: 'sending' | 'failed'
+  status?: 'sending' | 'failed' | 'typing'
 }
 
 /**
@@ -239,7 +241,7 @@ export default function PanelBubble({
         />
       ) : (
         <span className="cb-panel-bubble-text" style={{ fontFamily: `'${font}', cursive` }}>
-          {bubble.text}
+          {status === 'typing' ? <BubbleTypingDots /> : bubble.text}
         </span>
       )}
     </div>
