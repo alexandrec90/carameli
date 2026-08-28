@@ -112,6 +112,55 @@ describe('PanelBubbles, binding a chain to a number', () => {
     expect(sms.send).toHaveBeenCalledWith(PEER, 'hello')
   })
 
+  it('reports the number it sent to, so the panel can keep it on the picker', () => {
+    // The panel's own half of "a thread I started is a row I can turn back to"; what it
+    // does with the number is ComicPanel's (see ComicPanelDial.test.tsx). Reported as the
+    // picker spells it rather than as E.164, because the drum letters what the field does.
+    const sms = idleSms()
+    const onPeerTexted = vi.fn()
+    render(
+      <PanelBubbles
+        bubbles={[picker(), ...chainBubbles()]}
+        chains={[chain()]}
+        panel={0}
+        clip="none"
+        isVisible={() => true}
+        interactive
+        editing={false}
+        sms={sms}
+        onPeerTexted={onPeerTexted}
+      />,
+    )
+
+    const composer = screen.getByRole('textbox', { name: 'Speech bubble text' })
+    fireEvent.change(composer, { target: { value: 'hello' } })
+    fireEvent.keyDown(composer, { key: 'Enter' })
+
+    expect(onPeerTexted).toHaveBeenCalledWith(PEER)
+  })
+
+  it('reports nothing until something is actually sent', () => {
+    // A number that merely resolved is not a conversation: a reader part-way through
+    // typing one passes through other people's numbers, and a drum that collected those
+    // would be a list of near misses.
+    const onPeerTexted = vi.fn()
+    render(
+      <PanelBubbles
+        bubbles={[picker(), ...chainBubbles()]}
+        chains={[chain()]}
+        panel={0}
+        clip="none"
+        isVisible={() => true}
+        interactive
+        editing={false}
+        sms={idleSms()}
+        onPeerTexted={onPeerTexted}
+      />,
+    )
+
+    expect(onPeerTexted).not.toHaveBeenCalled()
+  })
+
   it('routes keyboard focus to the composer except while the phone thought bubble is hovered', () => {
     const { container } = render(
       <div className="cb-panel">

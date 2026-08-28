@@ -3,10 +3,11 @@ import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import ComicPanel from '../../skins/comic-book/ComicPanel'
+import type { BubbleChain } from '../../skins/comic-book/bubbleChain'
 import { NEW_BUBBLE, NEW_IMAGE } from '../../skins/comic-book/editor/configSeed'
 import { newNumberPad } from '../../skins/comic-book/editor/numberPadValidate'
 import type { BubbleTransform, ImgTransform } from '../../skins/comic-book/editor/types'
-import { idleSms } from './smsStub'
+import { idleSms, smsMessage } from './smsStub'
 
 // The seam the 'dial' kind exists for: a number pad projected onto a *picture* and a
 // balloon on the same panel are two ways of typing one number. ComicPanel is the only
@@ -28,7 +29,17 @@ const bubble = (over: Partial<BubbleTransform> = {}): BubbleTransform => ({
 beforeEach(() => vi.spyOn(navigator, 'languages', 'get').mockReturnValue(['en-US']))
 afterEach(() => vi.restoreAllMocks())
 
-function draw(bubbles: BubbleTransform[], onNumberPadKey = vi.fn(), onPhoneSubmit = vi.fn()) {
+interface DrawOver {
+  chains?: BubbleChain[]
+  sms?: ReturnType<typeof idleSms>
+}
+
+function draw(
+  bubbles: BubbleTransform[],
+  { chains = [], sms = idleSms() }: DrawOver = {},
+  onNumberPadKey = vi.fn(),
+  onPhoneSubmit = vi.fn(),
+) {
   render(
     <MemoryRouter initialEntries={['/']}>
       <ComicPanel
@@ -37,8 +48,8 @@ function draw(bubbles: BubbleTransform[], onNumberPadKey = vi.fn(), onPhoneSubmi
         poly={POLY}
         images={[img({ numberPad: newNumberPad() })]}
         bubbles={bubbles}
-        chains={[]}
-        sms={idleSms()}
+        chains={chains}
+        sms={sms}
         natSizes={{}}
         editorActive={false}
         hovered
@@ -189,6 +200,88 @@ describe('a panel holding a dial balloon', () => {
     fireEvent.keyDown(field()!, { key: 'Enter' })
 
     expect(onPhoneSubmit).toHaveBeenCalledWith('(999) 888-7777')
+  })
+})
+
+describe('a panel whose dial picks the peer of an SMS chain', () => {
+  // The other seam ComicPanel owns: the thought bubble says *who*, the chain beside it
+  // says *what*, and the shortlist is the only thing that remembers a number the reader
+  // typed. Without that, a conversation started on a typed number is reachable exactly
+  // once — turning the drum away from it is a one-way door.
+  const PEER = '+14155551111'
+  const OTHER = '+14155552222'
+
+  const chainBubbles = (): BubbleTransform[] => [
+    bubble({ chain: 'chain-1', right: 5, content: 'input', text: '' }),
+    bubble({ chain: 'chain-1', right: 55 }),
+  ]
+  const smsChain = (): BubbleChain[] => [
+    { id: 'chain-1', grow: false, stepMs: 900, rows: 4, sms: true, messages: [] },
+  ]
+  const bothThreads = () =>
+    idleSms({
+      conversations: {
+        [PEER]: [smsMessage({ id: 'a', text: 'first thread' })],
+        [OTHER]: [smsMessage({ id: 'b', text: 'second thread' })],
+      },
+    })
+
+  it('keeps a number a message was sent to, so the reader can turn back to that thread', () => {
+    const sms = bothThreads()
+    const { field, rows } = draw(
+      [bubble({ content: 'dial', text: '4155551111' }), ...chainBubbles()],
+      { chains: smsChain(), sms },
+    )
+    expect(screen.getByText('first thread')).toBeTruthy()
+
+    // A number the author never listed, typed into the thought bubble. It binds at once —
+    // but it has narrowed the drum to nothing, so there is no row to come back to.
+    fireEvent.change(field()!, { target: { value: '4155552222' } })
+    expect(screen.getByText('second thread')).toBeTruthy()
+    expect(rows()).toEqual([])
+
+    const composer = screen.getByRole('textbox', { name: 'Speech bubble text' })
+    fireEvent.change(composer, { target: { value: 'hello' } })
+    fireEvent.keyDown(composer, { key: 'Enter' })
+
+    expect(sms.send).toHaveBeenCalledWith(OTHER, 'hello')
+    // Sending made it a row of the drum, with the filter cleared and both threads on it.
+    expect(rows()).toEqual(['(415) 555-1111', '(415) 555-2222'])
+
+    // Which is the whole point: the two conversations are now one scroll apart.
+    const thought = field()!.closest('.cb-panel-bubble') as HTMLElement
+    fireEvent.wheel(thought, { deltaY: -200 })
+    expect(field()!.value).toBe('(415) 555-1111')
+    expect(screen.getByText('first thread')).toBeTruthy()
+
+    fireEvent.wheel(thought, { deltaY: 200 })
+    expect(field()!.value).toBe('(415) 555-2222')
+    expect(screen.getByText('second thread')).toBeTruthy()
+  })
+
+  it('leaves the shortlist alone until a message is actually sent', () => {
+    const { field, rows } = draw(
+      [bubble({ content: 'dial', text: '4155551111' }), ...chainBubbles()],
+      { chains: smsChain(), sms: bothThreads() },
+    )
+
+    fireEvent.change(field()!, { target: { value: '4155552222' } })
+    fireEvent.change(field()!, { target: { value: '4155551111' } })
+
+    expect(rows()).toEqual(['(415) 555-1111'])
+  })
+
+  it('does not list a texted number twice when the author already offered it', () => {
+    const { rows } = draw(
+      [bubble({ content: 'dial', text: '4155551111' }), ...chainBubbles()],
+      { chains: smsChain(), sms: bothThreads() },
+    )
+
+    const composer = screen.getByRole('textbox', { name: 'Speech bubble text' })
+    fireEvent.change(composer, { target: { value: 'hello' } })
+    fireEvent.keyDown(composer, { key: 'Enter' })
+
+    expect(rows()).toEqual(['(415) 555-1111'])
   })
 })
 

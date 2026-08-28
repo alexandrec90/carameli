@@ -82,6 +82,18 @@ interface PanelBubblesProps {
    */
   dialled?: string[]
   /**
+   * Reports the number a bound chain has just been texted from this panel, so it joins
+   * that same shortlist. A conversation started on a number the reader typed is otherwise
+   * reachable exactly once: the picker only offers what the author listed and what has
+   * been dialled, so turning the drum away from a typed peer is a one-way door, and every
+   * number typed after it opens another empty thread with no way back to the last.
+   *
+   * Sending is the event rather than the number resolving, because a valid number is not
+   * yet a conversation — a reader part-way through typing passes through other people's
+   * numbers, and a drum that collected those would be a list of near misses.
+   */
+  onPeerTexted?(value: string): void
+  /**
    * What the telephone's keys do, for any `actions` balloon on this panel. Absent in the
    * editor and on a page with no telephone: the keys are drawn there and do nothing.
    */
@@ -124,6 +136,7 @@ export default function PanelBubbles({
   dialFresh = false,
   onDialChange,
   dialled = EMPTY_DIALLED,
+  onPeerTexted,
   phoneActions,
 }: PanelBubblesProps) {
   const ids = editing ? [] : chainIdsOn(bubbles, panel)
@@ -230,7 +243,13 @@ export default function PanelBubbles({
                 ? {
                     messages: sms.conversations[peer] ?? NO_MESSAGES,
                     typing: sms.typing[peer] === true,
-                    onSend: (text: string) => void sms.send(peer, text),
+                    onSend: (text: string) => {
+                      // The reader's own spelling of the number, not `peer`: the drum
+                      // letters its rows the way the field does, and E.164 is the form
+                      // the API takes rather than the one the panel shows.
+                      onPeerTexted?.(chosen)
+                      void sms.send(peer, text)
+                    },
                   }
                 : undefined
             }
