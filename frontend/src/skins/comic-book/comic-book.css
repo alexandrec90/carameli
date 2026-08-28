@@ -19,8 +19,16 @@
   --cb-dot-hover-alpha: 0.35;
   --cb-accent:        var(--cb-yellow);   /* overridden per-page */
   --cb-hue-deg:       0deg;
-  --cb-cursor-default: url('/comic-book/pointer-cursor.webp') 6 6, default;
-  --cb-cursor-click: url('/comic-book/click-cursor.webp') 16 18, pointer;
+
+  /* Sized against the native arrow, not against the artwork. These first shipped fitted
+     to a 64px box each, which is over three times the ~19px of ink a system arrow draws
+     and reads as a sticker being dragged around the page rather than as a pointer. They
+     are now one shared downscale of their two masters -- the same factor for both, which
+     is the part that keeps the hand at the arrow's scale; two independent fit-to-N boxes
+     do not, because the masters are not the same shape. `assetPolicy.test.ts` holds both
+     the ceiling and the ratio. */
+  --cb-cursor-default: url('/comic-book/pointer-cursor.webp') 2 1, default;
+  --cb-cursor-click: url('/comic-book/click-cursor.webp') 9 10, pointer;
 }
 
 /* ─── Fonts ─────────────────────────────────────────────────────────────────── */
