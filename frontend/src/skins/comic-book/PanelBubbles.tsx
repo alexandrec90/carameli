@@ -1,6 +1,8 @@
 import { Fragment, useCallback, useEffect, useState } from 'react'
 
-import { chainIdsOn, chainMembers, defaultChain, peerPickerOn } from './bubbleChain'
+import {
+  chainIdsOn, chainMembers, defaultChain, isComposerContent, peerPickerOn,
+} from './bubbleChain'
 import type { BubbleChain } from './bubbleChain'
 import PanelBubble from './PanelBubble'
 import PanelBubbleChain from './PanelBubbleChain'
@@ -80,6 +82,18 @@ interface PanelBubblesProps {
    */
   dialled?: string[]
   /**
+   * Reports the number a bound chain has just been texted from this panel, so it joins
+   * that same shortlist. A conversation started on a number the reader typed is otherwise
+   * reachable exactly once: the picker only offers what the author listed and what has
+   * been dialled, so turning the drum away from a typed peer is a one-way door, and every
+   * number typed after it opens another empty thread with no way back to the last.
+   *
+   * Sending is the event rather than the number resolving, because a valid number is not
+   * yet a conversation — a reader part-way through typing passes through other people's
+   * numbers, and a drum that collected those would be a list of near misses.
+   */
+  onPeerTexted?(value: string): void
+  /**
    * What the telephone's keys do, for any `actions` balloon on this panel. Absent in the
    * editor and on a page with no telephone: the keys are drawn there and do nothing.
    */
@@ -122,6 +136,7 @@ export default function PanelBubbles({
   dialFresh = false,
   onDialChange,
   dialled = EMPTY_DIALLED,
+  onPeerTexted,
   phoneActions,
 }: PanelBubblesProps) {
   const ids = editing ? [] : chainIdsOn(bubbles, panel)
@@ -145,6 +160,11 @@ export default function PanelBubbles({
   // Stable, because BubbleWheel reports through an effect and would re-report on every
   // render of this panel otherwise — which is a render of this panel, forever.
   const onWheelSelect = useCallback((value: string) => setPicked(value), [])
+  const [pickerHovered, setPickerHovered] = useState(false)
+  const composerOwnsKeyboard = conversations.some(c => {
+    const sender = bubbles[c.members[0]]
+    return sender != null && isComposerContent(sender.content)
+  })
 
   // Whether anything on this panel actually wants a thread. A picker is an ordinary
   // balloon on most panels, and resolving a number off one is not a reason to poll a
@@ -181,6 +201,8 @@ export default function PanelBubbles({
             visible={isVisible(i)}
             interactive={interactive}
             onWheelSelect={i === pickerIndex ? onWheelSelect : undefined}
+            keyboard={i === pickerIndex ? !composerOwnsKeyboard : undefined}
+            onHoverChange={i === pickerIndex ? setPickerHovered : undefined}
             onSubmit={
               bubble.content === 'phone' || bubble.content === 'dial'
                 ? onPhoneSubmit
@@ -215,12 +237,19 @@ export default function PanelBubbles({
             // together; the sender template's answer is the conversation's.
             visible={isVisible(members[0])}
             interactive={interactive}
+            keyboard={composerOwnsKeyboard && !pickerHovered}
             conversation={
               live && peer
                 ? {
                     messages: sms.conversations[peer] ?? NO_MESSAGES,
                     typing: sms.typing[peer] === true,
-                    onSend: (text: string) => void sms.send(peer, text),
+                    onSend: (text: string) => {
+                      // The reader's own spelling of the number, not `peer`: the drum
+                      // letters its rows the way the field does, and E.164 is the form
+                      // the API takes rather than the one the panel shows.
+                      onPeerTexted?.(chosen)
+                      void sms.send(peer, text)
+                    },
                   }
                 : undefined
             }

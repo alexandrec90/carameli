@@ -6,6 +6,8 @@ import {
   CHAIN_MIN_WIDTH_RATIO,
   CHAIN_ROW_GAP,
   bubbleHeightPct,
+  chainRowLinks,
+  chainRowTop,
   chainColumns,
   chainIds,
   chainIdsOn,
@@ -21,6 +23,7 @@ import {
   messageWidth,
   mirrorColumn,
   readTranscript,
+  recipientStemTarget,
   stepHead,
   visibleWindow,
 } from '../../skins/comic-book/bubbleChain'
@@ -264,17 +267,37 @@ describe('conversationRows', () => {
     expect(rows[2].bubble.width).toBeLessThan(rows[1].bubble.width)
   })
 
-  // Not a fixed pitch: a row is pushed up by the height of the balloon below it, so two
-  // balloons of different widths still tile instead of overlapping.
-  it('stacks each row on the height of the one below it', () => {
+  it('packs rows by their visible ellipses instead of their tail-padded boxes', () => {
     expect(rows[0].bubble.top).toBe(cols.me.top)
     for (let i = 1; i < rows.length; i += 1) {
       const below = rows[i - 1].bubble
-      expect(rows[i].bubble.top).toBeCloseTo(
+      expect(rows[i].bubble.top).toBeCloseTo(chainRowTop(below, rows[i].bubble.width, 1), 6)
+      expect(rows[i].bubble.top).toBeGreaterThan(
         below.top - bubbleHeightPct(below.width, 1) - CHAIN_ROW_GAP,
-        6,
       )
     }
+  })
+
+  it('links rows vertically within each speaker column only', () => {
+    expect(chainRowLinks(rows).map(pair => pair.map(row => row.key))).toEqual([['1', '0']])
+    const alternating = conversationRows(
+      visibleWindow(3, 6),
+      readTranscript(['in one', '> out one', 'in two', '> out two']),
+      cols,
+      false,
+      1,
+    )
+    expect(chainRowLinks(alternating).map(pair => pair.map(row => row.side))).toEqual([
+      ['out', 'out'],
+      ['in', 'in'],
+    ])
+  })
+
+  it('keeps the newest recipient stem on the template-authored panel point', () => {
+    const target = recipientStemTarget(cols.them, rows[1].bubble, 1)
+    const templateTarget = recipientStemTarget(cols.them, cols.them, 1)
+    expect(target).not.toEqual(templateTarget)
+    expect(target.every(Number.isFinite)).toBe(true)
   })
 
   it('leaves the tail on the newest balloon of each column and nowhere else', () => {

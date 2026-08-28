@@ -127,21 +127,25 @@ export default function ComicPanel({
         },
         [country, dialFresh],
     )
-    // Numbers actually dialled from this panel, which join the dial's shortlist so the
-    // drum becomes a redial list: a number reached once by typing it out or by punching
-    // it into the picture is a row to turn to from then on. Held here for the same reason
-    // the value is — it is the panel's number, however many balloons show it — and reset
-    // when the page unmounts, which is what a comic panel's memory is worth.
+    // Numbers this panel has actually reached, which join the dial's shortlist so the
+    // drum becomes a redial list: a number reached once by typing it out, by punching it
+    // into the picture, or by texting it is a row to turn to from then on. Held here for
+    // the same reason the value is — it is the panel's number, however many balloons show
+    // it — and reset when the page unmounts, which is what a comic panel's memory is worth.
     const [dialled, setDialled] = useState<string[]>([])
+    const rememberNumber = useCallback(
+        (value: string) => setDialled(current => addDialled(current, value)),
+        [],
+    )
     const onDialSubmit = useCallback(
         (value: string) => {
-            setDialled(current => addDialled(current, value))
+            rememberNumber(value)
             // The dialled number stays on the display, finished — the next key starts a
             // new call rather than growing a number that has already been placed.
             setDialFresh(true)
             onPhoneSubmit?.(value)
         },
-        [onPhoneSubmit],
+        [onPhoneSubmit, rememberNumber],
     )
 
     return (
@@ -205,6 +209,7 @@ export default function ComicPanel({
                 dialFresh={dialFresh}
                 dialled={dialled}
                 onDialChange={onDialChange}
+                onPeerTexted={rememberNumber}
                 phoneActions={phoneActions}
             />
         </div>

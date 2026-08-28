@@ -56,6 +56,18 @@ describe('BubbleInput', () => {
     expect(input.tabIndex).toBe(-1)
   })
 
+  it('takes the keyboard on reveal and draws the same comic caret as the dial', () => {
+    const { container, rerender } = render(
+      <BubbleInput kind="input" initialValue="Draft" font="Comic Neue" enabled revealed />,
+    )
+    const input = screen.getByRole('textbox', { name: 'Speech bubble text' }) as HTMLInputElement
+    expect(document.activeElement).toBe(input)
+    expect(container.querySelector('.cb-dial-caret')).not.toBeNull()
+
+    rerender(<BubbleInput kind="input" initialValue="Draft" font="Comic Neue" enabled />)
+    expect(document.activeElement).not.toBe(input)
+  })
+
   it('does not send input clicks or keys to the navigable panel beneath it', () => {
     const click = vi.fn()
     const keyDown = vi.fn()
