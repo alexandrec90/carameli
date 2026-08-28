@@ -19,6 +19,16 @@
   --cb-dot-hover-alpha: 0.35;
   --cb-accent:        var(--cb-yellow);   /* overridden per-page */
   --cb-hue-deg:       0deg;
+
+  /* Sized against the native arrow, not against the artwork. These first shipped fitted
+     to a 64px box each, which is over three times the ~19px of ink a system arrow draws
+     and reads as a sticker being dragged around the page rather than as a pointer. They
+     are now one shared downscale of their two masters -- the same factor for both, which
+     is the part that keeps the hand at the arrow's scale; two independent fit-to-N boxes
+     do not, because the masters are not the same shape. `assetPolicy.test.ts` holds both
+     the ceiling and the ratio. */
+  --cb-cursor-default: url('/comic-book/pointer-cursor.webp') 2 1, default;
+  --cb-cursor-click: url('/comic-book/click-cursor.webp') 9 10, pointer;
 }
 
 /* ─── Fonts ─────────────────────────────────────────────────────────────────── */
@@ -43,6 +53,7 @@
   font-family: 'Comic Neue', cursive;
   font-weight: 700;
   color: var(--cb-black);
+  cursor: var(--cb-cursor-default);
 }
 
 /* Per-panel Ben-Day dot canvas — clipped to the panel polygon via inline clip-path */
@@ -115,7 +126,7 @@
   letter-spacing: 2px;
   text-transform: uppercase;
   color: var(--cb-black);
-  cursor: pointer;
+  cursor: var(--cb-cursor-click);
   box-shadow: var(--cb-shadow);
   text-align: left;
   transition: box-shadow 80ms ease-out, transform 80ms ease-out;
@@ -142,7 +153,7 @@
 }
 
 .cb-panel.clickable {
-  cursor: pointer;
+  cursor: var(--cb-cursor-click);
 }
 
 /* Editor: the selected panel reveals its full (unclipped) image for framing. z-index 3
@@ -205,7 +216,7 @@
   letter-spacing: 2px;
   text-transform: uppercase;
   color: var(--cb-black);
-  cursor: pointer;
+  cursor: var(--cb-cursor-click);
   transition: box-shadow 80ms ease-out, transform 80ms ease-out, filter 80ms ease-out;
 }
 
@@ -230,11 +241,19 @@
 /* ─── Panel stacking while a bubble shows ─────────────────────────────────────
    The bubbles and their tubes live in bubbles.css; this is the panel-side half. */
 
-/* Elevate a panel whose bubble is showing above the SVG outline layer (z:3) so the
-   bubble, which lives inside the panel div, paints on top of the ink lines. Driven by
-   a class rather than :hover because a link reveals its partner's bubble too, and that
-   partner is never the element under the pointer. */
-.cb-panel-lift {
+/* Elevate the balloons of a panel whose bubbles are showing above the SVG outline layer
+   (z:3) so the ink lines do not cross them. Driven by a class rather than :hover because
+   a link reveals its partner's bubble too, and that partner is never the element under
+   the pointer.
+
+   The lift is on the bubble wrappers, NEVER on `.cb-panel` itself. A panel raised over
+   the ink takes its Ben-Day canvas and its clipped pictures up with it, and those are
+   clipped to the very polygon the ink strokes — so they cover the inner half of that
+   5 px stroke and the border reads as thinning to half width on hover. Only the balloons
+   need to be above the ink, and a spilling one already is (z:5, in the root context,
+   since a panel makes no stacking context); this raises the clipped ones, which
+   `.cb-bubble-clip` traps at z:1. */
+.cb-panel-lift .cb-bubble-clip {
   z-index: 8;
 }
 

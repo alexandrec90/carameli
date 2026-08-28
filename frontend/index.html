@@ -5,6 +5,10 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="theme-color" content="#1A0F00" />
+  <!-- Both spellings: the `apple-` one is what iOS Safari reads, the bare one is the
+       standard every other engine reads — and Chrome warns on every load about the
+       `apple-` one alone, which is the other message filling the console. -->
+  <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <link rel="manifest" href="/manifest.json" />
@@ -27,9 +31,9 @@
     stylesheet for three fonts nothing used.
 
     The stored skin is readable synchronously, so the guard costs microseconds and the
-    preload scanner still sees the tags on the skin that wants them — the fonts
-    included, because comic-book's *loading* screen is set in Bangers before its chunk
-    has even been fetched.
+    art on the skin that wants it still starts downloading here in <head>, before the
+    entry module is fetched — the fonts included, because comic-book's *loading* screen
+    is set in Bangers before its chunk has even been fetched.
 
     SKINS and DEFAULT must match `src/skins/registry.ts`, and PANELS must match the
     images `editor/layoutConfig.ts` draws. Both agreements are asserted by
@@ -70,13 +74,24 @@
       if (SKINS.indexOf(stored) === -1) stored = DEFAULT;
       if (stored !== 'comic-book') return;
 
+      // Fetched with an Image rather than a link preload. Both issue the same
+      // request at the same moment, but a preload has to be *claimed* by a consumer
+      // within about three seconds of the load event or Chrome prints "was preloaded
+      // using link preload but not used within a few seconds from the window's load
+      // event" — once per file, on every reload. The consumer is the <img> the
+      // comic-book chunk renders, and in dev that chunk is still arriving module by
+      // module when the load event fires, so the page drew the art a second or two
+      // after the browser had given up on it. An Image is its own consumer, so there
+      // is nothing left to claim, and holding the objects keeps the bytes in the
+      // memory cache for the <img> that follows.
+      // The asset policy proves this list matches the pictures the page draws and
+      // that every file exists, so no runtime audit has to ship to each visitor.
       var list = PANELS[location.pathname === '/' ? 'home' : 'classic'];
+      window.__carameliArt = [];
       for (var i = 0; i < list.length; i++) {
-        var preload = document.createElement('link');
-        preload.rel = 'preload';
-        preload.as = 'image';
-        preload.href = list[i];
-        document.head.appendChild(preload);
+        var image = new Image();
+        image.src = list[i];
+        window.__carameliArt.push(image);
       }
 
       var fonts = document.createElement('link');

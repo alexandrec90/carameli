@@ -30,7 +30,7 @@
   background: transparent;
   color: inherit;
   font: inherit;
-  cursor: pointer;
+  cursor: var(--cb-cursor-click);
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
   transition: background-color 120ms ease-out, box-shadow 120ms ease-out,
