@@ -208,8 +208,11 @@ describe('a panel whose dial picks the peer of an SMS chain', () => {
   // says *what*, and the shortlist is the only thing that remembers a number the reader
   // typed. Without that, a conversation started on a typed number is reachable exactly
   // once — turning the drum away from it is a one-way door.
-  const PEER = '+14155551111'
-  const OTHER = '+14155552222'
+  // Numbers no carrier assigned, on purpose: that is what a reader types when they are
+  // trying the page out, and it is the case binding used to drop on the floor.
+  const PEER = '+15550001111'
+  const OTHER = '+15550002222'
+  const THIRD = '5550003333'
 
   const chainBubbles = (): BubbleTransform[] => [
     bubble({ chain: 'chain-1', right: 5, content: 'input', text: '' }),
@@ -229,14 +232,14 @@ describe('a panel whose dial picks the peer of an SMS chain', () => {
   it('keeps a number a message was sent to, so the reader can turn back to that thread', () => {
     const sms = bothThreads()
     const { field, rows } = draw(
-      [bubble({ content: 'dial', text: '4155551111' }), ...chainBubbles()],
+      [bubble({ content: 'dial', text: '5550001111' }), ...chainBubbles()],
       { chains: smsChain(), sms },
     )
     expect(screen.getByText('first thread')).toBeTruthy()
 
     // A number the author never listed, typed into the thought bubble. It binds at once —
     // but it has narrowed the drum to nothing, so there is no row to come back to.
-    fireEvent.change(field()!, { target: { value: '4155552222' } })
+    fireEvent.change(field()!, { target: { value: '5550002222' } })
     expect(screen.getByText('second thread')).toBeTruthy()
     expect(rows()).toEqual([])
 
@@ -246,34 +249,51 @@ describe('a panel whose dial picks the peer of an SMS chain', () => {
 
     expect(sms.send).toHaveBeenCalledWith(OTHER, 'hello')
     // Sending made it a row of the drum, with the filter cleared and both threads on it.
-    expect(rows()).toEqual(['(415) 555-1111', '(415) 555-2222'])
+    expect(rows()).toEqual(['(555) 000-1111', '(555) 000-2222'])
 
     // Which is the whole point: the two conversations are now one scroll apart.
     const thought = field()!.closest('.cb-panel-bubble') as HTMLElement
     fireEvent.wheel(thought, { deltaY: -200 })
-    expect(field()!.value).toBe('(415) 555-1111')
+    expect(field()!.value).toBe('(555) 000-1111')
     expect(screen.getByText('first thread')).toBeTruthy()
 
     fireEvent.wheel(thought, { deltaY: 200 })
-    expect(field()!.value).toBe('(415) 555-2222')
+    expect(field()!.value).toBe('(555) 000-2222')
     expect(screen.getByText('second thread')).toBeTruthy()
   })
 
   it('leaves the shortlist alone until a message is actually sent', () => {
     const { field, rows } = draw(
-      [bubble({ content: 'dial', text: '4155551111' }), ...chainBubbles()],
+      [bubble({ content: 'dial', text: '5550001111' }), ...chainBubbles()],
       { chains: smsChain(), sms: bothThreads() },
     )
 
-    fireEvent.change(field()!, { target: { value: '4155552222' } })
-    fireEvent.change(field()!, { target: { value: '4155551111' } })
+    fireEvent.change(field()!, { target: { value: '5550002222' } })
+    fireEvent.change(field()!, { target: { value: '5550001111' } })
 
-    expect(rows()).toEqual(['(415) 555-1111'])
+    expect(rows()).toEqual(['(555) 000-1111'])
+  })
+
+  it('shows a number with no thread an empty one, not somebody else’s', () => {
+    // One conversation per number, including the numbers nobody has ever texted. The
+    // third number here has no messages, so the panel must show none — the fault was that
+    // it showed whatever had been typed under the last unresolvable number instead.
+    const { field } = draw(
+      [bubble({ content: 'dial', text: '5550001111' }), ...chainBubbles()],
+      { chains: smsChain(), sms: bothThreads() },
+    )
+
+    fireEvent.change(field()!, { target: { value: '5550002222' } })
+    expect(screen.getByText('second thread')).toBeTruthy()
+
+    fireEvent.change(field()!, { target: { value: THIRD } })
+    expect(screen.queryByText('first thread')).toBeNull()
+    expect(screen.queryByText('second thread')).toBeNull()
   })
 
   it('does not list a texted number twice when the author already offered it', () => {
     const { rows } = draw(
-      [bubble({ content: 'dial', text: '4155551111' }), ...chainBubbles()],
+      [bubble({ content: 'dial', text: '5550001111' }), ...chainBubbles()],
       { chains: smsChain(), sms: bothThreads() },
     )
 
@@ -281,7 +301,7 @@ describe('a panel whose dial picks the peer of an SMS chain', () => {
     fireEvent.change(composer, { target: { value: 'hello' } })
     fireEvent.keyDown(composer, { key: 'Enter' })
 
-    expect(rows()).toEqual(['(415) 555-1111'])
+    expect(rows()).toEqual(['(555) 000-1111'])
   })
 })
 

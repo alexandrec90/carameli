@@ -27,17 +27,32 @@ export function browserCountry(): CountryCode | undefined {
 }
 
 /**
- * A written number in the E.164 form an API takes, or null when it is not a valid number.
+ * A written number in the E.164 form an API takes, or null when it is not a number at all.
  *
  * This is the join between what an author *writes* and what a request *sends*: a wheel
  * picker's options are lettering in a comic panel — `(555) 010-4477`, `+1 555 010 4477` —
  * and the same option has to become one canonical string, or the same conversation is two
  * conversations depending on how it was typed. Null rather than a throw, because an option
  * that is a person's name is an ordinary thing for a panel to hold and not an error.
+ *
+ * **The test is `isPossible`, not `isValid`, and the difference is the whole point.**
+ * `isValid` asks whether a number is in an assigned range of a real numbering plan, which
+ * every made-up number fails: `(555) 555-5555` and `(123) 123-1234` parse perfectly and are
+ * not valid, so this returned null for them. That null then travelled — it left a chain
+ * *unbound*, which is a composer wired to nothing, and every invented number shared the one
+ * fallback transcript that state left behind. So a reader trying two numbers of their own
+ * got one conversation that followed them from number to number, and neither number was
+ * ever a thread that could be returned to.
+ *
+ * Identity is what this function is for, and an invented number still has one. `isPossible`
+ * keeps out what is genuinely not a destination — a name, a half-typed number — and lets
+ * every number-shaped thing be its own conversation. Whether a carrier will *accept* it is
+ * the carrier's answer to give, on a message that visibly fails, rather than something to
+ * pre-empt by silently pretending the number was never dialled.
  */
 export function toE164(value: string, country?: CountryCode): string | null {
   const parsed = parsePhoneNumberFromString(value, country)
-  return parsed?.isValid() ? parsed.number : null
+  return parsed?.isPossible() ? parsed.number : null
 }
 
 /** Anything a telephone keypad has that a written number does not. */

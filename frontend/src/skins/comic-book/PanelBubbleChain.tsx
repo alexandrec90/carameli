@@ -105,6 +105,15 @@ export default function PanelBubbleChain({
 
   const cols = chainColumns(members)
   const live = cols !== null && isComposerContent(cols.me.content)
+  // A chain that asked to be bound and was not — the panel has no number yet, or has one
+  // half-typed. It must not answer its own composer. `typed` below is a single array on
+  // this component, so it does not belong to any peer and outlives every change of one:
+  // an orphaned chain that kept messages would show the same transcript under every
+  // unresolvable number, which reads as one conversation following the reader around.
+  // Nothing is dropped that was ever going anywhere — an unbound chain has no destination
+  // for the message in the first place, and saying so by doing nothing is better than
+  // drawing a balloon that was never sent.
+  const orphaned = chain.sms && !conversation
   // A live chain spends its bottom row on the composer, so one fewer row holds messages.
   const holders = messageRows(chain.rows, live)
   // A live chain does *not* fall back to the balloons' own words: the sender template's
@@ -227,6 +236,9 @@ export default function PanelBubbleChain({
       steeredRef.current = false
       return
     }
+    // Asked for a carrier and got none: see `orphaned`. The local buffer is for a chain
+    // the author wrote as an offline animation, never for one waiting on a number.
+    if (orphaned) return
     setTyped(prev => [...prev, `${OUT_PREFIX}${text}`])
     setHead(total)
   }
