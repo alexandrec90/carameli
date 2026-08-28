@@ -1,8 +1,11 @@
 import type { LayoutKind, PageGrids, PanelGrid } from '../panelGeometry'
-import { PANEL_PAGES, PANELS } from '../panels'
+import { PANEL_PAGES } from '../panels'
+import type { Panel } from '../panels'
+import { PATTERN_STYLE_KEYS } from '../panelPatterns'
 import type { BubbleType } from './bubbleTypes'
 import { PANEL_PATTERNS } from './layoutConfig'
 import { numberPadSuffix } from './serializeNumberPad'
+import { serializePanels } from './serializePanels'
 import { tableSuffix } from './serializeTable'
 import { round, strLiteral } from './tsLiteral'
 import type { BubbleChain, EditorConfig } from './types'
@@ -134,10 +137,10 @@ const GRID_HEADER = `// The panel shapes themselves: one record per page, one gr
 const LAYOUT_KINDS: LayoutKind[] = ['landscape', 'portrait', 'square']
 
 /** One grid's two fields, indented for the record literal that holds it. */
-function gridBody(grid: PanelGrid): string {
+function gridBody(grid: PanelGrid, panels: Panel[]): string {
   const points = grid.vertices.map(([x, y]) => `[${round(x, 4)}, ${round(y, 4)}]`).join(', ')
   const rings = grid.panels
-    .map((ring, i) => `        [${ring.join(', ')}], // ${PANELS[i]?.label ?? `panel ${i}`}`)
+    .map((ring, i) => `        [${ring.join(', ')}], // ${panels[i]?.label ?? `panel ${i}`}`)
     .join('\n')
   return `      vertices: [${points}],\n      panels: [\n${rings}\n      ],`
 }
@@ -151,9 +154,9 @@ function gridBody(grid: PanelGrid): string {
  * slot of the page it is. An empty ring is emitted as `[]` under the same label: the
  * panel lives on the other page, and its slot stays visible rather than vanishing.
  */
-export function serializeGrids(grids: PageGrids): string {
+export function serializeGrids(grids: PageGrids, panels: Panel[]): string {
   const pages = PANEL_PAGES.map(page => {
-    const blocks = LAYOUT_KINDS.map(kind => `    ${kind}: {\n${gridBody(grids[page][kind])}\n    },`).join('\n')
+    const blocks = LAYOUT_KINDS.map(kind => `    ${kind}: {\n${gridBody(grids[page][kind], panels)}\n    },`).join('\n')
     return `  ${page}: {\n${blocks}\n  },`
   }).join('\n')
   return `${GRID_HEADER}\nexport const PANEL_GRIDS: PageGrids = {\n${pages}\n}\n`
@@ -220,26 +223,31 @@ export function serializeConfig(c: EditorConfig): string {
         `chain: ${strLiteral(b.chain)} },`,
     )
     .join('\n')
-  const patternLines = PANELS
-    .map((p, i) => `  '${c.patterns[i] ?? PANEL_PATTERNS[i]}', // ${p.label}`)
+  // Patterns iterate the panel list, not the config's own array: the two are parallel by
+  // contract, so a slot the working copy never carried writes its shipped default — or,
+  // past the shipped list, the first registered style — rather than `undefined`.
+  const patternLines = c.panels
+    .map((p, i) => `  '${c.patterns[i] ?? PANEL_PATTERNS[i] ?? PATTERN_STYLE_KEYS[0]}', // ${p.label}`)
     .join('\n')
   return (
+    serializePanels(c.panels) +
     `${IMG_HEADER}\nexport const PANEL_IMG_TRANSFORMS: ImgTransform[] = [\n${imgLines}\n]\n\n` +
     `${BUBBLE_HEADER}\nexport const PANEL_BUBBLE_TRANSFORMS: BubbleTransform[] = [\n${bubbleLines}\n]\n\n` +
     serializeChains(c.chains) +
     `${PATTERN_HEADER}\nexport const PANEL_PATTERNS: PanelBgStyle[] = [\n${patternLines}\n]\n\n` +
-    serializeGrids(c.grids)
+    serializeGrids(c.grids, c.panels)
   )
 }
 
 /**
  * Serialize a full, ready-to-write `editor/layoutConfig.ts` file: the import header
- * plus the four `export const` blocks from {@link serializeConfig}. Used by the
- * editor's Save button, which POSTs this verbatim to the dev-only write endpoint.
+ * plus the `export const` blocks from {@link serializeConfig}. Used by the editor's
+ * Save button, which POSTs this verbatim to the dev-only write endpoint.
  */
 export function serializeConfigFile(c: EditorConfig): string {
   return (
     `import type { PanelBgStyle } from '../panelPatterns'\n` +
+    `import type { Panel } from '../panels'\n` +
     `import type { ImgTransform, BubbleTransform, BubbleChain, PageGrids } from './types'\n\n` +
     serializeConfig(c)
   )

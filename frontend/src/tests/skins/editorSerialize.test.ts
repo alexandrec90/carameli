@@ -20,10 +20,11 @@ import { moveVertex } from '../../skins/comic-book/editor/panelGridOps'
 import { serializeConfig, serializeConfigFile } from '../../skins/comic-book/editor/serialize'
 import { newTable } from '../../skins/comic-book/editor/tableValidate'
 import type { EditorConfig } from '../../skins/comic-book/editor/types'
-import { PANELS } from '../../skins/comic-book/panels'
+import { PANELS } from '../../skins/comic-book/editor/layoutConfig'
 
 const IMPORT_LINE =
   "import type { ImgTransform, BubbleTransform, BubbleChain, PageGrids } from './types'"
+const PANEL_IMPORT_LINE = "import type { Panel } from '../panels'"
 
 /**
  * Count `{ ... }` object entries inside the named const's array literal, at the
@@ -84,13 +85,17 @@ function transformsOf(ts: string): string {
 function reparse(ts: string): EditorConfig {
   const body = ts
     .replace("import type { PanelBgStyle } from '../panelPatterns'", '')
+    .replace(PANEL_IMPORT_LINE, '')
     .replace(IMPORT_LINE, '')
+    .replace(/export const PANELS: Panel\[\] =/, 'const panels =')
     .replace(/export const PANEL_IMG_TRANSFORMS: ImgTransform\[\] =/, 'const images =')
     .replace(/export const PANEL_BUBBLE_TRANSFORMS: BubbleTransform\[\] =/, 'const bubbles =')
     .replace(/export const PANEL_BUBBLE_CHAINS: BubbleChain\[\] =/, 'const chains =')
     .replace(/export const PANEL_PATTERNS: PanelBgStyle\[\] =/, 'const patterns =')
     .replace(/export const PANEL_GRIDS: PageGrids =/, 'const grids =')
-  return new Function(`${body}\nreturn { images, bubbles, chains, grids, patterns }`)() as EditorConfig
+  return new Function(
+    `${body}\nreturn { panels, images, bubbles, chains, grids, patterns }`,
+  )() as EditorConfig
 }
 
 describe('serializeConfig', () => {
@@ -421,7 +426,9 @@ describe('serializeConfigFile', () => {
   it('prepends the import header to the const blocks', () => {
     const file = serializeConfigFile(seedConfig())
     expect(file.startsWith("import type { PanelBgStyle } from '../panelPatterns'")).toBe(true)
+    expect(file).toContain(PANEL_IMPORT_LINE)
     expect(file).toContain(IMPORT_LINE)
+    expect(file).toContain('export const PANELS: Panel[] = [')
     expect(file).toContain('export const PANEL_IMG_TRANSFORMS: ImgTransform[] = [')
     expect(file).toContain('export const PANEL_BUBBLE_TRANSFORMS: BubbleTransform[] = [')
     expect(file).toContain('export const PANEL_PATTERNS: PanelBgStyle[] = [')
@@ -431,6 +438,24 @@ describe('serializeConfigFile', () => {
   it('produces a body whose literals re-evaluate to the source config', () => {
     const cfg = seedConfig()
     expect(reparse(serializeConfigFile(cfg))).toEqual(cfg)
+  })
+
+  it('emits the panel list first, one entry per panel, and re-reads it', () => {
+    const cfg = seedConfig()
+    const file = serializeConfigFile(cfg)
+    expect(file.indexOf('export const PANELS')).toBeLessThan(
+      file.indexOf('export const PANEL_IMG_TRANSFORMS'),
+    )
+    expect((file.match(/^ {2}\{ label: /gm) ?? []).length).toBe(PANELS.length)
+    expect(reparse(file).panels).toEqual(PANELS)
+  })
+
+  it('emits a panel the editor appended, with its label quoted', () => {
+    const cfg = seedConfig()
+    cfg.panels.push({ label: "Mechanic's 2nd", isLogo: false, page: 'classic' })
+    const out = reparse(serializeConfig(cfg))
+    expect(out.panels).toHaveLength(PANELS.length + 1)
+    expect(out.panels[PANELS.length]).toEqual({ label: "Mechanic's 2nd", isLogo: false, page: 'classic' })
   })
 
   /*

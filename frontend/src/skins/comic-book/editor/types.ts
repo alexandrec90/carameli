@@ -3,6 +3,7 @@ import type { BubbleChain } from '../bubbleChain'
 import type { BubbleContentKind } from '../bubbleContent'
 import type { PageGrids } from '../panelGeometry'
 import type { PanelBgStyle } from '../panelPatterns'
+import type { Panel } from '../panels'
 import type { NumberPadProjection, TableProjection } from '../surfaceTypes'
 import type { BubbleType } from './bubbleTypes'
 
@@ -11,7 +12,7 @@ import type { BubbleType } from './bubbleTypes'
 // layoutConfig.ts — which the editor overwrites whole — keeps naming exactly one module
 // for its types.
 export type { LayoutKind, PageGrids, PanelGrid } from '../panelGeometry'
-export type { PanelPage } from '../panels'
+export type { Panel, PanelPage } from '../panels'
 
 // Same bargain for chains: the renderer owns the behaviour (../bubbleChain.ts), the
 // editor owns the field on the bubble that joins one, and layoutConfig.ts imports both
@@ -161,9 +162,13 @@ export interface BubbleTransform {
 }
 
 /**
- * The editor's working document. Neither array is parallel to PANELS: each entry names
- * its own panel, so both are free-length and adding one is an append that has to line
- * up with nothing.
+ * The editor's working document. `panels` is the list everything else indexes into: the
+ * slots of the grid, in the order every grid's ring table and `patterns` follow. It is
+ * append-only in the editor — splitting a panel pushes the new half onto the end, so no
+ * picture, bubble or ring that names an existing panel has to be renumbered.
+ *
+ * Neither `images` nor `bubbles` is parallel to it: each entry names its own panel, so
+ * both are free-length and adding one is an append that has to line up with nothing.
  *
  * `chains` is derived rather than authored: its entries are exactly the ids the bubbles
  * carry, kept in step by `syncChains` after every edit — and those ids are themselves
@@ -177,11 +182,12 @@ export interface BubbleTransform {
  * picture framed for the landscape one has nothing to say about the portrait one. The
  * editor edits whichever grid the route and window it is open in draw.
  *
- * `patterns` is the other exception, and it *is* parallel to PANELS: a Ben-Day
+ * `patterns` is the other exception, and it *is* parallel to `panels`: a Ben-Day
  * background belongs to the panel slot itself, not to a picture or a bubble on it, so
- * entry `i` is the style drawn behind `PANELS[i]`.
+ * entry `i` is the style drawn behind `panels[i]`.
  */
 export interface EditorConfig {
+  panels: Panel[]
   images: ImgTransform[]
   bubbles: BubbleTransform[]
   chains: BubbleChain[]

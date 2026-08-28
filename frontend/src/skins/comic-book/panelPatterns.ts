@@ -9,8 +9,8 @@ import {
 // ─── Pattern style registry ──────────────────────────────────────────────────
 // The editable half of a panel background. Which style each panel *shows* is the
 // author's choice and lives in editor/layoutConfig.ts (PANEL_PATTERNS, parallel to
-// PANELS); this module owns the vocabulary of styles and the per-panel palette and
-// dot metrics that stay tuned whichever style is picked.
+// PANELS there); this module owns the vocabulary of styles and the per-panel palette
+// and dot metrics that stay tuned whichever style is picked.
 
 export type PanelBgStyle =
     | 'halftone-gradient'
@@ -70,7 +70,11 @@ export interface PanelBgConfig {
     cornerY?: number
 }
 
-/** Index-parallel to PANELS — a panel's tuning belongs to the slot, not a picture. */
+/**
+ * One tuning per shipped panel slot, in PANELS order — a panel's tuning belongs to the
+ * slot, not a picture. Read it through {@link panelBgConfig}: the editor can split a
+ * panel, and a panel past the end of this palette reuses it from the top.
+ */
 export const PANEL_BG_CONFIGS: PanelBgConfig[] = [
     // 0 logo — dense top-left fading bottom-right, warm yellow
     {
@@ -141,6 +145,16 @@ export const PANEL_BG_CONFIGS: PanelBgConfig[] = [
         focalX: 0.5, focalY: 0.45, rayCount: 20
     },
 ]
+
+/**
+ * The tuning for panel `i`, whatever `i` is. A panel the editor added by splitting
+ * has no entry of its own above, so the palette wraps: panel 12 draws with slot 0's
+ * colours, panel 13 with slot 1's, and so on.
+ */
+export function panelBgConfig(i: number): PanelBgConfig {
+    const n = PANEL_BG_CONFIGS.length
+    return PANEL_BG_CONFIGS[((i % n) + n) % n]
+}
 
 // ─── Dispatch ────────────────────────────────────────────────────────────────
 
