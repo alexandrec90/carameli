@@ -1,0 +1,175 @@
+import { describe, expect, it } from 'vitest'
+
+import { layoutViolations, violationLines } from '../../skins/comic-book/editor/configParity'
+import type { BubbleTransform, ImgTransform } from '../../skins/comic-book/editor/types'
+
+// A finished caption: it says something, it points at a speaker, and it answers both a
+// hover and a press. Every bubble case below is this one with a field taken away.
+const caption = (over: Partial<BubbleTransform> = {}): BubbleTransform => ({
+  panel: 1,
+  top: -35,
+  right: -12,
+  width: 55,
+  rotate: -5,
+  spill: true,
+  type: 'soft',
+  tail: 'down-left',
+  content: 'text',
+  text: 'Hello',
+  linkTo: null,
+  hoverType: 'cloud',
+  clickType: 'lightning',
+  chain: '',
+  ...over,
+})
+
+const picture = (over: Partial<ImgTransform> = {}): ImgTransform => ({
+  panel: 0,
+  src: '/comic-book/logo.webp',
+  alt: 'Carameli',
+  left: 0,
+  top: 0,
+  width: 100,
+  height: 100,
+  scale: 1,
+  offsetX: 0,
+  offsetY: 0,
+  anchor: 'center bottom',
+  spill: false,
+  ...over,
+})
+
+const of = (bubbles: BubbleTransform[], images: ImgTransform[] = []) =>
+  violationLines(layoutViolations({ images, bubbles }))
+
+describe('layoutViolations — a finished layout', () => {
+  it('finds nothing wrong with a caption that is done', () => {
+    expect(layoutViolations({ images: [picture()], bubbles: [caption()] })).toEqual([])
+  })
+})
+
+describe('layoutViolations — the state the editor drops on the page', () => {
+  // Verbatim from the balloons `+ Bubble` left behind in three separate worktrees: a
+  // placeholder caption with no tail and neither morph target chosen. This is the shape
+  // the whole module exists to name, so it is asserted as the literal it was found as
+  // rather than as a call to the factory above.
+  const placeholder: BubbleTransform = {
+    panel: 11, top: -20, right: 28, width: 27, rotate: -5, spill: true, type: 'soft',
+    tail: 'none', content: 'text', text: 'New bubble', linkTo: null,
+    hoverType: null, clickType: null, chain: '',
+  }
+
+  it('names the tail, the hover and the click, and nothing else', () => {
+    expect(of([placeholder])).toEqual([
+      'bubble 0 (“New bubble”) has no tail, so nothing on the page says who is speaking',
+      'bubble 0 (“New bubble”) has no hover shape, so it does not answer the pointer',
+      'bubble 0 (“New bubble”) has no click shape, so it does not answer a press',
+    ])
+  })
+
+  it('reports each unfinished balloon separately, so the count is the work left', () => {
+    expect(of([placeholder, placeholder, caption()])).toHaveLength(6)
+  })
+})
+
+describe('layoutViolations — captions', () => {
+  it('wants a tail on the first end of a linked pair but not the second', () => {
+    const pair = [
+      caption({ tail: 'none', linkTo: 1 }),
+      caption({ tail: 'none' }),
+    ]
+    expect(of(pair)).toEqual([
+      'bubble 0 (“Hello”) has no tail, so nothing on the page says who is speaking',
+    ])
+  })
+
+  it('wants a hover and a click shape distinct from the resting one', () => {
+    expect(of([caption({ hoverType: 'soft', clickType: 'soft' })])).toEqual([
+      'bubble 0 (“Hello”) morphs to its own resting shape on hover, which reads as nothing happening',
+      'bubble 0 (“Hello”) morphs to its own resting shape on click, which reads as nothing happening',
+    ])
+  })
+
+  it('wants something in a caption', () => {
+    expect(of([caption({ text: '' })])).toEqual(['bubble 0 is a caption with nothing to say'])
+  })
+})
+
+describe('layoutViolations — what is not a caption', () => {
+  // A field is placed where the art puts it and points at nothing; a chained balloon is a
+  // template the live thread stamps. Neither takes a tail or a morph target, so neither
+  // may be reported for going without one.
+  it('exempts a field from the tail and the morph targets', () => {
+    const field = caption({ content: 'phone', tail: 'none', hoverType: null, clickType: null })
+    expect(of([field])).toEqual([])
+  })
+
+  it('exempts a balloon in a chain from the same three', () => {
+    const member = caption({ chain: 'thread-1', tail: 'none', hoverType: null, clickType: null })
+    expect(of([member])).toEqual([])
+  })
+
+  it('still holds a field to the rules that are about drawing at all', () => {
+    expect(of([caption({ content: 'wheel', width: 0, panel: 99 })])).toEqual([
+      'bubble 0 (“Hello”) sits on panel 99, which is not one of the 12 panels',
+      'bubble 0 (“Hello”) has no width, so it draws nothing',
+    ])
+  })
+})
+
+describe('layoutViolations — links the renderer would drop', () => {
+  it('catches a self link', () => {
+    expect(of([caption({ linkTo: 0 })])).toEqual(['bubble 0 (“Hello”) is linked to itself'])
+  })
+
+  it('catches a link past the end of the array', () => {
+    expect(of([caption({ linkTo: 7 })])).toEqual([
+      'bubble 0 (“Hello”) is linked to bubble 7, which does not exist',
+    ])
+  })
+
+  // The tube never appears and nothing says why, which is the reason this is worth a
+  // violation rather than being left to the renderer to swallow.
+  it('catches a link across panels', () => {
+    expect(of([caption({ linkTo: 1 }), caption({ panel: 2 })])).toEqual([
+      'bubble 0 (“Hello”) is linked across panels to bubble 1, and no tube is drawn for that',
+    ])
+  })
+})
+
+describe('layoutViolations — pictures', () => {
+  it('catches a frame with no extent', () => {
+    expect(of([], [picture({ width: 0 })])).toEqual([
+      'picture 0 (/comic-book/logo.webp) has a frame with no extent, so none of it is on screen',
+    ])
+  })
+
+  it('catches a scale that draws nothing', () => {
+    expect(of([], [picture({ scale: 0 })])).toEqual([
+      'picture 0 (/comic-book/logo.webp) is scaled to 0, which draws nothing',
+    ])
+  })
+
+  it('catches art served from outside the skin’s own directory', () => {
+    expect(of([], [picture({ src: '/icons/icon-192.png' })])).toEqual([
+      'picture 0 (/icons/icon-192.png) is not served from /comic-book/',
+    ])
+  })
+
+  it('catches a picture carrying two projected surfaces', () => {
+    const both = picture({
+      table: { quad: [[0, 0], [1, 0], [1, 1], [0, 1]], rows: 4, header: true, fontScale: 0.5, ink: '#000', columns: [], data: [] },
+      numberPad: { quad: [[0, 0], [1, 0], [1, 1], [0, 1]], fontScale: 0.5, ink: '#000' },
+    })
+    expect(of([], [both])).toEqual([
+      'picture 0 (/comic-book/logo.webp) carries both a table and a number pad; a picture has one projected surface',
+    ])
+  })
+
+  it('reports pictures before bubbles, so the list reads down the page', () => {
+    expect(of([caption({ width: 0 })], [picture({ scale: 0 })])).toEqual([
+      'picture 0 (/comic-book/logo.webp) is scaled to 0, which draws nothing',
+      'bubble 0 (“Hello”) has no width, so it draws nothing',
+    ])
+  })
+})

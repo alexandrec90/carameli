@@ -34,6 +34,7 @@ import ComicPanel from '../../skins/comic-book/ComicPanel'
 import PanelInk from '../../skins/comic-book/PanelInk'
 import type { ImgTransform } from '../../skins/comic-book/editor/types'
 import type { Panel } from '../../skins/comic-book/panels'
+import { SKIN_CSS, cssRules } from './skinCss'
 import { idleSms } from './smsStub'
 
 // A slanted quad, like the real panel polygons — the gutters are not square, which is
@@ -187,25 +188,12 @@ describe("a picture's window is the panel's, translated", () => {
 })
 
 describe('the stylesheet gives a picture no border either', () => {
-  // Every stylesheet the skin ships, read as source. `import.meta.glob` rather than a
-  // hand-written list on purpose: a rule for a picture may be written in any file, and a
-  // list is a list someone forgets to add the eleventh stylesheet to. It also resolves
-  // at build time, so there is no `node:fs` and no `__dirname` to get past `lint:types`.
-  const CSS = import.meta.glob('../../skins/comic-book/**/*.css', {
-    query: '?raw',
-    import: 'default',
-    eager: true,
-  }) as Record<string, string>
-  const CSS_FILES = Object.keys(CSS).sort()
-
-  /** `selector { body }` pairs, comments stripped — a comment may say "border" freely. */
-  function rules(css: string): { selector: string; body: string }[] {
-    const bare = css.replace(/\/\*[\s\S]*?\*\//g, '')
-    return [...bare.matchAll(/([^{}]+)\{([^{}]*)\}/g)].map(m => ({
-      selector: m[1].trim(),
-      body: m[2],
-    }))
-  }
+  // Every stylesheet the skin ships, read as source — from disk, via `skinCss.ts`. This
+  // block used to glob them with `import.meta.glob(…, { query: '?raw' })`, which Vitest's
+  // default `css: false` stubs to the **empty string**: the file list was right, every
+  // rule assertion below ran against no content, and the whole describe had been green on
+  // nothing since it was written.
+  const CSS_FILES = Object.keys(SKIN_CSS).sort()
 
   /** A declaration that paints an edge — `none`/`0` is the absence of one, so it passes. */
   function paintsAnEdge(body: string): string[] {
@@ -214,17 +202,18 @@ describe('the stylesheet gives a picture no border either', () => {
       .map(m => `${m[1]}: ${m[2].trim()}`)
   }
 
-  // The glob is asserted non-empty first: an `it.each([])` is zero tests and a green run.
-  it('finds the skin\'s stylesheets', () => {
+  // Asserted non-empty first, contents and all: an `it.each([])` is zero tests and a green
+  // run, and a stylesheet that resolved to nothing is the same silence one level down.
+  it('finds the skin\'s stylesheets, with their contents', () => {
     expect(CSS_FILES.length).toBeGreaterThan(5)
     // Their *contents* too, which the count above does not cover: vitest stubs a CSS
     // request to an empty string unless the file is in `test.css.include`, and this file
     // was green on twelve empty strings for as long as it had existed.
-    expect(CSS_FILES.every(f => CSS[f].length > 0)).toBe(true)
+    expect(CSS_FILES.filter(f => SKIN_CSS[f].trim() === '')).toEqual([])
   })
 
   it.each(CSS_FILES)('%s styles no edge onto a picture', file => {
-    const offenders = rules(CSS[file])
+    const offenders = cssRules(SKIN_CSS[file])
       .filter(r => /\.cb-img-clip|\.cb-panel-img/.test(r.selector))
       .flatMap(r => paintsAnEdge(r.body).map(d => `${r.selector} { ${d} }`))
 
@@ -236,7 +225,7 @@ describe('the stylesheet gives a picture no border either', () => {
   // The parser is asserted against a rule that should fail, so a green run above means
   // "no such rule" rather than "the regex matched nothing".
   it('would catch a border added to the clip wrapper', () => {
-    const offenders = rules('.cb-img-clip { border: 5px solid #111111; }')
+    const offenders = cssRules('.cb-img-clip { border: 5px solid #111111; }')
       .filter(r => /\.cb-img-clip/.test(r.selector))
       .flatMap(r => paintsAnEdge(r.body))
 
