@@ -1,5 +1,28 @@
 import type { PanelBgStyle } from '../panelPatterns'
+import type { Panel } from '../panels'
 import type { ImgTransform, BubbleTransform, BubbleChain, PageGrids } from './types'
+
+// The panels themselves: the slots every grid is cut into, and nothing about what is
+// drawn inside them. Panel `i` is `PANELS[i]` everywhere — every grid's ring table,
+// PANEL_PATTERNS and the `panel` field of every picture and bubble index into this
+// list — and only the panels whose `page` matches the route carry a ring in that
+// page's grids; the rest hold an empty ring and render nothing. The editor appends to
+// it when a panel is split (shapes mode: select a panel, then split it), so a new
+// panel takes the next index and nothing that names an existing one has to move.
+export const PANELS: Panel[] = [
+  { label: 'Logo', isLogo: true, page: 'classic' },
+  { label: 'Switchboard', isLogo: false, page: 'classic' },
+  { label: 'Mailman 1', isLogo: false, page: 'classic' },
+  { label: 'Mechanic', isLogo: false, page: 'classic' },
+  { label: 'Receptionist', isLogo: false, page: 'classic' },
+  { label: 'Rolodex', isLogo: false, page: 'classic' },
+  { label: 'Rotary phone', isLogo: false, page: 'classic' },
+  { label: 'Mailman 2', isLogo: false, page: 'classic' },
+  { label: 'Logo 2', isLogo: true, page: 'home' },
+  { label: 'Notepad', isLogo: false, page: 'home' },
+  { label: 'Push-button phone', isLogo: false, page: 'home' },
+  { label: 'Conversation', isLogo: false, page: 'home' },
+]
 
 // Not parallel to PANELS: each picture names its `panel`, so a panel may own several or
 // none, and the array is ordered by panel only for readability. `src`/`alt` are the

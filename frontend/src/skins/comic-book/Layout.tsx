@@ -7,13 +7,13 @@ import ComicPanel from './ComicPanel'
 import { LoadingOverlay, useLoadingScreen } from './LoadingOverlay'
 import PanelInk from './PanelInk'
 import { gridPolys, layoutKindFor } from './panelGeometry'
-import { PANELS, pageForPath } from './panels'
+import { pageForPath } from './panels'
 import { softphoneActions } from './phoneActions'
 import { usePanelDots } from './usePanelDots'
 import { usePanelHover } from './usePanelHover'
 import {
     PANEL_BUBBLE_CHAINS, PANEL_IMG_TRANSFORMS, PANEL_BUBBLE_TRANSFORMS,
-    PANEL_GRIDS, PANEL_PATTERNS,
+    PANEL_GRIDS, PANEL_PATTERNS, PANELS,
 } from './editor/layoutConfig'
 import { shouldRevealImg, useEditorMode } from './editor/useEditorMode'
 import { useLiveTableImages } from './useLiveTableImages'
@@ -35,9 +35,10 @@ function accentForPath(path: string): string {
 }
 
 // ─── Panel contents ─────────────────────────────────────────────────────────
-// A panel is a slot in the grid and nothing more: its label, whether it is the logo,
-// where it navigates and which *page* it belongs to live in PANELS (./panels.ts),
-// index-parallel to the rings of every grid in PANEL_GRIDS. Each page's grid keeps a
+// A panel is a slot in the grid and nothing more: its label, whether it is the logo
+// and which *page* it belongs to live in PANELS (editor/layoutConfig.ts, typed by
+// ./panels.ts), index-parallel to the rings of every grid in PANEL_GRIDS — the editor
+// appends to both together when a panel is split. Each page's grid keeps a
 // ring for every panel, with an empty ring where the panel sits on the other page —
 // gridPolys hands those back with no vertices, and the sparse map below turns them
 // into null slots so nothing renders for them here.
@@ -76,6 +77,7 @@ export function Layout({ navItems, sms, softphone }: LayoutProps) {
     const chainT = editor.active ? editor.config.chains : PANEL_BUBBLE_CHAINS
     const grids = editor.active ? editor.config.grids : PANEL_GRIDS
     const patterns = editor.active ? editor.config.patterns : PANEL_PATTERNS
+    const panels = editor.active ? editor.config.panels : PANELS
 
     const settledCountRef = useRef(0)
 
@@ -120,7 +122,7 @@ export function Layout({ navItems, sms, softphone }: LayoutProps) {
     // One tick per picture element that has loaded or failed. Counted against the
     // number of pictures actually on *this page* — a picture on the other page never
     // mounts, so it never settles, and counting it would hold the loader up forever.
-    const imgCount = imgT.filter(t => PANELS[t.panel]?.page === page).length
+    const imgCount = imgT.filter(t => panels[t.panel]?.page === page).length
     const markSettled = useCallback(() => {
         settledCountRef.current += 1
         if (settledCountRef.current >= imgCount) setLoaded(true)
@@ -180,7 +182,7 @@ export function Layout({ navItems, sms, softphone }: LayoutProps) {
                     array is sparse: a null slot is a panel on the other page. */}
                 {panelPolys.map((poly, i) => {
                     if (!poly) return null
-                    const info = PANELS[i]
+                    const info = panels[i]
                     if (!info) return null
                     return (
                         <ComicPanel

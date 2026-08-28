@@ -1,13 +1,13 @@
 import { logger } from '../../../lib/logger'
 import { isTailDir } from '../bubbleBox'
 import { isBubbleContentKind } from '../bubbleContent'
-import { PANELS } from '../panels'
-import { isPanelBgStyle } from '../panelPatterns'
+import { isPanelBgStyle, PATTERN_STYLE_KEYS } from '../panelPatterns'
 import type { PanelBgStyle } from '../panelPatterns'
 import { isBubbleType } from './bubbleTypes'
 import { hydrateChains, normalizeChainId, propagateChains, syncChains } from './chainOps'
+import { isPanelList } from './configPanels'
 import { CONFIG_KEY, cloneGrids, NEW_BUBBLE, NEW_IMAGE, seedConfig } from './configSeed'
-import { PANEL_PATTERNS } from './layoutConfig'
+import { PANEL_PATTERNS, PANELS } from './layoutConfig'
 import { coerceNumberPad } from './numberPadValidate'
 import { isPageGrids } from './panelGridValidate'
 import { coerceTable } from './tableValidate'
@@ -97,22 +97,30 @@ function coerceBubbleEnums(b: BubbleTransform): BubbleTransform {
 /**
  * The pattern array a payload carries, coerced back to one style per panel slot.
  *
- * Parallel to PANELS, so the length is not the author's: a short array (saved before a
- * panel existed) backfills from the shipped defaults, a long one is cut, and a slot
- * naming a style that has since been retired — or was never one — falls back to its
- * shipped default rather than failing the draw. The style name is the whole entry, so
- * unlike a bubble there is nothing else to save around it.
+ * Parallel to the panel list, so the length is not the author's: it is `count` — the
+ * payload's own panel count once that has been settled, the shipped list's by default.
+ * A short array (saved before a panel existed) backfills from the shipped defaults, a
+ * long one is cut, and a slot naming a style that has since been retired — or was never
+ * one — falls back to its shipped default rather than failing the draw. A slot past the
+ * shipped list has no shipped default and takes the first registered style. The style
+ * name is the whole entry, so unlike a bubble there is nothing else to save around it.
  */
-export function normalizePatterns(raw: unknown): PanelBgStyle[] {
+export function normalizePatterns(raw: unknown, count: number = PANELS.length): PanelBgStyle[] {
   const list = Array.isArray(raw) ? raw : []
   const dropped: Record<number, unknown> = {}
-  const out = PANEL_PATTERNS.map((shipped, i) => {
+  const out: PanelBgStyle[] = []
+  for (let i = 0; i < count; i++) {
+    const shipped = PANEL_PATTERNS[i] ?? PATTERN_STYLE_KEYS[0]
     const candidate = list[i]
-    if (candidate === undefined) return shipped
-    if (isPanelBgStyle(candidate)) return candidate
-    dropped[i] = candidate
-    return shipped
-  })
+    if (candidate === undefined) {
+      out.push(shipped)
+    } else if (isPanelBgStyle(candidate)) {
+      out.push(candidate)
+    } else {
+      dropped[i] = candidate
+      out.push(shipped)
+    }
+  }
   if (Object.keys(dropped).length > 0) {
     logger.warn('Dropped retired comic-book pattern styles', { key: CONFIG_KEY, dropped })
   }
@@ -120,12 +128,13 @@ export function normalizePatterns(raw: unknown): PanelBgStyle[] {
 }
 
 /**
- * Pull an entry's `panel` back into the panel list. A panel index from an older
- * payload — or from a config hand-edited against a different grid — can outrun it, and
- * clamping beats an entry that renders nowhere and so cannot be selected to be fixed.
+ * Pull an entry's `panel` back into the panel list of `count` panels. A panel index
+ * from an older payload — or from a config hand-edited against a different grid — can
+ * outrun it, and clamping beats an entry that renders nowhere and so cannot be selected
+ * to be fixed.
  */
-function clampPanel<T extends { panel: number }>(entry: T): T {
-  return { ...entry, panel: Math.min(Math.max(entry.panel, 0), PANELS.length - 1) }
+function clampPanel<T extends { panel: number }>(entry: T, count: number): T {
+  return { ...entry, panel: Math.min(Math.max(entry.panel, 0), count - 1) }
 }
 
 /**
@@ -160,7 +169,20 @@ export function hydrateConfig(raw: string | null): EditorConfig {
     // that isn't there cannot be repaired into a page, only into a differently broken
     // one — so a payload that fails the structural guard falls back to the shipped
     // grids and the author's pictures and words survive around them.
+    //
+    // `panels` goes with the grids, together or not at all: every ring table is
+    // panels-length, so a list the grids do not match — one hand-edited without the
+    // other — cannot be repaired into a page either. A payload from before the list was
+    // saved has no `panels` and checks its grids against the shipped list, as it always
+    // did; one that has both keeps both, including any panel a split appended.
     const seed = seedConfig()
+    const savedPanels = isPanelList(parsed.panels)
+      ? parsed.panels.map(p => ({ label: p.label, isLogo: p.isLogo, page: p.page }))
+      : seed.panels
+    const savedGrids = isPageGrids(parsed.grids, savedPanels.length) ? cloneGrids(parsed.grids) : null
+    const panels = savedGrids ? savedPanels : seed.panels
+    const grids = savedGrids ?? seed.grids
+    const count = panels.length
     const bubbles = propagateChains(sanitizeLinks(
       parsed.bubbles.map(b =>
         // Cast because a persisted payload predates whatever fields were added since,
@@ -169,13 +191,14 @@ export function hydrateConfig(raw: string | null): EditorConfig {
         // retired, and merging over NEW_BUBBLE cannot catch one because the field is
         // present, just no longer meaningful.
         coerceBubbleEnums(
-          clampPanel({ panel: 0, ...NEW_BUBBLE, ...(b as Partial<BubbleTransform>) }),
+          clampPanel({ panel: 0, ...NEW_BUBBLE, ...(b as Partial<BubbleTransform>) }, count),
         ),
       ),
     ))
     return {
-      grids: isPageGrids(parsed.grids, PANELS.length) ? cloneGrids(parsed.grids) : seed.grids,
-      patterns: normalizePatterns(parsed.patterns),
+      panels,
+      grids,
+      patterns: normalizePatterns(parsed.patterns, count),
       images: parsed.images.map((t, i) => {
         // Typed as possibly-absent because the payload may be longer than the seed:
         // a ninth picture the author added has no shipped entry to recover from, and
@@ -186,7 +209,7 @@ export function hydrateConfig(raw: string | null): EditorConfig {
           ...NEW_IMAGE,
           ...shipped,
           ...(t as Partial<ImgTransform>),
-        })
+        }, count)
         // Projected content is nested, so a payload written before a field existed — or
         // with a cell that came back as a number — needs repair inside rather than a
         // whole-value merge. Each coercer returns undefined for the ordinary case of a

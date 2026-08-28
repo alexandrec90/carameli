@@ -7,6 +7,7 @@ import {
   PANEL_BUBBLE_TRANSFORMS,
   PANEL_GRIDS,
   PANEL_PATTERNS,
+  PANELS,
 } from './layoutConfig'
 import { cloneNumberPad } from './numberPadValidate'
 import { cloneTable } from './tableValidate'
@@ -112,6 +113,7 @@ export function cloneImg(t: ImgTransform): ImgTransform {
 /** Deep clone of the on-disk constants — the canonical "default" config. */
 export function seedConfig(): EditorConfig {
   return {
+    panels: PANELS.map(p => ({ ...p })),
     images: PANEL_IMG_TRANSFORMS.map(cloneImg),
     bubbles: PANEL_BUBBLE_TRANSFORMS.map(b => ({ ...b })),
     chains: PANEL_BUBBLE_CHAINS.map(cloneChain),
@@ -123,6 +125,7 @@ export function seedConfig(): EditorConfig {
 /** Deep clone of an arbitrary config (no shared references with the input). */
 export function cloneConfig(c: EditorConfig): EditorConfig {
   return {
+    panels: c.panels.map(p => ({ ...p })),
     images: c.images.map(cloneImg),
     bubbles: c.bubbles.map(b => ({ ...b })),
     chains: c.chains.map(cloneChain),
@@ -142,10 +145,25 @@ export function setGrid(config: EditorConfig, page: PanelPage, kind: LayoutKind,
 }
 
 /**
+ * The shipped grid for one page and breakpoint, with its ring table padded out to
+ * `count` panels. A working copy may hold panels the shipped file never had — every
+ * split appends one — and the shipped ring table stops at the shipped list, so handed
+ * back as-is it would be short of the working copy's panels, which the grid guard reads
+ * as torn. A panel added since gets an empty ring here: it is not on this breakpoint of
+ * this page until it is split into it again, exactly as a panel on the other page.
+ */
+export function shippedGridFor(page: PanelPage, kind: LayoutKind, count: number): PanelGrid {
+  const shipped = PANEL_GRIDS[page][kind]
+  const panels = shipped.panels.map(r => [...r])
+  while (panels.length < count) panels.push([])
+  return { vertices: shipped.vertices.map(([x, y]) => [x, y]), panels }
+}
+
+/**
  * Restore one page's grid for one breakpoint to the shipped default, returning a new
  * config. Per breakpoint rather than all three, because the author is looking at one
  * window shape and undoing the other two's shapes unseen is not what "reset" reads as.
  */
 export function resetGrid(config: EditorConfig, page: PanelPage, kind: LayoutKind): EditorConfig {
-  return setGrid(config, page, kind, PANEL_GRIDS[page][kind])
+  return setGrid(config, page, kind, shippedGridFor(page, kind, config.panels.length))
 }

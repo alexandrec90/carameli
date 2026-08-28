@@ -1,7 +1,6 @@
 import { TAIL_DIRS, TAIL_DIR_KEYS } from '../bubbleBox'
 import type { TailDir } from '../bubbleBox'
 import type { BubbleContentKind } from '../bubbleContent'
-import { PANELS } from '../panels'
 import { BUBBLE_TYPES, BUBBLE_TYPE_KEYS } from './bubbleTypes'
 import type { BubbleType } from './bubbleTypes'
 import { linkCandidates } from './configOps'
@@ -55,8 +54,8 @@ export default function BubbleInspector({ api, index, bubble }: BubbleInspectorP
           value={bubble.panel}
           onChange={e => api.setBubble(index, { panel: Number(e.target.value) })}
         >
-          {PANELS.map((p, i) => (
-            <option key={p.label} value={i}>{p.label}</option>
+          {api.config.panels.map((p, i) => (
+            <option key={i} value={i}>{p.label}</option>
           ))}
         </select>
       </label>
@@ -195,7 +194,7 @@ export default function BubbleInspector({ api, index, bubble }: BubbleInspectorP
       </label>
       {candidates.length === 0 && (
         <div className="cb-ed-hint">
-          Add a second bubble to {PANELS[bubble.panel]?.label ?? `panel ${bubble.panel}`}
+          Add a second bubble to {api.config.panels[bubble.panel]?.label ?? `panel ${bubble.panel}`}
           {' '}to link this one — a link joins two bubbles on the same panel.
         </div>
       )}

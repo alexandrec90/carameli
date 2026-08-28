@@ -22,7 +22,7 @@ import { describe, expect, it } from 'vitest'
 
 import { PANEL_ASSETS } from './src/skins/comic-book/editor/assets'
 import { PANEL_IMG_TRANSFORMS } from './src/skins/comic-book/editor/layoutConfig'
-import { PANELS } from './src/skins/comic-book/panels'
+import { PANELS } from './src/skins/comic-book/editor/layoutConfig'
 import { DEFAULT_SKIN, SKIN_NAMES } from './src/skins/registry'
 import {
   ASSETS_SRC_DIR,

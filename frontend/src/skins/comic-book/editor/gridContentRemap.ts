@@ -1,7 +1,6 @@
 import { gridPolys } from '../panelGeometry'
 import type { Rect } from '../panelGeometry'
-import { setGrid } from './configSeed'
-import { PANEL_GRIDS } from './layoutConfig'
+import { setGrid, shippedGridFor } from './configSeed'
 import type {
   BubbleTransform,
   EditorConfig,
@@ -159,5 +158,7 @@ export function resetGridKeepingContent(
   kind: LayoutKind,
   viewport: { w: number; h: number },
 ): EditorConfig {
-  return setGridKeepingContent(config, page, kind, PANEL_GRIDS[page][kind], viewport)
+  return setGridKeepingContent(
+    config, page, kind, shippedGridFor(page, kind, config.panels.length), viewport,
+  )
 }

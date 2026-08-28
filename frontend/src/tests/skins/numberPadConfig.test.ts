@@ -22,13 +22,15 @@ function reparseNumberPad(source: string): NumberPadProjection {
 
 function reparseConfig(source: string): EditorConfig {
   const body = source
+    .replace("import type { Panel } from '../panels'\n", '')
+    .replace(/export const PANELS: Panel\[\] =/, 'const panels =')
     .replace(/export const PANEL_IMG_TRANSFORMS: ImgTransform\[\] =/, 'const images =')
     .replace(/export const PANEL_BUBBLE_TRANSFORMS: BubbleTransform\[\] =/, 'const bubbles =')
     .replace(/export const PANEL_BUBBLE_CHAINS: BubbleChain\[\] =/, 'const chains =')
     .replace(/export const PANEL_PATTERNS: PanelBgStyle\[\] =/, 'const patterns =')
     .replace(/export const PANEL_GRIDS: PageGrids =/, 'const grids =')
   return new Function(
-    `${body}\nreturn { images, bubbles, chains, grids, patterns }`,
+    `${body}\nreturn { panels, images, bubbles, chains, grids, patterns }`,
   )() as EditorConfig
 }
 

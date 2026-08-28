@@ -1,8 +1,11 @@
 import { useCallback, useMemo, useState } from 'react'
 
+import { logger } from '../../../lib/logger'
 import { CONFIG_KEY, hydrateConfig, seedConfig } from './configOps'
+import { setPanelLabel as setPanelLabelIn, splitPanel as splitPanelIn } from './configPanels'
 import { clearStoredConfig, detectActive, persistConfig } from './editorStorage'
 import { resetGridKeepingContent, setGridKeepingContent } from './gridContentRemap'
+import type { CutAxis } from './panelGridCut'
 import type { EditMode, Selection, SelectionKind } from './selection'
 import { useContentEdits } from './useContentEdits'
 import type { ContentEdits } from './useContentEdits'
@@ -36,6 +39,15 @@ export interface EditorModeApi extends ContentEdits {
   setGridFor(page: PanelPage, kind: LayoutKind, grid: PanelGrid): void
   /** Restore one page's grid for one breakpoint to the shipped default, content held still. */
   resetGridFor(page: PanelPage, kind: LayoutKind): void
+  /**
+   * Cut `panel` in two through its middle — `across` for a panel above and one below,
+   * `down` for side by side — in every grid of its page, appending the new half to the
+   * panel list and selecting it. `kind` is the grid on screen, whose content is held
+   * still. Returns false, changing nothing, when the cut is refused (./configPanels.ts).
+   */
+  splitPanel(panel: number, axis: CutAxis, kind: LayoutKind): boolean
+  /** Rename one panel. */
+  setPanelLabel(panel: number, label: string): void
 }
 
 /**
@@ -123,6 +135,29 @@ export function useEditorMode(): EditorModeApi {
     [apply],
   )
 
+  // Computed against the rendered config rather than inside `apply`'s updater, because
+  // the caller needs the answer now — a refused cut is reported in the inspector, and a
+  // functional update cannot hand a boolean back out. Nothing else edits the config
+  // between a click and its handler, so the two are the same object.
+  const splitPanel = useCallback(
+    (panel: number, axis: CutAxis, kind: LayoutKind): boolean => {
+      const result = splitPanelIn(config, panel, axis, { kind, viewport: viewportSize() })
+      if (!result) {
+        logger.warn('Refused to split comic-book panel', { panel, axis })
+        return false
+      }
+      apply(() => result.config)
+      setSelected({ kind: 'panel', index: result.index })
+      return true
+    },
+    [apply, config],
+  )
+
+  const setPanelLabel = useCallback(
+    (panel: number, label: string) => apply(prev => setPanelLabelIn(prev, panel, label)),
+    [apply],
+  )
+
   const resetAll = useCallback(() => {
     // Drop the persisted override entirely so the next load re-seeds from the
     // constants (a true "back to source defaults"), then reflect that in state.
@@ -144,7 +179,12 @@ export function useEditorMode(): EditorModeApi {
       resetAll,
       setGridFor,
       resetGridFor,
+      splitPanel,
+      setPanelLabel,
     }),
-    [content, active, config, selected, mode, setMode, select, clear, resetAll, setGridFor, resetGridFor],
+    [
+      content, active, config, selected, mode, setMode, select, clear, resetAll,
+      setGridFor, resetGridFor, splitPanel, setPanelLabel,
+    ],
   )
 }

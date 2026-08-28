@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { PANEL_GRIDS } from '../../skins/comic-book/editor/layoutConfig'
+import { PANEL_GRIDS, PANELS } from '../../skins/comic-book/editor/layoutConfig'
 import {
   insertBend,
   isRemovableBend,
@@ -16,7 +16,7 @@ import {
 } from '../../skins/comic-book/editor/panelGridValidate'
 import { EDGE_MARGIN, frameRect, panelRing } from '../../skins/comic-book/panelGeometry'
 import type { LayoutKind, PanelGrid } from '../../skins/comic-book/panelGeometry'
-import { PANEL_PAGES, PANELS } from '../../skins/comic-book/panels'
+import { PANEL_PAGES } from '../../skins/comic-book/panels'
 
 // The grid edits behind every shape gesture. They are pure functions of a grid, which is
 // the point: the drag hook only decides *which* one a gesture means.

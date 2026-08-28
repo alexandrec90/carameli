@@ -1,4 +1,4 @@
-import type { NormPt, PanelGrid, Rect, VpPt } from '../panelGeometry'
+import type { NormPt, PanelGrid, Rect, VertexConstraint, VpPt } from '../panelGeometry'
 import { clampVertex, constraintOf, toViewport } from '../panelGeometry'
 
 // Every edit the shape editor makes to a {@link PanelGrid}, as pure functions. They live
@@ -139,15 +139,21 @@ export function moveVertices(grid: PanelGrid, indices: number[], dx: number, dy:
  * Repeat it and the seam becomes a lightning bolt — which is the whole feature, and why
  * a bend is a vertex like any other rather than a second kind of thing. It is dragged,
  * nudged and deleted by the same operations as a junction.
+ *
+ * A bend is `free` unless told otherwise: a seam between two panels is interior, so its
+ * corners are. The one caller that breaks a *frame* edge — a panel cut that runs out to
+ * the page edge — passes that edge's constraint, so the new vertex sits on the frame
+ * instead of a margin inside it.
  */
 export function insertBend(
   grid: PanelGrid,
   a: number,
   b: number,
   at: NormPt,
+  constraint: VertexConstraint = 'free',
 ): { grid: PanelGrid; index: number } {
   const index = grid.vertices.length
-  const vertices: NormPt[] = [...grid.vertices, clampVertex(at, 'free')]
+  const vertices: NormPt[] = [...grid.vertices, clampVertex(at, constraint)]
   const panels = grid.panels.map(ring => {
     const out: number[] = []
     for (let i = 0; i < ring.length; i++) {

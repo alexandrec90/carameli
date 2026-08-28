@@ -5,7 +5,6 @@ import { logger } from '../../../lib/logger'
 import type { LayoutKind, PanelPoly, Rect } from '../panelGeometry'
 import { frameRect } from '../panelGeometry'
 import type { PanelPage } from '../panels'
-import { PANELS } from '../panels'
 import { assetLabel } from './assets'
 import EditorToolbar from './EditorToolbar'
 import type { PageSelectProps } from './PageSelect'
@@ -21,7 +20,7 @@ import './editor-shapes.css'
 
 interface EditorOverlayProps {
   api: EditorModeApi
-  /** One entry per PANELS slot; null where the panel lives on the other page. */
+  /** One entry per panel slot; null where the panel lives on the other page. */
   panelPolys: (PanelPoly | null)[]
   /** Which page's grids this route is showing, so shape edits reach the right record. */
   page: PanelPage
@@ -45,9 +44,10 @@ function rectStyle(r: Rect): CSSProperties {
  * *Content* renders transparent per-panel click targets and a draggable selection
  * outline with resize/rotate/pan handles, for placing pictures and bubbles.
  *
- * *Panel shapes* puts those away and draws the grid itself: a handle on every line two
- * panels share and on every corner those lines meet at. The outer frame gets neither,
- * which is how it stays fixed — see PanelSeams.tsx.
+ * *Panel shapes* puts the picture and bubble targets away and draws the grid itself: a
+ * handle on every line two panels share and on every corner those lines meet at. The
+ * outer frame gets neither, which is how it stays fixed — see PanelSeams.tsx. The
+ * panel targets stay, under the seams, so a panel can be selected and cut in two.
  *
  * Both write through the same working copy, which Save POSTs to a dev-only Vite
  * middleware that rewrites editor/layoutConfig.ts on disk (see EditorToolbar.tsx).
@@ -105,27 +105,30 @@ export default function EditorOverlay({
         onClick={api.clear}
       />
 
-      {/* The content targets are not merely hidden in shapes mode, they are not rendered:
-          a panel-sized click target sitting over a seam would eat every drag aimed at the
-          line running through it. */}
+      {/* Per-panel click targets — the backdrop for everything drawn on a panel.
+          Selecting a panel is what "+ Image" and "+ Bubble" act on, and it is the only
+          way to reach a panel that has nothing on it yet. Rendered in both modes: in
+          shapes mode a selected panel is what the split buttons cut, and the targets
+          paint *before* the seam layer, so a seam or a corner running across one still
+          takes the pointer — only the space between the lines selects the panel. */}
+      {panelPolys.map((poly, i) =>
+        poly === null ? null : (
+          <button
+            key={i}
+            type="button"
+            className="cb-ed-target"
+            style={rectStyle(poly.bounds)}
+            aria-label={`Select ${config.panels[i]?.label ?? `panel ${i}`}`}
+            onClick={() => api.select('panel', i)}
+          />
+        ),
+      )}
+
+      {/* The picture and bubble targets are not merely hidden in shapes mode, they are
+          not rendered: a picture-sized click target sitting over a seam would eat every
+          drag aimed at the line running through it. */}
       {!shapeMode && (
         <>
-          {/* Per-panel click targets — the backdrop for everything drawn on a panel.
-              Selecting a panel is what "+ Image" and "+ Bubble" act on, and it is the only
-              way to reach a panel that has nothing on it yet. */}
-          {panelPolys.map((poly, i) =>
-            poly === null ? null : (
-              <button
-                key={i}
-                type="button"
-                className="cb-ed-target"
-                style={rectStyle(poly.bounds)}
-                aria-label={`Select ${PANELS[i]?.label ?? `panel ${i}`}`}
-                onClick={() => api.select('panel', i)}
-              />
-            ),
-          )}
-
           {/* One click target per picture, on the rectangle its pixels visibly occupy —
               the image, not the frame it hangs in. They paint after the panel targets so
               a picture wins the click where the two overlap. */}
@@ -138,7 +141,7 @@ export default function EditorOverlay({
                 type="button"
                 className="cb-ed-target cb-ed-target-img"
                 style={rectStyle(imgVisibleRect(poly.bounds, natSizes[img.src], img))}
-                aria-label={`Select ${assetLabel(img.src)} on ${PANELS[img.panel]?.label ?? `panel ${img.panel}`}`}
+                aria-label={`Select ${assetLabel(img.src)} on ${config.panels[img.panel]?.label ?? `panel ${img.panel}`}`}
                 onClick={() => api.select('img', i)}
               />
             )
@@ -156,7 +159,7 @@ export default function EditorOverlay({
                 type="button"
                 className="cb-ed-target cb-ed-target-bubble"
                 style={rectStyle(bubbleRect(poly.bounds, bubble))}
-                aria-label={`Select ${PANELS[bubble.panel]?.label ?? `panel ${bubble.panel}`} bubble ${i}`}
+                aria-label={`Select ${config.panels[bubble.panel]?.label ?? `panel ${bubble.panel}`} bubble ${i}`}
                 onClick={() => api.select('bubble', i)}
               />
             )
@@ -166,8 +169,8 @@ export default function EditorOverlay({
 
       {/* Selection outline. A picture or a bubble gets a draggable body plus handles;
           a selected *panel* is only ever outlined, because a panel is a slot in the
-          grid and there is nothing about it to drag. */}
-      {!shapeMode && selected?.kind === 'panel' && selectedRect && (
+          grid and there is nothing about it to drag — in either mode. */}
+      {selected?.kind === 'panel' && selectedRect && (
         <div className="cb-ed-outline cb-ed-outline-panel" style={rectStyle(selectedRect)} aria-hidden="true" />
       )}
       {!shapeMode && selected && selected.kind !== 'panel' && selectedRect && (

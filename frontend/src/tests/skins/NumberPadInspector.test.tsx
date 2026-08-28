@@ -8,7 +8,7 @@ import { newTable } from '../../skins/comic-book/editor/tableValidate'
 import type { EditorModeApi } from '../../skins/comic-book/editor/useEditorMode'
 
 function editorApi() {
-  return { setImg: vi.fn() } as unknown as EditorModeApi
+  return { config: seedConfig(), setImg: vi.fn() } as unknown as EditorModeApi
 }
 
 describe('number-pad image option', () => {

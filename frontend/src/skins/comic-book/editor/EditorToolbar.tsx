@@ -3,7 +3,6 @@ import { useState } from 'react'
 import { logger } from '../../../lib/logger'
 import type { LayoutKind, PanelGrid } from '../panelGeometry'
 import type { PanelPage } from '../panels'
-import { PANELS } from '../panels'
 import InspectorPanel from './InspectorPanel'
 import PageSelect from './PageSelect'
 import type { PageSelectProps } from './PageSelect'
@@ -198,7 +197,7 @@ export default function EditorToolbar({ api, selPanel, pageSelect, shapes }: Edi
             title={
               selPanel === null
                 ? 'Select a panel first'
-                : `Add a picture to ${PANELS[selPanel]?.label ?? `panel ${selPanel}`}`
+                : `Add a picture to ${api.config.panels[selPanel]?.label ?? `panel ${selPanel}`}`
             }
             onClick={() => selPanel !== null && api.addImgOn(selPanel)}
           >
@@ -211,7 +210,7 @@ export default function EditorToolbar({ api, selPanel, pageSelect, shapes }: Edi
             title={
               selPanel === null
                 ? 'Select a panel first'
-                : `Add a bubble to ${PANELS[selPanel]?.label ?? `panel ${selPanel}`}`
+                : `Add a bubble to ${api.config.panels[selPanel]?.label ?? `panel ${selPanel}`}`
             }
             onClick={() => selPanel !== null && api.addBubbleOn(selPanel)}
           >
