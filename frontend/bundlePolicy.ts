@@ -98,8 +98,14 @@ export const MAX_LAZY_CHUNK_BYTES = 260 * 1024
  */
 export const MAX_TOTAL_JS_BYTES = 955 * 1024
 
-/** Every `.css` file in `dist/assets/`, summed. Today 38 KB across 2 files. */
-export const MAX_TOTAL_CSS_BYTES = 44 * 1024
+/**
+ * Every `.css` file in `dist/assets/`, summed. Today 44.2 KB across 2 files.
+ *
+ * This raise (44 → 45) is the chain's typing-dots row — the bounce, its stagger, and the
+ * reduced-motion pulse that replaces it. The build was already within 0.3 KB of the
+ * ceiling before those rules, so most of the headroom this buys is theirs only on paper.
+ */
+export const MAX_TOTAL_CSS_BYTES = 45 * 1024
 
 /**
  * Every webfont in `dist/assets/`, summed. Today 231 KB: five weights of Outfit, each

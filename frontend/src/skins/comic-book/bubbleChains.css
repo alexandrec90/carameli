@@ -108,10 +108,55 @@
   text-decoration: line-through;
 }
 
+/* The peer mid-composition: three dots bouncing in turn where their words will be, the
+ * way a phone draws it. Round on purpose — the skin's straight-edge rule is about panels
+ * and cards, and these are pen dots, like the thought bubble's own puffs. The stagger is
+ * two nth-child delays rather than three animations; negative would start mid-bounce,
+ * and a forward delay reads as the dots taking turns, which is the familiar cadence.
+ */
+.cb-typing {
+  display: inline-flex;
+  gap: 0.3em;
+  align-items: center;
+}
+
+.cb-typing-dot {
+  width: 0.5em;
+  height: 0.5em;
+  border-radius: 50%;
+  background: #111;
+  animation: cb-typing-bounce 900ms ease-in-out infinite;
+}
+
+.cb-typing-dot:nth-child(2) {
+  animation-delay: 150ms;
+}
+
+.cb-typing-dot:nth-child(3) {
+  animation-delay: 300ms;
+}
+
+@keyframes cb-typing-bounce {
+  0%,
+  60%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.35;
+  }
+
+  30% {
+    transform: translateY(-0.3em);
+    opacity: 1;
+  }
+}
+
 /* Reduced motion: the conversation still grows and still scrolls — that is content arriving,
  * not decoration — but it does so by appearing rather than by travelling. The opacity
  * fade is kept: it is what distinguishes a new message from one that was always there,
  * and it moves nothing.
+ *
+ * The typing dots keep pulsing in place: "the peer is composing" is information with no
+ * other channel, and an opacity pulse carries it without motion.
  */
 @media (prefers-reduced-motion: reduce) {
   .cb-chain-bubble {
@@ -120,5 +165,21 @@
 
   .cb-chain-bubble.is-visible {
     animation: none;
+  }
+
+  .cb-typing-dot {
+    animation-name: cb-typing-pulse;
+  }
+}
+
+@keyframes cb-typing-pulse {
+  0%,
+  60%,
+  100% {
+    opacity: 0.35;
+  }
+
+  30% {
+    opacity: 1;
   }
 }
