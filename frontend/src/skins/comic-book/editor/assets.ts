@@ -21,9 +21,7 @@ export const PANEL_ASSETS: PanelAsset[] = [
   { src: '/comic-book/rotary%20phone.webp', label: 'Rotary phone' },
   { src: '/comic-book/mailman2.webp', label: 'Post office' },
   { src: '/comic-book/logo2.webp', label: 'Carameli logo 2' },
-  { src: '/comic-book/notepad.webp', label: 'Notepad' },
   { src: '/comic-book/push-button-phone.webp', label: 'Push-button phone' },
-  { src: '/comic-book/man-woman-talking.webp', label: 'Phone conversation' },
   { src: '/comic-book/conversation.webp', label: 'Two agents talking' },
   { src: '/comic-book/hand-notepad.webp', label: 'Hand with notepad' },
   { src: '/comic-book/call-button.webp', label: 'Call button' },
@@ -41,6 +39,9 @@ export const PANEL_ASSETS: PanelAsset[] = [
   { src: '/comic-book/click.webp', label: 'Click' },
   { src: '/comic-book/pointer.webp', label: 'Pointer' },
   { src: '/comic-book/wait.webp', label: 'Wait' },
+  { src: '/comic-book/cheating-man.webp', label: 'Cheating man' },
+  { src: '/comic-book/despondent-wife.webp', label: 'Despondent wife' },
+  { src: '/comic-book/ringing-phone.webp', label: 'Ringing phone' },
 ]
 
 /**

@@ -150,6 +150,11 @@ export default function ComicPanel({
 
     return (
         <div
+            // The index, readable from the DOM, is what lets usePanelHover measure
+            // this panel's drawn balloons: the hover follows their outlines, not
+            // their boxes, and a chain's rows stand where no transform says they
+            // do — so the hit test asks the elements.
+            data-cb-panel={index}
             className={[
                 'cb-panel',
                 info.isLogo ? 'logo' : '',
@@ -160,6 +165,11 @@ export default function ComicPanel({
                 // of the ink stroking its polygon and the border would read as thinner
                 // under the pointer.
                 !editorActive && hovered ? 'cb-panel-lift' : '',
+                // Colorize (dots and pictures — see comic-book.css). A class rather
+                // than :hover: the elements are overlapping bounding rectangles, so
+                // CSS :hover lights whichever one stacks higher, not the panel the
+                // geometric hit test says the pointer is on.
+                hovered ? 'cb-panel-hot' : '',
             ].filter(Boolean).join(' ')}
             style={{
                 position: 'absolute',

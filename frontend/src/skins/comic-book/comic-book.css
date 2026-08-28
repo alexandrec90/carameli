@@ -68,8 +68,10 @@
   transition: filter 200ms ease-out;
 }
 
-/* On hover the dots colorize, mirroring the image reveal */
-.cb-panel:hover .cb-dots-panel-canvas {
+/* On hover the dots colorize, mirroring the image reveal. cb-panel-hot, not :hover:
+   hover is decided by the geometric hit test (usePanelHover), and the element under
+   the pointer is a bounding rectangle that may belong to a different panel. */
+.cb-panel-hot .cb-dots-panel-canvas {
   filter: none;
 }
 
@@ -183,8 +185,8 @@
   transition: filter 200ms ease-out, opacity 200ms ease-out;
 }
 
-/* All panels colorize on hover */
-.cb-panel:hover .cb-panel-img {
+/* All panels colorize on hover — the class for the reason the dots rule gives */
+.cb-panel-hot .cb-panel-img {
   filter: none;
 }
 

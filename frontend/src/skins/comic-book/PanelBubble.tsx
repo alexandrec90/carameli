@@ -223,7 +223,9 @@ export default function PanelBubble({
         {/* The hit region: unpainted, never morphs, and — with a real input, the only
             other thing here that takes a pointer — all a hover or a press can land on.
             `all` rather than `visiblePainted` because it has no paint to be visible;
-            see hitRingPoints for what it covers and why it is a shape per state. */}
+            see hitRingPoints for what it covers and why it is a shape per state. The
+            panel hover reads this same group (usePanelHover), so a spilled balloon
+            keeps its panel lit over exactly the region that answers to the pointer. */}
         <g className="cb-bubble-hit" pointerEvents={hitPointerEvents}>
           {hitShapes.map(t => (
             <path key={t} d={pathD(hitRingPoints(t, bubble.tail))} />
