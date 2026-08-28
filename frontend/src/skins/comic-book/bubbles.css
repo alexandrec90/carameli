@@ -99,7 +99,9 @@
    pointer-events: all an element is still a target over its interior "regardless of
    the value of the fill, stroke and visibility properties", which is exactly the
    trade wanted here: a hit target with no ink of its own. Whether it is live at all
-   is PanelBubble's inline pointer-events, so nothing here may set that property. */
+   is PanelBubble's inline pointer-events, so nothing here may set that property.
+   usePanelHover measures this group's geometry too, so it is also the exact region
+   over which a spilled balloon keeps its panel hovered. */
 .cb-bubble-hit {
   fill: none;
   stroke: none;

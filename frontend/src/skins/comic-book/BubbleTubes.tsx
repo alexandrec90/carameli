@@ -13,6 +13,8 @@ interface BubbleTubesProps {
 
 interface Tube {
   key: string
+  /** The panel both ends sit on — the hover hit test reads it off the element. */
+  panel: number
   geo: TubeGeometry
   visible: boolean
 }
@@ -39,7 +41,11 @@ export default function BubbleTubes({ polys, bubbles, isVisible }: BubbleTubesPr
       bubbleRect(poly.bounds, bubbles[i]),
       bubbleRect(poly.bounds, bubbles[j]),
     )
-    if (geo) acc.push({ key: `${i}-${j}`, geo, visible: isVisible(i) && isVisible(j) })
+    if (geo) {
+      acc.push({
+        key: `${i}-${j}`, panel: bubbles[i].panel, geo, visible: isVisible(i) && isVisible(j),
+      })
+    }
     return acc
   }, [])
 
@@ -48,7 +54,14 @@ export default function BubbleTubes({ polys, bubbles, isVisible }: BubbleTubesPr
   return (
     <svg className="cb-tube-svg" aria-hidden="true">
       {tubes.map(t => (
-        <g key={t.key} className={`cb-tube${t.visible ? ' is-visible' : ''}`}>
+        // The panel index, readable from the DOM, is what lets usePanelHover count a
+        // visible tube as its panel's ink: a corridor through the gutter keeps the
+        // hover exactly as the balloons it joins do.
+        <g
+          key={t.key}
+          className={`cb-tube${t.visible ? ' is-visible' : ''}`}
+          data-cb-panel={t.panel}
+        >
           <path className="cb-tube-fill" d={t.geo.fill} />
           {t.geo.rails.map((d, r) => (
             <path key={r} className="cb-tube-rail" d={d} />

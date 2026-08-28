@@ -113,7 +113,7 @@ export function Layout({ navItems, sms, softphone }: LayoutProps) {
     // and needs the same answer, which CSS cannot hand it — and off the panel elements
     // entirely, because those are overlapping bounding rectangles and the browser's
     // hit-testing answered for the rectangles, not the polygons (see panelHover.ts).
-    const hovered = usePanelHover(panelPolys, imgT, bubbleT, natSizes)
+    const hovered = usePanelHover(panelPolys, imgT, natSizes)
     const bubbleVisible = (i: number): boolean =>
         isBubbleRevealed(bubbleT, hovered, editor.active, i)
 

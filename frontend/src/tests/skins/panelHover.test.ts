@@ -1,8 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
-import { BUBBLE_ASPECT } from '../../skins/comic-book/bubbleBox'
 import { hoveredPanelAt, pointInPolygon } from '../../skins/comic-book/panelHover'
-import type { BubbleTransform, ImgTransform } from '../../skins/comic-book/editor/types'
+import type { ImgTransform } from '../../skins/comic-book/editor/types'
 import type { PanelPoly } from '../../skins/comic-book/panelGeometry'
 
 // Two panels either side of a slanted seam. Panel 0's bounding rectangle reaches
@@ -28,25 +27,18 @@ const img = (over: Partial<ImgTransform>): ImgTransform => ({
   scale: 1, offsetX: 0, offsetY: 0, anchor: 'center center', spill: false, ...over,
 })
 
-const bub = (over: Partial<BubbleTransform>): BubbleTransform => ({
-  panel: 0, top: 0, right: 0, width: 40, rotate: 0, spill: true, type: 'soft',
-  tail: 'none', content: 'text', text: '', linkTo: null, hoverType: null,
-  clickType: null, chain: '', ...over,
-})
-
 const at = (
   x: number,
   y: number,
   over: {
     images?: ImgTransform[]
-    bubbles?: BubbleTransform[]
     natSizes?: Record<string, { w: number; h: number }>
     current?: number | null
+    overInk?: (x: number, y: number, panel: number) => boolean
   } = {},
 ): number | null =>
   hoveredPanelAt(
-    x, y, POLYS,
-    over.images ?? [], over.bubbles ?? [], over.natSizes ?? {}, over.current ?? null,
+    x, y, POLYS, over.images ?? [], over.natSizes ?? {}, over.current ?? null, over.overInk,
   )
 
 describe('pointInPolygon', () => {
@@ -72,53 +64,34 @@ describe('hoveredPanelAt', () => {
   })
 
   it('skips null slots (panels on the other page)', () => {
-    expect(hoveredPanelAt(30, 50, [null, POLYS[1]], [], [], {}, null)).toBeNull()
+    expect(hoveredPanelAt(30, 50, [null, POLYS[1]], [], {}, null)).toBeNull()
   })
 
-  describe('a spilled bubble of the hovered panel', () => {
-    // right: -20 hangs the balloon past panel 0's right edge: its box runs
-    // x 80..120, y 10..10+40·aspect — over the seam and into panel 1's polygon.
-    const bubbles = [bub({ top: 10, right: -20, width: 40 })]
-    const inBubble: [number, number] = [110, 10 + (40 * BUBBLE_ASPECT) / 2]
-
-    it('keeps the hover while the pointer rides it over the seam', () => {
-      expect(at(...inBubble, { bubbles, current: 0 })).toBe(0)
-    })
-
-    it('does not grab the hover while its panel is not the hovered one', () => {
-      // Not hovered means not revealed: invisible ink must not take the pointer.
-      expect(at(...inBubble, { bubbles, current: null })).toBe(1)
-      expect(at(...inBubble, { bubbles, current: 1 })).toBe(1)
-    })
-
-    it('does not stick without spill — the clip hides it past the seam', () => {
-      const clipped = [bub({ top: 10, right: -20, width: 40, spill: false })]
-      expect(at(...inBubble, { bubbles: clipped, current: 0 })).toBe(1)
-    })
-
-    it('does not stick for a chain member — a template is never drawn where it stands', () => {
-      // The chain stamps rows elsewhere (bubbleChain.ts); keeping the hover on the
-      // template's empty box left the neighbour lit under a visible conversation.
-      const chained = [bub({ top: 10, right: -20, width: 40, chain: 'chain-1' })]
-      expect(at(...inBubble, { bubbles: chained, current: 0 })).toBe(1)
-    })
-  })
-
-  describe('the overInk probe (the renderer answering for drawn chain rows)', () => {
+  describe('the overInk probe (the renderer answering for drawn balloons)', () => {
+    // Balloons have no rectangle test here at all: the only thing that keeps a hover
+    // past the seam is the outline the renderer actually drew, which usePanelHover
+    // measures. Modelled as ink covering x 80..120, y 10..40 of panel 0.
     const overInk = (x: number, y: number, panel: number): boolean =>
       panel === 0 && x >= 80 && x <= 120 && y >= 10 && y <= 40
 
     it('keeps the hover on ink the probe vouches for', () => {
-      expect(hoveredPanelAt(110, 20, POLYS, [], [], {}, 0, overInk)).toBe(0)
+      expect(at(110, 20, { current: 0, overInk })).toBe(0)
     })
 
     it('asks only about the hovered panel — hidden ink cannot grab the pointer', () => {
-      expect(hoveredPanelAt(110, 20, POLYS, [], [], {}, 1, overInk)).toBe(1)
-      expect(hoveredPanelAt(110, 20, POLYS, [], [], {}, null, overInk)).toBe(1)
+      expect(at(110, 20, { current: 1, overInk })).toBe(1)
+      expect(at(110, 20, { current: null, overInk })).toBe(1)
     })
 
-    it('releases the hover where the probe finds nothing', () => {
-      expect(hoveredPanelAt(150, 80, POLYS, [], [], {}, 0, overInk)).toBe(1)
+    it('releases the hover the moment the probe finds nothing under the point', () => {
+      // One pixel past the ink, still where a balloon's box would be.
+      expect(at(121, 20, { current: 0, overInk })).toBe(1)
+      expect(at(110, 41, { current: 0, overInk })).toBe(1)
+      expect(at(150, 80, { current: 0, overInk })).toBe(1)
+    })
+
+    it('falls back to the polygons without a probe', () => {
+      expect(at(110, 20, { current: 0 })).toBe(1)
     })
   })
 

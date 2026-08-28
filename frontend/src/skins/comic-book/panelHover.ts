@@ -12,9 +12,17 @@
 // is drawn past its panel's edge, so the pointer can sit on panel 1's ink while
 // standing inside panel 2's polygon — and it is panel 1 that must light, because
 // panel 1's ink is what is being pointed at.
+//
+// The same rule holds for the ink itself: a balloon is its outline, not its box. The
+// element a balloon is drawn in is a rectangle around an ellipse, a tail and (for a
+// thought bubble) a trail of puffs, and most of that rectangle is empty. A hover that
+// treated the rectangle as the balloon kept the neighbour dark with the pointer
+// visibly on its ground — so this module never tests a balloon's rectangle at all.
+// Balloons are answered for by `overInk`, the renderer's own measurement of what it
+// drew (see usePanelHover.ts).
 
-import { bubbleRect, imgRect, renderedImgRect } from './editor/transforms'
-import type { BubbleTransform, ImgTransform } from './editor/types'
+import { imgRect, renderedImgRect } from './editor/transforms'
+import type { ImgTransform } from './editor/types'
 import type { PanelPoly, Rect, VpPt } from './panelGeometry'
 
 /** Natural image sizes by src, as Layout records them (absent until loaded). */
@@ -54,10 +62,15 @@ function spillImgRect(bounds: Rect, t: ImgTransform, natSizes: NatSizes): Rect {
  *
  * Three questions, in the order the ink stacks:
  *
- * 1. **The hovered panel's own spill keeps the hover.** Its balloons are revealed and
- *    its lift puts them (and its spilled pictures) above every neighbour, so a pointer
- *    that follows a balloon over the seam is still pointing at this panel — it does not
- *    flick to the panel whose polygon happens to lie underneath.
+ * 1. **The hovered panel's own drawn ink keeps the hover.** Its balloons are revealed
+ *    and its lift puts them (and its spilled pictures) above every neighbour, so a
+ *    pointer that follows a balloon over the seam is still pointing at this panel — it
+ *    does not flick to the panel whose polygon happens to lie underneath. `overInk`
+ *    is the balloon half of that question: whether the point is on the outline of a
+ *    balloon (or a connector tube) panel `current` has actually drawn, measured off
+ *    the rendered SVG so it is exact for every balloon — the ones placed by their
+ *    transforms and the rows a chain stamps at positions only the renderer knows.
+ *    The moment the pointer leaves that outline, the hover is decided afresh below.
  * 2. **Any spilled picture claims its owner.** Pictures are visible whether or not
  *    their panel is lit, so ink hanging over a neighbour belongs to the panel that drew
  *    it. Later entries win ties, matching paint order.
@@ -67,34 +80,24 @@ function spillImgRect(bounds: Rect, t: ImgTransform, natSizes: NatSizes): Rect {
  * Balloons of panels *not hovered* are hidden, which is why step 1 asks only about
  * `current`: invisible ink must not grab the pointer. A balloon without `spill` is
  * clipped to its polygon, so the polygon test already answers for every part of it a
- * reader can see.
- *
- * A balloon naming a `chain` is a *template*, never drawn where it stands: the chain
- * stamps rows stacked up the panel from it (see bubbleChain.ts), and where those rows
- * are depends on state only the renderer has — the transcript, the scroll position,
- * the measured panel aspect. So chain members are excluded from the box test here and
- * `overInk` answers for them instead: usePanelHover passes a probe that measures the
- * balloons actually on screen, which is exact where this module could only guess.
+ * reader can see — the probe skips those too.
  */
 export function hoveredPanelAt(
   x: number,
   y: number,
   polys: (PanelPoly | null)[],
   images: ImgTransform[],
-  bubbles: BubbleTransform[],
   natSizes: NatSizes,
   current: number | null,
   overInk?: (x: number, y: number, panel: number) => boolean,
 ): number | null {
   const cur = current == null ? null : polys[current]
   if (current != null && cur) {
-    const overOwnSpill =
-      bubbles.some(b =>
-        b.panel === current && b.spill && !b.chain && inRect(x, y, bubbleRect(cur.bounds, b))) ||
+    const overOwnInk =
+      (overInk?.(x, y, current) ?? false) ||
       images.some(t =>
-        t.panel === current && t.spill && inRect(x, y, spillImgRect(cur.bounds, t, natSizes))) ||
-      (overInk?.(x, y, current) ?? false)
-    if (overOwnSpill) return current
+        t.panel === current && t.spill && inRect(x, y, spillImgRect(cur.bounds, t, natSizes)))
+    if (overOwnInk) return current
   }
   for (let k = images.length - 1; k >= 0; k--) {
     const t = images[k]

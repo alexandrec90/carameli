@@ -147,8 +147,9 @@ export default function ComicPanel({
     return (
         <div
             // The index, readable from the DOM, is what lets usePanelHover measure
-            // this panel's drawn balloons — a chain's rows stand where no transform
-            // says they do, so the hit test asks the elements.
+            // this panel's drawn balloons: the hover follows their outlines, not
+            // their boxes, and a chain's rows stand where no transform says they
+            // do — so the hit test asks the elements.
             data-cb-panel={index}
             className={[
                 'cb-panel',
