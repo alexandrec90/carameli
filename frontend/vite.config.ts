@@ -187,13 +187,6 @@ export default defineConfig(({ mode }) => {
       // would make a plain `npm run test:run` red on any tree nobody has built. So it
       // is excluded here and reached through `npm run test:bundle`, which builds first.
       exclude: [...configDefaults.exclude, '**/bundlePolicy.test.ts'],
-      // The stylesheet-contract tests (panelHover, comicBookImageBorders) read the
-      // skin's CSS as text through `?raw` globs. Vitest's default CSS handling stubs
-      // every CSS module to an empty string — `?raw` included — which turns a
-      // "the stylesheet must (not) say X" assertion into one that reads ''. Opting
-      // the skin's stylesheets in lets those imports carry the real source; all
-      // other CSS keeps the cheap empty stub.
-      css: { include: [/skins\/comic-book\/.*\.css/] },
       // Pin the API base to empty so URL assertions stay hermetic regardless of
       // any ambient VITE_API_BASE_URL in the shell/CI. The app talks to the
       // backend through the dev-server proxy (relative paths), so '' is correct.

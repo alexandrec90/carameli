@@ -18,7 +18,7 @@ const POLYS: (PanelPoly | null)[] = [
 const bub = (over: Partial<BubbleTransform>): BubbleTransform => ({
   panel: 1, top: 10, right: 0, width: 20, rotate: 0, spill: true, type: 'soft',
   tail: 'none', content: 'text', text: '', linkTo: null, hoverType: null,
-  clickType: null, chain: '', ...over,
+  clickType: null, hoverBold: false, chain: '', ...over,
 })
 
 const LINKED = [bub({ right: 70, linkTo: 1 }), bub({ right: 0 })]
