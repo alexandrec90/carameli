@@ -68,16 +68,6 @@
       var FONTS =
         'https://fonts.googleapis.com/css2?family=Bangers&family=Boogaloo&family=Permanent+Marker&display=swap';
 
-      // One closure per file: the handlers have to name the URL that settled, and a
-      // `var` in the loop below would hand every one of them the last URL instead.
-      function fetchArt(art, url) {
-        var img = new Image();
-        img.onload = function () { art.settled[url] = Math.round(performance.now()); };
-        img.onerror = function () { art.failed.push(url); };
-        img.src = url;
-        return img;
-      }
-
       var stored = null;
       // Safari in private mode throws on localStorage rather than returning null.
       try { stored = localStorage.getItem('skin'); } catch (e) { stored = null; }
@@ -94,17 +84,14 @@
       // after the browser had given up on it. An Image is its own consumer, so there
       // is nothing left to claim, and holding the objects keeps the bytes in the
       // memory cache for the <img> that follows.
-      //
-      // `window.__carameliArt` is what `src/lib/artPreload.ts` audits once the page
-      // has settled. Art still undrawn by then is a PANELS list that has drifted from
-      // what the page draws — the defect the console warning could not tell apart
-      // from a slow dev boot, and the reason it was worth keeping a signal at all.
-      var page = location.pathname === '/' ? 'home' : 'classic';
-      var list = PANELS[page];
-      var art = { page: page, urls: list.slice(), images: [], settled: {}, failed: [] };
-      window.__carameliArt = art;
+      // The asset policy proves this list matches the pictures the page draws and
+      // that every file exists, so no runtime audit has to ship to each visitor.
+      var list = PANELS[location.pathname === '/' ? 'home' : 'classic'];
+      window.__carameliArt = [];
       for (var i = 0; i < list.length; i++) {
-        art.images.push(fetchArt(art, list[i]));
+        var image = new Image();
+        image.src = list[i];
+        window.__carameliArt.push(image);
       }
 
       var fonts = document.createElement('link');

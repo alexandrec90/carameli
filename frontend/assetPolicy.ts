@@ -464,9 +464,9 @@ export function listReferenceSources(root: string = FRONTEND_ROOT): string[] {
  * draws it, by an inline script rather than by tags written out here — and a check
  * that read only static tags would have gone from measuring eight images to measuring
  * none the moment that guard landed, reporting a critical path of 0 KB as comfortably
- * inside budget. The guard's own spelling is `new Image()` rather than a `<link>`, for
- * the reason `src/lib/artPreload.ts` gives; it is read out of its `PANELS` list, so
- * which of the two it uses does not change what is counted here.
+ * inside budget. The guard's own spelling is `new Image()` rather than a `<link>` to
+ * avoid Chrome's unused-preload warning; it is read out of its `PANELS` list, so which
+ * of the two it uses does not change what is counted here.
  */
 export function findPreloadedImages(html: string): string[] {
   const out: string[] = []
