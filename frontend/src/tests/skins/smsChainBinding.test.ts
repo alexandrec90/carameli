@@ -83,6 +83,10 @@ describe('peerPickerOn', () => {
     expect(peerPickerOn([b(0, '', 'text'), b(0, '', 'dial')], 0)).toBe(1)
   })
 
+  it('finds a dial carrying a call key, which names a counterparty the same way', () => {
+    expect(peerPickerOn([b(0, '', 'text'), b(0, '', 'dial-call')], 0)).toBe(1)
+  })
+
   it('is -1 on a panel that has no picker', () => {
     expect(peerPickerOn([b(0, '', 'text')], 0)).toBe(-1)
   })

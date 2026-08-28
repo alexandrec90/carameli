@@ -14,6 +14,7 @@ import BubbleDial from './BubbleDial'
 import BubbleInput from './BubbleInput'
 import BubbleTypingDots from './BubbleTypingDots'
 import BubbleWheel from './BubbleWheel'
+import { isDialContent } from './bubbleContent'
 import { dialOptions } from './dialPicker'
 import { BUBBLE_TYPES } from './editor/bubbleTypes'
 import { bubbleStyle } from './editor/transforms'
@@ -149,11 +150,13 @@ export default function PanelBubble({
   const font = BUBBLE_TYPES[shape].font
   const editableKind =
     bubble.content === 'input' || bubble.content === 'phone' ? bubble.content : null
+  // Either dial kind — they differ only by the call key, which changes nothing about how
+  // the balloon is placed, revealed, or given the keyboard (see isDialContent).
+  const dial = isDialContent(bubble.content)
   // Every kind that puts a real form control in the balloon, which is the question the
   // wrapper's aria and focus handling actually asks — a dial has one too, and so do the
   // action buttons.
-  const hasField =
-    editableKind !== null || bubble.content === 'dial' || bubble.content === 'actions'
+  const hasField = editableKind !== null || dial || bubble.content === 'actions'
   // The dial's drum: what the author listed, then what has been dialled that they did not.
   // Memoized so the filter BubbleDial runs over it survives a hover — this balloon
   // re-renders on every pointer enter and leave. Its re-seat keys on the contents rather
@@ -165,7 +168,7 @@ export default function PanelBubble({
   // A keyboard user can tab to an otherwise hidden control; focus reveals its bubble
   // immediately and blur returns it to the panel-hover reveal rule.
   const shown = visible || focused
-  const holdsKeyboard = keyboard ?? bubble.content === 'dial'
+  const holdsKeyboard = keyboard ?? dial
 
   const className = [
     'cb-panel-bubble',
@@ -242,7 +245,7 @@ export default function PanelBubble({
           revealed={visible && holdsKeyboard}
           onSubmit={onSubmit}
         />
-      ) : bubble.content === 'dial' ? (
+      ) : dial ? (
         <BubbleDial
           options={dialList}
           value={dialValue}
@@ -259,6 +262,9 @@ export default function PanelBubble({
           enabled={interactive}
           hostRef={rootRef}
           onSubmit={onSubmit}
+          // The one difference between the two dial kinds: the telephone's green key,
+          // drawn at the right of the field and greyed until there is a number to dial.
+          call={bubble.content === 'dial-call'}
         />
       ) : bubble.content === 'actions' ? (
         <BubbleActions text={bubble.text} font={font} enabled={interactive} actions={actions} />

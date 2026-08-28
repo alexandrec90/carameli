@@ -249,6 +249,12 @@ describe('dialBubbleOn', () => {
     expect(dialBubbleOn([b(0, '', 'wheel'), b(0, '', 'dial')], 0)).toBe(1)
   })
 
+  it('finds a dial that carries a call key too', () => {
+    // The projected keypad types into a 'dial-call' the same way: the key is beside the
+    // field, not instead of it.
+    expect(dialBubbleOn([b(0, '', 'wheel'), b(0, '', 'dial-call')], 0)).toBe(1)
+  })
+
   it('is -1 on a panel whose picker is a plain wheel', () => {
     // The projected keypad has nothing to type into there, so it keeps its old handler.
     expect(dialBubbleOn([b(0, '', 'wheel')], 0)).toBe(-1)

@@ -56,3 +56,38 @@
 .cb-bubble-dial .cb-wheel-option.is-selected {
   visibility: hidden;
 }
+
+/* ─── The call key ('dial-call') ─────────────────────────────────────────────────
+   The telephone's green key drawn at the right of the field (BubbleCallKey.tsx). Its
+   ink, its greying and its press come from .cb-bubble-key / .cb-bubble-action in
+   bubbleInputs.css — this is one key of the same handset, not a second treatment — so
+   what is here is only where it sits and how much of the window it takes.
+
+   The field AND the drum give up the same strip, so the number and the rows behind it
+   stay centred on each other. A field alone would centre its digits on one axis while
+   the options behind them centred on another, which reads as the drum being crooked. */
+.cb-bubble-dial.has-call .cb-dial-field,
+.cb-bubble-dial.has-call .cb-wheel-track {
+  right: 2.4em;
+}
+
+/* Beating the `width: 100%` above, which would otherwise win over the new `right` and
+   push the field back under the key. */
+.cb-bubble-dial.has-call .cb-dial-field {
+  width: auto;
+}
+
+/* Stretched to the window rather than centred with a transform: .cb-bubble-key's hover
+   and press are themselves transforms, and a translate here would be replaced by them —
+   the key would jump to the top of the balloon on the way down. Flex does the centring
+   instead, and leaves that transform free. */
+.cb-bubble-call-key {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2em;
+}

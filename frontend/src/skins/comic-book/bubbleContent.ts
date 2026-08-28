@@ -1,5 +1,12 @@
-/** The five ways a panel bubble can present its authored text. */
-export type BubbleContentKind = 'text' | 'wheel' | 'input' | 'phone' | 'dial' | 'actions'
+/** The seven ways a panel bubble can present its authored text. */
+export type BubbleContentKind =
+  | 'text'
+  | 'wheel'
+  | 'input'
+  | 'phone'
+  | 'dial'
+  | 'dial-call'
+  | 'actions'
 
 export const BUBBLE_CONTENT_KINDS: BubbleContentKind[] = [
   'text',
@@ -7,8 +14,23 @@ export const BUBBLE_CONTENT_KINDS: BubbleContentKind[] = [
   'input',
   'phone',
   'dial',
+  'dial-call',
   'actions',
 ]
+
+/**
+ * True for either dial: the drum-with-a-field, and the same balloon with the telephone's
+ * green key beside that field ('dial-call').
+ *
+ * The key is the *whole* difference between them, so every other question a panel asks
+ * about a dial — is this the balloon the projected keypad types into, the one an SMS
+ * chain takes its peer from, the one that owns the keyboard while the panel is revealed —
+ * has the same answer for both. They ask through here rather than each spelling out a
+ * two-way comparison, so adding a third dial is one edit instead of six.
+ */
+export function isDialContent(content: string): boolean {
+  return content === 'dial' || content === 'dial-call'
+}
 
 /** Runtime guard for persisted payloads, mirroring isBubbleType / isTailDir. */
 export function isBubbleContentKind(value: unknown): value is BubbleContentKind {
@@ -29,5 +51,5 @@ export function dialBubbleOn(
   bubbles: readonly { panel: number; chain: string; content: string }[],
   panel: number,
 ): number {
-  return bubbles.findIndex(b => b.panel === panel && b.chain === '' && b.content === 'dial')
+  return bubbles.findIndex(b => b.panel === panel && b.chain === '' && isDialContent(b.content))
 }
