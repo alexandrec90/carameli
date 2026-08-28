@@ -347,6 +347,27 @@ describe('the skin guard in index.html', () => {
         'Order is the preload priority, so it has to match too.',
     ).toEqual(drawnByPage())
   })
+
+  it('fetches the art with an Image rather than a link preload', () => {
+    // A `<link rel="preload" as="image">` has to be claimed by a consumer within about
+    // three seconds of the load event or Chrome warns, once per file, on every load.
+    // The consumer is the <img> the comic-book chunk renders, and in dev that chunk is
+    // still arriving when the load event fires — so the console filled with warnings
+    // about art the page went on to draw a second later. An Image is its own consumer.
+    expect(
+      /rel\s*=\s*["']preload["']|\.rel\s*=\s*['"]preload['"]/.test(html),
+      'index.html preloads with a <link rel="preload"> again. That is the spelling ' +
+        'that made Chrome warn "was preloaded using link preload but not used within ' +
+        'a few seconds from the window\'s load event" for every panel on every load.',
+    ).toBe(false)
+
+    expect(
+      /new Image\(\)/.test(html),
+      'The guard no longer fetches the panel art at all. Nothing then starts the ' +
+        'download until the comic-book chunk renders, which is the late load the ' +
+        'PANELS list exists to avoid.',
+    ).toBe(true)
+  })
 })
 
 describe("the editor's picture manifest", () => {
