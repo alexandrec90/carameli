@@ -3,13 +3,17 @@ import type { ChangeEvent, KeyboardEvent, PointerEvent } from 'react'
 
 import type { BubbleContentKind } from './bubbleContent'
 import { browserCountry, formatPhoneInput } from './phoneInput'
+import { useDialCaret } from './useDialCaret'
 import { usePhoneField } from './usePhoneField'
+import { useRevealedField } from './useRevealedField'
 
 interface BubbleInputProps {
   kind: Extract<BubbleContentKind, 'input' | 'phone'>
   initialValue: string
   font: string
   enabled: boolean
+  /** Focus this field while its panel owns the keyboard. */
+  revealed?: boolean
   /**
    * Called with the trimmed value when Enter is pressed, after which the field clears.
    * Absent — the ordinary case — leaves Enter doing nothing, because a lone input balloon
@@ -22,7 +26,7 @@ interface BubbleInputProps {
 
 /** A real, single-line input fitted inside a speech bubble. */
 export default function BubbleInput({
-  kind, initialValue, font, enabled, onSubmit,
+  kind, initialValue, font, enabled, revealed = false, onSubmit,
 }: BubbleInputProps) {
   const inputRef = useRef<HTMLInputElement>(null)
   const country = useMemo(() => browserCountry(), [])
@@ -32,6 +36,9 @@ export default function BubbleInput({
   )
   // Format-as-you-type and digit-wise deletion, shared with the dial picker.
   const field = usePhoneField(inputRef, country, setValue)
+  const caretRef = useDialCaret(inputRef, false)
+
+  useRevealedField(inputRef, revealed, enabled)
 
   const onChange = (event: ChangeEvent<HTMLInputElement>): void => {
     if (!phone) {
@@ -62,21 +69,31 @@ export default function BubbleInput({
   const stopPointer = (event: PointerEvent<HTMLInputElement>): void => event.stopPropagation()
 
   return (
-    <input
-      ref={inputRef}
-      className="cb-panel-bubble-text cb-bubble-input"
+    <div
+      className="cb-panel-bubble-text cb-bubble-field"
       style={{ fontFamily: `'${font}', cursive` }}
-      type={phone ? 'tel' : 'text'}
-      inputMode={phone ? 'tel' : 'text'}
-      autoComplete={phone ? 'tel' : 'off'}
-      aria-label={phone ? 'Phone number' : 'Speech bubble text'}
-      disabled={!enabled}
-      tabIndex={enabled ? 0 : -1}
-      value={value}
-      onChange={onChange}
-      onKeyDown={onKeyDown}
-      onPointerDown={stopPointer}
-      onClick={event => event.stopPropagation()}
-    />
+    >
+      <input
+        ref={inputRef}
+        className="cb-bubble-input"
+        type={phone ? 'tel' : 'text'}
+        inputMode={phone ? 'tel' : 'text'}
+        autoComplete={phone ? 'tel' : 'off'}
+        aria-label={phone ? 'Phone number' : 'Speech bubble text'}
+        disabled={!enabled}
+        tabIndex={enabled ? 0 : -1}
+        value={value}
+        onChange={onChange}
+        onKeyDown={onKeyDown}
+        onPointerDown={stopPointer}
+        onClick={event => event.stopPropagation()}
+      />
+      <span
+        ref={caretRef}
+        className="cb-dial-caret"
+        style={{ visibility: 'hidden' }}
+        aria-hidden="true"
+      />
+    </div>
   )
 }

@@ -112,6 +112,34 @@ describe('PanelBubbles, binding a chain to a number', () => {
     expect(sms.send).toHaveBeenCalledWith(PEER, 'hello')
   })
 
+  it('routes keyboard focus to the composer except while the phone thought bubble is hovered', () => {
+    const { container } = render(
+      <div className="cb-panel">
+        <PanelBubbles
+          bubbles={[picker({ content: 'dial', text: PEER }), ...chainBubbles()]}
+          chains={[chain()]}
+          panel={0}
+          clip="none"
+          isVisible={() => true}
+          interactive
+          editing={false}
+          sms={idleSms()}
+          dialValue={PEER}
+        />
+      </div>,
+    )
+    const composer = screen.getByRole('textbox', { name: 'Speech bubble text' })
+    const phone = screen.getByRole('textbox', { name: 'Phone number' })
+    const thought = phone.closest('.cb-panel-bubble') as HTMLElement
+
+    expect(document.activeElement).toBe(composer)
+    fireEvent.pointerEnter(thought)
+    expect(document.activeElement).toBe(phone)
+    fireEvent.pointerLeave(thought)
+    expect(document.activeElement).toBe(composer)
+    expect(container.querySelectorAll('.cb-dial-caret')).toHaveLength(2)
+  })
+
   it('leaves a chain that did not ask to be bound alone', () => {
     const sms = idleSms({
       conversations: { [PEER]: [smsMessage({ id: 'a', text: 'real message' })] },

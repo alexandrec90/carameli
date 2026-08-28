@@ -96,8 +96,12 @@ export const MAX_LAZY_CHUNK_BYTES = 260 * 1024
  * that positions the ink block per keystroke, and the fresh-number flag both keyboards
  * read. All of it lands in the same lazy comic-book chunk; `package.json` is untouched
  * and the chunk count is unchanged at 46, so nothing new was pulled in.
+ *
+ * This raise (958 → 959) is 0.8 KB: the SMS composer now shares that caret and keyboard
+ * handoff, while its conversation draws per-column links and a fixed recipient stem.
+ * It remains isolated to the same lazy comic-book chunk and adds no dependency or chunk.
  */
-export const MAX_TOTAL_JS_BYTES = 958 * 1024
+export const MAX_TOTAL_JS_BYTES = 959 * 1024
 
 /**
  * Every `.css` file in `dist/assets/`, summed. Today 44.2 KB across 2 files.

@@ -26,36 +26,6 @@
   transform: translateY(-50%);
   text-align: center;
 
-  /* The pointer keeps the panel's own cursor — an I-beam over hand-lettering reads as
-     a form pasted onto the artwork — and the native caret goes with it: the slanted
-     ink block below (.cb-dial-caret, placed by useDialCaret.ts) blinks instead. */
-  cursor: default;
-  caret-color: transparent;
-}
-
-/* The focus underline (.cb-bubble-input:focus-visible) is dropped here alone: the
-   dial's field sits mid-balloon over the drum, and a 3px bar under the centre row
-   reads as a fourth frame line rather than as focus ink. */
-.cb-bubble-dial .cb-dial-field:focus-visible {
-  border-bottom-color: transparent;
-}
-
-/* The comic caret: a black block slanted with the lettering, stood where the native
-   caret would blink. `left` is set per keystroke by useDialCaret.ts. */
-.cb-dial-caret {
-  position: absolute;
-  top: 50%;
-  width: 0.3em;
-  height: 1.05em;
-  background: var(--cb-black);
-  transform: translateY(-50%) skewX(-12deg);
-  pointer-events: none;
-  animation: cb-dial-caret-blink 1.1s infinite;
-}
-
-@keyframes cb-dial-caret-blink {
-  0%, 50% { opacity: 1; }
-  50.01%, 100% { opacity: 0; }
 }
 
 /* Row 0 of the drum: the number as typed, which the field is already lettering. Blank,

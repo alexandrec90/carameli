@@ -1,4 +1,4 @@
-import { BUBBLE_ASPECT } from './bubbleBox'
+import { BUBBLE_ASPECT, BUBBLE_ELLIPSE_N, tailTip } from './bubbleBox'
 import type { BubbleTransform } from './editor/types'
 
 // A bubble *chain* is an SMS conversation, drawn the way a phone draws one: two columns
@@ -117,7 +117,7 @@ export const CHAIN_ROWS = { min: 2, max: 12, step: 1 }
 export const DEFAULT_CHAIN_ROWS = 6
 
 /** Gap between one row and the next, in % of the panel box height. */
-export const CHAIN_ROW_GAP = 2
+export const CHAIN_ROW_GAP = 1.5
 
 /**
  * Message length, in characters, at which a balloon reaches its column's full width.
@@ -406,6 +406,57 @@ export interface ChainRow {
    */
   key: string
   bubble: BubbleTransform
+  /** Which template stamped the row, used to link each column vertically. */
+  side: 'out' | 'in'
+}
+
+/** Consecutive rows belonging to the same speaker, bottom row first in each pair. */
+export function chainRowLinks(rows: readonly ChainRow[]): [ChainRow, ChainRow][] {
+  const last = new Map<ChainRow['side'], ChainRow>()
+  const links: [ChainRow, ChainRow][] = []
+  for (const row of rows) {
+    const below = last.get(row.side)
+    if (below) links.push([below, row])
+    last.set(row.side, row)
+  }
+  return links
+}
+
+/** Place an upper row by the visible ellipse below it, not by its tail-padded box. */
+export function chainRowTop(
+  below: Pick<BubbleTransform, 'top' | 'width'>,
+  upperWidth: number,
+  panelAspect: number,
+): number {
+  const lowerHeight = bubbleHeightPct(below.width, panelAspect)
+  const upperHeight = bubbleHeightPct(upperWidth, panelAspect)
+  const ellipseTop = BUBBLE_ELLIPSE_N.cy - BUBBLE_ELLIPSE_N.ry
+  const ellipseBottom = BUBBLE_ELLIPSE_N.cy + BUBBLE_ELLIPSE_N.ry
+  return below.top + lowerHeight * ellipseTop - upperHeight * ellipseBottom - CHAIN_ROW_GAP
+}
+
+/** Convert the recipient template's authored stem tip into one rendered row's SVG space. */
+export function recipientStemTarget(
+  template: BubbleTransform,
+  row: BubbleTransform,
+  panelAspect: number,
+): [number, number] {
+  const [tipX, tipY] = tailTip(template.tail)
+  const templateX = 100 - template.right - template.width / 2
+  const templateY = template.top / panelAspect + template.width * BUBBLE_ASPECT / 2
+  const rowX = 100 - row.right - row.width / 2
+  const rowY = row.top / panelAspect + row.width * BUBBLE_ASPECT / 2
+  const dx = templateX - rowX
+  const dy = templateY - rowY
+  const rad = (-row.rotate * Math.PI) / 180
+  const localX = dx * Math.cos(rad) - dy * Math.sin(rad)
+    + (tipX / 200 - 0.5) * template.width
+  const localY = dx * Math.sin(rad) + dy * Math.cos(rad)
+    + (tipY / 150 - 0.5) * template.width * BUBBLE_ASPECT
+  return [
+    (localX / row.width + 0.5) * 200,
+    (localY / (row.width * BUBBLE_ASPECT) + 0.5) * 150,
+  ]
 }
 
 /**
@@ -443,16 +494,17 @@ export function conversationRows(
   // The left column's left edge, which is what its balloons are aligned against.
   const themLeft = 100 - cols.them.right - cols.them.width
   const tailed = { out: false, in: false }
-  let top = cols.me.top
-
-  const stack = (width: number): void => {
-    top -= bubbleHeightPct(width, panelAspect) + CHAIN_ROW_GAP
+  let below: BubbleTransform | null = null
+  const place = (bubble: BubbleTransform): BubbleTransform => {
+    const top = below ? chainRowTop(below, bubble.width, panelAspect) : cols.me.top
+    const placed = { ...bubble, top }
+    below = placed
+    return placed
   }
 
   if (live) {
-    rows.push({ key: 'composer', bubble: { ...cols.me, top } })
+    rows.push({ key: 'composer', side: 'out', bubble: place(cols.me) })
     tailed.out = true
-    stack(cols.me.width)
   }
 
   if (typing) {
@@ -460,18 +512,17 @@ export function conversationRows(
     const width = messageWidth('', cols.them.width)
     rows.push({
       key: TYPING_KEY,
-      bubble: {
+      side: 'in',
+      bubble: place({
         ...cols.them,
-        top,
         width,
         right: 100 - themLeft - width,
         content: 'text',
         text: '',
         linkTo: null,
-      },
+      }),
     })
     tailed.in = true
-    stack(width)
   }
 
   for (const m of shown) {
@@ -482,9 +533,9 @@ export function conversationRows(
     const side = line.out ? 'out' : 'in'
     rows.push({
       key: String(m),
-      bubble: {
+      side,
+      bubble: place({
         ...template,
-        top,
         width,
         right: line.out ? cols.me.right : 100 - themLeft - width,
         tail: tailed[side] ? 'none' : template.tail,
@@ -496,10 +547,9 @@ export function conversationRows(
         // The templates are linked to each other — that linkage is the chain — and a
         // stamped row is not a balloon anything can link to.
         linkTo: null,
-      },
+      }),
     })
     tailed[side] = true
-    stack(width)
   }
 
   return rows

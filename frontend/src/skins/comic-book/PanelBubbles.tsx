@@ -1,6 +1,8 @@
 import { Fragment, useCallback, useEffect, useState } from 'react'
 
-import { chainIdsOn, chainMembers, defaultChain, peerPickerOn } from './bubbleChain'
+import {
+  chainIdsOn, chainMembers, defaultChain, isComposerContent, peerPickerOn,
+} from './bubbleChain'
 import type { BubbleChain } from './bubbleChain'
 import PanelBubble from './PanelBubble'
 import PanelBubbleChain from './PanelBubbleChain'
@@ -145,6 +147,11 @@ export default function PanelBubbles({
   // Stable, because BubbleWheel reports through an effect and would re-report on every
   // render of this panel otherwise — which is a render of this panel, forever.
   const onWheelSelect = useCallback((value: string) => setPicked(value), [])
+  const [pickerHovered, setPickerHovered] = useState(false)
+  const composerOwnsKeyboard = conversations.some(c => {
+    const sender = bubbles[c.members[0]]
+    return sender != null && isComposerContent(sender.content)
+  })
 
   // Whether anything on this panel actually wants a thread. A picker is an ordinary
   // balloon on most panels, and resolving a number off one is not a reason to poll a
@@ -181,6 +188,8 @@ export default function PanelBubbles({
             visible={isVisible(i)}
             interactive={interactive}
             onWheelSelect={i === pickerIndex ? onWheelSelect : undefined}
+            keyboard={i === pickerIndex ? !composerOwnsKeyboard : undefined}
+            onHoverChange={i === pickerIndex ? setPickerHovered : undefined}
             onSubmit={
               bubble.content === 'phone' || bubble.content === 'dial'
                 ? onPhoneSubmit
@@ -215,6 +224,7 @@ export default function PanelBubbles({
             // together; the sender template's answer is the conversation's.
             visible={isVisible(members[0])}
             interactive={interactive}
+            keyboard={composerOwnsKeyboard && !pickerHovered}
             conversation={
               live && peer
                 ? {
