@@ -63,6 +63,7 @@ export const NEW_BUBBLE: Omit<BubbleTransform, 'panel'> = {
   linkTo: null,
   hoverType: null,
   clickType: null,
+  hoverBold: false,
   chain: '',
 }
 

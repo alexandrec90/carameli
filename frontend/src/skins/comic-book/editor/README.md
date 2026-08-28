@@ -16,7 +16,8 @@ placement **and content** (panel / top / right / width / rotate / spill / type /
 content / text — lettering, a comma-delimited wheel picker, a text input, a phone
 input formatted from the browser locale, or a dial, which is the wheel and the phone
 input in one balloon), plus each bubble's event morph targets
-(`hoverType`, `clickType`) and its
+(`hoverType`, `clickType`), whether the pointer also inks its outline heavier
+(`hoverBold`) and its
 linked partner (`linkTo`) and the SMS conversation that linkage makes it a column of (`chain`,
 an editor-generated id resolved through `PANEL_BUBBLE_CHAINS` — see *Bubble chains*
 below). It also holds
@@ -254,8 +255,13 @@ different images can only crossfade. A new bubble type belongs in `bubbleShape.t
      (`peerPickerOn`), which then binds to whatever the field says.
      Edit the **text** or **initial value**, choose the shapes to
      morph to **on hover**
-     and **on click** (`— no change —` keeps the resting shape), and pick a **link
-     to** partner to join with a connector tube. Turning or removing a tail morphs
+     and **on click** (`— no change —` keeps the resting shape), tick **bolder outline
+     on hover** to have the pointer ink this balloon heavier as well, and pick a **link
+     to** partner to join with a connector tube. The bold is the one event response that
+     is not a morph, because weight is a stroke rather than a shape; it takes the tail
+     and a thought bubble's puffs with it — they are the same ring and the same class —
+     and stops there: a connector tube keeps its own weight, so does the balloon at the
+     far end of it, and so does every other row of a chain. Turning or removing a tail morphs
      like any other shape change, because the tail is one ring vertex pulled out.
      The tube redraws live as you drag either end; two bubbles that overlap draw no
      tube at all, so drag them apart if one doesn't appear. Links are symmetric —

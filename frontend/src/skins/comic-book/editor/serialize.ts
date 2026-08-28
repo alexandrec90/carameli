@@ -54,7 +54,10 @@ const IMG_HEADER = `// Not parallel to PANELS: each picture names its \`panel\`,
 const BUBBLE_HEADER = `// Not parallel to PANELS either: each bubble names its \`panel\`, a panel may own any
 // number of them, and the array is ordered by panel only for readability. \`type\`/\`text\`
 // are the resting content, \`hoverType\` and \`clickType\` the shapes to morph to on
-// pointer-over and press (null = stay put), \`tail\` which way the tail points ('none'
+// pointer-over and press (null = stay put), \`hoverBold\` whether pointer-over also inks
+// this balloon's outline heavier — its tail and a thought bubble's puffs bold with it,
+// while a connector tube, the balloon at the far end of one and the other rows of a
+// chain keep their own weight — \`tail\` which way the tail points ('none'
 // for no tail), and \`linkTo\` the bubble to join with a connector tube — an index into
 // this array, which must name a bubble on the same panel. \`spill: true\` keeps the
 // current look where bubbles float into the gutter. \`content\` picks how \`text\` reads:
@@ -220,7 +223,7 @@ export function serializeConfig(c: EditorConfig): string {
         `spill: ${b.spill}, type: '${b.type}', tail: '${b.tail}', ` +
         `content: '${b.content}', text: ${strLiteral(b.text)}, linkTo: ${b.linkTo}, ` +
         `hoverType: ${typeLiteral(b.hoverType)}, clickType: ${typeLiteral(b.clickType)}, ` +
-        `chain: ${strLiteral(b.chain)} },`,
+        `hoverBold: ${b.hoverBold}, chain: ${strLiteral(b.chain)} },`,
     )
     .join('\n')
   // Patterns iterate the panel list, not the config's own array: the two are parallel by

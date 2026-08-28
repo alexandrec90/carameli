@@ -159,7 +159,7 @@ describe('serializeConfig', () => {
       '{ panel: 0, top: -35, right: -12, width: 55, rotate: -5, spill: true, ' +
         "type: 'soft', tail: 'down-left', content: 'text', " +
         'text: "It\'s Carameli!", linkTo: 1, ' +
-        "hoverType: 'cloud', clickType: 'lightning', chain: '' },",
+        "hoverType: 'cloud', clickType: 'lightning', hoverBold: false, chain: '' },",
     )
   })
 
@@ -206,7 +206,7 @@ describe('serializeConfig', () => {
       clickType: null,
     })
     const ts = serializeConfig(cfg)
-    expect(ts).toContain("linkTo: null, hoverType: null, clickType: null, chain: '' },")
+    expect(ts).toContain("linkTo: null, hoverType: null, clickType: null, hoverBold: false, chain: '' },")
     expect(ts).not.toContain("'null'")
   })
 

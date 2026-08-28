@@ -421,6 +421,7 @@ describe('bubbleStyle', () => {
       linkTo: null,
       hoverType: null,
       clickType: null,
+      hoverBold: false,
       chain: '',
     }) as Record<string, string>
     expect(style.top).toBe('-35%')

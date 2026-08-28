@@ -22,7 +22,9 @@ offsetX / offsetY / anchor / spill, with `src` drawn from the `PANEL_ASSETS` man
 in `editor/assets.ts`) and speech-bubble
 placement and behaviour (`PANEL_BUBBLE_TRANSFORMS`: panel / top / right / width /
 rotate / spill / type / tail / content / text, plus `hoverType` / `clickType` event
-morph targets, the `linkTo` tube partner and the `chain` this balloon is a slot of;
+morph targets, `hoverBold` for a heavier outline under the pointer — the balloon's own
+only: its tail and puffs bold with it, a tube and the balloon at the far end of one do
+not — the `linkTo` tube partner and the `chain` this balloon is a slot of;
 content may be lettering, a wheel picker, a text input, a locale-formatted phone
 input, a dial — an autocomplete over that phone input, its list drawn as the wheel — or
 the telephone's own call/end-call keys) and the chain settings those names resolve to

@@ -88,6 +88,7 @@ function withUnfinishedBubble(): EditorConfig {
         linkTo: null,
         hoverType: null,
         clickType: null,
+        hoverBold: false,
         chain: '',
       },
     ],

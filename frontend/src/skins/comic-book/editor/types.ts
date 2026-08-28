@@ -138,6 +138,21 @@ export interface BubbleTransform {
   /** Shape to pulse to when the bubble is pressed; null = stay put. */
   clickType: BubbleType | null
   /**
+   * Ink the outline heavier while the pointer is over this balloon; false = stay put.
+   *
+   * The third event response, beside `hoverType` and `clickType`, and deliberately its
+   * own field rather than a heavier *shape*: the ring is one closed path per type and a
+   * bolder version of a type would be a second entry in `SHAPES` that morphs from the
+   * first by moving no vertex at all. Weight is a stroke, so it is a stroke.
+   *
+   * **It stops at this balloon.** The tail thickens with it — the tail is a vertex of the
+   * same ring, and a thought bubble's puffs carry the same class — but a connector tube's
+   * rails and the balloon at the far end of one keep their own weight, because the hover
+   * is per-balloon state (see PanelBubble) and nothing propagates it. Same for a chain: a
+   * row bolds under the pointer and the rows above it do not.
+   */
+  hoverBold: boolean
+  /**
    * Id of the bubble chain this balloon is a slot of; '' when it is not in one.
    *
    * **Not typed by the author.** The editor generates it and never shows it: the author

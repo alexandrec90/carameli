@@ -163,6 +163,11 @@ export default function PanelBubble({
     interactive ? 'is-interactive' : '',
     chained ? 'cb-chain-bubble' : '',
     status ? `is-${status}` : '',
+    // The heavier outline, and only ever this balloon's: `hover` is local state on this
+    // component, so a linked partner, the tube between them and the rows above this one
+    // in a chain are all somebody else's render and keep the resting weight. The tail
+    // and the thought puffs do bold, because they are the same ring and the same class.
+    hover && bubble.hoverBold ? 'is-bold' : '',
   ]
     .filter(Boolean)
     .join(' ')
