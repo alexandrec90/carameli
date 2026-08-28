@@ -36,30 +36,26 @@ export const PANEL_IMG_TRANSFORMS: ImgTransform[] = [
   { panel: 5, src: '/comic-book/rolodex.webp', alt: 'Rolodex', left: 0, top: 0, width: 100, height: 100, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center bottom', spill: false },
   { panel: 6, src: '/comic-book/rotary%20phone.webp', alt: 'Rotary phone', left: 0, top: 0, width: 100, height: 100, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center bottom', spill: false },
   { panel: 7, src: '/comic-book/mailman2.webp', alt: 'Post office', left: 0, top: 0, width: 100, height: 100, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center bottom', spill: false },
-  { panel: 8, src: '/comic-book/logo2.webp', alt: 'Carameli', left: -6.2, top: -1.1, width: 104, height: 106.1, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center center', spill: false },
-  { panel: 9, src: '/comic-book/push-button-phone.webp', alt: 'Notepad', left: -38.1, top: 2.6, width: 139.8, height: 121.8, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center bottom', spill: false, numberPad: {
-    quad: [[44.96, 25.44], [52.35, 20.85], [55.84, 50.56], [47.52, 55.36]],
+  { panel: 8, src: '/comic-book/logo2.webp', alt: 'Carameli', left: -5.2, top: -1.1, width: 87.7, height: 103.3, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center center', spill: false },
+  { panel: 9, src: '/comic-book/push-button-phone.webp', alt: 'Notepad', left: -38.4, top: 2.5, width: 140.1, height: 118.2, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center bottom', spill: false, numberPad: {
+    quad: [[38.52, 25.02], [55.15, 20.22], [63.26, 50.35], [44.3, 56.2]],
     fontScale: 0.55, ink: '#1b3a8f',
   } },
-  { panel: 10, src: '/comic-book/hand-notepad.webp', alt: 'Push-button phone', left: -18.7, top: -0.9, width: 130.5, height: 120.6, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center bottom', spill: false, table: {
-    quad: [[32.03, 9.45], [69.19, 9.31], [70.02, 71.44], [31.57, 72.13]],
+  { panel: 10, src: '/comic-book/hand-notepad.webp', alt: 'Push-button phone', left: -18.3, top: 5.1, width: 137.4, height: 120.9, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center bottom', spill: false, table: {
+    quad: [[14.7, 6.8], [88.19, 6.94], [89.85, 73.11], [14.03, 73.24]],
     rows: 12, header: true, fontScale: 0.5, ink: '#1b3a8f',
+    source: 'calls',
     columns: [
-      { label: 'Name', width: 2, align: 'left' },
-      { label: 'Number', width: 1, align: 'right' },
+      { label: 'Time', width: 1, align: 'left' },
+      { label: 'Dir', width: 0.7, align: 'left' },
+      { label: 'From', width: 1.8, align: 'left' },
+      { label: 'To', width: 1.8, align: 'left' },
+      { label: 'Status', width: 1.3, align: 'left' },
     ],
     data: [
-      ['Ada Lovelace', '555-0101'],
-      ['Grace Hopper', '555-0102'],
-      ['Alan Turing', '555-0103'],
-      ['Katherine Johnson', '555-0104'],
-      ['Margaret Hamilton', '555-0105'],
-      ['Claude Shannon', '555-0106'],
-      ['Hedy Lamarr', '555-0107'],
-      ['Vint Cerf', '555-0108'],
     ],
   } },
-  { panel: 11, src: '/comic-book/conversation.webp', alt: 'Phone conversation', left: 13.3, top: 40.8, width: 73.1, height: 64, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center bottom', spill: false },
+  { panel: 11, src: '/comic-book/conversation.webp', alt: 'Phone conversation', left: 14.4, top: 40.8, width: 72.2, height: 64, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center bottom', spill: false },
 ]
 
 // Not parallel to PANELS either: each bubble names its `panel`, a panel may own any
@@ -99,8 +95,11 @@ export const PANEL_BUBBLE_TRANSFORMS: BubbleTransform[] = [
   { panel: 5, top: -35, right: -12, width: 55, rotate: -5, spill: true, type: 'lightning', tail: 'down-left', content: 'text', text: 'RING RING!', linkTo: null, hoverType: 'cloud', clickType: 'soft', chain: '' },
   { panel: 6, top: -35, right: -12, width: 55, rotate: -5, spill: true, type: 'lightning', tail: 'down-left', content: 'text', text: 'Ka-POW!', linkTo: null, hoverType: 'soft', clickType: 'cloud', chain: '' },
   { panel: 7, top: -35, right: -12, width: 55, rotate: -5, spill: true, type: 'cloud', tail: 'down-left', content: 'text', text: 'Delivering dreams...', linkTo: null, hoverType: 'soft', clickType: 'lightning', chain: '' },
-  { panel: 9, top: 1, right: 8, width: 36, rotate: -5, spill: true, type: 'cloud', tail: 'none', content: 'phone', text: '4388762750', linkTo: null, hoverType: null, clickType: null, chain: '' },
-  { panel: 9, top: 57, right: 13, width: 17, rotate: -5, spill: true, type: 'cloud', tail: 'none', content: 'actions', text: 'Call, End call', linkTo: 10, hoverType: null, clickType: null, chain: '' },
+  { panel: 9, top: 1, right: 8, width: 36, rotate: -5, spill: true, type: 'cloud', tail: 'none', content: 'dial', text: '4388762750', linkTo: null, hoverType: null, clickType: null, chain: '' },
+  { panel: 9, top: 49, right: 12, width: 21, rotate: -5, spill: true, type: 'cloud', tail: 'none', content: 'actions', text: 'Call, End call', linkTo: 10, hoverType: null, clickType: null, chain: '' },
+  { panel: 11, top: 26, right: 54, width: 23, rotate: -5, spill: true, type: 'soft', tail: 'down-left', content: 'text', text: 'recipient sms', linkTo: null, hoverType: null, clickType: null, chain: 'chain-1' },
+  { panel: 11, top: 57, right: 76, width: 31, rotate: -5, spill: true, type: 'cloud', tail: 'right', content: 'dial', text: '4388762750', linkTo: null, hoverType: null, clickType: null, chain: '' },
+  { panel: 11, top: 16, right: 21, width: 31, rotate: -5, spill: true, type: 'soft', tail: 'down-left', content: 'text', text: 'sender sms', linkTo: null, hoverType: null, clickType: null, chain: 'chain-2' },
 ]
 
 // One entry per chain id the bubbles above carry — the list is derived from them, not
@@ -130,7 +129,10 @@ export const PANEL_BUBBLE_TRANSFORMS: BubbleTransform[] = [
 // wheel-picker balloon (a `content: 'wheel'` bubble outside the chain, its `text` the
 // comma-delimited list of numbers) is turned to, so a panel with `sms` and no picker shows
 // an empty conversation rather than guessing at one.
-export const PANEL_BUBBLE_CHAINS: BubbleChain[] = []
+export const PANEL_BUBBLE_CHAINS: BubbleChain[] = [
+  { id: 'chain-1', grow: true, stepMs: 900, rows: 6, sms: true, messages: [] },
+  { id: 'chain-2', grow: true, stepMs: 900, rows: 6, sms: false, messages: [] },
+]
 
 // The one array here that IS parallel to PANELS: a pattern belongs to the panel slot
 // itself, not to a picture or a bubble on it, so entry `i` is the Ben-Day background
@@ -229,7 +231,7 @@ export const PANEL_GRIDS: PageGrids = {
   },
   home: {
     landscape: {
-      vertices: [[0, 0], [1, 0], [1, 1], [0, 1], [0, 0.4007], [1, 0.3502], [0.3778, 0], [0.3866, 0.3994], [0.3649, 1]],
+      vertices: [[0, 0], [1, 0], [1, 1], [0, 1], [0, 0.4007], [1, 0.3502], [0.3778, 0], [0.3573, 0.4112], [0.3674, 1], [0.458, 0.4112]],
       panels: [
         [], // Logo
         [], // Switchboard
@@ -239,10 +241,10 @@ export const PANEL_GRIDS: PageGrids = {
         [], // Rolodex
         [], // Rotary phone
         [], // Mailman 2
-        [0, 6, 7, 4], // Logo 2
-        [6, 1, 5, 7], // Notepad
+        [0, 6, 9, 7, 4], // Logo 2
+        [6, 1, 5, 9], // Notepad
         [4, 7, 8, 3], // Push-button phone
-        [7, 5, 2, 8], // Conversation
+        [7, 9, 5, 2, 8], // Conversation
       ],
     },
     portrait: {
