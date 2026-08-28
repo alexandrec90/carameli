@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter, useLocation } from 'react-router-dom'
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 
 import ComicPanel from '../../skins/comic-book/ComicPanel'
 import { idleSms } from './smsStub'
@@ -10,8 +10,7 @@ function CurrentPath() {
 }
 
 describe('ComicPanel', () => {
-  it('keeps hover behavior without acting as a navigation control', () => {
-    const onHover = vi.fn()
+  it('is not a navigation control and owns no hover handlers', () => {
     const formerlyLinkedPanel = {
       label: 'Switchboard',
       isLogo: false,
@@ -34,7 +33,6 @@ describe('ComicPanel', () => {
           natSizes={{}}
           editorActive={false}
           hovered={false}
-          onHover={onHover}
           isRevealed={() => false}
           isBubbleVisible={() => false}
           dotRef={() => undefined}
@@ -50,9 +48,11 @@ describe('ComicPanel', () => {
     expect(panel.getAttribute('tabindex')).toBeNull()
     expect(panel.classList.contains('clickable')).toBe(false)
 
+    // Hover is decided by Layout's geometric hit test (usePanelHover), never by
+    // this element: its box is the polygon's bounding rectangle, and neighbouring
+    // rectangles overlap wherever a seam slants. Entering the element is inert.
     fireEvent.mouseEnter(panel)
-    fireEvent.mouseLeave(panel)
-    expect(onHover.mock.calls).toEqual([[true], [false]])
+    expect(panel.classList.contains('cb-panel-lift')).toBe(false)
 
     fireEvent.click(panel)
     expect(screen.getByTestId('current-path').textContent).toBe('/')

@@ -83,7 +83,6 @@ function renderPanel(images: ImgTransform[]): HTMLElement {
         natSizes={{}}
         editorActive={false}
         hovered={false}
-        onHover={() => undefined}
         isRevealed={() => false}
         isBubbleVisible={() => false}
         dotRef={() => undefined}
