@@ -67,7 +67,14 @@ function spillImgRect(bounds: Rect, t: ImgTransform, natSizes: NatSizes): Rect {
  * Balloons of panels *not hovered* are hidden, which is why step 1 asks only about
  * `current`: invisible ink must not grab the pointer. A balloon without `spill` is
  * clipped to its polygon, so the polygon test already answers for every part of it a
- * reader can see. Chained balloons are approximated by their template's box.
+ * reader can see.
+ *
+ * A balloon naming a `chain` is a *template*, never drawn where it stands: the chain
+ * stamps rows stacked up the panel from it (see bubbleChain.ts), and where those rows
+ * are depends on state only the renderer has — the transcript, the scroll position,
+ * the measured panel aspect. So chain members are excluded from the box test here and
+ * `overInk` answers for them instead: usePanelHover passes a probe that measures the
+ * balloons actually on screen, which is exact where this module could only guess.
  */
 export function hoveredPanelAt(
   x: number,
@@ -77,14 +84,16 @@ export function hoveredPanelAt(
   bubbles: BubbleTransform[],
   natSizes: NatSizes,
   current: number | null,
+  overInk?: (x: number, y: number, panel: number) => boolean,
 ): number | null {
   const cur = current == null ? null : polys[current]
   if (current != null && cur) {
     const overOwnSpill =
       bubbles.some(b =>
-        b.panel === current && b.spill && inRect(x, y, bubbleRect(cur.bounds, b))) ||
+        b.panel === current && b.spill && !b.chain && inRect(x, y, bubbleRect(cur.bounds, b))) ||
       images.some(t =>
-        t.panel === current && t.spill && inRect(x, y, spillImgRect(cur.bounds, t, natSizes)))
+        t.panel === current && t.spill && inRect(x, y, spillImgRect(cur.bounds, t, natSizes))) ||
+      (overInk?.(x, y, current) ?? false)
     if (overOwnSpill) return current
   }
   for (let k = images.length - 1; k >= 0; k--) {

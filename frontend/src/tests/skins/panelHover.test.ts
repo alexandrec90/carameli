@@ -95,6 +95,60 @@ describe('hoveredPanelAt', () => {
       const clipped = [bub({ top: 10, right: -20, width: 40, spill: false })]
       expect(at(...inBubble, { bubbles: clipped, current: 0 })).toBe(1)
     })
+
+    it('does not stick for a chain member — a template is never drawn where it stands', () => {
+      // The chain stamps rows elsewhere (bubbleChain.ts); keeping the hover on the
+      // template's empty box left the neighbour lit under a visible conversation.
+      const chained = [bub({ top: 10, right: -20, width: 40, chain: 'chain-1' })]
+      expect(at(...inBubble, { bubbles: chained, current: 0 })).toBe(1)
+    })
+  })
+
+  describe('the overInk probe (the renderer answering for drawn chain rows)', () => {
+    const overInk = (x: number, y: number, panel: number): boolean =>
+      panel === 0 && x >= 80 && x <= 120 && y >= 10 && y <= 40
+
+    it('keeps the hover on ink the probe vouches for', () => {
+      expect(hoveredPanelAt(110, 20, POLYS, [], [], {}, 0, overInk)).toBe(0)
+    })
+
+    it('asks only about the hovered panel — hidden ink cannot grab the pointer', () => {
+      expect(hoveredPanelAt(110, 20, POLYS, [], [], {}, 1, overInk)).toBe(1)
+      expect(hoveredPanelAt(110, 20, POLYS, [], [], {}, null, overInk)).toBe(1)
+    })
+
+    it('releases the hover where the probe finds nothing', () => {
+      expect(hoveredPanelAt(150, 80, POLYS, [], [], {}, 0, overInk)).toBe(1)
+    })
+  })
+
+  describe('the stylesheets defer to the geometric hover', () => {
+    // The panel element is the polygon's bounding rectangle, so the browser's own
+    // `:hover` on it answers for the wrong shape — the historical bug: a chain spilled
+    // over a seam kept the geometric hover (balloons visible) while `:hover` colorized
+    // the neighbour underneath. Anything hover-driven on a panel keys off the
+    // `cb-panel-hot` class instead. Same glob rationale as comicBookImageBorders.
+    const CSS = import.meta.glob('../../skins/comic-book/**/*.css', {
+      query: '?raw',
+      import: 'default',
+      eager: true,
+    }) as Record<string, string>
+
+    it('finds the skin stylesheets', () => {
+      expect(Object.keys(CSS).length).toBeGreaterThan(5)
+    })
+
+    it('never styles anything off the panel element’s own :hover', () => {
+      const offenders = Object.entries(CSS).flatMap(([file, css]) =>
+        css.includes('.cb-panel:hover') ? [file] : [])
+      expect(offenders).toEqual([])
+    })
+
+    it('colorizes the dots and the pictures from cb-panel-hot', () => {
+      const css = Object.values(CSS).join('\n')
+      expect(css).toContain('.cb-panel-hot .cb-dots-panel-canvas')
+      expect(css).toContain('.cb-panel-hot .cb-panel-img')
+    })
   })
 
   describe('a spilled picture', () => {
