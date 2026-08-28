@@ -30,8 +30,9 @@ function bubbleLabel(b: BubbleTransform, i: number): string {
 
 /**
  * The bubble-only half of the selection inspector: which panel it belongs to, its
- * shape and tail, how its text is presented, the text itself, the event morph
- * targets, its link, and whether the linked group is a chain.
+ * shape and tail, how its text is presented, the text itself, the event responses —
+ * the two morph targets and the hover weight — its link, and whether the linked group
+ * is a chain.
  *
  * The link picker offers only the other bubbles on the same panel — that is where
  * the same-panel rule is enforced, by never presenting the invalid choice. Changing
@@ -171,6 +172,18 @@ export default function BubbleInspector({ api, index, bubble }: BubbleInspectorP
             <option key={key} value={key}>{BUBBLE_TYPES[key].label}</option>
           ))}
         </select>
+      </label>
+
+      {/* The third event response, and the one that is not a morph: weight is a stroke,
+          so it is a checkbox rather than a fourth entry in the shape list. It bolds this
+          balloon alone — a tube and the balloon at its far end keep their own ink. */}
+      <label className="cb-ed-check">
+        <input
+          type="checkbox"
+          checked={bubble.hoverBold}
+          onChange={e => api.setBubble(index, { hoverBold: e.target.checked })}
+        />
+        <span>Bolder outline on hover</span>
       </label>
 
       {/* Connector tube — and, with the checkbox below, the chain. Symmetric, so it only

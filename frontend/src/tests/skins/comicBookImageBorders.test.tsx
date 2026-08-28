@@ -217,6 +217,10 @@ describe('the stylesheet gives a picture no border either', () => {
   // The glob is asserted non-empty first: an `it.each([])` is zero tests and a green run.
   it('finds the skin\'s stylesheets', () => {
     expect(CSS_FILES.length).toBeGreaterThan(5)
+    // Their *contents* too, which the count above does not cover: vitest stubs a CSS
+    // request to an empty string unless the file is in `test.css.include`, and this file
+    // was green on twelve empty strings for as long as it had existed.
+    expect(CSS_FILES.every(f => CSS[f].length > 0)).toBe(true)
   })
 
   it.each(CSS_FILES)('%s styles no edge onto a picture', file => {

@@ -61,7 +61,10 @@ export const PANEL_IMG_TRANSFORMS: ImgTransform[] = [
 // Not parallel to PANELS either: each bubble names its `panel`, a panel may own any
 // number of them, and the array is ordered by panel only for readability. `type`/`text`
 // are the resting content, `hoverType` and `clickType` the shapes to morph to on
-// pointer-over and press (null = stay put), `tail` which way the tail points ('none'
+// pointer-over and press (null = stay put), `hoverBold` whether pointer-over also inks
+// this balloon's outline heavier — its tail and a thought bubble's puffs bold with it,
+// while a connector tube, the balloon at the far end of one and the other rows of a
+// chain keep their own weight — `tail` which way the tail points ('none'
 // for no tail), and `linkTo` the bubble to join with a connector tube — an index into
 // this array, which must name a bubble on the same panel. `spill: true` keeps the
 // current look where bubbles float into the gutter. `content` picks how `text` reads:
@@ -85,21 +88,21 @@ export const PANEL_IMG_TRANSFORMS: ImgTransform[] = [
 // landscape layout; the portrait and square layouts reshape the panels, so a pair may
 // end up close enough there to drop its tube. Retune per layout in the editor.
 export const PANEL_BUBBLE_TRANSFORMS: BubbleTransform[] = [
-  { panel: 0, top: -35, right: -12, width: 55, rotate: -5, spill: true, type: 'soft', tail: 'down-left', content: 'text', text: "It's Carameli!", linkTo: 1, hoverType: 'cloud', clickType: 'lightning', chain: '' },
-  { panel: 0, top: 30, right: 45, width: 45, rotate: -5, spill: true, type: 'soft', tail: 'none', content: 'text', text: '...at your service!', linkTo: null, hoverType: 'cloud', clickType: 'lightning', chain: '' },
-  { panel: 1, top: -35, right: -12, width: 55, rotate: -5, spill: true, type: 'soft', tail: 'down-right', content: 'text', text: 'Number please!', linkTo: null, hoverType: 'cloud', clickType: 'lightning', chain: '' },
-  { panel: 2, top: -35, right: -12, width: 55, rotate: -5, spill: true, type: 'cloud', tail: 'down-left', content: 'text', text: 'I wonder...', linkTo: null, hoverType: 'soft', clickType: 'lightning', chain: '' },
-  { panel: 3, top: -35, right: -12, width: 55, rotate: -5, spill: true, type: 'lightning', tail: 'down-left', content: 'text', text: 'FIXED!', linkTo: 5, hoverType: 'cloud', clickType: 'soft', chain: '' },
-  { panel: 3, top: 30, right: 45, width: 45, rotate: -5, spill: true, type: 'soft', tail: 'none', content: 'text', text: '...for now.', linkTo: null, hoverType: 'cloud', clickType: 'lightning', chain: '' },
-  { panel: 4, top: -30, right: 30, width: 45, rotate: -5, spill: true, type: 'soft', tail: 'down-right', content: 'text', text: 'One moment please!', linkTo: null, hoverType: 'cloud', clickType: 'lightning', chain: '' },
-  { panel: 5, top: -35, right: -12, width: 55, rotate: -5, spill: true, type: 'lightning', tail: 'down-left', content: 'text', text: 'RING RING!', linkTo: null, hoverType: 'cloud', clickType: 'soft', chain: '' },
-  { panel: 6, top: -35, right: -12, width: 55, rotate: -5, spill: true, type: 'lightning', tail: 'down-left', content: 'text', text: 'Ka-POW!', linkTo: null, hoverType: 'soft', clickType: 'cloud', chain: '' },
-  { panel: 7, top: -35, right: -12, width: 55, rotate: -5, spill: true, type: 'cloud', tail: 'down-left', content: 'text', text: 'Delivering dreams...', linkTo: null, hoverType: 'soft', clickType: 'lightning', chain: '' },
-  { panel: 9, top: 1, right: 8, width: 36, rotate: -5, spill: true, type: 'cloud', tail: 'none', content: 'dial', text: '4388762750', linkTo: null, hoverType: null, clickType: null, chain: '' },
-  { panel: 9, top: 49, right: 12, width: 21, rotate: -5, spill: true, type: 'cloud', tail: 'none', content: 'actions', text: 'Call, End call', linkTo: 10, hoverType: null, clickType: null, chain: '' },
-  { panel: 11, top: 26, right: 54, width: 23, rotate: -5, spill: true, type: 'soft', tail: 'down-left', content: 'text', text: 'recipient sms', linkTo: null, hoverType: null, clickType: null, chain: 'chain-1' },
-  { panel: 11, top: 57, right: 76, width: 31, rotate: -5, spill: true, type: 'cloud', tail: 'right', content: 'dial', text: '4388762750', linkTo: null, hoverType: null, clickType: null, chain: '' },
-  { panel: 11, top: 16, right: 21, width: 31, rotate: -5, spill: true, type: 'soft', tail: 'down-left', content: 'text', text: 'sender sms', linkTo: null, hoverType: null, clickType: null, chain: 'chain-2' },
+  { panel: 0, top: -35, right: -12, width: 55, rotate: -5, spill: true, type: 'soft', tail: 'down-left', content: 'text', text: "It's Carameli!", linkTo: 1, hoverType: 'cloud', clickType: 'lightning', hoverBold: false, chain: '' },
+  { panel: 0, top: 30, right: 45, width: 45, rotate: -5, spill: true, type: 'soft', tail: 'none', content: 'text', text: '...at your service!', linkTo: null, hoverType: 'cloud', clickType: 'lightning', hoverBold: false, chain: '' },
+  { panel: 1, top: -35, right: -12, width: 55, rotate: -5, spill: true, type: 'soft', tail: 'down-right', content: 'text', text: 'Number please!', linkTo: null, hoverType: 'cloud', clickType: 'lightning', hoverBold: false, chain: '' },
+  { panel: 2, top: -35, right: -12, width: 55, rotate: -5, spill: true, type: 'cloud', tail: 'down-left', content: 'text', text: 'I wonder...', linkTo: null, hoverType: 'soft', clickType: 'lightning', hoverBold: false, chain: '' },
+  { panel: 3, top: -35, right: -12, width: 55, rotate: -5, spill: true, type: 'lightning', tail: 'down-left', content: 'text', text: 'FIXED!', linkTo: 5, hoverType: 'cloud', clickType: 'soft', hoverBold: false, chain: '' },
+  { panel: 3, top: 30, right: 45, width: 45, rotate: -5, spill: true, type: 'soft', tail: 'none', content: 'text', text: '...for now.', linkTo: null, hoverType: 'cloud', clickType: 'lightning', hoverBold: false, chain: '' },
+  { panel: 4, top: -30, right: 30, width: 45, rotate: -5, spill: true, type: 'soft', tail: 'down-right', content: 'text', text: 'One moment please!', linkTo: null, hoverType: 'cloud', clickType: 'lightning', hoverBold: false, chain: '' },
+  { panel: 5, top: -35, right: -12, width: 55, rotate: -5, spill: true, type: 'lightning', tail: 'down-left', content: 'text', text: 'RING RING!', linkTo: null, hoverType: 'cloud', clickType: 'soft', hoverBold: false, chain: '' },
+  { panel: 6, top: -35, right: -12, width: 55, rotate: -5, spill: true, type: 'lightning', tail: 'down-left', content: 'text', text: 'Ka-POW!', linkTo: null, hoverType: 'soft', clickType: 'cloud', hoverBold: false, chain: '' },
+  { panel: 7, top: -35, right: -12, width: 55, rotate: -5, spill: true, type: 'cloud', tail: 'down-left', content: 'text', text: 'Delivering dreams...', linkTo: null, hoverType: 'soft', clickType: 'lightning', hoverBold: false, chain: '' },
+  { panel: 9, top: 1, right: 8, width: 36, rotate: -5, spill: true, type: 'cloud', tail: 'none', content: 'dial', text: '4388762750', linkTo: null, hoverType: null, clickType: null, hoverBold: false, chain: '' },
+  { panel: 9, top: 49, right: 12, width: 21, rotate: -5, spill: true, type: 'cloud', tail: 'none', content: 'actions', text: 'Call, End call', linkTo: 10, hoverType: null, clickType: null, hoverBold: false, chain: '' },
+  { panel: 11, top: 26, right: 54, width: 23, rotate: -5, spill: true, type: 'soft', tail: 'down-left', content: 'text', text: 'recipient sms', linkTo: null, hoverType: null, clickType: null, hoverBold: false, chain: 'chain-1' },
+  { panel: 11, top: 57, right: 76, width: 31, rotate: -5, spill: true, type: 'cloud', tail: 'right', content: 'dial', text: '4388762750', linkTo: null, hoverType: null, clickType: null, hoverBold: false, chain: '' },
+  { panel: 11, top: 16, right: 21, width: 31, rotate: -5, spill: true, type: 'soft', tail: 'down-left', content: 'text', text: 'sender sms', linkTo: null, hoverType: null, clickType: null, hoverBold: false, chain: 'chain-2' },
 ]
 
 // One entry per chain id the bubbles above carry — the list is derived from them, not

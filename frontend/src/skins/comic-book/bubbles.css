@@ -1,4 +1,5 @@
 @import './bubbleInputs.css';
+@import './bubbleTubes.css';
 
 /* Speech bubbles and their connector tubes.
    Split out to stay under the skin's 250-line ceiling; imported by Layout.tsx after
@@ -141,10 +142,29 @@
 .cb-bubble-shape {
   fill: var(--cb-white);
   stroke: var(--cb-black);
-  stroke-width: 4;
+  stroke-width: var(--cb-bubble-ink, 4);
   stroke-linejoin: miter;
   stroke-miterlimit: 20;
   vector-effect: non-scaling-stroke;
+
+  /* Weight eases rather than snapping, on the morph's own duration, so a bubble that
+     both bolds and changes shape on hover does the two as one gesture. */
+  transition: stroke-width 180ms ease-out;
+}
+
+/* The `hoverBold` option (PANEL_BUBBLE_TRANSFORMS): a heavier outline while the pointer
+   is over this balloon. React-driven, from PanelBubble's own hover state, which is what
+   confines it — a linked partner, the tube welded between them and the other rows of a
+   chain are separate renders and never see this class.
+
+   Scoped to this bubble's subtree, so both the ring and the thought puffs take it: the
+   tail is a vertex of that ring and the puffs carry the same class, which is how "the
+   border, and its stem's border" ends up being one declaration rather than three.
+
+   7, against the resting 4 and the panel ink's 5: heavy enough to read as the balloon
+   answering the pointer, short of the weight that makes a balloon look like a panel. */
+.cb-panel-bubble.is-bold {
+  --cb-bubble-ink: 7;
 }
 
 /* Thought-bubble puffs are detached, so they cannot join the morph ring — they
@@ -226,45 +246,3 @@
   opacity: 1;
 }
 
-/* ─── Bubble connector tubes ─────────────────────────────────────────────────── */
-
-/* One viewport-level layer. Its z-index is load-bearing at both ends: above a lifted
-   panel (z:8) so each tube's white fill erases the slice of bubble outline it covers
-   — that erasure IS the weld, there is no path union — and below the Ben-Day wash
-   (z:10) so a page transition still covers the tubes. No viewBox: path coordinates
-   are viewport pixels, and overflow:visible lets a tube follow a bubble that floats
-   past the viewport edge. */
-.cb-tube-svg {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  overflow: visible;
-  pointer-events: none;
-  z-index: 9;
-}
-
-/* Matches .cb-panel-bubble's opacity transition so a tube fades in step with the
-   two bubbles it joins rather than popping a frame ahead of them. */
-.cb-tube {
-  opacity: 0;
-  transition: opacity 180ms ease-out;
-}
-
-.cb-tube.is-visible {
-  opacity: 1;
-}
-
-.cb-tube-fill {
-  fill: var(--cb-white);
-  stroke: none;
-}
-
-/* Rails only — the corridor's two ends stay unstroked, which is what lets it read as
-   open into each bubble instead of as a separate capsule laid on top. */
-.cb-tube-rail {
-  fill: none;
-  stroke: var(--cb-black);
-  stroke-width: 4;
-  stroke-linecap: butt;
-}

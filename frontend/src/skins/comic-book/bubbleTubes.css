@@ -1,0 +1,51 @@
+/* ─── Bubble connector tubes ───────────────────────────────────────────────────
+   The corridor joining two linked balloons (bubbleTube.ts, BubbleTubes.tsx). Split
+   out of bubbles.css to keep that file under the skin's 250-line ceiling; it is
+   @import-ed from there, so nothing about the cascade changed. Every selector here
+   is unique to tubes. */
+
+/* One viewport-level layer. Its z-index is load-bearing at both ends: above a lifted
+   panel (z:8) so each tube's white fill erases the slice of bubble outline it covers
+   — that erasure IS the weld, there is no path union — and below the Ben-Day wash
+   (z:10) so a page transition still covers the tubes. No viewBox: path coordinates
+   are viewport pixels, and overflow:visible lets a tube follow a bubble that floats
+   past the viewport edge. */
+.cb-tube-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+  z-index: 9;
+}
+
+/* Matches .cb-panel-bubble's opacity transition so a tube fades in step with the
+   two bubbles it joins rather than popping a frame ahead of them. */
+.cb-tube {
+  opacity: 0;
+  transition: opacity 180ms ease-out;
+}
+
+.cb-tube.is-visible {
+  opacity: 1;
+}
+
+.cb-tube-fill {
+  fill: var(--cb-white);
+  stroke: none;
+}
+
+/* Rails only — the corridor's two ends stay unstroked, which is what lets it read as
+   open into each bubble instead of as a separate capsule laid on top.
+
+   The weight is a constant, not `--cb-bubble-ink`: a balloon whose `hoverBold` is on
+   thickens under the pointer and its tube does not, because a corridor is one
+   utterance crossing two balloons and thickening only its far half would read as the
+   drawing coming apart. */
+.cb-tube-rail {
+  fill: none;
+  stroke: var(--cb-black);
+  stroke-width: 4;
+  stroke-linecap: butt;
+}
