@@ -5,20 +5,29 @@ import type { BubbleTransform, ImgTransform } from './editor/types'
 import type { PanelPoly } from './panelGeometry'
 
 /**
- * Whether the pointer sits on a balloon panel `panel` has actually drawn. The pure hit
- * test covers plain balloons from their transforms, but a chain's balloons are stamped
- * rows whose places only the renderer knows — so this asks the rendered elements. Only
- * balloons currently shown (`is-visible`) count, and only unclipped ones: a balloon
- * inside a `.cb-bubble-clip` wrapper has no ink outside its panel polygon, so sticking
- * to its box out there would keep the hover on ink nobody can see.
+ * Whether the pointer sits on ink of a balloon panel `panel` has actually drawn. The
+ * pure hit test covers plain balloons from their transforms, but a chain's balloons are
+ * stamped rows whose places only the renderer knows — so this asks their SVG geometry.
+ * The containing element's rectangle is deliberately not enough: most of that box is
+ * transparent around the balloon, and counting it makes hover stick after the pointer
+ * has visibly reached the panel below. Only shown, unclipped balloons count.
  */
 function overDrawnBalloon(x: number, y: number, panel: number): boolean {
   const host = document.querySelector(`.cb-panel[data-cb-panel="${panel}"]`)
   if (!host) return false
   for (const el of host.querySelectorAll('.cb-panel-bubble.is-visible')) {
     if (el.closest('.cb-bubble-clip')) continue
-    const r = el.getBoundingClientRect()
-    if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) return true
+    const svg = el.querySelector<SVGSVGElement>('.cb-panel-bubble-svg')
+    const point = svg?.createSVGPoint()
+    if (!svg || !point) continue
+    point.x = x
+    point.y = y
+    for (const shape of svg.querySelectorAll<SVGGeometryElement>('.cb-bubble-shape')) {
+      const matrix = shape.getScreenCTM()
+      if (!matrix) continue
+      const local = point.matrixTransform(matrix.inverse())
+      if (shape.isPointInFill(local) || shape.isPointInStroke(local)) return true
+    }
   }
   return false
 }

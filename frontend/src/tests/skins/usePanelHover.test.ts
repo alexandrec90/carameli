@@ -76,10 +76,27 @@ describe('usePanelHover', () => {
       panel.dataset.cbPanel = '0'
       const balloon = document.createElement('div')
       balloon.className = `cb-panel-bubble${over.visible === false ? '' : ' is-visible'}`
-      // jsdom lays nothing out, so the measurement the hook makes is stubbed: the
-      // balloon's box runs x 80..120, y 10..40 — across the seam into panel 1.
-      balloon.getBoundingClientRect = () =>
-        ({ left: 80, right: 120, top: 10, bottom: 40 }) as DOMRect
+      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
+      svg.classList.add('cb-panel-bubble-svg')
+      const shape = document.createElementNS('http://www.w3.org/2000/svg', 'path')
+      shape.classList.add('cb-bubble-shape')
+      // jsdom has no SVG geometry implementation. Model painted ink spanning
+      // x 90..115, y 10..40 inside a larger transparent element box.
+      Object.defineProperties(svg, {
+        createSVGPoint: { value: () => ({
+          x: 0,
+          y: 0,
+          matrixTransform() { return this },
+        }) },
+      })
+      Object.defineProperties(shape, {
+        getScreenCTM: { value: () => ({ inverse: () => ({}) }) },
+        isPointInFill: { value: (point: DOMPoint) =>
+          point.x >= 90 && point.x <= 115 && point.y >= 10 && point.y <= 40 },
+        isPointInStroke: { value: () => false },
+      })
+      svg.appendChild(shape)
+      balloon.appendChild(svg)
       if (over.clipped) {
         const clip = document.createElement('div')
         clip.className = 'cb-bubble-clip'
@@ -102,8 +119,9 @@ describe('usePanelHover', () => {
       move(110, 20)
       expect(result.current).toBe(0)
 
-      // Off the balloon: panel 1 takes the hover, and the balloons follow it away.
-      move(150, 80)
+      // Still inside the balloon element's rectangular box, but outside its visible
+      // outline: panel 1 takes the hover immediately.
+      move(118, 20)
       expect(result.current).toBe(1)
     })
 
