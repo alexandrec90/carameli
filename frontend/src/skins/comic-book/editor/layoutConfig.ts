@@ -99,7 +99,7 @@ export const PANEL_BUBBLE_TRANSFORMS: BubbleTransform[] = [
   { panel: 9, top: 49, right: 12, width: 21, rotate: -5, spill: true, type: 'cloud', tail: 'none', content: 'actions', text: 'Call, End call', linkTo: 10, hoverType: null, clickType: null, chain: '' },
   { panel: 11, top: 26, right: 54, width: 23, rotate: -5, spill: true, type: 'soft', tail: 'down-left', content: 'text', text: 'recipient sms', linkTo: null, hoverType: null, clickType: null, chain: 'chain-1' },
   { panel: 11, top: 57, right: 76, width: 31, rotate: -5, spill: true, type: 'cloud', tail: 'right', content: 'dial', text: '4388762750', linkTo: null, hoverType: null, clickType: null, chain: '' },
-  { panel: 11, top: 16, right: 21, width: 31, rotate: -5, spill: true, type: 'soft', tail: 'down-left', content: 'text', text: 'sender sms', linkTo: null, hoverType: null, clickType: null, chain: 'chain-2' },
+  { panel: 11, top: 16, right: 21, width: 31, rotate: -5, spill: true, type: 'soft', tail: 'down-left', content: 'input', text: '', linkTo: null, hoverType: null, clickType: null, chain: 'chain-1' },
 ]
 
 // One entry per chain id the bubbles above carry — the list is derived from them, not
@@ -131,7 +131,6 @@ export const PANEL_BUBBLE_TRANSFORMS: BubbleTransform[] = [
 // an empty conversation rather than guessing at one.
 export const PANEL_BUBBLE_CHAINS: BubbleChain[] = [
   { id: 'chain-1', grow: true, stepMs: 900, rows: 6, sms: true, messages: [] },
-  { id: 'chain-2', grow: true, stepMs: 900, rows: 6, sms: false, messages: [] },
 ]
 
 // The one array here that IS parallel to PANELS: a pattern belongs to the panel slot

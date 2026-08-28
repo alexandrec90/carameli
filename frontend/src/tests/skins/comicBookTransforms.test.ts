@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { BUBBLE_ASPECT, TAIL_DIR_KEYS } from '../../skins/comic-book/bubbleBox'
+import { isComposerContent } from '../../skins/comic-book/bubbleChain'
 import { linkedPairs } from '../../skins/comic-book/bubbleTube'
 import { BUBBLE_TYPES, BUBBLE_TYPE_KEYS } from '../../skins/comic-book/editor/bubbleTypes'
 import {
@@ -517,11 +518,16 @@ describe('default config parity', () => {
     })
   })
 
+  // A chain's composer is the one balloon authored blank: its `text` is the field's
+  // initial value (PanelBubble hands it to BubbleInput as such), and a composer that
+  // opens with words in it is a message the reader did not write.
+  const isComposer = (b: BubbleTransform) => isThread(b) && isComposerContent(b.content)
+
   it('floats every bubble into the gutter with a caption and a rotation', () => {
     PANEL_BUBBLE_TRANSFORMS.forEach(b => {
       expect(b.spill).toBe(true)
       expect(b.rotate).toBe(-5)
-      expect(b.text.length).toBeGreaterThan(0)
+      if (!isComposer(b)) expect(b.text.length).toBeGreaterThan(0)
       expect(b.width).toBeGreaterThan(0)
     })
   })
