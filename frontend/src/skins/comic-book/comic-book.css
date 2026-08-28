@@ -230,11 +230,19 @@
 /* ─── Panel stacking while a bubble shows ─────────────────────────────────────
    The bubbles and their tubes live in bubbles.css; this is the panel-side half. */
 
-/* Elevate a panel whose bubble is showing above the SVG outline layer (z:3) so the
-   bubble, which lives inside the panel div, paints on top of the ink lines. Driven by
-   a class rather than :hover because a link reveals its partner's bubble too, and that
-   partner is never the element under the pointer. */
-.cb-panel-lift {
+/* Elevate the balloons of a panel whose bubbles are showing above the SVG outline layer
+   (z:3) so the ink lines do not cross them. Driven by a class rather than :hover because
+   a link reveals its partner's bubble too, and that partner is never the element under
+   the pointer.
+
+   The lift is on the bubble wrappers, NEVER on `.cb-panel` itself. A panel raised over
+   the ink takes its Ben-Day canvas and its clipped pictures up with it, and those are
+   clipped to the very polygon the ink strokes — so they cover the inner half of that
+   5 px stroke and the border reads as thinning to half width on hover. Only the balloons
+   need to be above the ink, and a spilling one already is (z:5, in the root context,
+   since a panel makes no stacking context); this raises the clipped ones, which
+   `.cb-bubble-clip` traps at z:1. */
+.cb-panel-lift .cb-bubble-clip {
   z-index: 8;
 }
 

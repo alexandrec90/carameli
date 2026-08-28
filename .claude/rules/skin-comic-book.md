@@ -263,8 +263,8 @@ a delete, an add, a panel change — runs `sanitizeLinks`.
 
 The corridor is **welded by paint order, not by a path union**: it sinks into both
 bubbles and the tube layer paints above them (z-index 9), so its white fill erases
-the slice of outline it covers. Both z-indices are load-bearing — above the lifted
-panel (z 8), below the Ben-Day wash (z 10). Overlapping bubbles draw no tube at all,
+the slice of outline it covers. Both z-indices are load-bearing — above a lifted
+balloon (z 8), below the Ben-Day wash (z 10). Overlapping bubbles draw no tube at all,
 by design; a corridor shorter than its own width reads as a smudge.
 
 ### Bubble chains — two balloons read as an SMS thread
