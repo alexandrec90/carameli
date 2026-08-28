@@ -1,4 +1,5 @@
 import { BUBBLE_ASPECT, BUBBLE_ELLIPSE_N, tailTip } from './bubbleBox'
+import { isDialContent } from './bubbleContent'
 import type { BubbleTransform } from './editor/types'
 
 // A bubble *chain* is an SMS conversation, drawn the way a phone draws one: two columns
@@ -296,7 +297,8 @@ export function readTranscript(messages: readonly string[]): ChainLine[] {
 }
 
 /** The content kinds that pick a number: a drum of options, or one you can also type. */
-const PICKER_CONTENT = ['wheel', 'dial']
+const isPickerContent = (content: string): boolean =>
+  content === 'wheel' || isDialContent(content)
 
 /**
  * The balloon on `panel` whose picker names the number a live conversation is with, or -1
@@ -309,8 +311,9 @@ const PICKER_CONTENT = ['wheel', 'dial']
  * the same way that linkage plus a checkbox is how they express "these two are a
  * conversation".
  *
- * A `dial` counts because it *is* a wheel picker — one whose picked option can also be
- * typed or punched in on the panel's keypad. A conversation bound to a number the reader
+ * Either `dial` counts because it *is* a wheel picker — one whose picked option can also
+ * be typed or punched in on the panel's keypad, and, for `dial-call`, placed from a key
+ * beside the field. A conversation bound to a number the reader
  * dialled is the same conversation as one bound to a number they turned to; that the two
  * are one balloon rather than two is the point of the kind.
  *
@@ -323,7 +326,7 @@ export function peerPickerOn(
   panel: number,
 ): number {
   return bubbles.findIndex(
-    b => b.panel === panel && b.chain === '' && PICKER_CONTENT.includes(b.content),
+    b => b.panel === panel && b.chain === '' && isPickerContent(b.content),
   )
 }
 

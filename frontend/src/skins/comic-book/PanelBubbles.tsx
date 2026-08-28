@@ -4,6 +4,7 @@ import {
   chainIdsOn, chainMembers, defaultChain, isComposerContent, peerPickerOn,
 } from './bubbleChain'
 import type { BubbleChain } from './bubbleChain'
+import { isDialContent } from './bubbleContent'
 import PanelBubble from './PanelBubble'
 import PanelBubbleChain from './PanelBubbleChain'
 import type { BubbleTransform } from './editor/types'
@@ -62,8 +63,9 @@ interface PanelBubblesProps {
    * either — its Enter belongs to the conversation's composer (see PanelBubbleChain) —
    * which the claimed-index filter below already guarantees.
    *
-   * A `dial` balloon dials on Enter too, and for the same reason: it is a phone field
-   * with a shortlist behind it.
+   * Either `dial` balloon dials on Enter too, and for the same reason: it is a phone field
+   * with a shortlist behind it. A `dial-call` sends its own call key here as well, so the
+   * key and Enter place the same call.
    */
   onPhoneSubmit?(value: string): void
   /**
@@ -153,7 +155,7 @@ export default function PanelBubbles({
   // A dial picker reports nothing: its number is the panel's, because the keypad in the
   // picture writes to it too. So the number a chain binds to comes from the prop rather
   // than from the local selection below, and the two are never both in play.
-  const dialPicker = pickerIndex >= 0 && bubbles[pickerIndex].content === 'dial'
+  const dialPicker = pickerIndex >= 0 && isDialContent(bubbles[pickerIndex].content)
   // Whichever option the drum is showing. Reported by BubbleWheel on mount as well as on
   // every turn, so this is populated before the reader touches anything.
   const [picked, setPicked] = useState('')
@@ -204,7 +206,7 @@ export default function PanelBubbles({
             keyboard={i === pickerIndex ? !composerOwnsKeyboard : undefined}
             onHoverChange={i === pickerIndex ? setPickerHovered : undefined}
             onSubmit={
-              bubble.content === 'phone' || bubble.content === 'dial'
+              bubble.content === 'phone' || isDialContent(bubble.content)
                 ? onPhoneSubmit
                 : undefined
             }

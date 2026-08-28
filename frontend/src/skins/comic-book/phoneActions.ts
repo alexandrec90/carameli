@@ -26,8 +26,20 @@ export interface PhoneAction {
  * here is not an error: `BubbleActions` letters it, which is what a balloon with no
  * telephone behind it looks like in the editor.
  */
+/**
+ * The green key on its own, because a `dial-call` balloon draws it beside its field
+ * rather than from a label an author typed (BubbleCallKey). Exported so the artwork and
+ * the accessible name are stated once: a second copy of the path is a key that stops
+ * being the same key the moment either is renamed.
+ */
+export const CALL_KEY: PhoneAction = {
+  id: 'call',
+  src: '/comic-book/call-button.webp',
+  label: 'Call',
+}
+
 const KEYS: Readonly<Record<string, PhoneAction>> = {
-  call: { id: 'call', src: '/comic-book/call-button.webp', label: 'Call' },
+  call: CALL_KEY,
   endcall: { id: 'hangup', src: '/comic-book/end-call-button.webp', label: 'End call' },
 }
 

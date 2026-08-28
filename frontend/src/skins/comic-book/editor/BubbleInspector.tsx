@@ -1,5 +1,6 @@
 import { TAIL_DIRS, TAIL_DIR_KEYS } from '../bubbleBox'
 import type { TailDir } from '../bubbleBox'
+import { isDialContent } from '../bubbleContent'
 import type { BubbleContentKind } from '../bubbleContent'
 import { BUBBLE_TYPES, BUBBLE_TYPE_KEYS } from './bubbleTypes'
 import type { BubbleType } from './bubbleTypes'
@@ -96,12 +97,13 @@ export default function BubbleInspector({ api, index, bubble }: BubbleInspectorP
           <option value="input">Text input</option>
           <option value="phone">Phone input</option>
           <option value="dial">Dial (wheel + phone input)</option>
+          <option value="dial-call">Dial + call button</option>
           <option value="actions">Action buttons</option>
         </select>
       </label>
       <label className="cb-ed-field">
         <span>
-          {bubble.content === 'wheel' || bubble.content === 'dial'
+          {bubble.content === 'wheel' || isDialContent(bubble.content)
             ? 'options'
             : bubble.content === 'input' || bubble.content === 'phone'
               ? 'initial value'
@@ -122,12 +124,17 @@ export default function BubbleInspector({ api, index, bubble }: BubbleInspectorP
           scroll to turn it — the picker is live outside edit mode.
         </div>
       )}
-      {bubble.content === 'dial' && (
+      {isDialContent(bubble.content) && (
         <div className="cb-ed-hint">
           Comma-delimited, same as the wheel — but this is an autocomplete: the drum&apos;s
           centre line is a real phone field, and typing into it (or punching a number pad
           projected onto a picture on this panel) narrows the rows behind it. The first
           option is what it starts on; Enter dials, and adds the number to the list.
+          {bubble.content === 'dial-call' && (
+            <> The telephone&apos;s green key sits at the right of the field and places the
+            same call Enter does. It stays greyed until the number in the field is one that
+            could be dialled.</>
+          )}
         </div>
       )}
       {(bubble.content === 'input' || bubble.content === 'phone') && (

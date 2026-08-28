@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { KeyboardEvent, PointerEvent, RefObject } from 'react'
 
+import BubbleCallKey from './BubbleCallKey'
 import {
   dialDigits,
   dialMatches,
@@ -60,6 +61,13 @@ interface BubbleDialProps {
   hostRef: RefObject<HTMLDivElement | null>
   /** Enter dials the number. Absent leaves Enter doing nothing. */
   onSubmit?(value: string): void
+  /**
+   * Draw the telephone's green key at the right of the field — the 'dial-call' kind. The
+   * key runs the same `onSubmit` Enter does and is greyed until the number is one that
+   * could be dialled (BubbleCallKey); everything else about the balloon is unchanged,
+   * which is why this is a flag here rather than a second component.
+   */
+  call?: boolean
 }
 
 /**
@@ -96,6 +104,7 @@ interface BubbleDialProps {
  */
 export default function BubbleDial({
   options, value, fresh, onChange, font, open, revealed, enabled, hostRef, onSubmit,
+  call = false,
 }: BubbleDialProps) {
   const inputRef = useRef<HTMLInputElement>(null)
   // The comic caret shows only where typing would append — never over a fresh,
@@ -203,7 +212,10 @@ export default function BubbleDial({
 
   return (
     <div
-      className={`cb-panel-bubble-text cb-bubble-wheel cb-bubble-dial${open ? ' is-open' : ''}`}
+      className={
+        `cb-panel-bubble-text cb-bubble-wheel cb-bubble-dial${call ? ' has-call' : ''}` +
+        `${open ? ' is-open' : ''}`
+      }
       style={{ fontFamily: `'${font}', cursive` }}
     >
       {/* The drum. Decorative: every row here is either the field's own (blank, below) or
@@ -253,6 +265,9 @@ export default function BubbleDial({
         style={{ visibility: 'hidden' }}
         aria-hidden="true"
       />
+      {call && (
+        <BubbleCallKey value={value} country={country} enabled={enabled} onCall={onSubmit} />
+      )}
     </div>
   )
 }
