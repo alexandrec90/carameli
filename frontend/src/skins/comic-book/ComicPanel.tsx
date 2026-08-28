@@ -150,8 +150,11 @@ export default function ComicPanel({
                 'cb-panel',
                 info.isLogo ? 'logo' : '',
                 revealFull ? 'cb-panel-reveal' : '',
-                // Lift the panel over the ink-line SVG while its bubbles show,
-                // so they are not crossed by frame ink.
+                // Lifts this panel's clipped balloons over the ink-line SVG while its
+                // bubbles show, so they are not crossed by frame ink. The panel itself
+                // stays put: raised, its own clipped content would cover the inner half
+                // of the ink stroking its polygon and the border would read as thinner
+                // under the pointer.
                 !editorActive && hovered ? 'cb-panel-lift' : '',
             ].filter(Boolean).join(' ')}
             style={{

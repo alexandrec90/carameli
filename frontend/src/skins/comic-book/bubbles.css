@@ -109,7 +109,10 @@
    bubble is clipped to the panel polygon (supplied inline) instead of floating.
    z-index 1 creates a stacking context that traps the bubble's z-5 below the
    panel-outline SVG (z-3): a clipped bubble sits behind the frame lines, while a
-   spilling bubble (no wrapper) escapes above them. */
+   spilling bubble (no wrapper) escapes above them. While its panel is hovered,
+   `.cb-panel-lift .cb-bubble-clip` (comic-book.css) raises this wrapper to z-8 so the
+   revealed balloon clears the ink — that is the panel's whole lift, because lifting
+   the panel element covers its own ink instead. */
 .cb-bubble-clip {
   position: absolute;
   inset: 0;
@@ -229,7 +232,7 @@
 /* ─── Bubble connector tubes ─────────────────────────────────────────────────── */
 
 /* One viewport-level layer. Its z-index is load-bearing at both ends: above a lifted
-   panel (z:8) so each tube's white fill erases the slice of bubble outline it covers
+   balloon (z:8) so each tube's white fill erases the slice of bubble outline it covers
    — that erasure IS the weld, there is no path union — and below the Ben-Day wash
    (z:10) so a page transition still covers the tubes. No viewBox: path coordinates
    are viewport pixels, and overflow:visible lets a tube follow a bubble that floats

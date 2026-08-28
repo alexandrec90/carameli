@@ -222,3 +222,31 @@
 .cb-ed-status-error {
   color: #ff9a9a;
 }
+
+/* What is still half-built in the working copy. Amber rather than the error red: nothing
+   has gone wrong, there is just work left, and a red block above the Save button every
+   time a balloon is added would be read as a fault and then stop being read at all. */
+.cb-ed-unfinished {
+  margin: 6px 0 0;
+  padding: 5px 6px;
+  border-left: 3px solid #d9a441;
+  background: rgb(217 164 65 / 12%);
+  color: #e6c98a;
+  font-size: 10px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.cb-ed-unfinished-head {
+  margin: 0;
+  font-weight: 700;
+}
+
+.cb-ed-unfinished-list {
+  /* Long enough to be worth scrolling rather than pushing Ship off the toolbar: eight
+     unfinished balloons is an ordinary afternoon's work in progress. */
+  max-height: 120px;
+  margin: 4px 0 0;
+  padding-left: 14px;
+  overflow-y: auto;
+}
