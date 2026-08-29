@@ -44,7 +44,7 @@
 .cb-ed-vx {
   stroke: #fff;
   stroke-width: 2;
-  cursor: grab;
+  cursor: var(--cb-cursor-grab);
   pointer-events: auto;
 }
 

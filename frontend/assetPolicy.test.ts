@@ -159,7 +159,11 @@ describe('comic-book cursors', () => {
   const CURSORS = {
     pointer: { export: 'pointer-cursor.webp', master: 'pointer.png' },
     click: { export: 'click-cursor.webp', master: 'click.png' },
+    grab: { export: 'hand-dragger-cursor.webp', master: 'hand-dragger.png' },
   } as const
+
+  /** The arrow is the yardstick every other cursor is measured against. */
+  const SCALED_AGAINST_POINTER = ['click', 'grab'] as const
 
   const sizeOfExport = (which: keyof typeof CURSORS) =>
     readImageSizeAt(path.join(PUBLIC_DIR, 'comic-book', CURSORS[which].export))
@@ -178,19 +182,19 @@ describe('comic-book cursors', () => {
     },
   )
 
-  /* The two are one downscale of their own masters, which is what makes the hand look
-     proportionate to the arrow. Fitting each into its own N-px box instead silently
-     rescales them against each other, because the masters are not the same shape --
-     that is how the hand ended up the arrow's height with a wider glyph in it. */
-  it("keeps the hand at the arrow's scale", () => {
+  /* Each is one downscale of its own master by the same factor, which is what makes the
+     hands look proportionate to the arrow. Fitting each into its own N-px box instead
+     silently rescales them against each other, because the masters are not the same
+     shape -- that is how the hand ended up the arrow's height with a wider glyph in it. */
+  it.each(SCALED_AGAINST_POINTER)("keeps %s at the arrow's scale", which => {
     const pointer = sizeOfExport('pointer')
-    const click = sizeOfExport('click')
+    const other = sizeOfExport(which)
     const pointerMaster = sizeOfMaster('pointer')
-    const clickMaster = sizeOfMaster('click')
-    expect(pointer && click && pointerMaster && clickMaster).toBeTruthy()
+    const otherMaster = sizeOfMaster(which)
+    expect(pointer && other && pointerMaster && otherMaster).toBeTruthy()
 
-    const exportRatio = (click?.height ?? 0) / (pointer?.height ?? 1)
-    const masterRatio = (clickMaster?.height ?? 0) / (pointerMaster?.height ?? 1)
+    const exportRatio = (other?.height ?? 0) / (pointer?.height ?? 1)
+    const masterRatio = (otherMaster?.height ?? 0) / (pointerMaster?.height ?? 1)
     expect(exportRatio).toBeCloseTo(masterRatio, 1)
   })
 
@@ -201,8 +205,25 @@ describe('comic-book cursors', () => {
     expect(stylesheet).toContain(
       "--cb-cursor-click: url('/comic-book/click-cursor.webp') 9 10, pointer",
     )
+    expect(stylesheet).toContain(
+      "--cb-cursor-grab: url('/comic-book/hand-dragger-cursor.webp') 8 10, grab",
+    )
     expect(stylesheet).toContain('cursor: var(--cb-cursor-default)')
     expect(stylesheet).toContain('cursor: var(--cb-cursor-click)')
+  })
+
+  /* The grab hand is declared in the skin's stylesheet and spent in the editor's, so a
+     bare `cursor: grab` left behind anywhere in the skin is a handle still wearing the
+     system hand next to one wearing the glove. `grabbing` keeps its native keyword --
+     see the token's own comment for why. */
+  it('dresses every grabbable surface in the skin, leaving none on the native hand', () => {
+    const skinDir = path.join(FRONTEND_ROOT, 'src', 'skins', 'comic-book')
+    const bare = walkFiles(skinDir).filter(
+      rel =>
+        rel.endsWith('.css') &&
+        /(^|\W)cursor:\s*grab\s*;/m.test(readFileSync(path.join(skinDir, rel), 'utf-8')),
+    )
+    expect(bare, `bare \`cursor: grab\` in ${bare.join(', ')}`).toEqual([])
   })
 
   /* A hotspot outside the image is silently ignored by the browser and the cursor falls
@@ -212,6 +233,7 @@ describe('comic-book cursors', () => {
     const hotspots: Record<keyof typeof CURSORS, RegExp> = {
       pointer: /pointer-cursor\.webp'\) (\d+) (\d+),/,
       click: /click-cursor\.webp'\) (\d+) (\d+),/,
+      grab: /hand-dragger-cursor\.webp'\) (\d+) (\d+),/,
     }
     for (const which of Object.keys(hotspots) as (keyof typeof CURSORS)[]) {
       const match = stylesheet.match(hotspots[which])

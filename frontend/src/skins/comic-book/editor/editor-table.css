@@ -30,7 +30,7 @@
    one that resizes the frame they sit in. */
 .cb-ed-quad-grip {
   border-radius: 50%;
-  cursor: grab;
+  cursor: var(--cb-cursor-grab);
 }
 
 .cb-ed-quad-grip:active {
