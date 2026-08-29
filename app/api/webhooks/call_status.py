@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import logging
+import uuid
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
@@ -25,6 +26,7 @@ from app.services import (
     phone_line_service,
     pointer_service,
     recording_links,
+    transcription,
     crm_notify,
 )
 
@@ -45,6 +47,38 @@ def _recording_enabled(phone_line: PhoneLine | None = None) -> bool:
     if settings.jambonz_record_all_calls:
         return True
     return bool(phone_line is not None and phone_line.recording_enabled)
+
+
+async def _with_transcription(
+    dial_verb: dict[str, Any],
+    *,
+    call_sid: str,
+    customer_id: uuid.UUID,
+    direction: str,
+    extension_id: uuid.UUID | None = None,
+) -> dict[str, Any]:
+    """Attach live transcription to a dial verb, and record who owns the result.
+
+    Returns ``dial_verb`` unchanged when transcription is off, so every call site can
+    wrap unconditionally. The session record is what later lets the streaming
+    endpoints answer "may this tenant read this call", and what turns a forked
+    channel number back into "our extension" or "the far party" -- both facts are
+    known here and nowhere downstream.
+    """
+    action = transcription.build_transcribe_action()
+    if action is None:
+        return dial_verb
+    dial_verb["transcribe"] = action
+    # Forking audio requires the media to stay on the feature server; releasing it
+    # would leave nothing to transcribe once the legs are bridged.
+    dial_verb["anchorMedia"] = True
+    await transcription.start_session(
+        call_sid,
+        customer_id=customer_id,
+        direction=direction,
+        extension_id=extension_id,
+    )
+    return dial_verb
 
 
 def _validate_jambonz_signature(raw_body: bytes, signature: str) -> None:
@@ -146,6 +180,12 @@ async def jambonz_call_status_webhook(
         WEBHOOK_FAILURES_TOTAL.inc()
         logger.exception("Failed to persist Jambonz call event for call_sid=%s", call_sid)
         return JSONResponse({"status": "ok"})
+
+    # A finished call has no more subtitles coming; tell subscribers so they close
+    # rather than waiting out their own timeout. Best-effort inside close_session, so
+    # a Redis outage cannot turn a persisted call event into a provider retry.
+    if _is_terminal_call_status(call_event.status):
+        await transcription.close_session(call_sid)
 
     # Write-back to CRM for terminal call states (legacy notify controller contract).
     if settings.crm_webhook_url and _is_terminal_call_status(call_event.status):
@@ -293,7 +333,10 @@ async def jambonz_incoming_call_webhook(
     if phone_line is not None:
         try:
             verbs = await _inbound_dial_verbs(
-                session, phone_line, from_number=data.get("from", "") or ""
+                session,
+                phone_line,
+                from_number=data.get("from", "") or "",
+                call_sid=call_sid,
             )
         except Exception:
             WEBHOOK_FAILURES_TOTAL.inc()
@@ -324,17 +367,23 @@ async def _outbound_dial_verbs(
             internal.extension_number,
         )
         return [
-            {
-                "verb": "dial",
-                "callerId": caller.extension_number,
-                "answerOnBridge": True,
-                "target": [
-                    {
-                        "type": "sip",
-                        "sipUri": agent_sip_uri(internal.sip_username, internal.sip_domain_sid),
-                    }
-                ],
-            }
+            await _with_transcription(
+                {
+                    "verb": "dial",
+                    "callerId": caller.extension_number,
+                    "answerOnBridge": True,
+                    "target": [
+                        {
+                            "type": "sip",
+                            "sipUri": agent_sip_uri(internal.sip_username, internal.sip_domain_sid),
+                        }
+                    ],
+                },
+                call_sid=call_sid,
+                customer_id=caller.customer_id,
+                direction="outbound",
+                extension_id=caller.id,
+            )
         ]
 
     destination = dialed_to_e164(to_number)
@@ -365,12 +414,18 @@ async def _outbound_dial_verbs(
     if _recording_enabled(phone_line):
         verbs.append(_RECORD_START_VERB)
     verbs.append(
-        {
-            "verb": "dial",
-            "callerId": phone_line.phone_number,
-            "answerOnBridge": True,
-            "target": [target],
-        }
+        await _with_transcription(
+            {
+                "verb": "dial",
+                "callerId": phone_line.phone_number,
+                "answerOnBridge": True,
+                "target": [target],
+            },
+            call_sid=call_sid,
+            customer_id=caller.customer_id,
+            direction="outbound",
+            extension_id=caller.id,
+        )
     )
     logger.info("Routing device call_sid=%s from ext=%s to PSTN", call_sid, caller.extension_number)
     return verbs
@@ -385,7 +440,7 @@ async def _outbound_caller_line(session: AsyncSession, caller: Extension) -> Pho
 
 
 async def _inbound_dial_verbs(
-    session: AsyncSession, phone_line: PhoneLine, from_number: str
+    session: AsyncSession, phone_line: PhoneLine, from_number: str, call_sid: str
 ) -> list[dict[str, Any]] | None:
     """Build the dial verb array for a DID mapped to an extension, or None."""
     pointer = await pointer_service.get_for_phone_line(session, phone_line.id)
@@ -398,13 +453,19 @@ async def _inbound_dial_verbs(
     if _recording_enabled(phone_line):
         verbs.append(_RECORD_START_VERB)
     verbs.append(
-        {
-            "verb": "dial",
-            "callerId": from_number,
-            "target": [
-                {"type": "sip", "sipUri": agent_sip_uri(ext.sip_username, ext.sip_domain_sid)}
-            ],
-        }
+        await _with_transcription(
+            {
+                "verb": "dial",
+                "callerId": from_number,
+                "target": [
+                    {"type": "sip", "sipUri": agent_sip_uri(ext.sip_username, ext.sip_domain_sid)}
+                ],
+            },
+            call_sid=call_sid,
+            customer_id=phone_line.customer_id,
+            direction="inbound",
+            extension_id=ext.id,
+        )
     )
     return verbs
 
@@ -488,13 +549,19 @@ async def jambonz_dtmf_result_webhook(
     if _recording_enabled(phone_line):
         verbs.append(_RECORD_START_VERB)
     verbs.append(
-        {
-            "verb": "dial",
-            "callerId": data.get("from", "") or "",
-            "target": [
-                {"type": "sip", "sipUri": agent_sip_uri(ext.sip_username, ext.sip_domain_sid)}
-            ],
-        }
+        await _with_transcription(
+            {
+                "verb": "dial",
+                "callerId": data.get("from", "") or "",
+                "target": [
+                    {"type": "sip", "sipUri": agent_sip_uri(ext.sip_username, ext.sip_domain_sid)}
+                ],
+            },
+            call_sid=call_sid,
+            customer_id=phone_line.customer_id,
+            direction="inbound",
+            extension_id=ext.id,
+        )
     )
     logger.info("dtmf-result: routing call_sid=%s to extension %s", call_sid, digits)
     return JSONResponse(verbs)
@@ -515,6 +582,7 @@ async def jambonz_dtmf_result_webhook(
 )
 async def jambonz_outbound_answered_webhook(
     request: Request,
+    session: Annotated[AsyncSession, Depends(get_session)],
 ) -> Response:
     """Bridge an answered outbound call to the agent SIP URI carried in the call tag."""
     # auth: signature validation
@@ -551,14 +619,44 @@ async def jambonz_outbound_answered_webhook(
     verbs: list[dict[str, Any]] = []
     if _recording_enabled():
         verbs.append(_RECORD_START_VERB)
-    verbs.append(
-        {
-            "verb": "dial",
-            "callerId": from_number,
-            "target": [{"type": "sip", "sipUri": sip_uri}],
-        }
-    )
+    dial_verb: dict[str, Any] = {
+        "verb": "dial",
+        "callerId": from_number,
+        "target": [{"type": "sip", "sipUri": sip_uri}],
+    }
+    # The contact is the A leg here — this call was placed *to* them and is now being
+    # bridged to the agent — so our own party is the dialled leg, as on an inbound call.
+    agent_ext = await _extension_for_sip_uri(session, sip_uri, call_sid)
+    if agent_ext is not None:
+        dial_verb = await _with_transcription(
+            dial_verb,
+            call_sid=call_sid,
+            customer_id=agent_ext.customer_id,
+            direction="inbound",
+            extension_id=agent_ext.id,
+        )
+    verbs.append(dial_verb)
     return JSONResponse(verbs)
+
+
+async def _extension_for_sip_uri(
+    session: AsyncSession, sip_uri: str, call_sid: str
+) -> Extension | None:
+    """Resolve ``sip:user@realm`` back to the extension it belongs to, or None.
+
+    Only transcription needs this — the bridge itself dials the URI as given — so a
+    lookup failure is logged and swallowed rather than costing the call.
+    """
+    username = sip_uri.removeprefix("sip:").split("@", 1)[0].strip()
+    if not username:
+        return None
+    try:
+        return await extension_service.get_by_sip_username_global(session, username)
+    except Exception:
+        logger.warning(
+            "Failed to resolve extension for agent SIP URI on call_sid=%s", call_sid, exc_info=True
+        )
+        return None
 
 
 @jambonz_router.post(
@@ -576,6 +674,7 @@ async def jambonz_outbound_answered_webhook(
 )
 async def jambonz_callback_answered_webhook(
     request: Request,
+    session: Annotated[AsyncSession, Depends(get_session)],
 ) -> Response:
     """Return a Jambonz dial verb to bridge the answered agent leg to the contact number."""
     raw_body = await request.body()
@@ -616,13 +715,25 @@ async def jambonz_callback_answered_webhook(
     verbs: list[dict[str, Any]] = []
     if _recording_enabled():
         verbs.append(_RECORD_START_VERB)
-    verbs.append(
-        {
-            "verb": "dial",
-            "callerId": from_number,
-            "target": [{"type": "phone", "number": contact_number}],
-        }
-    )
+    dial_verb: dict[str, Any] = {
+        "verb": "dial",
+        "callerId": from_number,
+        "target": [{"type": "phone", "number": contact_number}],
+    }
+    # A callback rings the agent first, so our own party is the A leg here. The
+    # agent's SIP URI is what this call was placed to; when it does not resolve to a
+    # known extension there is no tenant to attribute the transcript to, so the call
+    # is bridged untranscribed rather than producing segments nobody may read.
+    agent_ext = await _extension_for_sip_uri(session, data.get("to", "") or "", call_sid)
+    if agent_ext is not None:
+        dial_verb = await _with_transcription(
+            dial_verb,
+            call_sid=call_sid,
+            customer_id=agent_ext.customer_id,
+            direction="outbound",
+            extension_id=agent_ext.id,
+        )
+    verbs.append(dial_verb)
     return JSONResponse(verbs)
 
 
@@ -673,3 +784,62 @@ async def jambonz_voicemail_hook_webhook(
 
     logger.info("Playing voicemail drop audio call_sid=%s", call_sid)
     return JSONResponse([{"verb": "play", "url": audio_url}, {"verb": "hangup"}])
+
+
+@jambonz_router.post(
+    "/transcription",
+    response_model=WebhookAck,
+    responses={
+        400: {"description": "Bad request (non-JSON body)"},
+        403: {"description": "Forbidden (invalid signature)"},
+    },
+    openapi_extra={
+        "requestBody": {
+            "required": True,
+            "content": {"application/json": {"schema": {"type": "object"}}},
+        }
+    },
+)
+async def jambonz_transcription_webhook(request: Request) -> Response:
+    """Receive one interim or final speech result and fan it out to live subscribers.
+
+    Jambonz posts here several times a second per speaker while transcription is
+    running, so this handler stays deliberately thin: no database, no CRM write-back,
+    no verbs in the response. Nothing about the transcript text is logged — it is call
+    content, and this endpoint is the one place all of it passes through.
+    """
+    # auth: signature validation
+    raw_body = await request.body()
+    signature = request.headers.get("X-Jambonz-Signature", "")
+    _validate_jambonz_signature(raw_body, signature)
+
+    try:
+        data: dict[str, Any] = await request.json()
+    except Exception:
+        WEBHOOK_FAILURES_TOTAL.inc()
+        logger.warning("Jambonz transcription webhook received non-JSON body")
+        return Response(status_code=400)
+
+    if not isinstance(data, dict):
+        WEBHOOK_FAILURES_TOTAL.inc()
+        logger.warning(
+            "Jambonz transcription webhook received non-dict payload type: %s",
+            type(data).__name__,
+        )
+        return Response(status_code=400)
+
+    result = transcription.parse_hook_payload(data)
+    if result is None:
+        # A silent or unrecognisable result is ordinary, not an error: acknowledging
+        # it keeps Jambonz from retrying a frame that will never parse.
+        return JSONResponse({"status": "ok"})
+
+    await transcription.record_segment(
+        result.call_sid,
+        text=result.text,
+        is_final=result.is_final,
+        channel=result.channel,
+        confidence=result.confidence,
+        language=result.language,
+    )
+    return JSONResponse({"status": "ok"})

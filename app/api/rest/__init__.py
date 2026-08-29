@@ -13,9 +13,10 @@ calling them.
 
 from fastapi import APIRouter
 
-from app.api.rest import extensions, phone_lines
+from app.api.rest import extensions, phone_lines, transcripts
 
 rest_router = APIRouter(prefix="/api/v1")
 
 rest_router.include_router(extensions.router)
 rest_router.include_router(phone_lines.router)
+rest_router.include_router(transcripts.router)

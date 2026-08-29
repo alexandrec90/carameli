@@ -41,6 +41,21 @@ class Settings(BaseSettings):
     jambonz_outbound_trunk: str = ""
     sip_credential_encryption_secret: str = ""
 
+    # Live call transcription. Jambonz runs the recognition and posts results to
+    # /webhooks/jambonz/transcription; the STT credential is account state on the
+    # Jambonz side, not a setting here. Default-off because every transcribed
+    # minute is billed by that vendor and consent rules vary by jurisdiction.
+    transcription_enabled: bool = False
+    transcription_vendor: str = "deepgram"
+    transcription_language: str = "en-US"
+    # Interim results are what make subtitles feel live: without them a line only
+    # appears once the speaker stops talking.
+    transcription_interim: bool = True
+    # Finalised segments are held only long enough for a consumer to join a call
+    # late or reconnect mid-call. Nothing persists them beyond this window.
+    transcription_buffer_ttl_seconds: int = Field(default=3600, ge=60, le=86400)
+    transcription_buffer_max_segments: int = Field(default=200, ge=10, le=2000)
+
     # Browser softphone. The WSS endpoint is derived from the extension's own SIP
     # realm (`wss://<realm>:<port>`); set sip_wss_url to override the whole URI when
     # the SBC is not reachable there.
