@@ -40,11 +40,22 @@ function Row({
   const Cell = head ? 'th' : 'td'
   return (
     <tr>
-      {cells.map((text, i) => (
-        <Cell key={i} className="cb-ptable-cell" style={{ textAlign: aligns[i] ?? 'left' }}>
-          {text}
-        </Cell>
-      ))}
+      {cells.map((text, i) => {
+        const isStatusArt = text.startsWith('/comic-book/call-')
+        return (
+          <Cell key={i} className="cb-ptable-cell" style={{ textAlign: aligns[i] ?? 'left' }}>
+            {isStatusArt ? (
+              <img
+                className="cb-ptable-status"
+                src={text}
+                alt={text.includes('in-progress') ? 'Call in progress' : text.includes('failed') ? 'Call failed' : 'Call ended'}
+              />
+            ) : (
+              text
+            )}
+          </Cell>
+        )
+      })}
     </tr>
   )
 }

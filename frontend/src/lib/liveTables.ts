@@ -1,5 +1,5 @@
 import type { CallEvent, SmsMessage } from '../api/client'
-import { formatClockTime } from './format'
+import { formatClockTime, formatDuration } from './format'
 
 /**
  * The record feeds a table can be pointed at, and the shape each one arrives in.
@@ -41,22 +41,18 @@ export interface LiveTableFeed {
  * rows past the window are what the wheel scrolls through. Not so many that a poll every
  * few seconds becomes a page of history nobody reads.
  */
-export const LIVE_TABLE_LIMIT = 50
+export const LIVE_TABLE_LIMIT = 100
 
 /**
- * The minimum a call log has to say: when, which way, between whom, and how it ended.
- *
- * Duration is deliberately absent. It is empty for exactly the call the live feed exists
- * to show — the one still ringing — so the column would be blank at the top and full
- * below it, which reads as missing data rather than as a call in progress. `Status`
- * carries that information already.
+ * The call log is deliberately compact: the remote number, start time, duration and a
+ * status illustration. The image path is a cell value so the projected table stays a
+ * generic renderer while this feed can use the comic-book artwork.
  */
 const CALL_COLUMNS: LiveTableColumn[] = [
-  { label: 'Time', width: 1, align: 'left' },
-  { label: 'Dir', width: 0.7, align: 'left' },
-  { label: 'From', width: 1.8, align: 'left' },
-  { label: 'To', width: 1.8, align: 'left' },
-  { label: 'Status', width: 1.3, align: 'left' },
+  { label: 'Number', width: 2, align: 'left' },
+  { label: 'Start time', width: 1.4, align: 'left' },
+  { label: 'Duration', width: 1, align: 'left' },
+  { label: 'Status', width: 0.7, align: 'center' },
 ]
 
 const SMS_COLUMNS: LiveTableColumn[] = [
@@ -87,17 +83,26 @@ export function directionLabel(direction: string | null): string {
   return direction ?? ''
 }
 
+export const CALL_STATUS_ART = {
+  ended: '/comic-book/call-ended.webp',
+  failed: '/comic-book/call-failed.webp',
+  inProgress: '/comic-book/call-in-progress.webp',
+} as const
+
+function statusArt(status: string | null): string {
+  const normalized = (status ?? '').toLowerCase()
+  if (normalized === 'completed') return CALL_STATUS_ART.ended
+  if (normalized === 'ringing' || normalized === 'in-progress') return CALL_STATUS_ART.inProgress
+  return CALL_STATUS_ART.failed
+}
+
 /** Call records as cells, index-parallel to {@link CALL_COLUMNS}. */
 export function callRows(events: CallEvent[]): string[][] {
   return events.map(e => [
-    // `started_at` is null until the call engine reports a start, which is precisely the
-    // window a live table is watching; `created_at` is when the row appeared and is never
-    // null, so the newest line has a time on it from the first callback.
+    e.direction.toLowerCase() === 'outbound' ? e.to_number ?? '' : e.from_number ?? '',
     formatClockTime(e.started_at ?? e.created_at),
-    directionLabel(e.direction),
-    e.from_number ?? '',
-    e.to_number ?? '',
-    e.status ?? '',
+    formatDuration(e.duration_seconds),
+    statusArt(e.status),
   ])
 }
 

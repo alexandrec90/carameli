@@ -5,6 +5,7 @@ import { formatClockTime } from '../../lib/format'
 import {
   callRows,
   directionLabel,
+  LIVE_TABLE_LIMIT,
   LIVE_TABLE_FEEDS,
   sameRows,
   smsRows,
@@ -75,6 +76,10 @@ describe('directionLabel', () => {
 })
 
 describe('feed shape', () => {
+  it('requests enough records to exercise table scrolling', () => {
+    expect(LIVE_TABLE_LIMIT).toBe(100)
+  })
+
   it('emits one cell per declared column, for every feed', () => {
     expect(callRows([makeCall()])[0]).toHaveLength(LIVE_TABLE_FEEDS.calls.columns.length)
     expect(smsRows([makeSms()])[0]).toHaveLength(LIVE_TABLE_FEEDS.sms.columns.length)
@@ -89,21 +94,38 @@ describe('feed shape', () => {
 })
 
 describe('callRows', () => {
-  it('maps a call to time, direction, both numbers and status', () => {
+  it('maps a call to its remote number, start time, duration and status art', () => {
     expect(callRows([makeCall()])).toEqual([
-      ['14:30', 'In', '+14155550000', '+14155550001', 'in-progress'],
+      ['+14155550000', '14:30', '', '/comic-book/call-in-progress.webp'],
     ])
   })
 
   it('falls back to created_at for a call that has not started yet', () => {
     // The row exists from the first callback; started_at arrives later. A blank time on
     // the newest line is exactly the line a live table is being watched for.
-    expect(callRows([makeCall({ started_at: null })])[0]?.[0]).toBe('14:29')
+    expect(callRows([makeCall({ started_at: null })])[0]?.[1]).toBe('14:29')
   })
 
   it('renders missing numbers and status as empty cells, not "null"', () => {
     const row = callRows([makeCall({ from_number: null, to_number: null, status: null })])[0]
-    expect(row?.slice(2)).toEqual(['', '', ''])
+    expect(row?.[0]).toBe('')
+    expect(row?.[3]).toBe('/comic-book/call-failed.webp')
+  })
+
+  it('formats duration and maps terminal statuses to the matching art', () => {
+    const row = callRows([
+      makeCall({
+        direction: 'outbound',
+        status: 'completed',
+        duration_seconds: 65,
+      }),
+    ])[0]
+    expect(row).toEqual([
+      '+14155550001',
+      '14:30',
+      '1:05',
+      '/comic-book/call-ended.webp',
+    ])
   })
 })
 

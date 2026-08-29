@@ -46,6 +46,14 @@
   text-overflow: ellipsis;
 }
 
+.cb-ptable-status {
+  display: inline-block;
+  width: 2.2em;
+  height: 2.2em;
+  object-fit: contain;
+  vertical-align: middle;
+}
+
 /* Editor only: the band guides. They are drawn *through* the same projection as the
    rows, which is the whole point — a guide that lined up with the picture's ruling
    would be a guide the rows also line up with.
