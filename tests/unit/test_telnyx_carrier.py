@@ -263,7 +263,13 @@ async def test_send_sms_raises_on_error() -> None:
 
 
 async def test_enable_sms_patches_real_messaging_profile_id() -> None:
-    """enable_sms must assign the configured messaging profile, never None."""
+    """enable_sms must assign the configured messaging profile, never None.
+
+    The assignment goes to the number's ``/messaging`` sub-resource: Telnyx answers a
+    ``messaging_profile_id`` on the bare ``/phone_numbers/{id}`` PATCH with a 422
+    ("The field messaging_profile_id is not reachable here"), which surfaced as a 502
+    from ``PUT /VsMessaging/Sms/Enable`` on 2026-08-28.
+    """
     carrier = _make_carrier(messaging_profile_id="MPreal123")
     fake_resp = _mock_response(200, {"data": {}})
     carrier._client.patch = AsyncMock(return_value=fake_resp)
@@ -272,7 +278,7 @@ async def test_enable_sms_patches_real_messaging_profile_id() -> None:
 
     carrier._client.patch.assert_awaited_once()
     call_args = carrier._client.patch.call_args
-    assert "/phone_numbers/PN123abc" in call_args[0][0]
+    assert call_args[0][0] == "/phone_numbers/PN123abc/messaging"
     assert call_args.kwargs["json"] == {"messaging_profile_id": "MPreal123"}
 
 
@@ -296,7 +302,8 @@ async def test_disable_sms_calls_patch_with_null_profile() -> None:
 
     carrier._client.patch.assert_awaited_once()
     call_args = carrier._client.patch.call_args
-    assert "/phone_numbers/PN123abc" in call_args[0][0]
+    # Same sub-resource as enable_sms: detaching the profile is the same PATCH with null.
+    assert call_args[0][0] == "/phone_numbers/PN123abc/messaging"
     assert call_args.kwargs["json"] == {"messaging_profile_id": None}
 
 

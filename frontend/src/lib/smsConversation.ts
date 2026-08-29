@@ -38,14 +38,29 @@ export function pendingMessage(key: string, text: string, at: string): SmsConver
   return { id: `${PENDING_PREFIX}${key}`, text, outbound: true, at, status: 'sending' }
 }
 
-/** Map the wire row onto the render shape. Direction decides the column, not the number. */
+/**
+ * Whether a carrier delivery status says the message never got there. Telnyx reports
+ * the outcome in a `message.finalized` receipt and the webhook stores it verbatim:
+ * `sending_failed` (rejected before it left) and `delivery_failed` (bounced by the far
+ * carrier) are the two failures; everything else — `queued`, `sending`, `sent`,
+ * `delivered`, `delivery_unconfirmed` — is a message on its way or arrived.
+ */
+function isDeliveryFailure(deliveryStatus: string | null | undefined): boolean {
+  return (deliveryStatus ?? '').endsWith('_failed')
+}
+
+/**
+ * Map the wire row onto the render shape. Direction decides the column, not the number,
+ * and a receipt that says the carrier gave up marks the row failed, so a real thread
+ * shows a bounced message the same way it shows one the API refused.
+ */
 export function toConversationMessage(m: SmsMessage): SmsConversationMessage {
   return {
     id: m.id,
     text: m.body ?? '',
     outbound: m.direction === 'outbound',
     at: m.created_at,
-    status: 'sent',
+    status: isDeliveryFailure(m.delivery_status) ? 'failed' : 'sent',
   }
 }
 
