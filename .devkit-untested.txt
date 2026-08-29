@@ -285,7 +285,6 @@ app/services/conference_service.py::create
 app/services/conference_service.py::deactivate
 app/services/conference_service.py::get_for_customer
 app/services/conference_service.py::list_for_customer
-app/services/customer_service.py::get_by_vs_id
 app/services/customer_service.py::get_phone_lines
 app/services/exemption_code_service.py::create
 app/services/exemption_code_service.py::deactivate
@@ -336,8 +335,6 @@ app/services/phone_line_service.py::get_by_phone_number_global
 app/services/phone_line_service.py::update_auto_attendant
 app/services/phone_line_service.py::update_recording_enabled
 app/services/phone_line_service.py::update_sms_enabled
-app/services/pointer_service.py::delete
-app/services/pointer_service.py::get
 app/services/pointer_service.py::get_for_extension
 app/services/pointer_service.py::get_for_phone_line
 app/services/providers/base.py::CallEngineProvider

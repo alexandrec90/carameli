@@ -10,12 +10,13 @@ from __future__ import annotations
 
 import json
 import uuid
+from datetime import UTC, datetime
 from typing import Any
 
 import pytest
 
 from app.core.config import settings
-from app.schemas.transcript import TranscriptSession
+from app.schemas.transcript import TranscriptSegment, TranscriptSession, TranscriptSnapshot
 from app.services import pointer_service, transcription
 from tests.conftest import AUTH_HEADERS
 
@@ -593,6 +594,86 @@ async def test_transcript_stream_is_forbidden_across_tenants(
     )
 
     assert resp.status_code == 403
+
+
+# ── the flag, the parsed hook result, the schemas, and the route table ─────
+
+
+def test_transcription_enabled_follows_the_setting(monkeypatch) -> None:
+    """The one place the feature flag is read, so the read is asserted directly rather
+    than only through the verb builder that happens to call it."""
+    monkeypatch.setattr(settings, "transcription_enabled", True)
+    assert transcription.transcription_enabled() is True
+
+    monkeypatch.setattr(settings, "transcription_enabled", False)
+    assert transcription.transcription_enabled() is False
+
+
+def test_hook_result_carries_every_field_lifted_from_the_payload() -> None:
+    """`HookResult` is the boundary between the provider's body and everything above
+    it: each field is read somewhere downstream, so each is asserted here."""
+    result = transcription.parse_hook_payload(_speech_payload(call_sid="CS-hr", channel=2))
+
+    assert result == transcription.HookResult(
+        call_sid="CS-hr",
+        text="hello there",
+        is_final=True,
+        channel=2,
+        confidence=0.94,
+        language="en-US",
+    )
+
+
+def test_transcript_snapshot_holds_its_segments_in_order() -> None:
+    """The read endpoint's response model. Serialising it is what the client sees, and
+    `seq` is the ordering a consumer joining mid-call depends on."""
+    segments = [
+        TranscriptSegment(
+            call_sid="CS-snap",
+            seq=seq,
+            speaker=speaker,
+            channel=channel,
+            text=text,
+            is_final=True,
+            confidence=0.9,
+            language="en-US",
+            at=datetime(2026, 8, 28, 12, 0, seq, tzinfo=UTC),
+        )
+        for seq, speaker, channel, text in [(1, "local", 1, "hello"), (2, "remote", 2, "hi")]
+    ]
+
+    snapshot = TranscriptSnapshot(call_sid="CS-snap", segments=segments)
+    dumped = snapshot.model_dump()
+
+    assert dumped["call_sid"] == "CS-snap"
+    assert [(s["seq"], s["speaker"], s["text"]) for s in dumped["segments"]] == [
+        (1, "local", "hello"),
+        (2, "remote", "hi"),
+    ]
+
+
+def test_routes_wire_each_transcript_surface_to_its_handler() -> None:
+    """The tests above reach these three through their URLs, which cannot tell a
+    renamed path from a handler that lost its decorator -- both answer 404. Naming the
+    method, the path and the function together is what fails on either change."""
+    from app.api.rest import transcripts
+    from app.api.webhooks import call_status
+
+    wired = {
+        (method, route.path): route.endpoint
+        for router in (transcripts.router, call_status.jambonz_router)
+        for route in router.routes
+        for method in route.methods
+    }
+
+    assert wired[("GET", "/calls/{call_sid}/transcript")] is transcripts.get_call_transcript
+    assert (
+        wired[("GET", "/calls/{call_sid}/transcript/stream")] is transcripts.stream_call_transcript
+    )
+    assert (
+        wired[("POST", "/webhooks/jambonz/transcription")]
+        is call_status.jambonz_transcription_webhook
+    )
 
 
 async def _customer_id(db_session, vs_customer_id: int) -> uuid.UUID:
