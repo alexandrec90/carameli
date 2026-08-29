@@ -8,7 +8,7 @@ import { LoadingOverlay, useLoadingScreen } from './LoadingOverlay'
 import PanelInk from './PanelInk'
 import { gridPolys, layoutKindFor } from './panelGeometry'
 import { pageForPath } from './panels'
-import { softphoneActions } from './phoneActions'
+import { callSceneOf, softphoneActions } from './phoneActions'
 import { usePanelDots } from './usePanelDots'
 import { usePanelHover } from './usePanelHover'
 import {
@@ -86,10 +86,7 @@ export function Layout({ navItems, sms, softphone }: LayoutProps) {
     // immediately: holding computed polygons in state meant nothing but a resize
     // could change them.
     const [viewport, setViewport] = useState<{ w: number; h: number }>(() =>
-        typeof window === 'undefined'
-            ? { w: 0, h: 0 }
-            : { w: window.innerWidth, h: window.innerHeight }
-    )
+        typeof window === 'undefined' ? { w: 0, h: 0 } : { w: window.innerWidth, h: window.innerHeight })
     const layoutKind = layoutKindFor(viewport.w, viewport.h)
     // Sparse, PANELS-length: a panel on the other page has an empty ring in this
     // page's grid, which gridPolys returns as a vertex-less polygon — mapped to null
@@ -148,6 +145,8 @@ export function Layout({ navItems, sms, softphone }: LayoutProps) {
     // memoised: what each key means moves with the call (`phoneActions.ts`), so a cached
     // pair would be the previous state's handset for one frame after the phone rang.
     const phoneActions = softphoneActions(softphone)
+    // The call scene the handset panel draws while a call is up (PanelCallScene), or null.
+    const call = callSceneOf(softphone)
 
     const accent = accentForPath(location.pathname)
     const washRef = usePageWash(location.pathname, accent)
@@ -202,6 +201,7 @@ export function Layout({ navItems, sms, softphone }: LayoutProps) {
                             onNumberPadKey={softphone.pressDigit}
                             onPhoneSubmit={dialFromBubble}
                             phoneActions={phoneActions}
+                            call={call}
                             dotRef={dotRefs[i]}
                             onSettled={markSettled}
                             onNatSize={recordNatSize}

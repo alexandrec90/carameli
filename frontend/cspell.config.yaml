@@ -51,6 +51,8 @@ words:
   - Lobster
   - Boogaloo
   - Fugaz
+  # Geometry (the polygon clipping algorithm in callSceneGeometry.ts)
+  - Hodgman
   # Design / motion terms
   - maximalism
   - maximalist

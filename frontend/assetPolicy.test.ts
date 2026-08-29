@@ -20,9 +20,11 @@ import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 
+import { CALL_SCENE_ART } from './src/skins/comic-book/callScene'
 import { PANEL_ASSETS } from './src/skins/comic-book/editor/assets'
-import { PANEL_IMG_TRANSFORMS } from './src/skins/comic-book/editor/layoutConfig'
+import { PANEL_BUBBLE_TRANSFORMS, PANEL_IMG_TRANSFORMS } from './src/skins/comic-book/editor/layoutConfig'
 import { PANELS } from './src/skins/comic-book/editor/layoutConfig'
+import { handsetOn } from './src/skins/comic-book/phoneActions'
 import { DEFAULT_SKIN, SKIN_NAMES } from './src/skins/registry'
 import {
   ASSETS_SRC_DIR,
@@ -71,6 +73,23 @@ function drawnByPage(): Record<string, string[]> {
     if (!urls.includes(url)) urls.push(url)
   }
   return drawn
+}
+
+/**
+ * `drawn`, plus the call scene's pictures on every page with a drawn telephone. They are
+ * not panel art — no layout draws them, so the `index.html` guard must not preload them,
+ * and `drawnByPage` alone is what that check compares against — but a visit that places
+ * a call fetches them, on whichever page the handset is, so the page budget prices them
+ * there rather than as chrome every route pays for.
+ */
+function withCallSceneArt(drawn: Record<string, string[]>): Record<string, string[]> {
+  const sceneUrls = Object.values(CALL_SCENE_ART).map(safeDecode)
+  const out: Record<string, string[]> = {}
+  for (const [page, urls] of Object.entries(drawn)) {
+    const handset = PANELS.some((p, i) => p.page === page && handsetOn(PANEL_BUBBLE_TRANSFORMS, i))
+    out[page] = handset ? [...urls, ...sceneUrls.filter(url => !urls.includes(url))] : urls
+  }
+  return out
 }
 
 /** Synthetic headers, so the parser is tested against known dimensions. */
@@ -598,7 +617,7 @@ describe('the served tree', () => {
         findServedReferences(readFileSync(file, 'utf-8')),
       ]),
     )
-    const art = drawnByPage()
+    const art = withCallSceneArt(drawnByPage())
     const loads = measurePageLoads({ served, art, references })
 
     it('measures every page the layout has, so a page cannot go unbudgeted', () => {

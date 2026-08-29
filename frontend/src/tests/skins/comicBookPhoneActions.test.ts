@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 
 import type { CallStatus, UseSoftphoneResult } from '../../hooks/useSoftphone'
+import { EMPTY_TRANSCRIPT } from '../../lib/callTranscript'
 import { phoneAction, softphoneActions } from '../../skins/comic-book/phoneActions'
 
 /**
@@ -30,6 +31,7 @@ const phoneStub = (over: Partial<UseSoftphoneResult> = {}): UseSoftphoneResult =
   hangup: vi.fn(async () => {}),
   toggleMute: vi.fn(),
   pressDigit: vi.fn(),
+  transcript: EMPTY_TRANSCRIPT,
   ...over,
 })
 

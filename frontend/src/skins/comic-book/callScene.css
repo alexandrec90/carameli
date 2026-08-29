@@ -1,0 +1,88 @@
+/* The call scene: the telephone's panel split in two while a call is up
+   (PanelCallScene.tsx, CallBubble.tsx). Imported by bubbles.css beside the other
+   bubble sheets, so Layout.tsx's import list is unchanged. */
+
+.cb-call-half {
+  position: absolute;
+  overflow: visible;
+}
+
+/* A half's picture fills the half and is windowed by its polygon (clip-path inline),
+   the way a panel picture is windowed by its panel. It takes .cb-panel-img's rest
+   filter (comic-book.css) but never that class's hover release: the panel drops
+   cb-panel-hot for the life of the scene, and a half lights for exactly one reason. */
+.cb-call-art {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.cb-call-half.is-speaking .cb-call-art {
+  filter: none;
+}
+
+/* Paper between the halves, over the panel's dots. */
+.cb-call-gutter {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  background: var(--cb-white);
+}
+
+/* The ink around each half: the stroke PanelInk.tsx gives a panel, one layer above
+   that SVG (z 3) — the two coincide along the panel's own edges — and below the
+   balloons (z 5). */
+.cb-call-ink {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+  z-index: 4;
+  fill: none;
+  stroke: var(--cb-black);
+  stroke-width: 5;
+  stroke-linejoin: miter;
+}
+
+/* A call balloon sits over the head of the figure in its half, upright: a transcript
+   reads as text, not as lettering, and a tilted scrolling column reads as a fault. */
+.cb-panel-bubble.cb-call-bubble {
+  --cb-bubble-rot: 0deg;
+
+  top: 2%;
+  right: auto;
+  left: 12%;
+  width: 76%;
+}
+
+/* The words, then — on the caller's side — the red key under them. */
+.cb-call-bubble-body {
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-end;
+  gap: 0.35em;
+}
+
+/* A window over a transcript that only grows: it scrolls, and takes the wheel itself,
+   since the balloon wrapper is pointer-transparent (see bubbles.css). */
+.cb-call-transcript {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  text-align: left;
+  pointer-events: auto;
+  scrollbar-width: thin;
+}
+
+.cb-call-line {
+  margin: 0 0 0.3em;
+}
+
+.cb-call-end {
+  flex: 0 0 auto;
+  align-self: center;
+}

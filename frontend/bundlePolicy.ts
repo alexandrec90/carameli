@@ -117,8 +117,17 @@ export const MAX_LAZY_CHUNK_BYTES = 260 * 1024
  * `usePanelHover.ts` grew the SVG geometry probe that asks the shape, plus the tube
  * corridors `BubbleTubes` now labels with the panel they belong to. Same lazy comic-book
  * chunk, still 46 of them, `package.json` untouched, so nothing new was pulled in.
+ *
+ * This raise (966 → 970) is the call scene, 3.9 KB measured as this branch's build
+ * (969.6 KB) against the master it branches from (965.7 KB): `PanelCallScene` splits the
+ * handset's panel in two while a call is up, `callSceneGeometry.ts` cuts its polygon
+ * along a vertical line a gutter apart, and `CallBubble` is a balloon holding a scrolling
+ * transcript and the red key. The dev-only call simulation (`useCallSimulation`,
+ * `callSimulation.ts`) is behind an `import.meta.env.DEV` test in App.tsx and is not in
+ * the build — its script text does not appear in `dist/`. Same lazy comic-book chunk,
+ * still 46 of them, `package.json` untouched, so nothing new was pulled in.
  */
-export const MAX_TOTAL_JS_BYTES = 966 * 1024
+export const MAX_TOTAL_JS_BYTES = 970 * 1024
 
 /**
  * Every `.css` file in `dist/assets/`, summed. Today 44.2 KB across 2 files.
@@ -134,8 +143,13 @@ export const MAX_TOTAL_JS_BYTES = 966 * 1024
  * this does *not* pay for is the lettered caret, which arrived twice: once on this branch
  * as a field's caret shared by the dial and the SMS composer, once on master as the
  * dial's own. Deduplicating it in the merge is what kept this raise to a single KB.
+ *
+ * This raise (46 → 47) is the call scene's sheet (`callScene.css`): the two halves and
+ * their pictures, the paper gutter between them, the ink around each, and the transcript
+ * balloon with its scrolling window and the key under it. About 0.3 KB, against a build
+ * that had 0.05 KB of room.
  */
-export const MAX_TOTAL_CSS_BYTES = 46 * 1024
+export const MAX_TOTAL_CSS_BYTES = 47 * 1024
 
 /**
  * Every webfont in `dist/assets/`, summed. Today 231 KB: five weights of Outfit, each
