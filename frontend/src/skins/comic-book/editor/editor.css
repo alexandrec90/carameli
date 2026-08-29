@@ -86,7 +86,7 @@
   top: -8px;
   background: #ff8c00;
   border-radius: 50%;
-  cursor: grab;
+  cursor: var(--cb-cursor-grab);
 }
 
 /* Top-left corner: pan the picture inside its frame (image only). Round, like the
@@ -97,7 +97,7 @@
   top: -8px;
   background: #28c8a0;
   border-radius: 50%;
-  cursor: grab;
+  cursor: var(--cb-cursor-grab);
 }
 
 /* A selected panel is only outlined — there is nothing about a grid slot to drag, so

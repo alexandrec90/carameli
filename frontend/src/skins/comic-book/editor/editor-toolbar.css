@@ -34,7 +34,7 @@
 }
 
 .cb-ed-grip {
-  cursor: grab;
+  cursor: var(--cb-cursor-grab);
   touch-action: none;
   user-select: none;
 }
