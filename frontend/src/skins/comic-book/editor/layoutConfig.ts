@@ -123,7 +123,7 @@ export const PANEL_BUBBLE_TRANSFORMS: BubbleTransform[] = [
   { panel: 5, top: -35, right: -12, width: 55, rotate: -5, spill: true, type: 'lightning', tail: 'down-left', content: 'text', text: 'RING RING!', linkTo: null, hoverType: 'cloud', clickType: 'soft', hoverBold: false, chain: '' },
   { panel: 6, top: -35, right: -12, width: 55, rotate: -5, spill: true, type: 'lightning', tail: 'down-left', content: 'text', text: 'Ka-POW!', linkTo: null, hoverType: 'soft', clickType: 'cloud', hoverBold: false, chain: '' },
   { panel: 7, top: -35, right: -12, width: 55, rotate: -5, spill: true, type: 'cloud', tail: 'down-left', content: 'text', text: 'Delivering dreams...', linkTo: null, hoverType: 'soft', clickType: 'lightning', hoverBold: false, chain: '' },
-  { panel: 9, top: 1, right: 8, width: 36, rotate: -5, spill: true, type: 'cloud', tail: 'none', content: 'dial', text: '4388762750', linkTo: null, hoverType: null, clickType: null, hoverBold: false, chain: '' },
+  { panel: 9, top: 1, right: 8, width: 36, rotate: -5, spill: true, type: 'cloud', tail: 'none', content: 'dial-call', text: '4388762750', linkTo: null, hoverType: null, clickType: null, hoverBold: false, chain: '' },
   { panel: 9, top: 49, right: 12, width: 21, rotate: -5, spill: true, type: 'cloud', tail: 'none', content: 'actions', text: 'Call, End call', linkTo: 10, hoverType: null, clickType: null, hoverBold: false, chain: '' },
   { panel: 11, top: 26, right: 54, width: 23, rotate: -5, spill: true, type: 'soft', tail: 'down-left', content: 'text', text: 'recipient sms', linkTo: null, hoverType: null, clickType: null, hoverBold: false, chain: 'chain-1' },
   { panel: 11, top: 57, right: 76, width: 31, rotate: -5, spill: true, type: 'cloud', tail: 'right', content: 'dial', text: '4388762750', linkTo: null, hoverType: null, clickType: null, hoverBold: false, chain: '' },
@@ -258,7 +258,7 @@ export const PANEL_GRIDS: PageGrids = {
   },
   home: {
     landscape: {
-      vertices: [[0, 0], [1, 0], [1, 1], [0, 1], [0, 0.4007], [1, 0.3502], [0.3778, 0], [0.3573, 0.4112], [0.3674, 1], [0.458, 0.4142]],
+      vertices: [[0, 0], [1, 0], [1, 1], [0, 1], [0, 0.4007], [1, 0.3502], [0.3778, 0], [0.3573, 0.4112], [0.3674, 1], [0.458, 0.4113]],
       panels: [
         [], // Logo
         [], // Switchboard
