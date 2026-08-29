@@ -486,3 +486,29 @@ async def test_list_sms_messages_without_peer_is_unchanged(client, db_session) -
         "SMpeer6115a",
         "SMpeer6115b",
     }
+
+
+def test_router_wires_each_legacy_sms_path_to_its_handler() -> None:
+    """The ASMX paths are the CRM contract, so assert the route table itself.
+
+    Every test above reaches these handlers through a URL, which cannot tell a renamed
+    path from a handler that lost its decorator: both read as 404. This names the
+    method, the path and the function together, so either change fails here first.
+    """
+    from app.api.vsapi import sms
+
+    wired = {
+        (method, route.path): route.endpoint
+        for route in sms.router.routes
+        for method in route.methods
+    }
+
+    assert (
+        wired[("PUT", "/VsMessaging/Sms/Enable/{customerId}/{smsPhoneNumber:path}")]
+        is sms.enable_sms
+    )
+    assert (
+        wired[("PUT", "/VsMessaging/Sms/Disable/{customerId}/{smsPhoneNumber:path}")]
+        is sms.disable_sms
+    )
+    assert wired[("POST", "/VsMessaging/Sms/Send/{customerId}")] is sms.send_sms
