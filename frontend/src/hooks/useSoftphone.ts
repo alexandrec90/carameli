@@ -3,6 +3,8 @@ import type { Session } from 'sip.js'
 import type { SessionManager } from 'sip.js/lib/platform/web'
 import { api } from '../api/client'
 import type { Extension } from '../api/client'
+import { EMPTY_TRANSCRIPT } from '../lib/callTranscript'
+import type { CallTranscript } from '../lib/callTranscript'
 import { DEMO_VS_CUSTOMER_ID } from '../lib/constants'
 import { logger } from '../lib/logger'
 
@@ -49,6 +51,12 @@ export interface UseSoftphoneResult {
   toggleMute: () => void
   /** A dialpad press: a DTMF tone mid-call, otherwise another digit to dial. */
   pressDigit: (digit: string) => void
+  /**
+   * What has been said on the call so far, and who is speaking now. Empty on the live
+   * phone: nothing transcribes a real call yet, and this is the seam a transcription
+   * will fill (`lib/callTranscript.ts`). The simulation fills it with a script.
+   */
+  transcript: CallTranscript
 }
 
 /** Everything a SIP request line accepts: digits, and the three dialable symbols. */
@@ -384,5 +392,6 @@ export function useSoftphone(): UseSoftphoneResult {
     hangup,
     toggleMute,
     pressDigit,
+    transcript: EMPTY_TRANSCRIPT,
   }
 }

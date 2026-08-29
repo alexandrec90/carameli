@@ -202,7 +202,7 @@ class TelnyxCarrier:
         if not self._messaging_profile_id:
             raise ValueError("TELNYX_MESSAGING_PROFILE_ID is not configured; cannot enable SMS")
         resp = await self._client.patch(
-            f"/phone_numbers/{provider_sid}",
+            f"/phone_numbers/{provider_sid}/messaging",
             json={"messaging_profile_id": self._messaging_profile_id},
         )
         if resp.is_error:
@@ -216,7 +216,7 @@ class TelnyxCarrier:
 
     async def disable_sms(self, provider_sid: str) -> None:
         resp = await self._client.patch(
-            f"/phone_numbers/{provider_sid}",
+            f"/phone_numbers/{provider_sid}/messaging",
             json={"messaging_profile_id": None},
         )
         if resp.is_error:

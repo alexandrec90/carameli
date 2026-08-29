@@ -1,5 +1,7 @@
 import type { UseSoftphoneResult } from '../../hooks/useSoftphone'
+import type { CallTranscript } from '../../lib/callTranscript'
 import { canHangup } from '../../lib/softphone'
+import { splitOptions } from './wheelPicker'
 
 /**
  * The two keys an `actions` balloon can draw: the green one and the red one, the only
@@ -38,9 +40,16 @@ export const CALL_KEY: PhoneAction = {
   label: 'Call',
 }
 
+/** The red key, for the same reason: the call scene draws it under the caller's words. */
+export const HANGUP_KEY: PhoneAction = {
+  id: 'hangup',
+  src: '/comic-book/end-call-button.webp',
+  label: 'End call',
+}
+
 const KEYS: Readonly<Record<string, PhoneAction>> = {
   call: CALL_KEY,
-  endcall: { id: 'hangup', src: '/comic-book/end-call-button.webp', label: 'End call' },
+  endcall: HANGUP_KEY,
 }
 
 /** Fold an authored label onto its key, or null when it names none. */
@@ -83,4 +92,45 @@ export function softphoneActions(phone: UseSoftphoneResult): PhoneActionHandlers
       ? { run: () => { void phone.decline() }, disabled: false }
       : { run: () => { void phone.hangup() }, disabled: !onCall },
   }
+}
+
+/**
+ * True when panel `panel` draws the telephone's keys — an `actions` balloon naming one,
+ * or a `dial-call` — and so is the panel a call is placed from, and the one the call
+ * scene replaces while it is up. Same exclusion as `dialBubbleOn`: a balloon in a chain
+ * is a message, not the handset.
+ */
+export function handsetOn(
+  bubbles: readonly { panel: number; chain: string; content: string; text: string }[],
+  panel: number,
+): boolean {
+  return bubbles.some(
+    b =>
+      b.panel === panel &&
+      b.chain === '' &&
+      (b.content === 'dial-call' ||
+        (b.content === 'actions' && splitOptions(b.text).some(label => phoneAction(label) !== null))),
+  )
+}
+
+/** What the scene shows: the far end ringing, or the two parties talking. */
+export type CallScenePhase = 'ringing' | 'connected'
+
+/** The call, as the handset panel draws it (PanelCallScene): a phase, the words, and the red key. */
+export interface CallScene {
+  phase: CallScenePhase
+  transcript: CallTranscript
+  onEnd(): void
+}
+
+/**
+ * The scene for the phone's current call, or null when there is none to draw. An
+ * outbound call is a scene from the moment it is dialled; an inbound one only once it is
+ * answered, since until then the drawn telephone's keys are the whole story.
+ */
+export function callSceneOf(phone: UseSoftphoneResult): CallScene | null {
+  const phase: CallScenePhase | null =
+    phone.callStatus === 'dialing' ? 'ringing' : phone.callStatus === 'active' ? 'connected' : null
+  if (phase === null) return null
+  return { phase, transcript: phone.transcript, onEnd: () => { void phone.hangup() } }
 }
