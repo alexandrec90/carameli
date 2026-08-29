@@ -126,8 +126,15 @@ export const MAX_LAZY_CHUNK_BYTES = 260 * 1024
  * `callSimulation.ts`) is behind an `import.meta.env.DEV` test in App.tsx and is not in
  * the build — its script text does not appear in `dist/`. Same lazy comic-book chunk,
  * still 46 of them, `package.json` untouched, so nothing new was pulled in.
+ *
+ * This raise (970 → 971) is the scrollable call-records table, 0.48 KB measured as this
+ * branch's merge (970.2 KB) against the master it merges (969.7 KB): `liveTables.ts`
+ * fetches a hundred records and maps each call's status to its own piece of art, and
+ * `ProjectedTable` scrolls that body inside the panel's fixed band while the headings
+ * stay put. Same lazy comic-book chunk, still 46 of them, `package.json` untouched, so
+ * nothing new was pulled in.
  */
-export const MAX_TOTAL_JS_BYTES = 970 * 1024
+export const MAX_TOTAL_JS_BYTES = 971 * 1024
 
 /**
  * Every `.css` file in `dist/assets/`, summed. Today 44.2 KB across 2 files.
