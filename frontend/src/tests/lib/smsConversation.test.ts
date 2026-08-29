@@ -57,6 +57,20 @@ describe('toConversationMessage', () => {
   it('renders a message with no body as an empty balloon rather than crashing', () => {
     expect(toConversationMessage(wire({ body: null as unknown as string })).text).toBe('')
   })
+
+  it.each(['sending_failed', 'delivery_failed'])(
+    'marks a row whose carrier receipt says %s as failed',
+    (delivery_status) => {
+      expect(toConversationMessage(wire({ delivery_status })).status).toBe('failed')
+    },
+  )
+
+  it.each(['queued', 'sending', 'sent', 'delivered', 'delivery_unconfirmed', 'received', null])(
+    'keeps a row whose delivery status is %s as sent',
+    (delivery_status) => {
+      expect(toConversationMessage(wire({ delivery_status })).status).toBe('sent')
+    },
+  )
 })
 
 describe('mergeMessages', () => {
