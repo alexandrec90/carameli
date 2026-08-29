@@ -69,8 +69,8 @@ describe('withLiveRows', () => {
 
   it('puts the feed\'s rows on the surface that named it', () => {
     const images = [img({ table: liveTable(newTable(), 'calls') })]
-    const out = withLiveRows(images, { calls: [['14:30', 'In', 'a', 'b', 'ringing']] })
-    expect(out[0]?.table?.data).toEqual([['14:30', 'In', 'a', 'b', 'ringing']])
+    const out = withLiveRows(images, { calls: [['a', '14:30', '1:05', '/comic-book/call-ended.webp']] })
+    expect(out[0]?.table?.data).toEqual([['a', '14:30', '1:05', '/comic-book/call-ended.webp']])
     expect(out[0]?.table?.source).toBe('calls')
   })
 
@@ -135,11 +135,10 @@ describe('useLiveTableImages', () => {
     const { result } = renderHook(() => useLiveTableImages(images))
     await waitFor(() => expect(result.current[0]?.table?.data).toHaveLength(1))
     expect(result.current[0]?.table?.data[0]).toEqual([
-      '16:45',
-      'Out',
-      '+14155550000',
       '+14155550001',
-      'ringing',
+      '16:45',
+      '',
+      '/comic-book/call-in-progress.webp',
     ])
     expect(smsList).not.toHaveBeenCalled()
   })

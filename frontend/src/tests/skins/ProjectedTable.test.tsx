@@ -140,6 +140,16 @@ describe('ProjectedTable', () => {
     expect(surface!.style.color).toBeTruthy()
   })
 
+  it('renders status artwork as a compact image cell', () => {
+    const { container } = draw({
+      columns: [{ label: 'Status', width: 1, align: 'center' }],
+      data: [['/comic-book/call-ended.webp']],
+    })
+    const image = container.querySelector('.cb-ptable-status') as HTMLImageElement | null
+    expect(image?.src).toContain('/comic-book/call-ended.webp')
+    expect(image?.alt).toBe('Call ended')
+  })
+
   // A quad the author has collapsed while dragging has no matrix; drawing nothing beats
   // letting CSS drop a NaN transform and leave an unplaced table over the picture.
   it('draws nothing at all for a surface that has no geometry', () => {

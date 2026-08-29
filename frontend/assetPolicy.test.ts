@@ -23,6 +23,7 @@ import { describe, expect, it } from 'vitest'
 import { PANEL_ASSETS } from './src/skins/comic-book/editor/assets'
 import { PANEL_IMG_TRANSFORMS } from './src/skins/comic-book/editor/layoutConfig'
 import { PANELS } from './src/skins/comic-book/editor/layoutConfig'
+import { CALL_STATUS_ART } from './src/lib/liveTables'
 import { DEFAULT_SKIN, SKIN_NAMES } from './src/skins/registry'
 import {
   ASSETS_SRC_DIR,
@@ -599,6 +600,9 @@ describe('the served tree', () => {
       ]),
     )
     const art = drawnByPage()
+    // These are conditional home-page art: the call-record surface renders one status
+    // image per visible call row, so they belong to home rather than shared chrome.
+    art.home.push(...Object.values(CALL_STATUS_ART))
     const loads = measurePageLoads({ served, art, references })
 
     it('measures every page the layout has, so a page cannot go unbudgeted', () => {
