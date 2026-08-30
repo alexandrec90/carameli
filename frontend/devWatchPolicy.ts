@@ -46,10 +46,25 @@ export const DOCKER_POLL_INTERVAL_MS = 500
  * Paths excluded from the poll sweep, on top of Vite's own defaults.
  *
  * Vite already ignores `.git` and `node_modules`. It does **not** ignore `dist/`,
- * which in this repo is a full copy of `public/` — including ~30 MB of PNG
- * masters — restat'd twice a second for a directory the dev server never reads.
- * Nothing listed here can produce a hot update, so ignoring it costs no HMR
- * fidelity: a changed image or font needs a reload either way.
+ * which in this repo is a full copy of `public/` — restat'd twice a second for a
+ * directory the dev server never reads — nor `assets-src/`, the ~40 MB of PNG
+ * masters that `scripts/encode-comic-art.py` reads and nothing serves. Nothing
+ * listed here can produce a hot update, so ignoring it costs no HMR fidelity.
+ *
+ * **`public/` is never on this list, and that is load-bearing.** The dev server
+ * does not stat `public/` per request: `initPublicFiles` reads the directory once
+ * at startup into a Set, `servePublicMiddleware` answers only names in that Set,
+ * and the *only* thing that keeps the Set current is the watcher's add/unlink
+ * events. Ignore a path under `public/` and a picture written after startup is
+ * served the SPA's `index.html` instead of its bytes — a silent 404 that survives
+ * every reload and clears only on a container restart. This list previously
+ * carried `public/**\/*.{png,webp,…}` on the reasoning that a binary asset cannot
+ * hot-update, which is true and beside the point: the events are what the registry
+ * is built from, not what HMR is triggered by. Two replaced comic-book panels
+ * vanished from the page that way, and looked for all the world like a bad deploy.
+ *
+ * The sweep cost that reasoning was buying is smaller than it reads, because
+ * chokidar stats *files*, not bytes: all of `public/` is ~44 of them.
  */
 export const WATCH_IGNORED: readonly string[] = [
   '**/dist/**',
@@ -57,7 +72,7 @@ export const WATCH_IGNORED: readonly string[] = [
   '**/playwright-report/**',
   '**/test-results/**',
   '**/.vite/**',
-  '**/public/**/*.{png,jpg,jpeg,webp,avif,gif,ico,mp4,woff,woff2,ttf,otf}',
+  '**/assets-src/**',
 ]
 
 export interface DevWatchOptions {
