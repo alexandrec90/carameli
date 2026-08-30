@@ -19,7 +19,7 @@ from collections.abc import Generator
 from typing import TypedDict, cast
 
 import pytest
-from playwright.sync_api import Page, sync_playwright
+from playwright.sync_api import Page, Playwright
 
 # Base URL for the frontend dev server. A worktree does not get :5173 -- each box
 # leases its own ports -- so this is overridable, and both spellings work:
@@ -74,26 +74,34 @@ def viewport(request: pytest.FixtureRequest) -> Viewport:
 
 @pytest.fixture
 def matrix_page(
+    playwright: Playwright,
     base_url: str,
     matrix_browser_name: str,
     viewport: Viewport,
 ) -> Generator[Page, None, None]:
-    """Dedicated page fixture parametrized across browsers and viewports."""
-    with sync_playwright() as playwright:
-        browser_type = getattr(playwright, matrix_browser_name)
-        browser = browser_type.launch(headless=True)
-        context = browser.new_context(
-            base_url=base_url,
-            reduced_motion="reduce",
-            viewport={"width": viewport["width"], "height": viewport["height"]},
-        )
-        page = context.new_page()
+    """Dedicated page fixture parametrized across browsers and viewports.
 
-        try:
-            yield page
-        finally:
-            context.close()
-            browser.close()
+    Takes pytest-playwright's session-scoped ``playwright`` fixture rather than
+    opening a second ``sync_playwright()``. The sync API drives its own event loop
+    on this thread, so a nested one raises "Playwright Sync API inside the asyncio
+    loop" as soon as *any* earlier test has started the plugin's. Nothing in
+    tests/e2e/ sorted before this module until test_asset_usage.py landed; from
+    that night on, all 27 tests here errored in setup.
+    """
+    browser_type = getattr(playwright, matrix_browser_name)
+    browser = browser_type.launch(headless=True)
+    context = browser.new_context(
+        base_url=base_url,
+        reduced_motion="reduce",
+        viewport={"width": viewport["width"], "height": viewport["height"]},
+    )
+    page = context.new_page()
+
+    try:
+        yield page
+    finally:
+        context.close()
+        browser.close()
 
 
 @pytest.fixture(scope="session")

@@ -87,7 +87,16 @@ COLLECT_IMAGE_USAGE = """
   }
   for (const node of document.querySelectorAll('*')) {
     const style = getComputedStyle(node)
-    for (const value of [style.backgroundImage, style.borderImageSource, style.maskImage]) {
+    // `cursor` belongs here with the paint properties: a custom cursor is an image the
+    // page asked for and the compositor draws. Leaving it out reported comic-book's two
+    // cursor sprites as fetched-but-never-drawn on every browser from the night they
+    // landed, which is a false finding, not a payload to delete.
+    for (const value of [
+      style.backgroundImage,
+      style.borderImageSource,
+      style.maskImage,
+      style.cursor,
+    ]) {
       if (!value || value === 'none') continue
       for (const match of value.matchAll(/url\\(["']?([^"')]+)["']?\\)/g)) {
         used.add(normalise(match[1]))
