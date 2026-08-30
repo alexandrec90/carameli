@@ -20,7 +20,7 @@ describe('InspectorPanel names', () => {
     render(<InspectorPanel api={api} panel={9} />)
 
     const name = screen.getByRole('textbox', { name: 'panel name' })
-    expect((name as HTMLInputElement).value).toBe('Notepad')
+    expect((name as HTMLInputElement).value).toBe('Push-button phone')
     fireEvent.change(name, { target: { value: 'Dial Pad' } })
     expect(setPanelLabel).toHaveBeenCalledWith(9, 'Dial Pad')
   })

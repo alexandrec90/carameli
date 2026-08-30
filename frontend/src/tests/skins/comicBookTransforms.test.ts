@@ -548,6 +548,28 @@ describe('default config parity', () => {
     })
   })
 
+  it('keeps the replacement phone and notepad bound to their matching surfaces', () => {
+    const phone = PANEL_IMG_TRANSFORMS.find(t => t.src.endsWith('push-button-phone.webp'))
+    const notepad = PANEL_IMG_TRANSFORMS.find(t => t.src.endsWith('hand-notepad.webp'))
+
+    expect(phone).toMatchObject({
+      alt: 'Push-button phone',
+      numberPad: {
+        quad: [[35.63, 26.46], [48.52, 22.85], [53.63, 44.38], [40.15, 48.14]],
+      },
+    })
+    expect(PANELS[phone!.panel].label).toBe('Push-button phone')
+
+    expect(notepad).toMatchObject({
+      alt: 'Hand writing on notepad',
+      table: {
+        quad: [[14.7, 6.8], [82, 6.9], [82, 60], [14, 60]],
+        fontScale: 0.35,
+      },
+    })
+    expect(PANELS[notepad!.panel].label).toBe('Notepad')
+  })
+
   // A chain's composer is the one balloon authored blank: its `text` is the field's
   // initial value (PanelBubble hands it to BubbleInput as such), and a composer that
   // opens with words in it is a message the reader did not write.
@@ -577,10 +599,10 @@ describe('default config parity', () => {
     })
   })
 
-  // Two caption pairs, plus the home page's telephone: the number a reader types and
-  // the buttons that dial it are one instrument, and the tube is what says so.
-  it('links three pairs, each declared from exactly one end', () => {
-    expect(linkedPairs(PANEL_BUBBLE_TRANSFORMS)).toEqual([[0, 1], [4, 5], [10, 11]])
+  // The two caption pairs remain tubed together. The home page's telephone no longer
+  // needs a third pair: `dial-call` keeps the number and its green key in one balloon.
+  it('links both caption pairs, each declared from exactly one end', () => {
+    expect(linkedPairs(PANEL_BUBBLE_TRANSFORMS)).toEqual([[0, 1], [4, 5]])
   })
 
   // Both halves of a linked *caption* pair are one speaker's line continuing, so only
