@@ -130,7 +130,7 @@ function pictureViolations(images: ImgTransform[], panelCount: number): LayoutVi
     // number labels every value past the first with a heading for a different one, or
     // (as here, when it holds more) leaves the tail of the row blank.
     //
-    // The wording and the widths stay unjudged on purpose: renaming a heading and
+    // The wording and the widths are left alone on purpose: renaming a heading and
     // re-proportioning it to the ruling in the photograph are exactly what an author is
     // for. This catches the one way the two lists come apart without anyone choosing it —
     // a Save from a tab opened before the feed's shape changed, which writes the old

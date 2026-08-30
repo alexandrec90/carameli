@@ -53,7 +53,11 @@ type ShipState =
  * went unnoticed: every press downloaded a copy of `layoutConfig.ts` and the editor's
  * work never reached the app outside edit mode.
  */
-type SaveState = { phase: 'idle' } | { phase: 'done' } | { phase: 'error'; message: string }
+type SaveState =
+  | { phase: 'idle' }
+  | { phase: 'confirm' }
+  | { phase: 'done' }
+  | { phase: 'error'; message: string }
 
 interface EditorToolbarProps {
   api: EditorModeApi
@@ -110,6 +114,14 @@ export default function EditorToolbar({ api, selPanel, pageSelect, shapes }: Edi
   }
 
   const onSave = () => {
+    // A working copy that predates the file on disk overwrites work nobody chose to
+    // revert, and the author is the only one who can tell a deliberate rollback from a tab
+    // left open across a merge. So the first press asks and the second writes — one extra
+    // click, and only in the case where the file has actually moved.
+    if (api.stale && save.phase !== 'confirm') {
+      setSave({ phase: 'confirm' })
+      return
+    }
     const content = serializeConfigFile(config)
     fetch(SAVE_ENDPOINT, {
       method: 'POST',
@@ -249,8 +261,13 @@ export default function EditorToolbar({ api, selPanel, pageSelect, shapes }: Edi
       )}
 
       <div className="cb-ed-actions">
-        <button type="button" className="cb-ed-btn cb-ed-btn-primary" onClick={onSave}>
-          {save.phase === 'done' ? 'Saved!' : 'Save'}
+        <button
+          type="button"
+          className="cb-ed-btn cb-ed-btn-primary"
+          onClick={onSave}
+          title={api.stale ? 'The config file has changed since this working copy started' : undefined}
+        >
+          {save.phase === 'done' ? 'Saved!' : save.phase === 'confirm' ? 'Overwrite it?' : 'Save'}
         </button>
         <button
           type="button"
@@ -267,7 +284,7 @@ export default function EditorToolbar({ api, selPanel, pageSelect, shapes }: Edi
           outside edit mode still shows the old layout.
         </p>
       )}
-      <LayoutWarnings violations={violations} />
+      <LayoutWarnings violations={violations} stale={api.stale} />
       {/* Save writes the file; Ship carries it to a branch and a PR. They are separate
           buttons because Save is the inner loop — pressed every few drags — and Ship is
           the moment the work should stop being local to one tree.

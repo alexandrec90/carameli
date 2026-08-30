@@ -237,6 +237,19 @@
   overflow-wrap: anywhere;
 }
 
+/* The one warning here that IS a fault: red, because unlike an unfinished balloon it is
+   not work left to do but work about to be undone, and it appears only when the file has
+   actually moved — never on an ordinary afternoon. */
+.cb-ed-stale {
+  border-left-color: #d95050;
+  background: rgb(217 80 80 / 14%);
+  color: #f0b3b3;
+}
+
+.cb-ed-stale-body {
+  margin: 4px 0 0;
+}
+
 .cb-ed-unfinished-head {
   margin: 0;
   font-weight: 700;
