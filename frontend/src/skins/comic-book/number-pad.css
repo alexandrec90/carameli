@@ -40,25 +40,80 @@
 /* Outside the editor the surface paints its glyphs in `transparent`, so this glow is
    the *only* thing that says a key is under the pointer. It is drawn in the authored
    ink (`--cb-number-pad-ink`) rather than `currentcolor`, which is the colour of
-   nothing here — and lands just outside the cell, so it reads as light on the
-   photographed surface rather than as a button that was there all along. */
+   nothing here.
+
+   **The lit key is one uniform colour, cell and halo alike.** Every state below paints
+   its `background-color` and the *inner* stop of its `box-shadow` from the same
+   `color-mix`, so the cell's edge is where a soft glow starts falling off rather than a
+   line across it. The version this replaced mixed a 12% fill inside a 45% ring, which
+   read as a dim panel with a bright border drawn round it — a button that had been
+   there all along, which is the one thing a projection must not look like.
+
+   It breathes instead of sitting still: light thrown onto a photographed surface is
+   never quite steady, and a pulse is legible at an intensity a static tint has to shout
+   at. */
 .cb-number-pad-button:hover,
 .cb-number-pad-button:focus-visible {
-  background-color: color-mix(in srgb, var(--cb-number-pad-ink, currentcolor) 12%, transparent);
-  box-shadow: 0 0 0.34em 0.05em
-    color-mix(in srgb, var(--cb-number-pad-ink, currentcolor) 45%, transparent);
+  animation: cb-number-pad-glow 1100ms ease-in-out infinite alternate;
 }
 
-/* Pressed: the same glow hardened rather than a second effect — the halo pulls in tight
-   and gains an edge, which is what a soft projection does when a key takes the press. */
+@keyframes cb-number-pad-glow {
+  from {
+    background-color: color-mix(in srgb, var(--cb-number-pad-ink, currentcolor) 34%, transparent);
+    box-shadow: 0 0 0.5em 0.02em
+      color-mix(in srgb, var(--cb-number-pad-ink, currentcolor) 34%, transparent);
+  }
+
+  to {
+    background-color: color-mix(in srgb, var(--cb-number-pad-ink, currentcolor) 62%, transparent);
+    box-shadow: 0 0 1em 0.1em
+      color-mix(in srgb, var(--cb-number-pad-ink, currentcolor) 62%, transparent);
+  }
+}
+
+/* Pressed: the same glow flaring rather than a second effect — the key floods to nearly
+   solid ink and throws a wider halo, then settles back to the lit level while the finger
+   is still down. Overrides the hover pulse, since a press is an answer to the pointer
+   being there, not a second thing happening at the same time. */
 .cb-number-pad-button:active {
-  background-color: color-mix(in srgb, var(--cb-number-pad-ink, currentcolor) 30%, transparent);
-  box-shadow: 0 0 0 0.05em
-      color-mix(in srgb, var(--cb-number-pad-ink, currentcolor) 90%, transparent),
-    0 0 0.14em 0.01em color-mix(in srgb, var(--cb-number-pad-ink, currentcolor) 70%, transparent);
+  animation: cb-number-pad-press 260ms ease-out forwards;
 
   /* Reads as the key going down into the surface it is painted on. */
-  transform: scale(0.96);
+  transform: scale(0.94);
+}
+
+@keyframes cb-number-pad-press {
+  from {
+    background-color: color-mix(in srgb, var(--cb-number-pad-ink, currentcolor) 96%, transparent);
+    box-shadow: 0 0 1.5em 0.28em
+      color-mix(in srgb, var(--cb-number-pad-ink, currentcolor) 96%, transparent);
+  }
+
+  to {
+    background-color: color-mix(in srgb, var(--cb-number-pad-ink, currentcolor) 78%, transparent);
+    box-shadow: 0 0 1em 0.12em
+      color-mix(in srgb, var(--cb-number-pad-ink, currentcolor) 78%, transparent);
+  }
+}
+
+/* Reduced motion: the key still lights and still flares on the press — that is the only
+   feedback a pad with transparent glyphs has — but it holds each level instead of
+   breathing through it. */
+@media (prefers-reduced-motion: reduce) {
+  .cb-number-pad-button:hover,
+  .cb-number-pad-button:focus-visible {
+    animation: none;
+    background-color: color-mix(in srgb, var(--cb-number-pad-ink, currentcolor) 52%, transparent);
+    box-shadow: 0 0 0.75em 0.06em
+      color-mix(in srgb, var(--cb-number-pad-ink, currentcolor) 52%, transparent);
+  }
+
+  .cb-number-pad-button:active {
+    animation: none;
+    background-color: color-mix(in srgb, var(--cb-number-pad-ink, currentcolor) 88%, transparent);
+    box-shadow: 0 0 1.2em 0.18em
+      color-mix(in srgb, var(--cb-number-pad-ink, currentcolor) 88%, transparent);
+  }
 }
 
 .cb-number-pad-button:focus-visible {

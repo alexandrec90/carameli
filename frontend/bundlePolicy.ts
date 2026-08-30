@@ -133,8 +133,19 @@ export const MAX_LAZY_CHUNK_BYTES = 260 * 1024
  * `ProjectedTable` scrolls that body inside the panel's fixed band while the headings
  * stay put. Same lazy comic-book chunk, still 46 of them, `package.json` untouched, so
  * nothing new was pulled in.
+ *
+ * This raise (971 → 972) is **not this branch's** — it ships no JavaScript at all.
+ * Master went 0.2 KB over on 2026-08-29, when three comic-book PRs merged within minutes
+ * of each other, each measured against a master that did not yet contain the other two.
+ * The default branch runs no gate of its own, so the overflow was invisible there and
+ * surfaced on the first PR to merge that master in, which was this one. Still 46 chunks
+ * and `package.json` untouched, so nothing new was pulled in: this is three already
+ * accepted costs arriving together, and the honest place to record it is here.
+ *
+ * Parallel branches are how this budget gets passed rather than raised, which is why the
+ * paragraphs above each say which master their number was measured against.
  */
-export const MAX_TOTAL_JS_BYTES = 971 * 1024
+export const MAX_TOTAL_JS_BYTES = 972 * 1024
 
 /**
  * Every `.css` file in `dist/assets/`, summed. Today 44.2 KB across 2 files.
@@ -155,8 +166,16 @@ export const MAX_TOTAL_JS_BYTES = 971 * 1024
  * their pictures, the paper gutter between them, the ink around each, and the transcript
  * balloon with its scrolling window and the key under it. About 0.3 KB, against a build
  * that had 0.05 KB of room.
+ *
+ * This raise (47 → 48) is the number pad's glow (`number-pad.css`): the two keyframe
+ * sets the lit and the pressed states now animate through, and the reduced-motion block
+ * that holds each level instead of breathing it. About 0.45 KB, against a build that had
+ * none. Outside the editor the pad paints its glyphs in `transparent`, so this light is
+ * the only thing that says a key is under the pointer, and the static tint it replaces
+ * read as a button that had always been there rather than as light thrown onto a
+ * photographed surface.
  */
-export const MAX_TOTAL_CSS_BYTES = 47 * 1024
+export const MAX_TOTAL_CSS_BYTES = 48 * 1024
 
 /**
  * Every webfont in `dist/assets/`, summed. Today 231 KB: five weights of Outfit, each
