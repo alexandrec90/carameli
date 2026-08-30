@@ -228,6 +228,23 @@ export default function EditorToolbar({ api, selPanel, pageSelect, shapes }: Edi
           >
             + Bubble
           </button>
+          {/* A conversation is not "a bubble, twice": it is two balloons that have to be
+              linked, chained, given the right content and bound, in that order, and any
+              one of those undone by an ordinary edit takes it apart. So it is its own
+              button, and the author is never asked to assemble it. */}
+          <button
+            type="button"
+            className="cb-ed-btn"
+            disabled={selPanel === null}
+            title={
+              selPanel === null
+                ? 'Select a panel first'
+                : `Add an SMS conversation to ${api.config.panels[selPanel]?.label ?? `panel ${selPanel}`}`
+            }
+            onClick={() => selPanel !== null && api.addSmsOn(selPanel)}
+          >
+            + SMS
+          </button>
         </div>
       )}
 

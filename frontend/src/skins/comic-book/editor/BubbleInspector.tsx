@@ -31,18 +31,17 @@ function bubbleLabel(b: BubbleTransform, i: number): string {
 /**
  * The bubble-only half of the selection inspector: which panel it belongs to, its
  * shape and tail, how its text is presented, the text itself, the event responses —
- * the two morph targets and the hover weight — its link, and whether the linked group
- * is a chain.
+ * the two morph targets and the hover weight — and its link.
  *
  * The link picker offers only the other bubbles on the same panel — that is where
  * the same-panel rule is enforced, by never presenting the invalid choice. Changing
  * the panel therefore clears a link that no longer makes sense, which `patchBubble`
  * does rather than this component.
  *
- * Those two controls are deliberately adjacent, because together they are the whole of
- * "these balloons are one SMS thread": the picker says *which* balloons, the checkbox says
- * what the group of them is. A chain used to be a name typed into a third field, which
- * meant the author could say it twice and disagree with themselves.
+ * What is *not* here any more is the chain toggle. Being one SMS thread is no longer
+ * something an author says about balloons after drawing them; it is what **+ SMS** makes,
+ * whole, and the settings of the conversation a chained balloon belongs to are the
+ * ChainInspector's below.
  */
 export default function BubbleInspector({ api, index, bubble }: BubbleInspectorProps) {
   const candidates = linkCandidates(api.config.bubbles, index)
@@ -220,26 +219,20 @@ export default function BubbleInspector({ api, index, bubble }: BubbleInspectorP
         </div>
       )}
 
-      {/* The chain toggle. Applied to the whole linked group rather than to this balloon,
-          because a thread is a property of the column: ticking it here chains everything
-          reachable through the links above, and unticking it takes the whole column back
-          to plain balloons. That is why it is a checkbox and not a name — the author has
-          already said which balloons belong together by linking them. */}
-      <label className="cb-ed-check">
-        <input
-          type="checkbox"
-          checked={bubble.chain !== ''}
-          onChange={e => api.setChained(index, e.target.checked)}
-        />
-        <span>Scrollable chain</span>
-      </label>
-      <div className="cb-ed-hint">
-        {bubble.chain
-          ? `The linked balloons are one thread: messages run through them, the wheel moves
-             the window, and no tubes are drawn between them.`
-          : `Link balloons into a column, then tick this on any of them to read the column
-             as one SMS thread instead of as tube-joined balloons.`}
-      </div>
+      {/* No chain checkbox. A conversation used to be assembled here — link two balloons,
+          tick "scrollable chain", set the sender's content, tick "live SMS" — and every one
+          of those was an ordinary edit that could be undone by accident, silently, leaving
+          balloons that looked right and showed nothing. **+ SMS** in the toolbar is now the
+          only way to make one, so the couplings are established together or not at all;
+          what is left to edit is what an author actually wants to change, and it is in the
+          conversation section below. */}
+      {bubble.chain !== '' && (
+        <div className="cb-ed-hint">
+          This balloon is one column of a conversation — its settings are below. Its shape,
+          tail, rotation and lettering are the template every row on this side is stamped
+          from; its placement is where that side of the table sits.
+        </div>
+      )}
     </>
   )
 }

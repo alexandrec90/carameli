@@ -134,18 +134,29 @@ export const MAX_LAZY_CHUNK_BYTES = 260 * 1024
  * stay put. Same lazy comic-book chunk, still 46 of them, `package.json` untouched, so
  * nothing new was pulled in.
  *
- * This raise (971 → 972) is **not this branch's** — it ships no JavaScript at all.
+ * This raise (971 → 972) was not any one branch's — nothing in it ships JavaScript.
  * Master went 0.2 KB over on 2026-08-29, when three comic-book PRs merged within minutes
  * of each other, each measured against a master that did not yet contain the other two.
  * The default branch runs no gate of its own, so the overflow was invisible there and
- * surfaced on the first PR to merge that master in, which was this one. Still 46 chunks
- * and `package.json` untouched, so nothing new was pulled in: this is three already
- * accepted costs arriving together, and the honest place to record it is here.
+ * surfaced on the first PR to merge that master in. Still 46 chunks and `package.json`
+ * untouched: three already accepted costs arriving together.
  *
  * Parallel branches are how this budget gets passed rather than raised, which is why the
- * paragraphs above each say which master their number was measured against.
+ * paragraphs here each say which master their number was measured against — and why this
+ * merge pays for both halves rather than one subsuming the other.
+ *
+ * This raise (972 → 973) is `+ SMS` making a conversation whole, 0.79 KB measured as this
+ * branch's build (971.1 KB) against the master it branches from (970.3 KB):
+ * `chainCreate.ts` spawns both root bubbles already linked, chained and bound, and
+ * `reconcile.ts` is the settle step lifted out of `configOps.ts` so it can. The dashed
+ * frame that made the change visible — `chainFrame.ts` and the overlay that draws it — is
+ * *not* in this number: `EditorOverlay` is behind an `import.meta.env.DEV` test in
+ * Layout.tsx and never reaches the build. What does reach it is the editor's state layer,
+ * which Layout imports statically for `useEditorMode`, and that is where these 0.79 KB
+ * land. Same lazy comic-book chunk, still 46 of them, `package.json` untouched, so nothing
+ * new was pulled in.
  */
-export const MAX_TOTAL_JS_BYTES = 972 * 1024
+export const MAX_TOTAL_JS_BYTES = 973 * 1024
 
 /**
  * Every `.css` file in `dist/assets/`, summed. Today 44.2 KB across 2 files.
