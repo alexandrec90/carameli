@@ -22,11 +22,17 @@
 
   /* Sized against the native arrow, not against the artwork. These first shipped fitted
      to a 64px box each, which is over three times the ~19px of ink a system arrow draws
-     and reads as a sticker being dragged around the page rather than as a pointer. They
-     are now one shared downscale of their masters -- the same factor for all three, which
-     is the part that keeps the hand at the arrow's scale; independent fit-to-N boxes do
-     not, because the masters are not the same shape. `assetPolicy.test.ts` holds both the
-     ceiling and the ratio.
+     and reads as a sticker being dragged around the page rather than as a pointer. The
+     arrow, the click hand and the grab hand are one shared downscale of their masters --
+     the same factor for all three, which is the part that keeps the hands at the arrow's
+     scale; independent fit-to-N boxes do not, because the masters are not the same shape.
+     `assetPolicy.test.ts` holds both the ceiling and the ratio.
+
+     The move cross is measured against the ceiling instead, and is the one cursor that
+     has to be: it is a symmetric glyph whose ink runs edge to edge in a master three
+     times the arrow's size, so the hands' factor would draw it at 54px. What the three
+     hands share is a subject -- an arrow and two hands, all drawn at one remove -- and a
+     cross is not one of them.
 
      The grab hand is the open glove, so it dresses the resting state of a drag handle and
      the fallback carries `grab` for it. `grabbing` is deliberately left native: a closed
@@ -35,6 +41,7 @@
   --cb-cursor-default: url('/comic-book/pointer-cursor.webp') 2 1, default;
   --cb-cursor-click: url('/comic-book/click-cursor.webp') 9 10, pointer;
   --cb-cursor-grab: url('/comic-book/hand-dragger-cursor.webp') 8 10, grab;
+  --cb-cursor-move: url('/comic-book/move-cursor.webp') 15 15, move;
 }
 
 /* ─── Fonts ─────────────────────────────────────────────────────────────────── */
