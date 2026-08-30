@@ -1,5 +1,5 @@
 import {
-  CHAIN_ROWS, CHAIN_STEP_MS, chainMembers, chainTranscript, defaultChain, isComposerContent,
+  CHAIN_ROWS, chainMembers, chainTranscript, defaultChain, isComposerContent,
   messageRows, peerPickerOn, readTranscript,
 } from '../bubbleChain'
 import { parseMessages } from './chainOps'
@@ -19,10 +19,20 @@ interface ChainInspectorProps {
  * balloon is a column of, shown below the balloon's own fields whenever it is in a chain.
  *
  * There is no chain picker and no delete button, because the list is derived — a chain
- * exists exactly while some linked group is ticked as one (see syncChains and
- * propagateChains). What this edits is the behaviour of one that already exists, plus the
- * transcript that runs through it. Scrolling is not among the settings: a chain *is* a
- * window over a transcript, so the wheel always moves it.
+ * exists exactly while some linked group carries an id (see syncChains and
+ * propagateChains), which **+ SMS** in the toolbar is now the only thing that arranges.
+ *
+ * What is left here is what an author has an actual reason to change: how many **rows** the
+ * table holds, and — on a chain that is not bound to a real thread — the transcript that
+ * runs through it. Everything else that used to sit here was a switch that could take a
+ * working conversation apart with one click and give no sign that it had: scrolling
+ * (a chain *is* a window over a transcript, so the wheel always moves it), the growth
+ * animation and its delay, and the live-SMS binding itself.
+ *
+ * Where the table *lands* is not a field either, and deliberately: it is the two balloons'
+ * own placement, drawn on the panel as a dashed frame (see chainFrame.ts) so that dragging
+ * them and setting `rows` have a visible result. That frame is the answer to the editor
+ * and the running page disagreeing about where a conversation is.
  */
 export default function ChainInspector({ api, index, bubble }: ChainInspectorProps) {
   const { bubbles } = api.config
@@ -70,62 +80,59 @@ export default function ChainInspector({ api, index, bubble }: ChainInspectorPro
         />
       </label>
 
-      <label className="cb-ed-check">
-        <input
-          type="checkbox"
-          checked={chain.grow}
-          onChange={e => api.setChain(chain.id, { grow: e.target.checked })}
-        />
-        <span>Grow in one message at a time</span>
-      </label>
+      <div className="cb-ed-hint">
+        The dashed frame on the panel is where those rows will land. It is the whole of
+        stretching the table: drag either balloon to move that side&apos;s column, resize one
+        to widen it, and change <em>rows</em> to set how far up the panel the conversation
+        reaches.
+      </div>
 
-      {chain.grow && !live && (
-        <label className="cb-ed-field">
-          <span>step ms</span>
-          <input
-            className="cb-ed-input"
-            type="number"
-            min={CHAIN_STEP_MS.min}
-            max={CHAIN_STEP_MS.max}
-            step={CHAIN_STEP_MS.step}
-            value={chain.stepMs}
-            onChange={e => api.setChain(chain.id, { stepMs: Number(e.target.value) })}
-          />
-        </label>
-      )}
-
-      <label className="cb-ed-check">
-        <input
-          type="checkbox"
-          checked={chain.sms}
-          onChange={e => api.setChain(chain.id, { sms: e.target.checked })}
-        />
-        <span>Live SMS conversation</span>
-      </label>
+      {/* No "live SMS" checkbox, and no growth controls. A conversation added with **+ SMS**
+          is bound already — that is what the button means — and how it plays is the
+          renderer's business. What is left here is what an author has a reason to change. */}
       {chain.sms && (
         <div className="cb-ed-hint">
           {hasPicker
-            ? 'Bound to whichever number this panel’s wheel picker is turned to. The transcript below is not drawn — the balloons are the real messages — and Enter in the composer sends one for money.'
-            : 'This panel has no wheel-picker balloon, so there is no number to bind to and the conversation renders empty. Add a bubble with `wheel` content, outside the chain, whose text is the numbers separated by commas.'}
+            ? 'Bound to whichever number this panel’s picker balloon is showing. The transcript below is not drawn — the balloons are the real messages — and Enter in the composer sends one for money. Nothing binds and nothing sends while the editor is open.'
+            : 'This panel has no picker balloon, so there is no number to bind to and the conversation renders empty outside edit mode. Add one below.'}
+        </div>
+      )}
+      {chain.sms && !hasPicker && (
+        <div className="cb-ed-actions">
+          <button
+            type="button"
+            className="cb-ed-btn"
+            onClick={() => api.addPeerPickerOn(bubble.panel)}
+          >
+            + Number picker
+          </button>
         </div>
       )}
 
-      <label className="cb-ed-field">
-        <span>messages</span>
-        <textarea
-          className="cb-ed-textarea"
-          rows={6}
-          value={chain.messages.join('\n')}
-          placeholder={'One message per line, oldest first.\nStart a line with > for the sender’s side.'}
-          onChange={e => api.setChain(chain.id, { messages: parseMessages(e.target.value) })}
-        />
-      </label>
-      <div className="cb-ed-hint">
-        {total} message{total === 1 ? '' : 's'} — {out} sent, {total - out} received — through{' '}
-        {holders} row{holders === 1 ? '' : 's'}
-        {live ? ' (the bottom row is the composer)' : ''}
-        {total > holders ? ' — the wheel scrolls the rest into view.' : '.'}
-      </div>
+      {/* An authored transcript, on a chain that has one. A bound chain does not: its
+          balloons are the account's real messages, so a textarea here would be a field the
+          author can type into and never see again — which is the editor disagreeing with
+          what runs, in the one place that costs money to discover. */}
+      {!chain.sms && (
+        <>
+          <label className="cb-ed-field">
+            <span>messages</span>
+            <textarea
+              className="cb-ed-textarea"
+              rows={6}
+              value={chain.messages.join('\n')}
+              placeholder={'One message per line, oldest first.\nStart a line with > for the sender’s side.'}
+              onChange={e => api.setChain(chain.id, { messages: parseMessages(e.target.value) })}
+            />
+          </label>
+          <div className="cb-ed-hint">
+            {total} message{total === 1 ? '' : 's'} — {out} sent, {total - out} received — through{' '}
+            {holders} row{holders === 1 ? '' : 's'}
+            {live ? ' (the bottom row is the composer)' : ''}
+            {total > holders ? ' — the wheel scrolls the rest into view.' : '.'}
+          </div>
+        </>
+      )}
       {live && (
         <div className="cb-ed-hint">
           Outside edit mode this conversation starts at the composer alone and grows by one

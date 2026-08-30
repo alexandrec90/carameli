@@ -107,3 +107,15 @@
   cursor: var(--cb-cursor-default);
   pointer-events: none;
 }
+
+/* Where an SMS conversation's rows will land. Chrome and nothing else: it takes no
+   pointer, so the two balloons measured to draw it stay the only things that move it,
+   and it paints under the selection outline rather than competing with one. Violet,
+   because it is neither a hit target nor a selection and should not read as either. */
+.cb-ed-chainbox {
+  position: absolute;
+  box-sizing: border-box;
+  border: 1px dashed rgb(150 90 255 / 70%);
+  background: rgb(150 90 255 / 5%);
+  pointer-events: none;
+}

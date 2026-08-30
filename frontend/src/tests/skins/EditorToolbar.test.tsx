@@ -30,6 +30,8 @@ function editorApi(config: EditorConfig): EditorModeApi {
     resetGridFor: vi.fn(),
     addImgOn: vi.fn(),
     addBubbleOn: vi.fn(),
+    addSmsOn: vi.fn(),
+    addPeerPickerOn: vi.fn(),
     setImg: vi.fn(),
     setBubble: vi.fn(),
     setChained: vi.fn(),
@@ -44,12 +46,13 @@ function editorApi(config: EditorConfig): EditorModeApi {
   }
 }
 
-function renderToolbar(config: EditorConfig = seedConfig()) {
-  return render(
+function renderToolbar(config: EditorConfig = seedConfig(), selPanel: number | null = null) {
+  const api = editorApi(config)
+  const view = render(
     <MemoryRouter>
       <EditorToolbar
-        api={editorApi(config)}
-        selPanel={null}
+        api={api}
+        selPanel={selPanel}
         pageSelect={{ navItems: [], previewingLoading: false, onPreviewLoading: vi.fn() }}
         shapes={{
           page: 'classic',
@@ -60,6 +63,7 @@ function renderToolbar(config: EditorConfig = seedConfig()) {
       />
     </MemoryRouter>,
   )
+  return { ...view, api }
 }
 
 /**
@@ -219,6 +223,24 @@ describe('EditorToolbar', () => {
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1))
     const [url] = fetchMock.mock.calls[0] as [string]
     expect(url).toBe('/__comic-editor/save')
+  })
+
+  // A conversation is its own button because it is not "a bubble, twice": the two halves
+  // have to be linked, chained, given the right content and bound together or not at all.
+  // That it sits beside `+ Image` and `+ Bubble` is the whole of the author's discovery of
+  // it, so the button's presence is worth an assertion of its own.
+  it('offers + SMS beside + Image and + Bubble, on the selected panel', () => {
+    const { api } = renderToolbar(seedConfig(), 11)
+
+    fireEvent.click(screen.getByRole('button', { name: '+ SMS' }))
+
+    expect(api.addSmsOn).toHaveBeenCalledWith(11)
+  })
+
+  it('holds + SMS until a panel is picked, since a conversation belongs to one panel', () => {
+    renderToolbar()
+
+    expect(screen.getByRole<HTMLButtonElement>('button', { name: '+ SMS' }).disabled).toBe(true)
   })
 
   it('says nothing and leaves Ship alone on the shipped layout', () => {

@@ -67,6 +67,49 @@ export const NEW_BUBBLE: Omit<BubbleTransform, 'panel'> = {
   chain: '',
 }
 
+/**
+ * The sender's root balloon of a brand-new conversation — the right-hand column, the one
+ * the composer sits at the foot of.
+ *
+ * Placed on the panel rather than at {@link NEW_BUBBLE}'s deliberately-off-centre spot,
+ * because a conversation is not one balloon the author drags into place: its rows stack
+ * *upward* from this template, so where it lands decides where the whole table hangs. Two
+ * thirds of the way down leaves five more rows' worth of panel above it, which is what the
+ * default row count asks for.
+ *
+ * `content: 'input'` is not decoration — it is the whole of "this conversation is live".
+ * The bottom row becomes a real field, and what a reader types there is the next message.
+ * Its recipient half is this balloon mirrored (see `addSmsConversation`), so there is no
+ * second constant to keep in step with it.
+ */
+export const NEW_SMS_SENDER: Omit<BubbleTransform, 'panel'> = {
+  ...NEW_BUBBLE,
+  top: 62,
+  right: 8,
+  width: 34,
+  content: 'input',
+  text: '',
+}
+
+/**
+ * The balloon that says *who* a conversation is with: a phone field with a shortlist
+ * behind it, outside the chain, which `peerPickerOn` finds and reads a number off.
+ *
+ * A separate balloon on purpose — the picker says who, the chain says what — which is the
+ * one piece of a working conversation that the two root bubbles cannot supply themselves.
+ * Empty options rather than a made-up number: the shortlist grows from what is dialled.
+ */
+export const NEW_PEER_PICKER: Omit<BubbleTransform, 'panel'> = {
+  ...NEW_BUBBLE,
+  top: 20,
+  right: 62,
+  width: 30,
+  type: 'cloud',
+  tail: 'right',
+  content: 'dial',
+  text: '',
+}
+
 export const LAYOUT_KINDS: LayoutKind[] = ['landscape', 'portrait', 'square']
 
 /**

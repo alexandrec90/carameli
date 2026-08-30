@@ -46,7 +46,9 @@ Config edits themselves live in `configOps.ts` (React-free: seed/hydrate/patch,
 add/remove picture or bubble, pattern switch, link sanitation), which re-exports
 `configSeed.ts` and `configHydrate.ts` (backfill, enum coercion, pattern fallback);
 grid edits live in `panelGridOps.ts` and the chain list's own lifecycle in
-`chainOps.ts`.
+`chainOps.ts`; `reconcile.ts` settles links, ids and the list after any bubble-touching
+edit, `chainCreate.ts` builds a whole conversation in one op, and `chainFrame.ts` is the
+editor-only geometry of where its rows land.
 
 **A `layoutConfig.ts` you did not edit is somebody's unsaved design, not a broken
 branch.** Because Save writes the served tree directly, a browser tab left open mid-
@@ -164,11 +166,11 @@ two are not the same input, which is why the keys take no argument.
 | Gate | `import.meta.env.DEV && (?edit=1 \|\| flag)` | Never ships — `?edit=1` is inert in prod |
 | Select | click a **panel**, a **picture** or a **bubble** | A picture wins over the panel under it, a bubble over both; a panel is only outlined — it is the slot the **+** buttons add to, where its **name** and background pattern are edited, and (in shapes mode) what the split buttons cut. Panels are selectable in both modes |
 | Adjust | drag / wheel / handles / arrows | Move the frame or bubble, resize (bottom-right grip), pan the picture inside its frame (top-left grip, picture only), rotate (top-right grip, bubble only), nudge (⇧×10); for a picture **Alt** swaps the two framings |
-| Add / remove | **+ Image** / **+ Bubble** toolbar buttons, **Delete image** / **Delete bubble** in the inspector | Adds to the selected panel; deleting a bubble clears any link naming it |
+| Add / remove | **+ Image** / **+ Bubble** / **+ SMS** toolbar buttons, **Delete image** / **Delete bubble** in the inspector | Adds to the selected panel; deleting a bubble clears any link naming it |
 | Panel fields | inspector controls | **name** (free text) and background **pattern** style (`PATTERN_STYLE_KEYS`; palette stays per panel) |
 | Picture fields | inspector selects | panel, picture (`PANEL_ASSETS`), alt (empty = decorative), anchor, spill |
-| Bubble fields | inspector selects | panel, type, **tail** (nine options incl. **No tail**), **content** (Text / Wheel picker / Text input / Phone input / Dial / Action buttons), authored text or initial value, hover/click morph, **chain** (free text, completing on the names already in use), link |
-| Chain fields | inspector, below the bubble's own, when the bubble names a chain | **grow** / **step ms**, **scroll**, **messages** (one per line; empty = speak the balloons' own text), **+ Balloon in chain** — they edit the whole column, not the selected balloon. Chained balloons render flat in edit mode so each stays selectable |
+| Bubble fields | inspector selects | panel, type, **tail** (nine options incl. **No tail**), **content** (Text / Wheel picker / Text input / Phone input / Dial / Action buttons), authored text or initial value, hover/click morph, link. There is **no chain control**: a conversation is made whole by **+ SMS** and never assembled here |
+| Chain fields | inspector, below the bubble's own, when the bubble is in a chain | **rows**; **messages** on an *unbound* chain only (one per line; empty = speak the balloons' own text); **+ Other column** and **+ Number picker** when either is missing. They edit the conversation, not the selected balloon. Chained balloons render flat in edit mode so each stays selectable, and the table's extent is drawn as a dashed frame (`chainFrame.ts`) so moving a template or changing `rows` has a visible result |
 | Table on / off | **Project a table onto this image** checkbox (picture inspector) | Switching on seeds a starter surface; switching off deletes the table and its cells, leaving the picture |
 | Table source | **shows** select (table inspector) | *Cells typed below* or a live feed (**Call records**, **SMS messages**). Picking a feed takes its columns and empties the cells; going back seeds a fresh authored surface, since five empty feed-shaped columns would leave nothing on the notepad to see |
 | Table fields | inspector controls | rows visible, text size, ink, headings on/off, the four corner X/Y pairs, **Reset corners**, and a columns list (heading / width weight / alignment) plus the cell text, one row per line, tab- or `\|`-separated. A live surface has no cell block, and no **+ Column** / **−** |

@@ -268,25 +268,38 @@ different images can only crossfade. A new bubble type belongs in `bubbleShape.t
      declare it at one end only — and the **link to** dropdown lists only the other
      bubbles on the same panel (it is disabled when there are none). Changing a
      bubble's panel clears a link that would have crossed one.
-   - Also for bubbles: the **scrollable chain** checkbox, directly under **link to**,
-     turns the balloons linked to this one into an SMS conversation — and unticking it
-     turns them back into tube-joined balloons. It applies to the whole linked group,
-     because a conversation is a property of the pair: link first, then tick either end.
-     There is no chain name to type; the id in the exported config is the editor's
-     bookkeeping. Ticking it drops the group's tubes, and the chain's own controls appear
-     below: **rows** (how many the table holds at once), **grow one at a time** with its
-     **step ms**, and the **messages** box — one per line, oldest first, a leading `>`
-     marking the sender's side, and an empty box meaning the two drawn balloons' own text
-     is the transcript. **+ Other column** appears while the chain has only one balloon
-     and adds its partner mirrored across the panel, tail flipped, linked back to it. Set
-     the **sender's** balloon (the rightmost) to **Text input** or **Phone input** to make
-     the chain live — it then starts as just that field at the bottom right and grows by
-     one row each time Enter is pressed outside edit mode. In edit mode the two templates
-     render flat, all-visible and at their own placements, so you are always dragging the
-     columns themselves rather than chasing a row an animation put somewhere.
-   - **+ Image** / **+ Bubble** (toolbar) append a new picture or bubble to the
-     selected panel — select the panel, a picture on it or a bubble on it first, so
-     there is a panel to add to — and select what they added. **Delete image** /
+   - **+ SMS** (toolbar) is how a conversation is made, and the only way. It drops **two
+     root bubbles** on the selected panel — the sender's on the right, the recipient's
+     mirrored across from it — already linked, already one chain, already bound to the
+     account's real thread, with the sender set to **Text input** so the bottom row is a
+     composer. There is nothing to assemble and no order to get right: that used to be six
+     separate edits, any one of which could be undone by accident and leave balloons that
+     looked finished and drew nothing.
+     - **Position the two root bubbles** by dragging them: each is the template every row
+       on its side is stamped from — its shape, tail, rotation and lettering — and its
+       placement is where that column sits. Drag one past the other to swap the columns.
+     - **Stretch the table** the same way: resize a template to widen its column, and set
+       **rows** in the conversation section for how far up the panel the thread reaches.
+       The **dashed violet frame** on the panel is where those rows will actually land, so
+       every one of these edits has a visible result in edit mode.
+     - **+ Number picker** appears in the conversation section when the panel has no
+       picker balloon. Which number a bound conversation is with is not stored on the
+       chain — it is whatever the panel's first non-chained `wheel`/`dial` balloon is
+       showing (`peerPickerOn`) — so without one the thread renders empty.
+     - **+ Other column** appears while a chain has only one balloon and adds its partner
+       mirrored across the panel, tail flipped, linked back to it.
+     - A chain that is *not* bound keeps its **messages** box — one per line, oldest
+       first, a leading `>` marking the sender's side, an empty box meaning the two drawn
+       balloons' own text is the transcript. A bound one does not: its balloons are real
+       messages, so an authored transcript there is a field you could type into and never
+       see again.
+     - In edit mode the two templates render flat, all-visible and at their own
+       placements, so you are always dragging the columns themselves rather than chasing a
+       row an animation put somewhere. Nothing binds and nothing sends while the editor is
+       open.
+   - **+ Image** / **+ Bubble** / **+ SMS** (toolbar) append a new picture, bubble or
+     conversation to the selected panel — select the panel, a picture on it or a bubble on
+     it first, so there is a panel to add to — and select what they added. **Delete image** /
      **Delete bubble** (inspector) removes the selected one; deleting a bubble also
      clears any link that named it. **Reset** restores a shipped element to its
      default; one you added has no default, so reset leaves it alone.
@@ -456,6 +469,9 @@ configSeed.ts       PURE: the working copy's seed, clone, and per-breakpoint gri
 gridContentRemap.ts PURE: grid set/reset with every picture and balloon held still on screen
 configHydrate.ts    PURE: parse a persisted payload back into a config, falling back per field
 chainOps.ts         PURE chain-list lifecycle: linked groups -> ids, derive the list, patch, clamp, hydrate
+reconcile.ts        PURE: settle links, ids and the chain list after any bubble-touching edit
+chainCreate.ts      PURE: + SMS (two bound root bubbles, whole) and + Number picker
+chainFrame.ts       PURE: where a conversation's rows land, as the editor's dashed frame
 useSeamDrag.ts      hook: which gesture a pointer means, and the grid edit it maps to
 PanelSeams.tsx      the draggable line + vertex handles (shapes mode)
 ShapeInspector.tsx  shapes-mode inspector: vertex read-out, add corner, straighten, reset grid
@@ -475,12 +491,12 @@ transforms.ts       PURE helpers: CSS builders, frame/drag/scale math, clamp
 useEditorMode.ts    hook: flag detection, working copy, persistence, selection
 useOverlayInteraction.ts  pointer/wheel/keyboard wiring (thin)
 useToolbarDrag.ts   hook: draggable toolbar position (viewport-clamped, persisted)
-EditorOverlay.tsx   overlay UI: click targets, outlines, seams (dev-only, dynamically imported)
+EditorOverlay.tsx   overlay UI: click targets, outlines, chain frames, seams (dev-only, dynamically imported)
 EditorToolbar.tsx   toolbar chrome: mode toggle, page select, inspector slot, save/reset/export
 InspectorPanel.tsx  selection inspector: read-outs, spill, per-element reset, delete
 ImageInspector.tsx  picture-only controls: panel, picture, alt, anchor
-BubbleInspector.tsx bubble-only controls: panel, type, tail, content, text, hover/click, link, chain toggle
-ChainInspector.tsx  the chain half of that inspector: rows, grow, step ms, messages, + column
+BubbleInspector.tsx bubble-only controls: panel, type, tail, content, text, hover/click, link
+ChainInspector.tsx  the chain half of that inspector: rows, an unbound chain's messages, + column, + picker
 PageSelect.tsx      toolbar dropdown: switch page / preview the loading screen
 pageSelection.ts    PURE helpers behind PageSelect (sentinel value, selection resolution)
 ../bubbleChains.css chain row placement + the arrival/scroll animations (ships in prod)
