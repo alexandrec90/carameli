@@ -1,63 +1,24 @@
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 
-import { logger } from '../../../lib/logger'
 import type { LayoutKind, PanelGrid } from '../panelGeometry'
 import type { PanelPage } from '../panels'
+import AddContentButtons from './AddContentButtons'
 import { layoutViolations } from './configParity'
 import InspectorPanel from './InspectorPanel'
 import LayoutWarnings from './LayoutWarnings'
 import PageSelect from './PageSelect'
 import type { PageSelectProps } from './PageSelect'
-import { serializeConfig, serializeConfigFile } from './serialize'
 import ShapeInspector from './ShapeInspector'
 import type { EditorModeApi } from './useEditorMode'
+import { useLayoutTransport } from './useLayoutTransport'
 import type { SeamDragApi } from './useSeamDrag'
 import { useToolbarColumns } from './useToolbarColumns'
 import { useToolbarDrag } from './useToolbarDrag'
 
 // The editor's own chrome: the mode switch, the inspector for whatever is selected, and
 // the four ways a working copy leaves the browser. Split out of EditorOverlay.tsx when
-// the shape editor doubled the number of things a toolbar has to hold.
-
-/** Dev-only endpoint (Vite middleware) that overwrites editor/layoutConfig.ts. */
-const SAVE_ENDPOINT = '/__comic-editor/save'
-
-/**
- * Dev-only endpoint that saves *and* then branches, commits, pushes and opens or
- * updates a PR. Save alone writes into whichever tree the dev server is serving, and
- * two of the three that run this editor — a detached `.ui-previews/` copy, the static
- * checkout — hold that file somewhere git is not watching and a cleanup can delete.
- * See `frontend/shipLayout.ts` for the whole of that reasoning.
- */
-const SHIP_ENDPOINT = '/__comic-editor/ship'
-
-/** What the ship endpoint answers with; mirrors ShipOutcome in frontend/shipLayout.ts. */
-interface ShipResponse {
-  ok: boolean
-  message: string
-  branch?: string
-  prUrl?: string
-}
-
-type ShipState =
-  | { phase: 'idle' }
-  | { phase: 'busy' }
-  | { phase: 'done'; message: string; prUrl?: string }
-  | { phase: 'error'; message: string }
-
-/**
- * Save's outcome, as a state rather than a boolean, because the failure has to be
- * *visible*. A save that cannot write the file falls back to downloading it, and while
- * that fallback was announced only in the log the button said "Save" again a moment
- * later — indistinguishable from a save that worked. That is how a broken write target
- * went unnoticed: every press downloaded a copy of `layoutConfig.ts` and the editor's
- * work never reached the app outside edit mode.
- */
-type SaveState =
-  | { phase: 'idle' }
-  | { phase: 'confirm' }
-  | { phase: 'done' }
-  | { phase: 'error'; message: string }
+// the shape editor doubled the number of things a toolbar has to hold; what each of those
+// four presses *does* is ./useLayoutTransport.ts, so this file stays markup.
 
 interface EditorToolbarProps {
   api: EditorModeApi
@@ -67,109 +28,20 @@ interface EditorToolbarProps {
   shapes: { page: PanelPage; kind: LayoutKind; grid: PanelGrid; drag: SeamDragApi }
 }
 
-/** Fallback when the save endpoint/clipboard is unavailable: download the file. */
-function downloadConfig(text: string): void {
-  const blob = new Blob([text], { type: 'text/typescript' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = 'layoutConfig.ts'
-  a.click()
-  URL.revokeObjectURL(url)
-}
-
 export default function EditorToolbar({ api, selPanel, pageSelect, shapes }: EditorToolbarProps) {
   const { config, mode } = api
   const toolbarDrag = useToolbarDrag()
   const toolbarColumns = useToolbarColumns(toolbarDrag.rootProps.ref)
-  const [copied, setCopied] = useState(false)
-  const [save, setSave] = useState<SaveState>({ phase: 'idle' })
-  const [summary, setSummary] = useState('')
-  const [ship, setShip] = useState<ShipState>({ phase: 'idle' })
 
   // Derived from the working copy rather than checked on the way out, so a balloon
   // finished mid-session stops being reported the moment it is finished. See
   // ./configParity.ts for which rules are structural and which belong to today's layout.
   const violations = useMemo(() => layoutViolations(config), [config])
+  const transport = useLayoutTransport(config, api.stale, violations.length)
+  const { save, ship } = transport
 
-  const onShip = () => {
-    setShip({ phase: 'busy' })
-    const content = serializeConfigFile(config)
-    fetch(SHIP_ENDPOINT, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content, summary }),
-    })
-      .then(res => res.json().then((body: ShipResponse) => ({ res, body })))
-      .then(({ res, body }) => {
-        if (!res.ok || !body.ok) throw new Error(body?.message ?? `HTTP ${res.status}`)
-        setShip({ phase: 'done', message: body.message, prUrl: body.prUrl })
-        logger.info('Comic-book editor: layout shipped', { message: body.message })
-      })
-      .catch((err: unknown) => {
-        const message = err instanceof Error ? err.message : String(err)
-        setShip({ phase: 'error', message })
-        logger.error('Comic-book editor: ship failed', { err: message })
-      })
-  }
-
-  const onSave = () => {
-    // A working copy that predates the file on disk overwrites work nobody chose to
-    // revert, and the author is the only one who can tell a deliberate rollback from a tab
-    // left open across a merge. So the first press asks and the second writes — one extra
-    // click, and only in the case where the file has actually moved.
-    if (api.stale && save.phase !== 'confirm') {
-      setSave({ phase: 'confirm' })
-      return
-    }
-    const content = serializeConfigFile(config)
-    fetch(SAVE_ENDPOINT, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content }),
-    })
-      .then(res => {
-        if (!res.ok) throw new Error(`HTTP ${res.status}`)
-        setSave({ phase: 'done' })
-        // The count goes in the log because it is the record of what the *file* now
-        // holds: the author sees the list in the toolbar, but whoever finds this tree
-        // afterwards sees only the file.
-        logger.info('Comic-book editor: config saved to layoutConfig.ts', {
-          unfinished: violations.length,
-        })
-        window.setTimeout(() => setSave({ phase: 'idle' }), 1500)
-      })
-      .catch((err: unknown) => {
-        const message = err instanceof Error ? err.message : String(err)
-        logger.error('Comic-book editor: save failed, downloading instead', { err: message })
-        // The download stays — it is the only copy of the work when the endpoint is
-        // gone — but it is now announced, so it cannot read as a save that worked.
-        setSave({ phase: 'error', message })
-        downloadConfig(content)
-      })
-  }
-
-  const onCopyConfig = () => {
-    const text = serializeConfig(config)
-    const confirm = () => {
-      setCopied(true)
-      logger.info('Comic-book editor: config copied to clipboard')
-      window.setTimeout(() => setCopied(false), 1500)
-    }
-    if (navigator.clipboard?.writeText) {
-      navigator.clipboard
-        .writeText(text)
-        .then(confirm)
-        .catch(err => {
-          logger.error('Comic-book editor: clipboard write failed, downloading instead', {
-            err: String(err),
-          })
-          downloadConfig(serializeConfigFile(config))
-        })
-    } else {
-      downloadConfig(serializeConfigFile(config))
-    }
-  }
+  const saveLabel =
+    save.phase === 'done' ? 'Saved!' : save.phase === 'confirm' ? 'Overwrite it?' : 'Save'
 
   return (
     <div
@@ -210,64 +82,16 @@ export default function EditorToolbar({ api, selPanel, pageSelect, shapes }: Edi
         <div className="cb-ed-hint">Click a panel, a picture or a bubble to select it.</div>
       )}
 
-      {mode === 'content' && (
-        <div className="cb-ed-actions">
-          {/* New pictures and bubbles land on the selected panel, because there is no
-              other answer to "which panel" that does not need a second click. */}
-          <button
-            type="button"
-            className="cb-ed-btn"
-            disabled={selPanel === null}
-            title={
-              selPanel === null
-                ? 'Select a panel first'
-                : `Add a picture to ${api.config.panels[selPanel]?.label ?? `panel ${selPanel}`}`
-            }
-            onClick={() => selPanel !== null && api.addImgOn(selPanel)}
-          >
-            + Image
-          </button>
-          <button
-            type="button"
-            className="cb-ed-btn"
-            disabled={selPanel === null}
-            title={
-              selPanel === null
-                ? 'Select a panel first'
-                : `Add a bubble to ${api.config.panels[selPanel]?.label ?? `panel ${selPanel}`}`
-            }
-            onClick={() => selPanel !== null && api.addBubbleOn(selPanel)}
-          >
-            + Bubble
-          </button>
-          {/* A conversation is not "a bubble, twice": it is two balloons that have to be
-              linked, chained, given the right content and bound, in that order, and any
-              one of those undone by an ordinary edit takes it apart. So it is its own
-              button, and the author is never asked to assemble it. */}
-          <button
-            type="button"
-            className="cb-ed-btn"
-            disabled={selPanel === null}
-            title={
-              selPanel === null
-                ? 'Select a panel first'
-                : `Add an SMS conversation to ${api.config.panels[selPanel]?.label ?? `panel ${selPanel}`}`
-            }
-            onClick={() => selPanel !== null && api.addSmsOn(selPanel)}
-          >
-            + SMS
-          </button>
-        </div>
-      )}
+      {mode === 'content' && <AddContentButtons api={api} selPanel={selPanel} />}
 
       <div className="cb-ed-actions">
         <button
           type="button"
           className="cb-ed-btn cb-ed-btn-primary"
-          onClick={onSave}
+          onClick={transport.onSave}
           title={api.stale ? 'The config file has changed since this working copy started' : undefined}
         >
-          {save.phase === 'done' ? 'Saved!' : save.phase === 'confirm' ? 'Overwrite it?' : 'Save'}
+          {saveLabel}
         </button>
         <button
           type="button"
@@ -300,8 +124,8 @@ export default function EditorToolbar({ api, selPanel, pageSelect, shapes }: Edi
           className="cb-ed-ship-summary"
           aria-label="Ship summary"
           placeholder="What changed (optional)"
-          value={summary}
-          onChange={e => setSummary(e.target.value)}
+          value={transport.summary}
+          onChange={e => transport.setSummary(e.target.value)}
         />
         <button
           type="button"
@@ -312,7 +136,7 @@ export default function EditorToolbar({ api, selPanel, pageSelect, shapes }: Edi
               : 'Save, then commit and push this layout and open or update its PR'
           }
           disabled={ship.phase === 'busy' || violations.length > 0}
-          onClick={onShip}
+          onClick={transport.onShip}
         >
           {ship.phase === 'busy' ? 'Shipping…' : 'Ship'}
         </button>
@@ -335,14 +159,14 @@ export default function EditorToolbar({ api, selPanel, pageSelect, shapes }: Edi
       )}
 
       <div className="cb-ed-actions">
-        <button type="button" className="cb-ed-btn" onClick={onCopyConfig}>
-          {copied ? 'Copied!' : 'Copy config'}
+        <button type="button" className="cb-ed-btn" onClick={transport.onCopyConfig}>
+          {transport.copied ? 'Copied!' : 'Copy config'}
         </button>
         <button
           type="button"
           className="cb-ed-btn cb-ed-btn-icon"
           title="Download layoutConfig.ts (clipboard/save fallback)"
-          onClick={() => downloadConfig(serializeConfigFile(config))}
+          onClick={transport.onDownload}
         >
           .ts
         </button>

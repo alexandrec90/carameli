@@ -1,22 +1,21 @@
 import { useCallback, useMemo, useState } from 'react'
 
 import { logger } from '../../../lib/logger'
-import { CONFIG_KEY, hydrateConfig, seedConfig } from './configOps'
 import { setPanelLabel as setPanelLabelIn, splitPanel as splitPanelIn } from './configPanels'
 import { setPageLabel as setPageLabelIn } from './configPages'
-import { isStaleWorkingCopy, seedStamp } from './configStamp'
-import { clearStoredConfig, detectActive, persistConfig, storedStamp } from './editorStorage'
+import { detectActive } from './editorStorage'
 import { resetGridKeepingContent, setGridKeepingContent } from './gridContentRemap'
 import type { CutAxis } from './panelGridCut'
 import type { EditMode, Selection, SelectionKind } from './selection'
 import { useContentEdits } from './useContentEdits'
 import type { ContentEdits } from './useContentEdits'
+import { useWorkingCopy } from './useWorkingCopy'
 import type { EditorConfig, LayoutKind, PanelGrid, PanelPage } from './types'
 
 // The pure operations on a config live in ./configOps.ts and ./panelGridOps.ts, the
-// content mutators in ./useContentEdits.ts and the browser edges in ./editorStorage.ts;
-// this module is the React state between them — the edit flag, the working copy, the
-// selection, and which half of the editor is in front.
+// content mutators in ./useContentEdits.ts, the browser edges in ./editorStorage.ts and
+// the working copy's own state in ./useWorkingCopy.ts; this module is the React state
+// between them — the edit flag, the selection, and which half of the editor is in front.
 
 export type { EditMode, Selection, SelectionKind } from './selection'
 
@@ -94,19 +93,8 @@ function viewportSize(): { w: number; h: number } {
  */
 export function useEditorMode(): EditorModeApi {
   const [active] = useState(detectActive)
-  // The payload is read once and answers two questions: what the working copy is, and
-  // which `layoutConfig.ts` it came from. Both from the same string, so a storage write
-  // between the two reads cannot pair a config with another payload's stamp.
-  const [boot] = useState(() => {
-    if (!active || typeof window === 'undefined') return { config: seedConfig(), stamp: null }
-    const raw = window.localStorage.getItem(CONFIG_KEY)
-    return { config: hydrateConfig(raw), stamp: storedStamp(raw) }
-  })
-  const [config, setConfig] = useState<EditorConfig>(boot.config)
-  // Never recomputed: the seed is a module constant, and a change to the file it comes
-  // from restarts the bundle (Vite has no accept handler for it, so it full-reloads).
-  const current = useMemo(() => seedStamp(), [])
-  const [stamp, setStamp] = useState<string | null>(boot.stamp)
+  const copy = useWorkingCopy(active)
+  const { config, apply } = copy
   const [selected, setSelected] = useState<Selection | null>(null)
   const [mode, setModeState] = useState<EditMode>('content')
 
@@ -125,20 +113,6 @@ export function useEditorMode(): EditorModeApi {
   }, [])
 
   const clear = useCallback(() => setSelected(null), [])
-
-  /** Apply a pure config operation, persisting whatever comes back. */
-  const apply = useCallback((op: (prev: EditorConfig) => EditorConfig) => {
-    // A payload written before stamps existed adopts this bundle's on its first edit —
-    // the one point at which "which file did this come from" has an answer that is at
-    // least not a guess. An edit never *refreshes* a stamp that is already there: that is
-    // exactly the staleness the stamp exists to keep hold of.
-    setStamp(prev => prev ?? current)
-    setConfig(prev => {
-      const next = op(prev)
-      persistConfig(next, stamp ?? current)
-      return next
-    })
-  }, [stamp, current])
 
   const content = useContentEdits(apply, setSelected)
 
@@ -187,23 +161,16 @@ export function useEditorMode(): EditorModeApi {
   )
 
   const resetAll = useCallback(() => {
-    // Drop the persisted override entirely so the next load re-seeds from the
-    // constants (a true "back to source defaults"), then reflect that in state.
-    clearStoredConfig()
-    setConfig(seedConfig())
+    copy.reset()
     setSelected(null)
-    // The working copy *is* the file again, so whatever it used to predate it no longer
-    // does — leaving the old stamp here would warn about a config that came from the very
-    // bundle it is being compared with.
-    setStamp(current)
-  }, [current])
+  }, [copy])
 
   return useMemo(
     () => ({
       ...content,
       active,
       config,
-      stale: isStaleWorkingCopy(stamp),
+      stale: copy.stale,
       selected,
       mode,
       setMode,
@@ -217,7 +184,7 @@ export function useEditorMode(): EditorModeApi {
       setPageLabel,
     }),
     [
-      content, active, config, stamp, selected, mode, setMode, select, clear, resetAll,
+      content, active, config, copy.stale, selected, mode, setMode, select, clear, resetAll,
       setGridFor, resetGridFor, splitPanel, setPanelLabel, setPageLabel,
     ],
   )
