@@ -116,6 +116,14 @@ export default function PanelBubbleChain({
   const orphaned = chain.sms && !conversation
   // A live chain spends its bottom row on the composer, so one fewer row holds messages.
   const holders = messageRows(chain.rows, live)
+  // The typing row spends a message row while it is up, the way the composer spends one
+  // for good: the table's height budget is the panel's, so the dots displace the oldest
+  // visible message rather than stacking past the top.
+  const typing = conversation?.typing === true
+  // How many messages the window holds, which is what the render and the wheel's floor
+  // are both measured in — they have to be the same number or the wheel stops one row
+  // short of, or one row past, the table it is moving.
+  const windowRows = holders - (typing ? 1 : 0)
   // A live chain does *not* fall back to the balloons' own words: the sender template's
   // text is the field's initial value, not a message. Its ordinary starting state is a
   // conversation of nothing but a composer.
@@ -130,6 +138,13 @@ export default function PanelBubbleChain({
       : backlog
   const total = messages.length
   const full = growTarget(holders, total)
+  // The oldest the wheel goes: the head at which the window is *first* full. A window is a
+  // fixed pane over a transcript — twenty messages through six rows is six on screen at
+  // every scroll position, not six at the bottom thinning to one at the top — and without
+  // this the reader can walk the head down to 0 and be left looking at a single balloon
+  // with five empty rows above it. On a transcript shorter than the table this is its last
+  // message, so a two-message chain still scrolls to the first of the two.
+  const floor = growTarget(windowRows, total)
   // Where the conversation sits when it has not been played or scrolled: at the newest
   // message for a live chain, the way a messaging app opens at the bottom; at the start of
   // the transcript otherwise, so `grow` has somewhere to grow from.
@@ -215,9 +230,9 @@ export default function PanelBubbleChain({
   useEffect(() => {
     turnRef.current = steps => {
       steeredRef.current = true
-      setHead(h => stepHead(h, steps, total))
+      setHead(h => stepHead(h, steps, total, floor))
     }
-  }, [total])
+  }, [total, floor])
   useDialWheel(hostRef, keyboard, visible && total > 0, turnRef)
 
   /**
@@ -253,12 +268,8 @@ export default function PanelBubbleChain({
     return status === 'sent' || status === undefined ? undefined : status
   }
 
-  // The typing row spends a message row while it is up, the way the composer spends one
-  // for good: the table's height budget is the panel's, so the dots displace the oldest
-  // visible message rather than stacking past the top.
-  const typing = conversation?.typing === true
   const rows = conversationRows(
-    visibleWindow(head, holders - (typing ? 1 : 0)),
+    visibleWindow(head, windowRows),
     readTranscript(messages),
     cols,
     live,

@@ -157,10 +157,14 @@ describe('PanelBubbleChain', () => {
     expect(texts(container)).toEqual(['four', 'three', 'two'])
   })
 
-  it('stops at the start of the conversation rather than scrolling past it', () => {
+  // "At most X rows" is also "at least X rows once there are X messages". The window is a
+  // pane of a fixed size: scrolling back moves the conversation through it. It used to
+  // walk the head down to the first message and leave one balloon under two blank rows,
+  // which reads as the table shrinking rather than as the thread scrolling.
+  it('keeps the table full when the reader scrolls back through a long conversation', () => {
     const { container } = render(
       <PanelBubbleChain
-        chain={chain({ messages: ['one', 'two', 'three'] })}
+        chain={chain({ messages: ['one', 'two', 'three', 'four', 'five'] })}
         members={columns()}
         visible
         interactive
@@ -170,7 +174,25 @@ describe('PanelBubbleChain', () => {
 
     fireEvent.wheel(layer, { deltaY: -600 })
 
-    expect(texts(container)).toEqual(['one'])
+    expect(texts(container)).toEqual(['three', 'two', 'one'])
+  })
+
+  // The same clamp, on a transcript that never filled the table: the whole conversation is
+  // already on screen, so the wheel has nothing to reach and takes nothing away either.
+  it('stops at the start of a conversation shorter than the table', () => {
+    const { container } = render(
+      <PanelBubbleChain
+        chain={chain({ messages: ['one', 'two'] })}
+        members={columns()}
+        visible
+        interactive
+      />,
+    )
+    const layer = container.querySelector('.cb-chain-layer') as HTMLDivElement
+
+    fireEvent.wheel(layer, { deltaY: -600 })
+
+    expect(texts(container)).toEqual(['two', 'one'])
   })
 
   // A conversation with only one balloon drawn is still a conversation: the missing column

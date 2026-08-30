@@ -595,7 +595,21 @@ export function visibleWindow(head: number, rows: number): number[] {
  * messages are *above* the newest, so wheel-up — which everywhere else reveals earlier
  * content — walks the head back down the transcript. `wheelSteps` gives wheel-up a
  * negative `steps`, and adding it does exactly that.
+ *
+ * `floor` is the head at which the table is first full — {@link growTarget} for the rows
+ * the window fills — and the wheel never goes below it. A window is a fixed pane over a
+ * transcript, so scrolling back through a long conversation moves the messages through
+ * the pane; it does not empty the pane one row at a time until a single balloon is left,
+ * which is what an unbounded head does at the top of the thread. Once the transcript is
+ * shorter than the table the floor *is* the top — `growTarget` returns `total - 1` there,
+ * so a two-message chain in a six-row table still scrolls to its first message.
+ *
+ * Growth is exempt because it never comes through here: it climbs the head itself, from
+ * below the floor, and the first turn of the wheel ends it. That turn lands on the floor
+ * rather than one row further back, which is the same statement as every other — the
+ * reader steered, so the table is full.
  */
-export function stepHead(head: number, steps: number, total: number): number {
-  return clampHead(head + steps, total)
+export function stepHead(head: number, steps: number, total: number, floor = 0): number {
+  if (total <= 0) return -1
+  return Math.max(clampHead(head + steps, total), Math.min(floor, total - 1))
 }

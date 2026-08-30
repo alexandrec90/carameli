@@ -415,6 +415,34 @@ describe('stepHead', () => {
     expect(stepHead(0, -3, 10)).toBe(0)
     expect(stepHead(9, 3, 10)).toBe(9)
   })
+
+  // A window is a fixed pane over the transcript: scrolling back through twenty messages
+  // moves them through six rows, it does not empty the pane one row at a time until a
+  // single balloon is left under five blank rows. `floor` is the head at which the table
+  // is first full, and the wheel does not go below it.
+  it('stops where the window is still full rather than thinning it to one row', () => {
+    expect(stepHead(8, -2, 20, growTarget(6, 20))).toBe(6)
+    expect(stepHead(6, -3, 20, growTarget(6, 20))).toBe(5)
+    expect(stepHead(5, -1, 20, growTarget(6, 20))).toBe(5)
+  })
+
+  // Growth climbs the head from 0, below the floor. The first turn of the wheel ends it,
+  // and lands on the floor rather than one row further back: the reader steered, so the
+  // table is full.
+  it('lifts a head left below the floor by growth onto it', () => {
+    expect(stepHead(2, -1, 20, growTarget(6, 20))).toBe(5)
+  })
+
+  // Shorter than the table, the floor is the newest message, because the whole transcript
+  // is already on screen and there is nothing above it to scroll to.
+  it('leaves a transcript shorter than the table where it is', () => {
+    expect(stepHead(1, -4, 2, growTarget(6, 2))).toBe(1)
+  })
+
+  it('never parks the head past the end when the floor outruns the transcript', () => {
+    expect(stepHead(0, -1, 1, 5)).toBe(0)
+    expect(stepHead(0, -1, 0, 5)).toBe(-1)
+  })
 })
 
 describe('defaultChain', () => {
