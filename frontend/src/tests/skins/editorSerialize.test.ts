@@ -87,6 +87,7 @@ function reparse(ts: string): EditorConfig {
     .replace("import type { PanelBgStyle } from '../panelPatterns'", '')
     .replace(PANEL_IMPORT_LINE, '')
     .replace(IMPORT_LINE, '')
+    .replace(/export const PAGE_LABELS: Record<string, string> =/, 'const pageLabels =')
     .replace(/export const PANELS: Panel\[\] =/, 'const panels =')
     .replace(/export const PANEL_IMG_TRANSFORMS: ImgTransform\[\] =/, 'const images =')
     .replace(/export const PANEL_BUBBLE_TRANSFORMS: BubbleTransform\[\] =/, 'const bubbles =')
@@ -94,11 +95,20 @@ function reparse(ts: string): EditorConfig {
     .replace(/export const PANEL_PATTERNS: PanelBgStyle\[\] =/, 'const patterns =')
     .replace(/export const PANEL_GRIDS: PageGrids =/, 'const grids =')
   return new Function(
-    `${body}\nreturn { panels, images, bubbles, chains, grids, patterns }`,
+    `${body}\nreturn { pageLabels, panels, images, bubbles, chains, grids, patterns }`,
   )() as EditorConfig
 }
 
 describe('serializeConfig', () => {
+  it('writes an edited page name under its route without changing the route', () => {
+    const cfg = seedConfig()
+    cfg.pageLabels['/phone-lines'] = 'The Hotline'
+    const ts = serializeConfig(cfg)
+
+    expect(ts).toContain("'/phone-lines': 'The Hotline'")
+    expect(reparse(ts).pageLabels).toEqual({ '/phone-lines': 'The Hotline' })
+  })
+
   it('emits all the const blocks — every picture, bubble and pattern', () => {
     const ts = serializeConfig(seedConfig())
     expect(ts).toContain('export const PANEL_IMG_TRANSFORMS: ImgTransform[] = [')
@@ -428,6 +438,7 @@ describe('serializeConfigFile', () => {
     expect(file.startsWith("import type { PanelBgStyle } from '../panelPatterns'")).toBe(true)
     expect(file).toContain(PANEL_IMPORT_LINE)
     expect(file).toContain(IMPORT_LINE)
+    expect(file).toContain('export const PAGE_LABELS: Record<string, string> = {}')
     expect(file).toContain('export const PANELS: Panel[] = [')
     expect(file).toContain('export const PANEL_IMG_TRANSFORMS: ImgTransform[] = [')
     expect(file).toContain('export const PANEL_BUBBLE_TRANSFORMS: BubbleTransform[] = [')

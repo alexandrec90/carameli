@@ -6,6 +6,7 @@ import {
   PANEL_IMG_TRANSFORMS,
   PANEL_BUBBLE_TRANSFORMS,
   PANEL_GRIDS,
+  PAGE_LABELS,
   PANEL_PATTERNS,
   PANELS,
 } from './layoutConfig'
@@ -114,6 +115,7 @@ export function cloneImg(t: ImgTransform): ImgTransform {
 /** Deep clone of the on-disk constants — the canonical "default" config. */
 export function seedConfig(): EditorConfig {
   return {
+    pageLabels: { ...PAGE_LABELS },
     panels: PANELS.map(p => ({ ...p })),
     images: PANEL_IMG_TRANSFORMS.map(cloneImg),
     bubbles: PANEL_BUBBLE_TRANSFORMS.map(b => ({ ...b })),
@@ -126,6 +128,7 @@ export function seedConfig(): EditorConfig {
 /** Deep clone of an arbitrary config (no shared references with the input). */
 export function cloneConfig(c: EditorConfig): EditorConfig {
   return {
+    pageLabels: { ...c.pageLabels },
     panels: c.panels.map(p => ({ ...p })),
     images: c.images.map(cloneImg),
     bubbles: c.bubbles.map(b => ({ ...b })),

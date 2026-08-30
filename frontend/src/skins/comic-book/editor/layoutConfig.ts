@@ -2,6 +2,11 @@ import type { PanelBgStyle } from '../panelPatterns'
 import type { Panel } from '../panels'
 import type { ImgTransform, BubbleTransform, BubbleChain, PageGrids } from './types'
 
+// Route names remain keyed by the app's canonical paths. Only overrides live here:
+// a route without one keeps the shared label from routes.ts, while an edited name is
+// saved with the rest of this skin's layout.
+export const PAGE_LABELS: Record<string, string> = {}
+
 // The panels themselves: the slots every grid is cut into, and nothing about what is
 // drawn inside them. Panel `i` is `PANELS[i]` everywhere — every grid's ring table,
 // PANEL_PATTERNS and the `panel` field of every picture and bubble index into this

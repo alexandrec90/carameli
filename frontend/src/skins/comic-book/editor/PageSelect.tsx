@@ -6,8 +6,10 @@ import { LOADING_PAGE_VALUE, pageSelectValue, resolvePageSelection } from './pag
 
 export interface PageSelectProps {
   navItems: NavItem[]
+  pageLabels: Record<string, string>
   previewingLoading: boolean
   onPreviewLoading(on: boolean): void
+  onPageLabel(path: string, label: string): void
 }
 
 /**
@@ -19,14 +21,19 @@ export interface PageSelectProps {
  */
 export default function PageSelect({
   navItems,
+  pageLabels,
   previewingLoading,
   onPreviewLoading,
+  onPageLabel,
 }: PageSelectProps) {
   const navigate = useNavigate()
   const location = useLocation()
 
   const value = pageSelectValue(previewingLoading, location.pathname)
   const knownPath = navItems.some(item => item.path === location.pathname)
+  const defaultLabel =
+    navItems.find(item => item.path === location.pathname)?.label ?? location.pathname
+  const currentLabel = pageLabels[location.pathname] ?? defaultLabel
 
   const onChange = (next: string) => {
     const sel = resolvePageSelection(next, location.pathname)
@@ -36,19 +43,36 @@ export default function PageSelect({
   }
 
   return (
-    <label className="cb-ed-field">
-      <span>Page</span>
-      <select
-        className="cb-ed-select"
-        value={value}
-        onChange={e => onChange(e.target.value)}
-      >
-        {navItems.map(item => (
-          <option key={item.path} value={item.path}>{item.label}</option>
-        ))}
-        {!knownPath && <option value={location.pathname}>{location.pathname}</option>}
-        <option value={LOADING_PAGE_VALUE}>Loading screen</option>
-      </select>
-    </label>
+    <>
+      <label className="cb-ed-field">
+        <span>Page</span>
+        <select
+          className="cb-ed-select"
+          value={value}
+          onChange={e => onChange(e.target.value)}
+        >
+          {navItems.map(item => (
+            <option key={item.path} value={item.path}>
+              {pageLabels[item.path] ?? item.label}
+            </option>
+          ))}
+          {!knownPath && (
+            <option value={location.pathname}>
+              {pageLabels[location.pathname] ?? location.pathname}
+            </option>
+          )}
+          <option value={LOADING_PAGE_VALUE}>Loading screen</option>
+        </select>
+      </label>
+      <label className="cb-ed-field">
+        <span>page name</span>
+        <input
+          type="text"
+          value={currentLabel}
+          disabled={previewingLoading}
+          onChange={e => onPageLabel(location.pathname, e.target.value)}
+        />
+      </label>
+    </>
   )
 }

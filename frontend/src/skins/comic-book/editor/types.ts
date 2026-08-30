@@ -202,6 +202,8 @@ export interface BubbleTransform {
  * entry `i` is the style drawn behind `panels[i]`.
  */
 export interface EditorConfig {
+  /** Skin-local display-name overrides keyed by canonical route path. */
+  pageLabels: Record<string, string>
   panels: Panel[]
   images: ImgTransform[]
   bubbles: BubbleTransform[]
