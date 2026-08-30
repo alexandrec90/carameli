@@ -113,8 +113,62 @@ jobs:
           timeout 120 bash -c 'until curl -sf http://localhost:8000/health; do sleep 2; done'
           sudo chown -R "$(id -u):$(id -g)" logs
           timeout 300 bash -c 'until curl -sf http://localhost:5173; do sleep 2; done'
+      # Nothing in `docker compose up` creates the schema, and until the frontend
+      # started calling the API from the home page an unmigrated stack looked fine:
+      # /health does not touch the database, so the suite went green against a
+      # backend that had no tables at all. It stopped being invisible the night the
+      # comic-book home page began loading real call, SMS and extension data —
+      # `POST /auth/session` grants an admin cookie without credentials, so every
+      # one of those calls reached the database and raised, and the page saw only
+      # "Access-Control-Allow-Origin missing" because Starlette renders an unhandled
+      # exception outside CORSMiddleware.
+      #
+      # The customer is seeded through the app's own API rather than SQL: the
+      # frontend asks for vs_customer_id 1 on every dashboard route, and a stack
+      # where that 404s is not a stack these tests can call clean. Its lists are
+      # empty, which is a state the UI renders without complaint.
+      - name: Migrate and seed the E2E stack
+        run: |
+          set -euo pipefail
+          docker compose exec -T app alembic upgrade head
+          api_key=$(sed -n 's/^API_KEY_SECRET=//p' .env | head -n 1)
+          curl -sS -f -X POST http://localhost:8000/vsapi/1.0.0/VsCustomer/Create \
+            -H 'Content-Type: application/json' \
+            -H "Authorization: Bearer ${api_key}" \
+            -d '{"vs_customer_id": 1}' -o /dev/null
       - name: Run cross-browser E2E
         run: pytest tests/e2e/ --browser=chromium --browser=firefox --browser=webkit -q
+      # A backend fault reaches these tests only as an opaque CORS message. An
+      # unhandled exception is rendered by Starlette's ServerErrorMiddleware, which
+      # sits OUTSIDE CORSMiddleware, so the 500 carries no Access-Control-Allow-Origin
+      # and the browser can say nothing but "header missing" — the status and the body
+      # are unreadable from the page. Capture them here, on the runner, where they are
+      # still readable, and keep them as an artifact rather than in scrolled-away log
+      # output.
+      - name: Capture backend diagnostics
+        if: failure()
+        run: |
+          mkdir -p reports
+          docker compose logs --no-color --timestamps app > reports/e2e-app.log 2>&1 || true
+          docker compose logs --no-color --timestamps frontend > reports/e2e-frontend.log 2>&1 || true
+          grep -E '^(CORS_ORIGINS|APP_HOST_PORT|COMPOSE_PROFILES)=' .env > reports/e2e-env.log 2>&1 || true
+          for path in \
+            '/health' \
+            '/api/v1/extensions?vs_customer_id=1' \
+            '/vsapi/1.0.0/VsCall/List/1?limit=100' \
+            '/vsapi/1.0.0/VsCustomer/GetPhoneLines/1'
+          do
+            printf -- '--- GET %s\n' "$path" >> reports/e2e-endpoint-probe.log
+            curl -sS -i -H 'Origin: http://localhost:5173' \
+              "http://localhost:8000${path}" >> reports/e2e-endpoint-probe.log 2>&1 || true
+            printf -- '\n\n' >> reports/e2e-endpoint-probe.log
+          done
+      - name: Upload backend diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-diagnostics
+          path: reports/
       - name: Upload Playwright traces
         if: failure()
         uses: actions/upload-artifact@v7
