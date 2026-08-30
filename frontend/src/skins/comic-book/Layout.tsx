@@ -6,6 +6,10 @@ import BubbleTubes from './BubbleTubes'
 import ComicPanel from './ComicPanel'
 import { LoadingOverlay, useLoadingScreen } from './LoadingOverlay'
 import PanelInk from './PanelInk'
+<<<<<<< Updated upstream
+=======
+import PhoneHud, { hudIsVisible, pageCanDial } from './PhoneHud'
+>>>>>>> Stashed changes
 import { gridPolys, layoutKindFor } from './panelGeometry'
 import { pageForPath } from './panels'
 import { callSceneOf, softphoneActions } from './phoneActions'
@@ -141,12 +145,20 @@ export function Layout({ navItems, sms, softphone }: LayoutProps) {
         void autoDial(value)
     }, [autoDial])
 
+<<<<<<< Updated upstream
     // The two keys of the drawn telephone. Rebuilt every render on purpose rather than
     // memoised: what each key means moves with the call (`phoneActions.ts`), so a cached
     // pair would be the previous state's handset for one frame after the phone rang.
     const phoneActions = softphoneActions(softphone)
     // The call scene the handset panel draws while a call is up (PanelCallScene), or null.
     const call = callSceneOf(softphone)
+=======
+    // A page carrying either way of dialling gets the rest of the telephone: the display
+    // and the call keys neither a photographed pad nor a balloon has room for. Pages with
+    // no way to dial show no furniture.
+    const showPhoneHud =
+        pageCanDial(imgT, bubbleT, page) && !editor.active && hudIsVisible(softphone)
+>>>>>>> Stashed changes
 
     const accent = accentForPath(location.pathname)
     const washRef = usePageWash(location.pathname, accent)
@@ -200,9 +212,13 @@ export function Layout({ navItems, sms, softphone }: LayoutProps) {
                             isBubbleVisible={bubbleVisible}
                             onNumberPadKey={softphone.pressDigit}
                             onPhoneSubmit={dialFromBubble}
+<<<<<<< Updated upstream
                             phoneActions={phoneActions}
                             call={call}
                             dotRef={dotRefs[i]}
+=======
+                            dotRef={el => { panelDotRefs.current[i] = el }}
+>>>>>>> Stashed changes
                             onSettled={markSettled}
                             onNatSize={recordNatSize}
                         />

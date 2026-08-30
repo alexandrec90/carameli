@@ -50,6 +50,7 @@ interface PanelBubblesProps {
    */
   editing: boolean
   /**
+<<<<<<< Updated upstream
    * The page's live SMS, from the hook App owns. Nothing here fetches: this panel says
    * which conversation it is showing and reads what comes back, which is the skin rule
    * (`.claude/rules/skin-architecture.md`) applied to chrome that has no view to get
@@ -57,6 +58,8 @@ interface PanelBubblesProps {
    */
   sms: UseSmsConversationsResult
   /**
+=======
+>>>>>>> Stashed changes
    * Dials what a reader typed into a `phone` balloon and pressed Enter on, making that
    * balloon the number pad's fallback: somewhere to type a number on a page whose picture
    * has no keypad on it, or when the projected keys are awkward to hit.
@@ -64,6 +67,7 @@ interface PanelBubblesProps {
    * `input` balloons are free text and never dial. A balloon inside a chain never dials
    * either — its Enter belongs to the conversation's composer (see PanelBubbleChain) —
    * which the claimed-index filter below already guarantees.
+<<<<<<< Updated upstream
    *
    * Either `dial` balloon dials on Enter too, and for the same reason: it is a phone field
    * with a shortlist behind it. A `dial-call` sends its own call key here as well, so the
@@ -102,6 +106,10 @@ interface PanelBubblesProps {
    * editor and on a page with no telephone: the keys are drawn there and do nothing.
    */
   phoneActions?: PhoneActionHandlers
+=======
+   */
+  onPhoneSubmit?(value: string): void
+>>>>>>> Stashed changes
 }
 
 /**
@@ -134,6 +142,7 @@ export default function PanelBubbles({
   isVisible,
   interactive,
   editing,
+<<<<<<< Updated upstream
   sms,
   onPhoneSubmit,
   dialValue = '',
@@ -142,6 +151,9 @@ export default function PanelBubbles({
   dialled = EMPTY_DIALLED,
   onPeerTexted,
   phoneActions,
+=======
+  onPhoneSubmit,
+>>>>>>> Stashed changes
 }: PanelBubblesProps) {
   const ids = editing ? [] : chainIdsOn(bubbles, panel)
   const conversations = ids.map(id => ({
@@ -227,6 +239,7 @@ export default function PanelBubbles({
             bubble={bubble}
             visible={isVisible(i)}
             interactive={interactive}
+<<<<<<< Updated upstream
             onWheelSelect={i === pickerIndex ? onWheelSelect : undefined}
             keyboard={owner === key}
             // Only a claimant reports: lettering under the pointer is not a balloon
@@ -244,6 +257,9 @@ export default function PanelBubbles({
             dialled={dialled}
             onDialChange={onDialChange}
             actions={bubble.content === 'actions' ? phoneActions : undefined}
+=======
+            onSubmit={bubble.content === 'phone' ? onPhoneSubmit : undefined}
+>>>>>>> Stashed changes
           />
         )
         // spill off: a clip wrapper hides the overflow behind the panel edge.

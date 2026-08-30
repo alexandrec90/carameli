@@ -221,6 +221,7 @@ different images can only crossfade. A new bubble type belongs in `bubbleShape.t
    - For bubbles: pick the **panel** it belongs to, a resting **type** (sets shape +
      lettering font), which way the **tail** points (**No tail** is one of the nine
      options), pick the **content** presentation (**Text**, **Wheel picker**, **Text
+<<<<<<< Updated upstream
      input**, **Phone input**, **Dial**, or **Action buttons**). Wheel text is
      comma-delimited options: hover the bubble outside edit mode and scroll to turn it.
      Input text is its initial value; phone input formats live using the browser locale,
@@ -253,6 +254,16 @@ different images can only crossfade. A new bubble type belongs in `bubbleShape.t
      component that can see both halves. Enter dials and, unlike a composer, keeps the
      number on the display. A dial also counts as the panel's picker for an SMS chain
      (`peerPickerOn`), which then binds to whatever the field says.
+=======
+     input**, or **Phone input**). Wheel text is comma-delimited options: hover the
+     bubble outside edit mode and scroll to turn it. Input text is its initial value;
+     phone input formats live using the browser locale, while a leading `+` selects an
+     international calling code. A **Phone input** balloon that is not in a chain is the
+     projected pad's fallback: Enter places the call, on the same shared softphone and
+     with the same caption box (`../PhoneHud.tsx`) reporting it, so a page whose art
+     carries no keypad still has somewhere to dial from. In a chain that same content
+     is the conversation's composer instead and dials nothing.
+>>>>>>> Stashed changes
      Edit the **text** or **initial value**, choose the shapes to
      morph to **on hover**
      and **on click** (`— no change —` keeps the resting shape), tick **bolder outline

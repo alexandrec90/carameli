@@ -61,8 +61,13 @@ interface PanelBubbleProps {
   /**
    * Passed through to an `input`/`phone` balloon: Enter sends the field's contents here
    * and clears it. A chain's composer supplies one, and so does a standalone `phone`
+<<<<<<< Updated upstream
    * balloon, whose Enter places the call. A `dial` balloon's Enter places the call too,
    * without clearing. Every other input balloon keeps what is typed in it.
+=======
+   * balloon, whose Enter places the call. Every other input balloon keeps what is typed
+   * in it.
+>>>>>>> Stashed changes
    */
   onSubmit?: (value: string) => void
   /**

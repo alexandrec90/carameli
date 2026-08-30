@@ -45,6 +45,7 @@ interface ComicPanelProps {
      * A panel holding a `dial` balloon takes its own keys instead — see below.
      */
     onNumberPadKey?(key: string): void
+<<<<<<< Updated upstream
     /**
      * Dials the number typed into one of this panel's `phone` balloons. On a panel that
      * holds a `dial` the call goes out through the same prop, after the number has been
@@ -58,6 +59,10 @@ interface ComicPanelProps {
      * of its pictures and balloons (PanelCallScene); every other panel ignores it.
      */
     call?: CallScene | null
+=======
+    /** Dials the number typed into one of this panel's `phone` balloons. */
+    onPhoneSubmit?(value: string): void
+>>>>>>> Stashed changes
     /** Mounts the Ben-Day dot canvas into Layout's animation loop. */
     dotRef(el: HTMLCanvasElement | null): void
     onSettled(): void
@@ -76,9 +81,15 @@ interface ComicPanelProps {
  * down through PanelBubbles, so neither half has to know the other exists.
  */
 export default function ComicPanel({
+<<<<<<< Updated upstream
     index, info, poly, images, bubbles, chains, sms, natSizes,
     editorActive, hovered, isRevealed, isBubbleVisible, onNumberPadKey,
     onPhoneSubmit, phoneActions, call, dotRef, onSettled, onNatSize,
+=======
+    index, info, poly, images, bubbles, chains, natSizes,
+    editorActive, hovered, onHover, isRevealed, isBubbleVisible, onNumberPadKey,
+    onPhoneSubmit, dotRef, onSettled, onNatSize,
+>>>>>>> Stashed changes
 }: ComicPanelProps) {
     const { bounds, vp } = poly
     // The call scene, on the handset panel alone and never in the editor, where the
@@ -228,6 +239,7 @@ export default function ComicPanel({
                 isVisible={isBubbleVisible}
                 interactive={!editorActive}
                 editing={editorActive}
+<<<<<<< Updated upstream
                 sms={sms}
                 onPhoneSubmit={dialIndex >= 0 ? onDialSubmit : onPhoneSubmit}
                 dialValue={dialValue}
@@ -236,6 +248,9 @@ export default function ComicPanel({
                 onDialChange={onDialChange}
                 onPeerTexted={rememberNumber}
                 phoneActions={phoneActions}
+=======
+                onPhoneSubmit={onPhoneSubmit}
+>>>>>>> Stashed changes
             />
             </>)}
         </div>
