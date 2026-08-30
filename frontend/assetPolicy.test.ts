@@ -366,6 +366,7 @@ describe('isLoadingSource', () => {
   it.each([
     'CLAUDE.md',
     '../.claude/rules/skin-comic-book.md',
+    'src/skins/comic-book/comic-book.css',
     'src/tests/skins/assetUsage.test.ts',
     'src/skins/comic-book/PanelBubble.test.tsx',
     'src/skins/comic-book/phoneActions.spec.ts',
@@ -376,7 +377,6 @@ describe('isLoadingSource', () => {
   it.each([
     'index.html',
     'src/skins/comic-book/phoneActions.ts',
-    'src/skins/comic-book/comic-book.css',
     'src/skins/comic-book/editor/layoutConfig.ts',
   ])('counts %s, which a browser acts on', file => {
     expect(isLoadingSource(file)).toBe(true)

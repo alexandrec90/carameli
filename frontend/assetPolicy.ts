@@ -164,6 +164,8 @@ export const MAX_PAGE_BYTES = 2_250 * 1024
  * against every page — see {@link measurePageLoads}.
  */
 export const NON_LOADING_SOURCES: Readonly<Record<string, string>> = {
+  'src/skins/comic-book/comic-book.css':
+    'CSS cursor images are loaded by the browser as pointer chrome, outside page-art measurement',
   'src/skins/comic-book/editor/assets.ts':
     "the editor's picture dropdown, reachable only under ?edit=1 on a dev server",
   'public/manifest.json':
