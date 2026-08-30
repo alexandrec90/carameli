@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+
 import { act, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
@@ -37,11 +40,28 @@ describe('configStamp', () => {
   })
 
   // The stamp says which file a copy came from, not what the author has done since, so a
-  // config that would serialize identically stamps identically however it was built.
-  it('reads the file the config would write, not the object it is', () => {
+  // config holding the same content stamps identically however it was built — cloned
+  // arrays, and fields in another order, are not differences anyone can see.
+  it('reads what the config holds, not the object it is', () => {
     const config = seedConfig()
     const rebuilt = { ...config, images: config.images.map(t => ({ ...t })) }
     expect(configStamp(rebuilt)).toBe(configStamp(config))
+
+    const [{ scale, ...restOfFirst }, ...rest] = config.images
+    const reordered = { ...config, images: [{ scale, ...restOfFirst }, ...rest] }
+    expect(configStamp(reordered)).toBe(configStamp(config))
+  })
+
+  // The stamp is reached from `useEditorMode`, which the skin imports whether or not the
+  // editor is on. Hashing the *serialized file* was the obvious way to write this and it
+  // put ./serialize.ts — 13 KB of TypeScript emitter nobody outside edit mode runs — into
+  // every visitor's bundle. `test:bundle` caught it once; this catches it in a second.
+  it('does not drag the TypeScript serializer into the production bundle', () => {
+    const source = readFileSync(
+      resolve(process.cwd(), 'src/skins/comic-book/editor/configStamp.ts'),
+      'utf8',
+    )
+    expect(source).not.toMatch(/from '\.\/serialize'/)
   })
 })
 

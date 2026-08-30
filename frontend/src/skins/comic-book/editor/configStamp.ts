@@ -1,5 +1,4 @@
 import { seedConfig } from './configSeed'
-import { serializeConfigFile } from './serialize'
 import type { EditorConfig } from './types'
 
 // Which `layoutConfig.ts` a working copy came from.
@@ -23,13 +22,30 @@ import type { EditorConfig } from './types'
 // is a thing to read in an editor, not in a toolbar.
 
 /**
- * A short, stable fingerprint of everything a config would write to the file. Taken over
- * the serialized text rather than the object so it changes exactly when the file would —
- * a reordered key or a cloned array is not a difference the author can see, and must not
- * read as one.
+ * The config as one canonical string: keys in sorted order, so a cloned array or an object
+ * rebuilt with its fields in another order — neither of which is a difference an author can
+ * see — stamps the same. Written here rather than taken from ./serialize.ts on purpose:
+ * this module is reached from `useEditorMode`, which the skin imports whether or not the
+ * editor is on, and importing the TypeScript serializer put its 13 KB into every visitor's
+ * bundle for a hash. The `test:bundle` budget caught that; the comment is here so the
+ * import is not reintroduced as a tidying-up.
+ */
+function canonical(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`
+  if (value !== null && typeof value === 'object') {
+    const record = value as Record<string, unknown>
+    return `{${Object.keys(record).sort().map(k => `${k}:${canonical(record[k])}`).join(',')}}`
+  }
+  return JSON.stringify(value) ?? 'null'
+}
+
+/**
+ * A short, stable fingerprint of everything a config holds. Taken over the canonical form
+ * rather than the object's identity so it changes exactly when the file it would write
+ * changes — a reordered key or a cloned array must not read as an edit.
  */
 export function configStamp(config: EditorConfig): string {
-  const text = serializeConfigFile(config)
+  const text = canonical(config)
   // FNV-1a, 32-bit: no dependency, no crypto, and collisions here cost a warning that is
   // not shown, not a wrong write.
   let hash = 0x811c9dc5
