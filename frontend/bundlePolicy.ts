@@ -133,8 +133,19 @@ export const MAX_LAZY_CHUNK_BYTES = 260 * 1024
  * `ProjectedTable` scrolls that body inside the panel's fixed band while the headings
  * stay put. Same lazy comic-book chunk, still 46 of them, `package.json` untouched, so
  * nothing new was pulled in.
+ *
+ * This raise (971 → 972) is `+ SMS` making a conversation whole, 0.79 KB measured as this
+ * branch's build (971.1 KB) against the master it branches from (970.3 KB):
+ * `chainCreate.ts` spawns both root bubbles already linked, chained and bound, and
+ * `reconcile.ts` is the settle step lifted out of `configOps.ts` so it can. The dashed
+ * frame that made the change visible — `chainFrame.ts` and the overlay that draws it — is
+ * *not* in this number: `EditorOverlay` is behind an `import.meta.env.DEV` test in
+ * Layout.tsx and never reaches the build. What does reach it is the editor's state layer,
+ * which Layout imports statically for `useEditorMode`, and that is where these 0.79 KB
+ * land. Same lazy comic-book chunk, still 46 of them, `package.json` untouched, so nothing
+ * new was pulled in.
  */
-export const MAX_TOTAL_JS_BYTES = 971 * 1024
+export const MAX_TOTAL_JS_BYTES = 972 * 1024
 
 /**
  * Every `.css` file in `dist/assets/`, summed. Today 44.2 KB across 2 files.
