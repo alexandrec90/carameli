@@ -1,11 +1,10 @@
 import { mirrorTailDir } from '../bubbleBox'
 import { chainMembers, mirrorColumn } from '../bubbleChain'
-import {
-  linkGroups, nextChainId, normalizeChainId, patchChainIn, propagateChains, syncChains,
-} from './chainOps'
+import { linkGroups, nextChainId, normalizeChainId, patchChainIn } from './chainOps'
 import type { PanelBgStyle } from '../panelPatterns'
 import { cloneConfig, cloneImg, NEW_BUBBLE, NEW_IMAGE, seedConfig } from './configSeed'
 import { sanitizeLinks } from './configHydrate'
+import { reconcile } from './reconcile'
 import type { BubbleChain, BubbleTransform, EditorConfig, ImgTransform } from './types'
 
 // Every change the editor makes to its working copy, as pure functions on a config.
@@ -19,25 +18,13 @@ import type { BubbleChain, BubbleTransform, EditorConfig, ImgTransform } from '.
 // All four are re-exported from here, so a caller still has one module to import from.
 // ./chainOps.ts is the exception: the chain list is derived rather than edited, so the
 // ops that maintain it are called from in here and are not part of the editor's surface.
+// ./chainCreate.ts is the one op that builds a *whole* conversation, and ./reconcile.ts is
+// the settling step both of those files run.
 
 export { CONFIG_KEY, NEW_BUBBLE, NEW_IMAGE, cloneConfig, resetGrid, seedConfig, setGrid } from './configSeed'
 export { hydrateConfig, sanitizeLinks } from './configHydrate'
 export { NEW_CHAIN } from './chainOps'
-
-/**
- * Bring the derived halves of a config back into agreement with its bubbles, in the one
- * order they can be derived in: links that no longer make sense are nulled, chain ids are
- * settled from the linkage that survives, and the chain list is recomputed from the ids.
- *
- * Every op that can touch a bubble runs this, which is what keeps "add a chain" and
- * "delete a chain" from needing to exist as operations at all — and what makes linking a
- * loose balloon onto a chained one enough to make it a slot of that chain.
- */
-function reconcile(config: EditorConfig): EditorConfig {
-  config.bubbles = propagateChains(sanitizeLinks(config.bubbles))
-  config.chains = syncChains(config.bubbles, config.chains)
-  return config
-}
+export { addPeerPicker, addSmsConversation } from './chainCreate'
 
 
 /**

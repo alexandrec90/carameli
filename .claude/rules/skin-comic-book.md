@@ -293,7 +293,7 @@ it here would be a fork.
 
 | Field | Effect |
 | --- | --- |
-| `grow` | plays the transcript in one message at a time, `stepMs` apart, instead of filling the table at once |
+| `grow` | plays the transcript in one message at a time, `stepMs` apart, instead of filling the table at once. Read at render time; **not an editor control** — see below |
 | `rows` | how many rows are on screen at once, counting the composer's; past that the wheel moves a window |
 | `messages` | the thread, oldest first; a leading `> ` marks the **sender's** side. **Empty means the chain speaks its two balloons' own `text`** |
 | `sms` | binds the conversation to the account's real SMS history — see below |
@@ -304,6 +304,15 @@ member with no chain are unreachable states rather than states to validate.
 Scrolling is not a toggle: a chain *is* a window over a transcript, so the wheel always
 moves it. **Live** is `content: 'input'` (or `'phone'`) on the sender template — the
 composer takes the bottom row and messages start one row up.
+
+**A conversation is made whole or not at all.** `addSmsConversation` (the editor's
+**+ SMS** button) establishes the two balloons, their linkage, the chain id, the sender's
+composer content and `sms: true` in one op. It is the *only* way to make one, because a
+working conversation is several couplings that must all hold and none of which announce
+themselves when broken — an author undoing one by accident got balloons that looked
+finished and drew nothing. `grow` and `stepMs` therefore have no control any more: they
+are how a bound thread plays, which is the renderer's business, and a switch that could
+take a conversation apart was worth more to remove than the tuning was to keep.
 
 These rules hold it together, each enforced where it can be enforced by construction:
 

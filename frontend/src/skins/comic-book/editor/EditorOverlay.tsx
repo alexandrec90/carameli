@@ -6,6 +6,7 @@ import type { LayoutKind, PanelPoly, Rect } from '../panelGeometry'
 import { frameRect } from '../panelGeometry'
 import type { PanelPage } from '../panels'
 import { assetLabel } from './assets'
+import { chainFramesOn } from './chainFrame'
 import EditorToolbar from './EditorToolbar'
 import type { PageSelectProps } from './PageSelect'
 import PanelSeams from './PanelSeams'
@@ -164,6 +165,26 @@ export default function EditorOverlay({
               />
             )
           })}
+
+          {/* Where each conversation's rows will actually land. Chains render *flat* in
+              edit mode so both templates stay selectable, which left the table itself
+              drawn nowhere the author could see — so dragging a template or changing
+              `rows` were edits with invisible results, and the editor read as disagreeing
+              with the page. The frame is chrome, not a control: it takes no pointer, and
+              stretching the table is still done by moving the two balloons it is measured
+              from. */}
+          {panelPolys.map((poly, i) =>
+            poly === null
+              ? null
+              : chainFramesOn(config.bubbles, config.chains, i, poly.bounds).map(frame => (
+                <div
+                  key={`${i}:${frame.id}`}
+                  className="cb-ed-chainbox"
+                  style={rectStyle(frame.rect)}
+                  aria-hidden="true"
+                />
+              )),
+          )}
         </>
       )}
 

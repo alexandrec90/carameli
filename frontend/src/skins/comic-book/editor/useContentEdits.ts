@@ -2,7 +2,8 @@ import { useCallback, useMemo } from 'react'
 
 import type { PanelBgStyle } from '../panelPatterns'
 import {
-  addBubble, addChainColumn as addChainColumnIn, addImg, patchBubble, patchChain, patchImg,
+  addBubble, addChainColumn as addChainColumnIn, addImg, addPeerPicker, addSmsConversation,
+  patchBubble, patchChain, patchImg,
   patchPattern,
   removeBubble, removeImg, resetOneIn, setChained as setChainedIn,
 } from './configOps'
@@ -36,6 +37,14 @@ export interface ContentEdits {
   addImgOn(panel: number): void
   deleteImg(index: number): void
   addBubbleOn(panel: number): void
+  /**
+   * Add a whole SMS conversation to `panel` — both root balloons, linked, chained and
+   * bound — and select the sender. One call because the six couplings a conversation is
+   * made of are not six decisions the author has any way to get right by hand.
+   */
+  addSmsOn(panel: number): void
+  /** Add the balloon a panel's conversations read their number off, and select it. */
+  addPeerPickerOn(panel: number): void
   /** Append the other column of `chain` on `panel` and select it. */
   addChainColumn(panel: number, chain: string): void
   deleteBubble(index: number): void
@@ -109,6 +118,34 @@ export function useContentEdits(apply: ApplyOp, setSelected: SetSelection): Cont
     [apply, setSelected],
   )
 
+  const addSmsOn = useCallback(
+    (panel: number) => {
+      let added = -1
+      apply(prev => {
+        const { config: next, index } = addSmsConversation(prev, panel)
+        added = index
+        return next
+      })
+      // The *sender* is selected, not the balloon that happens to be last: it is the one
+      // the table hangs from, and its inspector carries the conversation's own settings.
+      if (added >= 0) setSelected({ kind: 'bubble', index: added })
+    },
+    [apply, setSelected],
+  )
+
+  const addPeerPickerOn = useCallback(
+    (panel: number) => {
+      let added = -1
+      apply(prev => {
+        const { config: next, index } = addPeerPicker(prev, panel)
+        added = index
+        return next
+      })
+      if (added >= 0) setSelected({ kind: 'bubble', index: added })
+    },
+    [apply, setSelected],
+  )
+
   const addChainColumn = useCallback(
     (panel: number, chain: string) => {
       let added = -1
@@ -142,11 +179,11 @@ export function useContentEdits(apply: ApplyOp, setSelected: SetSelection): Cont
   return useMemo(
     () => ({
       setImg, setBubble, setChained, setChain, setPattern, addImgOn, deleteImg,
-      addBubbleOn, addChainColumn, deleteBubble, resetOne,
+      addBubbleOn, addSmsOn, addPeerPickerOn, addChainColumn, deleteBubble, resetOne,
     }),
     [
       setImg, setBubble, setChained, setChain, setPattern, addImgOn, deleteImg,
-      addBubbleOn, addChainColumn, deleteBubble, resetOne,
+      addBubbleOn, addSmsOn, addPeerPickerOn, addChainColumn, deleteBubble, resetOne,
     ],
   )
 }
