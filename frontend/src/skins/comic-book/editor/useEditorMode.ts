@@ -3,6 +3,7 @@ import { useCallback, useMemo, useState } from 'react'
 import { logger } from '../../../lib/logger'
 import { CONFIG_KEY, hydrateConfig, seedConfig } from './configOps'
 import { setPanelLabel as setPanelLabelIn, splitPanel as splitPanelIn } from './configPanels'
+import { setPageLabel as setPageLabelIn } from './configPages'
 import { clearStoredConfig, detectActive, persistConfig } from './editorStorage'
 import { resetGridKeepingContent, setGridKeepingContent } from './gridContentRemap'
 import type { CutAxis } from './panelGridCut'
@@ -48,6 +49,8 @@ export interface EditorModeApi extends ContentEdits {
   splitPanel(panel: number, axis: CutAxis, kind: LayoutKind): boolean
   /** Rename one panel. */
   setPanelLabel(panel: number, label: string): void
+  /** Override one route's display name for this skin. */
+  setPageLabel(path: string, label: string): void
 }
 
 /**
@@ -158,6 +161,11 @@ export function useEditorMode(): EditorModeApi {
     [apply],
   )
 
+  const setPageLabel = useCallback(
+    (path: string, label: string) => apply(prev => setPageLabelIn(prev, path, label)),
+    [apply],
+  )
+
   const resetAll = useCallback(() => {
     // Drop the persisted override entirely so the next load re-seeds from the
     // constants (a true "back to source defaults"), then reflect that in state.
@@ -181,10 +189,11 @@ export function useEditorMode(): EditorModeApi {
       resetGridFor,
       splitPanel,
       setPanelLabel,
+      setPageLabel,
     }),
     [
       content, active, config, selected, mode, setMode, select, clear, resetAll,
-      setGridFor, resetGridFor, splitPanel, setPanelLabel,
+      setGridFor, resetGridFor, splitPanel, setPanelLabel, setPageLabel,
     ],
   )
 }

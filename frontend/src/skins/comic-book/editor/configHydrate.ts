@@ -10,6 +10,7 @@ import { CONFIG_KEY, cloneGrids, NEW_BUBBLE, NEW_IMAGE, seedConfig } from './con
 import { PANEL_PATTERNS, PANELS } from './layoutConfig'
 import { coerceNumberPad } from './numberPadValidate'
 import { isPageGrids } from './panelGridValidate'
+import { normalizePageLabels } from './configPages'
 import { coerceTable } from './tableValidate'
 import type { BubbleTransform, EditorConfig, ImgTransform } from './types'
 
@@ -196,6 +197,7 @@ export function hydrateConfig(raw: string | null): EditorConfig {
       ),
     ))
     return {
+      pageLabels: normalizePageLabels(parsed.pageLabels),
       panels,
       grids,
       patterns: normalizePatterns(parsed.patterns, count),
