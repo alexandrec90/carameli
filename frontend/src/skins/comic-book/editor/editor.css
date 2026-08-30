@@ -57,7 +57,7 @@
   border: 2px solid #2878ff;
   box-shadow: 0 0 0 1px rgb(255 255 255 / 70%);
   pointer-events: auto;
-  cursor: move;
+  cursor: var(--cb-cursor-move);
   touch-action: none;
 }
 

@@ -40,6 +40,7 @@ function editorApi(config: EditorConfig): EditorModeApi {
     setPattern: vi.fn(),
     splitPanel: vi.fn(),
     setPanelLabel: vi.fn(),
+    setPageLabel: vi.fn(),
     deleteImg: vi.fn(),
     deleteBubble: vi.fn(),
     resetOne: vi.fn(),
@@ -53,7 +54,13 @@ function renderToolbar(config: EditorConfig = seedConfig(), selPanel: number | n
       <EditorToolbar
         api={api}
         selPanel={selPanel}
-        pageSelect={{ navItems: [], previewingLoading: false, onPreviewLoading: vi.fn() }}
+        pageSelect={{
+          navItems: [],
+          pageLabels: config.pageLabels,
+          previewingLoading: false,
+          onPreviewLoading: vi.fn(),
+          onPageLabel: vi.fn(),
+        }}
         shapes={{
           page: 'classic',
           kind: 'landscape',

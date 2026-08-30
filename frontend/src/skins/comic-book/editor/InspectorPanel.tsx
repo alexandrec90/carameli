@@ -31,6 +31,16 @@ export default function InspectorPanel({ api, panel }: InspectorPanelProps) {
   const panelName = config.panels[panel]?.label ?? `Panel ${panel}`
   const selImg = selected.kind === 'img' ? config.images[selected.index] : null
   const selBubble = selected.kind === 'bubble' ? config.bubbles[selected.index] : null
+  const panelNameField = (
+    <label className="cb-ed-field">
+      <span>panel name</span>
+      <input
+        type="text"
+        value={config.panels[panel]?.label ?? ''}
+        onChange={e => api.setPanelLabel(panel, e.target.value)}
+      />
+    </label>
+  )
 
   // A selected panel is a slot, not a drawn thing: it has no transform to read out and
   // nothing to reset — but the slot does own two editable attributes, its name and its
@@ -42,14 +52,7 @@ export default function InspectorPanel({ api, panel }: InspectorPanelProps) {
     return (
       <>
         <div className="cb-ed-label">{panelName} panel</div>
-        <label className="cb-ed-field">
-          <span>name</span>
-          <input
-            type="text"
-            value={config.panels[panel]?.label ?? ''}
-            onChange={e => api.setPanelLabel(panel, e.target.value)}
-          />
-        </label>
+        {panelNameField}
         <label className="cb-ed-field">
           <span>pattern</span>
           <select
@@ -77,6 +80,7 @@ export default function InspectorPanel({ api, panel }: InspectorPanelProps) {
       <div className="cb-ed-label">
         {selImg ? `${assetLabel(selImg.src)} on ${panelName}` : `${panelName} bubble`}
       </div>
+      {panelNameField}
 
       <dl className="cb-ed-values">
         {selImg && (

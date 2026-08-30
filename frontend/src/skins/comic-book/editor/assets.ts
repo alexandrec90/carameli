@@ -42,7 +42,7 @@ export const PANEL_ASSETS: PanelAsset[] = [
   { src: '/comic-book/cheating-man.webp', label: 'Cheating man' },
   { src: '/comic-book/despondent-wife.webp', label: 'Despondent wife' },
   { src: '/comic-book/ringing-phone.webp', label: 'Ringing phone' },
-  { src: '/comic-book/move-cursor.webp', label: 'Move cursor' },
+  { src: '/comic-book/move.webp', label: 'Move' },
   { src: '/comic-book/hand-dragger.webp', label: 'Hand dragger' },
 ]
 

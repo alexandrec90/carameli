@@ -45,6 +45,7 @@ function bubbleLabel(b: BubbleTransform, i: number): string {
  */
 export default function BubbleInspector({ api, index, bubble }: BubbleInspectorProps) {
   const candidates = linkCandidates(api.config.bubbles, index)
+  const page = api.config.panels[bubble.panel]?.page
 
   return (
     <>
@@ -55,9 +56,9 @@ export default function BubbleInspector({ api, index, bubble }: BubbleInspectorP
           value={bubble.panel}
           onChange={e => api.setBubble(index, { panel: Number(e.target.value) })}
         >
-          {api.config.panels.map((p, i) => (
-            <option key={i} value={i}>{p.label}</option>
-          ))}
+          {api.config.panels.map((p, i) =>
+            p.page === page ? <option key={i} value={i}>{p.label}</option> : null,
+          )}
         </select>
       </label>
       <label className="cb-ed-field">

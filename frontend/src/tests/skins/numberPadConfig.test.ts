@@ -23,14 +23,17 @@ function reparseNumberPad(source: string): NumberPadProjection {
 function reparseConfig(source: string): EditorConfig {
   const body = source
     .replace("import type { Panel } from '../panels'\n", '')
+    .replace(/export const PAGE_LABELS: Record<string, string> =/, 'const pageLabels =')
     .replace(/export const PANELS: Panel\[\] =/, 'const panels =')
     .replace(/export const PANEL_IMG_TRANSFORMS: ImgTransform\[\] =/, 'const images =')
     .replace(/export const PANEL_BUBBLE_TRANSFORMS: BubbleTransform\[\] =/, 'const bubbles =')
     .replace(/export const PANEL_BUBBLE_CHAINS: BubbleChain\[\] =/, 'const chains =')
     .replace(/export const PANEL_PATTERNS: PanelBgStyle\[\] =/, 'const patterns =')
     .replace(/export const PANEL_GRIDS: PageGrids =/, 'const grids =')
+  const leftovers = body.match(/^export .*$/gm)
+  if (leftovers) throw new Error(`Unparsed config declarations: ${leftovers.join(', ')}`)
   return new Function(
-    `${body}\nreturn { panels, images, bubbles, chains, grids, patterns }`,
+    `${body}\nreturn { pageLabels, panels, images, bubbles, chains, grids, patterns }`,
   )() as EditorConfig
 }
 
