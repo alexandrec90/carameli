@@ -45,7 +45,14 @@ interface PanelBubbleProps {
    * and off in the editor, where a drag has to track the pointer exactly.
    */
   chained?: boolean
-  /** This field owns panel-wide keyboard input while visible. */
+  /**
+   * This field owns panel-wide keyboard input while visible, so it focuses itself the
+   * moment the panel reveals it. Decided by the panel (`panelKeyboard.ts`) and never
+   * here: which balloon a keystroke belongs to depends on what else is drawn beside it,
+   * which is not a question this component can answer about itself. Absent — a balloon
+   * rendered outside a panel, as the editor's own previews are — means no field grabs
+   * anything, which is the safe answer rather than a second rule.
+   */
   keyboard?: boolean
   /** Fixed SVG-space endpoint for a chain row's speech stem. */
   tailTarget?: [number, number]
@@ -168,7 +175,7 @@ export default function PanelBubble({
   // A keyboard user can tab to an otherwise hidden control; focus reveals its bubble
   // immediately and blur returns it to the panel-hover reveal rule.
   const shown = visible || focused
-  const holdsKeyboard = keyboard ?? dial
+  const holdsKeyboard = keyboard === true
 
   const className = [
     'cb-panel-bubble',
@@ -256,9 +263,11 @@ export default function PanelBubble({
           // filters its drum, and a filter whose result only appears when the pointer
           // happens to be over the balloon is a filter nobody can see working.
           open={hover || focused}
-          // A lone dial owns a revealed panel; beside a composer it takes ownership only
-          // while hovered, then hands focus and wheel reach back to the conversation.
-          revealed={visible && (holdsKeyboard || hover)}
+          // Exactly what an `input` balloon gets, and from the same place: a hover is
+          // already ownership by the time it reaches here (see panelKeyboard.ts), so
+          // adding it a second time would let a hovered dial hold the keyboard the
+          // panel had just handed to the composer beside it.
+          revealed={visible && holdsKeyboard}
           enabled={interactive}
           hostRef={rootRef}
           onSubmit={onSubmit}

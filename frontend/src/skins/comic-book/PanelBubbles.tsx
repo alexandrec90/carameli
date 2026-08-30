@@ -1,10 +1,12 @@
 import { Fragment, useCallback, useEffect, useState } from 'react'
 
-import {
-  chainIdsOn, chainMembers, defaultChain, isComposerContent, peerPickerOn,
-} from './bubbleChain'
+import { chainIdsOn, chainMembers, defaultChain, peerPickerOn } from './bubbleChain'
 import type { BubbleChain } from './bubbleChain'
 import { isDialContent } from './bubbleContent'
+import {
+  bubbleClaim, bubbleKey, chainClaim, chainKey, CLAIM_NONE, keyboardOwner,
+} from './panelKeyboard'
+import type { KeyboardClaim } from './panelKeyboard'
 import PanelBubble from './PanelBubble'
 import PanelBubbleChain from './PanelBubbleChain'
 import type { BubbleTransform } from './editor/types'
@@ -162,11 +164,33 @@ export default function PanelBubbles({
   // Stable, because BubbleWheel reports through an effect and would re-report on every
   // render of this panel otherwise — which is a render of this panel, forever.
   const onWheelSelect = useCallback((value: string) => setPicked(value), [])
-  const [pickerHovered, setPickerHovered] = useState(false)
-  const composerOwnsKeyboard = conversations.some(c => {
-    const sender = bubbles[c.members[0]]
-    return sender != null && isComposerContent(sender.content)
-  })
+
+  // Which balloon the reader is typing into. Every field on the panel states a claim and
+  // `keyboardOwner` settles it — the pointer first, then the strongest claim if it stands
+  // alone, and nobody at all when two of equal standing would have to be guessed between.
+  // The answer belongs to the panel rather than to a balloon: drawing a second field
+  // changes what the first one is entitled to, which no balloon can see from inside.
+  const claims: KeyboardClaim[] = [
+    ...bubbles.flatMap((b, i) =>
+      b.panel === panel && !claimed.has(i)
+        ? [{ key: bubbleKey(i), claim: bubbleClaim(b.content) }]
+        : [],
+    ),
+    ...conversations.map(c => ({
+      key: chainKey(c.id),
+      claim: chainClaim(bubbles[c.members[0]]?.content ?? ''),
+    })),
+  ]
+  const [hoveredKey, setHoveredKey] = useState<string | null>(null)
+  const owner = keyboardOwner(claims, hoveredKey)
+  // Cleared only by the balloon that set it: a pointer crossing straight from one balloon
+  // to another reports the arrival before the departure, and a blind clear would drop the
+  // new owner on the leave that follows it.
+  const hoverReporter = (key: string) => (hovered: boolean) =>
+    setHoveredKey(current => {
+      if (hovered) return key
+      return current === key ? null : current
+    })
 
   // Whether anything on this panel actually wants a thread. A picker is an ordinary
   // balloon on most panels, and resolving a number off one is not a reason to poll a
@@ -197,14 +221,19 @@ export default function PanelBubbles({
     <>
       {bubbles.map((bubble, i) => {
         if (bubble.panel !== panel || claimed.has(i)) return null
+        const key = bubbleKey(i)
         const el = (
           <PanelBubble
             bubble={bubble}
             visible={isVisible(i)}
             interactive={interactive}
             onWheelSelect={i === pickerIndex ? onWheelSelect : undefined}
-            keyboard={i === pickerIndex ? !composerOwnsKeyboard : undefined}
-            onHoverChange={i === pickerIndex ? setPickerHovered : undefined}
+            keyboard={owner === key}
+            // Only a claimant reports: lettering under the pointer is not a balloon
+            // anybody could be typing into, so it leaves the owner where it is.
+            onHoverChange={
+              bubbleClaim(bubble.content) > CLAIM_NONE ? hoverReporter(key) : undefined
+            }
             onSubmit={
               bubble.content === 'phone' || isDialContent(bubble.content)
                 ? onPhoneSubmit
@@ -239,7 +268,8 @@ export default function PanelBubbles({
             // together; the sender template's answer is the conversation's.
             visible={isVisible(members[0])}
             interactive={interactive}
-            keyboard={composerOwnsKeyboard && !pickerHovered}
+            keyboard={owner === chainKey(id)}
+            onComposerHover={hoverReporter(chainKey(id))}
             conversation={
               live && peer
                 ? {
