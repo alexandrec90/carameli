@@ -1,27 +1,33 @@
 import { useCallback, useMemo, useState } from 'react'
 
 import { logger } from '../../../lib/logger'
-import { CONFIG_KEY, hydrateConfig, seedConfig } from './configOps'
 import { setPanelLabel as setPanelLabelIn, splitPanel as splitPanelIn } from './configPanels'
 import { setPageLabel as setPageLabelIn } from './configPages'
-import { clearStoredConfig, detectActive, persistConfig } from './editorStorage'
+import { detectActive } from './editorStorage'
 import { resetGridKeepingContent, setGridKeepingContent } from './gridContentRemap'
 import type { CutAxis } from './panelGridCut'
 import type { EditMode, Selection, SelectionKind } from './selection'
 import { useContentEdits } from './useContentEdits'
 import type { ContentEdits } from './useContentEdits'
+import { useWorkingCopy } from './useWorkingCopy'
 import type { EditorConfig, LayoutKind, PanelGrid, PanelPage } from './types'
 
 // The pure operations on a config live in ./configOps.ts and ./panelGridOps.ts, the
-// content mutators in ./useContentEdits.ts and the browser edges in ./editorStorage.ts;
-// this module is the React state between them — the edit flag, the working copy, the
-// selection, and which half of the editor is in front.
+// content mutators in ./useContentEdits.ts, the browser edges in ./editorStorage.ts and
+// the working copy's own state in ./useWorkingCopy.ts; this module is the React state
+// between them — the edit flag, the selection, and which half of the editor is in front.
 
 export type { EditMode, Selection, SelectionKind } from './selection'
 
 export interface EditorModeApi extends ContentEdits {
   active: boolean
   config: EditorConfig
+  /**
+   * True when this working copy was hydrated from a different `layoutConfig.ts` than the
+   * one the bundle holds — a merge, a checkout or another tab's Save moved the file under
+   * it — so writing it out would revert whatever changed there. See ./configStamp.ts.
+   */
+  stale: boolean
   selected: Selection | null
   mode: EditMode
   setMode(mode: EditMode): void
@@ -87,11 +93,8 @@ function viewportSize(): { w: number; h: number } {
  */
 export function useEditorMode(): EditorModeApi {
   const [active] = useState(detectActive)
-  const [config, setConfig] = useState<EditorConfig>(() =>
-    active && typeof window !== 'undefined'
-      ? hydrateConfig(window.localStorage.getItem(CONFIG_KEY))
-      : seedConfig(),
-  )
+  const copy = useWorkingCopy(active)
+  const { config, apply } = copy
   const [selected, setSelected] = useState<Selection | null>(null)
   const [mode, setModeState] = useState<EditMode>('content')
 
@@ -110,15 +113,6 @@ export function useEditorMode(): EditorModeApi {
   }, [])
 
   const clear = useCallback(() => setSelected(null), [])
-
-  /** Apply a pure config operation, persisting whatever comes back. */
-  const apply = useCallback((op: (prev: EditorConfig) => EditorConfig) => {
-    setConfig(prev => {
-      const next = op(prev)
-      persistConfig(next)
-      return next
-    })
-  }, [])
 
   const content = useContentEdits(apply, setSelected)
 
@@ -167,18 +161,16 @@ export function useEditorMode(): EditorModeApi {
   )
 
   const resetAll = useCallback(() => {
-    // Drop the persisted override entirely so the next load re-seeds from the
-    // constants (a true "back to source defaults"), then reflect that in state.
-    clearStoredConfig()
-    setConfig(seedConfig())
+    copy.reset()
     setSelected(null)
-  }, [])
+  }, [copy])
 
   return useMemo(
     () => ({
       ...content,
       active,
       config,
+      stale: copy.stale,
       selected,
       mode,
       setMode,
@@ -192,7 +184,7 @@ export function useEditorMode(): EditorModeApi {
       setPageLabel,
     }),
     [
-      content, active, config, selected, mode, setMode, select, clear, resetAll,
+      content, active, config, copy.stale, selected, mode, setMode, select, clear, resetAll,
       setGridFor, resetGridFor, splitPanel, setPanelLabel, setPageLabel,
     ],
   )

@@ -61,6 +61,19 @@ one: `git stash push -- frontend/src/skins/comic-book/editor/layoutConfig.ts`, n
 filling in the missing tails by hand — that silently overwrites work someone is still
 doing.
 
+**The other half of that hazard is a tab that is *behind* the file.** A working copy
+lives in `localStorage` and outlives every merge, checkout and pull, so a tab opened
+before a change to `layoutConfig.ts` writes the pre-change layout back over it on its
+next Save — silently, and looking afterwards exactly like whoever made the change having
+reverted it. That is how the call-record table lost the columns #274 gave it: #287 was a
+Save from a tab older than #274, and nothing anywhere went red. `editor/configStamp.ts`
+is the guard: the payload records a fingerprint of the `layoutConfig.ts` it was hydrated
+from and keeps it across every later edit, so a mismatch with the bundle's own means the
+file has moved underneath. The editor then says so in red above the buttons and makes
+Save ask once. **A payload from before stamps existed carries none and is not warned
+about** — it may well be stale, but nothing in it says so, and a warning on every one of
+them would be dismissed on the day it was finally right.
+
 The bubble box's on-screen geometry comes from `bubbleRect` in `transforms.ts`, used
 by **both** the renderer (to aim tubes) and the editor (hit target and selection
 outline). Keep it shared: when those two disagreed, the bubble you could click was
@@ -214,7 +227,8 @@ keyboard until it was clicked. A new content kind joins by naming a claim in
 | Tear | **Alt-drag a corner** | The inverse of the merge: the seams on the drag side follow the pointer, the rest stay, and the two corners end up joined by a new edge (`panelGridSplit.ts`). The torn corner snaps onto a neighbouring seam's continuation line, so a collapsed cross folds back into two junctions on one straight seam. While the result would be invalid nothing tears |
 | New panel | select a **panel**, then **Split top / bottom** or **Split left / right** in the shapes inspector | A straight cut through the middle of the panel's box, in all three grids of its page at once (`configPanels.ts` over `panelGridCut.ts`). The parent keeps its index, name, pattern and the upper/left half; the new panel is appended to `PANELS` with a numbered name and the parent's pattern, the other page's grids gain an empty ring, and on the grid on screen pictures and bubbles hold their place (`gridContentRemap.ts`). Refused whole, with a note, when any grid cannot take the cut. There is no delete |
 | Reset shapes | **Reset shapes** in the shapes inspector | Restores the current window shape's grid only — the three are edited independently. Pictures and bubbles stay where the author put them. A panel added since shipping has no shipped ring, so it is left empty on that window shape until split off again |
-| Save | **Save** button | `POST /__comic-editor/save` writes `layoutConfig.ts` (dev server only); **Copy config** / **.ts** are the fallbacks. Never refused — mid-design is when it matters most |
+| Save | **Save** button | `POST /__comic-editor/save` writes `layoutConfig.ts` (dev server only); **Copy config** / **.ts** are the fallbacks. Never refused — mid-design is when it matters most. Asks once (`Overwrite it?`) in the one case where it would undo somebody's work: a working copy hydrated from an older `layoutConfig.ts` than the bundle holds |
+| Behind the file | red block above the Save row | `editor/configStamp.ts` — this tab's working copy predates the `layoutConfig.ts` on disk, so Save reverts whatever moved it (a merge, a branch change, another tab's Save). **Reset** takes the file and discards this tab's work; there is no merge of the two |
 | Ship | **Ship** button + summary | `POST /__comic-editor/ship` saves, then branches, commits, pushes and opens or updates a PR (`frontend/shipLayout.ts`). **Disabled while anything is unfinished** |
 | Unfinished | amber list above the Ship row | `editor/configParity.ts` — the structural rules a layout must satisfy whoever authored it: every caption needs a tail and both morph targets, every link must resolve within its panel, every picture needs extent and a `/comic-book/` source |
 | Reset all | clears working copy | Removes `localStorage['comic-book:editConfig']`, re-seeds from source |
