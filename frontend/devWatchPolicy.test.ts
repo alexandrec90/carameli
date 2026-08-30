@@ -43,12 +43,18 @@ describe('resolveDevWatch', () => {
     expect(resolveDevWatch({ CHOKIDAR_USEPOLLING: 'true' })?.ignored).toContain('**/dist/**')
   })
 
-  it('keeps the poll sweep off binary public assets, which cannot hot-update', () => {
-    const pattern = WATCH_IGNORED.find(p => p.startsWith('**/public/'))
+  it('keeps the poll sweep off assets-src/, the encode script inputs nothing serves', () => {
+    expect(resolveDevWatch({ CHOKIDAR_USEPOLLING: 'true' })?.ignored)
+      .toContain('**/assets-src/**')
+  })
 
-    expect(pattern).toBeDefined()
-    for (const ext of ['png', 'webp', 'woff2']) {
-      expect(pattern).toContain(ext)
+  it('never ignores public/, because that is where the served-file registry comes from', () => {
+    // Vite reads public/ once at startup into a Set and answers requests only for
+    // names in it; the watcher's add/unlink events are the only thing that keeps it
+    // current. An ignored path under public/ therefore means a picture written after
+    // startup is served index.html instead of its bytes, until the server restarts.
+    for (const pattern of WATCH_IGNORED) {
+      expect(pattern).not.toMatch(/(^|\/)public\//)
     }
   })
 
