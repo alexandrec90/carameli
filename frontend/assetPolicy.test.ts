@@ -160,9 +160,13 @@ describe('comic-book cursors', () => {
     pointer: { export: 'pointer-cursor.webp', master: 'pointer.png' },
     click: { export: 'click-cursor.webp', master: 'click.png' },
     grab: { export: 'hand-dragger-cursor.webp', master: 'hand-dragger.png' },
+    move: { export: 'move-cursor.webp', master: 'move.png' },
   } as const
 
-  /** The arrow is the yardstick every other cursor is measured against. */
+  /* The arrow is the yardstick the *hands* are measured against — an arrow and two hands
+     are one subject drawn at one remove, so a shared downscale keeps them a set. The move
+     cross is not: its ink runs edge to edge in a master three times the arrow's, so the
+     hands' factor draws it at 54px. It answers to the ceiling below and nothing else. */
   const SCALED_AGAINST_POINTER = ['click', 'grab'] as const
 
   const sizeOfExport = (which: keyof typeof CURSORS) =>
@@ -208,22 +212,27 @@ describe('comic-book cursors', () => {
     expect(stylesheet).toContain(
       "--cb-cursor-grab: url('/comic-book/hand-dragger-cursor.webp') 8 10, grab",
     )
+    expect(stylesheet).toContain("--cb-cursor-move: url('/comic-book/move-cursor.webp') 15 15, move")
     expect(stylesheet).toContain('cursor: var(--cb-cursor-default)')
     expect(stylesheet).toContain('cursor: var(--cb-cursor-click)')
   })
 
-  /* The grab hand is declared in the skin's stylesheet and spent in the editor's, so a
-     bare `cursor: grab` left behind anywhere in the skin is a handle still wearing the
-     system hand next to one wearing the glove. `grabbing` keeps its native keyword --
-     see the token's own comment for why. */
-  it('dresses every grabbable surface in the skin, leaving none on the native hand', () => {
+  /* Each token is declared in the skin's stylesheet and spent in the editor's, so a bare
+     native keyword left behind anywhere in the skin is a surface still wearing the system
+     cursor next to one wearing the drawing. Shipping the artwork is only half the change
+     — `move-cursor.webp` sat in `public/` for a commit while the seam a reader drags and
+     the selection outline still read `cursor: move`, which looks exactly like a custom
+     cursor that failed to load. `grabbing` keeps its native keyword — see the token's own
+     comment for why — and there is no `moving` to leave behind. */
+  it.each([
+    ['grab', /(^|\W)cursor:\s*grab\s*;/m],
+    ['move', /(^|\W)cursor:\s*move\s*;/m],
+  ] as const)('leaves no surface in the skin on the native %s cursor', (keyword, pattern) => {
     const skinDir = path.join(FRONTEND_ROOT, 'src', 'skins', 'comic-book')
     const bare = walkFiles(skinDir).filter(
-      rel =>
-        rel.endsWith('.css') &&
-        /(^|\W)cursor:\s*grab\s*;/m.test(readFileSync(path.join(skinDir, rel), 'utf-8')),
+      rel => rel.endsWith('.css') && pattern.test(readFileSync(path.join(skinDir, rel), 'utf-8')),
     )
-    expect(bare, `bare \`cursor: grab\` in ${bare.join(', ')}`).toEqual([])
+    expect(bare, `bare \`cursor: ${keyword}\` in ${bare.join(', ')}`).toEqual([])
   })
 
   /* A hotspot outside the image is silently ignored by the browser and the cursor falls
@@ -234,6 +243,7 @@ describe('comic-book cursors', () => {
       pointer: /pointer-cursor\.webp'\) (\d+) (\d+),/,
       click: /click-cursor\.webp'\) (\d+) (\d+),/,
       grab: /hand-dragger-cursor\.webp'\) (\d+) (\d+),/,
+      move: /move-cursor\.webp'\) (\d+) (\d+),/,
     }
     for (const which of Object.keys(hotspots) as (keyof typeof CURSORS)[]) {
       const match = stylesheet.match(hotspots[which])
@@ -242,6 +252,17 @@ describe('comic-book cursors', () => {
       expect(Number(match?.[1])).toBeLessThan(size?.width ?? 0)
       expect(Number(match?.[2])).toBeLessThan(size?.height ?? 0)
     }
+  })
+
+  /* The other three point at something with a tip or a fingertip; a four-way cross points
+     at nothing, so its hotspot is its middle. Off-centre it is the one cursor whose error
+     is invisible while stationary and shows up only as a drag that starts somewhere else. */
+  it('hangs the move cross on its own centre', () => {
+    const size = sizeOfExport('move')
+    const match = stylesheet.match(/move-cursor\.webp'\) (\d+) (\d+),/)
+    expect(size && match).toBeTruthy()
+    expect(Math.abs(Number(match?.[1]) - (size?.width ?? 0) / 2)).toBeLessThanOrEqual(2)
+    expect(Math.abs(Number(match?.[2]) - (size?.height ?? 0) / 2)).toBeLessThanOrEqual(2)
   })
 })
 
