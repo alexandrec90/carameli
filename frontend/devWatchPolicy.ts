@@ -50,6 +50,28 @@ export const DOCKER_POLL_INTERVAL_MS = 500
  * masters — restat'd twice a second for a directory the dev server never reads.
  * Nothing listed here can produce a hot update, so ignoring it costs no HMR
  * fidelity: a changed image or font needs a reload either way.
+ *
+ * **Nothing under `public/` may be listed here, whatever it costs to stat.** That
+ * reasoning above — "a changed image needs a reload either way" — is true and was
+ * still the wrong test to apply, because the watcher is not only feeding HMR. Vite
+ * lists `public/` once at startup into a `Set` (`initPublicFiles`), serves a
+ * request only if the URL is in that `Set` (`servePublicMiddleware` falls straight
+ * through to the SPA fallback on a miss), and keeps the `Set` in sync **solely**
+ * from the watcher's `add`/`unlink` events. Ignore an extension here and every
+ * file with it becomes invisible to that sync: an image that did not exist at the
+ * moment the server booted can never be served, and one that briefly vanished —
+ * a `git checkout` across a branch that replaces it, which is delete-then-create
+ * on disk — is dropped from the `Set` and never re-added. The symptom is not a
+ * 404, which would at least look like a missing file: the SPA fallback answers
+ * `200 text/html`, so the browser reports a decode failure on an image that is
+ * sitting correctly on disk, correctly committed and correctly deployed.
+ *
+ * That is what this glob did on 2026-08-30. `hand-notepad.webp` and
+ * `push-button-phone.webp` were replaced by #287, were byte-correct in the
+ * container, and served `index.html` until the dev server was restarted — which
+ * read as the change never having shipped. The stat traffic this bought back was
+ * the whole of `public/` at a few dozen paths per tick, against `dist/` at
+ * thousands; it was never where the cost was.
  */
 export const WATCH_IGNORED: readonly string[] = [
   '**/dist/**',
@@ -57,7 +79,6 @@ export const WATCH_IGNORED: readonly string[] = [
   '**/playwright-report/**',
   '**/test-results/**',
   '**/.vite/**',
-  '**/public/**/*.{png,jpg,jpeg,webp,avif,gif,ico,mp4,woff,woff2,ttf,otf}',
 ]
 
 export interface DevWatchOptions {

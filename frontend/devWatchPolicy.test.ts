@@ -43,12 +43,17 @@ describe('resolveDevWatch', () => {
     expect(resolveDevWatch({ CHOKIDAR_USEPOLLING: 'true' })?.ignored).toContain('**/dist/**')
   })
 
-  it('keeps the poll sweep off binary public assets, which cannot hot-update', () => {
-    const pattern = WATCH_IGNORED.find(p => p.startsWith('**/public/'))
-
-    expect(pattern).toBeDefined()
-    for (const ext of ['png', 'webp', 'woff2']) {
-      expect(pattern).toContain(ext)
+  it('never ignores anything under public/, or the dev server stops serving it', () => {
+    // Regression, 2026-08-30: `**/public/**/*.{png,…,webp,…}` was ignored here on
+    // the reasoning that a changed image needs a reload either way — true, and
+    // beside the point. Vite lists public/ into a Set at startup and keeps that Set
+    // in sync only from watcher add/unlink events, so an ignored extension is one
+    // Vite can never learn about: a replaced .webp (delete-then-create, which is
+    // what `git checkout` does) fell out of the Set and the SPA fallback answered
+    // 200 text/html for it until the server was restarted. Reverting this makes
+    // correctly shipped artwork look like it never shipped.
+    for (const pattern of WATCH_IGNORED) {
+      expect(pattern).not.toMatch(/(^|\/)public\//)
     }
   })
 
