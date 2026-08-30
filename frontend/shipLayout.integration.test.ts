@@ -27,8 +27,14 @@ let remote: string
 
 /** Spawns with a fixed argv, exactly as vite.config.ts wires the real endpoint. */
 function runIn(cwd: string): Run {
-  return (cmd, args) =>
-    new Promise(done => {
+  return (cmd, args) => {
+    // A file:// remote can never have a GitHub PR. Do not spawn the user's real gh:
+    // when it is installed but unauthenticated it opens an interactive login prompt,
+    // leaving this otherwise-local test hung until Vitest's timeout.
+    if (cmd === 'gh') {
+      return Promise.resolve({ code: 1, stdout: '', stderr: 'no forge for file remote' })
+    }
+    return new Promise(done => {
       execFile(
         cmd,
         [...args],
@@ -39,6 +45,7 @@ function runIn(cwd: string): Run {
         },
       )
     })
+  }
 }
 
 async function git(cwd: string, ...args: string[]): Promise<string> {

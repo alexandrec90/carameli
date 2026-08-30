@@ -24,9 +24,9 @@ export const BUBBLE_CONTENT_KINDS: BubbleContentKind[] = [
  *
  * The key is the *whole* difference between them, so every other question a panel asks
  * about a dial — is this the balloon the projected keypad types into, the one an SMS
- * chain takes its peer from, the one that owns the keyboard while the panel is revealed —
- * has the same answer for both. They ask through here rather than each spelling out a
- * two-way comparison, so adding a third dial is one edit instead of six.
+ * chain takes its peer from, what does it claim of the panel's keyboard — has the same
+ * answer for both. They ask through here rather than each spelling out a two-way
+ * comparison, so adding a third dial is one edit instead of six.
  */
 export function isDialContent(content: string): boolean {
   return content === 'dial' || content === 'dial-call'

@@ -38,6 +38,7 @@ const ANCHORS = [
  */
 export default function ImageInspector({ api, index, image }: ImageInspectorProps) {
   const set = (patch: Partial<ImgTransform>) => api.setImg(index, patch)
+  const page = api.config.panels[image.panel]?.page
 
   return (
     <>
@@ -48,9 +49,9 @@ export default function ImageInspector({ api, index, image }: ImageInspectorProp
           value={image.panel}
           onChange={e => set({ panel: Number(e.target.value) })}
         >
-          {api.config.panels.map((p, i) => (
-            <option key={i} value={i}>{p.label}</option>
-          ))}
+          {api.config.panels.map((p, i) =>
+            p.page === page ? <option key={i} value={i}>{p.label}</option> : null,
+          )}
         </select>
       </label>
       <label className="cb-ed-field">

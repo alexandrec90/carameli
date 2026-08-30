@@ -29,6 +29,7 @@ import {
   PANEL_GRIDS,
   PANEL_IMG_TRANSFORMS,
   PANEL_BUBBLE_TRANSFORMS,
+  PAGE_LABELS,
   PANEL_PATTERNS,
   PANELS,
 } from '../../skins/comic-book/editor/layoutConfig'
@@ -54,6 +55,7 @@ describe('seedConfig', () => {
     const cfg = seedConfig()
     expect(cfg.images).toEqual(PANEL_IMG_TRANSFORMS)
     expect(cfg.bubbles).toEqual(PANEL_BUBBLE_TRANSFORMS)
+    expect(cfg.pageLabels).toEqual(PAGE_LABELS)
     expect(cfg.patterns).toEqual(PANEL_PATTERNS)
   })
 
@@ -116,10 +118,13 @@ describe('seedConfig', () => {
     expect(cfg.images[0]).not.toBe(PANEL_IMG_TRANSFORMS[0])
     expect(cfg.bubbles[0]).not.toBe(PANEL_BUBBLE_TRANSFORMS[0])
     expect(cfg.patterns).not.toBe(PANEL_PATTERNS)
+    expect(cfg.pageLabels).not.toBe(PAGE_LABELS)
     cfg.images[0].scale = 99
     expect(PANEL_IMG_TRANSFORMS[0].scale).toBe(1)
     cfg.patterns[0] = 'sunburst'
     expect(PANEL_PATTERNS[0]).toBe('halftone-gradient')
+    cfg.pageLabels['/'] = 'Elsewhere'
+    expect(PAGE_LABELS['/']).toBeUndefined()
   })
 })
 
@@ -198,6 +203,8 @@ describe('hydrateConfig', () => {
       grids: seedConfig().grids,
       // The panel list goes with the grids: absent, both come back shipped.
       panels: seedConfig().panels,
+      // Page names were added later and default to no route-label overrides.
+      pageLabels: {},
       // Patterns are the exception: the array is parallel to PANELS by contract, so
       // "nothing" is not a length it can have — absence re-seeds the defaults.
       patterns: [...PANEL_PATTERNS],

@@ -156,6 +156,37 @@ The number dialled is `dialTarget`, which the projected number pad types into. A
 balloon is the other way to place a call and holds its number in a field of its own; the
 two are not the same input, which is why the keys take no argument.
 
+## A field is typed into as soon as its panel lights up
+
+There is no click-to-focus on a page drawn as artwork: the panel revealing its balloons
+*is* the invitation, so a field takes the keyboard the moment that happens. That is a
+property of **every** field — `input`, `phone`, either dial, a chain's composer — and not
+of the two balloons it was first written for.
+
+`panelKeyboard.ts` owns it, as a claim per balloon settled per panel. `PanelBubbles` is
+the router: it collects the claims, tracks which balloon the pointer is on, and hands
+exactly one balloon `keyboard`. A balloon never decides for itself, because the answer
+depends on what else is drawn beside it — which is precisely what a balloon cannot see.
+
+| Claim | Who | Owns the panel when |
+| --- | --- | --- |
+| `CLAIM_COMPOSER` | a chain whose sender template is a field | nothing outranks it and nothing is hovered |
+| `CLAIM_FIELD` | `input`, `phone`, `dial`, `dial-call` | it is the only field on the panel |
+| `CLAIM_POINTER` | `wheel` | only while hovered — it takes the scroll, so a composer beside it must let go |
+| `CLAIM_NONE` | lettering, `actions` | never |
+
+Three rules decide it, in order: **the pointer wins**, then **the highest claim wins if
+it stands alone**, then **a tie owns nothing**. So one field on a panel needs no gesture,
+a composer beside a dial keeps the keyboard until the dial is hovered, and two plain
+inputs wait — posting keystrokes into whichever the config happened to list first is not
+a fact the reader can see on screen.
+
+**Never re-spell this inside a balloon.** Two components used to carry a private half of
+it each — a dial focused itself while revealed, a composer took the keyboard off the
+picker — which is why an `input` balloon drawn anywhere else sat there ignoring the
+keyboard until it was clicked. A new content kind joins by naming a claim in
+`bubbleClaim`, and a new panel-level owner by ranking above `CLAIM_FIELD`.
+
 ## Dev-only visual editor
 
 | Property | Value | Notes |

@@ -37,6 +37,13 @@ interface PanelBubbleChainProps {
   /** The composer owns panel-wide keyboard and wheel input. */
   keyboard?: boolean
   /**
+   * Reports the pointer arriving on and leaving the composer, so the panel's keyboard
+   * router can hand it the keyboard the way it does any other field (panelKeyboard.ts).
+   * A conversation claims through its composer alone: the rows above it are messages,
+   * and the pointer on one of those is reading rather than aiming to type.
+   */
+  onComposerHover?: (hovered: boolean) => void
+  /**
    * The real SMS conversation this chain is bound to, when it is bound to one — supplied
    * by PanelBubbles from the number the panel's wheel picker is turned to.
    *
@@ -91,7 +98,7 @@ export interface LiveConversation {
  * flickering rather than as a conversation moving.
  */
 export default function PanelBubbleChain({
-  chain, members, visible, interactive, keyboard = false, conversation,
+  chain, members, visible, interactive, keyboard = false, onComposerHover, conversation,
 }: PanelBubbleChainProps) {
   // What the reader has sent, oldest first, already marked as the sender's side. It lives
   // here rather than in the config because it is not the author's: it is gone on reload,
@@ -309,6 +316,7 @@ export default function PanelBubbleChain({
           interactive={interactive}
           chained
           keyboard={row.key === 'composer' && keyboard}
+          onHoverChange={row.key === 'composer' ? onComposerHover : undefined}
           tailTarget={
             row === newestRecipient && cols
               ? recipientStemTarget(cols.them, row.bubble, aspect)

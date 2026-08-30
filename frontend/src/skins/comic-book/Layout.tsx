@@ -235,8 +235,10 @@ export function Layout({ navItems, sms, softphone }: LayoutProps) {
                         viewport={viewport}
                         pageSelect={{
                             navItems,
+                            pageLabels: editor.config.pageLabels,
                             previewingLoading: loading.previewLoading,
                             onPreviewLoading: loading.handlePreviewLoading,
+                            onPageLabel: editor.setPageLabel,
                         }}
                     />
                 </Suspense>
