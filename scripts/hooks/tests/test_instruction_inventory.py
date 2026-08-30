@@ -27,6 +27,10 @@ def test_instruction_inventory_is_intentional():
         # somebody's real SMS thread — money and privacy, not lettering. Scoped to the
         # files that do the binding, so drawing a chain does not load it.
         "skin-comic-book-sms",
+        # The third split of the same file, for the same reason: what moves in this
+        # skin, and at what rate. A reference nothing else in the doctrine depends on,
+        # which is why it was the half that could leave.
+        "skin-comic-book-motion",
         "voip-providers",
         "webhooks",
     }
