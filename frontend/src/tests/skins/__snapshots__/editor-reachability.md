@@ -17,6 +17,16 @@ A mutator listed with no control is one an author cannot invoke from the toolbar
 - content/img[table] → button: + Bubble
 - content/panel → button: + Bubble
 
+## addCallOn
+
+- content/bubble → button: + Call
+- content/bubble[bound, no picker] → button: + Call
+- content/bubble[chain of one] → button: + Call
+- content/bubble[chained] → button: + Call
+- content/bubble[linked] → button: + Call
+- content/img → button: + Call
+- content/img[table] → button: + Call
+
 ## addChainColumn
 
 - content/bubble[chain of one] → button: + Other column
@@ -124,6 +134,7 @@ A mutator listed with no control is one an author cannot invoke from the toolbar
 
 - content/bubble → checkbox: Allow spill outside panel
 - content/bubble → checkbox: Bolder outline on hover
+- content/bubble → select: call role
 - content/bubble → select: content
 - content/bubble → select: link to
 - content/bubble → select: on click
@@ -134,6 +145,7 @@ A mutator listed with no control is one an author cannot invoke from the toolbar
 - content/bubble → textarea: text
 - content/bubble[bound, no picker] → checkbox: Allow spill outside panel
 - content/bubble[bound, no picker] → checkbox: Bolder outline on hover
+- content/bubble[bound, no picker] → select: call role
 - content/bubble[bound, no picker] → select: content
 - content/bubble[bound, no picker] → select: link to
 - content/bubble[bound, no picker] → select: on click
@@ -144,6 +156,7 @@ A mutator listed with no control is one an author cannot invoke from the toolbar
 - content/bubble[bound, no picker] → textarea: text
 - content/bubble[chain of one] → checkbox: Allow spill outside panel
 - content/bubble[chain of one] → checkbox: Bolder outline on hover
+- content/bubble[chain of one] → select: call role
 - content/bubble[chain of one] → select: content
 - content/bubble[chain of one] → select: link to
 - content/bubble[chain of one] → select: on click
@@ -154,6 +167,7 @@ A mutator listed with no control is one an author cannot invoke from the toolbar
 - content/bubble[chain of one] → textarea: text
 - content/bubble[chained] → checkbox: Allow spill outside panel
 - content/bubble[chained] → checkbox: Bolder outline on hover
+- content/bubble[chained] → select: call role
 - content/bubble[chained] → select: content
 - content/bubble[chained] → select: link to
 - content/bubble[chained] → select: on click
@@ -164,6 +178,7 @@ A mutator listed with no control is one an author cannot invoke from the toolbar
 - content/bubble[chained] → textarea: text
 - content/bubble[linked] → checkbox: Allow spill outside panel
 - content/bubble[linked] → checkbox: Bolder outline on hover
+- content/bubble[linked] → select: call role
 - content/bubble[linked] → select: content
 - content/bubble[linked] → select: link to
 - content/bubble[linked] → select: on click
@@ -172,6 +187,57 @@ A mutator listed with no control is one an author cannot invoke from the toolbar
 - content/bubble[linked] → select: tail
 - content/bubble[linked] → select: type
 - content/bubble[linked] → textarea: text
+
+## setCallPhase
+
+- content/bubble → button: Connected
+- content/bubble → button: Default
+- content/bubble → button: Ringing
+- content/bubble → select: call role
+- content/bubble[bound, no picker] → button: Connected
+- content/bubble[bound, no picker] → button: Default
+- content/bubble[bound, no picker] → button: Ringing
+- content/bubble[bound, no picker] → select: call role
+- content/bubble[chain of one] → button: Connected
+- content/bubble[chain of one] → button: Default
+- content/bubble[chain of one] → button: Ringing
+- content/bubble[chain of one] → select: call role
+- content/bubble[chained] → button: Connected
+- content/bubble[chained] → button: Default
+- content/bubble[chained] → button: Ringing
+- content/bubble[chained] → select: call role
+- content/bubble[linked] → button: Connected
+- content/bubble[linked] → button: Default
+- content/bubble[linked] → button: Ringing
+- content/bubble[linked] → select: call role
+- content/img → button: Connected
+- content/img → button: Default
+- content/img → button: Ringing
+- content/img → select: call role
+- content/img[number pad] → button: Connected
+- content/img[number pad] → button: Default
+- content/img[number pad] → button: Ringing
+- content/img[number pad] → select: call role
+- content/img[table] → button: Connected
+- content/img[table] → button: Default
+- content/img[table] → button: Ringing
+- content/img[table] → select: call role
+- content/nothing → button: Connected
+- content/nothing → button: Default
+- content/nothing → button: Ringing
+- content/panel → button: Connected
+- content/panel → button: Default
+- content/panel → button: Ringing
+- content/seam → button: Connected
+- content/seam → button: Default
+- content/seam → button: Ringing
+- content/vertex → button: Connected
+- content/vertex → button: Default
+- content/vertex → button: Ringing
+
+## setCallScene
+
+- content/panel → select: call split
 
 ## setChain
 
@@ -197,6 +263,7 @@ A mutator listed with no control is one an author cannot invoke from the toolbar
 - content/img → checkbox: Project a number pad on this picture
 - content/img → checkbox: Project a table on this picture
 - content/img → select: anchor
+- content/img → select: call role
 - content/img → select: panel
 - content/img → select: picture
 - content/img → text: alt
@@ -212,6 +279,7 @@ A mutator listed with no control is one an author cannot invoke from the toolbar
 - content/img[number pad] → number: top-right X %
 - content/img[number pad] → range: text
 - content/img[number pad] → select: anchor
+- content/img[number pad] → select: call role
 - content/img[number pad] → select: panel
 - content/img[number pad] → select: picture
 - content/img[number pad] → text: alt
@@ -231,6 +299,7 @@ A mutator listed with no control is one an author cannot invoke from the toolbar
 - content/img[table] → range: text
 - content/img[table] → select: align
 - content/img[table] → select: anchor
+- content/img[table] → select: call role
 - content/img[table] → select: panel
 - content/img[table] → select: picture
 - content/img[table] → select: shows

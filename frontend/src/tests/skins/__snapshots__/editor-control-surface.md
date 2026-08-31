@@ -12,13 +12,17 @@ diff as the code that added it.
 ## content/nothing
 
 - button: + Bubble
+- button: + Call
 - button: + Image
 - button: + SMS
 - button: .ts
+- button: Connected
 - button: Content
 - button: Copy config
+- button: Default
 - button: Panel shapes
 - button: Reset
+- button: Ringing
 - button: Save
 - button: Ship
 - select: Page
@@ -28,16 +32,22 @@ diff as the code that added it.
 ## content/panel
 
 - button: + Bubble
+- button: + Call
 - button: + Image
 - button: + SMS
 - button: .ts
+- button: Connected
 - button: Content
 - button: Copy config
+- button: Default
 - button: Panel shapes
 - button: Reset
+- button: Ringing
 - button: Save
 - button: Ship
+- range: call seam
 - select: Page
+- select: call split
 - select: pattern
 - text: Ship summary
 - text: page name
@@ -46,15 +56,19 @@ diff as the code that added it.
 ## content/img
 
 - button: + Bubble
+- button: + Call
 - button: + Image
 - button: + SMS
 - button: .ts
+- button: Connected
 - button: Content
 - button: Copy config
+- button: Default
 - button: Delete image
 - button: Panel shapes
 - button: Reset
 - button: Reset
+- button: Ringing
 - button: Save
 - button: Ship
 - checkbox: Allow spill outside frame
@@ -62,6 +76,7 @@ diff as the code that added it.
 - checkbox: Project a table on this picture
 - select: Page
 - select: anchor
+- select: call role
 - select: panel
 - select: picture
 - text: Ship summary
@@ -72,16 +87,20 @@ diff as the code that added it.
 ## content/img[table]
 
 - button: + Bubble
+- button: + Call
 - button: + Image
 - button: + SMS
 - button: .ts
+- button: Connected
 - button: Content
 - button: Copy config
+- button: Default
 - button: Delete image
 - button: Panel shapes
 - button: Reset
 - button: Reset
 - button: Reset corners
+- button: Ringing
 - button: Save
 - button: Ship
 - checkbox: Allow spill outside frame
@@ -109,6 +128,7 @@ diff as the code that added it.
 - select: align
 - select: align
 - select: anchor
+- select: call role
 - select: panel
 - select: picture
 - select: shows
@@ -124,16 +144,20 @@ diff as the code that added it.
 ## content/img[number pad]
 
 - button: + Bubble
+- button: + Call
 - button: + Image
 - button: + SMS
 - button: .ts
+- button: Connected
 - button: Content
 - button: Copy config
+- button: Default
 - button: Delete image
 - button: Panel shapes
 - button: Reset
 - button: Reset
 - button: Reset number-pad corners
+- button: Ringing
 - button: Save
 - button: Ship
 - checkbox: Allow spill outside frame
@@ -151,6 +175,7 @@ diff as the code that added it.
 - range: text
 - select: Page
 - select: anchor
+- select: call role
 - select: panel
 - select: picture
 - text: Ship summary
@@ -161,21 +186,26 @@ diff as the code that added it.
 ## content/bubble
 
 - button: + Bubble
+- button: + Call
 - button: + Image
 - button: + SMS
 - button: .ts
+- button: Connected
 - button: Content
 - button: Copy config
+- button: Default
 - button: Delete bubble
 - button: Panel shapes
 - button: Reset
 - button: Reset
+- button: Ringing
 - button: Save
 - button: Ship
 - checkbox: Allow spill outside panel
 - checkbox: Bolder outline on hover
 - checkbox: Scrolling chain
 - select: Page
+- select: call role
 - select: content
 - select: link to
 - select: on click
@@ -191,21 +221,26 @@ diff as the code that added it.
 ## content/bubble[linked]
 
 - button: + Bubble
+- button: + Call
 - button: + Image
 - button: + SMS
 - button: .ts
+- button: Connected
 - button: Content
 - button: Copy config
+- button: Default
 - button: Delete bubble
 - button: Panel shapes
 - button: Reset
 - button: Reset
+- button: Ringing
 - button: Save
 - button: Ship
 - checkbox: Allow spill outside panel
 - checkbox: Bolder outline on hover
 - checkbox: Scrolling chain
 - select: Page
+- select: call role
 - select: content
 - select: link to
 - select: on click
@@ -221,15 +256,19 @@ diff as the code that added it.
 ## content/bubble[chained]
 
 - button: + Bubble
+- button: + Call
 - button: + Image
 - button: + SMS
 - button: .ts
+- button: Connected
 - button: Content
 - button: Copy config
+- button: Default
 - button: Delete bubble
 - button: Panel shapes
 - button: Reset
 - button: Reset
+- button: Ringing
 - button: Save
 - button: Ship
 - checkbox: Allow spill outside panel
@@ -237,6 +276,7 @@ diff as the code that added it.
 - checkbox: Scrolling chain
 - number: rows
 - select: Page
+- select: call role
 - select: content
 - select: link to
 - select: on click
@@ -252,13 +292,17 @@ diff as the code that added it.
 ## content/vertex
 
 - button: + Bubble
+- button: + Call
 - button: + Image
 - button: + SMS
 - button: .ts
+- button: Connected
 - button: Content
 - button: Copy config
+- button: Default
 - button: Panel shapes
 - button: Reset
+- button: Ringing
 - button: Save
 - button: Ship
 - select: Page
@@ -268,13 +312,17 @@ diff as the code that added it.
 ## content/seam
 
 - button: + Bubble
+- button: + Call
 - button: + Image
 - button: + SMS
 - button: .ts
+- button: Connected
 - button: Content
 - button: Copy config
+- button: Default
 - button: Panel shapes
 - button: Reset
+- button: Ringing
 - button: Save
 - button: Ship
 - select: Page
@@ -431,16 +479,20 @@ diff as the code that added it.
 ## content/bubble[chain of one]
 
 - button: + Bubble
+- button: + Call
 - button: + Image
 - button: + Other column
 - button: + SMS
 - button: .ts
+- button: Connected
 - button: Content
 - button: Copy config
+- button: Default
 - button: Delete bubble
 - button: Panel shapes
 - button: Reset
 - button: Reset
+- button: Ringing
 - button: Save
 - button: Ship
 - checkbox: Allow spill outside panel
@@ -448,6 +500,7 @@ diff as the code that added it.
 - checkbox: Scrolling chain
 - number: rows
 - select: Page
+- select: call role
 - select: content
 - select: link to
 - select: on click
@@ -463,16 +516,20 @@ diff as the code that added it.
 ## content/bubble[bound, no picker]
 
 - button: + Bubble
+- button: + Call
 - button: + Image
 - button: + Number picker
 - button: + SMS
 - button: .ts
+- button: Connected
 - button: Content
 - button: Copy config
+- button: Default
 - button: Delete bubble
 - button: Panel shapes
 - button: Reset
 - button: Reset
+- button: Ringing
 - button: Save
 - button: Ship
 - checkbox: Allow spill outside panel
@@ -480,6 +537,7 @@ diff as the code that added it.
 - checkbox: Scrolling chain
 - number: rows
 - select: Page
+- select: call role
 - select: content
 - select: link to
 - select: on click

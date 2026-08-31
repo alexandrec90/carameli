@@ -8,6 +8,7 @@ import { layoutViolations, violationLines } from '../../skins/comic-book/editor/
 import {
   PANEL_IMG_TRANSFORMS,
   PANEL_BUBBLE_TRANSFORMS,
+  PANEL_BUBBLE_CHAINS,
 } from '../../skins/comic-book/editor/layoutConfig'
 import {
   imgTransformStyle,
@@ -566,25 +567,28 @@ describe('default config parity', () => {
     })
   })
 
+  // Which surface each replacement photograph carries, and that its panel and its alt
+  // text name the picture that is actually in it. All three come apart together: the
+  // panel names are edited in the inspector and the alt text in the picture beside it,
+  // so swapping two panels' names leaves each one labelling the other's art — and a
+  // screen reader then announces the notepad as a telephone.
+  //
+  // The corners and the text size are deliberately **not** pinned. They are what the
+  // editor exists to drag: a picture reframed on the page needs its quad re-dragged onto
+  // the ruling in the photograph, so a pinned corner fails on every legitimate retune and
+  // teaches whoever hits it to paste the new numbers in without reading them.
   it('keeps the replacement phone and notepad bound to their matching surfaces', () => {
     const phone = PANEL_IMG_TRANSFORMS.find(t => t.src.endsWith('push-button-phone.webp'))
     const notepad = PANEL_IMG_TRANSFORMS.find(t => t.src.endsWith('hand-notepad.webp'))
 
-    expect(phone).toMatchObject({
-      alt: 'Push-button phone',
-      numberPad: {
-        quad: [[35.63, 26.46], [48.52, 22.85], [53.63, 44.38], [40.15, 48.14]],
-      },
-    })
+    expect(phone?.alt).toBe('Push-button phone')
+    expect(phone?.numberPad?.quad).toHaveLength(4)
+    expect(phone?.table).toBeUndefined()
     expect(PANELS[phone!.panel].label).toBe('Push-button phone')
 
-    expect(notepad).toMatchObject({
-      alt: 'Hand writing on notepad',
-      table: {
-        quad: [[14.7, 6.8], [82, 6.9], [82, 60], [14, 60]],
-        fontScale: 0.35,
-      },
-    })
+    expect(notepad?.alt).toBe('Hand writing on notepad')
+    expect(notepad?.table?.quad).toHaveLength(4)
+    expect(notepad?.numberPad).toBeUndefined()
     expect(PANELS[notepad!.panel].label).toBe('Notepad')
   })
 
@@ -606,6 +610,24 @@ describe('default config parity', () => {
   // initial value (PanelBubble hands it to BubbleInput as such), and a composer that
   // opens with words in it is a message the reader did not write.
   const isComposer = (b: BubbleTransform) => isThread(b) && isComposerContent(b.content)
+
+  // A bound chain reads the account's real thread, so its composer is the only way to
+  // answer one — and the only thing that says the balloon is a field rather than
+  // lettering is one word of `content`. Until this assertion the word could be changed
+  // back to 'text' by any Save and nothing anywhere went red: `isComposer` was read only
+  // as an *exemption* from the caption rules, which a plain caption satisfies. A chain
+  // reduced to one template renders too (`chainMembers` mirrors the missing column), so
+  // the page still draws — it just cannot be sent from.
+  it('keeps a composer on every chain bound to the real SMS thread', () => {
+    PANEL_BUBBLE_CHAINS.filter(c => c.sms).forEach(chain => {
+      const members = PANEL_BUBBLE_TRANSFORMS.filter(b => b.chain === chain.id)
+      expect(members.length, `chain ${chain.id} needs both its column templates`).toBe(2)
+      expect(
+        members.some(isComposer),
+        `chain ${chain.id} is bound to the carrier but has no balloon to type into`,
+      ).toBe(true)
+    })
+  })
 
   it('floats every bubble into the gutter with a caption and a rotation', () => {
     // Call balloons are exempt for the same reason their figures are: they are placed in
