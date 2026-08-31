@@ -75,6 +75,58 @@ interface ComicPanelProps {
 }
 
 /**
+ * What this panel draws of the page's call: the seam it is cut on, the roles that
+ * moment of the call puts on screen, and which of them is speaking. A panel takes part
+ * only if its author gave it a call layout *and* a call is up — so on every other panel,
+ * which is every panel most of the time, all four answers are empty and the ordinary
+ * pictures and balloons below are the whole of what it draws.
+ */
+function callOnPanel(
+    callScenes: CallSceneLayout[],
+    index: number,
+    poly: PanelPoly,
+    call: CallScene | null | undefined,
+) {
+    const layout = callSceneOn(callScenes, index)
+    const scene = layout && call ? call : null
+    if (!layout || !scene) return { scene: null, halves: null, callRoles: null, lit: undefined }
+    return {
+        scene,
+        halves: splitAt(poly.vp, poly.bounds, layout.cut, layout.axis),
+        callRoles: rolesAtPhase(scene.phase),
+        lit: litRoles(scene.phase, scene.transcript.speaking),
+    }
+}
+
+/** The panel element's classes: what it is, and what the pointer and the call make of it. */
+function panelClass(
+    info: Panel,
+    revealFull: boolean,
+    hovered: boolean,
+    editorActive: boolean,
+    inCall: boolean,
+): string {
+    return [
+        'cb-panel',
+        info.isLogo ? 'logo' : '',
+        revealFull ? 'cb-panel-reveal' : '',
+        // Lifts this panel's clipped balloons over the ink-line SVG while its
+        // bubbles show, so they are not crossed by frame ink. The panel itself
+        // stays put: raised, its own clipped content would cover the inner half
+        // of the ink stroking its polygon and the border would read as thinner
+        // under the pointer.
+        !editorActive && hovered && !inCall ? 'cb-panel-lift' : '',
+        // Colorize (dots and pictures — see comic-book.css). A class rather
+        // than :hover: the elements are overlapping bounding rectangles, so
+        // CSS :hover lights whichever one stacks higher, not the panel the
+        // geometric hit test says the pointer is on. Never during the call
+        // scene, where a lit picture means its speaker is talking.
+        hovered && !inCall ? 'cb-panel-hot' : '',
+        inCall ? 'cb-panel-call' : '',
+    ].filter(Boolean).join(' ')
+}
+
+/**
  * One panel of the grid: the Ben-Day dot canvas, the pictures and the bubbles that
  * name this slot, absolutely positioned at the polygon Layout computed for it.
  * overflow stays visible so pictures and bubbles can spill into the gutters.
@@ -91,16 +143,10 @@ export default function ComicPanel({
     onPhoneSubmit, phoneActions, call, dotRef, onSettled, onNatSize,
 }: ComicPanelProps) {
     const { bounds, vp } = poly
-    // This panel's call layout, if the author gave it one, and whether it is the layout
-    // showing right now: a scene needs both a seam to draw and a call to draw in it.
-    const layout = callSceneOn(callScenes, index)
-    const scene = layout && call ? call : null
     // The seam, and which roles are on screen behind it. `null` roles is the ordinary
     // layout — every picture and balloon that is not part of a call — and that is the
     // whole switch: the two sets never overlap, so nothing is drawn twice.
-    const halves = layout && scene ? splitAt(vp, bounds, layout.cut, layout.axis) : null
-    const callRoles = scene ? rolesAtPhase(scene.phase) : null
-    const lit = scene ? litRoles(scene.phase, scene.transcript.speaking) : undefined
+    const { scene, halves, callRoles, lit } = callOnPanel(callScenes, index, poly, call)
 
     // The dots clip tightly to the panel polygon (element-relative px coords). A
     // picture is windowed by that same polygon, offset into its own frame — which
@@ -182,24 +228,7 @@ export default function ComicPanel({
             // their boxes, and a chain's rows stand where no transform says they
             // do — so the hit test asks the elements.
             data-cb-panel={index}
-            className={[
-                'cb-panel',
-                info.isLogo ? 'logo' : '',
-                revealFull ? 'cb-panel-reveal' : '',
-                // Lifts this panel's clipped balloons over the ink-line SVG while its
-                // bubbles show, so they are not crossed by frame ink. The panel itself
-                // stays put: raised, its own clipped content would cover the inner half
-                // of the ink stroking its polygon and the border would read as thinner
-                // under the pointer.
-                !editorActive && hovered && !scene ? 'cb-panel-lift' : '',
-                // Colorize (dots and pictures — see comic-book.css). A class rather
-                // than :hover: the elements are overlapping bounding rectangles, so
-                // CSS :hover lights whichever one stacks higher, not the panel the
-                // geometric hit test says the pointer is on. Never during the call
-                // scene, where a lit picture means its speaker is talking.
-                hovered && !scene ? 'cb-panel-hot' : '',
-                scene ? 'cb-panel-call' : '',
-            ].filter(Boolean).join(' ')}
+            className={panelClass(info, revealFull, hovered, editorActive, scene !== null)}
             style={{
                 position: 'absolute',
                 left: bounds.x,

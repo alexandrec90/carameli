@@ -9,11 +9,7 @@ import {
   puffOpacity,
   resolveBubbleShape,
 } from './bubbleShape'
-import BubbleActions from './BubbleActions'
-import BubbleDial from './BubbleDial'
-import BubbleInput from './BubbleInput'
-import BubbleTypingDots from './BubbleTypingDots'
-import BubbleWheel from './BubbleWheel'
+import BubbleBody from './BubbleBody'
 import { isDialContent } from './bubbleContent'
 import { dialOptions } from './dialPicker'
 import { BUBBLE_TYPES } from './editor/bubbleTypes'
@@ -26,9 +22,6 @@ import type { CallTranscriptLine } from '../../lib/callTranscript'
 
 /** How long a press holds its shape before easing back to the resting one. */
 const PULSE_MS = 560
-
-/** A dial with nowhere to report to still draws; it just cannot be changed. */
-const noop = (): void => undefined
 
 /** One shared empty list, so a dial's shortlist is not rebuilt on every render. */
 const NOTHING_DIALLED: string[] = []
@@ -277,67 +270,29 @@ export default function PanelBubble({
           ))}
         </g>
       </svg>
-      {editableKind ? (
-        <BubbleInput
-          key={`${editableKind}:${bubble.text}`}
-          kind={editableKind}
-          initialValue={bubble.text}
-          font={font}
-          enabled={interactive}
-          revealed={visible && holdsKeyboard}
-          onSubmit={onSubmit}
-        />
-      ) : dial ? (
-        <BubbleDial
-          options={dialList}
-          value={dialValue}
-          fresh={dialFresh}
-          onChange={onDialChange ?? noop}
-          font={font}
-          // Open on focus as well as on hover, unlike a plain wheel: typing into a dial
-          // filters its drum, and a filter whose result only appears when the pointer
-          // happens to be over the balloon is a filter nobody can see working.
-          open={hover || focused}
-          // Exactly what an `input` balloon gets, and from the same place: a hover is
-          // already ownership by the time it reaches here (see panelKeyboard.ts), so
-          // adding it a second time would let a hovered dial hold the keyboard the
-          // panel had just handed to the composer beside it.
-          revealed={visible && holdsKeyboard}
-          enabled={interactive}
-          hostRef={rootRef}
-          onSubmit={onSubmit}
-          // The one difference between the two dial kinds: the telephone's green key,
-          // drawn at the right of the field and greyed until there is a number to dial.
-          call={bubble.content === 'dial-call'}
-        />
-      ) : bubble.content === 'actions' ? (
-        <BubbleActions text={bubble.text} font={font} enabled={interactive} actions={actions} />
-      ) : transcript ? (
-        <div
-          ref={logRef}
-          className="cb-panel-bubble-text cb-call-transcript"
-          style={{ fontFamily: `'${font}', cursive` }}
-          role="log"
-          aria-label={linesLabel}
-          aria-live="polite"
-        >
-          {lines.map(line => (
-            <p key={line.id} className="cb-call-line">{line.text}</p>
-          ))}
-        </div>
-      ) : bubble.content === 'wheel' ? (
-        <BubbleWheel
-          options={splitOptions(bubble.text)}
-          font={font}
-          open={hover}
-          hostRef={rootRef}
-          onSelect={onWheelSelect}
-        />
-      ) : (
-        <span className="cb-panel-bubble-text" style={{ fontFamily: `'${font}', cursive` }}>
-          {status === 'typing' ? <BubbleTypingDots /> : bubble.text}
-        </span>
-      )}
+      <BubbleBody
+        bubble={bubble}
+        editableKind={editableKind}
+        dial={dial}
+        transcript={transcript}
+        font={font}
+        enabled={interactive}
+        revealed={visible && holdsKeyboard}
+        hover={hover}
+        focused={focused}
+        hostRef={rootRef}
+        logRef={logRef}
+        dialList={dialList}
+        dialValue={dialValue}
+        dialFresh={dialFresh}
+        onDialChange={onDialChange}
+        onSubmit={onSubmit}
+        onWheelSelect={onWheelSelect}
+        actions={actions}
+        status={status}
+        lines={lines}
+        linesLabel={linesLabel}
+      />
     </div>
   )
 }

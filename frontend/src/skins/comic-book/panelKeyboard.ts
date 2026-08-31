@@ -39,6 +39,13 @@ export interface KeyboardClaim {
   claim: number
 }
 
+/**
+ * Makes the reporter one claimant states its pointer through, given that claimant's key.
+ * The panel owns the answer, so it owns the factory; a balloon is handed the half of it
+ * that is about itself. See PanelBubbles.tsx for why a departure is not a blind clear.
+ */
+export type HoverReporter = (key: string) => (hovered: boolean) => void
+
 /** Key for the flat balloon at `index` into the page's bubble list. */
 export function bubbleKey(index: number): string {
   return `bubble:${index}`

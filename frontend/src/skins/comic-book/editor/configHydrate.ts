@@ -163,6 +163,38 @@ function clampPanel<T extends { panel: number }>(entry: T, count: number): T {
 }
 
 /**
+ * One picture from a payload, merged over the shipped entry at its index and then over
+ * the new-entity template, and repaired inside.
+ *
+ * Projected content is nested, so a payload written before a field existed — or with a
+ * cell that came back as a number — needs repair inside rather than a whole-value merge.
+ * Each coercer returns undefined for the ordinary case of a picture that is not that
+ * surface, and absent keys stay absent.
+ */
+function hydrateImage(
+  t: ImgTransform,
+  shipped: ImgTransform | undefined,
+  count: number,
+): ImgTransform {
+  const merged = coerceCallRole(clampPanel({
+    panel: 0,
+    ...NEW_IMAGE,
+    ...shipped,
+    ...(t as Partial<ImgTransform>),
+  }, count))
+  const table = coerceTable(merged.table)
+  const numberPad = coerceNumberPad(merged.numberPad)
+  const plain = { ...merged }
+  delete plain.table
+  delete plain.numberPad
+  // Existing table payloads win if a hand-edited config names both. The editor presents
+  // one projected-content choice and never writes the ambiguous state.
+  if (table) return { ...plain, table }
+  if (numberPad) return { ...plain, numberPad }
+  return plain
+}
+
+/**
  * Build a config from a persisted JSON string. Falls back to {@link seedConfig}
  * for null, malformed JSON, or a structurally invalid payload — never throws.
  */
@@ -220,32 +252,11 @@ export function hydrateConfig(raw: string | null): EditorConfig {
         )),
       ),
     ))
-    const images = parsed.images.map((t, i) => {
-      // Typed as possibly-absent because the payload may be longer than the seed:
-      // a ninth picture the author added has no shipped entry to recover from, and
-      // the template is then the whole answer.
-      const shipped = seed.images[i] as ImgTransform | undefined
-      const merged = coerceCallRole(clampPanel({
-        panel: 0,
-        ...NEW_IMAGE,
-        ...shipped,
-        ...(t as Partial<ImgTransform>),
-      }, count))
-      // Projected content is nested, so a payload written before a field existed — or
-      // with a cell that came back as a number — needs repair inside rather than a
-      // whole-value merge. Each coercer returns undefined for the ordinary case of a
-      // picture that is not that surface, and absent keys stay absent.
-      const table = coerceTable(merged.table)
-      const numberPad = coerceNumberPad(merged.numberPad)
-      const plain = { ...merged }
-      delete plain.table
-      delete plain.numberPad
-      // Existing table payloads win if a hand-edited config names both. The editor
-      // presents one projected-content choice and never writes the ambiguous state.
-      if (table) return { ...plain, table }
-      if (numberPad) return { ...plain, numberPad }
-      return plain
-    })
+    // The shipped entry is typed as possibly-absent because the payload may be longer
+    // than the seed: a ninth picture the author added has no shipped entry to recover
+    // from, and the template is then the whole answer.
+    const images = parsed.images.map((t, i) =>
+      hydrateImage(t, seed.images[i] as ImgTransform | undefined, count))
     return {
       pageLabels: normalizePageLabels(parsed.pageLabels),
       panels,

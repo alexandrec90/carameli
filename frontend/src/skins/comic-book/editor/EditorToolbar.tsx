@@ -2,8 +2,8 @@ import { useMemo } from 'react'
 
 import type { LayoutKind, PanelGrid } from '../panelGeometry'
 import type { PanelPage } from '../panels'
-import type { CallScenePhase } from '../phoneActions'
 import AddContentButtons from './AddContentButtons'
+import CallLayoutSwitch from './CallLayoutSwitch'
 import { layoutViolations } from './configParity'
 import InspectorPanel from './InspectorPanel'
 import LayoutWarnings from './LayoutWarnings'
@@ -20,13 +20,6 @@ import { useToolbarDrag } from './useToolbarDrag'
 // the four ways a working copy leaves the browser. Split out of EditorOverlay.tsx when
 // the shape editor doubled the number of things a toolbar has to hold; what each of those
 // four presses *does* is ./useLayoutTransport.ts, so this file stays markup.
-
-/** The layout switch's three positions: the ordinary contents, and the call's two states. */
-const CALL_LAYOUTS: readonly (readonly [CallScenePhase | null, string])[] = [
-  [null, 'Default'],
-  ['ringing', 'Ringing'],
-  ['connected', 'Connected'],
-]
 
 interface EditorToolbarProps {
   api: EditorModeApi
@@ -90,26 +83,11 @@ export default function EditorToolbar({ api, selPanel, pageSelect, shapes }: Edi
         <div className="cb-ed-hint">Click a panel, a picture or a bubble to select it.</div>
       )}
 
-      {mode === 'content' && <AddContentButtons api={api} selPanel={selPanel} />}
-
-      {/* Which layout the page's calls are showing. Three positions and not a checkbox
-          plus a phase: what a scene draws differs between ringing and connected — one
-          figure or two, and whose words are lit — so an author framing it has to be able
-          to stand in either. Session state, so the page comes back on Default. */}
-      {mode === 'content' && config.callScenes.length > 0 && (
-        <div className="cb-ed-modes" role="group" aria-label="Call layout">
-          {CALL_LAYOUTS.map(([phase, label]) => (
-            <button
-              key={label}
-              type="button"
-              className={`cb-ed-btn${api.callPhase === phase ? ' cb-ed-btn-on' : ''}`}
-              aria-pressed={api.callPhase === phase}
-              onClick={() => api.setCallPhase(phase)}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
+      {mode === 'content' && (
+        <>
+          <AddContentButtons api={api} selPanel={selPanel} />
+          <CallLayoutSwitch api={api} />
+        </>
       )}
 
       <div className="cb-ed-actions">

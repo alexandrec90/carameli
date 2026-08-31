@@ -1,12 +1,12 @@
-import { CALL_ROLE_LABELS, CALL_ROLES, callSceneOn, isCallRole } from '../callSceneRoles'
 import { PATTERN_STYLES, PATTERN_STYLE_KEYS } from '../panelPatterns'
 import type { PanelBgStyle } from '../panelPatterns'
 import { assetLabel } from './assets'
 import BubbleInspector from './BubbleInspector'
+import CallRoleField from './CallRoleField'
+import CallSeamFields from './CallSeamFields'
 import ChainInspector from './ChainInspector'
 import ImageInspector from './ImageInspector'
-import { CALL_CUT, indicesOnPanel } from './configOps'
-import type { CallRole } from './types'
+import { indicesOnPanel } from './configOps'
 import type { EditorModeApi } from './useEditorMode'
 
 interface InspectorPanelProps {
@@ -51,10 +51,6 @@ export default function InspectorPanel({ api, panel }: InspectorPanelProps) {
   if (selected.kind === 'panel') {
     const imgs = indicesOnPanel(config.images, panel).length
     const bubbles = indicesOnPanel(config.bubbles, panel).length
-    // The seam, on a panel that is a phone call. It belongs to the panel and not to any
-    // one entry: both halves are measured from it, so moving it from a picture's inspector
-    // would be editing every other entry's frame from inside one of them.
-    const scene = callSceneOn(config.callScenes, panel)
     return (
       <>
         <div className="cb-ed-label">{panelName} panel</div>
@@ -71,33 +67,7 @@ export default function InspectorPanel({ api, panel }: InspectorPanelProps) {
             ))}
           </select>
         </label>
-        {scene && (
-          <>
-            <label className="cb-ed-field">
-              <span>call seam</span>
-              <input
-                type="range"
-                min={CALL_CUT.min}
-                max={CALL_CUT.max}
-                step={CALL_CUT.step}
-                value={scene.cut}
-                onChange={e => api.setCallScene(panel, { cut: Number(e.target.value) })}
-              />
-              <output>{scene.cut}%</output>
-            </label>
-            <label className="cb-ed-field">
-              <span>call split</span>
-              <select
-                className="cb-ed-select"
-                value={scene.axis}
-                onChange={e => api.setCallScene(panel, { axis: e.target.value === 'y' ? 'y' : 'x' })}
-              >
-                <option value="x">Side by side</option>
-                <option value="y">One above the other</option>
-              </select>
-            </label>
-          </>
-        )}
+        <CallSeamFields api={api} panel={panel} />
         <div className="cb-ed-hint">
           {imgs} picture{imgs === 1 ? '' : 's'} · {bubbles} bubble{bubbles === 1 ? '' : 's'}.
           Click one to edit it, or add another below.
@@ -140,31 +110,12 @@ export default function InspectorPanel({ api, panel }: InspectorPanelProps) {
         )}
       </dl>
 
-      {/* Which layer of the panel this entry belongs to, and — if it is the call's —
-          which half it is framed against. Above the kind-specific fields because it is
-          the one that decides when the rest of them are even on screen: an entry with a
-          role is invisible on the default layout, and one without is invisible on the
-          call. Choosing a role therefore switches the page to the layout the entry has
-          just joined, or nothing appears to have happened. */}
-      <label className="cb-ed-field">
-        <span>call role</span>
-        <select
-          className="cb-ed-select"
-          value={selEntry.call ?? ''}
-          onChange={e => {
-            const call: CallRole | undefined = isCallRole(e.target.value) ? e.target.value : undefined
-            if (selected.kind === 'img') api.setImg(selected.index, { call })
-            else api.setBubble(selected.index, { call })
-            if (call === undefined) api.setCallPhase(null)
-            else if (api.callPhase === null) api.setCallPhase(call === 'ringing' ? 'ringing' : 'connected')
-          }}
-        >
-          <option value="">Not part of a call</option>
-          {CALL_ROLES.map(role => (
-            <option key={role} value={role}>{CALL_ROLE_LABELS[role]}</option>
-          ))}
-        </select>
-      </label>
+      <CallRoleField
+        api={api}
+        kind={selected.kind}
+        index={selected.index}
+        value={selEntry.call}
+      />
 
       {selImg && <ImageInspector api={api} index={selected.index} image={selImg} />}
       {selBubble && <BubbleInspector api={api} index={selected.index} bubble={selBubble} />}

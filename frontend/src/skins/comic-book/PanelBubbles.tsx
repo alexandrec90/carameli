@@ -1,47 +1,29 @@
-import { Fragment, useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 
 import { chainIdsOn, chainMembers, defaultChain, peerPickerOn } from './bubbleChain'
 import type { BubbleChain } from './bubbleChain'
 import { isDialContent } from './bubbleContent'
-import { halfSlot } from './callSceneGeometry'
-import type { SceneHalf, SceneHalves } from './callSceneGeometry'
-import { CALL_TRANSCRIPT_LABELS, callSpeaker, halfFor, inRoles } from './callSceneRoles'
-import {
-  bubbleClaim, bubbleKey, chainClaim, chainKey, CLAIM_NONE, keyboardOwner,
-} from './panelKeyboard'
+import type { SceneHalves } from './callSceneGeometry'
+import { inRoles } from './callSceneRoles'
+import { bubbleClaim, bubbleKey, chainClaim, chainKey, keyboardOwner } from './panelKeyboard'
 import type { KeyboardClaim } from './panelKeyboard'
-import PanelBubble from './PanelBubble'
-import PanelBubbleChain from './PanelBubbleChain'
-import { toClipPath } from './editor/transforms'
+import PanelChainThread from './PanelChainThread'
+import PanelFlatBubble from './PanelFlatBubble'
 import type { BubbleTransform, CallRole } from './editor/types'
 import type { Rect } from './panelGeometry'
 import type { PhoneActionHandlers } from './phoneActions'
 import { browserCountry, toE164 } from './phoneInput'
 import type { UseSmsConversationsResult } from '../../hooks/useSmsConversations'
-import { linesBy } from '../../lib/callTranscript'
 import type { CallTranscript } from '../../lib/callTranscript'
-import type { SmsConversationMessage } from '../../lib/smsConversation'
 
 /**
- * One shared "nothing yet" array. A chain whose first poll has not landed is handed this
- * rather than a fresh `[]` per render, so its transcript keeps the same identity and the
- * balloons do not remount underneath a conversation that has not changed.
- */
-const NO_MESSAGES: readonly SmsConversationMessage[] = []
-
-/**
- * The same, for a panel with nothing dialled yet: the dial's shortlist is memoized on
- * this array's identity, so a fresh `[]` per render would rebuild it every time.
+ * A panel with nothing dialled yet: the dial's shortlist is memoized on this array's
+ * identity, so a fresh `[]` per render would rebuild it every time.
  */
 const EMPTY_DIALLED: string[] = []
 
 /** One shared "nothing lit", for the same reason. */
 const NONE_LIT: readonly CallRole[] = []
-
-/** A half's slot, or the panel's own clip when the balloon is not in one. */
-function slotClip(half: SceneHalf | null, panelClip: string): string {
-  return half ? toClipPath(half.pts, half.box.x, half.box.y) : panelClip
-}
 
 interface PanelBubblesProps {
   /** Every bubble on the page — `panel` decides which ones this panel draws. */
@@ -75,7 +57,7 @@ interface PanelBubblesProps {
   /** CSS clip-path of the panel polygon, for bubbles that don't spill. */
   clip: string
   /** Whether bubble `index` (into `bubbles`) is currently revealed. */
-  isVisible(index: number): boolean
+  isVisible: (index: number) => boolean
   /** False in edit mode: the editor overlay owns the pointer there. */
   interactive: boolean
   /**
@@ -269,126 +251,52 @@ export default function PanelBubbles({
 
   return (
     <>
-      {bubbles.map((bubble, i) => {
-        if (bubble.panel !== panel || claimed.has(i) || !inRoles(bubble.call, callRoles)) {
-          return null
-        }
-        const key = bubbleKey(i)
-        const half = halfFor(bubble.call, halves)
-        // A transcript's words are the call's, never the balloon's own text. The seat is
-        // the role's; a transcript with no role — an author's, outside any call layout —
-        // is a window on the whole conversation rather than on one side of it.
-        const seat = bubble.call ? callSpeaker(bubble.call) : null
-        const words = bubble.content !== 'transcript' || !transcript
-          ? undefined
-          : seat
-            ? linesBy(transcript, seat)
-            : transcript.lines
-        const el = (
-          <PanelBubble
+      {bubbles.map((bubble, i) =>
+        bubble.panel !== panel || claimed.has(i) || !inRoles(bubble.call, callRoles) ? null : (
+          <PanelFlatBubble
+            key={i}
             bubble={bubble}
+            index={i}
+            halves={halves}
+            bounds={bounds}
+            clip={clip}
             visible={isVisible(i)}
             interactive={interactive}
-            onWheelSelect={i === pickerIndex ? onWheelSelect : undefined}
-            keyboard={owner === key}
-            // Only a claimant reports: lettering under the pointer is not a balloon
-            // anybody could be typing into, so it leaves the owner where it is.
-            onHoverChange={
-              bubbleClaim(bubble.content) > CLAIM_NONE ? hoverReporter(key) : undefined
-            }
-            onSubmit={
-              bubble.content === 'phone' || isDialContent(bubble.content)
-                ? onPhoneSubmit
-                : undefined
-            }
+            owner={owner}
+            hoverReporter={hoverReporter}
+            pickerIndex={pickerIndex}
+            onWheelSelect={onWheelSelect}
+            transcript={transcript}
+            lit={lit}
+            onPhoneSubmit={onPhoneSubmit}
             dialValue={dialValue}
             dialFresh={dialFresh}
             dialled={dialled}
             onDialChange={onDialChange}
-            actions={bubble.content === 'actions' ? phoneActions : undefined}
-            lines={words}
-            linesLabel={
-              bubble.content === 'transcript'
-                ? CALL_TRANSCRIPT_LABELS[bubble.call ?? 'none']
-                : undefined
-            }
-            // Heavy while its seat is talking, and only on a transcript: the words are
-            // what "this voice is on the line" is about, so bolding the red key beside
-            // them would say the button was speaking.
-            bold={bubble.content === 'transcript' && bubble.call !== undefined
-              && lit.includes(bubble.call)}
+            phoneActions={phoneActions}
           />
-        )
-        // spill off: a clip wrapper hides the overflow behind the edge it belongs to —
-        // its half's while a call is up, the panel's otherwise.
-        const placed = bubble.spill ? (
-          el
-        ) : (
-          <div className="cb-bubble-clip" style={{ clipPath: slotClip(half, clip) }}>
-            {el}
-          </div>
-        )
-        return half ? (
-          <div key={i} className="cb-call-slot" style={halfSlot(half, bounds)}>
-            {placed}
-          </div>
-        ) : (
-          <Fragment key={i}>{placed}</Fragment>
-        )
-      })}
-      {conversations.map(({ id, members, chain }) => {
-        // Bound only when the author asked for it *and* the panel resolved a number. A
-        // chain that asked and got nothing shows an empty conversation rather than falling
-        // back to the authored transcript: the fallback would put words in a real thread.
-        const live = chain.sms && peer !== null
-        const table = (
-          <PanelBubbleChain
-            chain={chain}
-            members={members.map(i => bubbles[i])}
-            // Every member of a chain belongs to this panel, so they reveal and hide
-            // together; the sender template's answer is the conversation's.
-            visible={isVisible(members[0])}
-            interactive={interactive}
-            keyboard={owner === chainKey(id)}
-            onComposerHover={hoverReporter(chainKey(id))}
-            conversation={
-              live && peer
-                ? {
-                    messages: sms.conversations[peer] ?? NO_MESSAGES,
-                    typing: sms.typing[peer] === true,
-                    onSend: (text: string) => {
-                      // The reader's own spelling of the number, not `peer`: the drum
-                      // letters its rows the way the field does, and E.164 is the form
-                      // the API takes rather than the one the panel shows.
-                      onPeerTexted?.(chosen)
-                      void sms.send(peer, text)
-                    },
-                  }
-                : undefined
-            }
-          />
-        )
-        // Spill is the sender template's call for the whole conversation. A table whose
-        // balloons disagreed would be clipped down one column, which reads as a rendering
-        // fault rather than as a choice — and that template is the one whose tail decides
-        // how far the conversation may lean off the panel in the first place. Its half is
-        // the conversation's too, for the same reason.
-        const half = halfFor(bubbles[members[0]].call, halves)
-        const placed = bubbles[members[0]].spill ? (
-          table
-        ) : (
-          <div className="cb-bubble-clip" style={{ clipPath: slotClip(half, clip) }}>
-            {table}
-          </div>
-        )
-        return half ? (
-          <div key={id} className="cb-call-slot" style={halfSlot(half, bounds)}>
-            {placed}
-          </div>
-        ) : (
-          <Fragment key={id}>{placed}</Fragment>
-        )
-      })}
+        ),
+      )}
+      {conversations.map(({ id, members, chain }) => (
+        <PanelChainThread
+          key={id}
+          chain={chain}
+          members={members.map(i => bubbles[i])}
+          halves={halves}
+          bounds={bounds}
+          clip={clip}
+          // Every member of a chain belongs to this panel, so they reveal and hide
+          // together; the sender template's answer is the conversation's.
+          visible={isVisible(members[0])}
+          interactive={interactive}
+          keyboard={owner === chainKey(id)}
+          onComposerHover={hoverReporter(chainKey(id))}
+          peer={peer}
+          chosen={chosen}
+          sms={sms}
+          onPeerTexted={onPeerTexted}
+        />
+      ))}
     </>
   )
 }

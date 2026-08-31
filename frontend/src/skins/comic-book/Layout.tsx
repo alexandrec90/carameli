@@ -3,23 +3,15 @@ import { useLocation } from 'react-router-dom'
 import type { LayoutProps } from '../types'
 import { isBubbleRevealed } from './bubbleTube'
 import BubbleTubes from './BubbleTubes'
-import { EDITOR_CALL_TRANSCRIPT } from './callScene'
-import { splitAt } from './callSceneGeometry'
-import { callSceneOn, halfFor, inRoles, rolesAtPhase } from './callSceneRoles'
 import ComicPanel from './ComicPanel'
 import { LoadingOverlay, useLoadingScreen } from './LoadingOverlay'
 import PanelInk from './PanelInk'
 import { gridPolys, layoutKindFor } from './panelGeometry'
-import type { Rect } from './panelGeometry'
+import { activeLayout, useCallLayout } from './layoutSource'
 import { pageForPath } from './panels'
-import { callSceneOf, softphoneActions } from './phoneActions'
+import { softphoneActions } from './phoneActions'
 import { usePanelDots } from './usePanelDots'
 import { usePanelHover } from './usePanelHover'
-import {
-    PANEL_BUBBLE_CHAINS, PANEL_CALL_SCENES, PANEL_IMG_TRANSFORMS, PANEL_BUBBLE_TRANSFORMS,
-    PANEL_GRIDS, PANEL_PATTERNS, PANELS,
-} from './editor/layoutConfig'
-import type { ImgTransform } from './editor/types'
 import { shouldRevealImg, useEditorMode } from './editor/useEditorMode'
 import { useLiveTableImages } from './useLiveTableImages'
 import { usePageWash } from './usePageWash'
@@ -72,18 +64,15 @@ export function Layout({ navItems, sms, softphone }: LayoutProps) {
     const editor = useEditorMode()
     const page = pageForPath(location.pathname)
 
-    // Source transforms from the editor's working copy when active, else constants.
-    const authoredImgs = editor.active ? editor.config.images : PANEL_IMG_TRANSFORMS
+    // Everything drawn comes from the editor's working copy when one is open, else from
+    // the shipped constants (./layoutSource.ts).
+    const layout = activeLayout(editor)
+    const { bubbles: bubbleT, chains: chainT, callScenes: callSceneT, grids, patterns, panels } =
+        layout
     // A picture whose surface names a live feed gets its cells from the records rather
     // than from the config. Applied here, between the working copy and the panels, so the
     // editor keeps holding — and saving — the authored surface with no rows in it.
-    const imgT = useLiveTableImages(authoredImgs)
-    const bubbleT = editor.active ? editor.config.bubbles : PANEL_BUBBLE_TRANSFORMS
-    const chainT = editor.active ? editor.config.chains : PANEL_BUBBLE_CHAINS
-    const callSceneT = editor.active ? editor.config.callScenes : PANEL_CALL_SCENES
-    const grids = editor.active ? editor.config.grids : PANEL_GRIDS
-    const patterns = editor.active ? editor.config.patterns : PANEL_PATTERNS
-    const panels = editor.active ? editor.config.panels : PANELS
+    const imgT = useLiveTableImages(layout.images)
 
     const settledCountRef = useRef(0)
 
@@ -118,34 +107,11 @@ export function Layout({ navItems, sms, softphone }: LayoutProps) {
     // and needs the same answer, which CSS cannot hand it — and off the panel elements
     // entirely, because those are overlapping bounding rectangles and the browser's
     // hit-testing answered for the rectangles, not the polygons (see panelHover.ts).
-    // The call every panel with a call layout draws, or null for none — which is what
-    // puts those panels back on their ordinary contents.
-    //
-    // In the editor it is the author's choice of layout rather than the telephone's
-    // state, carrying sample words so a transcript balloon is something you can frame.
-    // Deciding it here keeps the switch in one place: a panel asks whether there is a
-    // call to draw, never whether the editor is up.
-    const call = editor.active
-        ? editor.callPhase && { phase: editor.callPhase, transcript: EDITOR_CALL_TRANSCRIPT }
-        : callSceneOf(softphone)
-
-    // Where each picture is drawn while a call is up, for the hover probe — the same
-    // question PanelImages answers for the drawing, asked once more because the probe
-    // measures rectangles rather than reading the DOM (see panelHover.ts). Both come
-    // from `call` and `callSceneT`, so the two cannot disagree about which layout is up.
-    const callPhase = call?.phase ?? null
-    const imgBox = useCallback(
-        (t: ImgTransform, bounds: Rect): Rect | null => {
-            const scene = callPhase === null ? undefined : callSceneOn(callSceneT, t.panel)
-            const poly = panelPolys[t.panel]
-            const halves =
-                scene && poly ? splitAt(poly.vp, poly.bounds, scene.cut, scene.axis) : null
-            const roles = scene && callPhase ? rolesAtPhase(callPhase) : null
-            if (!inRoles(t.call, roles)) return null
-            return halfFor(t.call, halves)?.box ?? bounds
-        },
-        [callPhase, callSceneT, panelPolys],
-    )
+    // The call every panel with a call layout draws (or null for none, which is what puts
+    // those panels back on their ordinary contents), and the frames the hover probe must
+    // measure while it is up. Both from useCallLayout, so the two cannot disagree about
+    // which layout is showing.
+    const { call, imgBox } = useCallLayout(editor, softphone, callSceneT, panelPolys)
     const hovered = usePanelHover(panelPolys, imgT, natSizes, imgBox)
     const bubbleVisible = (i: number): boolean =>
         isBubbleRevealed(bubbleT, hovered, editor.active, i)

@@ -74,6 +74,46 @@ export type ImgBoxFn = (t: ImgTransform, bounds: Rect) => Rect | null
 const wholePanel: ImgBoxFn = (_t, bounds) => bounds
 
 /**
+ * Where a spilled picture's ink lands, or null for one this layout is not drawing.
+ * Both steps below ask the same question, and both have to ask it through `imgBox`.
+ */
+type InkRectFn = (t: ImgTransform, bounds: Rect) => Rect | null
+
+/** Whether any picture panel `current` spilled is under the point. Step 1's picture half. */
+function overOwnSpill(
+  x: number,
+  y: number,
+  current: number,
+  bounds: Rect,
+  images: ImgTransform[],
+  ink: InkRectFn,
+): boolean {
+  return images.some(t => {
+    if (t.panel !== current || !t.spill) return false
+    const rect = ink(t, bounds)
+    return rect !== null && inRect(x, y, rect)
+  })
+}
+
+/** The panel whose spilled ink is topmost under the point, or null. Step 2. */
+function spilledOwnerAt(
+  x: number,
+  y: number,
+  polys: (PanelPoly | null)[],
+  images: ImgTransform[],
+  ink: InkRectFn,
+): number | null {
+  for (let k = images.length - 1; k >= 0; k--) {
+    const t = images[k]
+    const p = polys[t.panel]
+    if (!t.spill || !p) continue
+    const rect = ink(t, p.bounds)
+    if (rect !== null && inRect(x, y, rect)) return t.panel
+  }
+  return null
+}
+
+/**
  * Which panel the pointer at `(x, y)` illuminates, or null over the gutter.
  *
  * Three questions, in the order the ink stacks:
@@ -109,28 +149,19 @@ export function hoveredPanelAt(
   imgBox: ImgBoxFn = wholePanel,
 ): number | null {
   /** The rect a spilled picture's ink covers, or null when it is not drawn. */
-  const inkRect = (t: ImgTransform, bounds: Rect): Rect | null => {
+  const inkRect: InkRectFn = (t, bounds) => {
     const box = imgBox(t, bounds)
     return box && spillImgRect(box, t, natSizes)
   }
   const cur = current == null ? null : polys[current]
-  if (current != null && cur) {
-    const overOwnInk =
-      (overInk?.(x, y, current) ?? false) ||
-      images.some(t => {
-        if (t.panel !== current || !t.spill) return false
-        const rect = inkRect(t, cur.bounds)
-        return rect !== null && inRect(x, y, rect)
-      })
-    if (overOwnInk) return current
-  }
-  for (let k = images.length - 1; k >= 0; k--) {
-    const t = images[k]
-    const p = polys[t.panel]
-    if (!t.spill || !p) continue
-    const rect = inkRect(t, p.bounds)
-    if (rect !== null && inRect(x, y, rect)) return t.panel
-  }
+  const keepsHover =
+    cur != null &&
+    current != null &&
+    ((overInk?.(x, y, current) ?? false) ||
+      overOwnSpill(x, y, current, cur.bounds, images, inkRect))
+  if (keepsHover) return current
+  const spilled = spilledOwnerAt(x, y, polys, images, inkRect)
+  if (spilled !== null) return spilled
   const under = polys.findIndex(p => p != null && pointInPolygon(x, y, p.vp))
   return under >= 0 ? under : null
 }
