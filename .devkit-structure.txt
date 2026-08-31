@@ -31,7 +31,7 @@ complexity::frontend/src/skins/comic-book/editor/BubbleInspector.tsx::BubbleInsp
 complexity::frontend/src/skins/comic-book/editor/ChainInspector.tsx::ChainInspector = 18
 complexity::frontend/src/skins/comic-book/editor/EditorOverlay.tsx::EditorOverlay = 36
 complexity::frontend/src/skins/comic-book/editor/EditorToolbar.tsx::EditorToolbar = 20
-complexity::frontend/src/skins/comic-book/editor/InspectorPanel.tsx::InspectorPanel = 26
+complexity::frontend/src/skins/comic-book/editor/InspectorPanel.tsx::InspectorPanel = 25
 complexity::frontend/src/skins/comic-book/editor/ShapeInspector.tsx::ShapeInspector = 20
 complexity::frontend/src/skins/comic-book/editor/configParity.ts::bubbleViolations = 17
 complexity::frontend/src/skins/comic-book/editor/panelGridValidate.ts::gridProblems = 21
