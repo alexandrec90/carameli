@@ -6,8 +6,9 @@ import { logger } from '../lib/logger'
 import {
   callRows,
   LIVE_TABLE_LIMIT,
-  sameRows,
+  mergeRows,
   smsRows,
+  type LiveTableRows,
   type TableSource,
 } from '../lib/liveTables'
 import { detectSimTables, simFeedRows } from '../lib/simTables'
@@ -32,8 +33,9 @@ export const LIVE_TABLE_POLL_MS = 5000
 /** The answer for a page with no live surface on it — one object, so identity holds. */
 const EMPTY: LiveTableRows = {}
 
-/** Cells per feed, keyed by source. A feed nobody asked for is simply absent. */
-export type LiveTableRows = Partial<Record<TableSource, string[][]>>
+// Re-exported so a consumer names the hook it calls rather than the module the shape
+// happens to be declared in; it lives beside `mergeRows` because that is what builds one.
+export type { LiveTableRows }
 
 async function fetchSource(source: TableSource): Promise<string[][]> {
   if (source === 'calls') {
@@ -102,21 +104,7 @@ export function useLiveTables(
         }),
       )
       if (cancelled) return
-      setRows(prev => {
-        let changed = Object.keys(prev).length !== wanted.length
-        const next: LiveTableRows = {}
-        for (const [source, data] of fetched) {
-          const previous = prev[source]
-          if (data === null || sameRows(previous, data)) {
-            next[source] = previous ?? []
-            if (previous === undefined) changed = true
-          } else {
-            next[source] = data
-            changed = true
-          }
-        }
-        return changed ? next : prev
-      })
+      setRows(prev => mergeRows(prev, fetched))
     }
 
     void refresh()
