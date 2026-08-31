@@ -17,6 +17,7 @@ from pathlib import Path
 import pytest
 
 SCRIPTS = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(SCRIPTS))
 
 
 def _load():
@@ -237,6 +238,7 @@ class TestArgumentValidation:
             label=None,
             no_register=False,
             force=False,
+            cursors=False,
         )
         base.update(over)
         return argparse.Namespace(**base)
@@ -262,6 +264,65 @@ class TestArgumentValidation:
     def test_parser_accepts_no_master_at_all(self):
         """A VS Code task passes no argument, so an empty `names` has to parse."""
         assert eca.build_parser().parse_args([]).names == []
+
+    def test_cursor_mode_has_one_explicit_scale_per_piece_of_pointer_chrome(self):
+        assert eca.CURSOR_MAX_EDGES == {
+            "pointer": 26,
+            "click": 31,
+            "hand-dragger": 24,
+            "move": 26,
+        }
+        assert max(eca.CURSOR_MAX_EDGES.values()) <= 32
+
+    def test_parser_accepts_cursor_mode(self):
+        args = eca.build_parser().parse_args(["move", "--cursors", "--force"])
+        assert args.names == ["move"]
+        assert args.cursors
+        assert args.force
+
+    def test_cursor_mode_refuses_the_content_art_scale(self):
+        with pytest.raises(eca.EncodeError, match="CURSOR_MAX_EDGES"):
+            eca.run(self._args(cursors=True, max_edge=100))
+
+    def test_cursor_mode_refuses_a_panel_art_label(self):
+        with pytest.raises(eca.EncodeError, match="--label"):
+            eca.run(self._args(cursors=True, label="Move"))
+
+    def test_cursor_mode_refuses_an_unconfigured_master(self, monkeypatch, tmp_path):
+        (tmp_path / "conversation.png").write_bytes(b"x")
+        monkeypatch.setattr(eca, "MASTERS_DIR", tmp_path)
+        with pytest.raises(eca.EncodeError, match="no cursor scale"):
+            eca.run(self._args(cursors=True))
+
+    def test_cursor_mode_uses_the_tuned_name_and_scale(self, monkeypatch, tmp_path):
+        masters = tmp_path / "masters"
+        exports = tmp_path / "exports"
+        public = tmp_path / "public"
+        masters.mkdir()
+        exports.mkdir()
+        public.mkdir()
+        (masters / "move.png").write_bytes(b"master")
+        policy = tmp_path / "assetPolicy.ts"
+        policy.write_text("export const MAX_PAGE_BYTES = 1 * 1024\n", encoding="utf-8")
+
+        seen = {}
+
+        def fake_encode(master, export, max_edge, quality):
+            seen.update(export=export, max_edge=max_edge, quality=quality)
+            export.write_bytes(b"webp")
+            return 26, 25
+
+        monkeypatch.setattr(eca, "MASTERS_DIR", masters)
+        monkeypatch.setattr(eca, "EXPORT_DIR", exports)
+        monkeypatch.setattr(eca, "PUBLIC_DIR", public)
+        monkeypatch.setattr(eca, "ASSET_POLICY", policy)
+        monkeypatch.setattr(eca, "encode", fake_encode)
+
+        report = eca.run(self._args(names=["move"], cursors=True, force=True))
+
+        assert seen == {"export": exports / "move-cursor.webp", "max_edge": 26, "quality": 82}
+        assert "move-cursor.webp  26x25" in report
+        assert "CURSOR_MAX_EDGES in scripts/comic_cursor_assets.py" in report
 
     def test_label_with_no_master_is_refused(self):
         """`--label` names one picture, and with `names` empty it would silently name

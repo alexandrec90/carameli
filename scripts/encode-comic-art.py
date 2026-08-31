@@ -54,6 +54,7 @@ Usage:
 
     python scripts/encode-comic-art.py conversation hand-notepad
     python scripts/encode-comic-art.py notepad --max-edge 1024 --label "Steno pad"
+    python scripts/encode-comic-art.py --cursors --force
 
 Notifications are a task-layer concern -- a VS Code task wraps this with
 scripts/notify-wrap.py. Do not emit a toast from inside the script.
@@ -70,6 +71,8 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import quote
+
+from comic_cursor_assets import CURSOR_MAX_EDGES, cursor_export_settings, cursor_names
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 FRONTEND = REPO_ROOT / "frontend"
@@ -383,11 +386,24 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="re-encode over an existing .webp",
     )
+    parser.add_argument(
+        "--cursors",
+        action="store_true",
+        help="encode the named cursor masters (or all four when no names are given) "
+        "to *-cursor.webp using CURSOR_MAX_EDGES; never registers them as panel art",
+    )
     return parser
 
 
-def run(args: argparse.Namespace) -> str:
-    """Do the work, returning the report. Raises {@link EncodeError} on failure."""
+def _validate_args(args: argparse.Namespace) -> None:
+    """Reject combinations whose meaning would be ambiguous or silently ignored."""
+    if args.cursors and args.label:
+        raise EncodeError("--label does not apply to pointer chrome; drop it with --cursors.")
+    if args.cursors and args.max_edge != DEFAULT_MAX_EDGE:
+        raise EncodeError(
+            "--cursors takes its per-image sizes from CURSOR_MAX_EDGES; edit that mapping "
+            "instead of passing --max-edge."
+        )
     if args.label and len(args.names) != 1:
         raise EncodeError("--label takes a single MASTER; name one, or drop the flag.")
     if not 1 <= args.quality <= 100:
@@ -395,7 +411,47 @@ def run(args: argparse.Namespace) -> str:
     if args.max_edge < 1:
         raise EncodeError(f"--max-edge must be positive, got {args.max_edge}.")
 
-    masters = [resolve_master(name) for name in args.names] if args.names else all_masters()
+
+def _encode_one(master: Master, args: argparse.Namespace) -> list[str]:
+    """Encode and, for content art, register one resolved master."""
+    if args.cursors:
+        try:
+            export_name, max_edge = cursor_export_settings(master.stem)
+        except KeyError as exc:
+            known = ", ".join(CURSOR_MAX_EDGES)
+            raise EncodeError(
+                f"{master.stem!r} has no cursor scale; expected one of: {known}."
+            ) from exc
+    else:
+        export_name, max_edge = master.export_name, args.max_edge
+    export = EXPORT_DIR / export_name
+    lines: list[str] = []
+    if export.exists() and not args.force:
+        lines.append(f"SKIP  {export_name} already exists (--force to redo)")
+    else:
+        width, height = encode(master, export, max_edge, args.quality)
+        size = export.stat().st_size / 1024
+        lines.append(f"OK    {export_name}  {width}x{height}  {size:,.1f} KB")
+
+    if args.cursors or args.no_register:
+        return lines
+
+    label = args.label or derive_label(master.stem)
+    source = MANIFEST.read_text(encoding="utf-8")
+    updated, changed = register_in_manifest(source, served_url(master.export_name), label)
+    if changed:
+        MANIFEST.write_text(updated, encoding="utf-8")
+        lines.append(f"      registered as '{label}' in {MANIFEST.name}")
+    else:
+        lines.append(f"      already in {MANIFEST.name}")
+    return lines
+
+
+def run(args: argparse.Namespace) -> str:
+    """Do the work, returning the report. Raises {@link EncodeError} on failure."""
+    _validate_args(args)
+    requested = cursor_names(args.names) if args.cursors else args.names
+    masters = [resolve_master(name) for name in requested] if requested else all_masters()
     if not masters:
         raise EncodeError(
             f"no masters in {MASTERS_DIR}. Put the lossless original there first -- "
@@ -405,29 +461,14 @@ def run(args: argparse.Namespace) -> str:
 
     lines: list[str] = []
     for master in masters:
-        export = EXPORT_DIR / master.export_name
-        if export.exists() and not args.force:
-            lines.append(f"SKIP  {master.export_name} already exists (--force to redo)")
-        else:
-            width, height = encode(master, export, args.max_edge, args.quality)
-            size = export.stat().st_size / 1024
-            lines.append(f"OK    {master.export_name}  {width}x{height}  {size:,.1f} KB")
-
-        if args.no_register:
-            continue
-
-        label = args.label or derive_label(master.stem)
-        source = MANIFEST.read_text(encoding="utf-8")
-        updated, changed = register_in_manifest(source, served_url(master.export_name), label)
-        if changed:
-            MANIFEST.write_text(updated, encoding="utf-8")
-            lines.append(f"      registered as '{label}' in {MANIFEST.name}")
-        else:
-            lines.append(f"      already in {MANIFEST.name}")
+        lines.extend(_encode_one(master, args))
 
     cap = read_max_page_bytes(ASSET_POLICY.read_text(encoding="utf-8"))
     lines.extend(["", budget_report(public_tree_bytes(PUBLIC_DIR), cap)])
-    lines.append("Place it in a panel from the editor: ?edit=1 -> select a panel -> + Image.")
+    if args.cursors:
+        lines.append("Cursor scale comes from CURSOR_MAX_EDGES in scripts/comic_cursor_assets.py.")
+    else:
+        lines.append("Place it in a panel from the editor: ?edit=1 -> select a panel -> + Image.")
     return "\n".join(lines)
 
 
