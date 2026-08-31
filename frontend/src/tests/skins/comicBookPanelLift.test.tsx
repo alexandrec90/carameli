@@ -126,6 +126,7 @@ describe('the hovered panel does not paint out its own ink', () => {
           images={[]}
           bubbles={[CLIPPED_BUBBLE]}
           chains={[]}
+          callScenes={[]}
           sms={idleSms()}
           natSizes={{}}
           editorActive={false}

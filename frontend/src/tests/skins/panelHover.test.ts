@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { hoveredPanelAt, pointInPolygon } from '../../skins/comic-book/panelHover'
+import type { ImgBoxFn } from '../../skins/comic-book/panelHover'
 import type { ImgTransform } from '../../skins/comic-book/editor/types'
 import type { PanelPoly } from '../../skins/comic-book/panelGeometry'
 
@@ -35,10 +36,12 @@ const at = (
     natSizes?: Record<string, { w: number; h: number }>
     current?: number | null
     overInk?: (x: number, y: number, panel: number) => boolean
+    imgBox?: ImgBoxFn
   } = {},
 ): number | null =>
   hoveredPanelAt(
     x, y, POLYS, over.images ?? [], over.natSizes ?? {}, over.current ?? null, over.overInk,
+    over.imgBox,
   )
 
 describe('pointInPolygon', () => {
@@ -143,6 +146,33 @@ describe('hoveredPanelAt', () => {
     it('claims nothing without spill — the panel clip hides the overhang', () => {
       const clipped = [img({ left: 70, top: 0, width: 60, height: 50 })]
       expect(at(110, 25, { images: clipped })).toBe(1)
+    })
+  })
+
+  describe('a panel drawing a phone call', () => {
+    // The picture's frame is x 70..130 of the panel box, and 85..115 of the right half
+    // of it — the two disagree by half the panel, which is what a wrong box costs.
+    const images = [img({ left: 70, top: 0, width: 60, height: 50, spill: true })]
+    /** The right half of panel 0, as a call's seam at 50% cuts it. */
+    const half = { x: 50, y: 0, w: 50, h: 100 }
+
+    it('measures a call figure against its half, not the whole panel', () => {
+      const imgBox: ImgBoxFn = () => half
+      expect(at(90, 25, { images, imgBox })).toBe(0)
+      // Inside the panel-measured frame, past the right edge of the half-measured one.
+      expect(at(120, 25, { images, imgBox })).toBe(1)
+    })
+
+    it('lights nothing from a picture the layout is not drawing', () => {
+      // A panel showing its call leaves its ordinary pictures off screen entirely, and
+      // ink that is not on screen must not answer for the pointer.
+      const imgBox: ImgBoxFn = () => null
+      expect(at(110, 25, { images, imgBox })).toBe(1)
+      expect(at(30, 50, { images, imgBox, current: 0, overInk: () => false })).toBe(0)
+    })
+
+    it('measures against the panel box when no call is up', () => {
+      expect(at(110, 25, { images })).toBe(0)
     })
   })
 })

@@ -7,14 +7,11 @@ import ComicPanel from './ComicPanel'
 import { LoadingOverlay, useLoadingScreen } from './LoadingOverlay'
 import PanelInk from './PanelInk'
 import { gridPolys, layoutKindFor } from './panelGeometry'
+import { activeLayout, useCallLayout } from './layoutSource'
 import { pageForPath } from './panels'
-import { callSceneOf, softphoneActions } from './phoneActions'
+import { softphoneActions } from './phoneActions'
 import { usePanelDots } from './usePanelDots'
 import { usePanelHover } from './usePanelHover'
-import {
-    PANEL_BUBBLE_CHAINS, PANEL_IMG_TRANSFORMS, PANEL_BUBBLE_TRANSFORMS,
-    PANEL_GRIDS, PANEL_PATTERNS, PANELS,
-} from './editor/layoutConfig'
 import { shouldRevealImg, useEditorMode } from './editor/useEditorMode'
 import { useLiveTableImages } from './useLiveTableImages'
 import { usePageWash } from './usePageWash'
@@ -67,17 +64,15 @@ export function Layout({ navItems, sms, softphone }: LayoutProps) {
     const editor = useEditorMode()
     const page = pageForPath(location.pathname)
 
-    // Source transforms from the editor's working copy when active, else constants.
-    const authoredImgs = editor.active ? editor.config.images : PANEL_IMG_TRANSFORMS
+    // Everything drawn comes from the editor's working copy when one is open, else from
+    // the shipped constants (./layoutSource.ts).
+    const layout = activeLayout(editor)
+    const { bubbles: bubbleT, chains: chainT, callScenes: callSceneT, grids, patterns, panels } =
+        layout
     // A picture whose surface names a live feed gets its cells from the records rather
     // than from the config. Applied here, between the working copy and the panels, so the
     // editor keeps holding — and saving — the authored surface with no rows in it.
-    const imgT = useLiveTableImages(authoredImgs)
-    const bubbleT = editor.active ? editor.config.bubbles : PANEL_BUBBLE_TRANSFORMS
-    const chainT = editor.active ? editor.config.chains : PANEL_BUBBLE_CHAINS
-    const grids = editor.active ? editor.config.grids : PANEL_GRIDS
-    const patterns = editor.active ? editor.config.patterns : PANEL_PATTERNS
-    const panels = editor.active ? editor.config.panels : PANELS
+    const imgT = useLiveTableImages(layout.images)
 
     const settledCountRef = useRef(0)
 
@@ -112,7 +107,12 @@ export function Layout({ navItems, sms, softphone }: LayoutProps) {
     // and needs the same answer, which CSS cannot hand it — and off the panel elements
     // entirely, because those are overlapping bounding rectangles and the browser's
     // hit-testing answered for the rectangles, not the polygons (see panelHover.ts).
-    const hovered = usePanelHover(panelPolys, imgT, natSizes)
+    // The call every panel with a call layout draws (or null for none, which is what puts
+    // those panels back on their ordinary contents), and the frames the hover probe must
+    // measure while it is up. Both from useCallLayout, so the two cannot disagree about
+    // which layout is showing.
+    const { call, imgBox } = useCallLayout(editor, softphone, callSceneT, panelPolys)
+    const hovered = usePanelHover(panelPolys, imgT, natSizes, imgBox)
     const bubbleVisible = (i: number): boolean =>
         isBubbleRevealed(bubbleT, hovered, editor.active, i)
 
@@ -145,9 +145,6 @@ export function Layout({ navItems, sms, softphone }: LayoutProps) {
     // memoised: what each key means moves with the call (`phoneActions.ts`), so a cached
     // pair would be the previous state's handset for one frame after the phone rang.
     const phoneActions = softphoneActions(softphone)
-    // The call scene the handset panel draws while a call is up (PanelCallScene), or null.
-    const call = callSceneOf(softphone)
-
     const accent = accentForPath(location.pathname)
     const washRef = usePageWash(location.pathname, accent)
     const loading = useLoadingScreen(ready, accent)
@@ -192,6 +189,7 @@ export function Layout({ navItems, sms, softphone }: LayoutProps) {
                             images={imgT}
                             bubbles={bubbleT}
                             chains={chainT}
+                            callScenes={callSceneT}
                             sms={sms}
                             natSizes={natSizes}
                             editorActive={editor.active}

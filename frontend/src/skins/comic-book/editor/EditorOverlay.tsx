@@ -1,17 +1,17 @@
 import { useEffect } from 'react'
-import type { CSSProperties } from 'react'
 
 import { logger } from '../../../lib/logger'
-import type { LayoutKind, PanelPoly, Rect } from '../panelGeometry'
+import type { LayoutKind, PanelPoly } from '../panelGeometry'
 import { frameRect } from '../panelGeometry'
 import type { PanelPage } from '../panels'
-import { assetLabel } from './assets'
-import { chainFramesOn } from './chainFrame'
 import EditorToolbar from './EditorToolbar'
+import { boxOf, overlaySelection, useCallOverlay } from './overlayGeometry'
+import OverlayTargets from './OverlayTargets'
 import type { PageSelectProps } from './PageSelect'
 import PanelSeams from './PanelSeams'
+import SelectionOutline from './SelectionOutline'
 import SurfaceCorners from './TableCorners'
-import { bubbleRect, imgRect, imgVisibleRect, surfaceBaseRect } from './transforms'
+import { imgRect, surfaceBaseRect } from './transforms'
 import { useOverlayInteraction } from './useOverlayInteraction'
 import { useSeamDrag } from './useSeamDrag'
 import type { EditorModeApi } from './useEditorMode'
@@ -33,10 +33,6 @@ interface EditorOverlayProps {
   /** Viewport size in px — the shape editor needs the page frame, not the panels. */
   viewport: { w: number; h: number }
   pageSelect: PageSelectProps
-}
-
-function rectStyle(r: Rect): CSSProperties {
-  return { left: r.x, top: r.y, width: r.w, height: r.h }
 }
 
 /**
@@ -74,27 +70,12 @@ export default function EditorOverlay({
   const frame = frameRect(viewport.w, viewport.h)
   const drag = useSeamDrag(api, page, layoutKind, grid, frame)
 
-  // Everything drawn is placed against the panel it *names*, never against a panel
-  // that shares its index — those parted company once a panel could own several of
-  // each. A `panel` selection is the panel itself, and is how "which panel does a new
-  // picture or bubble go on" gets an answer without a second click.
-  const selImg = selected?.kind === 'img' ? config.images[selected.index] : null
-  const selBubble = selected?.kind === 'bubble' ? config.bubbles[selected.index] : null
-  const selPanel =
-    selected === null
-      ? null
-      : selected.kind === 'panel'
-        ? selected.index
-        : (selImg?.panel ?? selBubble?.panel ?? null)
-  const selPoly = selPanel === null ? null : panelPolys[selPanel]
-
-  const selectedRect: Rect | null = !selPoly
-    ? null
-    : selImg
-      ? imgVisibleRect(selPoly.bounds, natSizes[selImg.src], selImg)
-      : selBubble
-        ? bubbleRect(selPoly.bounds, selBubble)
-        : selPoly.bounds
+  // Which layout the calls are showing, where each seam falls, and the box the selection
+  // occupies once both are known — all of it ./overlayGeometry.ts, so the targets, the
+  // outline and the grips are placed against the same answer the panels drew from.
+  const { callRoles, halvesOn } = useCallOverlay(api.callPhase, config.callScenes, panelPolys)
+  const { selImg, selPanel, selPoly, selHalves, selectedRect } =
+    overlaySelection(api, panelPolys, natSizes, halvesOn, callRoles)
 
   return (
     <div className="cb-ed-layer">
@@ -106,145 +87,36 @@ export default function EditorOverlay({
         onClick={api.clear}
       />
 
-      {/* Per-panel click targets — the backdrop for everything drawn on a panel.
-          Selecting a panel is what "+ Image" and "+ Bubble" act on, and it is the only
-          way to reach a panel that has nothing on it yet. Rendered in both modes: in
-          shapes mode a selected panel is what the split buttons cut, and the targets
-          paint *before* the seam layer, so a seam or a corner running across one still
-          takes the pointer — only the space between the lines selects the panel. */}
-      {panelPolys.map((poly, i) =>
-        poly === null ? null : (
-          <button
-            key={i}
-            type="button"
-            className="cb-ed-target"
-            style={rectStyle(poly.bounds)}
-            aria-label={`Select ${config.panels[i]?.label ?? `panel ${i}`}`}
-            onClick={() => api.select('panel', i)}
-          />
-        ),
-      )}
+      <OverlayTargets
+        api={api}
+        panelPolys={panelPolys}
+        natSizes={natSizes}
+        callRoles={callRoles}
+        halvesOn={halvesOn}
+        shapeMode={shapeMode}
+      />
 
-      {/* The picture and bubble targets are not merely hidden in shapes mode, they are
-          not rendered: a picture-sized click target sitting over a seam would eat every
-          drag aimed at the line running through it. */}
-      {!shapeMode && (
-        <>
-          {/* One click target per picture, on the rectangle its pixels visibly occupy —
-              the image, not the frame it hangs in. They paint after the panel targets so
-              a picture wins the click where the two overlap. */}
-          {config.images.map((img, i) => {
-            const poly = panelPolys[img.panel]
-            if (!poly) return null
-            return (
-              <button
-                key={i}
-                type="button"
-                className="cb-ed-target cb-ed-target-img"
-                style={rectStyle(imgVisibleRect(poly.bounds, natSizes[img.src], img))}
-                aria-label={`Select ${assetLabel(img.src)} on ${config.panels[img.panel]?.label ?? `panel ${img.panel}`}`}
-                onClick={() => api.select('img', i)}
-              />
-            )
-          })}
-
-          {/* One click target per bubble, placed against the panel it belongs to. They
-              paint last so a bubble stays clickable where it overlaps a picture, its own
-              panel — or a neighbour's, once it spills into the gutter. */}
-          {config.bubbles.map((bubble, i) => {
-            const poly = panelPolys[bubble.panel]
-            if (!poly) return null
-            return (
-              <button
-                key={i}
-                type="button"
-                className="cb-ed-target cb-ed-target-bubble"
-                style={rectStyle(bubbleRect(poly.bounds, bubble))}
-                aria-label={`Select ${config.panels[bubble.panel]?.label ?? `panel ${bubble.panel}`} bubble ${i}`}
-                onClick={() => api.select('bubble', i)}
-              />
-            )
-          })}
-
-          {/* Where each conversation's rows will actually land. Chains render *flat* in
-              edit mode so both templates stay selectable, which left the table itself
-              drawn nowhere the author could see — so dragging a template or changing
-              `rows` were edits with invisible results, and the editor read as disagreeing
-              with the page. The frame is chrome, not a control: it takes no pointer, and
-              stretching the table is still done by moving the two balloons it is measured
-              from. */}
-          {panelPolys.map((poly, i) =>
-            poly === null
-              ? null
-              : chainFramesOn(config.bubbles, config.chains, i, poly.bounds).map(frame => (
-                <div
-                  key={`${i}:${frame.id}`}
-                  className="cb-ed-chainbox"
-                  style={rectStyle(frame.rect)}
-                  aria-hidden="true"
-                />
-              )),
-          )}
-        </>
-      )}
-
-      {/* Selection outline. A picture or a bubble gets a draggable body plus handles;
-          a selected *panel* is only ever outlined, because a panel is a slot in the
-          grid and there is nothing about it to drag — in either mode. */}
-      {selected?.kind === 'panel' && selectedRect && (
-        <div className="cb-ed-outline cb-ed-outline-panel" style={rectStyle(selectedRect)} aria-hidden="true" />
-      )}
-      {!shapeMode && selected && selected.kind !== 'panel' && selectedRect && (
-        <div
-          className="cb-ed-outline"
-          style={rectStyle(selectedRect)}
-          aria-hidden="true"
-          onPointerDown={e => interaction.beginDrag(e, 'move')}
-          onPointerMove={interaction.onPointerMove}
-          onPointerUp={interaction.onPointerUp}
-          onWheel={interaction.onWheel}
-        >
-          <div
-            className="cb-ed-handle cb-ed-handle-br"
-            title={selected.kind === 'img' ? 'Drag to resize the frame' : 'Drag to resize'}
-            onPointerDown={e => interaction.beginDrag(e, 'resize')}
-            onPointerMove={interaction.onPointerMove}
-            onPointerUp={interaction.onPointerUp}
-          />
-          {/* A picture has two framings, so it needs two grips: the body moves the
-              frame across the panel, this one slides the picture behind it. Dragging
-              the body used to do the second thing, which is the whole complaint. */}
-          {selected.kind === 'img' && (
-            <div
-              className="cb-ed-handle cb-ed-handle-pan"
-              title="Drag to pan the picture inside its frame"
-              onPointerDown={e => interaction.beginDrag(e, 'pan')}
-              onPointerMove={interaction.onPointerMove}
-              onPointerUp={interaction.onPointerUp}
-            />
-          )}
-          {selected.kind === 'bubble' && (
-            <div
-              className="cb-ed-handle cb-ed-handle-rot"
-              title="Drag to rotate"
-              onPointerDown={e => interaction.beginDrag(e, 'rotate')}
-              onPointerMove={interaction.onPointerMove}
-              onPointerUp={interaction.onPointerUp}
-            />
-          )}
-        </div>
-      )}
+      <SelectionOutline
+        selected={selected}
+        rect={selectedRect}
+        shapeMode={shapeMode}
+        interaction={interaction}
+      />
 
       {/* The grips for whichever projected content the selected picture carries. They paint after
           the selection outline so a corner dragged inside the frame still wins the
           pointer over the body that would otherwise move the whole picture. */}
-      {!shapeMode && selected?.kind === 'img' && (selImg?.table || selImg?.numberPad) && selPoly && (
+      {!shapeMode && selected?.kind === 'img' && (selImg?.table || selImg?.numberPad) && selPoly && selectedRect && (
         <SurfaceCorners
           api={api}
           index={selected.index}
           surface={selImg.table ?? selImg.numberPad!}
           kind={selImg.table ? 'table' : 'numberPad'}
-          rect={surfaceBaseRect(imgRect(selPoly.bounds, selImg), natSizes[selImg.src], selImg)}
+          rect={surfaceBaseRect(
+            imgRect(boxOf(selImg, selPoly.bounds, selHalves), selImg),
+            natSizes[selImg.src],
+            selImg,
+          )}
         />
       )}
 

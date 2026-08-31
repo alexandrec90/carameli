@@ -28,6 +28,7 @@ function drawPanel(hovered: boolean) {
         images={[]}
         bubbles={[]}
         chains={[]}
+        callScenes={[]}
         sms={idleSms()}
         natSizes={{}}
         editorActive={false}

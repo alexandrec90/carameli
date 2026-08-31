@@ -16,6 +16,9 @@ import { idleSms, smsMessage } from './smsStub'
 // calling them possible, and binding used to demand validity — so every invented number
 // resolved to nothing, left the chain unbound, and shared one local transcript. Testing
 // with real-looking numbers is what hid that: the fixtures bound and the page did not.
+/** The box a balloon's percentages are measured against — the panel's, or half of one. */
+const PANEL_BOX = { x: 0, y: 0, w: 400, h: 300 }
+
 const PEER = '+15550001111'
 const OTHER = '+15550002222'
 
@@ -54,6 +57,7 @@ function renderPanel(bubbles: BubbleTransform[], chains: BubbleChain[], sms = id
       bubbles={bubbles}
       chains={chains}
       panel={0}
+      bounds={PANEL_BOX}
       clip="none"
       isVisible={() => true}
       interactive
@@ -127,6 +131,7 @@ describe('PanelBubbles, binding a chain to a number', () => {
         bubbles={[picker(), ...chainBubbles()]}
         chains={[chain()]}
         panel={0}
+        bounds={PANEL_BOX}
         clip="none"
         isVisible={() => true}
         interactive
@@ -153,6 +158,7 @@ describe('PanelBubbles, binding a chain to a number', () => {
         bubbles={[picker(), ...chainBubbles()]}
         chains={[chain()]}
         panel={0}
+        bounds={PANEL_BOX}
         clip="none"
         isVisible={() => true}
         interactive
@@ -172,6 +178,7 @@ describe('PanelBubbles, binding a chain to a number', () => {
           bubbles={[picker({ content: 'dial', text: PEER }), ...chainBubbles()]}
           chains={[chain()]}
           panel={0}
+          bounds={PANEL_BOX}
           clip="none"
           isVisible={() => true}
           interactive
@@ -255,6 +262,7 @@ describe('PanelBubbles, binding a chain to a number', () => {
         bubbles={[picker({ content: 'dial', text: '' }), ...chainBubbles()]}
         chains={[chain()]}
         panel={0}
+        bounds={PANEL_BOX}
         clip="none"
         isVisible={() => true}
         interactive
@@ -281,6 +289,7 @@ describe('PanelBubbles, binding a chain to a number', () => {
         bubbles={[picker(), ...chainBubbles()]}
         chains={[chain()]}
         panel={0}
+        bounds={PANEL_BOX}
         clip="none"
         isVisible={() => true}
         interactive={false}

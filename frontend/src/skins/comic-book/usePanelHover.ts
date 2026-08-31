@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 
 import { hoveredPanelAt } from './panelHover'
+import type { ImgBoxFn } from './panelHover'
 import type { ImgTransform } from './editor/types'
 import type { PanelPoly } from './panelGeometry'
 
@@ -79,12 +80,18 @@ export function usePanelHover(
   polys: (PanelPoly | null)[],
   images: ImgTransform[],
   natSizes: Record<string, { w: number; h: number }>,
+  /**
+   * Where each picture is drawn, for the panels showing a phone call — see ImgBoxFn.
+   * Memoize it at the call site: it is an effect dependency, and a fresh function every
+   * render would tear the window listener down and put it back on every render.
+   */
+  imgBox?: ImgBoxFn,
 ): number | null {
   const [hovered, setHovered] = useState<number | null>(null)
   useEffect(() => {
     const onMove = (e: PointerEvent) => {
       setHovered(prev =>
-        hoveredPanelAt(e.clientX, e.clientY, polys, images, natSizes, prev, overDrawnInk))
+        hoveredPanelAt(e.clientX, e.clientY, polys, images, natSizes, prev, overDrawnInk, imgBox))
     }
     const onLeave = () => setHovered(null)
     window.addEventListener('pointermove', onMove)
@@ -93,6 +100,6 @@ export function usePanelHover(
       window.removeEventListener('pointermove', onMove)
       document.documentElement.removeEventListener('mouseleave', onLeave)
     }
-  }, [polys, images, natSizes])
+  }, [polys, images, natSizes, imgBox])
   return hovered
 }

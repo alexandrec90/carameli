@@ -12,6 +12,9 @@ import { idleSms } from './smsStub'
 // telephone's dial): an `input` balloon drawn anywhere gets the same treatment, and a
 // panel holding several of them lets the pointer say which one.
 
+/** The box a balloon's percentages are measured against — the panel's, or half of one. */
+const PANEL_BOX = { x: 0, y: 0, w: 400, h: 300 }
+
 const bubble = (over: Partial<BubbleTransform> = {}): BubbleTransform => ({
   ...NEW_BUBBLE,
   panel: 0,
@@ -25,6 +28,7 @@ function draw(bubbles: BubbleTransform[], visible = true, interactive = true) {
       bubbles={bubbles}
       chains={[]}
       panel={0}
+      bounds={PANEL_BOX}
       clip="none"
       isVisible={() => visible}
       interactive={interactive}

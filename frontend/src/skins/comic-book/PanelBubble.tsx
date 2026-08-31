@@ -9,11 +9,7 @@ import {
   puffOpacity,
   resolveBubbleShape,
 } from './bubbleShape'
-import BubbleActions from './BubbleActions'
-import BubbleDial from './BubbleDial'
-import BubbleInput from './BubbleInput'
-import BubbleTypingDots from './BubbleTypingDots'
-import BubbleWheel from './BubbleWheel'
+import BubbleBody from './BubbleBody'
 import { isDialContent } from './bubbleContent'
 import { dialOptions } from './dialPicker'
 import { BUBBLE_TYPES } from './editor/bubbleTypes'
@@ -22,15 +18,16 @@ import type { BubbleTransform } from './editor/types'
 import type { PhoneActionHandlers } from './phoneActions'
 import { useBubbleMorph } from './useBubbleMorph'
 import { splitOptions } from './wheelPicker'
+import type { CallTranscriptLine } from '../../lib/callTranscript'
 
 /** How long a press holds its shape before easing back to the resting one. */
 const PULSE_MS = 560
 
-/** A dial with nowhere to report to still draws; it just cannot be changed. */
-const noop = (): void => undefined
-
 /** One shared empty list, so a dial's shortlist is not rebuilt on every render. */
 const NOTHING_DIALLED: string[] = []
+
+/** The same for a transcript balloon with no call behind it. */
+const NO_LINES: readonly CallTranscriptLine[] = []
 
 interface PanelBubbleProps {
   bubble: BubbleTransform
@@ -98,6 +95,20 @@ interface PanelBubbleProps {
    * animated dots.
    */
   status?: 'sending' | 'failed' | 'typing'
+  /**
+   * A `transcript` balloon's words — one seat's side of the call on its panel, oldest
+   * first. The balloon's own `text` says nothing here: a transcript is what was *said*,
+   * and an authored line in it would be a word nobody spoke. Absent on a transcript
+   * balloon with no call behind it, which then draws empty.
+   */
+  lines?: readonly CallTranscriptLine[]
+  /** Accessible name for that log — whose words these are. */
+  linesLabel?: string
+  /**
+   * Ink this balloon heavy whatever the pointer is doing. The call scene's, for the seat
+   * that is talking: the same weight a hover gives, meaning "this voice is on the line".
+   */
+  bold?: boolean
 }
 
 /**
@@ -124,6 +135,9 @@ export default function PanelBubble({
   dialled = NOTHING_DIALLED,
   actions,
   status,
+  lines = NO_LINES,
+  linesLabel,
+  bold = false,
 }: PanelBubbleProps) {
   const [hover, setHover] = useState(false)
   const [focused, setFocused] = useState(false)
@@ -131,8 +145,18 @@ export default function PanelBubble({
   const timerRef = useRef(0)
   // Handed to BubbleWheel so its wheel listener covers the whole balloon.
   const rootRef = useRef<HTMLDivElement>(null)
+  // The transcript's scrolling window, so the newest line can be kept in view.
+  const logRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => () => window.clearTimeout(timerRef.current), [])
+
+  // The newest line stays in view: a transcript only grows, so the window follows its end
+  // whenever a line lands. The reader's wheel scrolls back between lines. A no-op on every
+  // other kind of balloon, where the ref is never attached.
+  useEffect(() => {
+    const el = logRef.current
+    if (el) el.scrollTop = el.scrollHeight
+  }, [lines.length])
 
   const pulse = (): void => {
     window.clearTimeout(timerRef.current)
@@ -164,6 +188,10 @@ export default function PanelBubble({
   // wrapper's aria and focus handling actually asks — a dial has one too, and so do the
   // action buttons.
   const hasField = editableKind !== null || dial || bubble.content === 'actions'
+  // A window on the call rather than on `text`. Not a field — there is nothing to type
+  // into it — but not decorative either: it is a live region, so it keeps its words
+  // reachable instead of being hidden from a reader who cannot see the drawing.
+  const transcript = bubble.content === 'transcript'
   // The dial's drum: what the author listed, then what has been dialled that they did not.
   // Memoized so the filter BubbleDial runs over it survives a hover — this balloon
   // re-renders on every pointer enter and leave. Its re-seat keys on the contents rather
@@ -187,7 +215,7 @@ export default function PanelBubble({
     // component, so a linked partner, the tube between them and the rows above this one
     // in a chain are all somebody else's render and keep the resting weight. The tail
     // and the thought puffs do bold, because they are the same ring and the same class.
-    hover && bubble.hoverBold ? 'is-bold' : '',
+    (hover && bubble.hoverBold) || bold ? 'is-bold' : '',
   ]
     .filter(Boolean)
     .join(' ')
@@ -196,7 +224,7 @@ export default function PanelBubble({
     <div
       ref={rootRef}
       className={className}
-      aria-hidden={hasField ? undefined : true}
+      aria-hidden={hasField || transcript ? undefined : true}
       style={bubbleStyle(bubble)}
       // On the wrapper, though the wrapper itself takes no pointer: enter and leave
       // are synthesized from the subtree, so this is "the pointer is somewhere in the
@@ -242,54 +270,29 @@ export default function PanelBubble({
           ))}
         </g>
       </svg>
-      {editableKind ? (
-        <BubbleInput
-          key={`${editableKind}:${bubble.text}`}
-          kind={editableKind}
-          initialValue={bubble.text}
-          font={font}
-          enabled={interactive}
-          revealed={visible && holdsKeyboard}
-          onSubmit={onSubmit}
-        />
-      ) : dial ? (
-        <BubbleDial
-          options={dialList}
-          value={dialValue}
-          fresh={dialFresh}
-          onChange={onDialChange ?? noop}
-          font={font}
-          // Open on focus as well as on hover, unlike a plain wheel: typing into a dial
-          // filters its drum, and a filter whose result only appears when the pointer
-          // happens to be over the balloon is a filter nobody can see working.
-          open={hover || focused}
-          // Exactly what an `input` balloon gets, and from the same place: a hover is
-          // already ownership by the time it reaches here (see panelKeyboard.ts), so
-          // adding it a second time would let a hovered dial hold the keyboard the
-          // panel had just handed to the composer beside it.
-          revealed={visible && holdsKeyboard}
-          enabled={interactive}
-          hostRef={rootRef}
-          onSubmit={onSubmit}
-          // The one difference between the two dial kinds: the telephone's green key,
-          // drawn at the right of the field and greyed until there is a number to dial.
-          call={bubble.content === 'dial-call'}
-        />
-      ) : bubble.content === 'actions' ? (
-        <BubbleActions text={bubble.text} font={font} enabled={interactive} actions={actions} />
-      ) : bubble.content === 'wheel' ? (
-        <BubbleWheel
-          options={splitOptions(bubble.text)}
-          font={font}
-          open={hover}
-          hostRef={rootRef}
-          onSelect={onWheelSelect}
-        />
-      ) : (
-        <span className="cb-panel-bubble-text" style={{ fontFamily: `'${font}', cursive` }}>
-          {status === 'typing' ? <BubbleTypingDots /> : bubble.text}
-        </span>
-      )}
+      <BubbleBody
+        bubble={bubble}
+        editableKind={editableKind}
+        dial={dial}
+        transcript={transcript}
+        font={font}
+        enabled={interactive}
+        revealed={visible && holdsKeyboard}
+        hover={hover}
+        focused={focused}
+        hostRef={rootRef}
+        logRef={logRef}
+        dialList={dialList}
+        dialValue={dialValue}
+        dialFresh={dialFresh}
+        onDialChange={onDialChange}
+        onSubmit={onSubmit}
+        onWheelSelect={onWheelSelect}
+        actions={actions}
+        status={status}
+        lines={lines}
+        linesLabel={linesLabel}
+      />
     </div>
   )
 }

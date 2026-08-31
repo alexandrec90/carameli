@@ -30,6 +30,50 @@ export type {
 } from '../surfaceTypes'
 
 /**
+ * Which part of a panel's **phone-call layout** an entry belongs to.
+ *
+ * A panel has two layouts. The default one is everything on it that carries no `call`
+ * field at all; the call layout is everything that carries one, drawn instead of the
+ * default while a call is up on that panel. Membership and placement are the same field,
+ * which is what keeps the pair of layouts from needing a second list to say who is in
+ * which: absence is the default layout, and there is no third state to get wrong.
+ *
+ * The panel is cut in two along `CallSceneLayout.axis` at `CallSceneLayout.cut`, and the
+ * role says which half an entry is framed against — so its `left`/`top`/`width`/`height`
+ * (or a balloon's `top`/`right`/`width`) are percentages of that **half's** box, not of
+ * the whole panel. `scene` is the exception and is measured against the panel, for
+ * anything that belongs to the call but to neither party.
+ *
+ * | role | half | drawn while |
+ * | --- | --- | --- |
+ * | `ringing` | first | the far end is still ringing |
+ * | `remote` | first | the call is connected |
+ * | `local` | second | both — the caller is there throughout |
+ * | `scene` | neither; the whole panel | both |
+ */
+export type CallRole = 'ringing' | 'remote' | 'local' | 'scene'
+
+/**
+ * Where one panel's call layout is cut in two, and along which axis.
+ *
+ * **Derived, not authored** — exactly as {@link EditorConfig.chains} is. An entry exists
+ * for a panel if and only if some picture or balloon on it carries a {@link CallRole}, so
+ * "turn this panel into a phone call" is the act of adding those entries and "it is not
+ * one any more" is the act of deleting the last of them. `syncCallScenes` keeps the list
+ * in step after every edit, carrying the author's `cut` and `axis` across, which is the
+ * only reason the list exists at all: the two numbers need somewhere to live that survives
+ * a picture being deleted and everything after it renumbering.
+ */
+export interface CallSceneLayout {
+  /** Index into PANELS of the panel this scene is drawn on. */
+  panel: number
+  /** Where the cut falls, in % of the panel box along `axis`. */
+  cut: number
+  /** `'x'` cuts side by side, `'y'` one above the other. */
+  axis: 'x' | 'y'
+}
+
+/**
  * One picture on the page: which panel it belongs to, which file it shows, the frame
  * it is cropped to, and how the picture is framed *inside* that crop.
  *
@@ -89,6 +133,16 @@ export interface ImgTransform {
    * corners and one projected content layer.
    */
   numberPad?: NumberPadProjection
+  /**
+   * The part this picture plays in its panel's phone call; **absent** on a picture of the
+   * panel's ordinary layout. Absent rather than `null` for the same reason `table` is —
+   * a picture that went out without the key comes back without it.
+   *
+   * Its frame is then measured against the half named by the role rather than against the
+   * panel box, so a picture at 0/0/100/100 fills its half exactly as one at 0/0/100/100
+   * fills a panel. See {@link CallRole}.
+   */
+  call?: CallRole
 }
 
 /**
@@ -174,6 +228,15 @@ export interface BubbleTransform {
    * scroll into place.
    */
   chain: string
+  /**
+   * The part this balloon plays in its panel's phone call; **absent** on a balloon of the
+   * panel's ordinary layout, on the same absence-means-default terms as a picture's.
+   *
+   * Its `top`/`right`/`width` are then percentages of the half named by the role, and a
+   * `content: 'transcript'` balloon speaks that role's side of the conversation. See
+   * {@link CallRole}.
+   */
+  call?: CallRole
 }
 
 /**
@@ -208,6 +271,12 @@ export interface EditorConfig {
   images: ImgTransform[]
   bubbles: BubbleTransform[]
   chains: BubbleChain[]
+  /**
+   * Where each phone-call panel is cut in two — derived from the `call` fields above by
+   * `syncCallScenes`, exactly as `chains` is derived from the `chain` fields. See
+   * {@link CallSceneLayout}.
+   */
+  callScenes: CallSceneLayout[]
   grids: PageGrids
   patterns: PanelBgStyle[]
 }

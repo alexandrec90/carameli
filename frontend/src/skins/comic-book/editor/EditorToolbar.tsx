@@ -3,6 +3,7 @@ import { useMemo } from 'react'
 import type { LayoutKind, PanelGrid } from '../panelGeometry'
 import type { PanelPage } from '../panels'
 import AddContentButtons from './AddContentButtons'
+import CallLayoutSwitch from './CallLayoutSwitch'
 import { layoutViolations } from './configParity'
 import InspectorPanel from './InspectorPanel'
 import LayoutWarnings from './LayoutWarnings'
@@ -82,7 +83,12 @@ export default function EditorToolbar({ api, selPanel, pageSelect, shapes }: Edi
         <div className="cb-ed-hint">Click a panel, a picture or a bubble to select it.</div>
       )}
 
-      {mode === 'content' && <AddContentButtons api={api} selPanel={selPanel} />}
+      {mode === 'content' && (
+        <>
+          <AddContentButtons api={api} selPanel={selPanel} />
+          <CallLayoutSwitch api={api} />
+        </>
+      )}
 
       <div className="cb-ed-actions">
         <button

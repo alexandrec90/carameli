@@ -171,6 +171,39 @@ The number dialled is `dialTarget`, which the projected number pad types into. A
 balloon is the other way to place a call and holds its number in a field of its own; the
 two are not the same input, which is why the keys take no argument.
 
+## A panel is a phone call for as long as something on it carries a role
+
+A live call splits one panel down a seam and draws the two ends of it facing each other.
+That is a *second layout for that panel*, not a widget: the same pictures and balloons
+the editor already places, framed against half a panel instead of a whole one.
+
+**Membership and role are one optional field.** `call?: CallRole` on an `ImgTransform` or
+a `BubbleTransform` says both that the entry belongs to the panel's call layout and which
+part of it: `ringing` and `remote` are the far end before and after the pickup, `local` is
+the caller, `scene` spans the whole panel. **Absence — never `null` — is the panel's
+ordinary layout**, so a panel with no roles on it is an ordinary panel and the switch
+needs no flag of its own. `callSceneRoles.ts` owns every question asked of a role, so the
+drawing and the editor's click targets cannot disagree about where a picture is.
+
+Three consequences are the design:
+
+- **`PANEL_CALL_SCENES` is derived, and holds only the seam.** `syncCallScenes` rebuilds
+  it in `reconcile` from the roles the entries carry, so "add a scene" and "delete a
+  scene" are not operations: a scene with no members, and a role with no scene, are states
+  the editor cannot reach. What the record *does* hold is the cut and the axis — the one
+  thing no entry can imply.
+- **The two far-end roles share a half.** An author who framed the ringing telephone has
+  framed the person who answers it; splitting them would jump the picture across the panel
+  at the pickup and need a second framing to stop it.
+- **The keys are an ordinary `actions` balloon**, lettered `End call` and folded to the
+  softphone by `phoneActions.ts` like every other key on the page — so hanging up is not a
+  callback the scene owns, and the balloon can be moved, resized and re-lettered.
+
+Anything drawn against a half is measured against **that half's box**, by `halfFor`, in
+all three places at once: the picture, the click target, and the drag. A target measured
+against the panel sits where its picture is not, and a drag scaled by the panel travels
+about twice as far as the pointer.
+
 ## A field is typed into as soon as its panel lights up
 
 There is no click-to-focus on a page drawn as artwork: the panel revealing its balloons
@@ -215,6 +248,10 @@ keyboard until it was clicked. A new content kind joins by naming a claim in
 | Picture fields | inspector selects | panel, picture (`PANEL_ASSETS`), alt (empty = decorative), anchor, spill |
 | Bubble fields | inspector selects | panel, type, **tail** (nine options incl. **No tail**), **content** (Text / Wheel picker / Text input / Phone input / Dial / Action buttons), authored text or initial value, hover/click morph, link. There is **no chain control**: a conversation is made whole by **+ SMS** and never assembled here |
 | Chain fields | inspector, below the bubble's own, when the bubble is in a chain | **rows**; **messages** on an *unbound* chain only (one per line; empty = speak the balloons' own text); **+ Other column** and **+ Number picker** when either is missing. They edit the conversation, not the selected balloon. Chained balloons render flat in edit mode so each stays selectable, and the table's extent is drawn as a dashed frame (`chainFrame.ts`) so moving a template or changing `rows` has a visible result |
+| Make a call | **+ Call** toolbar button | Turns the selected panel into a phone call: three pictures and three balloons carrying `call` roles, plus a centred seam. Any panel will do — the button is disabled, with the reason in its title, only on one that is already a call. There is no "delete a call": clear the last role and the scene goes with it |
+| Call layout | **Call layout** group in the toolbar — **Default** / **Ringing** / **Connected** | Which layout every call on the page is showing, so a call can be framed at either moment. The group appears only once the page has a call on it. This is the switch the whole feature turns on: on Default the call's entries are off screen and have no targets, outlines or drags |
+| Call role | **call role** select (any picture or balloon inspector) | *Not part of a call* plus the four roles (`CALL_ROLE_LABELS`). Choosing one puts the entry in the panel's call layout and moves the page to the layout it just joined — otherwise nothing would appear to have happened. Clearing one returns the page to Default |
+| Call seam | **call seam** range + **call split** select (panel inspector) | Where the panel is cut and which way — side by side or one above the other. Bounded by `CALL_CUT`, since a cut at the edge leaves a half with no area and nothing to drag it back by. Only on a panel that is a call |
 | Table on / off | **Project a table onto this image** checkbox (picture inspector) | Switching on seeds a starter surface; switching off deletes the table and its cells, leaving the picture |
 | Table source | **shows** select (table inspector) | *Cells typed below* or a live feed (**Call records**, **SMS messages**). Picking a feed takes its columns and empties the cells; going back seeds a fresh authored surface, since five empty feed-shaped columns would leave nothing on the notepad to see |
 | Table fields | inspector controls | rows visible, text size, ink, headings on/off, the four corner X/Y pairs, **Reset corners**, and a columns list (heading / width weight / alignment) plus the cell text, one row per line, tab- or `\|`-separated. A live surface has no cell block, and no **+ Column** / **−** |

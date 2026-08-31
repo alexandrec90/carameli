@@ -1,7 +1,6 @@
 import type { UseSoftphoneResult } from '../../hooks/useSoftphone'
 import type { CallTranscript } from '../../lib/callTranscript'
 import { canHangup } from '../../lib/softphone'
-import { splitOptions } from './wheelPicker'
 
 /**
  * The two keys an `actions` balloon can draw: the green one and the red one, the only
@@ -40,7 +39,7 @@ export const CALL_KEY: PhoneAction = {
   label: 'Call',
 }
 
-/** The red key, for the same reason: the call scene draws it under the caller's words. */
+/** The red key, for the same reason: a call layout letters one beside the caller's words. */
 export const HANGUP_KEY: PhoneAction = {
   id: 'hangup',
   src: '/comic-book/end-call-button.webp',
@@ -94,33 +93,20 @@ export function softphoneActions(phone: UseSoftphoneResult): PhoneActionHandlers
   }
 }
 
-/**
- * True when panel `panel` draws the telephone's keys — an `actions` balloon naming one,
- * or a `dial-call` — and so is the panel a call is placed from, and the one the call
- * scene replaces while it is up. Same exclusion as `dialBubbleOn`: a balloon in a chain
- * is a message, not the handset.
- */
-export function handsetOn(
-  bubbles: readonly { panel: number; chain: string; content: string; text: string }[],
-  panel: number,
-): boolean {
-  return bubbles.some(
-    b =>
-      b.panel === panel &&
-      b.chain === '' &&
-      (b.content === 'dial-call' ||
-        (b.content === 'actions' && splitOptions(b.text).some(label => phoneAction(label) !== null))),
-  )
-}
-
 /** What the scene shows: the far end ringing, or the two parties talking. */
 export type CallScenePhase = 'ringing' | 'connected'
 
-/** The call, as the handset panel draws it (PanelCallScene): a phase, the words, and the red key. */
+/**
+ * The call, as a panel with a call layout draws it: which phase it is in, and the words.
+ *
+ * No handler for the red key: ending a call is what an `actions` balloon lettered
+ * `End call` does, on this panel like on any other, through `softphoneActions`. The scene
+ * used to carry one because it drew that key itself, and a second way to hang up was a
+ * second thing to keep in step with the phone's state.
+ */
 export interface CallScene {
   phase: CallScenePhase
   transcript: CallTranscript
-  onEnd(): void
 }
 
 /**
@@ -132,5 +118,5 @@ export function callSceneOf(phone: UseSoftphoneResult): CallScene | null {
   const phase: CallScenePhase | null =
     phone.callStatus === 'dialing' ? 'ringing' : phone.callStatus === 'active' ? 'connected' : null
   if (phase === null) return null
-  return { phase, transcript: phone.transcript, onEnd: () => { void phone.hangup() } }
+  return { phase, transcript: phone.transcript }
 }

@@ -535,8 +535,26 @@ describe('default config parity', () => {
   })
 
   it('uses center center only for the logo panels and center bottom for the rest', () => {
-    PANEL_IMG_TRANSFORMS.forEach(t => {
+    // Page art only. A picture carrying a `call` role is not on the page: it stands in
+    // half of a panel, framed by the author against that half, so the placement the page
+    // shares has nothing to say about it — see the call layout's own assertions below.
+    PANEL_IMG_TRANSFORMS.filter(t => t.call === undefined).forEach(t => {
       expect(t.anchor).toBe(PANELS[t.panel].isLogo ? 'center center' : 'center bottom')
+    })
+  })
+
+  it('gives each call figure its own half, filled and unrotated', () => {
+    // What `+ Call` leaves for an author to reframe: a picture over the whole of its
+    // half, anchored in the middle of it rather than standing on the panel's floor. The
+    // half it goes in is its role's, and the roles are what the layout switch reads.
+    const figures = PANEL_IMG_TRANSFORMS.filter(t => t.call !== undefined)
+    expect(figures.length).toBeGreaterThan(0)
+    figures.forEach(t => {
+      expect(t.anchor).toBe('center center')
+      expect(t.left).toBe(0)
+      expect(t.top).toBe(0)
+      expect(t.width).toBe(100)
+      expect(t.height).toBe(100)
     })
   })
 
@@ -590,11 +608,29 @@ describe('default config parity', () => {
   const isComposer = (b: BubbleTransform) => isThread(b) && isComposerContent(b.content)
 
   it('floats every bubble into the gutter with a caption and a rotation', () => {
-    PANEL_BUBBLE_TRANSFORMS.forEach(b => {
+    // Call balloons are exempt for the same reason their figures are: they are placed in
+    // half a panel beside the figure they belong to, and a transcript is a window on
+    // words the telephone supplies rather than a caption anyone authored.
+    PANEL_BUBBLE_TRANSFORMS.filter(b => b.call === undefined).forEach(b => {
       expect(b.spill).toBe(true)
       expect(b.rotate).toBe(-5)
       if (!isComposer(b)) expect(b.text.length).toBeGreaterThan(0)
       expect(b.width).toBeGreaterThan(0)
+    })
+  })
+
+  it('sits every call balloon square in its half, and letters only the key', () => {
+    const called = PANEL_BUBBLE_TRANSFORMS.filter(b => b.call !== undefined)
+    expect(called.length).toBeGreaterThan(0)
+    called.forEach(b => {
+      // Straight: a transcript read at an angle is harder to follow than it is charming,
+      // and the red key is a photograph of a button rather than a balloon in the art.
+      expect(b.rotate).toBe(0)
+      expect(b.width).toBeGreaterThan(0)
+      // A transcript's words come from the call, so authored text would be a second
+      // source for them; the key's are its label, and `phoneAction` folds it onto a key.
+      if (b.content === 'transcript') expect(b.text).toBe('')
+      else expect(b.text.length).toBeGreaterThan(0)
     })
   })
 

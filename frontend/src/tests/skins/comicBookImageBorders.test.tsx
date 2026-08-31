@@ -80,6 +80,7 @@ function renderPanel(images: ImgTransform[]): HTMLElement {
         images={images}
         bubbles={[]}
         chains={[]}
+        callScenes={[]}
         sms={idleSms()}
         natSizes={{}}
         editorActive={false}

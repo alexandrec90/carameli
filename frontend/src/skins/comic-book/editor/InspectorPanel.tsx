@@ -2,6 +2,8 @@ import { PATTERN_STYLES, PATTERN_STYLE_KEYS } from '../panelPatterns'
 import type { PanelBgStyle } from '../panelPatterns'
 import { assetLabel } from './assets'
 import BubbleInspector from './BubbleInspector'
+import CallRoleField from './CallRoleField'
+import CallSeamFields from './CallSeamFields'
 import ChainInspector from './ChainInspector'
 import ImageInspector from './ImageInspector'
 import { indicesOnPanel } from './configOps'
@@ -65,6 +67,7 @@ export default function InspectorPanel({ api, panel }: InspectorPanelProps) {
             ))}
           </select>
         </label>
+        <CallSeamFields api={api} panel={panel} />
         <div className="cb-ed-hint">
           {imgs} picture{imgs === 1 ? '' : 's'} · {bubbles} bubble{bubbles === 1 ? '' : 's'}.
           Click one to edit it, or add another below.
@@ -73,7 +76,8 @@ export default function InspectorPanel({ api, panel }: InspectorPanelProps) {
     )
   }
 
-  if (!selImg && !selBubble) return null
+  const selEntry = selImg ?? selBubble
+  if (!selEntry) return null
 
   return (
     <>
@@ -105,6 +109,13 @@ export default function InspectorPanel({ api, panel }: InspectorPanelProps) {
           </>
         )}
       </dl>
+
+      <CallRoleField
+        api={api}
+        kind={selected.kind}
+        index={selected.index}
+        value={selEntry.call}
+      />
 
       {selImg && <ImageInspector api={api} index={selected.index} image={selImg} />}
       {selBubble && <BubbleInspector api={api} index={selected.index} bubble={selBubble} />}
