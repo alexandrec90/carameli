@@ -33,6 +33,12 @@ export interface SkinLoadingConfig {
   textStyle: React.CSSProperties
   subtext?: string
   subtextStyle?: React.CSSProperties
+  /** CSS `cursor` for the whole loading screen, inherited by everything on it.
+      A loading screen renders *before* its skin's chunk — and therefore before that
+      skin's stylesheet and any custom property it defines — so a skin whose pointer is
+      drawn artwork has to spell the url and hotspot out here rather than name a token.
+      `loadingScreen.test.tsx` keeps this in step with `--cb-cursor-default`. */
+  cursor?: string
 }
 
 export const skinLoadingConfigs: Record<SkinName, SkinLoadingConfig> = {
@@ -63,6 +69,7 @@ export const skinLoadingConfigs: Record<SkinName, SkinLoadingConfig> = {
     },
     text: 'LOADING...',
     textStyle: { fontFamily: "'Bangers', cursive", fontSize: '52px', letterSpacing: '4px', color: '#111111', lineHeight: '1' },
+    cursor: "url('/comic-book/pointer-cursor.webp') 2 1, default",
   },
 }
 

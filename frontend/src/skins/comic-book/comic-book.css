@@ -336,6 +336,12 @@
   justify-content: center;
   pointer-events: none;
   background: #FAFAF2; /* fallback until canvas first-paints */
+
+  /* The sheet takes no pointer, so the drawn cursor comes from .cb-root underneath it.
+     What that does not stop is the legend joining a selection: a drag lands on the page
+     below, and the range the browser grows through the document takes in this text too,
+     so "LOADING" highlights on a screen nothing is meant to be read off. */
+  user-select: none;
 }
 
 .cb-loading-canvas {
