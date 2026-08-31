@@ -144,7 +144,7 @@ export const PANEL_BG_CONFIGS: PanelBgConfig[] = [
         baseSpacing: 15, baseRadius: 3.5, phase: 8.8,
         focalX: 0.5, focalY: 0.45, rayCount: 20
     },
-    // 12 notepad 2 — 45 deg bands, vivid cyan (home page)
+    // 12 pensive girl — 45 deg bands, vivid cyan (home page)
     {
         bg: '#E8FBFF', dotColor: '#0090C4',
         baseSpacing: 14, baseRadius: 3.6, phase: 9.6, angleDeg: 45

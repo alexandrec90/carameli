@@ -584,7 +584,7 @@ describe('default config parity', () => {
     expect(phone?.alt).toBe('Push-button phone')
     expect(phone?.numberPad?.quad).toHaveLength(4)
     expect(phone?.table).toBeUndefined()
-    expect(PANELS[phone!.panel].label).toBe('Push-button phone')
+    expect(PANELS[phone!.panel].label).toBe('Phone')
 
     expect(notepad?.alt).toBe('Hand writing on notepad')
     expect(notepad?.table?.quad).toHaveLength(4)
