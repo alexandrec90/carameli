@@ -156,8 +156,14 @@ export const MAX_LAZY_CHUNK_BYTES = 260 * 1024
  * land. Same lazy comic-book chunk, still 46 of them, `package.json` untouched, so nothing
  * new was pulled in.
  *
- * This raise (973 → 978) is the call layout becoming editable, 4.97 KB measured as this
- * branch's build (976.9 KB) against the master it branches from (971.9 KB). It is not a
+ * This raise (973 → 979) is the call layout becoming editable, 4.97 KB measured as this
+ * branch's build (977.8 KB) against the master it now contains (972.8 KB) — the same
+ * 4.97 KB it measured against the master it branched from, re-measured after that merge
+ * because master had moved 0.9 KB under it in the meantime and a paragraph naming a
+ * master that is no longer there cannot be checked. The extra kilobyte over the
+ * measurement is deliberate for the reason the 971 → 972 paragraph gives: the default
+ * branch runs no gate, so a ceiling set flush against one branch's build is passed by
+ * the next two that merge in parallel. It is not a
  * scene widget any more: `callSceneRoles.ts` answers every question a `call` role is
  * asked — which half, which moment, which voice — and `PanelImages`/`PanelBubbles` place
  * an entry against that half, so the call is drawn out of the same pictures and balloons
@@ -170,7 +176,7 @@ export const MAX_LAZY_CHUNK_BYTES = 260 * 1024
  * comic-book chunk, still 46 of them, `package.json` untouched, so nothing new was
  * pulled in.
  */
-export const MAX_TOTAL_JS_BYTES = 978 * 1024
+export const MAX_TOTAL_JS_BYTES = 979 * 1024
 
 /**
  * Every `.css` file in `dist/assets/`, summed. Today 44.2 KB across 2 files.
