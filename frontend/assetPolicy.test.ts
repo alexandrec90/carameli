@@ -173,43 +173,27 @@ describe('comic-book cursors', () => {
     move: { export: 'move-cursor.webp', master: 'move.png' },
   } as const
 
-  /* The arrow is the yardstick the *hands* are measured against — an arrow and two hands
-     are one subject drawn at one remove, so a shared downscale keeps them a set. The move
-     cross is not: its ink runs edge to edge in a master three times the arrow's, so the
-     hands' factor draws it at 54px. It answers to the ceiling below and nothing else. */
-  const SCALED_AGAINST_POINTER = ['click', 'grab'] as const
-
   const sizeOfExport = (which: keyof typeof CURSORS) =>
     readImageSizeAt(path.join(PUBLIC_DIR, 'comic-book', CURSORS[which].export))
-  const sizeOfMaster = (which: keyof typeof CURSORS) =>
-    readImageSizeAt(path.join(ASSETS_SRC_DIR, 'comic-book', CURSORS[which].master))
 
-  /* A system arrow draws ~19px of ink, so 32 is "the same size, a shade bigger" with
-     room for the ink outline. The 128 the CSS spec allows is not the useful ceiling:
-     these shipped at 64 and read as stickers. */
+  /* Chromium on Windows falls back to the native keyword when custom pointer chrome is
+     outside its reliable 32px envelope. The click hand used to be 34px tall, so the
+     otherwise-uncovered panel targets at the viewport's left and right edges showed the
+     native outstretched-index hand even though the editor declared a custom URL. */
   it.each(Object.keys(CURSORS) as (keyof typeof CURSORS)[])(
-    '%s is drawn at pointer scale, not at artwork scale',
+    '%s stays inside the native-cursor-safe envelope',
     which => {
       const size = sizeOfExport(which)
       expect(size).toBeDefined()
-      expect(Math.max(size?.width ?? Infinity, size?.height ?? Infinity)).toBeLessThanOrEqual(36)
+      expect(Math.max(size?.width ?? Infinity, size?.height ?? Infinity)).toBeLessThanOrEqual(32)
     },
   )
 
-  /* Each is one downscale of its own master by the same factor, which is what makes the
-     hands look proportionate to the arrow. Fitting each into its own N-px box instead
-     silently rescales them against each other, because the masters are not the same
-     shape -- that is how the hand ended up the arrow's height with a wider glyph in it. */
-  it.each(SCALED_AGAINST_POINTER)("keeps %s at the arrow's scale", which => {
-    const pointer = sizeOfExport('pointer')
-    const other = sizeOfExport(which)
-    const pointerMaster = sizeOfMaster('pointer')
-    const otherMaster = sizeOfMaster(which)
-    expect(pointer && other && pointerMaster && otherMaster).toBeTruthy()
-
-    const exportRatio = (other?.height ?? 0) / (pointer?.height ?? 1)
-    const masterRatio = (otherMaster?.height ?? 0) / (pointerMaster?.height ?? 1)
-    expect(exportRatio).toBeCloseTo(masterRatio, 1)
+  it('keeps the deliberately tuned long edges', () => {
+    expect(sizeOfExport('pointer')).toEqual({ width: 17, height: 26 })
+    expect(sizeOfExport('click')).toEqual({ width: 21, height: 31 })
+    expect(sizeOfExport('grab')).toEqual({ width: 20, height: 24 })
+    expect(sizeOfExport('move')).toEqual({ width: 26, height: 25 })
   })
 
   it('keeps custom cursor URLs, hotspots, and native fallbacks in the skin stylesheet', () => {
@@ -217,12 +201,12 @@ describe('comic-book cursors', () => {
       "--cb-cursor-default: url('/comic-book/pointer-cursor.webp') 2 1, default",
     )
     expect(stylesheet).toContain(
-      "--cb-cursor-click: url('/comic-book/click-cursor.webp') 9 10, pointer",
+      "--cb-cursor-click: url('/comic-book/click-cursor.webp') 8 9, pointer",
     )
     expect(stylesheet).toContain(
-      "--cb-cursor-grab: url('/comic-book/hand-dragger-cursor.webp') 8 10, grab",
+      "--cb-cursor-grab: url('/comic-book/hand-dragger-cursor.webp') 10 13, grab",
     )
-    expect(stylesheet).toContain("--cb-cursor-move: url('/comic-book/move-cursor.webp') 15 15, move")
+    expect(stylesheet).toContain("--cb-cursor-move: url('/comic-book/move-cursor.webp') 13 12, move")
     expect(stylesheet).toContain('cursor: var(--cb-cursor-default)')
     expect(stylesheet).toContain('cursor: var(--cb-cursor-click)')
   })
