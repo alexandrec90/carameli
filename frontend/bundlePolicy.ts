@@ -155,8 +155,22 @@ export const MAX_LAZY_CHUNK_BYTES = 260 * 1024
  * which Layout imports statically for `useEditorMode`, and that is where these 0.79 KB
  * land. Same lazy comic-book chunk, still 46 of them, `package.json` untouched, so nothing
  * new was pulled in.
+ *
+ * This raise (973 → 978) is the call layout becoming editable, 4.97 KB measured as this
+ * branch's build (976.9 KB) against the master it branches from (971.9 KB). It is not a
+ * scene widget any more: `callSceneRoles.ts` answers every question a `call` role is
+ * asked — which half, which moment, which voice — and `PanelImages`/`PanelBubbles` place
+ * an entry against that half, so the call is drawn out of the same pictures and balloons
+ * as everything else. The editor's own half is `callSceneOps.ts` (the derived scene list)
+ * and `callSceneCreate.ts` (the one op that builds a whole call), which reach the build
+ * through `useEditorMode`, imported statically by Layout.tsx. `EditorOverlay` and
+ * `InspectorPanel` do not — they are behind an `import.meta.env.DEV` test — so the seam
+ * range, the role select and the half-aware click targets are not in this number.
+ * `CallBubble.tsx` came out in the same change and is subtracted from it. Same lazy
+ * comic-book chunk, still 46 of them, `package.json` untouched, so nothing new was
+ * pulled in.
  */
-export const MAX_TOTAL_JS_BYTES = 973 * 1024
+export const MAX_TOTAL_JS_BYTES = 978 * 1024
 
 /**
  * Every `.css` file in `dist/assets/`, summed. Today 44.2 KB across 2 files.
