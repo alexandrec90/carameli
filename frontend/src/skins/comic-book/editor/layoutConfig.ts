@@ -23,11 +23,11 @@ export const PANELS: Panel[] = [
   { label: 'Rolodex', isLogo: false, page: 'classic' },
   { label: 'Rotary phone', isLogo: false, page: 'classic' },
   { label: 'Mailman 2', isLogo: false, page: 'classic' },
-  { label: 'Logo 2', isLogo: true, page: 'home' },
-  { label: 'Push-button phone', isLogo: false, page: 'home' },
+  { label: 'Logo', isLogo: true, page: 'home' },
+  { label: 'Phone', isLogo: false, page: 'home' },
   { label: 'Notepad', isLogo: false, page: 'home' },
-  { label: 'Conversation', isLogo: false, page: 'home' },
-  { label: 'Notepad 2', isLogo: false, page: 'home' },
+  { label: 'SMS Conversation', isLogo: false, page: 'home' },
+  { label: 'Pensive girl', isLogo: false, page: 'home' },
 ]
 
 // Not parallel to PANELS: each picture names its `panel`, so a panel may own several or
@@ -71,12 +71,12 @@ export const PANEL_IMG_TRANSFORMS: ImgTransform[] = [
   { panel: 5, src: '/comic-book/rolodex.webp', alt: 'Rolodex', left: 0, top: 0, width: 100, height: 100, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center bottom', spill: false },
   { panel: 6, src: '/comic-book/rotary%20phone.webp', alt: 'Rotary phone', left: 0, top: 0, width: 100, height: 100, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center bottom', spill: false },
   { panel: 7, src: '/comic-book/mailman2.webp', alt: 'Post office', left: 0, top: 0, width: 100, height: 100, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center bottom', spill: false },
-  { panel: 8, src: '/comic-book/logo2.webp', alt: 'Carameli', left: -20, top: 5, width: 133.1, height: 93.9, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center center', spill: false },
-  { panel: 9, src: '/comic-book/push-button-phone.webp', alt: 'Push-button phone', left: -40.3, top: 16.9, width: 153.1, height: 105.7, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center bottom', spill: false, numberPad: {
+  { panel: 8, src: '/comic-book/logo2.webp', alt: 'Carameli', left: -20, top: 5, width: 133.5, height: 94, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center center', spill: false },
+  { panel: 9, src: '/comic-book/push-button-phone.webp', alt: 'Push-button phone', left: -40.4, top: 16.9, width: 153.4, height: 105.7, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center bottom', spill: false, numberPad: {
     quad: [[36, 26.28], [48.57, 22.95], [53.74, 43.84], [40.38, 48.85]],
     fontScale: 0.55, ink: '#1b3a8f',
   } },
-  { panel: 10, src: '/comic-book/hand-notepad.webp', alt: 'Hand writing on notepad', left: -47, top: 0.7, width: 203.5, height: 152.7, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center bottom', spill: false, table: {
+  { panel: 10, src: '/comic-book/hand-notepad.webp', alt: 'Hand writing on notepad', left: -47, top: 4.2, width: 203.5, height: 147.4, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center bottom', spill: false, table: {
     quad: [[13.71, 8.67], [80.77, 8.48], [81.78, 59.93], [12.72, 60.39]],
     rows: 22, header: true, fontScale: 0.5, ink: '#1b3a8f',
     source: 'calls',
@@ -89,8 +89,8 @@ export const PANEL_IMG_TRANSFORMS: ImgTransform[] = [
     data: [
     ],
   } },
-  { panel: 11, src: '/comic-book/conversation.webp', alt: 'Phone conversation', left: 24, top: 33, width: 64.1, height: 72.5, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center bottom', spill: false },
-  { panel: 12, src: '/comic-book/soft%20bubble.webp', alt: 'Speech bubble', left: 19.9, top: 15.8, width: 55, height: 43.6, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center bottom', spill: false },
+  { panel: 11, src: '/comic-book/conversation.webp', alt: 'Phone conversation', left: 24, top: 42.9, width: 64.1, height: 61.7, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center bottom', spill: false },
+  { panel: 12, src: '/comic-book/pensive-woman.webp', alt: 'A woman waiting for the phone to ring', left: 0.1, top: 0, width: 105, height: 100, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center bottom', spill: true },
   { panel: 9, src: '/comic-book/ringing-phone.webp', alt: 'A telephone ringing at the far end', left: 0, top: 0, width: 100, height: 100, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center center', spill: false, call: 'ringing' },
   { panel: 9, src: '/comic-book/cheating-man.webp', alt: 'The man who answered', left: 0, top: 0, width: 100, height: 100, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center center', spill: false, call: 'remote' },
   { panel: 9, src: '/comic-book/despondent-wife.webp', alt: 'The woman placing the call', left: 0, top: 0, width: 100, height: 100, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center center', spill: false, call: 'local' },
@@ -144,9 +144,9 @@ export const PANEL_BUBBLE_TRANSFORMS: BubbleTransform[] = [
   { panel: 6, top: -35, right: -12, width: 55, rotate: -5, spill: true, type: 'lightning', tail: 'down-left', content: 'text', text: 'Ka-POW!', linkTo: null, hoverType: 'soft', clickType: 'cloud', hoverBold: false, chain: '' },
   { panel: 7, top: -35, right: -12, width: 55, rotate: -5, spill: true, type: 'cloud', tail: 'down-left', content: 'text', text: 'Delivering dreams...', linkTo: null, hoverType: 'soft', clickType: 'lightning', hoverBold: false, chain: '' },
   { panel: 9, top: 6, right: 8, width: 39, rotate: -5, spill: true, type: 'cloud', tail: 'none', content: 'dial-call', text: '4388762750', linkTo: null, hoverType: null, clickType: null, hoverBold: false, chain: '' },
-  { panel: 11, top: 17, right: 54, width: 20, rotate: -5, spill: true, type: 'soft', tail: 'down-right', content: 'text', text: 'recipient sms', linkTo: null, hoverType: null, clickType: null, hoverBold: false, chain: 'chain-1' },
-  { panel: 11, top: 48, right: 67, width: 27, rotate: -5, spill: true, type: 'cloud', tail: 'right', content: 'dial', text: '4388762750', linkTo: null, hoverType: null, clickType: null, hoverBold: true, chain: '' },
-  { panel: 11, top: 9, right: 24, width: 20, rotate: -5, spill: true, type: 'soft', tail: 'down-left', content: 'input', text: '', linkTo: null, hoverType: null, clickType: null, hoverBold: false, chain: 'chain-1' },
+  { panel: 11, top: 30, right: 54, width: 20, rotate: -5, spill: true, type: 'soft', tail: 'down-right', content: 'text', text: 'recipient sms', linkTo: null, hoverType: null, clickType: null, hoverBold: false, chain: 'chain-1' },
+  { panel: 11, top: 56, right: 67, width: 27, rotate: -5, spill: true, type: 'cloud', tail: 'right', content: 'dial', text: '4388762750', linkTo: null, hoverType: null, clickType: null, hoverBold: true, chain: '' },
+  { panel: 11, top: 23, right: 24, width: 20, rotate: -5, spill: true, type: 'soft', tail: 'down-left', content: 'input', text: '', linkTo: null, hoverType: null, clickType: null, hoverBold: false, chain: 'chain-1' },
   { panel: 9, top: 2, right: 12, width: 76, rotate: 0, spill: true, type: 'soft', tail: 'down', content: 'transcript', text: '', linkTo: null, hoverType: null, clickType: null, hoverBold: false, chain: '', call: 'remote' },
   { panel: 9, top: 2, right: 12, width: 76, rotate: 0, spill: true, type: 'soft', tail: 'down', content: 'transcript', text: '', linkTo: null, hoverType: null, clickType: null, hoverBold: false, chain: '', call: 'local' },
   { panel: 9, top: 74, right: 38, width: 24, rotate: 0, spill: true, type: 'soft', tail: 'none', content: 'actions', text: 'End call', linkTo: null, hoverType: null, clickType: null, hoverBold: false, chain: '', call: 'local' },
@@ -219,11 +219,11 @@ export const PANEL_PATTERNS: PanelBgStyle[] = [
   'diagonal-stripes', // Rolodex
   'concentric-rings', // Rotary phone
   'corner-burst', // Mailman 2
-  'halftone-gradient', // Logo 2
-  'corner-burst', // Push-button phone
+  'halftone-gradient', // Logo
+  'corner-burst', // Phone
   'sunburst', // Notepad
-  'radial-dots', // Conversation
-  'diagonal-stripes', // Notepad 2
+  'radial-dots', // SMS Conversation
+  'diagonal-stripes', // Pensive girl
 ]
 
 // The panel shapes themselves: one record per page, one grid per viewport shape inside
@@ -258,11 +258,11 @@ export const PANEL_GRIDS: PageGrids = {
         [11, 5, 7, 13, 12], // Rolodex
         [10, 9, 14, 15, 16], // Rotary phone
         [14, 12, 13, 17, 15], // Mailman 2
-        [], // Logo 2
-        [], // Push-button phone
+        [], // Logo
+        [], // Phone
         [], // Notepad
-        [], // Conversation
-        [], // Notepad 2
+        [], // SMS Conversation
+        [], // Pensive girl
       ],
     },
     portrait: {
@@ -276,11 +276,11 @@ export const PANEL_GRIDS: PageGrids = {
         [10, 7, 9, 13, 14, 11], // Rolodex
         [12, 11, 14, 15, 16], // Rotary phone
         [14, 13, 17, 15], // Mailman 2
-        [], // Logo 2
-        [], // Push-button phone
+        [], // Logo
+        [], // Phone
         [], // Notepad
-        [], // Conversation
-        [], // Notepad 2
+        [], // SMS Conversation
+        [], // Pensive girl
       ],
     },
     square: {
@@ -294,17 +294,17 @@ export const PANEL_GRIDS: PageGrids = {
         [10, 12, 13, 14], // Rolodex
         [12, 9, 15, 16, 13], // Rotary phone
         [15, 11, 17, 16], // Mailman 2
-        [], // Logo 2
-        [], // Push-button phone
+        [], // Logo
+        [], // Phone
         [], // Notepad
-        [], // Conversation
-        [], // Notepad 2
+        [], // SMS Conversation
+        [], // Pensive girl
       ],
     },
   },
   home: {
     landscape: {
-      vertices: [[0, 0], [1, 0], [1, 1], [0, 1], [0, 0.4007], [1, 0.4379], [0.2486, 0], [0.2725, 0.3988], [0.3065, 1], [0.7934, 0], [0.8181, 0.4247], [0.2764, 0.4579], [0.8214, 0.4814]],
+      vertices: [[0, 0], [1, 0], [1, 1], [0, 1], [0, 0.4007], [1, 0.3591], [0.2486, 0], [0.2719, 0.3773], [0.3065, 1], [0.7934, 0], [0.817, 0.4194], [0.2764, 0.4579], [0.8118, 0.3261]],
       panels: [
         [], // Logo
         [], // Switchboard
@@ -314,11 +314,11 @@ export const PANEL_GRIDS: PageGrids = {
         [], // Rolodex
         [], // Rotary phone
         [], // Mailman 2
-        [0, 6, 7, 4], // Logo 2
-        [10, 11, 7, 6, 9], // Push-button phone
+        [0, 6, 7, 4], // Logo
+        [12, 10, 11, 7, 6, 9], // Phone
         [4, 7, 11, 8, 3], // Notepad
-        [11, 10, 12, 5, 2, 8], // Conversation
-        [9, 1, 5, 12, 10], // Notepad 2
+        [11, 10, 12, 5, 2, 8], // SMS Conversation
+        [9, 1, 5, 12], // Pensive girl
       ],
     },
     portrait: {
@@ -332,11 +332,11 @@ export const PANEL_GRIDS: PageGrids = {
         [], // Rolodex
         [], // Rotary phone
         [], // Mailman 2
-        [0, 6, 7, 4], // Logo 2
-        [11, 8, 7, 6, 10], // Push-button phone
+        [0, 6, 7, 4], // Logo
+        [11, 8, 7, 6, 10], // Phone
         [4, 7, 8, 9, 3], // Notepad
-        [8, 11, 5, 2, 9], // Conversation
-        [10, 1, 5, 11], // Notepad 2
+        [8, 11, 5, 2, 9], // SMS Conversation
+        [10, 1, 5, 11], // Pensive girl
       ],
     },
     square: {
@@ -350,11 +350,11 @@ export const PANEL_GRIDS: PageGrids = {
         [], // Rolodex
         [], // Rotary phone
         [], // Mailman 2
-        [0, 6, 7, 4], // Logo 2
-        [11, 8, 7, 6, 10], // Push-button phone
+        [0, 6, 7, 4], // Logo
+        [11, 8, 7, 6, 10], // Phone
         [4, 7, 8, 9, 3], // Notepad
-        [8, 11, 5, 2, 9], // Conversation
-        [10, 1, 5, 11], // Notepad 2
+        [8, 11, 5, 2, 9], // SMS Conversation
+        [10, 1, 5, 11], // Pensive girl
       ],
     },
   },

@@ -51,12 +51,12 @@ describe('pageForPath', () => {
 describe('the home page grids', () => {
   it('names exactly five panels, the logo first', () => {
     expect(HOME).toHaveLength(5)
-    expect(PANELS[HOME[0]].label).toBe('Logo 2')
+    expect(PANELS[HOME[0]].label).toBe('Logo')
   })
 
   // The logo was asked for as a *minor* panel, at every viewport shape, and was the
   // smallest of the four the page shipped with. It is no longer the outright smallest:
-  // 'Notepad 2' was split off the Conversation panel on 2026-08-31 smaller still, which
+  // 'Pensive girl' was split off the SMS Conversation panel on 2026-08-31 smaller still, which
   // is the author's framing and not a regression. So what is held here is the request
   // itself — the logo never dominates the page — rather than a total order that any new
   // corner panel breaks. If the logo is ever enlarged past its share, this fails.

@@ -137,10 +137,17 @@ describe('serializeConfig', () => {
   // Read the value being replaced off the seed rather than naming it: a bare
   // `not.toContain('halftone-gradient')` also fails when some *other* slot happens to
   // ship that style, which is a fact about the art and not about the serializer.
+  //
+  // For the same reason the block is sliced rather than searched. The array is parallel
+  // to PANELS, so panel 0's entry is its first line — and a whole-file search for a
+  // `style, // label` pair answers about whichever slot matches first, which stopped
+  // being slot 0 the day two panels were both named 'Logo' (one per page, which the
+  // editor allows and nothing should forbid).
   it('writes the pattern an author picked, under its panel label comment', () => {
     const ts = serializeConfig(patchPattern(seedConfig(), 0, 'sunburst'))
-    expect(ts).toContain(`  'sunburst', // ${PANELS[0].label}\n`)
-    expect(ts).not.toContain(`  '${PANEL_PATTERNS[0]}', // ${PANELS[0].label}\n`)
+    const first = ts.split('export const PANEL_PATTERNS: PanelBgStyle[] = [\n')[1]?.split('\n')[0]
+    expect(first).toBe(`  'sunburst', // ${PANELS[0].label}`)
+    expect(first).not.toContain(PANEL_PATTERNS[0])
   })
 
   // The patterns block iterates PANELS, not the config: the array is parallel by
