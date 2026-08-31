@@ -39,6 +39,10 @@ function editorApi(config: EditorConfig): EditorModeApi {
     addChainColumn: vi.fn(),
     setPattern: vi.fn(),
     splitPanel: vi.fn(),
+    callPhase: null,
+    setCallPhase: vi.fn(),
+    addCallOn: vi.fn(),
+    setCallScene: vi.fn(),
     setPanelLabel: vi.fn(),
     setPageLabel: vi.fn(),
     deleteImg: vi.fn(),
@@ -248,6 +252,88 @@ describe('EditorToolbar', () => {
     renderToolbar()
 
     expect(screen.getByRole<HTMLButtonElement>('button', { name: '+ SMS' }).disabled).toBe(true)
+  })
+
+  // A phone call is `+ SMS`'s argument one size up — six coupled entries and a seam — so
+  // it gets a button beside the others for the same reason, and the same assertion.
+  it('offers + Call on the selected panel', () => {
+    const { api } = renderToolbar(seedConfig(), 4)
+
+    fireEvent.click(screen.getByRole('button', { name: '+ Call' }))
+
+    expect(api.addCallOn).toHaveBeenCalledWith(4)
+  })
+
+  it('holds + Call until a panel is picked, since a call belongs to one panel', () => {
+    renderToolbar()
+
+    expect(screen.getByRole<HTMLButtonElement>('button', { name: '+ Call' }).disabled).toBe(true)
+  })
+
+  it('goes dead on a panel that is already a phone call, and says why', () => {
+    // A panel is cut in two once. The second set of figures would stack invisibly on the
+    // first, so the button that would make them is closed rather than quietly refusing.
+    const config = seedConfig()
+    const panel = config.callScenes[0].panel
+    renderToolbar(config, panel)
+
+    const button = screen.getByRole<HTMLButtonElement>('button', { name: '+ Call' })
+    expect(button.disabled).toBe(true)
+    expect(button.title).toContain('already a phone call')
+  })
+
+  it('offers the three layouts a call panel can be framed in', () => {
+    // Three positions rather than a checkbox and a phase: what a scene draws differs
+    // between ringing and connected — one figure or two, and whose words are lit — so an
+    // author framing it has to be able to stand in either, and in the panel's own layout.
+    const { api } = renderToolbar()
+
+    const group = screen.getByRole('group', { name: 'Call layout' })
+    expect(Array.from(group.querySelectorAll('button')).map(b => b.textContent))
+      .toEqual(['Default', 'Ringing', 'Connected'])
+
+    fireEvent.click(screen.getByRole('button', { name: 'Connected' }))
+    expect(api.setCallPhase).toHaveBeenCalledWith('connected')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Default' }))
+    expect(api.setCallPhase).toHaveBeenCalledWith(null)
+  })
+
+  it('marks which layout is up, so the switch reads as a position and not an action', () => {
+    const api = editorApi(seedConfig())
+    render(
+      <MemoryRouter>
+        <EditorToolbar
+          api={{ ...api, callPhase: 'ringing' }}
+          selPanel={null}
+          pageSelect={{
+            navItems: [],
+            pageLabels: api.config.pageLabels,
+            previewingLoading: false,
+            onPreviewLoading: vi.fn(),
+            onPageLabel: vi.fn(),
+          }}
+          shapes={{
+            page: 'classic',
+            kind: 'landscape',
+            grid: api.config.grids.classic.landscape,
+            drag: {} as SeamDragApi,
+          }}
+        />
+      </MemoryRouter>,
+    )
+
+    expect(screen.getByRole('button', { name: 'Ringing' }).getAttribute('aria-pressed'))
+      .toBe('true')
+    expect(screen.getByRole('button', { name: 'Default' }).getAttribute('aria-pressed'))
+      .toBe('false')
+  })
+
+  it('offers no layout switch on a page where nothing is a call', () => {
+    const config = seedConfig()
+    renderToolbar({ ...config, callScenes: [] })
+
+    expect(screen.queryByRole('group', { name: 'Call layout' })).toBeNull()
   })
 
   it('says nothing and leaves Ship alone on the shipped layout', () => {

@@ -1,3 +1,8 @@
+import { Fragment } from 'react'
+
+import { halfSlot } from './callSceneGeometry'
+import type { SceneHalves } from './callSceneGeometry'
+import { halfFor, inRoles } from './callSceneRoles'
 import {
   fullImgStyle,
   imgClipStyle,
@@ -7,15 +12,35 @@ import {
   imgTransformStyle,
   surfaceBaseRect,
 } from './editor/transforms'
-import type { ImgTransform } from './editor/types'
+import type { CallRole, ImgTransform } from './editor/types'
 import ProjectedNumberPad from './ProjectedNumberPad'
 import ProjectedTable from './ProjectedTable'
+
+/** One shared "nothing lit", so the default does not remount anything per render. */
+const NONE_LIT: readonly CallRole[] = []
 
 interface PanelImagesProps {
   /** Every picture on the page — `panel` decides which ones this panel draws. */
   images: ImgTransform[]
   /** Index of the panel being drawn, into PANELS. */
   panel: number
+  /**
+   * Which call roles are on screen, or `null` for the panel's ordinary layout.
+   *
+   * This is the whole of the layout switch: `null` draws every picture that has no role,
+   * and a list draws exactly the roles in it. The two are exclusive, so a picture is in
+   * the call or it is in the panel and never in both.
+   */
+  callRoles?: CallRole[] | null
+  /**
+   * The panel cut in two, while a call is up on it. A picture whose role names a side is
+   * framed against *that* side's box and windowed by its polygon, in a slot positioned at
+   * it — so the author frames the far end against the far end's half, at the percentages
+   * they see, and the frame follows the seam when it is dragged.
+   */
+  halves?: SceneHalves | null
+  /** Roles colorized right now — the speaker's (`litRoles` in callSceneRoles.ts). */
+  lit?: readonly CallRole[]
   /** Box of the panel being drawn, in viewport coords. */
   bounds: { x: number; y: number; w: number; h: number }
   /** The panel's polygon in viewport coords — the window every picture is seen through. */
@@ -35,9 +60,9 @@ interface PanelImagesProps {
 }
 
 /**
- * The pictures belonging to one panel. A panel may own several or none — the array is
- * filtered by `panel` rather than indexed by it, so adding a picture in the editor is
- * an append and never has to line up with anything.
+ * The pictures belonging to one panel, in one of its layouts. A panel may own several or
+ * none — the array is filtered by `panel` and `callRoles` rather than indexed by either,
+ * so adding a picture in the editor is an append and never has to line up with anything.
  *
  * Each picture has its own frame over the panel box ({@link imgFrameStyle}) and is seen
  * through the panel's own polygon ({@link imgPanelClip}) — a rectangle of picture,
@@ -52,6 +77,9 @@ interface PanelImagesProps {
 export default function PanelImages({
   images,
   panel,
+  callRoles = null,
+  halves = null,
+  lit = NONE_LIT,
   bounds,
   vp,
   natSizes,
@@ -64,8 +92,15 @@ export default function PanelImages({
   return (
     <>
       {images.map((img, i) => {
-        if (img.panel !== panel) return null
-        const frame = imgFrameBox(bounds, img)
+        if (img.panel !== panel || !inRoles(img.call, callRoles)) return null
+        // The box this picture is framed against: its half of a call, or the panel. A
+        // half's pictures go in a slot positioned at it, so everything below — the frame
+        // percentages, the clip, the projected surfaces — is the ordinary code path with
+        // a smaller box, and none of it knows a call is up.
+        const half = halfFor(img.call, halves)
+        const box = half ? half.box : bounds
+        const poly = half ? half.pts : vp
+        const frame = imgFrameBox(box, img)
         const nat = natSizes[img.src]
         const reveal = isRevealed(i)
         // The box a projected surface's quad measures: the picture's rendered rect in
@@ -73,13 +108,12 @@ export default function PanelImages({
         // origin is 0,0 here). Based on the artwork rather than the frame so the
         // surface stays on the photograph when a resize re-letterboxes the frame.
         const base = surfaceBaseRect({ x: 0, y: 0, w: frame.w, h: frame.h }, nat, img)
-        return (
+        const clipped = (
           <div
-            key={i}
-            className="cb-img-clip"
+            className={`cb-img-clip${img.call && lit.includes(img.call) ? ' is-speaking' : ''}`}
             style={{
-              ...imgFrameStyle(bounds, img),
-              ...imgClipStyle(img.spill, reveal, imgPanelClip(vp, bounds, img)),
+              ...imgFrameStyle(box, img),
+              ...imgClipStyle(img.spill, reveal, imgPanelClip(poly, box, img)),
             }}
           >
             {/* Full-source geometry once the natural size is known, so pan/zoom
@@ -132,6 +166,13 @@ export default function PanelImages({
               />
             )}
           </div>
+        )
+        return half ? (
+          <div key={i} className="cb-call-slot" style={halfSlot(half, bounds)}>
+            {clipped}
+          </div>
+        ) : (
+          <Fragment key={i}>{clipped}</Fragment>
         )
       })}
     </>

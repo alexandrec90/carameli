@@ -44,6 +44,7 @@ function draw(bubbles: BubbleTransform[], { editing = false } = {}) {
         images={[img({ numberPad: newNumberPad() })]}
         bubbles={bubbles}
         chains={[]}
+        callScenes={[]}
         sms={idleSms()}
         natSizes={{}}
         editorActive={editing}

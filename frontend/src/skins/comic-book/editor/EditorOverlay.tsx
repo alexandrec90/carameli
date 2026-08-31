@@ -1,13 +1,18 @@
-import { useEffect } from 'react'
+import { useEffect, useMemo } from 'react'
 import type { CSSProperties } from 'react'
 
 import { logger } from '../../../lib/logger'
+import { splitAt } from '../callSceneGeometry'
+import type { SceneHalves } from '../callSceneGeometry'
+import { halfFor, inRoles, rolesAtPhase } from '../callSceneRoles'
 import type { LayoutKind, PanelPoly, Rect } from '../panelGeometry'
 import { frameRect } from '../panelGeometry'
 import type { PanelPage } from '../panels'
 import { assetLabel } from './assets'
 import { chainFramesOn } from './chainFrame'
+import type { ChainFrame } from './chainFrame'
 import EditorToolbar from './EditorToolbar'
+import type { BubbleChain, BubbleTransform, CallRole } from './types'
 import type { PageSelectProps } from './PageSelect'
 import PanelSeams from './PanelSeams'
 import SurfaceCorners from './TableCorners'
@@ -37,6 +42,44 @@ interface EditorOverlayProps {
 
 function rectStyle(r: Rect): CSSProperties {
   return { left: r.x, top: r.y, width: r.w, height: r.h }
+}
+
+/**
+ * The box an entry is placed against: its half of a call, or the panel itself. The same
+ * answer PanelImages and PanelBubbles get from `halfFor`, which is the point — a target
+ * measured against the panel while the drawing is measured against a half is a target
+ * that sits somewhere its picture is not.
+ */
+function boxOf(
+  entry: { call?: CallRole },
+  bounds: Rect,
+  halves: SceneHalves | null,
+): Rect {
+  return halfFor(entry.call, halves)?.box ?? bounds
+}
+
+/**
+ * Chain frames for one panel, each conversation measured against the box its own balloons
+ * are placed in. Three passes rather than one because a call's two halves are two boxes,
+ * and a conversation drawn on one of them is % of that half.
+ */
+function chainFramesFor(
+  bubbles: readonly BubbleTransform[],
+  chains: readonly BubbleChain[],
+  panel: number,
+  bounds: Rect,
+  halves: SceneHalves | null,
+  callRoles: CallRole[] | null,
+): ChainFrame[] {
+  const shown = bubbles.filter(b => inRoles(b.call, callRoles))
+  if (!halves) return chainFramesOn(shown, chains, panel, bounds)
+  const inHalf = (half: SceneHalves['a'] | null) =>
+    shown.filter(b => halfFor(b.call, halves) === half)
+  return [
+    ...chainFramesOn(inHalf(halves.a), chains, panel, halves.a.box),
+    ...chainFramesOn(inHalf(halves.b), chains, panel, halves.b.box),
+    ...chainFramesOn(inHalf(null), chains, panel, bounds),
+  ]
 }
 
 /**
@@ -74,6 +117,22 @@ export default function EditorOverlay({
   const frame = frameRect(viewport.w, viewport.h)
   const drag = useSeamDrag(api, page, layoutKind, grid, frame)
 
+  // Which layout the page's calls are showing, and where each one's seam falls — the same
+  // two facts ComicPanel works out for itself, because the overlay is not inside a panel
+  // and there is nothing to hand it down. `null` roles is the ordinary layout, and then
+  // every call entry is off screen and has no target.
+  const callRoles = api.callPhase === null ? null : rolesAtPhase(api.callPhase)
+  const halvesByPanel = useMemo(() => {
+    const out = new Map<number, SceneHalves>()
+    if (api.callPhase === null) return out
+    for (const scene of config.callScenes) {
+      const poly = panelPolys[scene.panel]
+      if (poly) out.set(scene.panel, splitAt(poly.vp, poly.bounds, scene.cut, scene.axis))
+    }
+    return out
+  }, [api.callPhase, config.callScenes, panelPolys])
+  const halvesOn = (panel: number): SceneHalves | null => halvesByPanel.get(panel) ?? null
+
   // Everything drawn is placed against the panel it *names*, never against a panel
   // that shares its index — those parted company once a panel could own several of
   // each. A `panel` selection is the panel itself, and is how "which panel does a new
@@ -88,13 +147,19 @@ export default function EditorOverlay({
         : (selImg?.panel ?? selBubble?.panel ?? null)
   const selPoly = selPanel === null ? null : panelPolys[selPanel]
 
-  const selectedRect: Rect | null = !selPoly
-    ? null
-    : selImg
-      ? imgVisibleRect(selPoly.bounds, natSizes[selImg.src], selImg)
-      : selBubble
-        ? bubbleRect(selPoly.bounds, selBubble)
-        : selPoly.bounds
+  // The selection's own box, which is its half's when it is part of the call on screen.
+  // An entry hidden by the current layout gets none: a handle over something that is not
+  // drawn drags a picture the author cannot see moving.
+  const selHalves = selPanel === null ? null : halvesOn(selPanel)
+  const selShown = selImg ?? selBubble
+  const selectedRect: Rect | null =
+    !selPoly || (selShown !== null && !inRoles(selShown.call, callRoles))
+      ? null
+      : selImg
+        ? imgVisibleRect(boxOf(selImg, selPoly.bounds, selHalves), natSizes[selImg.src], selImg)
+        : selBubble
+          ? bubbleRect(boxOf(selBubble, selPoly.bounds, selHalves), selBubble)
+          : selPoly.bounds
 
   return (
     <div className="cb-ed-layer">
@@ -135,13 +200,14 @@ export default function EditorOverlay({
               a picture wins the click where the two overlap. */}
           {config.images.map((img, i) => {
             const poly = panelPolys[img.panel]
-            if (!poly) return null
+            if (!poly || !inRoles(img.call, callRoles)) return null
+            const box = boxOf(img, poly.bounds, halvesOn(img.panel))
             return (
               <button
                 key={i}
                 type="button"
                 className="cb-ed-target cb-ed-target-img"
-                style={rectStyle(imgVisibleRect(poly.bounds, natSizes[img.src], img))}
+                style={rectStyle(imgVisibleRect(box, natSizes[img.src], img))}
                 aria-label={`Select ${assetLabel(img.src)} on ${config.panels[img.panel]?.label ?? `panel ${img.panel}`}`}
                 onClick={() => api.select('img', i)}
               />
@@ -153,13 +219,14 @@ export default function EditorOverlay({
               panel — or a neighbour's, once it spills into the gutter. */}
           {config.bubbles.map((bubble, i) => {
             const poly = panelPolys[bubble.panel]
-            if (!poly) return null
+            if (!poly || !inRoles(bubble.call, callRoles)) return null
+            const box = boxOf(bubble, poly.bounds, halvesOn(bubble.panel))
             return (
               <button
                 key={i}
                 type="button"
                 className="cb-ed-target cb-ed-target-bubble"
-                style={rectStyle(bubbleRect(poly.bounds, bubble))}
+                style={rectStyle(bubbleRect(box, bubble))}
                 aria-label={`Select ${config.panels[bubble.panel]?.label ?? `panel ${bubble.panel}`} bubble ${i}`}
                 onClick={() => api.select('bubble', i)}
               />
@@ -176,9 +243,14 @@ export default function EditorOverlay({
           {panelPolys.map((poly, i) =>
             poly === null
               ? null
-              : chainFramesOn(config.bubbles, config.chains, i, poly.bounds).map(frame => (
+              : chainFramesFor(
+                config.bubbles, config.chains, i, poly.bounds, halvesOn(i), callRoles,
+              ).map((frame, k) => (
                 <div
-                  key={`${i}:${frame.id}`}
+                  // Keyed by position as well as by id: a conversation whose two columns
+                  // sit on opposite halves of a call is measured once per half, so the
+                  // same id can be two frames.
+                  key={`${i}:${k}:${frame.id}`}
                   className="cb-ed-chainbox"
                   style={rectStyle(frame.rect)}
                   aria-hidden="true"
@@ -238,13 +310,17 @@ export default function EditorOverlay({
       {/* The grips for whichever projected content the selected picture carries. They paint after
           the selection outline so a corner dragged inside the frame still wins the
           pointer over the body that would otherwise move the whole picture. */}
-      {!shapeMode && selected?.kind === 'img' && (selImg?.table || selImg?.numberPad) && selPoly && (
+      {!shapeMode && selected?.kind === 'img' && (selImg?.table || selImg?.numberPad) && selPoly && selectedRect && (
         <SurfaceCorners
           api={api}
           index={selected.index}
           surface={selImg.table ?? selImg.numberPad!}
           kind={selImg.table ? 'table' : 'numberPad'}
-          rect={surfaceBaseRect(imgRect(selPoly.bounds, selImg), natSizes[selImg.src], selImg)}
+          rect={surfaceBaseRect(
+            imgRect(boxOf(selImg, selPoly.bounds, selHalves), selImg),
+            natSizes[selImg.src],
+            selImg,
+          )}
         />
       )}
 

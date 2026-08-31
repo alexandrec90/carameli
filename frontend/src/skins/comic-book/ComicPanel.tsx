@@ -2,15 +2,16 @@ import { useCallback, useMemo, useState } from 'react'
 
 import type { BubbleChain } from './bubbleChain'
 import { dialBubbleOn } from './bubbleContent'
+import { splitAt } from './callSceneGeometry'
+import { callSceneOn, litRoles, rolesAtPhase } from './callSceneRoles'
 import { addDialled, appendDialKey } from './dialPicker'
 import PanelBubbles from './PanelBubbles'
 import PanelCallScene from './PanelCallScene'
 import PanelImages from './PanelImages'
-import { handsetOn } from './phoneActions'
 import { browserCountry, formatPhoneInput } from './phoneInput'
 import { splitOptions } from './wheelPicker'
 import { toClipPath } from './editor/transforms'
-import type { BubbleTransform, ImgTransform } from './editor/types'
+import type { BubbleTransform, CallSceneLayout, ImgTransform } from './editor/types'
 import type { PanelPoly } from './panelGeometry'
 import type { Panel } from './panels'
 import type { CallScene, PhoneActionHandlers } from './phoneActions'
@@ -27,6 +28,11 @@ interface ComicPanelProps {
     bubbles: BubbleTransform[]
     /** Per-chain behavior for the chain names carried by bubbles. */
     chains: BubbleChain[]
+    /**
+     * Every panel that has a phone-call layout, and where its seam runs. This panel draws
+     * its own while a call is up; the rest of the page's is nothing to it.
+     */
+    callScenes: CallSceneLayout[]
     /** Passed straight to PanelBubbles, which is where a chain binds to a real thread. */
     sms: UseSmsConversationsResult
     natSizes: Record<string, { w: number; h: number }>
@@ -54,8 +60,12 @@ interface ComicPanelProps {
     /** Makes the call/end-call keys of this panel's `actions` balloons a working handset. */
     phoneActions?: PhoneActionHandlers
     /**
-     * The page's call, while one is up. Drawn only by the panel with the handset, in place
-     * of its pictures and balloons (PanelCallScene); every other panel ignores it.
+     * The page's call, while one is up. Drawn only by a panel that has a call layout, in
+     * place of its ordinary pictures and balloons; every other panel ignores it.
+     *
+     * In the editor this is the synthetic scene Layout supplies while the author is
+     * working on the call layout — which is why nothing here asks whether the editor is
+     * up: "is this panel showing its call?" is one question with one answer.
      */
     call?: CallScene | null
     /** Mounts the Ben-Day dot canvas into Layout's animation loop. */
@@ -76,14 +86,21 @@ interface ComicPanelProps {
  * down through PanelBubbles, so neither half has to know the other exists.
  */
 export default function ComicPanel({
-    index, info, poly, images, bubbles, chains, sms, natSizes,
+    index, info, poly, images, bubbles, chains, callScenes, sms, natSizes,
     editorActive, hovered, isRevealed, isBubbleVisible, onNumberPadKey,
     onPhoneSubmit, phoneActions, call, dotRef, onSettled, onNatSize,
 }: ComicPanelProps) {
     const { bounds, vp } = poly
-    // The call scene, on the handset panel alone and never in the editor, where the
-    // author is placing the pictures the scene would cover.
-    const scene = call && !editorActive && handsetOn(bubbles, index) ? call : null
+    // This panel's call layout, if the author gave it one, and whether it is the layout
+    // showing right now: a scene needs both a seam to draw and a call to draw in it.
+    const layout = callSceneOn(callScenes, index)
+    const scene = layout && call ? call : null
+    // The seam, and which roles are on screen behind it. `null` roles is the ordinary
+    // layout — every picture and balloon that is not part of a call — and that is the
+    // whole switch: the two sets never overlap, so nothing is drawn twice.
+    const halves = layout && scene ? splitAt(vp, bounds, layout.cut, layout.axis) : null
+    const callRoles = scene ? rolesAtPhase(scene.phase) : null
+    const lit = scene ? litRoles(scene.phase, scene.transcript.speaking) : undefined
 
     // The dots clip tightly to the panel polygon (element-relative px coords). A
     // picture is windowed by that same polygon, offset into its own frame — which
@@ -198,9 +215,12 @@ export default function ComicPanel({
                 className="cb-dots-panel-canvas"
                 style={{ clipPath: dotClip }}
             />
-            {scene ? (
-                <PanelCallScene poly={poly} scene={scene} />
-            ) : (<>
+            {/* The seam a call puts across the panel — paper and ink only. What stands
+                on either side of it comes through the ordinary two components below,
+                which is what makes a call scene something an author can lay out. */}
+            {halves && (
+                <PanelCallScene bounds={bounds} vp={vp} halves={halves} />
+            )}
             {/* Pictures — however many name this panel, each on its own rectangular
                 frame over the panel box, each seen through the panel's polygon.
                 `spill` (and the editor's full-reveal selection) drops the clip so a
@@ -208,6 +228,9 @@ export default function ComicPanel({
             <PanelImages
                 images={images}
                 panel={index}
+                callRoles={callRoles}
+                halves={halves}
+                lit={lit}
                 bounds={bounds}
                 vp={vp}
                 natSizes={natSizes}
@@ -224,6 +247,11 @@ export default function ComicPanel({
                 bubbles={bubbles}
                 chains={chains}
                 panel={index}
+                callRoles={callRoles}
+                halves={halves}
+                lit={lit}
+                transcript={scene?.transcript}
+                bounds={bounds}
                 clip={dotClip}
                 isVisible={isBubbleVisible}
                 interactive={!editorActive}
@@ -237,7 +265,6 @@ export default function ComicPanel({
                 onPeerTexted={rememberNumber}
                 phoneActions={phoneActions}
             />
-            </>)}
         </div>
     )
 }

@@ -3,16 +3,23 @@ import { Fragment, useCallback, useEffect, useState } from 'react'
 import { chainIdsOn, chainMembers, defaultChain, peerPickerOn } from './bubbleChain'
 import type { BubbleChain } from './bubbleChain'
 import { isDialContent } from './bubbleContent'
+import { halfSlot } from './callSceneGeometry'
+import type { SceneHalf, SceneHalves } from './callSceneGeometry'
+import { CALL_TRANSCRIPT_LABELS, callSpeaker, halfFor, inRoles } from './callSceneRoles'
 import {
   bubbleClaim, bubbleKey, chainClaim, chainKey, CLAIM_NONE, keyboardOwner,
 } from './panelKeyboard'
 import type { KeyboardClaim } from './panelKeyboard'
 import PanelBubble from './PanelBubble'
 import PanelBubbleChain from './PanelBubbleChain'
-import type { BubbleTransform } from './editor/types'
+import { toClipPath } from './editor/transforms'
+import type { BubbleTransform, CallRole } from './editor/types'
+import type { Rect } from './panelGeometry'
 import type { PhoneActionHandlers } from './phoneActions'
 import { browserCountry, toE164 } from './phoneInput'
 import type { UseSmsConversationsResult } from '../../hooks/useSmsConversations'
+import { linesBy } from '../../lib/callTranscript'
+import type { CallTranscript } from '../../lib/callTranscript'
 import type { SmsConversationMessage } from '../../lib/smsConversation'
 
 /**
@@ -28,6 +35,14 @@ const NO_MESSAGES: readonly SmsConversationMessage[] = []
  */
 const EMPTY_DIALLED: string[] = []
 
+/** One shared "nothing lit", for the same reason. */
+const NONE_LIT: readonly CallRole[] = []
+
+/** A half's slot, or the panel's own clip when the balloon is not in one. */
+function slotClip(half: SceneHalf | null, panelClip: string): string {
+  return half ? toClipPath(half.pts, half.box.x, half.box.y) : panelClip
+}
+
 interface PanelBubblesProps {
   /** Every bubble on the page — `panel` decides which ones this panel draws. */
   bubbles: BubbleTransform[]
@@ -35,6 +50,28 @@ interface PanelBubblesProps {
   chains: BubbleChain[]
   /** Index of the panel being drawn, into PANELS. */
   panel: number
+  /**
+   * Which call roles are on screen, or `null` for the panel's ordinary layout — the whole
+   * of the layout switch, exactly as in PanelImages. It settles the panel's keyboard too:
+   * a field in the layout that is *not* showing states no claim, so drawing a call over a
+   * panel hands the keyboard to whatever the call itself draws.
+   */
+  callRoles?: CallRole[] | null
+  /**
+   * The panel cut in two, while a call is up on it. A balloon whose role names a side is
+   * placed in a slot at that side, so its `top`/`right`/`width` are percentages of the
+   * half it belongs to and the author frames it against what they can see.
+   */
+  halves?: SceneHalves | null
+  /** Roles inked heavy right now — the speaker's (`litRoles` in callSceneRoles.ts). */
+  lit?: readonly CallRole[]
+  /**
+   * The words of the call on this panel, for its `transcript` balloons. Each one shows its
+   * own role's seat; one with no role shows both seats in the order they were said.
+   */
+  transcript?: CallTranscript
+  /** Box of the panel being drawn, in viewport coords — where a half's slot sits inside it. */
+  bounds: Rect
   /** CSS clip-path of the panel polygon, for bubbles that don't spill. */
   clip: string
   /** Whether bubble `index` (into `bubbles`) is currently revealed. */
@@ -105,13 +142,16 @@ interface PanelBubblesProps {
 }
 
 /**
- * The bubbles belonging to one panel. A panel may own several or none — the array is
- * filtered by `panel` rather than indexed by it, so adding a bubble in the editor is
- * an append and never has to line up with anything.
+ * The bubbles belonging to one panel, in whichever of its layouts is showing. A panel may
+ * own several or none — the array is filtered by `panel` and `callRoles` rather than
+ * indexed by either, so adding a bubble in the editor is an append and never has to line
+ * up with anything.
  *
  * Each bubble is placed against this panel's box by `bubbleStyle`, so it must render
  * inside the panel element even when `spill` lets its ink cross the panel edge; that
- * is why this is a fragment of siblings and not its own positioned layer.
+ * is why this is a fragment of siblings and not its own positioned layer. A balloon in
+ * one half of a call scene gets a slot element at that half, and nothing else changes:
+ * its percentages then resolve against the half, which is the box the author framed it in.
  *
  * Bubbles naming a `chain` are pulled out of that flat list and handed to
  * PanelBubbleChain as the two templates of one SMS conversation — a table of balloons that
@@ -130,6 +170,11 @@ export default function PanelBubbles({
   bubbles,
   chains,
   panel,
+  callRoles = null,
+  halves = null,
+  lit = NONE_LIT,
+  transcript,
+  bounds,
   clip,
   isVisible,
   interactive,
@@ -144,13 +189,18 @@ export default function PanelBubbles({
   phoneActions,
 }: PanelBubblesProps) {
   const ids = editing ? [] : chainIdsOn(bubbles, panel)
-  const conversations = ids.map(id => ({
+  const threads = ids.map(id => ({
     id,
     members: chainMembers(bubbles, id, panel),
     chain: chains.find(c => c.id === id) ?? defaultChain(id),
   }))
-  // Indices the conversations have claimed, so the flat pass below skips them.
-  const claimed = new Set(conversations.flatMap(c => c.members))
+  // Indices the conversations have claimed, so the flat pass below skips them. Every
+  // thread on the panel, drawn or not: a member of a conversation the other layout owns
+  // is still not a loose balloon, and drawing it as one is how a hidden layout leaks.
+  const claimed = new Set(threads.flatMap(c => c.members))
+  // A conversation belongs to the layout its sender template does; the rest of its
+  // balloons follow, because a table split across two layouts is not a table.
+  const conversations = threads.filter(c => inRoles(bubbles[c.members[0]]?.call, callRoles))
 
   // The balloon whose options are phone numbers, or -1 on a panel with no picker.
   const pickerIndex = peerPickerOn(bubbles, panel)
@@ -172,7 +222,7 @@ export default function PanelBubbles({
   // changes what the first one is entitled to, which no balloon can see from inside.
   const claims: KeyboardClaim[] = [
     ...bubbles.flatMap((b, i) =>
-      b.panel === panel && !claimed.has(i)
+      b.panel === panel && !claimed.has(i) && inRoles(b.call, callRoles)
         ? [{ key: bubbleKey(i), claim: bubbleClaim(b.content) }]
         : [],
     ),
@@ -220,8 +270,20 @@ export default function PanelBubbles({
   return (
     <>
       {bubbles.map((bubble, i) => {
-        if (bubble.panel !== panel || claimed.has(i)) return null
+        if (bubble.panel !== panel || claimed.has(i) || !inRoles(bubble.call, callRoles)) {
+          return null
+        }
         const key = bubbleKey(i)
+        const half = halfFor(bubble.call, halves)
+        // A transcript's words are the call's, never the balloon's own text. The seat is
+        // the role's; a transcript with no role — an author's, outside any call layout —
+        // is a window on the whole conversation rather than on one side of it.
+        const seat = bubble.call ? callSpeaker(bubble.call) : null
+        const words = bubble.content !== 'transcript' || !transcript
+          ? undefined
+          : seat
+            ? linesBy(transcript, seat)
+            : transcript.lines
         const el = (
           <PanelBubble
             bubble={bubble}
@@ -244,15 +306,34 @@ export default function PanelBubbles({
             dialled={dialled}
             onDialChange={onDialChange}
             actions={bubble.content === 'actions' ? phoneActions : undefined}
+            lines={words}
+            linesLabel={
+              bubble.content === 'transcript'
+                ? CALL_TRANSCRIPT_LABELS[bubble.call ?? 'none']
+                : undefined
+            }
+            // Heavy while its seat is talking, and only on a transcript: the words are
+            // what "this voice is on the line" is about, so bolding the red key beside
+            // them would say the button was speaking.
+            bold={bubble.content === 'transcript' && bubble.call !== undefined
+              && lit.includes(bubble.call)}
           />
         )
-        // spill off: a clip wrapper hides the overflow behind the panel edge.
-        return bubble.spill ? (
-          <Fragment key={i}>{el}</Fragment>
+        // spill off: a clip wrapper hides the overflow behind the edge it belongs to —
+        // its half's while a call is up, the panel's otherwise.
+        const placed = bubble.spill ? (
+          el
         ) : (
-          <div key={i} className="cb-bubble-clip" style={{ clipPath: clip }}>
+          <div className="cb-bubble-clip" style={{ clipPath: slotClip(half, clip) }}>
             {el}
           </div>
+        )
+        return half ? (
+          <div key={i} className="cb-call-slot" style={halfSlot(half, bounds)}>
+            {placed}
+          </div>
+        ) : (
+          <Fragment key={i}>{placed}</Fragment>
         )
       })}
       {conversations.map(({ id, members, chain }) => {
@@ -290,13 +371,22 @@ export default function PanelBubbles({
         // Spill is the sender template's call for the whole conversation. A table whose
         // balloons disagreed would be clipped down one column, which reads as a rendering
         // fault rather than as a choice — and that template is the one whose tail decides
-        // how far the conversation may lean off the panel in the first place.
-        return bubbles[members[0]].spill ? (
-          <Fragment key={id}>{table}</Fragment>
+        // how far the conversation may lean off the panel in the first place. Its half is
+        // the conversation's too, for the same reason.
+        const half = halfFor(bubbles[members[0]].call, halves)
+        const placed = bubbles[members[0]].spill ? (
+          table
         ) : (
-          <div key={id} className="cb-bubble-clip" style={{ clipPath: clip }}>
+          <div className="cb-bubble-clip" style={{ clipPath: slotClip(half, clip) }}>
             {table}
           </div>
+        )
+        return half ? (
+          <div key={id} className="cb-call-slot" style={halfSlot(half, bounds)}>
+            {placed}
+          </div>
+        ) : (
+          <Fragment key={id}>{placed}</Fragment>
         )
       })}
     </>

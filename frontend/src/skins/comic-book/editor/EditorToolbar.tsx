@@ -1,8 +1,10 @@
 import { useMemo, useState } from 'react'
 
 import { logger } from '../../../lib/logger'
+import { callSceneOn } from '../callSceneRoles'
 import type { LayoutKind, PanelGrid } from '../panelGeometry'
 import type { PanelPage } from '../panels'
+import type { CallScenePhase } from '../phoneActions'
 import { layoutViolations } from './configParity'
 import InspectorPanel from './InspectorPanel'
 import LayoutWarnings from './LayoutWarnings'
@@ -55,6 +57,13 @@ type ShipState =
  */
 type SaveState = { phase: 'idle' } | { phase: 'done' } | { phase: 'error'; message: string }
 
+/** The layout switch's three positions: the ordinary contents, and the call's two states. */
+const CALL_LAYOUTS: readonly (readonly [CallScenePhase | null, string])[] = [
+  [null, 'Default'],
+  ['ringing', 'Ringing'],
+  ['connected', 'Connected'],
+]
+
 interface EditorToolbarProps {
   api: EditorModeApi
   /** The panel a new picture or bubble would go on, or null. */
@@ -87,6 +96,9 @@ export default function EditorToolbar({ api, selPanel, pageSelect, shapes }: Edi
   // finished mid-session stops being reported the moment it is finished. See
   // ./configParity.ts for which rules are structural and which belong to today's layout.
   const violations = useMemo(() => layoutViolations(config), [config])
+
+  // A panel is a call once, so the button that makes one goes dead on a panel that is.
+  const callOnSelected = selPanel !== null && callSceneOn(config.callScenes, selPanel) !== undefined
 
   const onShip = () => {
     setShip({ phase: 'busy' })
@@ -245,6 +257,44 @@ export default function EditorToolbar({ api, selPanel, pageSelect, shapes }: Edi
           >
             + SMS
           </button>
+          {/* A phone call is the same argument again, one size up: three figures, two
+              transcripts and a key to hang up with, each framed against a half of a panel
+              that does not exist until one of them says it does. */}
+          <button
+            type="button"
+            className="cb-ed-btn"
+            disabled={selPanel === null || callOnSelected}
+            title={
+              selPanel === null
+                ? 'Select a panel first'
+                : callOnSelected
+                  ? 'This panel is already a phone call'
+                  : `Turn ${api.config.panels[selPanel]?.label ?? `panel ${selPanel}`} into a phone call`
+            }
+            onClick={() => selPanel !== null && api.addCallOn(selPanel)}
+          >
+            + Call
+          </button>
+        </div>
+      )}
+
+      {/* Which layout the page's calls are showing. Three positions and not a checkbox
+          plus a phase: what a scene draws differs between ringing and connected — one
+          figure or two, and whose words are lit — so an author framing it has to be able
+          to stand in either. Session state, so the page comes back on Default. */}
+      {mode === 'content' && config.callScenes.length > 0 && (
+        <div className="cb-ed-modes" role="group" aria-label="Call layout">
+          {CALL_LAYOUTS.map(([phase, label]) => (
+            <button
+              key={label}
+              type="button"
+              className={`cb-ed-btn${api.callPhase === phase ? ' cb-ed-btn-on' : ''}`}
+              aria-pressed={api.callPhase === phase}
+              onClick={() => api.setCallPhase(phase)}
+            >
+              {label}
+            </button>
+          ))}
         </div>
       )}
 

@@ -1,11 +1,14 @@
 import { mirrorTailDir } from '../bubbleBox'
 import { chainMembers, mirrorColumn } from '../bubbleChain'
+import { patchCallSceneIn } from './callSceneOps'
 import { linkGroups, nextChainId, normalizeChainId, patchChainIn } from './chainOps'
 import type { PanelBgStyle } from '../panelPatterns'
 import { cloneConfig, cloneImg, NEW_BUBBLE, NEW_IMAGE, seedConfig } from './configSeed'
 import { sanitizeLinks } from './configHydrate'
 import { reconcile } from './reconcile'
-import type { BubbleChain, BubbleTransform, EditorConfig, ImgTransform } from './types'
+import type {
+  BubbleChain, BubbleTransform, CallSceneLayout, EditorConfig, ImgTransform,
+} from './types'
 
 // Every change the editor makes to its working copy, as pure functions on a config.
 // They live apart from useEditorMode.ts so they can be tested without React, and
@@ -19,12 +22,16 @@ import type { BubbleChain, BubbleTransform, EditorConfig, ImgTransform } from '.
 // ./chainOps.ts is the exception: the chain list is derived rather than edited, so the
 // ops that maintain it are called from in here and are not part of the editor's surface.
 // ./chainCreate.ts is the one op that builds a *whole* conversation, and ./reconcile.ts is
-// the settling step both of those files run.
+// the settling step both of those files run. ./callSceneOps.ts and ./callSceneCreate.ts
+// are the same pair again for phone-call layouts — a derived list and the one op that
+// builds a whole scene — which is why neither has an add or a delete of its own.
 
 export { CONFIG_KEY, NEW_BUBBLE, NEW_IMAGE, cloneConfig, resetGrid, seedConfig, setGrid } from './configSeed'
 export { hydrateConfig, sanitizeLinks } from './configHydrate'
 export { NEW_CHAIN } from './chainOps'
+export { CALL_CUT } from './callSceneOps'
 export { addPeerPicker, addSmsConversation } from './chainCreate'
+export { addCallScene } from './callSceneCreate'
 
 
 /**
@@ -38,15 +45,25 @@ export function patchPattern(config: EditorConfig, panel: number, style: PanelBg
   return next
 }
 
-/** Patch-merge a single image entry, returning a new config. */
+/**
+ * Patch-merge a single image entry, returning a new config. Reconciled afterwards because
+ * `call` and `panel` are both fields a patch can carry, and either one decides whether the
+ * picture's panel is drawing a phone call at all.
+ */
 export function patchImg(
   config: EditorConfig,
   index: number,
   patch: Partial<ImgTransform>,
 ): EditorConfig {
   const next = cloneConfig(config)
-  if (next.images[index]) next.images[index] = cloneImg({ ...next.images[index], ...patch })
-  return next
+  if (!next.images[index]) return next
+  const merged = cloneImg({ ...next.images[index], ...patch })
+  // Absence is how "not part of a call" is spelled, everywhere — a patch clearing the role
+  // must leave the picture without the key rather than with an undefined one, or the
+  // serializer writes `call: undefined` and `'call' in img` stops meaning anything.
+  if ('call' in patch && patch.call === undefined) delete merged.call
+  next.images[index] = merged
+  return reconcile(next)
 }
 
 /**
@@ -66,8 +83,25 @@ export function patchBubble(
   // Normalised here, not in the inspector, so a name typed with a stray trailing space
   // joins the chain the author meant rather than starting a second one beside it.
   if (patch.chain !== undefined) merged.chain = normalizeChainId(merged.chain)
+  // Absence, not undefined — see patchImg.
+  if ('call' in patch && patch.call === undefined) delete merged.call
   next.bubbles[index] = merged
   return reconcile(next)
+}
+
+/**
+ * Patch-merge one panel's call scene — where its seam falls and which way it runs.
+ * There is no add or remove counterpart: the list follows the entries (see
+ * {@link reconcile}), exactly as the chain list does.
+ */
+export function patchCallScene(
+  config: EditorConfig,
+  panel: number,
+  patch: Partial<CallSceneLayout>,
+): EditorConfig {
+  const next = cloneConfig(config)
+  next.callScenes = patchCallSceneIn(next.callScenes, panel, patch)
+  return next
 }
 
 /**
@@ -115,19 +149,20 @@ export function addImg(
 ): { config: EditorConfig; index: number } {
   const next = cloneConfig(config)
   next.images.push({ ...NEW_IMAGE, panel })
-  return { config: next, index: next.images.length - 1 }
+  return { config: reconcile(next), index: next.images.length - 1 }
 }
 
 /**
  * Remove picture `index`, returning a new config. Nothing refers to a picture by index
  * the way a bubble's `linkTo` refers to a bubble, so this is the plain splice its
- * counterpart cannot be.
+ * counterpart cannot be — but it is still reconciled, because deleting the last entry
+ * that carried a role is how a panel stops being a phone call.
  */
 export function removeImg(config: EditorConfig, index: number): EditorConfig {
   const next = cloneConfig(config)
   if (!next.images[index]) return next
   next.images.splice(index, 1)
-  return next
+  return reconcile(next)
 }
 
 /** Append a bubble on `panel`, returning the new config and the new bubble's index. */

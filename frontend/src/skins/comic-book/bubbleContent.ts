@@ -1,4 +1,11 @@
-/** The seven ways a panel bubble can present its authored text. */
+/**
+ * The eight ways a panel bubble can present its authored text.
+ *
+ * 'transcript' is the one that presents something *else*: the words come from the call on
+ * the balloon's panel and its own `text` is ignored. It is here rather than in a component
+ * of its own because everything else about it is an ordinary balloon — a shape, a tail, a
+ * place on the panel, all of it draggable — and a call's words are worth no less.
+ */
 export type BubbleContentKind =
   | 'text'
   | 'wheel'
@@ -7,6 +14,7 @@ export type BubbleContentKind =
   | 'dial'
   | 'dial-call'
   | 'actions'
+  | 'transcript'
 
 export const BUBBLE_CONTENT_KINDS: BubbleContentKind[] = [
   'text',
@@ -16,6 +24,7 @@ export const BUBBLE_CONTENT_KINDS: BubbleContentKind[] = [
   'dial',
   'dial-call',
   'actions',
+  'transcript',
 ]
 
 /**

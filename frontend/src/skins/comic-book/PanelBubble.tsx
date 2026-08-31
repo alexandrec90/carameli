@@ -22,6 +22,7 @@ import type { BubbleTransform } from './editor/types'
 import type { PhoneActionHandlers } from './phoneActions'
 import { useBubbleMorph } from './useBubbleMorph'
 import { splitOptions } from './wheelPicker'
+import type { CallTranscriptLine } from '../../lib/callTranscript'
 
 /** How long a press holds its shape before easing back to the resting one. */
 const PULSE_MS = 560
@@ -31,6 +32,9 @@ const noop = (): void => undefined
 
 /** One shared empty list, so a dial's shortlist is not rebuilt on every render. */
 const NOTHING_DIALLED: string[] = []
+
+/** The same for a transcript balloon with no call behind it. */
+const NO_LINES: readonly CallTranscriptLine[] = []
 
 interface PanelBubbleProps {
   bubble: BubbleTransform
@@ -98,6 +102,20 @@ interface PanelBubbleProps {
    * animated dots.
    */
   status?: 'sending' | 'failed' | 'typing'
+  /**
+   * A `transcript` balloon's words — one seat's side of the call on its panel, oldest
+   * first. The balloon's own `text` says nothing here: a transcript is what was *said*,
+   * and an authored line in it would be a word nobody spoke. Absent on a transcript
+   * balloon with no call behind it, which then draws empty.
+   */
+  lines?: readonly CallTranscriptLine[]
+  /** Accessible name for that log — whose words these are. */
+  linesLabel?: string
+  /**
+   * Ink this balloon heavy whatever the pointer is doing. The call scene's, for the seat
+   * that is talking: the same weight a hover gives, meaning "this voice is on the line".
+   */
+  bold?: boolean
 }
 
 /**
@@ -124,6 +142,9 @@ export default function PanelBubble({
   dialled = NOTHING_DIALLED,
   actions,
   status,
+  lines = NO_LINES,
+  linesLabel,
+  bold = false,
 }: PanelBubbleProps) {
   const [hover, setHover] = useState(false)
   const [focused, setFocused] = useState(false)
@@ -131,8 +152,18 @@ export default function PanelBubble({
   const timerRef = useRef(0)
   // Handed to BubbleWheel so its wheel listener covers the whole balloon.
   const rootRef = useRef<HTMLDivElement>(null)
+  // The transcript's scrolling window, so the newest line can be kept in view.
+  const logRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => () => window.clearTimeout(timerRef.current), [])
+
+  // The newest line stays in view: a transcript only grows, so the window follows its end
+  // whenever a line lands. The reader's wheel scrolls back between lines. A no-op on every
+  // other kind of balloon, where the ref is never attached.
+  useEffect(() => {
+    const el = logRef.current
+    if (el) el.scrollTop = el.scrollHeight
+  }, [lines.length])
 
   const pulse = (): void => {
     window.clearTimeout(timerRef.current)
@@ -164,6 +195,10 @@ export default function PanelBubble({
   // wrapper's aria and focus handling actually asks — a dial has one too, and so do the
   // action buttons.
   const hasField = editableKind !== null || dial || bubble.content === 'actions'
+  // A window on the call rather than on `text`. Not a field — there is nothing to type
+  // into it — but not decorative either: it is a live region, so it keeps its words
+  // reachable instead of being hidden from a reader who cannot see the drawing.
+  const transcript = bubble.content === 'transcript'
   // The dial's drum: what the author listed, then what has been dialled that they did not.
   // Memoized so the filter BubbleDial runs over it survives a hover — this balloon
   // re-renders on every pointer enter and leave. Its re-seat keys on the contents rather
@@ -187,7 +222,7 @@ export default function PanelBubble({
     // component, so a linked partner, the tube between them and the rows above this one
     // in a chain are all somebody else's render and keep the resting weight. The tail
     // and the thought puffs do bold, because they are the same ring and the same class.
-    hover && bubble.hoverBold ? 'is-bold' : '',
+    (hover && bubble.hoverBold) || bold ? 'is-bold' : '',
   ]
     .filter(Boolean)
     .join(' ')
@@ -196,7 +231,7 @@ export default function PanelBubble({
     <div
       ref={rootRef}
       className={className}
-      aria-hidden={hasField ? undefined : true}
+      aria-hidden={hasField || transcript ? undefined : true}
       style={bubbleStyle(bubble)}
       // On the wrapper, though the wrapper itself takes no pointer: enter and leave
       // are synthesized from the subtree, so this is "the pointer is somewhere in the
@@ -277,6 +312,19 @@ export default function PanelBubble({
         />
       ) : bubble.content === 'actions' ? (
         <BubbleActions text={bubble.text} font={font} enabled={interactive} actions={actions} />
+      ) : transcript ? (
+        <div
+          ref={logRef}
+          className="cb-panel-bubble-text cb-call-transcript"
+          style={{ fontFamily: `'${font}', cursive` }}
+          role="log"
+          aria-label={linesLabel}
+          aria-live="polite"
+        >
+          {lines.map(line => (
+            <p key={line.id} className="cb-call-line">{line.text}</p>
+          ))}
+        </div>
       ) : bubble.content === 'wheel' ? (
         <BubbleWheel
           options={splitOptions(bubble.text)}

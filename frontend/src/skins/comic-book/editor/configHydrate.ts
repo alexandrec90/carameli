@@ -1,9 +1,11 @@
 import { logger } from '../../../lib/logger'
 import { isTailDir } from '../bubbleBox'
 import { isBubbleContentKind } from '../bubbleContent'
+import { isCallRole } from '../callSceneRoles'
 import { isPanelBgStyle, PATTERN_STYLE_KEYS } from '../panelPatterns'
 import type { PanelBgStyle } from '../panelPatterns'
 import { isBubbleType } from './bubbleTypes'
+import { hydrateCallScenes, syncCallScenes } from './callSceneOps'
 import { hydrateChains, normalizeChainId, propagateChains, syncChains } from './chainOps'
 import { isPanelList } from './configPanels'
 import { CONFIG_KEY, cloneGrids, NEW_BUBBLE, NEW_IMAGE, seedConfig } from './configSeed'
@@ -12,7 +14,7 @@ import { coerceNumberPad } from './numberPadValidate'
 import { isPageGrids } from './panelGridValidate'
 import { normalizePageLabels } from './configPages'
 import { coerceTable } from './tableValidate'
-import type { BubbleTransform, EditorConfig, ImgTransform } from './types'
+import type { BubbleTransform, CallRole, EditorConfig, ImgTransform } from './types'
 
 // Reading a persisted working copy back. Everything here exists because a payload
 // outlives the code that wrote it: fields get added, names get retired, and a saved
@@ -92,6 +94,28 @@ function coerceBubbleEnums(b: BubbleTransform): BubbleTransform {
   if (Object.keys(dropped).length > 0) {
     logger.warn('Dropped retired comic-book bubble attributes', { key: CONFIG_KEY, dropped })
   }
+  return next
+}
+
+/**
+ * Drop a `call` role that is no longer one — or never was.
+ *
+ * Deleted rather than defaulted, because unlike a shape or a tail there is no neutral role
+ * to fall back to: every role puts the entry in a *particular* half of a particular layout,
+ * and guessing one would move a picture the author never meant to be in a call into it.
+ * Absence is exactly the state that says "part of this panel's ordinary layout", which is
+ * where an entry naming a role the skin no longer knows belongs.
+ *
+ * Shared by both arrays rather than folded into {@link coerceBubbleEnums}, because a picture
+ * carries the field too and has no enum pass of its own — and because a role dropped from
+ * a picture is the one that can take a whole call layout apart with it.
+ */
+function coerceCallRole<T extends { call?: CallRole }>(entry: T): T {
+  if (entry.call === undefined || isCallRole(entry.call)) return entry
+  const dropped = entry.call
+  const next = { ...entry }
+  delete next.call
+  logger.warn('Dropped retired comic-book call role', { key: CONFIG_KEY, dropped })
   return next
 }
 
@@ -191,42 +215,43 @@ export function hydrateConfig(raw: string | null): EditorConfig {
         // half of that: the payload also *outlives* names that have since been
         // retired, and merging over NEW_BUBBLE cannot catch one because the field is
         // present, just no longer meaningful.
-        coerceBubbleEnums(
+        coerceCallRole(coerceBubbleEnums(
           clampPanel({ panel: 0, ...NEW_BUBBLE, ...(b as Partial<BubbleTransform>) }, count),
-        ),
+        )),
       ),
     ))
+    const images = parsed.images.map((t, i) => {
+      // Typed as possibly-absent because the payload may be longer than the seed:
+      // a ninth picture the author added has no shipped entry to recover from, and
+      // the template is then the whole answer.
+      const shipped = seed.images[i] as ImgTransform | undefined
+      const merged = coerceCallRole(clampPanel({
+        panel: 0,
+        ...NEW_IMAGE,
+        ...shipped,
+        ...(t as Partial<ImgTransform>),
+      }, count))
+      // Projected content is nested, so a payload written before a field existed — or
+      // with a cell that came back as a number — needs repair inside rather than a
+      // whole-value merge. Each coercer returns undefined for the ordinary case of a
+      // picture that is not that surface, and absent keys stay absent.
+      const table = coerceTable(merged.table)
+      const numberPad = coerceNumberPad(merged.numberPad)
+      const plain = { ...merged }
+      delete plain.table
+      delete plain.numberPad
+      // Existing table payloads win if a hand-edited config names both. The editor
+      // presents one projected-content choice and never writes the ambiguous state.
+      if (table) return { ...plain, table }
+      if (numberPad) return { ...plain, numberPad }
+      return plain
+    })
     return {
       pageLabels: normalizePageLabels(parsed.pageLabels),
       panels,
       grids,
       patterns: normalizePatterns(parsed.patterns, count),
-      images: parsed.images.map((t, i) => {
-        // Typed as possibly-absent because the payload may be longer than the seed:
-        // a ninth picture the author added has no shipped entry to recover from, and
-        // the template is then the whole answer.
-        const shipped = seed.images[i] as ImgTransform | undefined
-        const merged = clampPanel({
-          panel: 0,
-          ...NEW_IMAGE,
-          ...shipped,
-          ...(t as Partial<ImgTransform>),
-        }, count)
-        // Projected content is nested, so a payload written before a field existed — or
-        // with a cell that came back as a number — needs repair inside rather than a
-        // whole-value merge. Each coercer returns undefined for the ordinary case of a
-        // picture that is not that surface, and absent keys stay absent.
-        const table = coerceTable(merged.table)
-        const numberPad = coerceNumberPad(merged.numberPad)
-        const plain = { ...merged }
-        delete plain.table
-        delete plain.numberPad
-        // Existing table payloads win if a hand-edited config names both. The editor
-        // presents one projected-content choice and never writes the ambiguous state.
-        if (table) return { ...plain, table }
-        if (numberPad) return { ...plain, numberPad }
-        return plain
-      }),
+      images,
       bubbles,
       // Rebuilt from the bubbles rather than trusted: the list is derived, so a payload
       // written before chains existed, one hand-edited into naming a chain nothing is
@@ -234,6 +259,12 @@ export function hydrateConfig(raw: string | null): EditorConfig {
       // chains the balloons describe — carrying over the settings of every entry that
       // is still real.
       chains: syncChains(bubbles, hydrateChains(parsed.chains)),
+      // Rebuilt from the entries for the same reason, and from *both* arrays: a panel is a
+      // phone call for as long as some picture or balloon on it carries a role, so a payload
+      // written before call layouts existed, one naming a seam on a panel where nothing
+      // carries a role, and one whose last call picture was deleted all come back agreeing with
+      // what is actually drawn — keeping the seam of every scene that is still real.
+      callScenes: syncCallScenes(images, bubbles, hydrateCallScenes(parsed.callScenes)),
     }
   } catch (err) {
     logger.warn('Discarding malformed comic-book editor config', {

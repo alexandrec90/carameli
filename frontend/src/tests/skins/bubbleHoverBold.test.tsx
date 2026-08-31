@@ -12,6 +12,9 @@ import type { BubbleTransform } from '../../skins/comic-book/editor/types'
 import type { EditorModeApi } from '../../skins/comic-book/editor/useEditorMode'
 import { idleSms } from './smsStub'
 
+/** The box a balloon's percentages are measured against — the panel's, or half of one. */
+const PANEL_BOX = { x: 0, y: 0, w: 400, h: 300 }
+
 // `hoverBold`: the third thing a balloon can do about the pointer, beside the two shape
 // morphs. Weight is a stroke rather than a shape, so it is a class and a stroke-width and
 // not a fourth entry in SHAPES.
@@ -97,6 +100,7 @@ describe('the bold stops at the balloon under the pointer', () => {
         bubbles={pair}
         chains={[]}
         panel={0}
+        bounds={PANEL_BOX}
         clip="none"
         isVisible={() => true}
         interactive

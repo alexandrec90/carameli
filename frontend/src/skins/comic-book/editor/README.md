@@ -58,6 +58,18 @@ the **same panel** — the editor only offers same-panel partners, and the rende
 any cross-panel link it is handed, because half a tube appearing on a different hover
 cannot read as one utterance.
 
+**A panel can hold a second layout, and a phone call is what one is for.** A picture or a
+bubble may carry a `call` role — `ringing` / `remote` (the far end before and after the
+pickup), `local` (the caller), `scene` (across the whole panel). Carrying one puts the
+entry in that panel's *call* layout and takes it out of the panel's ordinary one, and
+carrying none keeps it in the ordinary one; the field is absent rather than `null` when
+there is no role, so nothing has to be written on the entries that are not part of a call.
+`PANEL_CALL_SCENES` records only where each call panel is cut (`panel` / `cut` / `axis`) —
+membership is the roles, so the list is *derived* from them on every edit, and there is no
+way to have a scene with no members or a role with no scene. See
+[`../callSceneRoles.ts`](../callSceneRoles.ts) for what each role means and
+[`callSceneOps.ts`](./callSceneOps.ts) for the derivation.
+
 **A bubble chain is one SMS conversation, drawn as a table of two columns.** **Linkage is
 what makes one.** Link two balloons together with the `link to` picker — the same field
 that declares a connector tube — and tick **scrollable chain** on either: the rightmost of
@@ -297,6 +309,28 @@ different images can only crossfade. A new bubble type belongs in `bubbleShape.t
        placements, so you are always dragging the columns themselves rather than chasing a
        row an animation put somewhere. Nothing binds and nothing sends while the editor is
        open.
+   - **+ Call** (toolbar) turns the selected panel into a phone call: it splits down the
+     middle and gets the far end, the caller, a transcript balloon each and a red **End
+     call** key. Any panel will do — the button is only disabled on one that is already a
+     call, and the reason is in its tooltip.
+     - **Call layout** (toolbar) is the switch: **Default** is the panel's ordinary
+       contents, **Ringing** and **Connected** are the two moments of the call. It appears
+       once the page has a call on it. Everything in the call layout is edited on Ringing
+       or Connected — on Default it is off screen and there is nothing to click, because a
+       handle over something that is not drawn moves a picture you cannot see moving.
+     - **Frame each side against its own half.** A picture or balloon with a role is
+       placed inside the half its role names, so `left`/`top`/`width` are percentages of
+       *that half* — drag, resize and pan work exactly as they do on a whole panel.
+     - **call seam** and **call split** (panel inspector, on a call panel) move the line
+       between the two halves and turn it — side by side, or one above the other.
+     - **call role** (any picture or bubble inspector) is what actually decides which
+       layout an entry is in: pick a role to move it into the call, *Not part of a call* to
+       take it back out. Picking one takes the page to the layout it just joined, since
+       otherwise the entry would vanish and nothing would appear to have happened. Add an
+       ordinary **+ Image** or **+ Bubble** to a call panel and give it a role to put more
+       than one thing in a half.
+     - There is **no delete-the-call button**: take the role off the last entry and the
+       split goes with it.
    - **+ Image** / **+ Bubble** / **+ SMS** (toolbar) append a new picture, bubble or
      conversation to the selected panel — select the panel, a picture on it or a bubble on
      it first, so there is a panel to add to — and select what they added. **Delete image** /

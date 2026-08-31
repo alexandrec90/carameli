@@ -163,14 +163,24 @@ export function linkedPairs(
  * shows when its own panel is hovered — every bubble on that panel does, so a linked
  * pair arrives and leaves together and no tube is ever left anchored to a hidden end —
  * or whenever the editor is up and every bubble has to be selectable.
+ *
+ * A balloon belonging to a call layout is exempt: it is on screen because the telephone
+ * is in use, and a reader watching a call should not have to keep the pointer on the
+ * panel to read the words. Whether it is drawn at all was already decided upstream by
+ * the layout the panel is showing (see callSceneRoles.inRoles), so there is nothing for
+ * hover to add. Before the scene was rebuilt out of ordinary pictures and balloons it
+ * drew its own transcript unconditionally, and this is where that behaviour now lives.
  */
 export function isBubbleRevealed(
-  bubbles: { panel: number }[],
+  bubbles: { panel: number; call?: string }[],
   hovered: number | null,
   editorActive: boolean,
   index: number,
 ): boolean {
   if (editorActive) return true
+  const bubble = bubbles[index]
+  if (!bubble) return false
+  if (bubble.call !== undefined) return true
   if (hovered === null) return false
-  return bubbles[index]?.panel === hovered
+  return bubble.panel === hovered
 }

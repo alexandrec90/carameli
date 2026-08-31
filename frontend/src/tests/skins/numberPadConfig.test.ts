@@ -28,12 +28,13 @@ function reparseConfig(source: string): EditorConfig {
     .replace(/export const PANEL_IMG_TRANSFORMS: ImgTransform\[\] =/, 'const images =')
     .replace(/export const PANEL_BUBBLE_TRANSFORMS: BubbleTransform\[\] =/, 'const bubbles =')
     .replace(/export const PANEL_BUBBLE_CHAINS: BubbleChain\[\] =/, 'const chains =')
+    .replace(/export const PANEL_CALL_SCENES: CallSceneLayout\[\] =/, 'const callScenes =')
     .replace(/export const PANEL_PATTERNS: PanelBgStyle\[\] =/, 'const patterns =')
     .replace(/export const PANEL_GRIDS: PageGrids =/, 'const grids =')
   const leftovers = body.match(/^export .*$/gm)
   if (leftovers) throw new Error(`Unparsed config declarations: ${leftovers.join(', ')}`)
   return new Function(
-    `${body}\nreturn { pageLabels, panels, images, bubbles, chains, grids, patterns }`,
+    `${body}\nreturn { pageLabels, panels, images, bubbles, chains, callScenes, grids, patterns }`,
   )() as EditorConfig
 }
 

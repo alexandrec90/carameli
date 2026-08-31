@@ -1,33 +1,32 @@
-/* The call scene: the telephone's panel split in two while a call is up
-   (PanelCallScene.tsx, CallBubble.tsx). Imported by bubbles.css beside the other
-   bubble sheets, so Layout.tsx's import list is unchanged. */
+/* The call scene: a panel split in two while a call is up (PanelCallScene.tsx). Imported
+   by bubbles.css beside the other bubble sheets, so Layout.tsx's import list is unchanged.
 
-.cb-call-half {
+   There is no rule here placing anything: the scene's pictures and balloons are ordinary
+   authored entries now, framed against their half by layoutConfig.ts. What is left is
+   what the author cannot express — the seam, the ink around each half, and how a
+   transcript's window behaves. */
+
+/* One half's box, inside the panel element. Everything a role puts on that half — its
+   pictures, its balloons, a whole SMS conversation if the author drew one there — is
+   positioned inside a slot, which is what makes the half the box its percentages mean. */
+.cb-call-slot {
   position: absolute;
   overflow: visible;
 }
 
-/* A half's picture fills the half and is windowed by its polygon (clip-path inline),
-   the way a panel picture is windowed by its panel. It takes .cb-panel-img's rest
-   filter (comic-book.css) but never that class's hover release: the panel drops
-   cb-panel-hot for the life of the scene, and a half lights for exactly one reason. */
-.cb-call-art {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.cb-call-half.is-speaking .cb-call-art {
+/* A call's pictures are ordinary panel pictures (PanelImages.tsx), framed against their
+   half and windowed by its polygon, so they take .cb-panel-img's rest filter from
+   comic-book.css. What they never take is that class's hover release: the panel drops
+   cb-panel-hot for the life of the scene, and a picture in a call lights for exactly one
+   reason — the person in it is the one talking. */
+.cb-img-clip.is-speaking .cb-panel-img {
   filter: none;
 }
 
-/* Paper between the halves, over the panel's dots. */
+/* Paper between the halves, over the panel's dots. Placed inline: the seam runs down or
+   across depending on the scene's axis, so which of the four edges are pinned is data. */
 .cb-call-gutter {
   position: absolute;
-  top: 0;
-  height: 100%;
   background: var(--cb-white);
 }
 
@@ -48,29 +47,17 @@
   stroke-linejoin: miter;
 }
 
-/* A call balloon sits over the head of the figure in its half, upright: a transcript
-   reads as text, not as lettering, and a tilted scrolling column reads as a fault. */
-.cb-panel-bubble.cb-call-bubble {
-  --cb-bubble-rot: 0deg;
+/* A window over a transcript that only grows: it scrolls, and takes the wheel itself,
+   since the balloon wrapper is pointer-transparent (see bubbles.css).
 
-  top: 2%;
-  right: auto;
-  left: 12%;
-  width: 76%;
-}
-
-/* The words, then — on the caller's side — the red key under them. */
-.cb-call-bubble-body {
+   Written against both classes because it shares an element with .cb-panel-bubble-text
+   (bubbles.css), which centres a single line of lettering in a flex box. A column of
+   lines wants the opposite of all three of those, and one class each would leave which
+   wins to the order two sheets happen to be imported in. */
+.cb-panel-bubble-text.cb-call-transcript {
   flex-direction: column;
   align-items: stretch;
-  justify-content: flex-end;
-  gap: 0.35em;
-}
-
-/* A window over a transcript that only grows: it scrolls, and takes the wheel itself,
-   since the balloon wrapper is pointer-transparent (see bubbles.css). */
-.cb-call-transcript {
-  flex: 1 1 auto;
+  justify-content: flex-start;
   min-height: 0;
   overflow-y: auto;
   text-align: left;
@@ -80,9 +67,4 @@
 
 .cb-call-line {
   margin: 0 0 0.3em;
-}
-
-.cb-call-end {
-  flex: 0 0 auto;
-  align-self: center;
 }

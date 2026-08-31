@@ -1,8 +1,12 @@
 import { PANEL_ASSETS } from './assets'
 import { PANEL_PAGES } from '../panels'
+import { CALL_SCENE_ALT, CALL_SCENE_ART } from '../callScene'
+import { cloneCallScene } from './callSceneOps'
 import { cloneChain } from './chainOps'
+import { HANGUP_KEY } from '../phoneActions'
 import {
   PANEL_BUBBLE_CHAINS,
+  PANEL_CALL_SCENES,
   PANEL_IMG_TRANSFORMS,
   PANEL_BUBBLE_TRANSFORMS,
   PANEL_GRIDS,
@@ -14,6 +18,7 @@ import { cloneNumberPad } from './numberPadValidate'
 import { cloneTable } from './tableValidate'
 import type {
   BubbleTransform,
+  CallRole,
   EditorConfig,
   ImgTransform,
   LayoutKind,
@@ -111,6 +116,68 @@ export const NEW_PEER_PICKER: Omit<BubbleTransform, 'panel'> = {
   text: '',
 }
 
+/**
+ * One of a call scene's figures, filling its half exactly.
+ *
+ * 0/0/100/100 rather than {@link NEW_IMAGE}'s inset, and that is the whole reason this
+ * constant exists: a call's pictures are *the halves* — the panel has been cut in two so
+ * that each side can hold one — so a figure landing four fifths of the way across its own
+ * half would read as the cut having gone wrong rather than as a picture waiting to be
+ * dragged. Every other framing is the author's from there.
+ */
+export function newCallArt(role: Exclude<CallRole, 'scene'>): Omit<ImgTransform, 'panel'> {
+  return {
+    ...NEW_IMAGE,
+    src: CALL_SCENE_ART[role],
+    alt: CALL_SCENE_ALT[role],
+    left: 0,
+    top: 0,
+    width: 100,
+    height: 100,
+    call: role,
+  }
+}
+
+/**
+ * One party's words: a plain balloon over the head of the figure in its half, upright,
+ * whose content kind makes it a window over that side of the transcript.
+ *
+ * Upright (`rotate: 0`) and untilted on purpose — a transcript reads as text rather than
+ * as lettering, and a scrolling column at an angle reads as a fault. `spill` is on because
+ * the balloon is placed against the *half*, which is small: an ellipse clipped at the seam
+ * would be cut in half by the very cut it is describing.
+ */
+export const NEW_CALL_TRANSCRIPT: Omit<BubbleTransform, 'panel'> = {
+  ...NEW_BUBBLE,
+  top: 2,
+  right: 12,
+  width: 76,
+  rotate: 0,
+  spill: true,
+  tail: 'down',
+  content: 'transcript',
+  text: '',
+}
+
+/**
+ * The red key that ends the call, as an ordinary `actions` balloon rather than a control
+ * welded into the transcript. `phoneActions.ts` already folds this label onto the drawn
+ * key, and `ComicPanel` already hands every `actions` balloon the softphone's handlers, so
+ * the key works from the moment it is added and can be dragged anywhere the author likes —
+ * which is the point of the scene being made of ordinary entries.
+ */
+export const NEW_CALL_END_KEY: Omit<BubbleTransform, 'panel'> = {
+  ...NEW_BUBBLE,
+  top: 74,
+  right: 38,
+  width: 24,
+  rotate: 0,
+  spill: true,
+  tail: 'none',
+  content: 'actions',
+  text: HANGUP_KEY.label,
+}
+
 export const LAYOUT_KINDS: LayoutKind[] = ['landscape', 'portrait', 'square']
 
 /**
@@ -163,6 +230,7 @@ export function seedConfig(): EditorConfig {
     images: PANEL_IMG_TRANSFORMS.map(cloneImg),
     bubbles: PANEL_BUBBLE_TRANSFORMS.map(b => ({ ...b })),
     chains: PANEL_BUBBLE_CHAINS.map(cloneChain),
+    callScenes: PANEL_CALL_SCENES.map(cloneCallScene),
     grids: cloneGrids(PANEL_GRIDS),
     patterns: [...PANEL_PATTERNS],
   }
@@ -176,6 +244,7 @@ export function cloneConfig(c: EditorConfig): EditorConfig {
     images: c.images.map(cloneImg),
     bubbles: c.bubbles.map(b => ({ ...b })),
     chains: c.chains.map(cloneChain),
+    callScenes: c.callScenes.map(cloneCallScene),
     grids: cloneGrids(c.grids),
     patterns: [...c.patterns],
   }

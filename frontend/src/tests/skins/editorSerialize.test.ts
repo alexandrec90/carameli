@@ -23,7 +23,8 @@ import type { EditorConfig } from '../../skins/comic-book/editor/types'
 import { PANELS } from '../../skins/comic-book/editor/layoutConfig'
 
 const IMPORT_LINE =
-  "import type { ImgTransform, BubbleTransform, BubbleChain, PageGrids } from './types'"
+  'import type { ImgTransform, BubbleTransform, BubbleChain, CallSceneLayout, PageGrids }' +
+  " from './types'"
 const PANEL_IMPORT_LINE = "import type { Panel } from '../panels'"
 
 /**
@@ -92,10 +93,11 @@ function reparse(ts: string): EditorConfig {
     .replace(/export const PANEL_IMG_TRANSFORMS: ImgTransform\[\] =/, 'const images =')
     .replace(/export const PANEL_BUBBLE_TRANSFORMS: BubbleTransform\[\] =/, 'const bubbles =')
     .replace(/export const PANEL_BUBBLE_CHAINS: BubbleChain\[\] =/, 'const chains =')
+    .replace(/export const PANEL_CALL_SCENES: CallSceneLayout\[\] =/, 'const callScenes =')
     .replace(/export const PANEL_PATTERNS: PanelBgStyle\[\] =/, 'const patterns =')
     .replace(/export const PANEL_GRIDS: PageGrids =/, 'const grids =')
   return new Function(
-    `${body}\nreturn { pageLabels, panels, images, bubbles, chains, grids, patterns }`,
+    `${body}\nreturn { pageLabels, panels, images, bubbles, chains, callScenes, grids, patterns }`,
   )() as EditorConfig
 }
 

@@ -49,6 +49,7 @@ function draw(
         images={[img({ numberPad: newNumberPad() })]}
         bubbles={bubbles}
         chains={chains}
+        callScenes={[]}
         sms={sms}
         natSizes={{}}
         editorActive={false}

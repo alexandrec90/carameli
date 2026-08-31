@@ -11,6 +11,9 @@ import { idleSms } from './smsStub'
 // to type a number — so its Enter has to reach the softphone. An `input` balloon is free
 // text, and a balloon inside a chain already spends its Enter on the conversation.
 
+/** The box a balloon's percentages are measured against — the panel's, or half of one. */
+const PANEL_BOX = { x: 0, y: 0, w: 400, h: 300 }
+
 const bubble = (over: Partial<BubbleTransform> = {}): BubbleTransform => ({
   ...NEW_BUBBLE,
   panel: 0,
@@ -24,6 +27,7 @@ function draw(bubbles: BubbleTransform[], onPhoneSubmit?: (value: string) => voi
       bubbles={bubbles}
       chains={[]}
       panel={0}
+      bounds={PANEL_BOX}
       clip="none"
       isVisible={() => true}
       interactive

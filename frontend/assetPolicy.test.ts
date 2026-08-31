@@ -22,10 +22,9 @@ import { describe, expect, it } from 'vitest'
 
 import { CALL_SCENE_ART } from './src/skins/comic-book/callScene'
 import { PANEL_ASSETS } from './src/skins/comic-book/editor/assets'
-import { PANEL_BUBBLE_TRANSFORMS, PANEL_IMG_TRANSFORMS } from './src/skins/comic-book/editor/layoutConfig'
+import { PANEL_CALL_SCENES, PANEL_IMG_TRANSFORMS } from './src/skins/comic-book/editor/layoutConfig'
 import { PANELS } from './src/skins/comic-book/editor/layoutConfig'
 import { CALL_STATUS_ART } from './src/lib/liveTables'
-import { handsetOn } from './src/skins/comic-book/phoneActions'
 import { DEFAULT_SKIN, SKIN_NAMES } from './src/skins/registry'
 import {
   ASSETS_SRC_DIR,
@@ -68,6 +67,10 @@ const kb = (bytes: number): string => `${(bytes / KB).toFixed(1)} KB`
 function drawnByPage(): Record<string, string[]> {
   const drawn: Record<string, string[]> = {}
   for (const transform of PANEL_IMG_TRANSFORMS) {
+    // A picture carrying a call role belongs to a layout the panel only shows while the
+    // telephone is in use, so it is not page art and the preload guard must not ask for
+    // it. `withCallSceneArt` puts it back where the *page budget* needs it priced.
+    if (transform.call !== undefined) continue
     const page = PANELS[transform.panel].page
     const url = safeDecode(transform.src)
     const urls = (drawn[page] ??= [])
@@ -77,18 +80,25 @@ function drawnByPage(): Record<string, string[]> {
 }
 
 /**
- * `drawn`, plus the call scene's pictures on every page with a drawn telephone. They are
- * not panel art — no layout draws them, so the `index.html` guard must not preload them,
- * and `drawnByPage` alone is what that check compares against — but a visit that places
- * a call fetches them, on whichever page the handset is, so the page budget prices them
- * there rather than as chrome every route pays for.
+ * `drawn`, plus the call scene's pictures on every page holding a panel an author cut in
+ * two. They are not panel art — the panel draws them only once a call is up, so the
+ * `index.html` guard must not preload them, and `drawnByPage` alone is what that check
+ * compares against — but a visit that places a call fetches them, on whichever page the
+ * scene is, so the page budget prices them there rather than as chrome every route pays
+ * for.
+ *
+ * The pages come from `PANEL_CALL_SCENES` rather than from a hunt for a drawn telephone:
+ * a call layout is now something an author puts on any panel, so the layout is the only
+ * thing that knows where one is.
  */
 function withCallSceneArt(drawn: Record<string, string[]>): Record<string, string[]> {
   const sceneUrls = Object.values(CALL_SCENE_ART).map(safeDecode)
+  const scenePages = new Set(PANEL_CALL_SCENES.map(scene => PANELS[scene.panel].page))
   const out: Record<string, string[]> = {}
   for (const [page, urls] of Object.entries(drawn)) {
-    const handset = PANELS.some((p, i) => p.page === page && handsetOn(PANEL_BUBBLE_TRANSFORMS, i))
-    out[page] = handset ? [...urls, ...sceneUrls.filter(url => !urls.includes(url))] : urls
+    out[page] = scenePages.has(page)
+      ? [...urls, ...sceneUrls.filter(url => !urls.includes(url))]
+      : urls
   }
   return out
 }

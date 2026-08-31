@@ -200,6 +200,8 @@ describe('hydrateConfig', () => {
       bubbles: [],
       // Derived from the bubbles, so a page with none has none — nothing to re-seed.
       chains: [],
+      // Likewise derived, from the call roles the entries carry: no entries, no scenes.
+      callScenes: [],
       grids: seedConfig().grids,
       // The panel list goes with the grids: absent, both come back shipped.
       panels: seedConfig().panels,
@@ -281,10 +283,11 @@ describe('hydrateConfig', () => {
       images: PANEL_IMG_TRANSFORMS,
       bubbles: [{ ...NEW_BUBBLE, panel: 99 }, { ...NEW_BUBBLE, panel: -4 }],
     })
-    expect(hydrateConfig(raw).bubbles.map(b => b.panel)).toEqual([
-      PANEL_IMG_TRANSFORMS.length - 1,
-      0,
-    ])
+    // The panel list is what a panel index is clamped against, and it is the seeded one
+    // here since the payload carries no panels of its own. It used to be spelled as the
+    // picture count, which was the same number only for as long as every panel held
+    // exactly one picture — a call layout puts three on one panel and it stopped being.
+    expect(hydrateConfig(raw).bubbles.map(b => b.panel)).toEqual([PANELS.length - 1, 0])
   })
 
   it('drops a cross-panel link a hand-edited payload smuggled in', () => {

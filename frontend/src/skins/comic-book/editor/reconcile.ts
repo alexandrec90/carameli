@@ -1,3 +1,4 @@
+import { syncCallScenes } from './callSceneOps'
 import { propagateChains, syncChains } from './chainOps'
 import { sanitizeLinks } from './configHydrate'
 import type { EditorConfig } from './types'
@@ -14,9 +15,15 @@ import type { EditorConfig } from './types'
  * Every op that can touch a bubble runs this, which is what keeps "add a chain" and
  * "delete a chain" from needing to exist as operations at all — and what makes linking a
  * loose balloon onto a chained one enough to make it a slot of that chain.
+ *
+ * Every op that can touch a **picture** runs it too, which the chain half never needed:
+ * a panel is a phone call for as long as some entry on it carries a `call` role, and a
+ * picture is one of the two kinds that can. Marking one is what turns the panel into a
+ * call; deleting the last marked one is what turns it back.
  */
 export function reconcile(config: EditorConfig): EditorConfig {
   config.bubbles = propagateChains(sanitizeLinks(config.bubbles))
   config.chains = syncChains(config.bubbles, config.chains)
+  config.callScenes = syncCallScenes(config.images, config.bubbles, config.callScenes)
   return config
 }

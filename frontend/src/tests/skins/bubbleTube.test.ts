@@ -174,4 +174,23 @@ describe('isBubbleRevealed', () => {
   it('tolerates an index with no bubble', () => {
     expect(isBubbleRevealed(bubbles, 0, false, 9)).toBe(false)
   })
+
+  // A call's words are on screen because the telephone is in use, not because the
+  // pointer is nearby. They only reach this function at all while their panel is
+  // drawing its call layout — the role filter has already decided that — so hover
+  // has nothing left to say about them. Before the scene became ordinary balloons it
+  // drew its own, unconditionally; without this a live call is silent until hovered.
+  const called = [b(0), { ...b(9), call: 'local' as const }]
+
+  it('reveals a call balloon with no panel hovered', () => {
+    expect(isBubbleRevealed(called, null, false, 1)).toBe(true)
+  })
+
+  it('still hides an ordinary balloon on the same page', () => {
+    expect(isBubbleRevealed(called, null, false, 0)).toBe(false)
+  })
+
+  it('reveals a call balloon while another panel is hovered', () => {
+    expect(isBubbleRevealed(called, 0, false, 1)).toBe(true)
+  })
 })
