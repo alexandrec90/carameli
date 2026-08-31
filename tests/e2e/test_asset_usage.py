@@ -41,10 +41,18 @@ from playwright.sync_api import Page
 # the matrix too.
 SKINS = ["carameli", "candy-shop", "barebone", "comic-book"]
 
-# Mirrors PANEL_IMG_TRANSFORMS in frontend/src/skins/comic-book/editor/layoutConfig.ts,
-# for the same reason: an outside view of what the app should be drawing. The exact list
-# is the static suite's business; here only the count matters.
-PANELS = 8
+# Mirrors the `home` list in the skin guard in frontend/index.html: the panels the '/'
+# route draws. Kept as a literal for the same reason SKINS is -- an outside view of what
+# the app should be drawing. The exact list is the static suite's business; here only the
+# count matters.
+#
+# It is deliberately NOT the length of PANEL_IMG_TRANSFORMS. That array spans both grids,
+# and `pageForPath` in src/skins/comic-book/panels.ts sends '/' to the four-panel home
+# grid while every other route gets the classic eight. Counting the whole array is what
+# made this test demand eight images from a page that asks for four, and it went unnoticed
+# because Firefox fetches an eighth resource of its own accord: the threshold was met in
+# one browser out of three, while Chromium and WebKit reported seven and failed.
+HOME_PANELS = 4
 
 # Fetched by the browser itself, never by the page: the PWA manifest's icon set and the
 # tab favicon. They are legitimately absent from the DOM, so exempting them is the
@@ -140,9 +148,10 @@ def test_the_collector_sees_the_traffic_it_is_measuring(page: Page) -> None:
     fetched = list(usage["fetched"])  # type: ignore[call-overload]
     used = set(usage["used"])  # type: ignore[call-overload]
 
-    assert len(fetched) >= PANELS, (
-        f"comic-book fetched {len(fetched)} image(s); it draws {PANELS} panels. "
-        "Either the page did not load or the resource collector stopped seeing images."
+    assert len(fetched) >= HOME_PANELS, (
+        f"comic-book fetched {len(fetched)} image(s); the home grid draws {HOME_PANELS} "
+        "panels. Either the page did not load or the resource collector stopped seeing "
+        "images."
     )
     assert used, "No image on the page decoded — the usage collector is reading nothing."
 
