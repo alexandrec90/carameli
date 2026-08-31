@@ -21,11 +21,10 @@
   --cb-hue-deg:       0deg;
 
   /* Sized against native pointer chrome, not against the artwork. The generated raster
-     dimensions are the scale: CURSOR_MAX_EDGES in scripts/comic_cursor_assets.py is the
-     one tuning point, and `python scripts/encode-comic-art.py --cursors --force`
-     regenerates these files. Each drawing gets its own long edge because their visible
-     ink fills different amounts of transparent canvas. Keep all four within 32px: a
-     larger custom cursor can fall back to the native keyword on Windows Chromium.
+     dimensions are the scale, pinned beside the cursor checks in assetPolicy.test.ts.
+     Each drawing gets its own long edge because their visible ink fills different
+     amounts of transparent canvas. Keep all four within 32px: a larger custom cursor
+     can fall back to the native keyword on Windows Chromium.
 
      The grab hand is the open glove, so it dresses the resting state of a drag handle and
      the fallback carries `grab` for it. `grabbing` is deliberately left native: a closed
