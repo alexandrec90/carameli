@@ -6,6 +6,7 @@ import CallRoleField from './CallRoleField'
 import CallSeamFields from './CallSeamFields'
 import ChainInspector from './ChainInspector'
 import ImageInspector from './ImageInspector'
+import PanelNameField from './PanelNameField'
 import { indicesOnPanel } from './configOps'
 import type { EditorModeApi } from './useEditorMode'
 
@@ -33,16 +34,7 @@ export default function InspectorPanel({ api, panel }: InspectorPanelProps) {
   const panelName = config.panels[panel]?.label ?? `Panel ${panel}`
   const selImg = selected.kind === 'img' ? config.images[selected.index] : null
   const selBubble = selected.kind === 'bubble' ? config.bubbles[selected.index] : null
-  const panelNameField = (
-    <label className="cb-ed-field">
-      <span>panel name</span>
-      <input
-        type="text"
-        value={config.panels[panel]?.label ?? ''}
-        onChange={e => api.setPanelLabel(panel, e.target.value)}
-      />
-    </label>
-  )
+  const panelNameField = <PanelNameField api={api} panel={panel} />
 
   // A selected panel is a slot, not a drawn thing: it has no transform to read out and
   // nothing to reset — but the slot does own two editable attributes, its name and its
