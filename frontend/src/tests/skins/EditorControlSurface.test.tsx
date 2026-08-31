@@ -75,20 +75,39 @@ const ALWAYS = [
   'text: page name',
 ]
 
+/**
+ * Which half of a call panel is being drawn, previewed from the toolbar. It is a
+ * property of the page rather than of a selection, so it is on the whole of content
+ * mode — shapes mode has no picture to preview it on and does not show it.
+ */
+const CALL_SWITCH = ['button: Default', 'button: Ringing', 'button: Connected']
+
+/** The four things that can be added to the selected panel. */
+const ADDERS = ['button: + Image', 'button: + Bubble', 'button: + SMS', 'button: + Call']
+
 describe('editor control surface', () => {
   it('content mode, nothing selected: the page controls and the transport', () => {
     renderToolbar('content', null, null)
 
-    expect(controlSurface()).toEqual([...ALWAYS, 'button: + Bubble', 'button: + Image', 'button: + SMS'].sort())
+    expect(controlSurface()).toEqual([...ALWAYS, ...ADDERS, ...CALL_SWITCH].sort())
   })
 
   // The panel's own two attributes — what it is called and what its Ben-Day background
-  // does — plus the three things that can be added to it.
+  // does — plus the four things that can be added to it. Panel 9 is the shipped phone
+  // call, so its seam and axis are here too; a panel that is not one shows neither.
   it('content mode, a panel selected: the panel name, its pattern, and what can be added', () => {
     renderToolbar('content', { kind: 'panel', index: 9 }, 9)
 
     expect(controlSurface()).toEqual(
-      [...ALWAYS, 'button: + Bubble', 'button: + Image', 'button: + SMS', 'text: panel name', 'select: pattern'].sort(),
+      [
+        ...ALWAYS,
+        ...ADDERS,
+        ...CALL_SWITCH,
+        'text: panel name',
+        'select: pattern',
+        'range: call seam',
+        'select: call split',
+      ].sort(),
     )
     expect(screen.getByRole('textbox', { name: 'panel name' })).toBeTruthy()
   })

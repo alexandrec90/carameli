@@ -127,12 +127,12 @@ export const PANEL_BG_CONFIGS: PanelBgConfig[] = [
         baseSpacing: 13, baseRadius: 3.5, phase: 6.4,
         focalX: 0.5, focalY: 0.5
     },
-    // 9 notepad — 135 deg bands, cobalt blue (home page)
+    // 9 push-button phone — 135 deg bands, cobalt blue (home page)
     {
         bg: '#E8F1FF', dotColor: '#0057B8',
         baseSpacing: 14, baseRadius: 4.0, phase: 7.2, angleDeg: 135
     },
-    // 10 push-button phone — center focal point, crimson (home page)
+    // 10 notepad — center focal point, crimson (home page)
     {
         bg: '#FFF0F3', dotColor: '#E8003D',
         baseSpacing: 13, baseRadius: 3.5, phase: 8.0,
@@ -143,6 +143,11 @@ export const PANEL_BG_CONFIGS: PanelBgConfig[] = [
         bg: '#F2FFF7', dotColor: '#007A3C', rayColor: '#00A651',
         baseSpacing: 15, baseRadius: 3.5, phase: 8.8,
         focalX: 0.5, focalY: 0.45, rayCount: 20
+    },
+    // 12 notepad 2 — 45 deg bands, vivid cyan (home page)
+    {
+        bg: '#E8FBFF', dotColor: '#0090C4',
+        baseSpacing: 14, baseRadius: 3.6, phase: 9.6, angleDeg: 45
     },
 ]
 

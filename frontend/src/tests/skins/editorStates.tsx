@@ -227,7 +227,13 @@ export function mockApi(config: EditorConfig, mode: EditMode, selected: Selectio
     addImgOn: vi.fn(),
     addBubbleOn: vi.fn(),
     addSmsOn: vi.fn(),
+    addCallOn: vi.fn(),
     addPeerPickerOn: vi.fn(),
+    // Which half of a call the page is previewing. `null` is the panel's ordinary
+    // contents — the state an author is in until they pick one from the toolbar.
+    callPhase: null,
+    setCallPhase: vi.fn(),
+    setCallScene: vi.fn(),
     setImg: vi.fn(),
     setBubble: vi.fn(),
     setChained: vi.fn(),
