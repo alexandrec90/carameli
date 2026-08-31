@@ -6,10 +6,12 @@ import { logger } from '../lib/logger'
 import {
   callRows,
   LIVE_TABLE_LIMIT,
-  sameRows,
+  mergeRows,
   smsRows,
+  type LiveTableRows,
   type TableSource,
 } from '../lib/liveTables'
+import { detectSimTables, simFeedRows } from '../lib/simTables'
 
 /**
  * Live call and SMS records for whatever is drawing them.
@@ -31,8 +33,9 @@ export const LIVE_TABLE_POLL_MS = 5000
 /** The answer for a page with no live surface on it — one object, so identity holds. */
 const EMPTY: LiveTableRows = {}
 
-/** Cells per feed, keyed by source. A feed nobody asked for is simply absent. */
-export type LiveTableRows = Partial<Record<TableSource, string[][]>>
+// Re-exported so a consumer names the hook it calls rather than the module the shape
+// happens to be declared in; it lives beside `mergeRows` because that is what builds one.
+export type { LiveTableRows }
 
 async function fetchSource(source: TableSource): Promise<string[][]> {
   if (source === 'calls') {
@@ -57,9 +60,29 @@ export function useLiveTables(
   const key = useMemo(() => [...new Set(sources)].sort().join(','), [sources])
   const wanted = useMemo(() => (key === '' ? [] : (key.split(',') as TableSource[])), [key])
   const [rows, setRows] = useState<LiveTableRows>({})
+  // Read once per mount, like the editor's own flag: a toggle that could change under a
+  // running page would have to decide what happens to the rows already on the surface.
+  //
+  // `import.meta.env.DEV` is spelled out at both uses, redundantly with the check inside
+  // `detectSimTables`, because that is what makes the simulation *tree-shakeable*: Vite
+  // substitutes the literal `false` in a production build, both references fall in dead
+  // branches, and `lib/simTables.ts` leaves the chunk entirely. Dev-only otherwise says
+  // only when the code runs, never whether it ships — which is how a page nobody can put
+  // it on still pays for a hundred made-up call records.
+  const [sim] = useState(() => import.meta.env.DEV && detectSimTables())
+  const simulated = useMemo(() => {
+    if (!import.meta.env.DEV || !sim || wanted.length === 0) return null
+    const out: LiveTableRows = {}
+    for (const source of wanted) out[source] = simFeedRows(source)
+    return out
+  }, [sim, wanted])
 
   useEffect(() => {
-    if (wanted.length === 0) return
+    // Simulated rows are the whole answer, so there is nothing to ask for and nothing to
+    // poll: an interval here would spend a request every few seconds on records that are
+    // thrown away, and the first reply would replace the full table with the two calls a
+    // development database holds, which is the state `?sim=1` exists to get out of.
+    if (sim || wanted.length === 0) return
     let cancelled = false
 
     const refresh = async () => {
@@ -81,21 +104,7 @@ export function useLiveTables(
         }),
       )
       if (cancelled) return
-      setRows(prev => {
-        let changed = Object.keys(prev).length !== wanted.length
-        const next: LiveTableRows = {}
-        for (const [source, data] of fetched) {
-          const previous = prev[source]
-          if (data === null || sameRows(previous, data)) {
-            next[source] = previous ?? []
-            if (previous === undefined) changed = true
-          } else {
-            next[source] = data
-            changed = true
-          }
-        }
-        return changed ? next : prev
-      })
+      setRows(prev => mergeRows(prev, fetched))
     }
 
     void refresh()
@@ -109,10 +118,12 @@ export function useLiveTables(
       clearInterval(timer)
       document.removeEventListener('visibilitychange', onVisibility)
     }
-  }, [wanted, pollMs])
+  }, [wanted, pollMs, sim])
 
   // Derived rather than cleared from the effect: a page with no live surface on it is the
   // common case, and the last page's rows must not be handed to it. `EMPTY` is a constant
-  // so that answer is identity-stable, which is what the caller's memo needs.
+  // so that answer is identity-stable, which is what the caller's memo needs — and the
+  // simulated answer is memoized on the same names for exactly that reason.
+  if (simulated) return simulated
   return wanted.length === 0 ? EMPTY : rows
 }

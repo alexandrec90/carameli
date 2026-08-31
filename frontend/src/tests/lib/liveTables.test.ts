@@ -7,6 +7,7 @@ import {
   directionLabel,
   LIVE_TABLE_LIMIT,
   LIVE_TABLE_FEEDS,
+  mergeRows,
   sameRows,
   smsRows,
   TABLE_SOURCES,
@@ -154,5 +155,38 @@ describe('sameRows', () => {
 
   it('is true for two empty feeds', () => {
     expect(sameRows([], [])).toBe(true)
+  })
+})
+
+describe('mergeRows', () => {
+  const A = [['+14155550000', '14:30', '', '/comic-book/call-in-progress.webp']]
+  const B = [['+14155550001', '14:31', '0:42', '/comic-book/call-ended.webp']]
+
+  it('takes the new cells when a poll finds something', () => {
+    expect(mergeRows({ calls: A }, [['calls', B]])).toEqual({ calls: B })
+  })
+
+  // Identity, not equality. A fresh object every few seconds re-renders every panel on the
+  // page for a notepad that says exactly what it said before.
+  it('hands back the very same object when nothing is news', () => {
+    const prev = { calls: A }
+    expect(mergeRows(prev, [['calls', A.map(r => [...r])]])).toBe(prev)
+  })
+
+  it('keeps what is on the surface when a request failed', () => {
+    expect(mergeRows({ calls: A }, [['calls', null]])).toEqual({ calls: A })
+  })
+
+  it('shows an empty feed rather than nothing when the first request fails', () => {
+    expect(mergeRows({}, [['calls', null]])).toEqual({ calls: [] })
+  })
+
+  it('counts a feed arriving as a change even when its rows are unchanged', () => {
+    const prev = { calls: A }
+    expect(mergeRows(prev, [['calls', A], ['sms', []]])).not.toBe(prev)
+  })
+
+  it('drops a feed no surface asks for any more', () => {
+    expect(mergeRows({ calls: A, sms: [] }, [['calls', A]])).toEqual({ calls: A })
   })
 })

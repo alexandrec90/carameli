@@ -88,6 +88,28 @@ export function liveTable(t: TableProjection, source: TableSource): TableProject
   }
 }
 
+/**
+ * The columns a surface wired to `source` actually has, given the ones a payload holds.
+ *
+ * The *count* belongs to the feed, because its cells are positional; the wording and the
+ * widths belong to the author, because re-heading a column and re-proportioning it to the
+ * ruling in the photograph are the whole of fitting a feed to a photograph. So a list of
+ * the right length is returned untouched, and one of any other length is replaced.
+ *
+ * That mismatch has exactly one cause: a working copy written before the feed changed
+ * shape. It outlives every merge and checkout in `localStorage`, so opening the editor
+ * redraws the *previous* feed's headings over this one's values — which reads as the
+ * change to the feed having been reverted, and becomes that on the next Save. It is what
+ * happened to the call-records table between #274 and #287, and what `configParity`
+ * reports after the fact; repairing it on the way in is what stops the next tab doing it
+ * again.
+ */
+export function feedColumns(held: TableColumn[], source: TableSource): TableColumn[] {
+  const feed = LIVE_TABLE_FEEDS[source].columns
+  if (held.length === feed.length) return held
+  return feed.map(c => ({ ...c }))
+}
+
 /** The same surface with its feed removed — the key absent, not set to undefined. */
 export function authoredTable(t: TableProjection): TableProjection {
   const next = { ...t, columns: t.columns.map(c => ({ ...c })), data: t.data.map(r => [...r]) }
@@ -117,8 +139,9 @@ export function coerceTable(v: unknown): TableProjection | undefined {
   const t = v as Partial<TableProjection>
   const quad = coerceQuad(t.quad)
   if (!quad) return undefined
-  const columns = Array.isArray(t.columns) && t.columns.length > 0 ? t.columns.map(coerceColumn) : newTable().columns
+  const held = Array.isArray(t.columns) && t.columns.length > 0 ? t.columns.map(coerceColumn) : newTable().columns
   const source = coerceSource(t.source)
+  const columns = source ? feedColumns(held, source) : held
   return {
     quad,
     rows: Math.round(num(t.rows, 8, ROW_COUNT.min, ROW_COUNT.max)),
