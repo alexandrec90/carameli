@@ -588,6 +588,20 @@ describe('default config parity', () => {
     expect(PANELS[notepad!.panel].label).toBe('Notepad')
   })
 
+  // The headings the call log was asked for, pinned so that changing them is a line in a
+  // diff somebody chose to write. `layoutViolations` already refuses a count that is not
+  // the feed's; this is the other half — the wording, which the editor lets an author
+  // change and a stale Save therefore changes silently. That is how the notepad spent
+  // two PRs labelled Time/Dir/From/To with the number under 'Time' and the status art
+  // under 'To'.
+  it('shows the call record headings on the notepad, in the feed’s own order', () => {
+    const notepad = PANEL_IMG_TRANSFORMS.find(t => t.src.endsWith('hand-notepad.webp'))
+    expect(notepad?.table?.source).toBe('calls')
+    expect(notepad?.table?.columns.map(c => c.label)).toEqual([
+      'Number', 'Start time', 'Duration', 'Status',
+    ])
+  })
+
   // A chain's composer is the one balloon authored blank: its `text` is the field's
   // initial value (PanelBubble hands it to BubbleInput as such), and a composer that
   // opens with words in it is a message the reader did not write.

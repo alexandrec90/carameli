@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
+import type { TableSource } from '../../lib/liveTables'
 import { layoutViolations, violationLines } from '../../skins/comic-book/editor/configParity'
-import type { BubbleTransform, ImgTransform, Panel } from '../../skins/comic-book/editor/types'
+import type { BubbleTransform, ImgTransform, Panel, TableColumn } from '../../skins/comic-book/editor/types'
 
 // A finished caption: it says something, it points at a speaker, and it answers both a
 // hover and a press. Every bubble case below is this one with a field taken away.
@@ -183,6 +184,59 @@ describe('layoutViolations — pictures', () => {
     expect(of([], [both])).toEqual([
       'picture 0 (/comic-book/logo.webp) carries both a table and a number pad; a picture has one projected surface',
     ])
+  })
+
+  // The regression this pair exists for: a Save from an editor tab opened before the
+  // call-records feed changed shape wrote the old five-column list back over the new
+  // four, and the page then drew every value one heading to the left with the last
+  // column empty. Nothing was red — the feed's mapper and its tests were untouched, and
+  // the headings live in a file the editor rewrites wholesale.
+  const liveTable = (columns: TableColumn[], source?: TableSource) =>
+    picture({
+      table: {
+        quad: [[0, 0], [1, 0], [1, 1], [0, 1]], rows: 4, header: true, fontScale: 0.5,
+        ink: '#000', columns, data: [], source,
+      },
+    })
+
+  const CALL_COLUMNS: TableColumn[] = [
+    { label: 'Number', width: 2, align: 'left' },
+    { label: 'Start time', width: 1.4, align: 'left' },
+    { label: 'Duration', width: 1, align: 'left' },
+    { label: 'Status', width: 0.7, align: 'center' },
+  ]
+
+  it('catches a live surface holding more headings than its feed has values', () => {
+    const stale: TableColumn[] = [
+      { label: 'Time', width: 1, align: 'left' },
+      { label: 'Dir', width: 0.7, align: 'left' },
+      { label: 'From', width: 1.8, align: 'left' },
+      { label: 'To', width: 1.8, align: 'left' },
+      { label: 'Status', width: 1.3, align: 'left' },
+    ]
+    expect(of([], [liveTable(stale, 'calls')])).toEqual([
+      'picture 0 (/comic-book/logo.webp) is wired to call records but holds 5 columns for '
+      + "that feed's 4 values, so its headings do not name its cells",
+    ])
+  })
+
+  it('catches a live surface holding fewer', () => {
+    expect(of([], [liveTable(CALL_COLUMNS.slice(0, 3), 'calls')])).toEqual([
+      'picture 0 (/comic-book/logo.webp) is wired to call records but holds 3 columns for '
+      + "that feed's 4 values, so its headings do not name its cells",
+    ])
+  })
+
+  // Wording and proportion are the author's: a heading renamed to suit the art, or a
+  // column widened to sit on the ruling in the photograph, is the editor working.
+  it('leaves an author’s headings and widths alone at the feed’s own count', () => {
+    const reworded = CALL_COLUMNS.map((c, i) => (i === 0 ? { ...c, label: 'Caller', width: 3 } : c))
+    expect(of([], [liveTable(reworded, 'calls')])).toEqual([])
+  })
+
+  // An authored surface has no feed to disagree with, so any number of columns is right.
+  it('says nothing about a surface with no feed', () => {
+    expect(of([], [liveTable(CALL_COLUMNS.slice(0, 2))])).toEqual([])
   })
 
   it('reports pictures before bubbles, so the list reads down the page', () => {

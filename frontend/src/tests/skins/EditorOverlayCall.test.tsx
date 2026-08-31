@@ -71,6 +71,7 @@ function editorApi(config: EditorConfig, over: Partial<EditorModeApi> = {}): Edi
   return {
     active: true,
     config,
+    stale: false,
     selected: null,
     mode: 'content',
     setMode: vi.fn(),

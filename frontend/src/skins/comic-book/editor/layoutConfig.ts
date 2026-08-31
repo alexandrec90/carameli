@@ -80,11 +80,10 @@ export const PANEL_IMG_TRANSFORMS: ImgTransform[] = [
     rows: 12, header: true, fontScale: 0.35, ink: '#1b3a8f',
     source: 'calls',
     columns: [
-      { label: 'Time', width: 1, align: 'left' },
-      { label: 'Dir', width: 0.7, align: 'left' },
-      { label: 'From', width: 1.8, align: 'left' },
-      { label: 'To', width: 1.8, align: 'left' },
-      { label: 'Status', width: 1.3, align: 'left' },
+      { label: 'Number', width: 2, align: 'left' },
+      { label: 'Start time', width: 1.4, align: 'left' },
+      { label: 'Duration', width: 1, align: 'left' },
+      { label: 'Status', width: 0.7, align: 'center' },
     ],
     data: [
     ],

@@ -1,3 +1,4 @@
+import { LIVE_TABLE_FEEDS } from '../../../lib/liveTables'
 import { linkedPairs } from '../bubbleTube'
 import type { Panel } from '../panels'
 import type { BubbleTransform, ImgTransform } from './types'
@@ -120,6 +121,32 @@ function pictureViolations(images: ImgTransform[], panelCount: number): LayoutVi
     if (!t.src.startsWith(ASSET_PREFIX)) add(`is not served from ${ASSET_PREFIX}`)
     if (t.table && t.numberPad) {
       add('carries both a table and a number pad; a picture has one projected surface')
+    }
+
+    // A feed's cells are positional: `lib/liveTables.ts` emits them in the order that
+    // feed declares its columns, and the surface draws them under whatever headings it
+    // holds. So the *count* is the feed's, not the author's — the inspector will not let
+    // one be added or removed while a source is on — and a surface holding any other
+    // number labels every value past the first with a heading for a different one, or
+    // (as here, when it holds more) leaves the tail of the row blank.
+    //
+    // The wording and the widths are left alone on purpose: renaming a heading and
+    // re-proportioning it to the ruling in the photograph are exactly what an author is
+    // for. This catches the one way the two lists come apart without anyone choosing it —
+    // a Save from a tab opened before the feed's shape changed, which writes the old
+    // column list back over the new one and reads afterwards as the feed having been
+    // reverted. That is not hypothetical: it is what happened to the call-records table
+    // between #274 and #287, and nothing anywhere went red.
+    const source = t.table?.source
+    if (source) {
+      const feed = LIVE_TABLE_FEEDS[source]
+      const held = t.table?.columns.length ?? 0
+      if (held !== feed.columns.length) {
+        add(
+          `is wired to ${feed.label.toLowerCase()} but holds ${held} columns for that feed's `
+          + `${feed.columns.length} values, so its headings do not name its cells`,
+        )
+      }
     }
   })
 

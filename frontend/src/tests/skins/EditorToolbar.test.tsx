@@ -16,10 +16,11 @@ vi.mock('../../lib/logger', () => ({
   logger: { info: vi.fn(), error: vi.fn(), warn: vi.fn() },
 }))
 
-function editorApi(config: EditorConfig): EditorModeApi {
+function editorApi(config: EditorConfig, stale = false): EditorModeApi {
   return {
     active: true,
     config,
+    stale,
     selected: null,
     mode: 'content',
     setMode: vi.fn(),
@@ -51,8 +52,12 @@ function editorApi(config: EditorConfig): EditorModeApi {
   }
 }
 
-function renderToolbar(config: EditorConfig = seedConfig(), selPanel: number | null = null) {
-  const api = editorApi(config)
+function renderToolbar(
+  config: EditorConfig = seedConfig(),
+  selPanel: number | null = null,
+  stale = false,
+) {
+  const api = editorApi(config, stale)
   const view = render(
     <MemoryRouter>
       <EditorToolbar
@@ -340,6 +345,45 @@ describe('EditorToolbar', () => {
     renderToolbar()
 
     expect(screen.queryByRole('status', { name: 'Unfinished layout' })).toBeNull()
+    expect(screen.queryByRole('status', { name: 'Working copy is behind the file' })).toBeNull()
     expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Ship' }).disabled).toBe(false)
+  })
+
+  // The regression these three exist for: a Save from a tab whose working copy came from
+  // an older `layoutConfig.ts` wrote it back whole, reverting a merged change to the
+  // call-record table. Nothing on screen had said the file had moved, and one press was
+  // all it took.
+  it('says so when the file has moved under the working copy', () => {
+    renderToolbar(seedConfig(), null, true)
+
+    const warning = screen.getByRole('status', { name: 'Working copy is behind the file' })
+    expect(warning.textContent).toContain('layoutConfig.ts has changed')
+    expect(warning.textContent).toContain('reverting whatever that was')
+  })
+
+  it('asks before overwriting a file the working copy never saw, then writes on the second press', async () => {
+    const fetchMock = stubFetch(200, {})
+    renderToolbar(seedConfig(), null, true)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+    expect(fetchMock).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Overwrite it?' }))
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1))
+    const [url] = fetchMock.mock.calls[0] as [string]
+    expect(url).toBe('/__comic-editor/save')
+  })
+
+  // The confirm is for the case where the file has moved and nothing else: an ordinary
+  // Save is the inner loop, pressed every few drags, and a second click on all of them
+  // would be clicked through without being read.
+  it('saves on the first press when the working copy is current', async () => {
+    const fetchMock = stubFetch(200, {})
+    renderToolbar()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1))
   })
 })
