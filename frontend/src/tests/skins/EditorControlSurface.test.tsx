@@ -2,12 +2,10 @@ import { render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { describe, expect, it, vi } from 'vitest'
 
-import EditorToolbar from '../../skins/comic-book/editor/EditorToolbar'
 import { seedConfig } from '../../skins/comic-book/editor/configSeed'
+import EditorToolbar from '../../skins/comic-book/editor/EditorToolbar'
 import type { EditMode, Selection } from '../../skins/comic-book/editor/selection'
-import type { EditorConfig } from '../../skins/comic-book/editor/types'
-import type { EditorModeApi } from '../../skins/comic-book/editor/useEditorMode'
-import type { SeamDragApi } from '../../skins/comic-book/editor/useSeamDrag'
+import { controlSurface, dragFor, mockApi } from './editorStates'
 
 // The editor's control surface, written down.
 //
@@ -38,60 +36,12 @@ vi.mock('../../lib/logger', () => ({
   logger: { info: vi.fn(), error: vi.fn(), warn: vi.fn() },
 }))
 
-function editorApi(config: EditorConfig, mode: EditMode, selected: Selection | null): EditorModeApi {
-  return {
-    active: true,
-    config,
-    stale: false,
-    selected,
-    mode,
-    setMode: vi.fn(),
-    select: vi.fn(),
-    clear: vi.fn(),
-    resetAll: vi.fn(),
-    setGridFor: vi.fn(),
-    resetGridFor: vi.fn(),
-    addImgOn: vi.fn(),
-    addBubbleOn: vi.fn(),
-    addSmsOn: vi.fn(),
-    addPeerPickerOn: vi.fn(),
-    setImg: vi.fn(),
-    setBubble: vi.fn(),
-    setChained: vi.fn(),
-    setChain: vi.fn(),
-    addChainColumn: vi.fn(),
-    setPattern: vi.fn(),
-    splitPanel: vi.fn(),
-    setPanelLabel: vi.fn(),
-    setPageLabel: vi.fn(),
-    deleteImg: vi.fn(),
-    deleteBubble: vi.fn(),
-    resetOne: vi.fn(),
-  }
-}
-
-/** Enough of the shape-drag API for the inspector to render; no gesture is exercised. */
-function seamDrag(selectedVertex: number | null = null): SeamDragApi {
-  return {
-    seams: [],
-    selectedVertex,
-    snapVertex: null,
-    canDeleteSelected: false,
-    onVertexDown: vi.fn(),
-    onSeamDown: vi.fn(),
-    onSeamDoubleClick: vi.fn(),
-    onPointerMove: vi.fn(),
-    onPointerUp: vi.fn(),
-    deleteSelected: vi.fn(),
-  }
-}
-
 function renderToolbar(mode: EditMode, selected: Selection | null, selPanel: number | null) {
   const config = seedConfig()
   render(
     <MemoryRouter>
       <EditorToolbar
-        api={editorApi(config, mode, selected)}
+        api={mockApi(config, mode, selected)}
         selPanel={selPanel}
         pageSelect={{
           navItems: [],
@@ -104,37 +54,11 @@ function renderToolbar(mode: EditMode, selected: Selection | null, selPanel: num
           page: 'classic',
           kind: 'landscape',
           grid: config.grids.classic.landscape,
-          drag: seamDrag(),
+          drag: dragFor(config, selected),
         }}
       />
     </MemoryRouter>,
   )
-}
-
-/**
- * How a control announces itself to an author: a button by its lettering, a field by the
- * `<span>` its `.cb-ed-field` label wraps, otherwise an explicit `aria-label`. Read off
- * the DOM rather than through `getByRole` so that the assertion can be the *whole set* —
- * a query can only ask after a control someone remembered to ask after.
- */
-function labelOf(el: Element): string {
-  if (el.tagName === 'BUTTON') return el.textContent?.trim() ?? ''
-  const aria = el.getAttribute('aria-label')
-  if (aria) return aria
-  const span = el.closest('label')?.querySelector('span')
-  if (span) return span.textContent?.trim() ?? ''
-  return el.getAttribute('placeholder') ?? '(unnamed)'
-}
-
-/** Every operable thing in the toolbar, as `kind: name`, sorted so order is not asserted. */
-function controlSurface(): string[] {
-  const toolbar = screen.getByRole('region', { name: 'Comic-book editor' })
-  return [...toolbar.querySelectorAll('button, input, select, textarea')]
-    .map(el => {
-      const kind = el instanceof HTMLInputElement ? el.type : el.tagName.toLowerCase()
-      return `${kind}: ${labelOf(el)}`
-    })
-    .sort()
 }
 
 /** The four transport controls and the mode switch: present in every state, so factored out. */

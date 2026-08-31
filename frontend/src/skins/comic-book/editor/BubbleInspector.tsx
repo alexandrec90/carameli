@@ -219,6 +219,22 @@ export default function BubbleInspector({ api, index, bubble }: BubbleInspectorP
         </div>
       )}
 
+      {/* The checkbox the comment above promises, and the only way to make a chain: it
+          applies to the whole linked group, because a thread is a property of the column
+          and one slot of it means nothing alone (./configOps.ts `setChained`). Ticking it
+          is what creates the chain id that ./ChainInspector.tsx then hangs the thread's
+          settings off, so without it the chain settings are unreachable — a chain could
+          be edited but never made. Not disabled on an unlinked balloon: a column of one
+          is a legal starting point, and linking more balloons in adopts its id. */}
+      <label className="cb-ed-check">
+        <input
+          type="checkbox"
+          checked={bubble.chain !== ''}
+          onChange={e => api.setChained(index, e.target.checked)}
+        />
+        <span>Scrolling chain</span>
+      </label>
+
       {/* No chain checkbox. A conversation used to be assembled here — link two balloons,
           tick "scrollable chain", set the sender's content, tick "live SMS" — and every one
           of those was an ordinary edit that could be undone by accident, silently, leaving

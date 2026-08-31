@@ -9,7 +9,19 @@
  * A panel is selectable at all because a picture no longer *is* its panel: adding one
  * needs a panel to add it to, and an empty panel would otherwise be unclickable.
  */
-export type SelectionKind = 'panel' | 'img' | 'bubble' | 'vertex' | 'seam'
+export const SELECTION_KINDS = ['panel', 'img', 'bubble', 'vertex', 'seam'] as const
+
+/**
+ * The same set as a type. Derived from the list rather than declared beside it so the two
+ * cannot disagree.
+ *
+ * The list exists as a *value* so that a test can enumerate the editor's states instead of
+ * naming them by hand — see `src/tests/skins/EditorSurfaceMatrix.test.tsx`. A guard that
+ * lists the states it covers only ever protects the features that existed on the day it
+ * was written; one that reads them from here grows a new column the moment a kind is
+ * added, and the snapshot it writes then has to be reviewed.
+ */
+export type SelectionKind = (typeof SELECTION_KINDS)[number]
 
 /** A selectable thing: which array, and which entry of it. */
 export interface Selection {
@@ -27,7 +39,10 @@ export interface Selection {
  * of a panel you are not over. Trying to serve both from one hit-test is how a drag
  * intended for a divider ends up nudging a balloon.
  */
-export type EditMode = 'content' | 'shapes'
+export const EDIT_MODES = ['content', 'shapes'] as const
+
+/** The same pair as a type; a value too, for the reason {@link SelectionKind} gives. */
+export type EditMode = (typeof EDIT_MODES)[number]
 
 /** Set or clear the selection — what the mutator hooks are handed. */
 export type SetSelection = (selection: Selection | null) => void
