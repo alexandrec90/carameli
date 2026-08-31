@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import importlib.util
+import re
 import sys
 from pathlib import Path
 
@@ -310,6 +311,49 @@ class TestAllMasters:
         monkeypatch.setattr(eca, "MASTERS_DIR", tmp_path)
         assert [m.stem for m in eca.all_masters()] == ["only"]
         assert eca.resolve_master("only").path == tmp_path / "only.png"
+
+
+COMIC_ASSETS_TS = eca.FRONTEND / "comicAssets.ts"
+
+
+def _ts_const(source: str, name: str) -> int:
+    match = re.search(rf"^export const {name} = (\d+)$", source, re.MULTILINE)
+    assert match, f"{name} is gone from comicAssets.ts, or is no longer a bare integer"
+    return int(match.group(1))
+
+
+class TestEncoderSettingsParity:
+    """`frontend/comicAssets.ts` carries its own copy of the encode settings, because the
+    dev-server plugin that encodes a master cannot read them from here: docker-compose
+    bind-mounts `frontend/` alone, so `scripts/` is not a path inside the container.
+
+    A duplicated constant is only safe while something fails when the two disagree, and
+    this is that something. Encoding at a different size or quality depending on *which*
+    of the two paths ran is exactly the kind of difference nobody sees until two panels
+    sit side by side.
+    """
+
+    @pytest.fixture
+    def source(self):
+        return COMIC_ASSETS_TS.read_text(encoding="utf-8")
+
+    def test_the_long_edge_matches(self, source):
+        assert _ts_const(source, "EXPORT_MAX_EDGE") == eca.DEFAULT_MAX_EDGE
+
+    def test_the_quality_matches(self, source):
+        assert _ts_const(source, "EXPORT_QUALITY") == eca.DEFAULT_QUALITY
+
+    def test_the_accepted_master_extensions_match(self, source):
+        match = re.search(
+            r"^export const MASTER_EXTENSIONS: readonly string\[\] = \[(.*)\]$",
+            source,
+            re.MULTILINE,
+        )
+        assert match, "MASTER_EXTENSIONS is gone from comicAssets.ts, or was reformatted"
+        listed = tuple(re.findall(r"'([^']+)'", match.group(1)))
+        # Order matters as much as membership: it is what resolves a bare name when a
+        # master exists as both a .png and a .jpg.
+        assert listed == eca.MASTER_EXTENSIONS
 
 
 class TestArtifact:

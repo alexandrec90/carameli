@@ -10,13 +10,26 @@ get wrong in ways nothing reports until much later:
    roughly 700-900px.
 2. **Register** the export in `PANEL_ASSETS`
    (`frontend/src/skins/comic-book/editor/assets.ts`). The editor's picture dropdown
-   is a hand-written manifest because a browser cannot enumerate a served directory
+   reads a written-down manifest because a browser cannot enumerate a served directory
    -- so an unregistered export is both unreachable from the editor and dead weight
    to `frontend/assetPolicy.test.ts`, which fails on a file in `public/` that no
    source references.
 3. **Place** it in a panel. That is authoring work, done in the editor at `?edit=1`
    and saved into `editor/layoutConfig.ts`. This script does not do it, and a
    picture is legitimately unplaced for a while.
+
+**With a dev server running, steps 1 and 2 happen without this script.**
+`frontend/comicAssetsWatch.ts` is a Vite plugin that watches both directories and does
+the same two things the moment a master lands in `assets-src/comic-book/` or a `.webp`
+lands in `public/comic-book/` -- and, unlike this script, takes a line back out when a
+picture is deleted. The rule it applies is `frontend/comicAssets.ts`, which duplicates
+{@link DEFAULT_MAX_EDGE} and {@link DEFAULT_QUALITY} because the container cannot see
+`scripts/`; `TestEncoderSettingsParity` fails when the copies drift.
+
+This script is what runs when no server is: a fresh clone, a CI check, an encode at a
+non-default `--max-edge`, or a `--label` that is not the one derived from the filename.
+Both paths are idempotent and append-only on `src`, so running one after the other
+changes nothing.
 
 Steps 1 and 2 are what this automates, and the encoder call is the part worth having
 in code rather than in prose. The `sharp-cli` line that lived in

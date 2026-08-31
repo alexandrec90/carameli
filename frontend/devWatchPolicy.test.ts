@@ -43,9 +43,13 @@ describe('resolveDevWatch', () => {
     expect(resolveDevWatch({ CHOKIDAR_USEPOLLING: 'true' })?.ignored).toContain('**/dist/**')
   })
 
-  it('keeps the poll sweep off assets-src/, the encode script inputs nothing serves', () => {
-    expect(resolveDevWatch({ CHOKIDAR_USEPOLLING: 'true' })?.ignored)
-      .toContain('**/assets-src/**')
+  it('never ignores assets-src/, because a master landing there is what triggers an encode', () => {
+    // It was ignored until `comicAssetsWatch.ts` existed, on the reasoning that nothing
+    // serves a master. True, and beside the point once the add event is the input to the
+    // encode: ignore it and a picture dropped in reaches the editor only after a restart.
+    for (const pattern of WATCH_IGNORED) {
+      expect(pattern).not.toMatch(/(^|\/)assets-src\//)
+    }
   })
 
   it('never ignores public/, because that is where the served-file registry comes from', () => {

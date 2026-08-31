@@ -37,10 +37,11 @@ const config: KnipConfig = {
     // Installed here because that is where the node_modules is, invoked from Python, so
     // no import anywhere names it.
     'markdownlint-cli',
-    // Required by `scripts/encode-comic-art.py`, which runs a short node program with
-    // `frontend/` as its cwd so `require('sharp')` resolves here. Invoked from Python,
-    // so no import anywhere names it.
-    'sharp',
+    // `sharp` was here on the same grounds until `comicAssetsWatch.ts` started importing
+    // it: `scripts/encode-comic-art.py` runs a short node program with `frontend/` as its
+    // cwd, so `require('sharp')` resolves here and no import named it. The dev-server
+    // plugin's dynamic `import('sharp')` is a reference knip can see, and knip reports the
+    // now-redundant exemption rather than leaving it to rot — so it is gone.
   ],
 
   // A module's own file is not evidence that anything outside it wants the export, but
