@@ -10,6 +10,7 @@ import {
   smsRows,
   type TableSource,
 } from '../lib/liveTables'
+import { detectSimTables, simFeedRows } from '../lib/simTables'
 
 /**
  * Live call and SMS records for whatever is drawing them.
@@ -57,9 +58,22 @@ export function useLiveTables(
   const key = useMemo(() => [...new Set(sources)].sort().join(','), [sources])
   const wanted = useMemo(() => (key === '' ? [] : (key.split(',') as TableSource[])), [key])
   const [rows, setRows] = useState<LiveTableRows>({})
+  // Read once per mount, like the editor's own flag: a toggle that could change under a
+  // running page would have to decide what happens to the rows already on the surface.
+  const [sim] = useState(detectSimTables)
+  const simulated = useMemo(() => {
+    if (!sim || wanted.length === 0) return null
+    const out: LiveTableRows = {}
+    for (const source of wanted) out[source] = simFeedRows(source)
+    return out
+  }, [sim, wanted])
 
   useEffect(() => {
-    if (wanted.length === 0) return
+    // Simulated rows are the whole answer, so there is nothing to ask for and nothing to
+    // poll: an interval here would spend a request every few seconds on records that are
+    // thrown away, and the first reply would replace the full table with the two calls a
+    // development database holds, which is the state `?sim=1` exists to get out of.
+    if (sim || wanted.length === 0) return
     let cancelled = false
 
     const refresh = async () => {
@@ -109,10 +123,12 @@ export function useLiveTables(
       clearInterval(timer)
       document.removeEventListener('visibilitychange', onVisibility)
     }
-  }, [wanted, pollMs])
+  }, [wanted, pollMs, sim])
 
   // Derived rather than cleared from the effect: a page with no live surface on it is the
   // common case, and the last page's rows must not be handed to it. `EMPTY` is a constant
-  // so that answer is identity-stable, which is what the caller's memo needs.
+  // so that answer is identity-stable, which is what the caller's memo needs — and the
+  // simulated answer is memoized on the same names for exactly that reason.
+  if (simulated) return simulated
   return wanted.length === 0 ? EMPTY : rows
 }

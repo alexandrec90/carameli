@@ -10,15 +10,29 @@ import {
   coerceQuad,
   coerceSource,
   coerceTable,
+  feedColumns,
   liveTable,
   newTable,
 } from '../../skins/comic-book/editor/tableValidate'
-import type { TableProjection } from '../../skins/comic-book/editor/types'
+import type { TableColumn, TableProjection } from '../../skins/comic-book/editor/types'
 
 // A projected table is a nested document inside a picture, which is what makes it the one
 // part of the config the surrounding merge-over-a-default cannot repair. These tests cover
 // the three ways it moves: switched on fresh, read back out of a saved payload, and
 // written into layoutConfig.ts.
+
+/**
+ * The call feed's columns as they were before #274 replaced the five with four. A working
+ * copy written by a tab open across that change still holds exactly these, and localStorage
+ * carried them over every merge and checkout since.
+ */
+const PRE_274_CALL_COLUMNS: TableColumn[] = [
+  { label: 'Time', width: 1, align: 'left' },
+  { label: 'Dir', width: 0.6, align: 'center' },
+  { label: 'From', width: 1.6, align: 'left' },
+  { label: 'To', width: 1.6, align: 'left' },
+  { label: 'Status', width: 1, align: 'left' },
+]
 
 /** Evaluate a serialized table literal, as a paste into the config file would. */
 function reparseTable(ts: string): TableProjection {
@@ -163,6 +177,15 @@ describe('hydrateConfig', () => {
     expect('table' in back.images[2]).toBe(false)
     expect(back.images[2].src).toBe(cfg.images[2].src)
   })
+
+  // End to end through the path the editor actually takes on every load: the whole stale
+  // payload, not a hand-built table.
+  it('heals a stale live surface on the way in, so edit mode shows the current feed', () => {
+    const cfg = seedConfig()
+    cfg.images[1].table = { ...liveTable(newTable(), 'calls'), columns: PRE_274_CALL_COLUMNS }
+    const back = hydrateConfig(JSON.stringify(cfg))
+    expect(back.images[1].table?.columns).toEqual(LIVE_TABLE_FEEDS.calls.columns)
+  })
 })
 
 describe('serializeTable', () => {
@@ -272,6 +295,45 @@ describe('coerceTable with a source', () => {
   it('throws away cells that came in beside a source', () => {
     const t = coerceTable({ ...newTable(), source: 'calls', data: [['14:30', 'In', '+14155550000']] })
     expect(t?.data).toEqual([])
+  })
+
+  // The bug this whole reconciliation exists for: a tab open across #274 kept the five
+  // columns above in localStorage, so every visit to ?edit=1 redrew them over the four
+  // values the feed now sends — which reads as the change having been reverted, and became
+  // that on the next Save.
+  it('re-heads a working copy written before the feed changed shape', () => {
+    const stale = { ...liveTable(newTable(), 'calls'), columns: PRE_274_CALL_COLUMNS }
+    const back = coerceTable(JSON.parse(JSON.stringify(stale)))
+    expect(back?.columns).toEqual(LIVE_TABLE_FEEDS.calls.columns)
+  })
+
+  it('leaves headings and widths the author tuned, while the count still matches', () => {
+    const tuned = liveTable(newTable(), 'calls').columns.map((c, i) => ({
+      ...c,
+      label: `Col ${i}`,
+      width: 3,
+    }))
+    const back = coerceTable(JSON.parse(JSON.stringify({ ...liveTable(newTable(), 'calls'), columns: tuned })))
+    expect(back?.columns).toEqual(tuned)
+  })
+})
+
+describe('feedColumns', () => {
+  it('adopts the feed when the counts disagree', () => {
+    expect(feedColumns(PRE_274_CALL_COLUMNS, 'calls')).toEqual(LIVE_TABLE_FEEDS.calls.columns)
+  })
+
+  it('shares no column object with the feed, so an edit does not reach the module', () => {
+    const cols = feedColumns(PRE_274_CALL_COLUMNS, 'calls')
+    cols[0].label = 'changed'
+    expect(LIVE_TABLE_FEEDS.calls.columns[0].label).not.toBe('changed')
+  })
+
+  // Identity, not equality: fitting a feed to the ruling in a photograph is re-heading and
+  // re-proportioning its columns, and a repair that rebuilt them would undo that on load.
+  it('hands back the author’s own list untouched when the count matches', () => {
+    const held = LIVE_TABLE_FEEDS.sms.columns.map(c => ({ ...c, label: 'mine' }))
+    expect(feedColumns(held, 'sms')).toBe(held)
   })
 })
 

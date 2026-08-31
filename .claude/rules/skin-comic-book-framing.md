@@ -138,7 +138,24 @@ Three consequences worth stating, because each one is a bug the obvious implemen
 - **A live surface's columns are the feed's**, because the mapper emits cells positionally.
   Widths, alignment and heading wording stay the author's — that is how a feed is fitted to
   the ruling in the photograph — but the editor hides **+ Column** and **−** while a feed is
-  on, since removing the second column would slide every value one heading left.
+  on, since removing the second column would slide every value one heading left. The count
+  is therefore **reconciled on the way out of a working copy**, by `feedColumns` in
+  `editor/tableValidate.ts`: a list of the feed's length is the author's and is left alone,
+  and one of any other length is replaced. It disagrees for exactly one reason — a tab
+  older than a change to the feed's shape, which `localStorage` carries across every merge
+  and checkout — and until the repair existed such a tab redrew the previous feed's
+  headings over this feed's values on every `?edit=1`, indistinguishably from the change
+  having been reverted. That is the second half of what #274 and #287 did to the call log,
+  and the half `configStamp.ts` does not catch: the payload's stamp warns that the *file*
+  moved, while this warns nobody and simply fixes the columns.
+- **`?sim=1` is how a surface gets framed against a full table** (`lib/simTables.ts`,
+  dev-only, `?sim=0` off, flag in `localStorage['live-tables:sim']`). A development
+  database holds two calls, so band height, ink and column width would otherwise all be
+  chosen against a three-line notepad with a wheel that does nothing. The made-up rows
+  *replace* the poll rather than seeding it — a reply arriving underneath would swap the
+  hundred rows back for the two — and they are built as records put through the feed's own
+  mapper, so a column added to a feed reaches them for free and no cell can drift out from
+  under its heading.
 - **Live means polling** — there is no push transport in this frontend. `useLiveTables`
   re-asks every `LIVE_TABLE_POLL_MS`, skips a hidden tab and refreshes on `visibilitychange`,
   and returns the *identical* row array when nothing changed, so a quiet poll does not

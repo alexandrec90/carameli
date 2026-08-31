@@ -152,6 +152,27 @@ column would slide every value one heading to the left. Nothing under `skins/` f
 `hooks/useLiveTables.ts` asks, `lib/liveTables.ts` maps a record to a row, and
 `Layout.tsx` drops the rows in between the working copy and the panels.
 
+**A live surface's column *count* belongs to the feed, and is repaired on load.** Wording
+and widths stay the author's — fitting a feed to the ruling in a photograph is exactly
+re-heading and re-proportioning its columns — but a list of the wrong length is replaced
+with the feed's own by `feedColumns` in `tableValidate.ts`, on the way out of the working
+copy. There is one way that length ever disagrees: a tab whose working copy was written
+before the feed changed shape. `localStorage` outlives every merge, checkout and pull, so
+that tab redrew the *previous* feed's headings over this feed's values every time the
+editor opened — which reads as somebody having reverted the change, and became that on the
+next Save. It is what happened to the call log when #274 replaced its five columns with
+four and #287 put them back. `configParity.ts` reports the mismatch after the fact;
+repairing it on the way in is what stops the next tab causing it.
+
+**`?sim=1` fills every live surface with made-up records** (`lib/simTables.ts`, dev only,
+`?sim=0` to stop and the flag persisted in `localStorage['live-tables:sim']` in between).
+A development database holds two calls and no messages, so the notepad you are lining up
+is three lines long and the wheel does nothing — which is the state every decision about
+band height, ink and column width would otherwise be made in. Simulated rows replace the
+poll rather than seeding it, so nothing is fetched while it is on, and they are built as
+records run through the feed's own mapper, which is what keeps them index-parallel to the
+columns with no second list to update.
+
 The surface divides into `rows` equal bands, and the scroll offset is an **integer index
 into the data**, never a pixel position: band *k* lands in exactly the same place at every
 offset, which is what keeps the lettering on the ruling drawn in the picture. Rows outside
