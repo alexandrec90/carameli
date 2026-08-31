@@ -47,9 +47,16 @@ export const DOCKER_POLL_INTERVAL_MS = 500
  *
  * Vite already ignores `.git` and `node_modules`. It does **not** ignore `dist/`,
  * which in this repo is a full copy of `public/` — restat'd twice a second for a
- * directory the dev server never reads — nor `assets-src/`, the ~40 MB of PNG
- * masters that `scripts/encode-comic-art.py` reads and nothing serves. Nothing
- * listed here can produce a hot update, so ignoring it costs no HMR fidelity.
+ * directory the dev server never reads. Nothing listed here can produce a hot
+ * update, so ignoring it costs no HMR fidelity.
+ *
+ * **`assets-src/` came off this list**, and for the same reason `public/` was never
+ * on it: an event there is not an HMR trigger but an input to something else.
+ * `comicAssetsWatch.ts` encodes a master the moment one lands, so ignoring the
+ * directory would mean a picture dropped in appeared in the editor only after a
+ * restart — the manual step the plugin exists to remove. The sweep cost is the same
+ * argument as `public/`'s below: chokidar stats files, not bytes, and the ~40 MB of
+ * masters are about thirty of them.
  *
  * **`public/` is never on this list, and that is load-bearing.** The dev server
  * does not stat `public/` per request: `initPublicFiles` reads the directory once
@@ -72,7 +79,6 @@ export const WATCH_IGNORED: readonly string[] = [
   '**/playwright-report/**',
   '**/test-results/**',
   '**/.vite/**',
-  '**/assets-src/**',
 ]
 
 export interface DevWatchOptions {

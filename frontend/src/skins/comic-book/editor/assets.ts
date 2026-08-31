@@ -1,7 +1,17 @@
 // The pictures a panel image can point at. A static manifest rather than a directory
 // listing: the files are served straight out of `frontend/public/comic-book/`, and the
 // browser has no way to enumerate that, so the editor's picture dropdown needs the list
-// written down. Adding artwork means dropping the file in and adding a line here.
+// written down.
+//
+// **Written down, but not by hand.** The dev server reconciles this array against that
+// directory at startup and on every add or unlink under it — `frontend/comicAssets.ts`
+// for the rule, `frontend/comicAssetsWatch.ts` for the wiring — so dropping a picture in
+// (or a master into `assets-src/comic-book/`, which is encoded first) registers it, and
+// deleting one takes its line back out. `scripts/encode-comic-art.py` does the same for a
+// tree with no server running.
+//
+// Edit a **label** here freely: sync appends and removes, and never renames. It is the
+// `src` list that is maintained for you, and a label you write survives every pass.
 
 /** One selectable picture, by public URL. */
 export interface PanelAsset {

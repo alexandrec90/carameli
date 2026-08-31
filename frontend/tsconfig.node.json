@@ -29,6 +29,11 @@
   "include": [
     "vite.config.ts",
     "configImports.test.ts",
+    "comicAssets.ts",
+    "comicAssets.test.ts",
+    "comicAssetsWatch.ts",
+    "comicAssetsWatch.test.ts",
+    "comicAssetsWatch.integration.test.ts",
     "devWatchPolicy.ts",
     "devWatchPolicy.test.ts",
     "editorConfigPath.ts",

@@ -11,6 +11,7 @@ import type { Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import { configDefaults } from 'vitest/config'
 
+import { comicAssetsPlugin } from './comicAssetsWatch.ts'
 import { resolveDevWatch } from './devWatchPolicy.ts'
 import { CONFIG_IN_REPO, editorConfigFile } from './editorConfigPath.ts'
 import { quietProxyErrors } from './proxyErrorPolicy.ts'
@@ -141,7 +142,10 @@ export default defineConfig(({ mode }) => {
     'http://127.0.0.1:8000'
 
   return {
-    plugins: [react(), comicEditorPlugin()],
+    // comicAssetsPlugin keeps the editor's picture dropdown level with the served
+    // directory while the server runs — art dropped in appears without a script or a
+    // restart. ./comicAssetsWatch.ts.
+    plugins: [react(), comicEditorPlugin(), comicAssetsPlugin(rootDir)],
 
     // A down backend logs one concise line instead of a stack trace per proxied
     // request — the normal state for host-Vite branch previews. ./proxyErrorPolicy.ts.

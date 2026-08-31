@@ -29,7 +29,8 @@ is split. The per-panel palette and dot metrics stay tuned in
 [`../panelPatterns.ts`](../panelPatterns.ts) (`PANEL_BG_CONFIGS`, read through
 `panelBgConfig`, which wraps for a panel past its end), so switching a panel's pattern
 keeps its colors. A picture's `src` is a public URL, offered in the
-editor by the static manifest in [`assets.ts`](./assets.ts) (`PANEL_ASSETS`). The
+editor by the manifest in [`assets.ts`](./assets.ts) (`PANEL_ASSETS`), which the dev
+server keeps level with the served directory (see [Adding a picture](#adding-a-picture)). The
 bubble `type` resolves to a lettering font via [`bubbleTypes.ts`](./bubbleTypes.ts)
 (`BUBBLE_TYPES`); the outline itself is generated vector geometry in
 [`../bubbleShape.ts`](../bubbleShape.ts). The renderer reads everything from these
@@ -372,6 +373,37 @@ different images can only crossfade. A new bubble type belongs in `bubbleShape.t
 `export const` blocks on the clipboard; **.ts** downloads a complete `layoutConfig.ts`.
 Both are used automatically if the Save endpoint or clipboard is unavailable.
 
+## Adding a picture
+
+Drop the lossless master into `frontend/assets-src/comic-book/` and it appears in the
+**picture** dropdown. Nothing else — no script, no server restart, no edit to
+[`assets.ts`](./assets.ts).
+
+[`frontend/comicAssetsWatch.ts`](../../../../comicAssetsWatch.ts) is a `serve`-only Vite
+plugin watching both directories. A master landing in `assets-src/comic-book/` is encoded
+to `.webp` in `public/comic-book/` at the size the panels draw at; a `.webp` landing in
+`public/comic-book/` directly is offered as it is. Either way the export is appended to
+`PANEL_ASSETS`, and writing that file is what refreshes the dropdown in an open tab.
+Deleting a picture takes its line back out, which is the part
+`scripts/encode-comic-art.py` never did.
+
+The label is derived from the filename — `push-button-phone.png` becomes
+`Push-button phone`. **Edit it in `assets.ts` and it stays edited**: reconciliation
+appends and removes, and never renames. That is why `conversation.webp` still reads
+`Two agents talking`.
+
+Two things worth knowing:
+
+- **`scripts/encode-comic-art.py` is still the tool with no server running** — a fresh
+  clone, CI, a non-default `--max-edge`, or a `--label` chosen up front rather than
+  corrected afterwards. The two share their rule
+  ([`frontend/comicAssets.ts`](../../../../comicAssets.ts)) and are idempotent, so
+  running one after the other changes nothing.
+- **A master is not free.** `assetPolicy.ts` fails a page whose art exceeds
+  `MAX_PAGE_BYTES`, and it counts what a visitor downloads — so a picture registered but
+  never placed in a panel costs a dropdown entry and no bytes, while placing it is what
+  spends the budget.
+
 ## Save writes a file; Ship makes it survive
 
 Save writes into whichever working tree the dev server is serving, and **two of the
@@ -422,7 +454,7 @@ nothing in a prod build.
 
 ```text
 types.ts            ImgTransform, BubbleTransform, BubbleChain, EditorConfig
-assets.ts           PANEL_ASSETS: the pictures a frame may point at (static manifest)
+assets.ts           PANEL_ASSETS: the pictures a frame may point at (written by the dev server)
 bubbleTypes.ts      BubbleType + BUBBLE_TYPES (lettering font per type) — ships in prod
 ../panels.ts        Panel, PANEL_PAGES, pageForPath: the slot type and the route → page rule
 layoutConfig.ts     PANELS (the slots `panel` indexes — label, isLogo, page) beside the framing data
