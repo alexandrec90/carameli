@@ -60,9 +60,16 @@ export function useLiveTables(
   const [rows, setRows] = useState<LiveTableRows>({})
   // Read once per mount, like the editor's own flag: a toggle that could change under a
   // running page would have to decide what happens to the rows already on the surface.
-  const [sim] = useState(detectSimTables)
+  //
+  // `import.meta.env.DEV` is spelled out at both uses, redundantly with the check inside
+  // `detectSimTables`, because that is what makes the simulation *tree-shakeable*: Vite
+  // substitutes the literal `false` in a production build, both references fall in dead
+  // branches, and `lib/simTables.ts` leaves the chunk entirely. Dev-only otherwise says
+  // only when the code runs, never whether it ships — which is how a page nobody can put
+  // it on still pays for a hundred made-up call records.
+  const [sim] = useState(() => import.meta.env.DEV && detectSimTables())
   const simulated = useMemo(() => {
-    if (!sim || wanted.length === 0) return null
+    if (!import.meta.env.DEV || !sim || wanted.length === 0) return null
     const out: LiveTableRows = {}
     for (const source of wanted) out[source] = simFeedRows(source)
     return out
