@@ -2,6 +2,7 @@ import { act, renderHook, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { CallEvent, SmsMessage } from '../api/client'
+import { LIVE_TABLE_LIMIT } from '../lib/liveTables'
 
 const callsList = vi.fn()
 const smsList = vi.fn()
@@ -189,5 +190,48 @@ describe('useLiveTables', () => {
       await vi.advanceTimersByTimeAsync(5000)
     })
     expect(callsList).toHaveBeenCalledTimes(1)
+  })
+
+  describe('under ?sim=1', () => {
+    beforeEach(() => {
+      window.localStorage.setItem('live-tables:sim', '1')
+    })
+
+    afterEach(() => {
+      window.localStorage.clear()
+    })
+
+    it('fills every surface on the page with a full table', async () => {
+      const { result } = renderHook(() => useLiveTables(['calls', 'sms']))
+      await settle()
+      expect(result.current.calls).toHaveLength(LIVE_TABLE_LIMIT)
+      expect(result.current.sms).toHaveLength(LIVE_TABLE_LIMIT)
+    })
+
+    // Not merely wasteful: the first reply would replace the hundred made-up rows with the
+    // two calls a development database holds, which is the state ?sim=1 exists to get out of.
+    it('asks the API for nothing at all', async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true })
+      renderHook(() => useLiveTables(['calls', 'sms'], 1000))
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5000)
+      })
+      expect(callsList).not.toHaveBeenCalled()
+      expect(smsList).not.toHaveBeenCalled()
+    })
+
+    it('hands back the identical arrays across renders, so nothing repaints', async () => {
+      const { result, rerender } = renderHook(() => useLiveTables(['calls']))
+      await settle()
+      const first = result.current
+      rerender()
+      expect(result.current).toBe(first)
+    })
+
+    it('still answers with nothing for a page that has no live surface', async () => {
+      const { result } = renderHook(() => useLiveTables([]))
+      await settle()
+      expect(result.current).toEqual({})
+    })
   })
 })

@@ -117,6 +117,37 @@ export function smsRows(messages: SmsMessage[]): string[][] {
   ])
 }
 
+/** Cells per feed, keyed by source. A feed nobody asked for is simply absent. */
+export type LiveTableRows = Partial<Record<TableSource, string[][]>>
+
+/**
+ * One round of replies folded into the rows already on the surfaces, or — when nothing in
+ * it is news — `prev` itself, by identity.
+ *
+ * That identity is the whole contract: the poll runs whether or not anything happened, and
+ * a fresh object every few seconds re-renders every panel on the page. A `null` entry is a
+ * request that failed, and keeps whatever the surface is already showing rather than
+ * blanking a notepad mid-call.
+ */
+export function mergeRows(
+  prev: LiveTableRows,
+  fetched: readonly (readonly [TableSource, string[][] | null])[],
+): LiveTableRows {
+  let changed = Object.keys(prev).length !== fetched.length
+  const next: LiveTableRows = {}
+  for (const [source, data] of fetched) {
+    const previous = prev[source]
+    if (data === null || sameRows(previous, data)) {
+      next[source] = previous ?? []
+      if (previous === undefined) changed = true
+    } else {
+      next[source] = data
+      changed = true
+    }
+  }
+  return changed ? next : prev
+}
+
 /**
  * Whether two polls produced the same cells.
  *
