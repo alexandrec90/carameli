@@ -5,6 +5,7 @@ import { constraintOf } from '../panelGeometry'
 import type { PanelPage } from '../panels'
 import type { CutAxis } from './panelGridCut'
 import { insertBend, moveVertex } from './panelGridOps'
+import PanelNameField from './PanelNameField'
 import type { EditorModeApi } from './useEditorMode'
 import type { SeamDragApi } from './useSeamDrag'
 
@@ -81,6 +82,9 @@ export default function ShapeInspector({ api, page, kind, grid, drag }: ShapeIns
       {panelInfo && panelIndex !== null ? (
         <>
           <div className="cb-ed-label">{panelInfo.label} panel</div>
+          {/* Editable here as well as in content mode: a split selects the half it just
+              made, and naming it is the next thing an author does. */}
+          <PanelNameField api={api} panel={panelIndex} />
           <div className="cb-ed-hint">
             Cut it in two along a straight line through its middle. The upper or left
             half keeps this panel&apos;s name, pictures and bubbles; the other half is a new
