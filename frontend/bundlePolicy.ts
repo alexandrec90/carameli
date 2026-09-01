@@ -181,8 +181,26 @@ export const MAX_LAZY_CHUNK_BYTES = 260 * 1024
  * `CallBubble.tsx` came out in the same change and is subtracted from it. Same lazy
  * comic-book chunk, still 46 of them, `package.json` untouched, so nothing new was
  * pulled in.
+ *
+ * This raise (981 → 986) is the editor taking the file's version of a panel it is behind,
+ * 3.34 KB measured as this branch's merge (984.3 KB) against the master it merges
+ * (980.9 KB, `d6bcf4c`) — the same 3,417 bytes this branch measured against `2847dbe`
+ * before three PRs landed on top of it, so the three cost nothing here and the delta is
+ * this branch's alone. Note where that master already stood: 0.1 KB under a ceiling set a
+ * kilobyte clear of the branch that raised it, spent by merges nobody re-measured — the
+ * 971 → 972 paragraph's failure again — so this ceiling is set a kilobyte clear of 984.3
+ * rather than flush against it.
+ *
+ * The bytes are the working copy's memory of the file it came from: `configDrift.ts`
+ * diffs the recorded `seedBase` against today's seed per panel, and `configAdopt.ts`
+ * splices one panel's entries back to the file's version, remapping every `linkTo` across
+ * the splice. Both reach the build through `useWorkingCopy` ← `useEditorMode`, which
+ * Layout.tsx imports statically. `StaleNotice.tsx`, which lists the drift and offers the
+ * Take button, does *not* — it hangs off `EditorOverlay`, behind the `import.meta.env.DEV`
+ * test, and its strings do not appear in `dist/`. Same lazy comic-book chunk, still 46 of
+ * them, `package.json` untouched, so nothing new was pulled in.
  */
-export const MAX_TOTAL_JS_BYTES = 981 * 1024
+export const MAX_TOTAL_JS_BYTES = 986 * 1024
 
 /**
  * Every `.css` file in `dist/assets/`, summed. Today 44.2 KB across 2 files.
