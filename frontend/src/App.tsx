@@ -36,6 +36,10 @@ export default function App() {
         background: cfg.background,
         backgroundImage: cfg.backgroundImage,
         backgroundSize: cfg.backgroundSize,
+        // A loading screen is a picture, not a document: it wears the skin's own
+        // pointer (inherited by everything on it) and its legend does not highlight.
+        cursor: cfg.cursor,
+        userSelect: 'none',
       }}>
         {showLoader && (cfg.card ? (
           <div style={{
