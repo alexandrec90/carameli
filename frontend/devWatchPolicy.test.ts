@@ -45,6 +45,21 @@ describe('resolveDevWatch', () => {
     expect(DOCKER_POLL_INTERVAL_MS).toBeGreaterThan(OBSERVED_SWEEP_MS)
   })
 
+  it('keeps real headroom over the sweep, which is what catches a mis-measured one', () => {
+    // The test above compares the two constants and passes at 2500 vs 2020 — which is
+    // exactly the pair that shipped in PR #306, with the sweep taken from a *serialized*
+    // `statSync` loop. chokidar stats through libuv's threadpool instead, so the honest
+    // figure is ~300-700 ms and 2020 was 3-6x too high. A `>` assertion cannot tell the
+    // two apart; a headroom ratio can.
+    //
+    // 2x is deliberately loose. The sweep moves with host load — 312, 469 and 701 ms
+    // across three rounds of the same tree — so an interval only fractionally above it
+    // is one busy moment away from overlapping again. A ratio this far off is not a
+    // tuning choice, it is the signature of the wrong measurement method, and the fix is
+    // to re-measure concurrently rather than to relax this number.
+    expect(DOCKER_POLL_INTERVAL_MS / OBSERVED_SWEEP_MS).toBeGreaterThanOrEqual(2)
+  })
+
   it('keeps native watching for local non-Docker dev', () => {
     expect(resolveDevWatch({})).toBeUndefined()
   })

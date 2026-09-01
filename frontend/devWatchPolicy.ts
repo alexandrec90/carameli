@@ -32,13 +32,37 @@
  * hot update anyway.
  *
  * **There is a third side, and it was missing until 2026-08-31: the interval has
- * to be longer than the sweep it schedules.** At 500 ms against a ~2 s sweep the
- * polls overlapped ~3.4x, so the watcher never idled and the 9p channel never went
+ * to be longer than the sweep it schedules.** At 500 ms the polls could not finish
+ * before the next was due, so the watcher never idled and the 9p channel never went
  * quiet — which does not present as a watcher fault at all, but as every page load
- * taking seconds. {@link DOCKER_POLL_INTERVAL_MS} carries the measurement and the
- * arithmetic. The table above is a *parallel-asset* benchmark and stayed green
- * throughout, because warm modules are answered from memory and never queue on 9p;
- * that is exactly why this survived the fix that produced the bottom row.
+ * taking seconds. {@link DOCKER_POLL_INTERVAL_MS} carries the measurement, and
+ * {@link OBSERVED_SWEEP_MS} carries the method, which turned out to matter more.
+ * The table above is a *parallel-asset* benchmark and stayed green throughout, because
+ * warm modules are answered from memory and never queue on 9p; that is exactly why this
+ * survived the fix that produced the bottom row.
+ *
+ * **And there is a fourth, which this file cannot fix: none of the above touches render
+ * delay.** With the watcher quiet, `index.html` is served in ~50 ms and LCP on the
+ * comic-book page was still 7.3 s, because 91% of it is the browser walking an
+ * unbundled 13-level module graph after that first byte lands. Fixing the watcher moved
+ * TTFB 2.4x and moved LCP by 2%. A timing that does not name which half it measured says
+ * almost nothing about this stack.
+ *
+ * **`server.warmup` is the obvious answer to that fourth cost and it is the wrong one.**
+ * It was written, committed and reverted here on 2026-09-01, so it is worth naming to
+ * stop the next attempt: warmup pre-transforms modules into Vite's in-memory cache, and
+ * the 6638 ms render delay was traced on a *reload*, with all 143 script requests
+ * answered `304 Not Modified` from a cache that was **already warm**. A fix whose
+ * mechanism is fully in effect during the measurement cannot be the cause of what was
+ * measured. It is not free either — enabling it took the container's `ready in` from
+ * ~29 s to ~73 s, moving the cost to startup rather than removing it.
+ *
+ * What is left, unfixed and named honestly: **143 requests deep in 13 serialized
+ * levels over HTTP/1.1**, which caps the browser at ~6 connections per origin. Depth is
+ * the part no number of connections can help — the browser cannot ask for a module until
+ * the one that imports it has arrived and been parsed — so the lever is graph *shape*,
+ * not cache temperature. Nobody should reach for `warmup` again without first re-checking whether
+ * the modules in their trace were 200s or 304s.
  */
 
 /**
@@ -53,29 +77,59 @@ export const MIN_SAFE_POLL_INTERVAL_MS = 300
  * container, over the 9p bind mount. **The interval below must stay above this**,
  * and that is the whole reason this constant is written down.
  *
- * Measured 2026-08-31 inside `carameli-frontend-1`, stat-ing the 513 files left
- * after {@link WATCH_IGNORED}: 943 ms idle, 1689 ms and 2020 ms under load. It is
- * ~2-3 ms per file and it is 9p round-trip latency, not CPU — which is why it gets
- * *worse* exactly when the machine is busy serving a page.
+ * Measured 2026-08-31 inside `carameli-frontend-1` over the 514 files left after
+ * {@link WATCH_IGNORED}, with `UV_THREADPOOL_SIZE=64` as docker-compose sets it:
+ * **312 ms, 469 ms, 701 ms** across three rounds.
+ *
+ * ## Measure it the way chokidar does, or the number is meaningless
+ *
+ * This constant first shipped as `2020`, taken from a **serialized** `statSync` loop —
+ * one round trip at a time, waiting for each. That is not what the watcher does:
+ * chokidar's `fs.watchFile` timers issue their stats through libuv's threadpool, so up
+ * to 64 are in flight at once and they pipeline down the 9p channel instead of
+ * round-tripping one by one. Both methods, same tree, same minute:
+ *
+ * | method | round 1 | round 2 | round 3 |
+ * | ------ | ------- | ------- | ------- |
+ * | serialized `statSync` (wrong) | 12988 ms | 12161 ms | 7353 ms |
+ * | threadpool `fs.stat` (what chokidar does) | 701 ms | 312 ms | 469 ms |
+ *
+ * The serialized figure overstates by **15-39x**, and it is not even stable — re-run it
+ * on a busier host and it says 12 s where yesterday it said 2 s. An agent who
+ * re-measures that way and honours the "interval must beat the sweep" rule below would
+ * raise the interval past 12 s and make HMR useless, having followed the instructions
+ * exactly. So the method is the load-bearing part of this comment, not the number:
+ * **stat concurrently, with the threadpool size the container actually runs.**
  */
-export const OBSERVED_SWEEP_MS = 2020
+export const OBSERVED_SWEEP_MS = 701
 
 /**
  * Interval used inside Docker. Coarse on purpose, and it must stay coarser than
  * {@link OBSERVED_SWEEP_MS}.
  *
- * **This was 500 ms, which is below the sweep's own cost, so sweeps overlapped
- * ~3.4x and the watcher never idled.** That is a different failure from the pegged
- * cores the interval was first tuned against, and it does not look like a watcher
- * problem at all: it presents as *page load* latency. `chokidar` polls each file on
- * its own `fs.watchFile` timer, so 513 files at 500 ms is ~1000 stats/second held
- * permanently in flight, and every one of them is a round trip down the single 9p
- * channel to Windows. Anything the dev server has to read from disk — `index.html`
- * on every navigation, a cold module, a `public/` asset — queues behind that
- * traffic. Measured on the comic-book page: `index.html` took 1.5-4.3 s to serve
- * while a *warm* module, answered from Vite's in-memory transform cache without
- * touching the filesystem, took 30 ms. The container burned 35% CPU serving
- * nothing.
+ * **This was 500 ms, which is below the sweep's own cost, so the watcher never
+ * idled.** That is a different failure from the pegged cores the interval was first
+ * tuned against, and it does not look like a watcher problem at all: it presents as
+ * *page load* latency. `chokidar` polls each file on its own `fs.watchFile` timer, so
+ * 514 files at 500 ms is ~1000 stats/second held permanently in flight, and every one of
+ * them is a round trip down the single 9p channel to Windows. Anything the dev server
+ * has to read from disk — `index.html` on every navigation, a cold module, a `public/`
+ * asset — queues behind that traffic. Measured on the comic-book page: `index.html` took
+ * 1.5-4.3 s to serve while a *warm* module, answered from Vite's in-memory transform
+ * cache without touching the filesystem, took 30 ms. The container burned 35% CPU
+ * serving nothing.
+ *
+ * An interval under the sweep does not overlap by a fixed multiple, which is worth
+ * saying because the first draft of this comment quoted one (`~3.4x`, arithmetic on a
+ * badly-measured sweep — see {@link OBSERVED_SWEEP_MS}). It is a feedback loop: the
+ * extra stats in flight make the channel slower, which makes the sweep longer, which
+ * puts still more in flight. The multiplier is whatever the loop settles at, and the
+ * only stable statement is the qualitative one — below its own sweep, the backlog grows.
+ *
+ * **After the fix, verified 2026-08-31:** `index.html` 48-131 ms from the host,
+ * TTFB 1618 ms -> 679 ms, and idle container CPU dipping to 5.6% where it had sat
+ * flat at 35.4% — that dip *is* the watcher idling, and it is the observable worth
+ * re-checking, more than any single timing.
  *
  * `UV_THREADPOOL_SIZE=64` in docker-compose is the other half of this and is still
  * load-bearing — it stops the stats starving libuv's pool — but it cannot help with

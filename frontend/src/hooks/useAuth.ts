@@ -18,6 +18,18 @@ const BASE = import.meta.env.VITE_API_BASE_URL ?? ''
  * `createRoot().render()`, so the round trip overlaps the skin load instead of following
  * it. That is not a dev-only saving: the serialization shipped.
  *
+ * **"Before render" is not "immediately", and in dev it is nowhere near it.** A traced
+ * load on 2026-08-31 put `POST /auth/session` on the wire at **3786 ms**, not at ~800 ms
+ * where `main.tsx` itself arrived. ES module semantics are the reason and they are worth
+ * knowing before trusting a call placed at the top of an entry file: `main.tsx`'s *body*
+ * cannot run until its own static import graph — `App.tsx`, `softphoneContext`,
+ * `routes`, and everything those pull — has been fetched and evaluated. Only the skin
+ * escapes that, because the registry reaches it through a dynamic `import()`. So the
+ * overlap this buys is real and measured (the skin's graph ran to 5.3 s, and the request
+ * was answered by 4.3 s, entirely hidden behind it) but it is an overlap with the
+ * *skin*, not a head start on the page. Moving it earlier still would mean an inline
+ * `<script>` in `index.html`, which is a different trade and has not been made.
+ *
  * **And one request means one request.** `React.StrictMode` double-invokes effects in
  * development, so a fetch issued from the effect body ran twice on every load and two
  * POSTs raced to set the session cookie. The usual reading of that is "StrictMode noise",
