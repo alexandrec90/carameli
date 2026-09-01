@@ -55,7 +55,14 @@ function ComicBookLoadingScreen({ showCard }: { showCard: boolean }) {
   }, [showCard])
 
   return (
-    <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', overflow: 'hidden', background: '#FAFAF2' }}>
+    <div style={{
+      position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center',
+      minHeight: '100vh', overflow: 'hidden', background: '#FAFAF2',
+      // The skin's stylesheet is the chunk this screen is waiting for, so the drawn
+      // pointer comes from the loading config rather than from `--cb-cursor-default`.
+      cursor: skinLoadingConfigs['comic-book'].cursor,
+      userSelect: 'none',
+    }}>
       <style>{`
                 @keyframes cb-ctx-pop {
                     0%   { transform: scale(0.35) rotate(-14deg); opacity: 0; }
@@ -149,6 +156,8 @@ export function SkinProvider({ children }: { children: React.ReactNode }) {
           background: cfg.background,
           backgroundImage: cfg.backgroundImage,
           backgroundSize: cfg.backgroundSize,
+          cursor: cfg.cursor,
+          userSelect: 'none',
         }}
       >
         {/* Only show the loading indicator after the debounce — fast / cached
