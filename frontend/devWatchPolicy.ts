@@ -30,6 +30,15 @@
  * docker-compose sets `UV_THREADPOOL_SIZE` so a sweep cannot starve a response,
  * and {@link WATCH_IGNORED} keeps the sweep off paths that could never trigger a
  * hot update anyway.
+ *
+ * **There is a third side, and it was missing until 2026-08-31: the interval has
+ * to be longer than the sweep it schedules.** At 500 ms against a ~2 s sweep the
+ * polls overlapped ~3.4x, so the watcher never idled and the 9p channel never went
+ * quiet — which does not present as a watcher fault at all, but as every page load
+ * taking seconds. {@link DOCKER_POLL_INTERVAL_MS} carries the measurement and the
+ * arithmetic. The table above is a *parallel-asset* benchmark and stayed green
+ * throughout, because warm modules are answered from memory and never queue on 9p;
+ * that is exactly why this survived the fix that produced the bottom row.
  */
 
 /**
@@ -39,8 +48,47 @@
  */
 export const MIN_SAFE_POLL_INTERVAL_MS = 300
 
-/** Interval used inside Docker. Coarse on purpose, but still sub-second HMR. */
-export const DOCKER_POLL_INTERVAL_MS = 500
+/**
+ * Longest a full sweep of the watched tree has been measured to take, in the
+ * container, over the 9p bind mount. **The interval below must stay above this**,
+ * and that is the whole reason this constant is written down.
+ *
+ * Measured 2026-08-31 inside `carameli-frontend-1`, stat-ing the 513 files left
+ * after {@link WATCH_IGNORED}: 943 ms idle, 1689 ms and 2020 ms under load. It is
+ * ~2-3 ms per file and it is 9p round-trip latency, not CPU — which is why it gets
+ * *worse* exactly when the machine is busy serving a page.
+ */
+export const OBSERVED_SWEEP_MS = 2020
+
+/**
+ * Interval used inside Docker. Coarse on purpose, and it must stay coarser than
+ * {@link OBSERVED_SWEEP_MS}.
+ *
+ * **This was 500 ms, which is below the sweep's own cost, so sweeps overlapped
+ * ~3.4x and the watcher never idled.** That is a different failure from the pegged
+ * cores the interval was first tuned against, and it does not look like a watcher
+ * problem at all: it presents as *page load* latency. `chokidar` polls each file on
+ * its own `fs.watchFile` timer, so 513 files at 500 ms is ~1000 stats/second held
+ * permanently in flight, and every one of them is a round trip down the single 9p
+ * channel to Windows. Anything the dev server has to read from disk — `index.html`
+ * on every navigation, a cold module, a `public/` asset — queues behind that
+ * traffic. Measured on the comic-book page: `index.html` took 1.5-4.3 s to serve
+ * while a *warm* module, answered from Vite's in-memory transform cache without
+ * touching the filesystem, took 30 ms. The container burned 35% CPU serving
+ * nothing.
+ *
+ * `UV_THREADPOOL_SIZE=64` in docker-compose is the other half of this and is still
+ * load-bearing — it stops the stats starving libuv's pool — but it cannot help with
+ * the 9p channel, which is serialized regardless of how many stats are in flight.
+ * Raising the interval is what actually reduces the traffic: 4x fewer stats per
+ * second, and no overlap.
+ *
+ * The trade is HMR latency, and it is worth naming rather than discovering: an edit
+ * now lands in the browser in up to ~2.5 s instead of ~0.5 s. For UI work where that
+ * matters, the host dev server (`devkit/scripts/preview-ui-host.py`) has no bind
+ * mount and no polling at all.
+ */
+export const DOCKER_POLL_INTERVAL_MS = 2500
 
 /**
  * Paths excluded from the poll sweep, on top of Vite's own defaults.

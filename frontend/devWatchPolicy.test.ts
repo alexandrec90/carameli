@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   DOCKER_POLL_INTERVAL_MS,
   MIN_SAFE_POLL_INTERVAL_MS,
+  OBSERVED_SWEEP_MS,
   WATCH_IGNORED,
   resolveDevWatch,
 } from './devWatchPolicy'
@@ -27,6 +28,21 @@ describe('resolveDevWatch', () => {
 
     expect(watch?.interval).toBeGreaterThanOrEqual(MIN_SAFE_POLL_INTERVAL_MS)
     expect(DOCKER_POLL_INTERVAL_MS).toBeGreaterThanOrEqual(MIN_SAFE_POLL_INTERVAL_MS)
+  })
+
+  it('keeps the interval longer than one sweep, so polls cannot overlap', () => {
+    // The regression this exists to catch, and the reason it is a *separate* test from
+    // the coarseness floor above: 500 ms against a ~2 s sweep passed that one and was
+    // still wrong. Overlapping polls keep the 9p channel permanently busy, and every
+    // request the dev server has to answer off disk queues behind them — so the symptom
+    // is page-load latency (index.html: 1.5-4.3 s) and nothing points at the watcher.
+    //
+    // An interval below the sweep it schedules is a backlog by construction, whatever
+    // the two numbers happen to be, so this compares them rather than pinning either.
+    const watch = resolveDevWatch({ CHOKIDAR_USEPOLLING: 'true' })
+
+    expect(watch?.interval).toBeGreaterThan(OBSERVED_SWEEP_MS)
+    expect(DOCKER_POLL_INTERVAL_MS).toBeGreaterThan(OBSERVED_SWEEP_MS)
   })
 
   it('keeps native watching for local non-Docker dev', () => {
