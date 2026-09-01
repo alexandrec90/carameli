@@ -29,8 +29,13 @@ import type { EditorConfig } from './types'
  * editor is on, and importing the TypeScript serializer put its 13 KB into every visitor's
  * bundle for a hash. The `test:bundle` budget caught that; the comment is here so the
  * import is not reintroduced as a tidying-up.
+ *
+ * Exported for ./configDrift.ts, which compares two configs *part by part* rather than
+ * whole. Same canonical form for both, deliberately: a difference this says nothing about
+ * is a difference the stamp does not see either, so the warning and the diff under it can
+ * never disagree about whether the file moved.
  */
-function canonical(value: unknown): string {
+export function canonical(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`
   if (value !== null && typeof value === 'object') {
     const record = value as Record<string, unknown>

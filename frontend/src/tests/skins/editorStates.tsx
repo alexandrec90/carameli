@@ -100,6 +100,18 @@ export interface EditorState {
    * someone gives it a control or a state, which is the property being bought.
    */
   derive?: (config: EditorConfig) => EditorConfig
+  /**
+   * Fields to set on the api itself, for a control gated on something that is not in the
+   * config at all.
+   *
+   * `derive` covers everything a config can be; the drift block is the case it cannot,
+   * because being behind the file is a fact about *two* configs — this working copy and
+   * the one the bundle holds — and no edit to one of them produces it.
+   *
+   * The same small door as `derive`, and the same bargain: the mocked methods stay mocked,
+   * so a state written here still measures which control reaches which mutator.
+   */
+  over?: Partial<EditorModeApi>
 }
 
 /** The (mode, selection) grid, derived, with nothing selected included in each mode. */
@@ -178,8 +190,27 @@ const REPAIR_STATES: EditorState[] = CHAINED === null ? [] : [
   },
 ]
 
-/** Every state worth mounting, in a stable order — the grid, then the repair cases. */
-export const EDITOR_STATES: EditorState[] = [...GRID_STATES, ...REPAIR_STATES]
+/**
+ * The tab that is behind `layoutConfig.ts`: something merged, checked out or saved from
+ * another tab while this one was open. The toolbar then lists what the file gained, with a
+ * Take on each panel — the only control that reaches `adoptFromFile`, and one no config
+ * can produce on its own.
+ */
+const BEHIND_STATE: EditorState = {
+  name: 'content/nothing[behind the file]',
+  mode: 'content',
+  selected: null,
+  over: {
+    stale: true,
+    drift: {
+      panels: [{ panel: 0, label: seedConfig().panels[0].label, changes: ['became a phone call'] }],
+      page: ['the panel shapes moved'],
+    },
+  },
+}
+
+/** Every state worth mounting, in a stable order — the grid, the repairs, then the merge. */
+export const EDITOR_STATES: EditorState[] = [...GRID_STATES, ...REPAIR_STATES, BEHIND_STATE]
 
 /**
  * Enough of the shape-drag API for the shape inspector to render truthfully in each
@@ -216,6 +247,9 @@ export function mockApi(config: EditorConfig, mode: EditMode, selected: Selectio
     active: true,
     config,
     stale: false,
+    drift: null,
+    untracked: false,
+    adoptFromFile: vi.fn(),
     selected,
     mode,
     setMode: vi.fn(),
@@ -258,7 +292,7 @@ export function mockApi(config: EditorConfig, mode: EditMode, selected: Selectio
 export function renderState(state: EditorState, api?: EditorModeApi): EditorModeApi {
   const seeded = seedConfig()
   const config = state.derive ? state.derive(seeded) : seeded
-  const editor = api ?? mockApi(config, state.mode, state.selected)
+  const editor = api ?? { ...mockApi(config, state.mode, state.selected), ...state.over }
   // The panel a new picture or bubble would land on: the selected panel, or the panel the
   // selected picture or balloon sits on — read off the item rather than assumed, so the
   // inspectors that name it show the panel the author is actually looking at.

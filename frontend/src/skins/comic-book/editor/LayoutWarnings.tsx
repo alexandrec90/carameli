@@ -1,5 +1,9 @@
+import type { ConfigDrift } from './configDrift'
 import type { LayoutViolation } from './configParity'
 import { violationLines } from './configParity'
+import StaleNotice from './StaleNotice'
+
+import './editor-warnings.css'
 
 // What is still half-built about the working copy, listed in the toolbar beside the two
 // buttons that write it out.
@@ -18,24 +22,20 @@ interface LayoutWarningsProps {
   violations: LayoutViolation[]
   /** True when Save would overwrite a `layoutConfig.ts` this working copy never saw. */
   stale: boolean
+  /** What that file gained, per panel, or null when this copy cannot say. */
+  drift: ConfigDrift | null
+  /** True for a copy carrying no record of the file it came from. */
+  untracked: boolean
+  onAdopt(panel: number): void
 }
 
-export default function LayoutWarnings({ violations, stale }: LayoutWarningsProps) {
-  if (violations.length === 0 && !stale) return null
+export default function LayoutWarnings({
+  violations, stale, drift, untracked, onAdopt,
+}: LayoutWarningsProps) {
+  if (violations.length === 0 && !stale && !untracked) return null
   return (
     <>
-      {stale && (
-        <div className="cb-ed-unfinished cb-ed-stale" role="status" aria-label="Working copy is behind the file">
-          <p className="cb-ed-unfinished-head">
-            layoutConfig.ts has changed since this working copy started.
-          </p>
-          <p className="cb-ed-stale-body">
-            Something moved the file under this tab — a merge, a branch change, or a Save
-            from another one. Saving writes this copy over it, reverting whatever that was.
-            Reset takes the current file instead, discarding the work in this tab.
-          </p>
-        </div>
-      )}
+      <StaleNotice stale={stale} drift={drift} untracked={untracked} onAdopt={onAdopt} />
       {violations.length > 0 && (
         <div className="cb-ed-unfinished" role="status" aria-label="Unfinished layout">
           <p className="cb-ed-unfinished-head">
