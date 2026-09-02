@@ -160,6 +160,11 @@ export default defineConfig(({ mode }) => {
       // Polling vs. native watching, and why the interval is coarse:
       // ./devWatchPolicy.ts.
       watch: resolveDevWatch(process.env),
+
+      // No `warmup:` here, and that is a measured decision rather than an omission —
+      // see devWatchPolicy.ts's closing section. Pre-transforming the skin graph looks
+      // like the answer to this app's 6.6 s render delay and is not: the delay was
+      // traced with the transform cache already warm.
       proxy: {
         // `/api` is the app's own REST surface (`/api/v1/...`). It was missing
         // here for as long as every dev path set VITE_API_BASE_URL to an absolute
