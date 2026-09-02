@@ -14,7 +14,9 @@ import {
   seedConfig,
 } from '../../skins/comic-book/editor/configOps'
 import { configStamp, seedStamp } from '../../skins/comic-book/editor/configStamp'
-import { persistConfig, storedBase, storedStamp } from '../../skins/comic-book/editor/editorStorage'
+import {
+  bootWorkingCopy, persistConfig, storedBase, storedStamp,
+} from '../../skins/comic-book/editor/editorStorage'
 import { setPanelLabel } from '../../skins/comic-book/editor/configPanels'
 import { useEditorMode } from '../../skins/comic-book/editor/useEditorMode'
 import type { EditorConfig } from '../../skins/comic-book/editor/types'
@@ -267,6 +269,57 @@ describe('storedBase', () => {
     const raw = window.localStorage.getItem(CONFIG_KEY)
     expect(JSON.parse(raw ?? '{}')).not.toHaveProperty('seedBase')
     expect(storedBase(raw)).toBeNull()
+  })
+})
+
+describe('bootWorkingCopy', () => {
+  beforeEach(() => {
+    window.localStorage.clear()
+  })
+
+  afterEach(() => {
+    window.localStorage.clear()
+  })
+
+  // Outside edit mode there is no working copy to be behind anything, so a base would be
+  // a drift report about a copy nobody is editing.
+  it('is the plain seed, untracked, when the editor is off', () => {
+    const boot = bootWorkingCopy(false)
+
+    expect(configStamp(boot.config)).toBe(seedStamp())
+    expect(boot.stamp).toBeNull()
+    expect(boot.base).toBeNull()
+  })
+
+  // The distinction the `untracked` flag is read off: no payload is a copy that *is* the
+  // file, so it gets a base and is tracked from its first edit — not an untracked one.
+  it('gives a fresh session today’s file as its base', () => {
+    const boot = bootWorkingCopy(true)
+
+    expect(boot.stamp).toBeNull()
+    expect(boot.base).not.toBeNull()
+    expect(configStamp(boot.base as EditorConfig)).toBe(seedStamp())
+  })
+
+  it('reads the copy, the stamp and the base off one stored payload', () => {
+    persistConfig(bare(), 'stamp-1', seedConfig())
+
+    const boot = bootWorkingCopy(true)
+
+    expect(boot.stamp).toBe('stamp-1')
+    expect(configStamp(boot.base as EditorConfig)).toBe(seedStamp())
+  })
+
+  // A payload written before the base existed. It must come back with none rather than
+  // with today's seed: claiming one would report no drift on the copy most likely to have
+  // some. See `storedBase`'s header.
+  it('leaves a payload that predates the base untracked', () => {
+    persistConfig(bare(), 'stamp-1', null)
+
+    const boot = bootWorkingCopy(true)
+
+    expect(boot.stamp).toBe('stamp-1')
+    expect(boot.base).toBeNull()
   })
 })
 

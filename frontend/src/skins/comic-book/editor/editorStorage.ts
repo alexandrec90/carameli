@@ -1,5 +1,5 @@
 import { logger } from '../../../lib/logger'
-import { CONFIG_KEY } from './configOps'
+import { CONFIG_KEY, hydrateConfig, seedConfig } from './configOps'
 import type { EditorConfig } from './types'
 
 // Where the editor's two persisted things live: the flag that says it is on, and the
@@ -112,6 +112,32 @@ export function storedBase(raw: string | null): EditorConfig | null {
   } catch {
     return null
   }
+}
+
+/** What a load starts from: the working copy, the file it came from, and that file. */
+export interface BootWorkingCopy {
+  config: EditorConfig
+  stamp: string | null
+  base: EditorConfig | null
+}
+
+/**
+ * Read all three off the persisted payload, from **one** string. Reading storage once and
+ * answering every question from that string is what stops a write landing between two
+ * reads and pairing a config with another payload's stamp or base.
+ *
+ * `active` is false outside edit mode, where there is no working copy at all and the seed
+ * is simply the layout.
+ */
+export function bootWorkingCopy(active: boolean): BootWorkingCopy {
+  if (!active || typeof window === 'undefined') {
+    return { config: seedConfig(), stamp: null, base: null }
+  }
+  const raw = window.localStorage.getItem(CONFIG_KEY)
+  // No payload at all is not an untracked copy: it is a copy that *is* the file, so it
+  // gets today's seed as its base and is tracked from its first edit.
+  if (raw === null) return { config: seedConfig(), stamp: null, base: seedConfig() }
+  return { config: hydrateConfig(raw), stamp: storedStamp(raw), base: storedBase(raw) }
 }
 
 /** Drop the working copy, so the next load re-seeds from the constants. */

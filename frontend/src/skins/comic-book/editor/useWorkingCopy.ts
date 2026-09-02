@@ -3,9 +3,9 @@ import { useCallback, useMemo, useState } from 'react'
 import { adoptPanel } from './configAdopt'
 import { configDrift, hasDrift } from './configDrift'
 import type { ConfigDrift } from './configDrift'
-import { CONFIG_KEY, hydrateConfig, seedConfig } from './configOps'
+import { seedConfig } from './configOps'
 import { configStamp, isStaleWorkingCopy } from './configStamp'
-import { clearStoredConfig, persistConfig, storedBase, storedStamp } from './editorStorage'
+import { bootWorkingCopy, clearStoredConfig, persistConfig } from './editorStorage'
 import type { EditorConfig } from './types'
 
 // The working copy itself: what the author has changed, where it is persisted, and which
@@ -46,19 +46,9 @@ export interface WorkingCopy {
  * is no copy at all and the seed is simply the layout.
  */
 export function useWorkingCopy(active: boolean): WorkingCopy {
-  // The payload is read once and answers three questions: what the working copy is, which
-  // `layoutConfig.ts` it came from, and what that file held. All from the same string, so
-  // a storage write between the reads cannot pair a config with another payload's base.
-  const [boot] = useState(() => {
-    if (!active || typeof window === 'undefined') {
-      return { config: seedConfig(), stamp: null, base: null as EditorConfig | null }
-    }
-    const raw = window.localStorage.getItem(CONFIG_KEY)
-    // No payload at all is not an untracked copy: it is a copy that *is* the file, so it
-    // gets today's seed as its base and is tracked from its first edit.
-    if (raw === null) return { config: seedConfig(), stamp: null, base: seedConfig() }
-    return { config: hydrateConfig(raw), stamp: storedStamp(raw), base: storedBase(raw) }
-  })
+  // What the payload holds — the copy, the `layoutConfig.ts` it came from, and that file —
+  // all read off one string in ./editorStorage.ts, which owns the browser edges.
+  const [boot] = useState(() => bootWorkingCopy(active))
   const [config, setConfig] = useState<EditorConfig>(boot.config)
   // Never recomputed: the seed is a module constant, and a change to the file it comes
   // from restarts the bundle (Vite has no accept handler for it, so it full-reloads).
@@ -69,13 +59,6 @@ export function useWorkingCopy(active: boolean): WorkingCopy {
   // and adopting a panel, which makes it the file *on that panel*. Never on an ordinary
   // edit: that is the drift this exists to keep hold of, exactly as the stamp is.
   const [base, setBase] = useState<EditorConfig | null>(boot.base)
-
-  const write = useCallback(
-    (next: EditorConfig, nextStamp: string, nextBase: EditorConfig | null) => {
-      persistConfig(next, nextStamp, nextBase)
-    },
-    [],
-  )
 
   const apply = useCallback((op: (prev: EditorConfig) => EditorConfig) => {
     // A payload written before stamps existed adopts this bundle's on its first edit —
@@ -90,10 +73,10 @@ export function useWorkingCopy(active: boolean): WorkingCopy {
     setStamp(prev => prev ?? current)
     setConfig(prev => {
       const next = op(prev)
-      write(next, stamp ?? current, base)
+      persistConfig(next, stamp ?? current, base)
       return next
     })
-  }, [stamp, current, base, write])
+  }, [stamp, current, base])
 
   const adopt = useCallback((panel: number) => {
     if (base === null) return
@@ -101,10 +84,10 @@ export function useWorkingCopy(active: boolean): WorkingCopy {
     setBase(nextBase)
     setConfig(prev => {
       const next = adoptPanel(prev, seed, panel)
-      write(next, stamp ?? current, nextBase)
+      persistConfig(next, stamp ?? current, nextBase)
       return next
     })
-  }, [base, seed, stamp, current, write])
+  }, [base, seed, stamp, current])
 
   const reset = useCallback(() => {
     // Drop the persisted override entirely so the next load re-seeds from the
