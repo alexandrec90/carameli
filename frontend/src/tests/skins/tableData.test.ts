@@ -1,14 +1,17 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  BAND_SIT,
   bodyRows,
   clampScroll,
   columnPercents,
   fitColumns,
+  FONT_SCALE,
   formatRows,
   maxScroll,
   parseRows,
   scrollByRows,
+  STATUS_BAND,
   visibleRows,
   wheelDeltaPx,
   WHEEL_ROW_PX,
@@ -20,6 +23,26 @@ import type { TableColumn, TableProjection } from '../../skins/comic-book/editor
 // throughout is that a row lands on the *same* band at every scroll position: the offset
 // is an index into the data, never a pixel, so nothing can drift a line off the ruling
 // drawn in the picture.
+
+/*
+ * The band budget: everything a cell puts inside a band has to fit inside one.
+ *
+ * Stated as an assertion rather than as a comment because the failure it prevents is
+ * silent and cumulative. A table row height is a *minimum* in CSS — content taller than
+ * the band grows the row rather than overflowing it — so lettering (or artwork) a few per
+ * cent over its band does not look wrong in that row, it walks every row below it off the
+ * ruled line and eventually off the bottom of the picture. Raising `FONT_SCALE.max` back to
+ * 1 is exactly that change, which is why it fails here.
+ */
+describe('band budget', () => {
+  it('leaves the tallest lettering room to sit above its rule', () => {
+    expect(FONT_SCALE.max + BAND_SIT).toBeLessThanOrEqual(1)
+  })
+
+  it('leaves status artwork the same room', () => {
+    expect(STATUS_BAND + BAND_SIT).toBeLessThanOrEqual(1)
+  })
+})
 
 const COLUMNS: TableColumn[] = [
   { label: 'Name', width: 2, align: 'left' },

@@ -109,6 +109,34 @@ travel (`wheelRows` carries the remainder) so a trackpad's dozen small deltas st
 row. Two off-screen buttons and an `aria-live` row count are the keyboard's version of the
 wheel; without them the rows past the first window are reachable by exactly one device.
 
+**A band is a budget, and everything in a cell has to fit inside it.** A table row height
+is a *minimum* in CSS, so content taller than its band does not overflow — it grows the
+row, and a few per cent over walks every row below it off the line it was drawn on and
+eventually off the bottom of the picture. Two constants in `tableData.ts` are what keeps
+the content inside: `BAND_SIT` (the gap the lettering sits above its rule) and
+`STATUS_BAND` (a status illustration's height), both fractions of the band, resolved into
+custom properties by `ProjectedTable.tsx` so `table.css` spends them rather than inventing
+its own. `FONT_SCALE.max + BAND_SIT <= 1` is the invariant, which is why the text slider
+stops short of a full band; `tableData.test.ts` pins it. Sizing anything in a cell in `em`
+is the mistake this replaced: the call feed's status artwork was `2.2em` of a font that is
+itself half a band, so **every row carrying one stood 16% taller than the heading row** —
+which is how a table whose rows are equal by construction came to have a short header, a
+walking body, and a last row 72 px below the foot of the notepad.
+
+The rows are clipped to the surface (`.cb-ptable-clip`) as the backstop for that, and it is
+not the scroll container rule 19 forbids: `hidden`, over a window of rows that were never
+rendered past, so there is nothing to scroll and no bar to draw.
+
+**The quad is what puts the rows on the drawn lines**, and it is seated against the
+artwork, not by eye: the surface divides into equal bands, so the bottom edge belongs *on*
+the last ruled line and the top edge exactly one band above the first. The shipped
+notepad's is checked against the ruling measured out of `hand-notepad.webp` in
+`notepadRuling.test.ts` — replace the picture and those three constants move with it in the
+same commit. **The surface does not draw the ruling itself, and should not**: the drawing
+already rules the whole sheet, edge to edge and well left of the red margin, so a drawn
+line would either double the printed one or fight it. The lines that stop at the writing
+area are the editor's band guides, which are chrome and are not there outside it.
+
 Editor chrome — the dashed outline, the per-band guides, the corner grips — is drawn only
 while the editor is open, and is drawn *through the same projection as the rows*, which is
 the point: a guide that lines up with the picture's ruling is a guide the rows line up with
