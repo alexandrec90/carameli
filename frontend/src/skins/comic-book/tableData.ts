@@ -11,8 +11,38 @@ export const WHEEL_ROW_PX = 100
 /** Row-count bounds offered by the editor. Two rows is the least that reads as a table. */
 export const ROW_COUNT = { min: 2, max: 60 }
 
-/** Lettering height as a fraction of a row's height. */
-export const FONT_SCALE = { min: 0.2, max: 1, step: 0.05 }
+/**
+ * Lettering height as a fraction of a row's height.
+ *
+ * **The maximum is below 1 on purpose, and {@link BAND_SIT} is why.** A cell is exactly one
+ * band tall, so its whole content — the line box plus the gap it sits above the rule — has
+ * to fit inside one: a table row is only ever a *minimum* height in CSS, so a line box a
+ * hair taller than its band does not overflow, it grows the row, and twenty-two rows each
+ * 6% over run the last of them a whole band and a half below the bottom of the notepad.
+ * `FONT_SCALE.max + BAND_SIT <= 1` is the invariant, pinned in `tableData.test.ts`.
+ */
+export const FONT_SCALE = { min: 0.2, max: 0.9, step: 0.05 }
+
+/**
+ * The gap between the lettering and the ruled line it sits on, as a fraction of the band.
+ *
+ * A fraction of the *band*, not of the font, so it is the same gap at every text size —
+ * writing does not creep away from the line as it gets bigger — and so the arithmetic
+ * above holds whatever the author does with the slider.
+ */
+export const BAND_SIT = 0.08
+
+/**
+ * Height of a status illustration in a cell, as a fraction of the band.
+ *
+ * Sized from the band rather than from the lettering for the reason the whole of this
+ * paragraph block exists: at `fontScale` 0.5 the artwork used to be given `2.2em`, which is
+ * 1.1 bands, so every row carrying one was 16% taller than its own line while the heading
+ * row — the one row with no illustration in it — stayed exactly one band. That is what put
+ * the header out of step with the body, walked the rows off the drawn ruling, and ran the
+ * table 72 px past the foot of the notepad.
+ */
+export const STATUS_BAND = 0.72
 
 /**
  * Row slots the data gets. The heading, when there is one, takes the first slot rather

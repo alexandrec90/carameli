@@ -245,6 +245,7 @@ A mutator listed with no control is one an author cannot invoke from the toolbar
 
 ## setCallScene
 
+- content/panel → range: call seam
 - content/panel → select: call split
 
 ## setChain
