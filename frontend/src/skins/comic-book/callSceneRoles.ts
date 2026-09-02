@@ -68,6 +68,23 @@ export function inRoles(call: CallRole | undefined, roles: CallRole[] | null): b
 }
 
 /**
+ * The roles `panel` is drawing at this moment, or null for its ordinary layout — a panel
+ * is a call only if its author gave it a scene *and* a call is up.
+ *
+ * Stated here, beside {@link inRoles}, because every caller needs the pair and a caller
+ * that spells the pairing itself is a second rule free to drift from the drawing. One did:
+ * the loading overlay counted the pictures on the page without asking this, so it waited
+ * on call-role pictures that mount only during a call and never revealed the home page.
+ */
+export function panelRoles(
+  scenes: readonly CallSceneLayout[],
+  panel: number,
+  call: { phase: CallScenePhase } | null | undefined,
+): CallRole[] | null {
+  return call && callSceneOn(scenes, panel) ? rolesAtPhase(call.phase) : null
+}
+
+/**
  * The half an entry with this `call` field is framed against, or null for the panel's own
  * box — which is what a `scene` role, and anything with no role at all, is measured in.
  *

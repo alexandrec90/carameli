@@ -3,7 +3,7 @@ import { useCallback, useMemo, useState } from 'react'
 import type { BubbleChain } from './bubbleChain'
 import { dialBubbleOn } from './bubbleContent'
 import { splitAt } from './callSceneGeometry'
-import { callSceneOn, litRoles, rolesAtPhase } from './callSceneRoles'
+import { callSceneOn, litRoles, panelRoles } from './callSceneRoles'
 import { addDialled, appendDialKey } from './dialPicker'
 import PanelBubbles from './PanelBubbles'
 import PanelCallScene from './PanelCallScene'
@@ -93,7 +93,7 @@ function callOnPanel(
     return {
         scene,
         halves: splitAt(poly.vp, poly.bounds, layout.cut, layout.axis),
-        callRoles: rolesAtPhase(scene.phase),
+        callRoles: panelRoles(callScenes, index, scene),
         lit: litRoles(scene.phase, scene.transcript.speaking),
     }
 }
