@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { patchImg } from '../../skins/comic-book/editor/configOps'
+import { FONT_SCALE } from '../../skins/comic-book/tableData'
 import { cloneConfig, seedConfig } from '../../skins/comic-book/editor/configSeed'
 import { hydrateConfig } from '../../skins/comic-book/editor/configHydrate'
 import {
@@ -54,7 +55,9 @@ describe('number-pad config', () => {
     })
     expect(pad?.quad[0][0]).toBe(-100)
     expect(pad?.quad[3][1]).toBe(200)
-    expect(pad?.fontScale).toBe(1)
+    // The shared ceiling: a projected surface's lettering is sized as a fraction of its
+    // row, and a row's worth of it leaves no room for the gap it sits above the line.
+    expect(pad?.fontScale).toBe(FONT_SCALE.max)
     expect(pad?.ink).toBe('#1b3a8f')
   })
 

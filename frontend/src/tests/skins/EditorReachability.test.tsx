@@ -72,6 +72,21 @@ function operate(el: HTMLElement): void {
       fireEvent.click(el)
       return
     }
+    /*
+     * A slider needs a number it can hold. `'probe'` is not one, so the DOM discards it
+     * and falls back to the range's *own* midpoint — which moves the slider only while
+     * that midpoint happens to differ from where the config left it. It did, until
+     * `FONT_SCALE.max` came down to 0.9 and the midpoint of 0.2–0.9 landed exactly on the
+     * number pad's shipped 0.55: no change event, no mutator call, and a control that had
+     * been reachable all along dropped out of the map. Aim at an end instead — the far one
+     * when the value is already at an end — so the probe moves it whatever the bounds are.
+     */
+    if (el.type === 'range') {
+      const min = el.min || '0'
+      const max = el.max || '100'
+      fireEvent.change(el, { target: { value: el.value === min ? max : min } })
+      return
+    }
     fireEvent.change(el, { target: { value: el.type === 'number' ? '7' : 'probe' } })
     return
   }

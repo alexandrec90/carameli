@@ -3,10 +3,12 @@ import type { CSSProperties, WheelEvent as ReactWheelEvent } from 'react'
 
 import type { TableProjection } from './editor/types'
 import {
+  BAND_SIT,
   bodyRows,
   clampScroll,
   columnPercents,
   maxScroll,
+  STATUS_BAND,
   visibleRows,
   wheelDeltaPx,
   wheelRows,
@@ -116,7 +118,13 @@ export default function ProjectedTable({ table, base, editing }: ProjectedTableP
     fontSize: `${rowH * table.fontScale}px`,
     // Bands are what the row count means, so the cells are sized from it rather than
     // from their contents: a tall cell would push every row below it off its line.
+    // The two below are the same rule applied to the two things inside a cell that can
+    // be taller than the band and grow it — the gap above the line, and a status
+    // illustration. Both are fractions of the band, resolved here rather than in the
+    // stylesheet, so the arithmetic that keeps them inside it is testable.
     ['--cb-ptable-row' as string]: `${rowH}px`,
+    ['--cb-ptable-sit' as string]: `${rowH * BAND_SIT}px`,
+    ['--cb-ptable-art' as string]: `${rowH * STATUS_BAND}px`,
     pointerEvents: editing ? 'none' : 'auto',
   }
 
@@ -126,23 +134,29 @@ export default function ProjectedTable({ table, base, editing }: ProjectedTableP
       style={surface}
       onWheel={onWheel}
     >
-      <table className="cb-ptable">
-        <colgroup>
-          {percents.map((pct, i) => (
-            <col key={i} style={{ width: `${pct}%` }} />
-          ))}
-        </colgroup>
-        {table.header && (
-          <thead>
-            <Row cells={table.columns.map(c => c.label)} aligns={aligns} head />
-          </thead>
-        )}
-        <tbody>
-          {visibleRows(table, offset).map((cells, i) => (
-            <Row key={i} cells={cells} aligns={aligns} />
-          ))}
-        </tbody>
-      </table>
+      {/* The rows are clipped to the surface. Not a scroll container — there is nothing
+          to scroll, since the rows past the window were never rendered — but the
+          guarantee that the surface *is* the surface: a cell that outgrew its band would
+          otherwise take the rows with it off the bottom of the notepad. */}
+      <div className="cb-ptable-clip">
+        <table className="cb-ptable">
+          <colgroup>
+            {percents.map((pct, i) => (
+              <col key={i} style={{ width: `${pct}%` }} />
+            ))}
+          </colgroup>
+          {table.header && (
+            <thead>
+              <Row cells={table.columns.map(c => c.label)} aligns={aligns} head />
+            </thead>
+          )}
+          <tbody>
+            {visibleRows(table, offset).map((cells, i) => (
+              <Row key={i} cells={cells} aligns={aligns} />
+            ))}
+          </tbody>
+        </table>
+      </div>
       {/* The wheel is the gesture that was asked for and it is the only one a mouse has
           here — there is no scrollbar to drag and no scroll container to tab into. These
           two buttons are the keyboard's version of it: off-screen, real buttons (so they

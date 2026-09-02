@@ -2,7 +2,8 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 
 import ProjectedTable from '../../skins/comic-book/ProjectedTable'
-import { WHEEL_ROW_PX } from '../../skins/comic-book/tableData'
+import { BAND_SIT, STATUS_BAND, WHEEL_ROW_PX } from '../../skins/comic-book/tableData'
+import { cssRules, SKIN_CSS } from './skinCss'
 import type { Quad } from '../../skins/comic-book/tableProjection'
 import type { TableProjection } from '../../skins/comic-book/editor/types'
 
@@ -138,6 +139,54 @@ describe('ProjectedTable', () => {
     const { surface } = draw()
     expect(surface!.style.transform.startsWith('matrix3d(')).toBe(true)
     expect(surface!.style.color).toBeTruthy()
+  })
+
+  /*
+   * The band is the unit of everything inside a cell, and these three tests are one bug
+   * told three ways.
+   *
+   * The status artwork was `2.2em` of a font that is itself a fraction of the band, so at
+   * the shipped `fontScale` of 0.5 it stood 1.1 bands tall. A table row is a *minimum*
+   * height in CSS: the row did not clip, it grew — every body row by 16%, while the heading
+   * row, the one row with no artwork in it, stayed exactly one band. That is what the
+   * notepad showed. The header was out of step with the body, each row sat lower on its
+   * ruled line than the one above it until the lettering was struck through, and the
+   * twenty-two rows ran 72 px past the foot of the pad.
+   */
+  it('sizes the gap and the status artwork from the band, not from the lettering', () => {
+    const { surface } = draw({ rows: 10 })
+    const rowH = Number.parseFloat(surface!.style.height) / 10
+    const px = (name: string) => Number.parseFloat(surface!.style.getPropertyValue(name))
+    expect(px('--cb-ptable-row')).toBeCloseTo(rowH, 6)
+    expect(px('--cb-ptable-sit')).toBeCloseTo(rowH * BAND_SIT, 6)
+    expect(px('--cb-ptable-art')).toBeCloseTo(rowH * STATUS_BAND, 6)
+  })
+
+  // The other half of that, and the half no render can check: jsdom applies no CSS, so the
+  // stylesheet is read as source. An `em` back in either of these rules is the bug back.
+  it('spends the band variables in the stylesheet rather than ems', () => {
+    const rules = cssRules(SKIN_CSS['src/skins/comic-book/table.css'])
+    const cell = rules.find(r => r.selector === '.cb-ptable-cell')!.body
+    const art = rules.find(r => r.selector === '.cb-ptable-status')!.body
+    expect(cell).toContain('var(--cb-ptable-sit)')
+    expect(art).toContain('var(--cb-ptable-art)')
+    expect(art).not.toContain('em')
+  })
+
+  /*
+   * The backstop for the same failure: the rows live in a clip the size of the surface, so
+   * a cell that outgrew its band again would be cut off at the edge of the notepad instead
+   * of running the table down the page. `hidden`, never `auto` — there is nothing to
+   * scroll, and a bar over a photograph would give the projection away.
+   */
+  it('holds the rows in a clip the size of the surface', () => {
+    const { container } = draw()
+    const clip = container.querySelector('.cb-ptable-clip')
+    expect(clip).not.toBeNull()
+    expect(clip!.querySelector('table.cb-ptable')).not.toBeNull()
+    const body = cssRules(SKIN_CSS['src/skins/comic-book/table.css'])
+      .find(r => r.selector === '.cb-ptable-clip')!.body
+    expect(body).toContain('overflow: hidden')
   })
 
   it('renders status artwork as a compact image cell', () => {

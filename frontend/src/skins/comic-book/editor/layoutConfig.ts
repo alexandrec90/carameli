@@ -77,7 +77,7 @@ export const PANEL_IMG_TRANSFORMS: ImgTransform[] = [
     fontScale: 0.55, ink: '#1b3a8f',
   } },
   { panel: 10, src: '/comic-book/hand-notepad.webp', alt: 'Hand writing on notepad', left: -47, top: 4.2, width: 203.5, height: 147.4, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center bottom', spill: false, table: {
-    quad: [[13.71, 8.67], [80.77, 8.48], [81.78, 59.93], [12.72, 60.39]],
+    quad: [[13.71, 6.52], [80.77, 6.22], [81.78, 57.32], [12.72, 57.79]],
     rows: 22, header: true, fontScale: 0.5, ink: '#1b3a8f',
     source: 'calls',
     columns: [

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { LIVE_TABLE_FEEDS } from '../../lib/liveTables'
+import { FONT_SCALE } from '../../skins/comic-book/tableData'
 import { cloneConfig, seedConfig } from '../../skins/comic-book/editor/configSeed'
 import { hydrateConfig } from '../../skins/comic-book/editor/configHydrate'
 import { serializeTable, tableSuffix } from '../../skins/comic-book/editor/serializeTable'
@@ -107,7 +108,9 @@ describe('coerceTable', () => {
       data: [['x', 'y', 'z'], 'not a row', [1, null]],
     })
     expect(t?.rows).toBe(9)
-    expect(t?.fontScale).toBe(1)
+    // The ceiling, not 1: lettering as tall as its own band plus the gap it sits above the
+    // rule is taller than the band, and a table row grows rather than overflowing.
+    expect(t?.fontScale).toBe(FONT_SCALE.max)
     expect(t?.ink).toBe('#1b3a8f')
     expect(t?.columns).toEqual([{ label: 'a', width: 1, align: 'left' }])
     // Every row re-shaped to the column count, whatever it arrived as.
