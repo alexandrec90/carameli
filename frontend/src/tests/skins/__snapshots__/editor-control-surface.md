@@ -549,3 +549,24 @@ diff as the code that added it.
 - text: page name
 - text: panel name
 - textarea: text
+
+## content/nothing[behind the file]
+
+- button: + Bubble
+- button: + Call
+- button: + Image
+- button: + SMS
+- button: .ts
+- button: Connected
+- button: Content
+- button: Copy config
+- button: Default
+- button: Panel shapes
+- button: Reset
+- button: Ringing
+- button: Save
+- button: Ship
+- button: Take
+- select: Page
+- text: Ship summary
+- text: page name

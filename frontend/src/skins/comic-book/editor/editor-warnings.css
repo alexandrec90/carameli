@@ -1,0 +1,91 @@
+/* The two blocks above Save: what is half-built in this working copy, and what the file
+   under it has gained since the copy was made. They live apart from editor-toolbar.css
+   because they are one component's surface — ./LayoutWarnings.tsx and the ./StaleNotice.tsx
+   it renders — rather than part of the toolbar chrome every control shares. */
+
+/* What is still half-built in the working copy. Amber rather than the error red: nothing
+   has gone wrong, there is just work left, and a red block above the Save button every
+   time a balloon is added would be read as a fault and then stop being read at all. */
+.cb-ed-unfinished {
+  margin: 6px 0 0;
+  padding: 5px 6px;
+  border-left: 3px solid #d9a441;
+  background: rgb(217 164 65 / 12%);
+  color: #e6c98a;
+  font-size: 10px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+/* The one warning here that IS a fault: red, because unlike an unfinished balloon it is
+   not work left to do but work about to be undone, and it appears only when the file has
+   actually moved — never on an ordinary afternoon. */
+.cb-ed-stale {
+  border-left-color: #d95050;
+  background: rgb(217 80 80 / 14%);
+  color: #f0b3b3;
+}
+
+.cb-ed-stale-body {
+  margin: 4px 0 0;
+}
+
+.cb-ed-unfinished-head {
+  margin: 0;
+  font-weight: 700;
+}
+
+.cb-ed-unfinished-list {
+  /* Long enough to be worth scrolling rather than pushing Ship off the toolbar: eight
+     unfinished balloons is an ordinary afternoon's work in progress. */
+  max-height: 120px;
+  margin: 4px 0 0;
+  padding-left: 14px;
+  overflow-y: auto;
+}
+
+/* The drifted panels, each with the button that takes it. No bullets and no indent: every
+   row ends in a control, so the button column is what the eye runs down, and a marker to
+   its left would compete with it. */
+.cb-ed-stale-list {
+  max-height: 120px;
+  margin: 5px 0 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.cb-ed-stale-list li {
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 2px 0;
+}
+
+.cb-ed-stale-what {
+  min-width: 0;
+}
+
+/* The page-level lines have no button, so they are set back from the ones that do rather
+   than left looking like rows whose control failed to render. */
+.cb-ed-stale-page {
+  margin-top: 2px;
+  opacity: 0.8;
+}
+
+.cb-ed-stale-take {
+  flex: none;
+  padding: 1px 6px;
+  border: 1px solid #d95050;
+  border-radius: 3px;
+  background: rgb(217 80 80 / 20%);
+  color: #f0b3b3;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.cb-ed-stale-take:hover {
+  background: rgb(217 80 80 / 34%);
+}

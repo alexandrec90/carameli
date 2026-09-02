@@ -59,6 +59,10 @@ A mutator listed with no control is one an author cannot invoke from the toolbar
 - content/img[table] → button: + SMS
 - content/panel → button: + SMS
 
+## adoptFromFile
+
+- content/nothing[behind the file] → button: Take
+
 ## clear
 
 - (no toolbar control) — the Escape key and a click on the page background, both handled by EditorOverlay rather than by any control in the toolbar
@@ -88,6 +92,7 @@ A mutator listed with no control is one an author cannot invoke from the toolbar
 - content/img[number pad] → button: Reset
 - content/img[table] → button: Reset
 - content/nothing → button: Reset
+- content/nothing[behind the file] → button: Reset
 - content/panel → button: Reset
 - content/seam → button: Reset
 - content/vertex → button: Reset
@@ -225,6 +230,9 @@ A mutator listed with no control is one an author cannot invoke from the toolbar
 - content/nothing → button: Connected
 - content/nothing → button: Default
 - content/nothing → button: Ringing
+- content/nothing[behind the file] → button: Connected
+- content/nothing[behind the file] → button: Default
+- content/nothing[behind the file] → button: Ringing
 - content/panel → button: Connected
 - content/panel → button: Default
 - content/panel → button: Ringing
@@ -326,6 +334,8 @@ A mutator listed with no control is one an author cannot invoke from the toolbar
 - content/img[table] → button: Panel shapes
 - content/nothing → button: Content
 - content/nothing → button: Panel shapes
+- content/nothing[behind the file] → button: Content
+- content/nothing[behind the file] → button: Panel shapes
 - content/panel → button: Content
 - content/panel → button: Panel shapes
 - content/seam → button: Content
@@ -364,6 +374,7 @@ A mutator listed with no control is one an author cannot invoke from the toolbar
 - content/img[number pad] → text: page name
 - content/img[table] → text: page name
 - content/nothing → text: page name
+- content/nothing[behind the file] → text: page name
 - content/panel → text: page name
 - content/seam → text: page name
 - content/vertex → text: page name

@@ -114,7 +114,13 @@ export default function EditorToolbar({ api, selPanel, pageSelect, shapes }: Edi
           outside edit mode still shows the old layout.
         </p>
       )}
-      <LayoutWarnings violations={violations} stale={api.stale} />
+      <LayoutWarnings
+        violations={violations}
+        stale={api.stale}
+        drift={api.drift}
+        untracked={api.untracked}
+        onAdopt={api.adoptFromFile}
+      />
       {/* Save writes the file; Ship carries it to a branch and a PR. They are separate
           buttons because Save is the inner loop — pressed every few drags — and Ship is
           the moment the work should stop being local to one tree.

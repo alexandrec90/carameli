@@ -11,6 +11,7 @@ import type { ContentEdits } from './useContentEdits'
 import { useGridEdits } from './useGridEdits'
 import type { GridEdits } from './useGridEdits'
 import { useWorkingCopy } from './useWorkingCopy'
+import type { ConfigDrift } from './configDrift'
 import type { EditorConfig } from './types'
 
 // The pure operations on a config live in ./configOps.ts and ./panelGridOps.ts, the
@@ -30,6 +31,15 @@ export interface EditorModeApi extends ContentEdits, CallEdits, GridEdits {
    * it — so writing it out would revert whatever changed there. See ./configStamp.ts.
    */
   stale: boolean
+  /**
+   * What the file gained since this copy started, per panel — the detail under `stale`, or
+   * null for a copy that cannot say. See ./configDrift.ts.
+   */
+  drift: ConfigDrift | null
+  /** True for a copy carrying no record of the file it came from, so drift is unknowable. */
+  untracked: boolean
+  /** Take the file's version of one panel, keeping this tab's work on the others. */
+  adoptFromFile(panel: number): void
   selected: Selection | null
   mode: EditMode
   setMode(mode: EditMode): void
@@ -104,6 +114,14 @@ export function useEditorMode(): EditorModeApi {
     setSelected(null)
   }, [copy])
 
+  // The selection goes with it: adopting a panel splices both entry lists, so the index a
+  // selection holds can land on a different picture than the one that was outlined — and
+  // silently editing the wrong entry is exactly the failure this whole module is for.
+  const adoptFromFile = useCallback((panel: number) => {
+    copy.adopt(panel)
+    setSelected(null)
+  }, [copy])
+
   return useMemo(
     () => ({
       ...content,
@@ -112,6 +130,9 @@ export function useEditorMode(): EditorModeApi {
       active,
       config,
       stale: copy.stale,
+      drift: copy.drift,
+      untracked: copy.untracked,
+      adoptFromFile,
       selected,
       mode,
       setMode,
@@ -122,8 +143,9 @@ export function useEditorMode(): EditorModeApi {
       setPageLabel,
     }),
     [
-      content, call, grid, active, config, copy.stale, selected, mode, setMode, select,
-      clear, resetAll, setPanelLabel, setPageLabel,
+      content, call, grid, active, config, copy.stale, copy.drift, copy.untracked,
+      adoptFromFile, selected, mode, setMode, select, clear, resetAll, setPanelLabel,
+      setPageLabel,
     ],
   )
 }

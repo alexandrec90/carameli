@@ -80,7 +80,7 @@ describe('isStaleWorkingCopy', () => {
 
 describe('storedStamp', () => {
   it('reads back the stamp persistConfig wrote, with the config intact beside it', () => {
-    persistConfig(seedConfig(), 'stamp-1')
+    persistConfig(seedConfig(), 'stamp-1', null)
     const raw = window.localStorage.getItem(CONFIG_KEY)
     expect(storedStamp(raw)).toBe('stamp-1')
     expect(JSON.parse(raw ?? '{}').panels).toHaveLength(seedConfig().panels.length)
