@@ -1,4 +1,4 @@
-import { useCallback } from 'react'
+import { useCallback, useMemo } from 'react'
 
 import { EDITOR_CALL_TRANSCRIPT } from './callScene'
 import { splitAt } from './callSceneGeometry'
@@ -63,6 +63,32 @@ export function drawnImageCount(
 ): number {
   return images.filter(t => panels[t.panel]?.page === page
     && inRoles(t.call, panelRoles(callScenes, t.panel, call))).length
+}
+
+/**
+ * {@link drawnImageCount} as the layout consumes it: memoised, and behind a hook boundary
+ * on purpose.
+ *
+ * React Compiler reads a call to an ordinary function as possibly *mutating* its arguments,
+ * and `panels` is a property of the same layout object `grids` comes from. Handing it to a
+ * plain helper therefore marked `grids` "modified later", which made the `panelPolys` memo
+ * above it impossible to preserve and made the compiler skip the whole component — four
+ * `preserve-manual-memoization` errors for a function that mutates nothing. A hook's
+ * arguments are frozen, so the same call through this door states what is already true.
+ * Keep the boundary even if the count moves: it is what keeps the skin's largest component
+ * compiled. The memo is the second reason — a stable count keeps `markSettled` stable.
+ */
+export function useDrawnImageCount(
+  images: readonly ImgTransform[],
+  panels: readonly Panel[],
+  page: PanelPage,
+  callScenes: readonly CallSceneLayout[],
+  call: CallScene | null,
+): number {
+  return useMemo(
+    () => drawnImageCount(images, panels, page, callScenes, call),
+    [images, panels, page, callScenes, call],
+  )
 }
 
 /**

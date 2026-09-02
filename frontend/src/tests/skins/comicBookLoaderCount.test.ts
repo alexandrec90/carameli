@@ -1,6 +1,7 @@
+import { renderHook } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 
-import { drawnImageCount } from '../../skins/comic-book/layoutSource'
+import { drawnImageCount, useDrawnImageCount } from '../../skins/comic-book/layoutSource'
 import { PANELS, PANEL_CALL_SCENES, PANEL_IMG_TRANSFORMS } from '../../skins/comic-book/editor/layoutConfig'
 import { EMPTY_TRANSCRIPT } from '../../lib/callTranscript'
 import type { CallScene } from '../../skins/comic-book/phoneActions'
@@ -20,6 +21,18 @@ import type { Panel } from '../../skins/comic-book/panels'
 const RINGING: CallScene = { phase: 'ringing', transcript: EMPTY_TRANSCRIPT }
 
 const scenesFor = (panel: number): CallSceneLayout[] => [{ panel, cut: 50, axis: 'x' }]
+
+const PANEL_FIXTURE = [
+  { label: 'Here', isLogo: false, page: 'home' },
+  { label: 'Away', isLogo: false, page: 'classic' },
+] as Panel[]
+
+// A real served file: `assetPolicy.test.ts` scans the source tree for `/comic-book/`
+// references and fails on one that public/ does not hold, fixture or not.
+const img = (panel: number, call?: ImgTransform['call']): ImgTransform =>
+  ({ panel, src: '/comic-book/logo.webp', alt: '', left: 0, top: 0, width: 100, height: 100,
+     scale: 1, offsetX: 0, offsetY: 0, anchor: 'center center', spill: false,
+     ...(call ? { call } : {}) }) as ImgTransform
 
 describe('drawnImageCount', () => {
   describe('against the shipped layout', () => {
@@ -48,16 +61,7 @@ describe('drawnImageCount', () => {
   })
 
   describe('the two reasons a picture is not drawn', () => {
-    const panels = [
-      { label: 'Here', isLogo: false, page: 'home' },
-      { label: 'Away', isLogo: false, page: 'classic' },
-    ] as Panel[]
-    // A real served file: `assetPolicy.test.ts` scans the source tree for `/comic-book/`
-    // references and fails on one that public/ does not hold, fixture or not.
-    const img = (panel: number, call?: ImgTransform['call']): ImgTransform =>
-      ({ panel, src: '/comic-book/logo.webp', alt: '', left: 0, top: 0, width: 100, height: 100,
-         scale: 1, offsetX: 0, offsetY: 0, anchor: 'center center', spill: false,
-         ...(call ? { call } : {}) }) as ImgTransform
+    const panels = PANEL_FIXTURE
 
     it('leaves out a picture whose panel is on the other page', () => {
       const images = [img(0), img(1)]
@@ -85,5 +89,37 @@ describe('drawnImageCount', () => {
       // A role on a panel with no seam is not a call layout, so the panel stays ordinary.
       expect(drawnImageCount(images, panels, 'home', scenesFor(1), RINGING)).toBe(1)
     })
+  })
+})
+
+// The hook is a boundary rather than arithmetic, and `Layout` has to reach the count through
+// it: React Compiler reads a call to a plain function as one that may mutate its arguments,
+// and `panels` belongs to the same layout object as the `grids` a memo above it depends on —
+// so a direct call marked that dependency "modified later" and made the compiler skip the
+// whole component. `preserve-manual-memoization` fails if the boundary is removed; these
+// cases hold the hook to the answer the pure function gives.
+describe('useDrawnImageCount', () => {
+  const images = [img(0), img(0, 'ringing'), img(0, 'local'), img(1)]
+
+  it('gives the pure count its answer', () => {
+    const { result } = renderHook(
+      () => useDrawnImageCount(images, PANEL_FIXTURE, 'home', scenesFor(0), null))
+
+    expect(result.current).toBe(drawnImageCount(images, PANEL_FIXTURE, 'home', scenesFor(0), null))
+    expect(result.current).toBe(1)
+  })
+
+  it('re-counts when a call comes up', () => {
+    const { result, rerender } = renderHook(
+      ({ call }: { call: CallScene | null }) =>
+        useDrawnImageCount(images, PANEL_FIXTURE, 'home', scenesFor(0), call),
+      { initialProps: { call: null as CallScene | null } })
+
+    expect(result.current).toBe(1)
+
+    rerender({ call: RINGING })
+
+    // Ringing swaps the panel's ordinary picture for the two the phase lights.
+    expect(result.current).toBe(2)
   })
 })

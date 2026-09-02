@@ -7,7 +7,7 @@ import ComicPanel from './ComicPanel'
 import { LoadingOverlay, useLoadingScreen } from './LoadingOverlay'
 import PanelInk from './PanelInk'
 import { gridPolys, layoutKindFor } from './panelGeometry'
-import { activeLayout, drawnImageCount, useCallLayout } from './layoutSource'
+import { activeLayout, useCallLayout, useDrawnImageCount } from './layoutSource'
 import { pageForPath } from './panels'
 import { softphoneActions } from './phoneActions'
 import { usePanelDots } from './usePanelDots'
@@ -119,7 +119,7 @@ export function Layout({ navItems, sms, softphone }: LayoutProps) {
     // One tick per picture element that has loaded or failed. Counted against the pictures
     // actually *drawn* — one the renderer skips never mounts, so it never settles, and
     // counting it would hold the loader up forever (drawnImageCount owns both reasons).
-    const imgCount = drawnImageCount(imgT, panels, page, callSceneT, call)
+    const imgCount = useDrawnImageCount(imgT, panels, page, callSceneT, call)
     const markSettled = useCallback(() => {
         settledCountRef.current += 1
         if (settledCountRef.current >= imgCount) setLoaded(true)
