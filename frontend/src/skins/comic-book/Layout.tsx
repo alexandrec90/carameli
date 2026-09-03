@@ -7,7 +7,7 @@ import ComicPanel from './ComicPanel'
 import { LoadingOverlay, useLoadingScreen } from './LoadingOverlay'
 import PanelInk from './PanelInk'
 import { gridPolys, layoutKindFor } from './panelGeometry'
-import { activeLayout, useCallLayout } from './layoutSource'
+import { activeLayout, useCallLayout, useDrawnImageCount } from './layoutSource'
 import { pageForPath } from './panels'
 import { softphoneActions } from './phoneActions'
 import { usePanelDots } from './usePanelDots'
@@ -116,10 +116,10 @@ export function Layout({ navItems, sms, softphone }: LayoutProps) {
     const bubbleVisible = (i: number): boolean =>
         isBubbleRevealed(bubbleT, hovered, editor.active, i)
 
-    // One tick per picture element that has loaded or failed. Counted against the
-    // number of pictures actually on *this page* — a picture on the other page never
-    // mounts, so it never settles, and counting it would hold the loader up forever.
-    const imgCount = imgT.filter(t => panels[t.panel]?.page === page).length
+    // One tick per picture element that has loaded or failed. Counted against the pictures
+    // actually *drawn* — one the renderer skips never mounts, so it never settles, and
+    // counting it would hold the loader up forever (drawnImageCount owns both reasons).
+    const imgCount = useDrawnImageCount(imgT, panels, page, callSceneT, call)
     const markSettled = useCallback(() => {
         settledCountRef.current += 1
         if (settledCountRef.current >= imgCount) setLoaded(true)

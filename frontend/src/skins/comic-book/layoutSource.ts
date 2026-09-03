@@ -1,9 +1,10 @@
-import { useCallback } from 'react'
+import { useCallback, useMemo } from 'react'
 
 import { EDITOR_CALL_TRANSCRIPT } from './callScene'
 import { splitAt } from './callSceneGeometry'
-import { callSceneOn, halfFor, inRoles, rolesAtPhase } from './callSceneRoles'
+import { callSceneOn, halfFor, inRoles, panelRoles, rolesAtPhase } from './callSceneRoles'
 import type { PanelPoly, Rect } from './panelGeometry'
+import type { Panel, PanelPage } from './panels'
 import { callSceneOf } from './phoneActions'
 import type { CallScene, CallScenePhase } from './phoneActions'
 import {
@@ -37,6 +38,57 @@ const SHIPPED_LAYOUT: EditorConfig = {
 /** The editor's working copy while one is open, the shipped constants otherwise. */
 export function activeLayout(editor: { active: boolean; config: EditorConfig }): EditorConfig {
   return editor.active ? editor.config : SHIPPED_LAYOUT
+}
+
+/**
+ * How many of `images` are drawn on `page` right now — what the loading overlay counts its
+ * settle events against.
+ *
+ * It must ask exactly what `PanelImages` asks before it mounts a picture, because a picture
+ * that never mounts fires neither `load` nor `error`: one counted but not drawn leaves the
+ * overlay waiting for a settle that cannot arrive, and the page never appears. **Two** things
+ * keep a picture off the page and both belong here — a panel that lives on the other page,
+ * and a call layout that is not the one on screen.
+ *
+ * The first was handled from the start; the second arrived with call layouts (#295) and was
+ * not, so the home page counted its three call-role pictures — which mount only during a
+ * call — and waited on 8 settles that could only ever reach 5.
+ */
+export function drawnImageCount(
+  images: readonly ImgTransform[],
+  panels: readonly Panel[],
+  page: PanelPage,
+  callScenes: readonly CallSceneLayout[],
+  call: CallScene | null,
+): number {
+  return images.filter(t => panels[t.panel]?.page === page
+    && inRoles(t.call, panelRoles(callScenes, t.panel, call))).length
+}
+
+/**
+ * {@link drawnImageCount} as the layout consumes it: memoised, and behind a hook boundary
+ * on purpose.
+ *
+ * React Compiler reads a call to an ordinary function as possibly *mutating* its arguments,
+ * and `panels` is a property of the same layout object `grids` comes from. Handing it to a
+ * plain helper therefore marked `grids` "modified later", which made the `panelPolys` memo
+ * above it impossible to preserve and made the compiler skip the whole component — four
+ * `preserve-manual-memoization` errors for a function that mutates nothing. A hook's
+ * arguments are frozen, so the same call through this door states what is already true.
+ * Keep the boundary even if the count moves: it is what keeps the skin's largest component
+ * compiled. The memo is the second reason — a stable count keeps `markSettled` stable.
+ */
+export function useDrawnImageCount(
+  images: readonly ImgTransform[],
+  panels: readonly Panel[],
+  page: PanelPage,
+  callScenes: readonly CallSceneLayout[],
+  call: CallScene | null,
+): number {
+  return useMemo(
+    () => drawnImageCount(images, panels, page, callScenes, call),
+    [images, panels, page, callScenes, call],
+  )
 }
 
 /**
