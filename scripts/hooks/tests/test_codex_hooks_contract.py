@@ -15,12 +15,13 @@ ADAPTER = "scripts/hooks/codex-hook-adapter.py"
 EXPECTED_DROPPED_EVENTS = frozenset({"PostToolUseFailure"})
 EXPECTED_DROPPED_MATCHERS = frozenset({("PostToolUse", "^Skill$")})
 EXPECTED_REDUNDANT_HANDLERS = frozenset({("PreToolUse", "scripts/hooks/enforce-capped-bash.py")})
-# `PreToolUse` survives classification and is then emptied: its only handler is the
-# Bash output cap, and devkit v0.9.0 classified that as redundant because Codex caps
-# command output itself. An event with no handlers left is omitted entirely, so it
-# leaves by a different door than `PostToolUseFailure` and is asserted separately.
-# Re-add a non-Bash PreToolUse hook and this expectation must shrink.
-EXPECTED_EMPTIED_EVENTS = frozenset({"PreToolUse"})
+# An event that survives classification but loses every handler is omitted entirely, so
+# it leaves by a different door than `PostToolUseFailure` and is asserted separately.
+# `PreToolUse` used to leave that way, when the Bash output cap -- redundant under Codex,
+# which caps command output itself -- was its only handler. The worktree-guard launcher
+# adopted with devkit v0.11.14 is a second, non-redundant `PreToolUse` handler, so the
+# event now reaches Codex and nothing is emptied. Drop that handler and this grows again.
+EXPECTED_EMPTIED_EVENTS: frozenset[str] = frozenset()
 EXPECTED_TOPOLOGY = {
     "SessionStart": (
         (
@@ -35,9 +36,14 @@ EXPECTED_TOPOLOGY = {
     # v0.7.0: cutting the task branch *inside* the checkout the session was in is what
     # let a checkout outlive its task. `worktree-guard.py` routes the same edit into an
     # ephemeral box instead, so there is no prompt-time handler left to mirror.
-    # No `PreToolUse` either, for a different reason than the retirement above: the event
-    # is supported and the hook still runs under Claude. Codex just does not receive it --
-    # see EXPECTED_EMPTIED_EVENTS.
+    # `PreToolUse` carries one group, not two: the Bash output cap is classified
+    # redundant and dropped, leaving the worktree-guard launcher as the whole event.
+    "PreToolUse": (
+        (
+            "^(Edit|Write|MultiEdit|NotebookEdit|apply_patch|create_file|Bash|PowerShell)$",
+            (("scripts/hooks/worktree-guard-launch.py",),),
+        ),
+    ),
     "PostToolUse": (
         (
             "^(Edit|Write|MultiEdit|apply_patch|create_file)$",

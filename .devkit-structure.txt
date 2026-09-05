@@ -1,10 +1,17 @@
 # Structural findings the code already had when it adopted the gate.
 #
-# Debt, not configuration. This file may only SHRINK: a new key fails the gate, a
+# Debt, not configuration. This file SHRINKS on its own: a new key fails the gate, a
 # value that grew fails the gate, and a line the code no longer earns fails it too,
 # so fixing a finding forces its line out (`structure_check.py --tighten` does that).
-# Never add or raise a line to make new code pass; fix the code. The one exception
-# is `dependency::` -- adding a package is a line here, so the PR diff shows it.
+# Never add or raise a line to make new code pass; fix the code. `dependency::` is one
+# exception -- adding a package is a line here, so the PR diff shows it.
+#
+# `--record --reason "..."` is the other, and it is the deliberate hole. A module far
+# past `file_lines` cannot gain a line, so a bug whose fix belongs in one has nowhere
+# to go, and the split the finding asks for is a separate body of work. Recording says
+# so out loud: the reason is mandatory, counter rules (`suppressions`, `todos`,
+# `skipped_tests`, ...) are refused because those are always somebody giving up rather
+# than a module's size, and every move is logged below with what it moved and why.
 #
 # Regenerate only when adopting the gate: python scripts/hooks/structure_check.py --seed
 class_lines::app/services/providers/carrier/telnyx.py::TelnyxCarrier = 356
@@ -54,13 +61,12 @@ complexity::scripts/lint-all.py::main = 18
 complexity::scripts/run-tests.py::main = 30
 complexity::scripts/run-tests.py::run_named_target = 18
 complexity::scripts/sync-devkit.py::main = 69
-complexity::scripts/sync-devkit.py::prune_hook_commands = 17
 definitions::frontend/src/skins/comic-book/bubbleChain.ts = 23
 definitions::frontend/src/skins/comic-book/editor/transforms.ts = 25
 definitions::scripts/diagnostics.py = 30
-definitions::scripts/hooks/harness_config.py = 31
-definitions::scripts/hooks/stop.py = 55
-definitions::scripts/hooks/structure_check.py = 38
+definitions::scripts/hooks/harness_config.py = 32
+definitions::scripts/hooks/stop.py = 51
+definitions::scripts/hooks/structure_check.py = 42
 definitions::scripts/hooks/structure_scan.py = 31
 definitions::scripts/lint-all.py = 35
 definitions::scripts/local-e2e.py = 21
@@ -406,16 +412,16 @@ file_lines::app/api/webhooks/call_status.py = 845
 file_lines::frontend/src/api/client.ts = 845
 file_lines::frontend/src/skins/comic-book/bubbleChain.ts = 615
 file_lines::scripts/diagnostics.py = 739
-file_lines::scripts/hooks/enforce-capped-bash.py = 625
-file_lines::scripts/hooks/harness_config.py = 580
-file_lines::scripts/hooks/stop.py = 1172
-file_lines::scripts/hooks/structure_check.py = 904
+file_lines::scripts/hooks/enforce-capped-bash.py = 629
+file_lines::scripts/hooks/harness_config.py = 655
+file_lines::scripts/hooks/stop.py = 1110
+file_lines::scripts/hooks/structure_check.py = 1042
 file_lines::scripts/hooks/structure_scan.py = 669
 file_lines::scripts/lint-all.py = 619
 file_lines::scripts/local-e2e.py = 549
 file_lines::scripts/report-workflow-failure.py = 614
 file_lines::scripts/run-tests.py = 712
-file_lines::scripts/sync-devkit.py = 1461
+file_lines::scripts/sync-devkit.py = 1417
 function_lines::app/api/vsapi/calls.py::initiate_outbound_call = 99
 function_lines::app/api/webhooks/call_status.py::jambonz_call_status_webhook = 104
 function_lines::app/api/webhooks/call_status.py::jambonz_dtmf_result_webhook = 82
@@ -452,7 +458,7 @@ function_lines::scripts/docker-up.py::main = 90
 function_lines::scripts/hooks/enforce-capped-bash.py::split_top_level = 96
 function_lines::scripts/run-e2e.py::main = 83
 function_lines::scripts/run-tests.py::main = 100
-function_lines::scripts/sync-devkit.py::main = 256
+function_lines::scripts/sync-devkit.py::main = 246
 function_params::app/api/vsapi/sms.py::list_sms_messages = 7
 function_params::app/api/vsapi/voicemail_drop.py::voicemail_drop = 7
 function_params::app/repositories/extension_repo.py::create = 8
@@ -572,3 +578,12 @@ swallowed_errors::scripts/probe-connectivity.py = 1
 swallowed_errors::scripts/start-ngrok.py = 1
 swallowed_errors::tests/integration/test_s3_storage.py = 1
 todos::app/api/auth.py = 1
+
+# --- recorded growth ------------------------------------------------
+
+# 2026-09-05  recorded: adopting devkit v0.11.14: harness_config.py gains the DEVKIT_HOOKS_OFF kill-switch parse, structure_check.py gains the --record escape itself, and enforce-capped-bash.py gains the one question a switched-off gate asks before reading stdin. All three are vendored, so their line counts are upstream's and devkit's own baseline already records these same numbers; the split each finding asks for is owed in devkit, not here.
+#   definitions::scripts/hooks/harness_config.py -> 32
+#   definitions::scripts/hooks/structure_check.py -> 42
+#   file_lines::scripts/hooks/enforce-capped-bash.py -> 629
+#   file_lines::scripts/hooks/harness_config.py -> 655
+#   file_lines::scripts/hooks/structure_check.py -> 1042
