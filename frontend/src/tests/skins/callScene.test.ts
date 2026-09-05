@@ -96,7 +96,7 @@ describe('the scene art', () => {
   it('keeps anything that reads as real data out of the sample words', () => {
     // This string ships in the production bundle. Sample data shaped like a customer's
     // number or name is how a placeholder gets quoted back as fact — see the same rule
-    // about a chain's `data` in .claude/rules/skin-comic-book-framing.md.
+    // about a chain's `data` in .claude/rules/skin-comic-book.md.
     for (const line of EDITOR_CALL_TRANSCRIPT.lines) {
       expect(line.text).not.toMatch(/\d{3}/)
       expect(line.text).not.toMatch(/@/)
