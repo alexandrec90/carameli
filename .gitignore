@@ -129,5 +129,10 @@ legacy-crm/
 # Claude Code local settings (personal permissions / preferences)
 .claude/settings.local.json
 
+# Ephemeral worktree boxes. These are checkouts of this same repository, created
+# and reaped by the global devkit worktree tooling; left untracked they make the
+# primary tree permanently dirty, which `scripts/ship.py` refuses to push from.
+.claude/worktrees/
+
 # Local Docker Compose overrides
 docker-compose.override.yml

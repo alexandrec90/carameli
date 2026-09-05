@@ -19,18 +19,12 @@ def test_instruction_inventory_is_intentional():
         "skin-barebone",
         "skin-candy-shop",
         "skin-carameli",
+        # One file, deliberately. It was four — framing, motion and sms split off to
+        # stay under the 500-line limit — but three of the four carried the same
+        # `paths:` glob, so every one of them loaded on every comic-book file: 857
+        # lines against a limit meant to cap 500. A split that does not narrow scope
+        # buys nothing; the fix was to cut the prose, not to add files.
         "skin-comic-book",
-        # The reference half of skin-comic-book, split off so neither file crosses
-        # the 500-line instruction limit. Not a second opinion about the skin.
-        "skin-comic-book-framing",
-        # Same split, same reason: what changes once a bubble chain is bound to
-        # somebody's real SMS thread — money and privacy, not lettering. Scoped to the
-        # files that do the binding, so drawing a chain does not load it.
-        "skin-comic-book-sms",
-        # The third split of the same file, for the same reason: what moves in this
-        # skin, and at what rate. A reference nothing else in the doctrine depends on,
-        # which is why it was the half that could leave.
-        "skin-comic-book-motion",
         "voip-providers",
         "webhooks",
     }
