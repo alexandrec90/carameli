@@ -35,12 +35,12 @@ blinker==1.9.0
     # via flask
 boolean-py==5.0
     # via license-expression
-boto3==1.43.79
+boto3==1.43.85
     # via
     #   -c requirements-test.txt
     #   -r requirements-dev.in
     #   -r requirements.in
-botocore==1.43.82
+botocore==1.43.88
     # via
     #   -c requirements-test.txt
     #   boto3
@@ -89,7 +89,7 @@ coverage==7.15.0
     #   -c requirements-test.txt
     #   mutmut
     #   pytest-testmon
-cryptography==50.0.0
+cryptography==50.0.1
     # via
     #   -c requirements-test.txt
     #   -r requirements.in
@@ -170,7 +170,7 @@ httpx==0.28.1
     # via
     #   -c requirements-test.txt
     #   -r requirements.in
-hypothesis==6.165.10
+hypothesis==6.167.1
     # via
     #   -c requirements-test.txt
     #   -r requirements-test.in
@@ -310,13 +310,13 @@ pycparser==3.0 ; (implementation_name != 'PyPy' and platform_python_implementati
     # via
     #   -c requirements-test.txt
     #   cffi
-pydantic==2.13.4
+pydantic==2.13.5
     # via
     #   -c requirements-test.txt
     #   -r requirements.in
     #   fastapi
     #   pydantic-settings
-pydantic-core==2.46.4
+pydantic-core==2.46.5
     # via
     #   -c requirements-test.txt
     #   pydantic
@@ -446,7 +446,7 @@ rich==15.0.0
     #   pip-audit
     #   schemathesis
     #   textual
-ruff==0.16.4
+ruff==0.16.5
     # via -r requirements-dev.in
 s3transfer==0.19.0
     # via
@@ -535,7 +535,7 @@ urllib3==2.7.0
     #   geventhttpclient
     #   requests
     #   sentry-sdk
-uv==0.12.5
+uv==0.12.8
     # via -r requirements-dev.in
 uvicorn==0.52.4
     # via

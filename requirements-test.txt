@@ -27,11 +27,11 @@ asyncpg==0.31.0
     # via
     #   -c requirements.txt
     #   -r requirements.in
-boto3==1.43.79
+boto3==1.43.85
     # via
     #   -c requirements.txt
     #   -r requirements.in
-botocore==1.43.82
+botocore==1.43.88
     # via
     #   -c requirements.txt
     #   boto3
@@ -62,7 +62,7 @@ colorama==0.4.6 ; sys_platform == 'win32'
     #   pytest
 coverage==7.15.0
     # via pytest-testmon
-cryptography==50.0.0
+cryptography==50.0.1
     # via
     #   -c requirements.txt
     #   -r requirements.in
@@ -106,7 +106,7 @@ httpx==0.28.1
     # via
     #   -c requirements.txt
     #   -r requirements.in
-hypothesis==6.165.10
+hypothesis==6.167.1
     # via
     #   -r requirements-test.in
     #   hypothesis-graphql
@@ -167,13 +167,13 @@ pycparser==3.0 ; implementation_name != 'PyPy' and platform_python_implementatio
     # via
     #   -c requirements.txt
     #   cffi
-pydantic==2.13.4
+pydantic==2.13.5
     # via
     #   -c requirements.txt
     #   -r requirements.in
     #   fastapi
     #   pydantic-settings
-pydantic-core==2.46.4
+pydantic-core==2.46.5
     # via
     #   -c requirements.txt
     #   pydantic
