@@ -49,37 +49,6 @@ def test_count_test_summary_no_summary_line():
 
 
 # ---------------------------------------------------------------------------
-# get_skip_reason
-# ---------------------------------------------------------------------------
-
-
-def test_get_skip_reason_missing_tool():
-    assert diag.get_skip_reason(["command not found: ruff"]) == "not installed"
-
-
-def test_get_skip_reason_docker_exec_missing_binary():
-    # `docker compose exec app pytest` when the binary is missing from the
-    # container fails with Docker's OCI wording, not bash's "command not found".
-    line = (
-        "OCI runtime exec failed: exec failed: unable to start container process: "
-        'exec: "pytest": executable file not found in $PATH'
-    )
-    assert diag.get_skip_reason([line]) == "not installed"
-
-
-def test_get_skip_reason_env_error():
-    assert diag.get_skip_reason(["connection refused"]) == "environment error"
-
-
-def test_get_skip_reason_real_error():
-    assert diag.get_skip_reason(["app/main.py:10:1: F401 unused import"]) is None
-
-
-def test_get_skip_reason_empty():
-    assert diag.get_skip_reason([]) is None
-
-
-# ---------------------------------------------------------------------------
 # digest_tests -- skip classification must not swallow real test failures
 # ---------------------------------------------------------------------------
 

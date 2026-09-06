@@ -18,6 +18,9 @@ The caller writes the artifact and prints the skip notes.
 
 import re
 
+# Re-exported: the runners and the existing tests reach the verdict through this module.
+from failure_class import get_skip_reason
+
 MAX_PER_BLOCK = 25
 # When a block is over the cap, keep this many lines from the END as well as the
 # head. A failure that embeds a captured subprocess traceback (e.g. an Alembic
@@ -43,33 +46,6 @@ def strip_ansi_lines(lines: list[str]) -> list[str]:
     return [_ANSI_RE.sub("", l) for l in lines]
 
 
-_MISSING_TOOL = [
-    "ModuleNotFoundError",
-    "command not found",
-    "not recognized",
-    "is not installed",
-    "Cannot find",
-    "could not be found",
-    # Docker's wording when `docker compose exec <svc> <cmd>` can't find the
-    # binary inside the container (a `bash -c` wrapper says "command not found").
-    "executable file not found",
-]
-_ENV_ERROR = [
-    "ConnectionRefusedError",
-    "InvalidPasswordError",
-    "OperationalError",
-    "authentication failed",
-    "could not connect",
-    "connection refused",
-    "timeout expired",
-    "Cannot connect to the Docker daemon",
-    "No such container",
-    "No such service",
-    "is not running",
-    "error during connect",
-]
-
-
 def source_header(label: str) -> str:
     """Provenance stamp on non-empty artifacts.
 
@@ -77,20 +53,6 @@ def source_header(label: str) -> str:
     actionable lines, without guessing the environment.
     """
     return f"# source: {label}"
-
-
-def get_skip_reason(lines: list[str]) -> str | None:
-    """Return a skip reason for environmental / missing-tool failures, else None.
-
-    These pollute the artifact with content the agent cannot fix, so the runners
-    emit a one-line skip note to the terminal instead of writing a section.
-    """
-    text = "\n".join(lines)
-    if any(p in text for p in _MISSING_TOOL):
-        return "not installed"
-    if any(p in text for p in _ENV_ERROR):
-        return "environment error"
-    return None
 
 
 def denoise(lines: list[str]) -> list[str]:
