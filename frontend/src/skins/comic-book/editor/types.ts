@@ -116,6 +116,22 @@ export interface ImgTransform {
   /** When true the picture may bleed past its frame; when false it is clipped to it. */
   spill: boolean
   /**
+   * How far forward this picture is drawn among the others on its panel — `DEPTH_MIN` is
+   * the back, `DEPTH_MAX` the front (both in `../imageDepth.ts`), and pictures at equal
+   * depth keep the order the config lists them in.
+   *
+   * It is what puts a hand *over* the notepad it is writing on while the notepad's
+   * projected table stays under the hand: the table rides inside its own picture's
+   * wrapper, so a picture drawn in front of the notepad is drawn in front of the rows
+   * too, and nothing about the table has to know.
+   *
+   * **It orders pictures within a layer, and `spill` is what picks the layer** — a
+   * spilling picture is lifted over the panel's ink, a clipped one sits under it — so two
+   * pictures that must stack in a chosen order want the same `spill` as each other. See
+   * `../imageDepth.ts` for why this is paint order rather than a z-index.
+   */
+  z: number
+  /**
    * A table projected onto whatever surface this picture depicts; **absent** on an
    * ordinary picture. Optional rather than always-present so `layoutConfig.ts` carries
    * the field only on the pictures that are surfaces — the serializer omits it

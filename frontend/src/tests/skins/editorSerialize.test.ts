@@ -167,12 +167,12 @@ describe('serializeConfig', () => {
     expect(ts).toContain(
       "{ panel: 0, src: '/comic-book/logo.webp', alt: 'Carameli', " +
         'left: 0, top: 0, width: 100, height: 100, scale: 1, offsetX: 0, offsetY: 0, ' +
-        "anchor: 'center center', spill: false },",
+        "anchor: 'center center', spill: false, z: 0 },",
     )
     expect(ts).toContain(
       "{ panel: 1, src: '/comic-book/switchboard.webp', alt: 'Switchboard', " +
         'left: 0, top: 0, width: 100, height: 100, scale: 1, offsetX: 0, offsetY: 0, ' +
-        "anchor: 'center bottom', spill: false },",
+        "anchor: 'center bottom', spill: false, z: 0 },",
     )
     expect(ts).toContain(
       '{ panel: 0, top: -35, right: -12, width: 55, rotate: -5, spill: true, ' +

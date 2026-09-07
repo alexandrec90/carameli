@@ -31,7 +31,7 @@ const PANEL_FIXTURE = [
 // references and fails on one that public/ does not hold, fixture or not.
 const img = (panel: number, call?: ImgTransform['call']): ImgTransform =>
   ({ panel, src: '/comic-book/logo.webp', alt: '', left: 0, top: 0, width: 100, height: 100,
-     scale: 1, offsetX: 0, offsetY: 0, anchor: 'center center', spill: false,
+     scale: 1, offsetX: 0, offsetY: 0, anchor: 'center center', spill: false, z: 0,
      ...(call ? { call } : {}) }) as ImgTransform
 
 describe('drawnImageCount', () => {

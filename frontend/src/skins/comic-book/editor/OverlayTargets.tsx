@@ -1,6 +1,7 @@
 import { halfFor, inRoles } from '../callSceneRoles'
 import type { SceneHalves } from '../callSceneGeometry'
 import type { PanelPoly, Rect } from '../panelGeometry'
+import { inDepthOrder } from '../imageDepth'
 import { assetLabel } from './assets'
 import { chainFramesOn } from './chainFrame'
 import type { ChainFrame } from './chainFrame'
@@ -81,8 +82,11 @@ export default function OverlayTargets({
         <>
           {/* One click target per picture, on the rectangle its pixels visibly occupy —
               the image, not the frame it hangs in. They paint after the panel targets so
-              a picture wins the click where the two overlap. */}
-          {config.images.map((img, i) => {
+              a picture wins the click where the two overlap — and in the same depth order
+              the page draws them in, so where two pictures overlap the click selects the
+              one on top. Ordering only these and not the page would make the hand you can
+              see the notepad you select. */}
+          {inDepthOrder(config.images).map(({ img, index: i }) => {
             const poly = panelPolys[img.panel]
             if (!poly || !inRoles(img.call, callRoles)) return null
             const box = boxOf(img, poly.bounds, halvesOn(img.panel))

@@ -47,8 +47,8 @@ describe('PanelInk', () => {
     const props = {
       polys: [poly(0)],
       images: [
-        { panel: 0, src: '/comic-book/logo.webp', alt: '', left: 0, top: 0, width: 100, height: 100, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center center', spill: false },
-        { panel: 0, src: '/comic-book/logo.webp', alt: '', left: 20, top: 20, width: 45, height: 45, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center center', spill: false },
+        { panel: 0, src: '/comic-book/logo.webp', alt: '', left: 0, top: 0, width: 100, height: 100, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center center', spill: false, z: 0 },
+        { panel: 0, src: '/comic-book/logo.webp', alt: '', left: 20, top: 20, width: 45, height: 45, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center center', spill: false, z: 0 },
       ],
     }
     const Ink = PanelInk as unknown as (p: typeof props) => ReactElement

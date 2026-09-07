@@ -39,6 +39,14 @@ export const PANELS: Panel[] = [
 // frame the picture *inside* its frame; `spill: false` clips it there, `spill: true`
 // lets it bleed past.
 //
+// `z` is depth: which picture on the panel is drawn in front of which, 0 at the back.
+// Pictures at the same depth keep the order they are listed in here, so a page whose
+// pictures are all at 0 draws exactly as it did before depth existed. It orders pictures
+// *within* a layer and `spill` picks the layer — a spilling picture is lifted over the
+// panel's ink and a clipped one sits under it — so a pair that has to stack in a chosen
+// order wants the same `spill` on both. Anything projected onto a picture rides with it:
+// depth is how a photographed hand is drawn over the rows on the notepad it holds.
+//
 // A picture with a `table` is a **surface**: an HTML table is projected onto it, so a
 // photographed notepad can hold live rows. `quad` is the four corners of that surface in
 // % of the picture's rendered rect (its own pixels, so a resize cannot slide the picture
@@ -63,20 +71,20 @@ export const PANELS: Panel[] = [
 // than of the whole panel, so 0/0/100/100 fills one side of the split. See
 // PANEL_CALL_SCENES below.
 export const PANEL_IMG_TRANSFORMS: ImgTransform[] = [
-  { panel: 0, src: '/comic-book/logo.webp', alt: 'Carameli', left: 0, top: 0, width: 100, height: 100, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center center', spill: false },
-  { panel: 1, src: '/comic-book/switchboard.webp', alt: 'Switchboard', left: 0, top: 0, width: 100, height: 100, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center bottom', spill: false },
-  { panel: 2, src: '/comic-book/mailman1.webp', alt: 'Mail carrier', left: 0, top: 0, width: 100, height: 100, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center bottom', spill: false },
-  { panel: 3, src: '/comic-book/mechanic.webp', alt: 'Mechanic', left: 0, top: 0, width: 100, height: 100, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center bottom', spill: false },
-  { panel: 4, src: '/comic-book/receptionist.webp', alt: 'Receptionist', left: 0, top: 0, width: 100, height: 100, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center bottom', spill: false },
-  { panel: 5, src: '/comic-book/rolodex.webp', alt: 'Rolodex', left: 0, top: 0, width: 100, height: 100, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center bottom', spill: false },
-  { panel: 6, src: '/comic-book/rotary%20phone.webp', alt: 'Rotary phone', left: 0, top: 0, width: 100, height: 100, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center bottom', spill: false },
-  { panel: 7, src: '/comic-book/mailman2.webp', alt: 'Post office', left: 0, top: 0, width: 100, height: 100, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center bottom', spill: false },
-  { panel: 8, src: '/comic-book/logo2.webp', alt: 'Carameli', left: -20, top: 5, width: 133.5, height: 94, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center center', spill: false },
-  { panel: 9, src: '/comic-book/push-button-phone.webp', alt: 'Push-button phone', left: -40.4, top: 16.9, width: 153.4, height: 105.7, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center bottom', spill: false, numberPad: {
+  { panel: 0, src: '/comic-book/logo.webp', alt: 'Carameli', left: 0, top: 0, width: 100, height: 100, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center center', spill: false, z: 0 },
+  { panel: 1, src: '/comic-book/switchboard.webp', alt: 'Switchboard', left: 0, top: 0, width: 100, height: 100, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center bottom', spill: false, z: 0 },
+  { panel: 2, src: '/comic-book/mailman1.webp', alt: 'Mail carrier', left: 0, top: 0, width: 100, height: 100, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center bottom', spill: false, z: 0 },
+  { panel: 3, src: '/comic-book/mechanic.webp', alt: 'Mechanic', left: 0, top: 0, width: 100, height: 100, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center bottom', spill: false, z: 0 },
+  { panel: 4, src: '/comic-book/receptionist.webp', alt: 'Receptionist', left: 0, top: 0, width: 100, height: 100, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center bottom', spill: false, z: 0 },
+  { panel: 5, src: '/comic-book/rolodex.webp', alt: 'Rolodex', left: 0, top: 0, width: 100, height: 100, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center bottom', spill: false, z: 0 },
+  { panel: 6, src: '/comic-book/rotary%20phone.webp', alt: 'Rotary phone', left: 0, top: 0, width: 100, height: 100, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center bottom', spill: false, z: 0 },
+  { panel: 7, src: '/comic-book/mailman2.webp', alt: 'Post office', left: 0, top: 0, width: 100, height: 100, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center bottom', spill: false, z: 0 },
+  { panel: 8, src: '/comic-book/logo2.webp', alt: 'Carameli', left: -20, top: 5, width: 133.5, height: 94, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center center', spill: false, z: 0 },
+  { panel: 9, src: '/comic-book/push-button-phone.webp', alt: 'Push-button phone', left: -40.4, top: 16.9, width: 153.4, height: 105.7, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center bottom', spill: false, z: 0, numberPad: {
     quad: [[36, 26.28], [48.57, 22.95], [53.74, 43.84], [40.38, 48.85]],
     fontScale: 0.55, ink: '#1b3a8f',
   } },
-  { panel: 10, src: '/comic-book/hand-notepad.webp', alt: 'Hand writing on notepad', left: -47, top: 4.2, width: 203.5, height: 147.4, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center bottom', spill: false, table: {
+  { panel: 10, src: '/comic-book/hand-notepad.webp', alt: 'Hand writing on notepad', left: -47, top: 4.2, width: 203.5, height: 147.4, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center bottom', spill: false, z: 0, table: {
     quad: [[13.71, 6.52], [80.77, 6.22], [81.78, 57.32], [12.72, 57.79]],
     rows: 22, header: true, fontScale: 0.5, ink: '#1b3a8f',
     source: 'calls',
@@ -89,11 +97,11 @@ export const PANEL_IMG_TRANSFORMS: ImgTransform[] = [
     data: [
     ],
   } },
-  { panel: 11, src: '/comic-book/conversation.webp', alt: 'Phone conversation', left: 24, top: 42.9, width: 64.1, height: 61.7, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center bottom', spill: false },
-  { panel: 12, src: '/comic-book/pensive-woman.webp', alt: 'A woman waiting for the phone to ring', left: 0.1, top: 0, width: 105, height: 100, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center bottom', spill: true },
-  { panel: 9, src: '/comic-book/ringing-phone.webp', alt: 'A telephone ringing at the far end', left: 0, top: 0, width: 100, height: 100, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center center', spill: false, call: 'ringing' },
-  { panel: 9, src: '/comic-book/cheating-man.webp', alt: 'The man who answered', left: 0, top: 0, width: 100, height: 100, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center center', spill: false, call: 'remote' },
-  { panel: 9, src: '/comic-book/despondent-wife.webp', alt: 'The woman placing the call', left: 0, top: 0, width: 100, height: 100, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center center', spill: false, call: 'local' },
+  { panel: 11, src: '/comic-book/conversation.webp', alt: 'Phone conversation', left: 24, top: 42.9, width: 64.1, height: 61.7, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center bottom', spill: false, z: 0 },
+  { panel: 12, src: '/comic-book/pensive-woman.webp', alt: 'A woman waiting for the phone to ring', left: 0.1, top: 0, width: 105, height: 100, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center bottom', spill: true, z: 0 },
+  { panel: 9, src: '/comic-book/ringing-phone.webp', alt: 'A telephone ringing at the far end', left: 0, top: 0, width: 100, height: 100, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center center', spill: false, z: 0, call: 'ringing' },
+  { panel: 9, src: '/comic-book/cheating-man.webp', alt: 'The man who answered', left: 0, top: 0, width: 100, height: 100, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center center', spill: false, z: 0, call: 'remote' },
+  { panel: 9, src: '/comic-book/despondent-wife.webp', alt: 'The woman placing the call', left: 0, top: 0, width: 100, height: 100, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center center', spill: false, z: 0, call: 'local' },
 ]
 
 // Not parallel to PANELS either: each bubble names its `panel`, a panel may own any

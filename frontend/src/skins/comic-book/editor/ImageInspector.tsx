@@ -1,3 +1,4 @@
+import { clampDepth, DEPTH } from '../imageDepth'
 import { PANEL_ASSETS } from './assets'
 import NumberPadInspector from './NumberPadInspector'
 import TableInspector from './TableInspector'
@@ -31,6 +32,11 @@ const ANCHORS = [
  * its window, so there was nothing here to edit and dragging could only slide the
  * picture underneath. Now the frame is the picture's own rectangle over the panel box
  * and a panel can hold as many as the author wants.
+ *
+ * `depth` is the second thing a panel with more than one picture needs, and the reason
+ * the frame alone was not enough: two pictures of one scene — the notepad and the hand
+ * writing on it — have to be told which is in front, and until now that was the order
+ * they happened to have been added in. A number is editable; an array order is not.
  *
  * TableInspector then hangs off the bottom of it: any picture may be turned into a
  * surface with a table projected onto it, which is a property of the picture rather than
@@ -94,6 +100,32 @@ export default function ImageInspector({ api, index, image }: ImageInspectorProp
           ))}
         </select>
       </label>
+      <label className="cb-ed-field">
+        <span>depth</span>
+        <input
+          className="cb-ed-input"
+          type="number"
+          min={DEPTH.min}
+          max={DEPTH.max}
+          step={DEPTH.step}
+          value={image.z}
+          // Falling back to the current depth, not to 0: a number field is empty for a
+          // keystroke while it is being retyped, and snapping the picture to the back of
+          // the panel on that frame reorders the page under the author's cursor.
+          onChange={e => {
+            const typed = Number.parseFloat(e.target.value)
+            set({ z: clampDepth(Number.isFinite(typed) ? typed : image.z) })
+          }}
+        />
+      </label>
+      <div className="cb-ed-hint">
+        Higher draws in front of the other pictures on this panel, and in front of
+        anything projected onto them — a hand over the rows on the notepad it holds.
+        Pictures set the same stay in the order they were added. The spill box below is a
+        coarser layer than this: a spilling picture is always over the panel&apos;s ink and
+        a clipped one always under it, so a pair that has to stack in a chosen order wants
+        the same spill setting on both.
+      </div>
       <TableInspector api={api} index={index} image={image} />
       <NumberPadInspector api={api} index={index} image={image} />
     </>

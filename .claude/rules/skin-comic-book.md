@@ -127,6 +127,18 @@ instead gives an inset picture the grid's slanted gutters. Pictures get no ink �
 `PanelInk` takes `polys` and nothing else — and a second stroked border would contradict
 the editor's selection outline, which traces `imgVisibleRect`.
 
+**Which picture is in front is `z`, and it is paint order** — `imageDepth.ts` sorts the
+pictures and `PanelImages` draws them in that order, because two positioned siblings with
+no z-index paint in document order. Not a z-index: a panel deliberately creates no
+stacking context (so a spilling picture can escape over the ink), which leaves the whole
+page competing in one context where the free integers between the panel ink at 3 and the
+balloons at 5 number exactly one. Depth orders pictures **within a layer and `spill` picks
+the layer**, so a pair that must stack in a chosen order needs the same `spill` on both.
+Anything projected onto a picture rides inside that picture's wrapper and moves with it,
+which is what makes a photographed hand at depth 1 cover the live rows on a notepad at
+depth 0. The editor's click targets take the same order (`OverlayTargets`), or the picture
+you can see would not be the picture you select.
+
 ### Connector tubes
 
 A thin white corridor joins linked bubbles (`bubbleTube.ts`, `BubbleTubes.tsx`) — one

@@ -74,6 +74,7 @@ diff as the code that added it.
 - checkbox: Allow spill outside frame
 - checkbox: Project a number pad on this picture
 - checkbox: Project a table on this picture
+- number: depth
 - select: Page
 - select: anchor
 - select: call role
@@ -114,6 +115,7 @@ diff as the code that added it.
 - number: Y %
 - number: bottom-left X %
 - number: bottom-right X %
+- number: depth
 - number: rows
 - number: top-left X %
 - number: top-right X %
@@ -170,6 +172,7 @@ diff as the code that added it.
 - number: Y %
 - number: bottom-left X %
 - number: bottom-right X %
+- number: depth
 - number: top-left X %
 - number: top-right X %
 - range: text

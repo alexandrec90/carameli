@@ -2,6 +2,7 @@ import { logger } from '../../../lib/logger'
 import { isTailDir } from '../bubbleBox'
 import { isBubbleContentKind } from '../bubbleContent'
 import { isCallRole } from '../callSceneRoles'
+import { clampDepth } from '../imageDepth'
 import { isPanelBgStyle, PATTERN_STYLE_KEYS } from '../panelPatterns'
 import type { PanelBgStyle } from '../panelPatterns'
 import { isBubbleType } from './bubbleTypes'
@@ -182,6 +183,11 @@ function hydrateImage(
     ...shipped,
     ...(t as Partial<ImgTransform>),
   }, count))
+  // Depth decides paint order through a comparator, so it is repaired rather than merely
+  // defaulted: merging supplies one when the key is missing, but a payload hand-edited to
+  // a string or a NaN would hand `sort` a comparator that answers nothing and reorder the
+  // whole page instead of one picture.
+  merged.z = clampDepth(merged.z)
   const table = coerceTable(merged.table)
   const numberPad = coerceNumberPad(merged.numberPad)
   const plain = { ...merged }

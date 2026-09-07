@@ -11,7 +11,7 @@ bubbles; **Panel shapes** drags the lines between panels.
 
 [`layoutConfig.ts`](./layoutConfig.ts) holds `PANEL_IMG_TRANSFORMS` and
 `PANEL_BUBBLE_TRANSFORMS` — picture placement **and content** (panel / src / alt /
-left / top / width / height / scale / offsetX / offsetY / anchor / spill) and bubble
+left / top / width / height / scale / offsetX / offsetY / anchor / spill / z) and bubble
 placement **and content** (panel / top / right / width / rotate / spill / type / tail /
 content / text — lettering, a comma-delimited wheel picker, a text input, a phone
 input formatted from the browser locale, or a dial, which is the wheel and the phone
@@ -128,6 +128,17 @@ you drag is the artwork's real rect, and nothing else is drawn around it.
 *inside* that frame. Before pictures became entities the frame was the panel polygon
 itself, so dragging could only slide the picture under a window that stayed put, and a
 second picture on the same panel had nowhere to go.
+
+**`depth` says which picture is in front.** 0 is the back, 9 the front, and pictures left
+at the same depth keep the order they were added in — so a layout that never touches the
+field draws exactly as it did before the field existed. It is what lets one scene be built
+out of two pictures: a photographed hand at depth 1 over a notepad at depth 0 covers the
+notepad *and the table projected onto it*, because projected content sits inside its own
+picture's wrapper and travels with it. `../imageDepth.ts` implements it as paint order
+rather than a z-index — the page has one stacking context on purpose, and ordering the DOM
+needs none of its scarce integers. The consequence is that **`spill` picks the layer and
+depth orders within it**: a spilling picture is always over the panel's ink and a clipped
+one always under it, so give a pair that has to stack in a chosen order the same `spill`.
 
 **A picture may also be a *surface*.** Switch **Project a table onto this image** on and
 the picture carries a `table`: four draggable corners (`quad`, in % of the picture's
