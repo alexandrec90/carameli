@@ -84,7 +84,7 @@ describe('useLiveTables', () => {
     const { result } = renderHook(() => useLiveTables(['calls']))
     await waitFor(() => expect(result.current.calls).toBeDefined())
     expect(result.current.calls).toEqual([
-      ['+14155550000', '14:30', '', '/comic-book/call-in-progress.webp'],
+      ['+14155550000', '14:30', '', 'In progress'],
     ])
     expect(result.current.sms).toBeUndefined()
     expect(smsList).not.toHaveBeenCalled()
@@ -110,7 +110,7 @@ describe('useLiveTables', () => {
       await vi.advanceTimersByTimeAsync(1000)
     })
     expect(result.current.calls).toHaveLength(2)
-    expect(result.current.calls?.[0]?.[3]).toBe('/comic-book/call-in-progress.webp')
+    expect(result.current.calls?.[0]?.[3]).toBe('In progress')
   })
 
   it('hands back the identical array when a poll finds nothing new', async () => {

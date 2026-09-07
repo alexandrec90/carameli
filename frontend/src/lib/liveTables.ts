@@ -44,15 +44,16 @@ export interface LiveTableFeed {
 export const LIVE_TABLE_LIMIT = 100
 
 /**
- * The call log is deliberately compact: the remote number, start time, duration and a
- * status illustration. The image path is a cell value so the projected table stays a
- * generic renderer while this feed can use the comic-book artwork.
+ * The call log is deliberately compact: the remote number, start time, duration and the
+ * status as a word. The status was artwork until the pictures turned to mush at the size
+ * a projected surface actually renders a cell — a band is a few pixels tall, so an
+ * illustration scaled into one is unreadable where a word is merely small.
  */
 const CALL_COLUMNS: LiveTableColumn[] = [
   { label: 'Number', width: 2, align: 'left' },
   { label: 'Start time', width: 1.4, align: 'left' },
   { label: 'Duration', width: 1, align: 'left' },
-  { label: 'Status', width: 0.7, align: 'center' },
+  { label: 'Status', width: 1.2, align: 'center' },
 ]
 
 const SMS_COLUMNS: LiveTableColumn[] = [
@@ -83,17 +84,25 @@ export function directionLabel(direction: string | null): string {
   return direction ?? ''
 }
 
-export const CALL_STATUS_ART = {
-  ended: '/comic-book/call-ended.webp',
-  failed: '/comic-book/call-failed.webp',
-  inProgress: '/comic-book/call-in-progress.webp',
+export const CALL_STATUS_LABELS = {
+  ended: 'Ended',
+  failed: 'Failed',
+  inProgress: 'In progress',
 } as const
 
-function statusArt(status: string | null): string {
+/**
+ * A carrier's status as the one word a reader wants.
+ *
+ * Three outcomes, not the provider's vocabulary: the column is a glance, and every
+ * status this app has met is either finished, still running, or neither. Anything
+ * unrecognized reads as `Failed` rather than passing through, because a cell showing a
+ * word nobody has defined is a cell that has to be looked up.
+ */
+function statusLabel(status: string | null): string {
   const normalized = (status ?? '').toLowerCase()
-  if (normalized === 'completed') return CALL_STATUS_ART.ended
-  if (normalized === 'ringing' || normalized === 'in-progress') return CALL_STATUS_ART.inProgress
-  return CALL_STATUS_ART.failed
+  if (normalized === 'completed') return CALL_STATUS_LABELS.ended
+  if (normalized === 'ringing' || normalized === 'in-progress') return CALL_STATUS_LABELS.inProgress
+  return CALL_STATUS_LABELS.failed
 }
 
 /** Call records as cells, index-parallel to {@link CALL_COLUMNS}. */
@@ -102,7 +111,7 @@ export function callRows(events: CallEvent[]): string[][] {
     e.direction.toLowerCase() === 'outbound' ? e.to_number ?? '' : e.from_number ?? '',
     formatClockTime(e.started_at ?? e.created_at),
     formatDuration(e.duration_seconds),
-    statusArt(e.status),
+    statusLabel(e.status),
   ])
 }
 

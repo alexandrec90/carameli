@@ -95,9 +95,9 @@ describe('feed shape', () => {
 })
 
 describe('callRows', () => {
-  it('maps a call to its remote number, start time, duration and status art', () => {
+  it('maps a call to its remote number, start time, duration and status word', () => {
     expect(callRows([makeCall()])).toEqual([
-      ['+14155550000', '14:30', '', '/comic-book/call-in-progress.webp'],
+      ['+14155550000', '14:30', '', 'In progress'],
     ])
   })
 
@@ -110,10 +110,10 @@ describe('callRows', () => {
   it('renders missing numbers and status as empty cells, not "null"', () => {
     const row = callRows([makeCall({ from_number: null, to_number: null, status: null })])[0]
     expect(row?.[0]).toBe('')
-    expect(row?.[3]).toBe('/comic-book/call-failed.webp')
+    expect(row?.[3]).toBe('Failed')
   })
 
-  it('formats duration and maps terminal statuses to the matching art', () => {
+  it('formats duration and maps terminal statuses to the matching word', () => {
     const row = callRows([
       makeCall({
         direction: 'outbound',
@@ -125,7 +125,7 @@ describe('callRows', () => {
       '+14155550001',
       '14:30',
       '1:05',
-      '/comic-book/call-ended.webp',
+      'Ended',
     ])
   })
 })
@@ -159,8 +159,8 @@ describe('sameRows', () => {
 })
 
 describe('mergeRows', () => {
-  const A = [['+14155550000', '14:30', '', '/comic-book/call-in-progress.webp']]
-  const B = [['+14155550001', '14:31', '0:42', '/comic-book/call-ended.webp']]
+  const A = [['+14155550000', '14:30', '', 'In progress']]
+  const B = [['+14155550001', '14:31', '0:42', 'Ended']]
 
   it('takes the new cells when a poll finds something', () => {
     expect(mergeRows({ calls: A }, [['calls', B]])).toEqual({ calls: B })

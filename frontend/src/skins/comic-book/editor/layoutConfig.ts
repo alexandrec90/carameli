@@ -92,7 +92,7 @@ export const PANEL_IMG_TRANSFORMS: ImgTransform[] = [
       { label: 'Number', width: 2, align: 'left' },
       { label: 'Start time', width: 1.4, align: 'left' },
       { label: 'Duration', width: 1, align: 'left' },
-      { label: 'Status', width: 0.7, align: 'center' },
+      { label: 'Status', width: 1.2, align: 'center' },
     ],
     data: [
     ],

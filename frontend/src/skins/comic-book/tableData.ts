@@ -33,18 +33,6 @@ export const FONT_SCALE = { min: 0.2, max: 0.9, step: 0.05 }
 export const BAND_SIT = 0.08
 
 /**
- * Height of a status illustration in a cell, as a fraction of the band.
- *
- * Sized from the band rather than from the lettering for the reason the whole of this
- * paragraph block exists: at `fontScale` 0.5 the artwork used to be given `2.2em`, which is
- * 1.1 bands, so every row carrying one was 16% taller than its own line while the heading
- * row — the one row with no illustration in it — stayed exactly one band. That is what put
- * the header out of step with the body, walked the rows off the drawn ruling, and ran the
- * table 72 px past the foot of the notepad.
- */
-export const STATUS_BAND = 0.72
-
-/**
  * Row slots the data gets. The heading, when there is one, takes the first slot rather
  * than sitting above the surface — the whole point of the row count is that every slot
  * lands on a line drawn in the picture, and a heading floating between two of them is

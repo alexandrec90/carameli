@@ -8,7 +8,6 @@ import {
   clampScroll,
   columnPercents,
   maxScroll,
-  STATUS_BAND,
   visibleRows,
   wheelDeltaPx,
   wheelRows,
@@ -42,22 +41,11 @@ function Row({
   const Cell = head ? 'th' : 'td'
   return (
     <tr>
-      {cells.map((text, i) => {
-        const isStatusArt = text.startsWith('/comic-book/call-')
-        return (
-          <Cell key={i} className="cb-ptable-cell" style={{ textAlign: aligns[i] ?? 'left' }}>
-            {isStatusArt ? (
-              <img
-                className="cb-ptable-status"
-                src={text}
-                alt={text.includes('in-progress') ? 'Call in progress' : text.includes('failed') ? 'Call failed' : 'Call ended'}
-              />
-            ) : (
-              text
-            )}
-          </Cell>
-        )
-      })}
+      {cells.map((text, i) => (
+        <Cell key={i} className="cb-ptable-cell" style={{ textAlign: aligns[i] ?? 'left' }}>
+          {text}
+        </Cell>
+      ))}
     </tr>
   )
 }
@@ -117,14 +105,12 @@ export default function ProjectedTable({ table, base, editing }: ProjectedTableP
     color: table.ink,
     fontSize: `${rowH * table.fontScale}px`,
     // Bands are what the row count means, so the cells are sized from it rather than
-    // from their contents: a tall cell would push every row below it off its line.
-    // The two below are the same rule applied to the two things inside a cell that can
-    // be taller than the band and grow it — the gap above the line, and a status
-    // illustration. Both are fractions of the band, resolved here rather than in the
-    // stylesheet, so the arithmetic that keeps them inside it is testable.
+    // from their contents: a tall cell would push every row below it off its line. The
+    // gap above the line is the same rule applied to the one thing inside a cell that
+    // can outgrow the band — a fraction of the band, resolved here rather than in the
+    // stylesheet, so the arithmetic that keeps it inside is testable.
     ['--cb-ptable-row' as string]: `${rowH}px`,
     ['--cb-ptable-sit' as string]: `${rowH * BAND_SIT}px`,
-    ['--cb-ptable-art' as string]: `${rowH * STATUS_BAND}px`,
     pointerEvents: editing ? 'none' : 'auto',
   }
 

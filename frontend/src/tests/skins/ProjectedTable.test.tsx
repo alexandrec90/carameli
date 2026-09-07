@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 
 import ProjectedTable from '../../skins/comic-book/ProjectedTable'
-import { BAND_SIT, STATUS_BAND, WHEEL_ROW_PX } from '../../skins/comic-book/tableData'
+import { BAND_SIT, WHEEL_ROW_PX } from '../../skins/comic-book/tableData'
 import { cssRules, SKIN_CSS } from './skinCss'
 import type { Quad } from '../../skins/comic-book/tableProjection'
 import type { TableProjection } from '../../skins/comic-book/editor/types'
@@ -142,35 +142,33 @@ describe('ProjectedTable', () => {
   })
 
   /*
-   * The band is the unit of everything inside a cell, and these three tests are one bug
-   * told three ways.
+   * The band is the unit of everything inside a cell, and these two tests are one bug told
+   * twice.
    *
-   * The status artwork was `2.2em` of a font that is itself a fraction of the band, so at
-   * the shipped `fontScale` of 0.5 it stood 1.1 bands tall. A table row is a *minimum*
-   * height in CSS: the row did not clip, it grew — every body row by 16%, while the heading
-   * row, the one row with no artwork in it, stayed exactly one band. That is what the
-   * notepad showed. The header was out of step with the body, each row sat lower on its
-   * ruled line than the one above it until the lettering was struck through, and the
-   * twenty-two rows ran 72 px past the foot of the pad.
+   * The status used to be artwork given `2.2em` of a font that is itself a fraction of the
+   * band, so at the shipped `fontScale` of 0.5 it stood 1.1 bands tall. A table row is a
+   * *minimum* height in CSS: the row did not clip, it grew — every body row by 16%, while
+   * the heading row, the one row with no artwork in it, stayed exactly one band. That is
+   * what the notepad showed. The header was out of step with the body, each row sat lower
+   * on its ruled line than the one above it until the lettering was struck through, and the
+   * twenty-two rows ran 72 px past the foot of the pad. The artwork is gone — a status is a
+   * word now — but the rule it broke is the one anything put in a cell has to keep.
    */
-  it('sizes the gap and the status artwork from the band, not from the lettering', () => {
+  it('sizes the gap from the band, not from the lettering', () => {
     const { surface } = draw({ rows: 10 })
     const rowH = Number.parseFloat(surface!.style.height) / 10
     const px = (name: string) => Number.parseFloat(surface!.style.getPropertyValue(name))
     expect(px('--cb-ptable-row')).toBeCloseTo(rowH, 6)
     expect(px('--cb-ptable-sit')).toBeCloseTo(rowH * BAND_SIT, 6)
-    expect(px('--cb-ptable-art')).toBeCloseTo(rowH * STATUS_BAND, 6)
   })
 
   // The other half of that, and the half no render can check: jsdom applies no CSS, so the
-  // stylesheet is read as source. An `em` back in either of these rules is the bug back.
+  // stylesheet is read as source. An `em` back in this rule is the bug back.
   it('spends the band variables in the stylesheet rather than ems', () => {
     const rules = cssRules(SKIN_CSS['src/skins/comic-book/table.css'])
     const cell = rules.find(r => r.selector === '.cb-ptable-cell')!.body
-    const art = rules.find(r => r.selector === '.cb-ptable-status')!.body
     expect(cell).toContain('var(--cb-ptable-sit)')
-    expect(art).toContain('var(--cb-ptable-art)')
-    expect(art).not.toContain('em')
+    expect(cell).not.toContain('em)')
   })
 
   /*
@@ -189,14 +187,20 @@ describe('ProjectedTable', () => {
     expect(body).toContain('overflow: hidden')
   })
 
-  it('renders status artwork as a compact image cell', () => {
+  // A cell is lettering and nothing else. The status column used to special-case a value
+  // that looked like an image path and draw an `<img>` for it, which is what shrank the
+  // status to an unreadable smudge at the size a projected band actually renders; a cell
+  // that renders anything but its text again would fail here.
+  it('letters every cell as text, drawing no image for any value', () => {
     const { container } = draw({
       columns: [{ label: 'Status', width: 1, align: 'center' }],
-      data: [['/comic-book/call-ended.webp']],
+      data: [['In progress'], ['/comic-book/call-ended.webp']],
+      header: false,
+      rows: 2,
     })
-    const image = container.querySelector('.cb-ptable-status') as HTMLImageElement | null
-    expect(image?.src).toContain('/comic-book/call-ended.webp')
-    expect(image?.alt).toBe('Call ended')
+    expect(container.querySelector('img')).toBeNull()
+    const cells = [...container.querySelectorAll('.cb-ptable-cell')].map(c => c.textContent)
+    expect(cells).toEqual(['In progress', '/comic-book/call-ended.webp'])
   })
 
   // A quad the author has collapsed while dragging has no matrix; drawing nothing beats

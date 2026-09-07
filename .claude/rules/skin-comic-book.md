@@ -311,11 +311,13 @@ surface (in `configSeed.ts`, `configHydrate.ts` and `serializeTable.ts` alike), 
   `aria-live` count are the keyboard's.
 - **A band is a budget.** A CSS row height is a *minimum*, so content taller than its band
   grows the row and walks every row below it off its line. `BAND_SIT` (lettering's gap
-  above its rule) and `STATUS_BAND` (a status illustration's height) in `tableData.ts` are
-  fractions of the band, resolved into custom properties by `ProjectedTable.tsx` so
-  `table.css` spends them rather than inventing its own; `FONT_SCALE.max + BAND_SIT <= 1`
-  is the invariant (`tableData.test.ts`). `.cb-ptable-clip` is the backstop — `hidden`
-  over a window nothing scrolls past, not the scroll container rule 18 forbids.
+  above its rule) in `tableData.ts` is a fraction of the band, resolved into a custom
+  property by `ProjectedTable.tsx` so `table.css` spends it rather than inventing its own;
+  `FONT_SCALE.max + BAND_SIT <= 1` is the invariant (`tableData.test.ts`). **A cell holds
+  lettering and nothing else** — the call log's status was artwork until the pictures came
+  out as smudges at the few pixels a band actually is, so it is a word now
+  (`CALL_STATUS_LABELS`). `.cb-ptable-clip` is the backstop — `hidden` over a window
+  nothing scrolls past, not the scroll container rule 18 forbids.
 - **The quad is what puts the rows on the drawn lines**, seated against the artwork rather
   than by eye: bands are equal, so the bottom edge belongs *on* the last ruled line and
   the top edge exactly one band above the first (`notepadRuling.test.ts` checks the
