@@ -1,10 +1,11 @@
 /**
- * The eight ways a panel bubble can present its authored text.
+ * The nine ways a panel bubble can present its authored text.
  *
- * 'transcript' is the one that presents something *else*: the words come from the call on
- * the balloon's panel and its own `text` is ignored. It is here rather than in a component
- * of its own because everything else about it is an ordinary balloon — a shape, a tail, a
- * place on the panel, all of it draggable — and a call's words are worth no less.
+ * 'transcript' and 'number-hangup' are the two that present something *else*: the words,
+ * or the number, come from the call on the balloon's panel and its own `text` is ignored.
+ * They are here rather than in components of their own because everything else about them
+ * is an ordinary balloon — a shape, a tail, a place on the panel, all of it draggable — and
+ * a call's words are worth no less.
  */
 export type BubbleContentKind =
   | 'text'
@@ -15,6 +16,7 @@ export type BubbleContentKind =
   | 'dial-call'
   | 'actions'
   | 'transcript'
+  | 'number-hangup'
 
 export const BUBBLE_CONTENT_KINDS: BubbleContentKind[] = [
   'text',
@@ -25,7 +27,18 @@ export const BUBBLE_CONTENT_KINDS: BubbleContentKind[] = [
   'dial-call',
   'actions',
   'transcript',
+  'number-hangup',
 ]
+
+/**
+ * True for a kind that draws one of the telephone's keys and so takes the handset's
+ * handlers: the lettered `actions` row, and the number-with-red-key balloon. A `dial-call`
+ * is not one — its green key places the call through the dial's own submit, not through
+ * a handler, because the number it dials is the field's rather than the phone's.
+ */
+export function takesPhoneActions(content: string): boolean {
+  return content === 'actions' || content === 'number-hangup'
+}
 
 /**
  * True for either dial: the drum-with-a-field, and the same balloon with the telephone's

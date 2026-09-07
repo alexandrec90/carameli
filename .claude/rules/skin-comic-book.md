@@ -387,8 +387,20 @@ disagree.
   hold is the cut and the axis, the one thing no entry implies.
 - **The two far-end roles share a half** — whoever framed the ringing telephone framed the
   person who answers it, and splitting them jumps the picture across at the pickup.
-- **The keys are an ordinary `actions` balloon**, so hanging up is not a callback the
-  scene owns and the balloon can be moved, resized and re-lettered.
+- **The line is an ordinary balloon** — `content: 'number-hangup'`, the number lettered on
+  the dial's centre line with the red key at the right (`BubbleNumberHangup.tsx`, the
+  `dial-call` balloon's mirror image) — so hanging up is no callback of the scene's, and
+  the balloon can be moved, resized and reshaped. The number is `CallScene.party` (the
+  softphone's `remoteParty`), falling back in the editor, whose synthetic scene carries
+  none, to the panel's own dialled number rather than a placeholder shipped in the bundle.
+- **A transcript is drawn only once the call is answered** — `bubbleDrawn` in
+  `callSceneRoles.ts`, asked by the drawing, the click targets and the selection outline
+  alike. Its role decides the half, the pickup the moment: Ringing shows the figures and
+  the line, Connected adds the words.
+- **`+ Image` / `+ Bubble` add to the layout on screen** — on a call panel showing Ringing
+  or Connected the new entry takes that phase's far-end role (`newEntryRole`), the one
+  drawn then and not at the other moment; on Default, or off a call, none. Both halves
+  prevent an add that appears to have done nothing, the second one that cut a panel in two.
 - **Anything drawn against a half is measured against that half's box**, by `halfFor`, in
   all three places at once — picture, click target, drag. A target measured against the
   panel sits where its picture is not; a drag scaled by the panel travels twice as far as
@@ -408,7 +420,7 @@ beside it, precisely what a balloon cannot see.
 | `CLAIM_COMPOSER` | a chain whose sender template is a field | nothing outranks it and nothing is hovered |
 | `CLAIM_FIELD` | `input`, `phone`, `dial`, `dial-call` | it is the only field on the panel |
 | `CLAIM_POINTER` | `wheel` | only while hovered — it takes the scroll, so a composer beside it must let go |
-| `CLAIM_NONE` | lettering, `actions` | never |
+| `CLAIM_NONE` | lettering, `actions`, `transcript`, `number-hangup` | never |
 
 Three rules decide it in order: **the pointer wins**, then **the highest claim wins if it
 stands alone**, then **a tie owns nothing** — the config's first input is not a fact the
@@ -423,9 +435,9 @@ panel-level owner by ranking above `CLAIM_FIELD`.
 `import.meta.env.DEV` so it is inert in prod. Click a panel, picture or bubble to select (a
 picture wins over the panel under it, a bubble over both); drag, wheel, handles and arrows
 adjust, with **Alt** swapping a picture's two framings. **+ Image**, **+ Bubble**, **+ SMS**
-and **+ Call** add to the selected panel. The inspector edits every field of the arrays
-above, with two deliberate gaps: **no chain control**, and no cell block or **+ Column** /
-**−** on a live surface.
+and **+ Call** add to the selected panel, the first two in whichever of its layouts the call
+switch is showing. The inspector edits every field of the arrays above, with two deliberate
+gaps: **no chain control**, and no cell block or **+ Column** / **−** on a live surface.
 
 | Control | Notes |
 | --- | --- |

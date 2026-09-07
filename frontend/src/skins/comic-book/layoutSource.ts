@@ -132,8 +132,11 @@ export function useCallLayout(
   callScenes: CallSceneLayout[],
   panelPolys: (PanelPoly | null)[],
 ): { call: CallScene | null; imgBox: (t: ImgTransform, bounds: Rect) => Rect | null } {
+  // No party: nobody is on the line in the editor, and a number-shaped placeholder here
+  // would be sample data in the production bundle. The balloon that letters it falls back
+  // to the panel's own dialled number, which is the author's and already in the config.
   const call = editor.active
-    ? editor.callPhase && { phase: editor.callPhase, transcript: EDITOR_CALL_TRANSCRIPT }
+    ? editor.callPhase && { phase: editor.callPhase, transcript: EDITOR_CALL_TRANSCRIPT, party: '' }
     : callSceneOf(softphone)
   const phase = call?.phase ?? null
   const imgBox = useCallback(

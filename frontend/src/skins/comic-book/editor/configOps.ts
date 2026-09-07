@@ -1,13 +1,15 @@
 import { mirrorTailDir } from '../bubbleBox'
 import { chainMembers, mirrorColumn } from '../bubbleChain'
+import { newEntryRole } from '../callSceneRoles'
 import { patchCallSceneIn } from './callSceneOps'
 import { linkGroups, nextChainId, normalizeChainId, patchChainIn } from './chainOps'
 import type { PanelBgStyle } from '../panelPatterns'
+import type { CallScenePhase } from '../phoneActions'
 import { cloneConfig, cloneImg, NEW_BUBBLE, NEW_IMAGE, seedConfig } from './configSeed'
 import { sanitizeLinks } from './configHydrate'
 import { reconcile } from './reconcile'
 import type {
-  BubbleChain, BubbleTransform, CallSceneLayout, EditorConfig, ImgTransform,
+  BubbleChain, BubbleTransform, CallRole, CallSceneLayout, EditorConfig, ImgTransform,
 } from './types'
 
 // Every change the editor makes to its working copy, as pure functions on a config.
@@ -142,13 +144,35 @@ export function patchChain(
   return next
 }
 
-/** Append a picture on `panel`, returning the new config and the new picture's index. */
+/**
+ * The `call` field a new entry on `panel` carries, as a spread — the key only when there
+ * is a role, so an entry added on the ordinary layout goes out without it (see `patchImg`
+ * for why absence and `undefined` are not the same fact here).
+ */
+function newEntryCall(
+  config: EditorConfig,
+  panel: number,
+  phase: CallScenePhase | null,
+): { call?: CallRole } {
+  const call = newEntryRole(config.callScenes, panel, phase)
+  return call === undefined ? {} : { call }
+}
+
+/**
+ * Append a picture on `panel`, returning the new config and the new picture's index.
+ *
+ * `phase` is the layout the author is looking at. On a call panel with its call up, the
+ * picture joins that layout — it is added *to what is on screen*, and one added to the
+ * default layout instead would be invisible until the author found the switch. See
+ * `newEntryRole` for which role that is.
+ */
 export function addImg(
   config: EditorConfig,
   panel: number,
+  phase: CallScenePhase | null = null,
 ): { config: EditorConfig; index: number } {
   const next = cloneConfig(config)
-  next.images.push({ ...NEW_IMAGE, panel })
+  next.images.push({ ...NEW_IMAGE, panel, ...newEntryCall(config, panel, phase) })
   return { config: reconcile(next), index: next.images.length - 1 }
 }
 
@@ -165,13 +189,17 @@ export function removeImg(config: EditorConfig, index: number): EditorConfig {
   return reconcile(next)
 }
 
-/** Append a bubble on `panel`, returning the new config and the new bubble's index. */
+/**
+ * Append a bubble on `panel`, returning the new config and the new bubble's index. `phase`
+ * is the layout on screen, exactly as for {@link addImg}.
+ */
 export function addBubble(
   config: EditorConfig,
   panel: number,
+  phase: CallScenePhase | null = null,
 ): { config: EditorConfig; index: number } {
   const next = cloneConfig(config)
-  next.bubbles.push({ ...NEW_BUBBLE, panel })
+  next.bubbles.push({ ...NEW_BUBBLE, panel, ...newEntryCall(config, panel, phase) })
   return { config: next, index: next.bubbles.length - 1 }
 }
 

@@ -3,7 +3,7 @@ import type { CSSProperties } from 'react'
 
 import { splitAt } from '../callSceneGeometry'
 import type { SceneHalves } from '../callSceneGeometry'
-import { halfFor, inRoles, rolesAtPhase } from '../callSceneRoles'
+import { bubbleDrawn, halfFor, inRoles, rolesAtPhase } from '../callSceneRoles'
 import type { PanelPoly, Rect } from '../panelGeometry'
 import type { CallScenePhase } from '../phoneActions'
 import { bubbleRect, imgVisibleRect } from './transforms'
@@ -122,8 +122,11 @@ export function overlaySelection(
   const selPanel = panelOfSelection(selected, selImg, selBubble)
   const selPoly = selPanel === null ? null : panelPolys[selPanel]
   const selHalves = selPanel === null ? null : halvesOn(selPanel)
-  const shown = selImg ?? selBubble
-  const hidden = shown !== null && !inRoles(shown.call, callRoles)
+  // The same two questions the panels ask before drawing: a picture by its role, a
+  // balloon by its role and its content — a transcript waits for the pickup.
+  const hidden = selImg
+    ? !inRoles(selImg.call, callRoles)
+    : selBubble !== null && !bubbleDrawn(selBubble, callRoles)
   const selectedRect =
     !selPoly || hidden ? null : entryRect(selImg, selBubble, selPoly, selHalves, natSizes)
   return { selImg, selPanel, selPoly, selHalves, selectedRect }

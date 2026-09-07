@@ -280,6 +280,7 @@ export default function ComicPanel({
                 halves={halves}
                 lit={lit}
                 transcript={scene?.transcript}
+                party={scene?.party}
                 bounds={bounds}
                 clip={dotClip}
                 isVisible={isBubbleVisible}

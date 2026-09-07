@@ -205,6 +205,23 @@ describe('what the overlay offers a click', () => {
     expect(boxes.some(box => spans(box, halves.a.box))).toBe(true)
     expect(boxes.some(box => spans(box, halves.b.box))).toBe(true)
   })
+
+  it('offers no transcript target while the telephone is still ringing', () => {
+    // The page draws no transcript before the pickup, so a target for one would select a
+    // balloon the author cannot see. Only the line — number and red key — is left, and
+    // it stands in the caller's half.
+    const config = calling()
+    const halves = halvesFor(config)
+    const transcripts = config.bubbles.filter(
+      b => b.panel === CALL_PANEL && b.content === 'transcript',
+    )
+    expect(transcripts.length).toBeGreaterThan(0)
+
+    const { bubbleTargets } = draw(config, { callPhase: 'ringing' })
+    const boxes = bubbleTargets().filter((b): b is Rect => b !== null)
+    expect(boxes).toHaveLength(1)
+    expect(boxes[0].x).toBeGreaterThanOrEqual(halves.b.box.x - 1)
+  })
 })
 
 describe('the selection outline', () => {
@@ -228,6 +245,21 @@ describe('the selection outline', () => {
     const { outline } = draw(config, { callPhase: 'ringing', selected: { kind: 'img', index } })
 
     expect(outline()).toBeNull()
+  })
+
+  it('gives no outline to a transcript while the telephone is still ringing', () => {
+    // The caller's transcript: its role is on screen in both phases, but the balloon is
+    // not drawn until the pickup, and a handle over it would drag something invisible.
+    const config = calling()
+    const index = config.bubbles.findIndex(
+      b => b.panel === CALL_PANEL && b.content === 'transcript' && b.call === 'local',
+    )
+    const before = draw(config, { callPhase: 'ringing', selected: { kind: 'bubble', index } })
+    expect(before.outline()).toBeNull()
+    before.container.remove()
+
+    const after = draw(config, { callPhase: 'connected', selected: { kind: 'bubble', index } })
+    expect(after.outline()).not.toBeNull()
   })
 
   it('gives no outline to the panel’s own picture while the call is up', () => {

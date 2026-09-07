@@ -1,5 +1,5 @@
 import { callSceneOn } from '../callSceneRoles'
-import { cloneConfig, newCallArt, NEW_CALL_END_KEY, NEW_CALL_TRANSCRIPT } from './configSeed'
+import { cloneConfig, newCallArt, NEW_CALL_LINE, NEW_CALL_TRANSCRIPT } from './configSeed'
 import { reconcile } from './reconcile'
 import type { EditorConfig } from './types'
 
@@ -8,15 +8,16 @@ import type { EditorConfig } from './types'
 // for the same reason: none of the six couplings is visible in the result.
 
 /**
- * Make `panel` a phone call: the three figures, the two transcripts and the red key, each
- * an ordinary picture or balloon carrying a {@link CallRole}, and the seam they are framed
+ * Make `panel` a phone call: the three figures, the two transcripts and the line, each an
+ * ordinary picture or balloon carrying a {@link CallRole}, and the seam they are framed
  * against.
  *
  * Six entries and no more, because a call *is* those six: the far end before it picks up
- * and after, the caller who is there throughout, a balloon for each party's words, and one
- * key to hang up with. Every one of them is an ordinary entry from here on — selected,
- * dragged, resized, retyped, given another picture or deleted — which is the whole point
- * of the scene being made of them rather than drawn by a component of its own.
+ * and after, the caller who is there throughout, a balloon for each party's words, and the
+ * number on the line with the key to drop it. Every one of them is an ordinary entry from
+ * here on — selected, dragged, resized, retyped, given another picture or deleted — which
+ * is the whole point of the scene being made of them rather than drawn by a component of
+ * its own.
  *
  * The seam is **not** set here. `reconcile` derives the scene list from the roles these
  * entries carry, so the centred default arrives with them; setting it separately would be
@@ -42,6 +43,6 @@ export function addCallScene(
   next.images.push({ ...newCallArt('local'), panel })
   next.bubbles.push({ ...NEW_CALL_TRANSCRIPT, panel, call: 'remote' })
   next.bubbles.push({ ...NEW_CALL_TRANSCRIPT, panel, call: 'local' })
-  next.bubbles.push({ ...NEW_CALL_END_KEY, panel, call: 'local' })
+  next.bubbles.push({ ...NEW_CALL_LINE, panel, call: 'local' })
   return { config: reconcile(next), index: first }
 }

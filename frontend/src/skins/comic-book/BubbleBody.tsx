@@ -3,6 +3,7 @@ import type { RefObject } from 'react'
 import BubbleActions from './BubbleActions'
 import BubbleDial from './BubbleDial'
 import BubbleInput from './BubbleInput'
+import BubbleNumberHangup from './BubbleNumberHangup'
 import BubbleTypingDots from './BubbleTypingDots'
 import BubbleWheel from './BubbleWheel'
 import type { BubbleTransform } from './editor/types'
@@ -47,6 +48,12 @@ interface BubbleBodyProps {
   lines: readonly CallTranscriptLine[]
   /** Accessible name for the transcript log — whose words these are. */
   linesLabel?: string
+  /**
+   * Who is on the line, for a `number-hangup` balloon. Empty when the call does not say —
+   * the editor's synthetic scene — and the balloon then letters the panel's own dialled
+   * number, so the author has something to frame it around.
+   */
+  party?: string
 }
 
 /**
@@ -80,6 +87,7 @@ export default function BubbleBody({
   status,
   lines,
   linesLabel,
+  party = '',
 }: BubbleBodyProps) {
   if (editableKind) {
     return (
@@ -124,6 +132,17 @@ export default function BubbleBody({
 
   if (bubble.content === 'actions') {
     return <BubbleActions text={bubble.text} font={font} enabled={enabled} actions={actions} />
+  }
+
+  if (bubble.content === 'number-hangup') {
+    return (
+      <BubbleNumberHangup
+        number={party || dialValue}
+        font={font}
+        enabled={enabled}
+        actions={actions}
+      />
+    )
   }
 
   if (transcript) {

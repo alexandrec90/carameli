@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest'
 
-import { BUBBLE_CONTENT_KINDS, isDialContent } from '../../skins/comic-book/bubbleContent'
+import {
+  BUBBLE_CONTENT_KINDS,
+  isDialContent,
+  takesPhoneActions,
+} from '../../skins/comic-book/bubbleContent'
 import {
   NEW_BUBBLE,
   hydrateConfig,
@@ -20,13 +24,27 @@ describe('interactive bubble content persistence', () => {
     expect(hydrateConfig(JSON.stringify({ images: [], bubbles })).bubbles).toEqual(bubbles)
   })
 
-  it('serializes inputs, dials and action buttons so an editor save preserves them', () => {
-    for (const content of ['input', 'phone', 'dial', 'dial-call', 'actions'] as const) {
+  it('serializes every live content kind so an editor save preserves it', () => {
+    for (const content of BUBBLE_CONTENT_KINDS) {
       const ts = serializeConfig(
         patchBubble(seedConfig(), 0, { content, text: 'Authored value' }),
       )
       expect(ts).toContain(`content: '${content}', text: 'Authored value',`)
     }
+  })
+})
+
+describe('takesPhoneActions', () => {
+  it('names the kinds that draw a key the handset’s handlers run', () => {
+    expect(takesPhoneActions('actions')).toBe(true)
+    expect(takesPhoneActions('number-hangup')).toBe(true)
+  })
+
+  it('leaves out the dial, whose green key dials through its own field', () => {
+    for (const content of BUBBLE_CONTENT_KINDS.filter(k => !takesPhoneActions(k))) {
+      expect(['actions', 'number-hangup']).not.toContain(content)
+    }
+    expect(takesPhoneActions('dial-call')).toBe(false)
   })
 })
 

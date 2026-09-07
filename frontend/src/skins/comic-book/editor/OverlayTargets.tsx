@@ -1,4 +1,4 @@
-import { halfFor, inRoles } from '../callSceneRoles'
+import { bubbleDrawn, halfFor, inRoles } from '../callSceneRoles'
 import type { SceneHalves } from '../callSceneGeometry'
 import type { PanelPoly, Rect } from '../panelGeometry'
 import { inDepthOrder } from '../imageDepth'
@@ -104,10 +104,12 @@ export default function OverlayTargets({
 
           {/* One click target per bubble, placed against the panel it belongs to. They
               paint last so a bubble stays clickable where it overlaps a picture, its own
-              panel — or a neighbour's, once it spills into the gutter. */}
+              panel — or a neighbour's, once it spills into the gutter. `bubbleDrawn` is
+              the panel's own question, so a transcript hidden until the pickup gets no
+              target on the Ringing layout either. */}
           {config.bubbles.map((bubble, i) => {
             const poly = panelPolys[bubble.panel]
-            if (!poly || !inRoles(bubble.call, callRoles)) return null
+            if (!poly || !bubbleDrawn(bubble, callRoles)) return null
             const box = boxOf(bubble, poly.bounds, halvesOn(bubble.panel))
             return (
               <button

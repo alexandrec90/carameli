@@ -642,17 +642,20 @@ describe('default config parity', () => {
     })
   })
 
-  it('sits every call balloon square in its half, and letters only the key', () => {
+  it('sits every call balloon square in its half, and letters nothing the call supplies', () => {
     const called = PANEL_BUBBLE_TRANSFORMS.filter(b => b.call !== undefined)
     expect(called.length).toBeGreaterThan(0)
+    // The kinds filled from the call itself: the words, and the number on the line.
+    const callFed = (content: string) => content === 'transcript' || content === 'number-hangup'
     called.forEach(b => {
       // Straight: a transcript read at an angle is harder to follow than it is charming,
-      // and the red key is a photograph of a button rather than a balloon in the art.
+      // and the line's number and red key are a readout, not a caption in the art.
       expect(b.rotate).toBe(0)
       expect(b.width).toBeGreaterThan(0)
-      // A transcript's words come from the call, so authored text would be a second
-      // source for them; the key's are its label, and `phoneAction` folds it onto a key.
-      if (b.content === 'transcript') expect(b.text).toBe('')
+      // Words and number come from the call, so authored text would be a second source
+      // for them; anything else lettered here — an `actions` key's label, say — is the
+      // author's and has to say something.
+      if (callFed(b.content)) expect(b.text).toBe('')
       else expect(b.text.length).toBeGreaterThan(0)
     })
   })

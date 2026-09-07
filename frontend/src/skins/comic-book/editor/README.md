@@ -266,7 +266,8 @@ different images can only crossfade. A new bubble type belongs in `bubbleShape.t
    - For bubbles: pick the **panel** it belongs to, a resting **type** (sets shape +
      lettering font), which way the **tail** points (**No tail** is one of the nine
      options), pick the **content** presentation (**Text**, **Wheel picker**, **Text
-     input**, **Phone input**, **Dial**, or **Action buttons**). Wheel text is
+     input**, **Phone input**, **Dial**, **Dial + call button**, **Action buttons**,
+     **Call transcript**, or **Number on the line + end call button**). Wheel text is
      comma-delimited options: hover the bubble outside edit mode and scroll to turn it.
      Input text is its initial value; phone input formats live using the browser locale,
      while a leading `+` selects an international calling code. A **Phone input** balloon
@@ -343,14 +344,26 @@ different images can only crossfade. A new bubble type belongs in `bubbleShape.t
        row an animation put somewhere. Nothing binds and nothing sends while the editor is
        open.
    - **+ Call** (toolbar) turns the selected panel into a phone call: it splits down the
-     middle and gets the far end, the caller, a transcript balloon each and a red **End
-     call** key. Any panel will do — the button is only disabled on one that is already a
-     call, and the reason is in its tooltip.
+     middle and gets the far end, the caller, a transcript balloon each and **the line** —
+     a thought balloon lettering the number that is ringing or answered, with the red
+     **End call** key at its right (the **Dial + call button** balloon seen from the other
+     end: nothing to type, nothing to turn). Any panel will do — the button is only
+     disabled on one that is already a call, and the reason is in its tooltip.
      - **Call layout** (toolbar) is the switch: **Default** is the panel's ordinary
        contents, **Ringing** and **Connected** are the two moments of the call. It appears
        once the page has a call on it. Everything in the call layout is edited on Ringing
        or Connected — on Default it is off screen and there is nothing to click, because a
        handle over something that is not drawn moves a picture you cannot see moving.
+     - **Ringing shows the figures and the line; Connected adds the transcripts.** A
+       transcript balloon is drawn only once the call is answered, whatever its role —
+       there are no words before that — so on Ringing it has no target either. The line
+       stays through both.
+     - **+ Image and + Bubble add to the layout you are looking at.** On Ringing or
+       Connected the new entry joins the call in the role drawn at that moment and not
+       the other (*Far end, ringing* / *Far end, answered*), so it appears where you are
+       standing; move it to the caller's half or across the panel with **call role**. On
+       Default it goes to the panel's ordinary contents as before, and a panel that is
+       not a call is never made one by an add.
      - **Frame each side against its own half.** A picture or balloon with a role is
        placed inside the half its role names, so `left`/`top`/`width` are percentages of
        *that half* — drag, resize and pan work exactly as they do on a whole panel.
@@ -359,9 +372,7 @@ different images can only crossfade. A new bubble type belongs in `bubbleShape.t
      - **call role** (any picture or bubble inspector) is what actually decides which
        layout an entry is in: pick a role to move it into the call, *Not part of a call* to
        take it back out. Picking one takes the page to the layout it just joined, since
-       otherwise the entry would vanish and nothing would appear to have happened. Add an
-       ordinary **+ Image** or **+ Bubble** to a call panel and give it a role to put more
-       than one thing in a half.
+       otherwise the entry would vanish and nothing would appear to have happened.
      - There is **no delete-the-call button**: take the role off the last entry and the
        split goes with it.
    - **+ Image** / **+ Bubble** / **+ SMS** (toolbar) append a new picture, bubble or
@@ -536,6 +547,9 @@ panelGridCut.ts     PURE: cut one ring in two along a straight line, inserting t
 ../PanelBubble.tsx  one bubble: outline SVG + content + hover/press morph state
 ../BubbleInput.tsx  real text/phone input; isolates its events from panel navigation
 ../BubbleDial.tsx   the 'dial' kind: an autocomplete drawn as a drum, field on its centre line
+../BubbleKey.tsx    one drawn telephone key: the artwork is the button, and every event stops at it
+../BubbleCallKey.tsx the green key beside a dial's field, greyed until the number could be dialled
+../BubbleNumberHangup.tsx the 'number-hangup' kind: the number on the line, red key at the right
 ../dialPicker.ts    PURE dial arithmetic: filter, which row, keypad-key append, redial list
 ../usePhoneField.ts caret-preserving phone editing, shared by BubbleInput and BubbleDial
 ../phoneInput.ts    PURE locale detection, live phone formatting + caret/deletion math
