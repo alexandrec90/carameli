@@ -35,7 +35,7 @@ else
 fi
 """
 
-NEW_TAIL = """# Activate the venv so language:system hooks find tools like detect-secrets-hook
+NEW_TAIL = """# Activate the venv so language:system hooks resolve the project's python
 REPO_ROOT="$(cd "$HERE/../.." && pwd)"
 if [ -z "$VIRTUAL_ENV" ] && [ -d "$REPO_ROOT/.venv/Scripts" ]; then
     export VIRTUAL_ENV="$REPO_ROOT/.venv"
