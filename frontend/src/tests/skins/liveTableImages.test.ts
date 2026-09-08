@@ -39,6 +39,7 @@ function img(over: Partial<ImgTransform> = {}): ImgTransform {
     offsetX: 0,
     offsetY: 0,
     anchor: 'center',
+    z: 0,
     spill: false,
     ...over,
   }

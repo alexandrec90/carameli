@@ -3,6 +3,7 @@ import { PANEL_PAGES } from '../panels'
 import { CALL_SCENE_ALT, CALL_SCENE_ART } from '../callScene'
 import { cloneCallScene } from './callSceneOps'
 import { cloneChain } from './chainOps'
+import { DEPTH_MIN } from '../imageDepth'
 import { HANGUP_KEY } from '../phoneActions'
 import {
   PANEL_BUBBLE_CHAINS,
@@ -51,6 +52,10 @@ export const NEW_IMAGE: Omit<ImgTransform, 'panel'> = {
   offsetY: 0,
   anchor: 'center center',
   spill: false,
+  // Backmost, so a picture added to a panel that already has one lands behind it rather
+  // than in front — the inset frame above is what makes it visible, and depth is then a
+  // deliberate choice rather than something every new picture has already made.
+  z: DEPTH_MIN,
   // No projected-content key: a picture is not a surface until the author selects one
   // in its inspector, and absence is what "not a surface" is spelled as.
 }

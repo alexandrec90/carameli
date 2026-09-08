@@ -1,3 +1,4 @@
+import { clampDepth } from '../imageDepth'
 import { PATTERN_STYLE_KEYS } from '../panelPatterns'
 import type { BubbleType } from './bubbleTypes'
 import { PANEL_PATTERNS } from './layoutConfig'
@@ -44,6 +45,14 @@ const IMG_HEADER = `// Not parallel to PANELS: each picture names its \`panel\`,
 // panel rather than as a bare rectangle. \`scale\`/\`offsetX\`/\`offsetY\`/\`anchor\` then
 // frame the picture *inside* its frame; \`spill: false\` clips it there, \`spill: true\`
 // lets it bleed past.
+//
+// \`z\` is depth: which picture on the panel is drawn in front of which, 0 at the back.
+// Pictures at the same depth keep the order they are listed in here, so a page whose
+// pictures are all at 0 draws exactly as it did before depth existed. It orders pictures
+// *within* a layer and \`spill\` picks the layer — a spilling picture is lifted over the
+// panel's ink and a clipped one sits under it — so a pair that has to stack in a chosen
+// order wants the same \`spill\` on both. Anything projected onto a picture rides with it:
+// depth is how a photographed hand is drawn over the rows on the notepad it holds.
 //
 // A picture with a \`table\` is a **surface**: an HTML table is projected onto it, so a
 // photographed notepad can hold live rows. \`quad\` is the four corners of that surface in
@@ -221,7 +230,8 @@ export function serializeConfig(c: EditorConfig): string {
         `left: ${round(t.left, 1)}, top: ${round(t.top, 1)}, ` +
         `width: ${round(t.width, 1)}, height: ${round(t.height, 1)}, ` +
         `scale: ${round(t.scale, 2)}, offsetX: ${Math.round(t.offsetX)}, ` +
-        `offsetY: ${Math.round(t.offsetY)}, anchor: '${t.anchor}', spill: ${t.spill}` +
+        `offsetY: ${Math.round(t.offsetY)}, anchor: '${t.anchor}', spill: ${t.spill}, ` +
+        `z: ${clampDepth(t.z)}` +
         `${callSuffix(t.call)}` +
         `${t.table ? tableSuffix(t.table) : numberPadSuffix(t.numberPad)} },`,
     )

@@ -2,7 +2,7 @@ import { Fragment } from 'react'
 
 import { halfSlot } from './callSceneGeometry'
 import type { SceneHalves } from './callSceneGeometry'
-import { halfFor, inRoles } from './callSceneRoles'
+import { halfFor } from './callSceneRoles'
 import {
   fullImgStyle,
   imgClipStyle,
@@ -13,6 +13,7 @@ import {
   surfaceBaseRect,
 } from './editor/transforms'
 import type { CallRole, ImgTransform } from './editor/types'
+import { panelDrawOrder } from './imageDepth'
 import ProjectedNumberPad from './ProjectedNumberPad'
 import ProjectedTable from './ProjectedTable'
 
@@ -73,6 +74,12 @@ interface PanelImagesProps {
  * Natural sizes are keyed by `src` rather than by index: two pictures on the same panel
  * may well be the same file, and keying by index would make the second one wait for its
  * own load to learn a size the first already knew.
+ *
+ * They are drawn back to front by `z` ({@link panelDrawOrder}), which is the whole of the
+ * depth control: two positioned siblings with no z-index paint in document order, so "in
+ * front" is spelled as "written later". Every index the component hands back out — the
+ * React key, `isRevealed` — is the picture's index in the config and not its place in
+ * that order, because the editor selects, inspects and saves by the former.
  */
 export default function PanelImages({
   images,
@@ -91,8 +98,7 @@ export default function PanelImages({
 }: PanelImagesProps) {
   return (
     <>
-      {images.map((img, i) => {
-        if (img.panel !== panel || !inRoles(img.call, callRoles)) return null
+      {panelDrawOrder(images, panel, callRoles).map(({ img, index: i }) => {
         // The box this picture is framed against: its half of a call, or the panel. A
         // half's pictures go in a slot positioned at it, so everything below — the frame
         // percentages, the clip, the projected surfaces — is the ordinary code path with

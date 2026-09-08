@@ -25,7 +25,7 @@ const POLYS: (PanelPoly | null)[] = [
 
 const img = (over: Partial<ImgTransform>): ImgTransform => ({
   panel: 0, src: 'a.webp', alt: '', left: 0, top: 0, width: 100, height: 100,
-  scale: 1, offsetX: 0, offsetY: 0, anchor: 'center center', spill: false, ...over,
+  scale: 1, offsetX: 0, offsetY: 0, anchor: 'center center', spill: false, z: 0, ...over,
 })
 
 const at = (

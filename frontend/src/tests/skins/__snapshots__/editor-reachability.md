@@ -271,6 +271,7 @@ A mutator listed with no control is one an author cannot invoke from the toolbar
 - content/img → checkbox: Allow spill outside frame
 - content/img → checkbox: Project a number pad on this picture
 - content/img → checkbox: Project a table on this picture
+- content/img → number: depth
 - content/img → select: anchor
 - content/img → select: call role
 - content/img → select: panel
@@ -284,6 +285,7 @@ A mutator listed with no control is one an author cannot invoke from the toolbar
 - content/img[number pad] → number: Y %
 - content/img[number pad] → number: bottom-left X %
 - content/img[number pad] → number: bottom-right X %
+- content/img[number pad] → number: depth
 - content/img[number pad] → number: top-left X %
 - content/img[number pad] → number: top-right X %
 - content/img[number pad] → range: text
@@ -301,6 +303,7 @@ A mutator listed with no control is one an author cannot invoke from the toolbar
 - content/img[table] → number: Y %
 - content/img[table] → number: bottom-left X %
 - content/img[table] → number: bottom-right X %
+- content/img[table] → number: depth
 - content/img[table] → number: rows
 - content/img[table] → number: top-left X %
 - content/img[table] → number: top-right X %
