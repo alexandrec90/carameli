@@ -55,12 +55,31 @@ repos:
         files: ^\.claude/(skills/|settings\.json$)
         pass_filenames: false
 
-      # The one check that must stay local: a secret that reaches the remote
-      # is leaked even if CI later goes red.
+  # --- the secret scanner -------------------------------------------------------
+  # The one check that must run at commit time rather than in CI: a secret that
+  # reaches the remote is leaked even if the PR gate later goes red. Cheap like the
+  # devkit hooks above -- an entropy scan of the staged files, not of the tree.
+  #
+  # Pinned to upstream rather than run as `language: system`, so pre-commit builds the
+  # tool its own environment. As a system hook this was the only entry in this file
+  # that needed the worktree's `.venv` on PATH, and pre-commit's answer to an
+  # executable it cannot find is to fail the hook: a freshly created worktree could
+  # not commit at all until it was provisioned, and the symptom read as a broken gate
+  # rather than as a missing venv.
+  #
+  # Keep `rev` in step with the `detect-secrets==` pin in `requirements-dev.txt` and
+  # with `.secrets.baseline`'s `version`. `scripts/lint-all.py` scans with the venv's
+  # copy and this hook scans with pre-commit's; two versions over one baseline rewrite
+  # each other's results, and `test_detect_secrets_channel.py` fails when they part.
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.5.0 # a tag, never a branch -- one bad upstream commit must not redden this repo
+    hooks:
       - id: detect-secrets
+        # Overrides upstream's display name: `scripts/pre-commit.py` maps the name
+        # pre-commit prints back to the hook id it re-runs after an auto-fix, and it
+        # can only read names written here.
         name: detect-secrets
-        language: system
-        entry: detect-secrets-hook --baseline .secrets.baseline
+        args: [--baseline, .secrets.baseline]
         # DEVKIT_FILES.json is the vendoring receipt: a machine-generated map of
         # path -> SHA-256 of each vendored file. Every entry is high-entropy hex by
         # construction and none of it is a secret, so the scanner flags the whole
