@@ -4,7 +4,7 @@ import { chainIdsOn, chainMembers, defaultChain, peerPickerOn } from './bubbleCh
 import type { BubbleChain } from './bubbleChain'
 import { isDialContent } from './bubbleContent'
 import type { SceneHalves } from './callSceneGeometry'
-import { inRoles } from './callSceneRoles'
+import { bubbleDrawn, inRoles } from './callSceneRoles'
 import { bubbleClaim, bubbleKey, chainClaim, chainKey, keyboardOwner } from './panelKeyboard'
 import type { KeyboardClaim } from './panelKeyboard'
 import PanelChainThread from './PanelChainThread'
@@ -52,6 +52,8 @@ interface PanelBubblesProps {
    * own role's seat; one with no role shows both seats in the order they were said.
    */
   transcript?: CallTranscript
+  /** Who is on the line, for a `number-hangup` balloon; absent while no call is up. */
+  party?: string
   /** Box of the panel being drawn, in viewport coords — where a half's slot sits inside it. */
   bounds: Rect
   /** CSS clip-path of the panel polygon, for bubbles that don't spill. */
@@ -156,6 +158,7 @@ export default function PanelBubbles({
   halves = null,
   lit = NONE_LIT,
   transcript,
+  party,
   bounds,
   clip,
   isVisible,
@@ -204,7 +207,7 @@ export default function PanelBubbles({
   // changes what the first one is entitled to, which no balloon can see from inside.
   const claims: KeyboardClaim[] = [
     ...bubbles.flatMap((b, i) =>
-      b.panel === panel && !claimed.has(i) && inRoles(b.call, callRoles)
+      b.panel === panel && !claimed.has(i) && bubbleDrawn(b, callRoles)
         ? [{ key: bubbleKey(i), claim: bubbleClaim(b.content) }]
         : [],
     ),
@@ -251,8 +254,10 @@ export default function PanelBubbles({
 
   return (
     <>
+      {/* `bubbleDrawn`, not `inRoles`: a transcript is drawn only once the call is
+          answered, on the same terms the editor's targets use. */}
       {bubbles.map((bubble, i) =>
-        bubble.panel !== panel || claimed.has(i) || !inRoles(bubble.call, callRoles) ? null : (
+        bubble.panel !== panel || claimed.has(i) || !bubbleDrawn(bubble, callRoles) ? null : (
           <PanelFlatBubble
             key={i}
             bubble={bubble}
@@ -267,6 +272,7 @@ export default function PanelBubbles({
             pickerIndex={pickerIndex}
             onWheelSelect={onWheelSelect}
             transcript={transcript}
+            party={party}
             lit={lit}
             onPhoneSubmit={onPhoneSubmit}
             dialValue={dialValue}

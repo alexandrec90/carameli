@@ -236,11 +236,16 @@ describe('addCallScene', () => {
     expect(config.images[index].call).toBe('ringing')
   })
 
-  it('gives the call one key to hang up with, and a transcript for each seat', () => {
+  it('gives the call the line — number and red key — and a transcript for each seat', () => {
     const { config } = addCallScene(bare(), 4)
     const contents = config.bubbles.map(b => b.content)
     expect(contents.filter(c => c === 'transcript')).toHaveLength(2)
-    expect(contents.filter(c => c === 'actions')).toHaveLength(1)
+    expect(contents.filter(c => c === 'number-hangup')).toHaveLength(1)
+    // A thought balloon in the caller's half: on screen through both phases, since the
+    // transcripts wait for the pickup and Ringing would otherwise show only the figures.
+    const line = config.bubbles.find(b => b.content === 'number-hangup')!
+    expect(line.type).toBe('cloud')
+    expect(line.call).toBe('local')
   })
 
   it('leaves the page it was handed alone', () => {

@@ -8,7 +8,7 @@ import { CALL_SCENE_ALT } from '../../skins/comic-book/callScene'
 import ComicPanel from '../../skins/comic-book/ComicPanel'
 import {
   newCallArt,
-  NEW_CALL_END_KEY,
+  NEW_CALL_LINE,
   NEW_CALL_TRANSCRIPT,
 } from '../../skins/comic-book/editor/configSeed'
 import type {
@@ -42,9 +42,12 @@ const CALL_IMAGES: ImgTransform[] = [
 const CALL_BUBBLES: BubbleTransform[] = [
   { ...NEW_CALL_TRANSCRIPT, panel: PANEL, call: 'remote' },
   { ...NEW_CALL_TRANSCRIPT, panel: PANEL, call: 'local' },
-  { ...NEW_CALL_END_KEY, panel: PANEL, call: 'local' },
+  { ...NEW_CALL_LINE, panel: PANEL, call: 'local' },
 ]
 const SCENE: CallSceneLayout = { panel: PANEL, cut: 50, axis: 'x' }
+
+/** The number on the line, as the softphone reports it. */
+const PARTY = '4388762750'
 
 const TALK: CallTranscript = {
   lines: [
@@ -55,8 +58,10 @@ const TALK: CallTranscript = {
   speaking: 'remote',
 }
 
-const ringing: CallScene = { phase: 'ringing', transcript: EMPTY_TRANSCRIPT }
-const connected = (transcript: CallTranscript): CallScene => ({ phase: 'connected', transcript })
+const ringing: CallScene = { phase: 'ringing', transcript: EMPTY_TRANSCRIPT, party: PARTY }
+const connected = (transcript: CallTranscript): CallScene => ({
+  phase: 'connected', transcript, party: PARTY,
+})
 
 interface DrawOptions {
   call?: CallScene | null
@@ -216,8 +221,9 @@ describe('a panel with a call layout', () => {
   })
 
   it('hangs up through the softphone, not through the scene', () => {
-    // The red key is an ordinary `actions` balloon: the scene carries no handler of its
-    // own, so there is exactly one way to end a call and one place it can fall out of step.
+    // The red key sits in an ordinary `number-hangup` balloon: the scene carries no
+    // handler of its own, so there is exactly one way to end a call and one place it can
+    // fall out of step.
     const hangup = vi.fn()
     const phoneActions: PhoneActionHandlers = { hangup: { run: hangup, disabled: false } }
     const { slotOf } = draw({ call: connected(TALK), phoneActions })
@@ -231,6 +237,41 @@ describe('a panel with a call layout', () => {
     expect(keySlot.getAttribute('style')).toBe(
       (slotOf(CALL_SCENE_ALT.local) as HTMLElement).getAttribute('style'),
     )
+  })
+
+  /** The line balloon as drawn: the number it letters and whether the red key is in it. */
+  const lineOn = (container: HTMLElement) => {
+    const line = container.querySelector('.cb-bubble-line') as HTMLElement | null
+    return {
+      number: line?.querySelector('[aria-label="On the line"]')?.textContent ?? null,
+      key: line?.querySelector('button[aria-label="End call"]') !== null,
+    }
+  }
+
+  it('shows the number on the line beside the red key while the telephone rings', () => {
+    // The one balloon a Ringing layout shows of the call: whoever is being rung, and the
+    // key to stop ringing them. Nothing to type into — the number is the call's.
+    const { container } = draw({ call: ringing })
+    expect(lineOn(container)).toEqual({ number: '(438) 876-2750', key: true })
+    expect(screen.queryByRole('textbox')).toBeNull()
+  })
+
+  it('keeps the line through the call, so the number is never lost', () => {
+    const { container } = draw({ call: connected(TALK) })
+    expect(lineOn(container)).toEqual({ number: '(438) 876-2750', key: true })
+  })
+
+  it('holds the transcripts back until the call is answered', () => {
+    // There are no words before the pickup. The caller's transcript is the one this
+    // matters for — its role is on screen in both phases — and the balloon would
+    // otherwise stand empty over the ringing telephone.
+    const { container } = draw({ call: ringing })
+    expect(screen.queryByRole('log')).toBeNull()
+    expect(container.querySelectorAll('.cb-call-transcript')).toHaveLength(0)
+    document.body.innerHTML = ''
+
+    draw({ call: connected(TALK) })
+    expect(screen.getAllByRole('log')).toHaveLength(2)
   })
 
   it('never lights from the pointer while a call is up', () => {

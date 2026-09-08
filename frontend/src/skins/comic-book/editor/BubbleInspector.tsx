@@ -29,6 +29,27 @@ function bubbleLabel(b: BubbleTransform, i: number): string {
 }
 
 /**
+ * What fills a balloon whose `text` the call supplies instead: the two kinds that read
+ * the call on their panel rather than what the author typed. A table rather than two
+ * more branches in the inspector, which is already at the complexity the gate allows.
+ */
+const CALL_FED_HINTS: Partial<Record<BubbleContentKind, string>> = {
+  transcript:
+    "A window over one side of the call on this panel — its role's seat — filled from the "
+    + 'call itself; the text above is ignored. Drawn only once the call is answered, so it '
+    + 'is off the Ringing layout.',
+  'number-hangup':
+    "The number that is ringing or answered, with the telephone's red key at the right of "
+    + 'it — the dial + call button seen from the other end. Nothing to type or turn; the '
+    + "text above is ignored, and in the editor it shows what this panel's dial is set to.",
+}
+
+function CallFedHint({ content }: { content: BubbleContentKind }) {
+  const hint = CALL_FED_HINTS[content]
+  return hint === undefined ? null : <div className="cb-ed-hint">{hint}</div>
+}
+
+/**
  * The bubble-only half of the selection inspector: which panel it belongs to, its
  * shape and tail, how its text is presented, the text itself, the event responses —
  * the two morph targets and the hover weight — and its link.
@@ -99,6 +120,8 @@ export default function BubbleInspector({ api, index, bubble }: BubbleInspectorP
           <option value="dial">Dial (wheel + phone input)</option>
           <option value="dial-call">Dial + call button</option>
           <option value="actions">Action buttons</option>
+          <option value="transcript">Call transcript</option>
+          <option value="number-hangup">Number on the line + end call button</option>
         </select>
       </label>
       <label className="cb-ed-field">
@@ -149,6 +172,7 @@ export default function BubbleInspector({ api, index, bubble }: BubbleInspectorP
           wired to nothing yet.
         </div>
       )}
+      <CallFedHint content={bubble.content} />
 
       {/* Event morph targets. "no change" (null) means the bubble keeps its
           resting shape for that event, which is not the same as picking the

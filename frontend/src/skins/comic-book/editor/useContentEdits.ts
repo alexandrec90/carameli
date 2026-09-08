@@ -1,6 +1,7 @@
 import { useCallback, useMemo } from 'react'
 
 import type { PanelBgStyle } from '../panelPatterns'
+import type { CallScenePhase } from '../phoneActions'
 import {
   addBubble, addChainColumn as addChainColumnIn, addImg, addPeerPicker, addSmsConversation,
   patchBubble, patchChain, patchImg,
@@ -34,8 +35,15 @@ export interface ContentEdits {
    */
   setChain(id: string, patch: Partial<BubbleChain>): void
   setPattern(panel: number, style: PanelBgStyle): void
+  /**
+   * Add a picture to `panel` and select it. It lands in the layout the author is looking
+   * at: on a call panel while Ringing or Connected is up, that is the call's layout, in
+   * the role drawn at that moment (`newEntryRole`). An add whose result is on the other
+   * layout is an add that appears to have done nothing.
+   */
   addImgOn(panel: number): void
   deleteImg(index: number): void
+  /** Add a bubble to `panel` and select it, in the layout on screen — as `addImgOn`. */
   addBubbleOn(panel: number): void
   /**
    * Add a whole SMS conversation to `panel` — both root balloons, linked, chained and
@@ -51,7 +59,12 @@ export interface ContentEdits {
   resetOne(kind: 'img' | 'bubble', index: number): void
 }
 
-export function useContentEdits(apply: ApplyOp, setSelected: SetSelection): ContentEdits {
+/**
+ * @param callPhase which layout the page's calls are showing — the switch's position,
+ *   from `useCallEdits`. Only the two adds read it; every other edit is to an entry the
+ *   author has already selected, which is on screen whatever the switch says.
+ */
+export function useContentEdits(apply: ApplyOp, setSelected: SetSelection, callPhase: CallScenePhase | null): ContentEdits {
   const setImg = useCallback(
     (index: number, patch: Partial<ImgTransform>) => apply(prev => patchImg(prev, index, patch)),
     [apply],
@@ -82,7 +95,7 @@ export function useContentEdits(apply: ApplyOp, setSelected: SetSelection): Cont
     (panel: number) => {
       let added = -1
       apply(prev => {
-        const { config: next, index } = addImg(prev, panel)
+        const { config: next, index } = addImg(prev, panel, callPhase)
         added = index
         return next
       })
@@ -90,7 +103,7 @@ export function useContentEdits(apply: ApplyOp, setSelected: SetSelection): Cont
       // to commit — selecting it here is what puts the new picture in the inspector.
       if (added >= 0) setSelected({ kind: 'img', index: added })
     },
-    [apply, setSelected],
+    [apply, setSelected, callPhase],
   )
 
   const deleteImg = useCallback(
@@ -107,7 +120,7 @@ export function useContentEdits(apply: ApplyOp, setSelected: SetSelection): Cont
     (panel: number) => {
       let added = -1
       apply(prev => {
-        const { config: next, index } = addBubble(prev, panel)
+        const { config: next, index } = addBubble(prev, panel, callPhase)
         added = index
         return next
       })
@@ -115,7 +128,7 @@ export function useContentEdits(apply: ApplyOp, setSelected: SetSelection): Cont
       // to commit — selecting it here is what puts the new bubble in the inspector.
       if (added >= 0) setSelected({ kind: 'bubble', index: added })
     },
-    [apply, setSelected],
+    [apply, setSelected, callPhase],
   )
 
   const addSmsOn = useCallback(

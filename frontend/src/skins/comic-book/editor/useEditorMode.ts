@@ -95,8 +95,10 @@ export function useEditorMode(): EditorModeApi {
 
   const clear = useCallback(() => setSelected(null), [])
 
-  const content = useContentEdits(apply, setSelected)
+  // The call edits first: the content adds need to know which layout is on screen, and
+  // that is the switch this hook holds.
   const call = useCallEdits(apply, setSelected)
+  const content = useContentEdits(apply, setSelected, call.callPhase)
   const grid = useGridEdits(apply, setSelected, config)
 
   const setPanelLabel = useCallback(

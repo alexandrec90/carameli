@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
+import { addCallScene } from '../../skins/comic-book/editor/callSceneCreate'
 import { normalizePatterns } from '../../skins/comic-book/editor/configHydrate'
 import {
   NEW_BUBBLE,
@@ -630,6 +631,30 @@ describe('addImg', () => {
     const { config } = addImg(addImg(seedConfig(), 6).config, 6)
     expect(indicesOnPanel(config.images, 6).length).toBeGreaterThanOrEqual(3)
   })
+
+  // The bug this holds against: with the page on Ringing, "+ Image" appended a picture
+  // to the panel's default layout — off screen, nothing appearing to have happened.
+  it('joins the call layout on screen when the panel is a call', () => {
+    const before = addCallScene(seedConfig(), 6).config
+    const ringing = addImg(before, 6, 'ringing')
+    expect(ringing.config.images[ringing.index].call).toBe('ringing')
+    const connected = addImg(before, 6, 'connected')
+    expect(connected.config.images[connected.index].call).toBe('remote')
+    // The seam is the one it already had, not a second one.
+    expect(connected.config.callScenes).toEqual(before.callScenes)
+  })
+
+  it('goes to the default layout, without the key, when no call is on screen', () => {
+    const before = addCallScene(seedConfig(), 6).config
+    const { config, index } = addImg(before, 6, null)
+    expect('call' in config.images[index]).toBe(false)
+  })
+
+  it('never makes a panel a call by adding a picture to it', () => {
+    const { config, index } = addImg(seedConfig(), 3, 'ringing')
+    expect('call' in config.images[index]).toBe(false)
+    expect(config.callScenes).toEqual(seedConfig().callScenes)
+  })
 })
 
 describe('removeImg', () => {
@@ -688,6 +713,26 @@ describe('addBubble', () => {
   it('lets one panel own several bubbles', () => {
     const { config } = addBubble(addBubble(seedConfig(), 6).config, 6)
     expect(indicesOnPanel(config.bubbles, 6).length).toBeGreaterThanOrEqual(2)
+  })
+
+  it('joins the call layout on screen when the panel is a call', () => {
+    const before = addCallScene(seedConfig(), 6).config
+    const ringing = addBubble(before, 6, 'ringing')
+    expect(ringing.config.bubbles[ringing.index].call).toBe('ringing')
+    const connected = addBubble(before, 6, 'connected')
+    expect(connected.config.bubbles[connected.index].call).toBe('remote')
+  })
+
+  it('goes to the default layout, without the key, when no call is on screen', () => {
+    const before = addCallScene(seedConfig(), 6).config
+    const { config, index } = addBubble(before, 6, null)
+    expect('call' in config.bubbles[index]).toBe(false)
+    expect(config.bubbles[index]).toEqual({ ...NEW_BUBBLE, panel: 6 })
+  })
+
+  it('never makes a panel a call by adding a bubble to it', () => {
+    const { config, index } = addBubble(seedConfig(), 3, 'connected')
+    expect('call' in config.bubbles[index]).toBe(false)
   })
 })
 

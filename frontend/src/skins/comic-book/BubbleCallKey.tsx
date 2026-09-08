@@ -1,6 +1,6 @@
-import type { KeyboardEvent, MouseEvent, PointerEvent } from 'react'
 import type { CountryCode } from 'libphonenumber-js/min'
 
+import BubbleKey from './BubbleKey'
 import { CALL_KEY } from './phoneActions'
 import { toE164 } from './phoneInput'
 
@@ -44,28 +44,12 @@ export default function BubbleCallKey({
   const dialable = toE164(value, country) !== null
   const off = !enabled || !dialable || !onCall
 
-  // Every event is stopped here rather than left to bubble: the panel underneath reads a
-  // press as "reveal this panel", and a key that also did that would flash the page on
-  // every call placed.
-  const stopPointer = (event: PointerEvent<HTMLButtonElement>): void => event.stopPropagation()
-  const stopKey = (event: KeyboardEvent<HTMLButtonElement>): void => event.stopPropagation()
-  const press = (event: MouseEvent<HTMLButtonElement>): void => {
-    event.stopPropagation()
-    onCall?.(value)
-  }
-
   return (
-    <button
-      type="button"
-      className="cb-bubble-action cb-bubble-key cb-bubble-call-key"
-      aria-label={CALL_KEY.label}
+    <BubbleKey
+      action={CALL_KEY}
       disabled={off}
-      tabIndex={off ? -1 : 0}
-      onPointerDown={stopPointer}
-      onKeyDown={stopKey}
-      onClick={press}
-    >
-      <img className="cb-bubble-key-art" src={CALL_KEY.src} alt="" />
-    </button>
+      className="cb-bubble-call-key"
+      onPress={() => onCall?.(value)}
+    />
   )
 }

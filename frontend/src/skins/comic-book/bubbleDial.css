@@ -57,11 +57,27 @@
   visibility: hidden;
 }
 
-/* ─── The call key ('dial-call') ─────────────────────────────────────────────────
-   The telephone's green key drawn at the right of the field (BubbleCallKey.tsx). Its
+/* ─── The number on the line ('number-hangup') ───────────────────────────────────
+   BubbleNumberHangup.tsx: the same window as the dial, the number lettered on the same
+   centre line, but a span rather than a field — nothing to type mid-call — and no drum.
+   Everything about where it sits is .cb-bubble-dial .cb-dial-field above; what is here
+   is only what a span needs that an input brought with it. */
+.cb-bubble-line .cb-line-number {
+  display: block;
+  box-sizing: border-box;
+  padding: 0.15em 0.25em;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ─── The key at the right ('dial-call', 'number-hangup') ─────────────────────────
+   The telephone's key drawn at the right of the field — green beside a dial
+   (BubbleCallKey.tsx), red beside the number on the line (BubbleNumberHangup.tsx). Its
    ink, its greying and its press come from .cb-bubble-key / .cb-bubble-action in
-   bubbleInputs.css — this is one key of the same handset, not a second treatment — so
-   what is here is only where it sits and how much of the window it takes.
+   bubbleInputs.css — one key of the same handset, not a second treatment — so what is
+   here is only where it sits and how much of the window it takes.
 
    The field AND the drum give up the same strip, so the number and the rows behind it
    stay centred on each other. A field alone would centre its digits on one axis while

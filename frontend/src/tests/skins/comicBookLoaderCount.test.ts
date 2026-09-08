@@ -18,7 +18,7 @@ import type { Panel } from '../../skins/comic-book/panels'
 // the second page landed) and a call-role picture with no call up (#295, which added the
 // roles without telling the counter about them, and left `/` on the loading screen forever).
 
-const RINGING: CallScene = { phase: 'ringing', transcript: EMPTY_TRANSCRIPT }
+const RINGING: CallScene = { phase: 'ringing', transcript: EMPTY_TRANSCRIPT, party: '' }
 
 const scenesFor = (panel: number): CallSceneLayout[] => [{ panel, cut: 50, axis: 'x' }]
 

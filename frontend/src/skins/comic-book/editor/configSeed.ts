@@ -4,7 +4,6 @@ import { CALL_SCENE_ALT, CALL_SCENE_ART } from '../callScene'
 import { cloneCallScene } from './callSceneOps'
 import { cloneChain } from './chainOps'
 import { DEPTH_MIN } from '../imageDepth'
-import { HANGUP_KEY } from '../phoneActions'
 import {
   PANEL_BUBBLE_CHAINS,
   PANEL_CALL_SCENES,
@@ -165,22 +164,29 @@ export const NEW_CALL_TRANSCRIPT: Omit<BubbleTransform, 'panel'> = {
 }
 
 /**
- * The red key that ends the call, as an ordinary `actions` balloon rather than a control
- * welded into the transcript. `phoneActions.ts` already folds this label onto the drawn
- * key, and `ComicPanel` already hands every `actions` balloon the softphone's handlers, so
- * the key works from the moment it is added and can be dragged anywhere the author likes —
+ * The line itself: a thought balloon lettering the number that is ringing or answered,
+ * with the red key that drops it at the right — the `dial-call` balloon's mirror image,
+ * for the other end of the call. An ordinary balloon rather than a control welded into
+ * the transcript: `ComicPanel` hands it the softphone's handlers as it does every key,
+ * so it works from the moment it is added and can be dragged anywhere the author likes,
  * which is the point of the scene being made of ordinary entries.
+ *
+ * In the caller's half, where the telephone is, and on screen through both phases — it
+ * is the one thing a Ringing layout shows of the call besides the figures, since the
+ * transcripts wait for the pickup (`bubbleDrawn`). Below the transcript's row, so the two
+ * do not land on each other once the call connects.
  */
-export const NEW_CALL_END_KEY: Omit<BubbleTransform, 'panel'> = {
+export const NEW_CALL_LINE: Omit<BubbleTransform, 'panel'> = {
   ...NEW_BUBBLE,
-  top: 74,
-  right: 38,
-  width: 24,
+  top: 62,
+  right: 12,
+  width: 76,
   rotate: 0,
   spill: true,
+  type: 'cloud',
   tail: 'none',
-  content: 'actions',
-  text: HANGUP_KEY.label,
+  content: 'number-hangup',
+  text: '',
 }
 
 export const LAYOUT_KINDS: LayoutKind[] = ['landscape', 'portrait', 'square']

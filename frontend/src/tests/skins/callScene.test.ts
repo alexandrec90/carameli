@@ -58,6 +58,13 @@ describe('callSceneOf', () => {
     expect(scene?.transcript).toBe(EMPTY_TRANSCRIPT)
   })
 
+  it('carries who is on the line, for the balloon that letters it', () => {
+    // The phone's own answer, unformatted: the number dialled, or the caller's once an
+    // inbound call is answered. What a `number-hangup` balloon shows.
+    const scene = callSceneOf(phoneStub({ callStatus: 'dialing', remoteParty: '4388762750' }))
+    expect(scene?.party).toBe('4388762750')
+  })
+
   it('connects once the call is up, carrying the phone transcript through', () => {
     const transcript: CallTranscript = {
       lines: [{ id: '1', speaker: 'remote', text: 'Hello?' }],
@@ -72,9 +79,9 @@ describe('callSceneOf', () => {
   // any more: the key is an ordinary `actions` balloon lettered `End call`, wired through
   // softphoneActions like every other one. Two ways to hang up were two things to keep in
   // step with the telephone's state, and this is the assertion that stops one coming back.
-  it('carries the phase and the words, and no handler of its own', () => {
+  it('carries the phase, the words and the party, and no handler of its own', () => {
     const scene = callSceneOf(phoneStub({ callStatus: 'active' }))
-    expect(Object.keys(scene ?? {}).sort()).toEqual(['phase', 'transcript'])
+    expect(Object.keys(scene ?? {}).sort()).toEqual(['party', 'phase', 'transcript'])
   })
 })
 

@@ -10,7 +10,7 @@ import {
   resolveBubbleShape,
 } from './bubbleShape'
 import BubbleBody from './BubbleBody'
-import { isDialContent } from './bubbleContent'
+import { isDialContent, takesPhoneActions } from './bubbleContent'
 import { dialOptions } from './dialPicker'
 import { BUBBLE_TYPES } from './editor/bubbleTypes'
 import { bubbleStyle } from './editor/transforms'
@@ -104,6 +104,8 @@ interface PanelBubbleProps {
   lines?: readonly CallTranscriptLine[]
   /** Accessible name for that log — whose words these are. */
   linesLabel?: string
+  /** Who is on the line, for a `number-hangup` balloon; '' when the call does not say. */
+  party?: string
   /**
    * Ink this balloon heavy whatever the pointer is doing. The call scene's, for the seat
    * that is talking: the same weight a hover gives, meaning "this voice is on the line".
@@ -137,6 +139,7 @@ export default function PanelBubble({
   status,
   lines = NO_LINES,
   linesLabel,
+  party,
   bold = false,
 }: PanelBubbleProps) {
   const [hover, setHover] = useState(false)
@@ -185,9 +188,9 @@ export default function PanelBubble({
   // the balloon is placed, revealed, or given the keyboard (see isDialContent).
   const dial = isDialContent(bubble.content)
   // Every kind that puts a real form control in the balloon, which is the question the
-  // wrapper's aria and focus handling actually asks — a dial has one too, and so do the
-  // action buttons.
-  const hasField = editableKind !== null || dial || bubble.content === 'actions'
+  // wrapper's aria and focus handling actually asks — a dial has one too, and so does
+  // every balloon that draws one of the telephone's keys.
+  const hasField = editableKind !== null || dial || takesPhoneActions(bubble.content)
   // A window on the call rather than on `text`. Not a field — there is nothing to type
   // into it — but not decorative either: it is a live region, so it keeps its words
   // reachable instead of being hidden from a reader who cannot see the drawing.
@@ -292,6 +295,7 @@ export default function PanelBubble({
         status={status}
         lines={lines}
         linesLabel={linesLabel}
+        party={party}
       />
     </div>
   )

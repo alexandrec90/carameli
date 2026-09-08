@@ -199,8 +199,27 @@ export const MAX_LAZY_CHUNK_BYTES = 260 * 1024
  * Take button, does *not* — it hangs off `EditorOverlay`, behind the `import.meta.env.DEV`
  * test, and its strings do not appear in `dist/`. Same lazy comic-book chunk, still 46 of
  * them, `package.json` untouched, so nothing new was pulled in.
+ *
+ * This raise (986 → 987) is the call layout's line — the number that is ringing or
+ * answered, with the red key beside it — 1.16 KB measured as this branch's build
+ * (985.84 KB) against a build of the master it sits on (984.68 KB, `0b6a872`, same
+ * `node_modules`). The first measurement of this branch was 986.6 against 985.4
+ * (`0173bc8`); it was re-measured here after #325 and #326 landed underneath, and the
+ * delta is the same 1.16 KB, so neither of those cost this branch anything. Both builds
+ * came down because #326 took the status artwork's branch out of `ProjectedTable`, and
+ * that is why the ceiling is 987 rather than the 988 the first measurement asked for: a
+ * kilobyte clear of 985.84, not of a number this branch no longer builds.
+ *
+ * The bytes are `BubbleNumberHangup.tsx` (the 'number-hangup' content kind), `BubbleKey.tsx`
+ * (the one drawn key it and `BubbleCallKey.tsx` now share — the latter shrank by the same
+ * markup), `CallScene.party` threaded from `ComicPanel` down to `BubbleBody`, `bubbleDrawn`
+ * and `newEntryRole` in `callSceneRoles.ts`, and the phase the two add ops in
+ * `configOps.ts` now take. All of it reaches the build through the comic-book chunk and
+ * `useEditorMode`; the inspector's two new hints and the overlay's target filter are behind
+ * the `import.meta.env.DEV` test and are not in this number. Same lazy comic-book chunk,
+ * still 46 of them, `package.json` untouched, so nothing new was pulled in.
  */
-export const MAX_TOTAL_JS_BYTES = 986 * 1024
+export const MAX_TOTAL_JS_BYTES = 987 * 1024
 
 /**
  * Every `.css` file in `dist/assets/`, summed. Today 44.2 KB across 2 files.

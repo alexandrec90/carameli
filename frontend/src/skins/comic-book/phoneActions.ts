@@ -107,6 +107,13 @@ export type CallScenePhase = 'ringing' | 'connected'
 export interface CallScene {
   phase: CallScenePhase
   transcript: CallTranscript
+  /**
+   * Who is on the line — the number dialled, or the caller's on a call that was answered
+   * — as the phone reports it, unformatted. What a `number-hangup` balloon letters. Empty
+   * when nothing knows it, which is the editor's synthetic scene: the balloon then shows
+   * the number its panel has dialled, so there is still something to frame it around.
+   */
+  party: string
 }
 
 /**
@@ -118,5 +125,5 @@ export function callSceneOf(phone: UseSoftphoneResult): CallScene | null {
   const phase: CallScenePhase | null =
     phone.callStatus === 'dialing' ? 'ringing' : phone.callStatus === 'active' ? 'connected' : null
   if (phase === null) return null
-  return { phase, transcript: phone.transcript }
+  return { phase, transcript: phone.transcript, party: phone.remoteParty }
 }

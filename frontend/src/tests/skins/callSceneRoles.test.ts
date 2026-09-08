@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  bubbleDrawn,
   CALL_ROLE_LABELS,
   CALL_ROLES,
   CALL_TRANSCRIPT_LABELS,
@@ -11,11 +12,13 @@ import {
   inRoles,
   isCallRole,
   litRoles,
+  newEntryRole,
+  roleForPhase,
   rolesAtPhase,
   rolesOnSide,
 } from '../../skins/comic-book/callSceneRoles'
 import type { SceneHalves } from '../../skins/comic-book/callSceneGeometry'
-import type { CallSceneLayout } from '../../skins/comic-book/editor/types'
+import type { CallRole, CallSceneLayout } from '../../skins/comic-book/editor/types'
 
 // What a `call` role means. This module is the layout switch: presence of a role puts an
 // entry in the call layout, absence keeps it in the panel's ordinary one, and which role
@@ -113,6 +116,68 @@ describe('inRoles', () => {
     expect(inRoles('remote', roles)).toBe(false)
     // And the panel's own contents step aside for the layout that replaced them.
     expect(inRoles(undefined, roles)).toBe(false)
+  })
+})
+
+describe('bubbleDrawn', () => {
+  const transcript = (call?: CallRole) => ({ call, content: 'transcript' })
+  const line = (call?: CallRole) => ({ call, content: 'number-hangup' })
+
+  it('draws a balloon exactly where its role is drawn, whatever it holds', () => {
+    // The role question first, and unchanged: this is `inRoles` for everything that is
+    // not a transcript.
+    expect(bubbleDrawn(line('local'), rolesAtPhase('ringing'))).toBe(true)
+    expect(bubbleDrawn(line('local'), rolesAtPhase('connected'))).toBe(true)
+    expect(bubbleDrawn(line('remote'), rolesAtPhase('ringing'))).toBe(false)
+    expect(bubbleDrawn(line(), null)).toBe(true)
+    expect(bubbleDrawn(line('local'), null)).toBe(false)
+  })
+
+  it('holds a transcript back until the call is answered', () => {
+    // There are no words before the pickup, and a balloon standing empty over a ringing
+    // telephone reads as the call having nothing to say. The caller's transcript is the
+    // one this changes: its role is on screen in both phases, so the role alone would
+    // draw it.
+    expect(bubbleDrawn(transcript('local'), rolesAtPhase('ringing'))).toBe(false)
+    expect(bubbleDrawn(transcript('local'), rolesAtPhase('connected'))).toBe(true)
+    expect(bubbleDrawn(transcript('remote'), rolesAtPhase('connected'))).toBe(true)
+  })
+
+  it('leaves a transcript outside any call layout alone', () => {
+    // An author's transcript on a panel with no call layout is a window on the whole
+    // conversation and is drawn as it always was.
+    expect(bubbleDrawn(transcript(), null)).toBe(true)
+  })
+})
+
+describe('roleForPhase', () => {
+  it('names the one role drawn at that moment and not at the other', () => {
+    // A balloon added while standing in Ringing turns up in Ringing, and only there — an
+    // author who wants it in both widens the role in the inspector.
+    expect(roleForPhase('ringing')).toBe('ringing')
+    expect(roleForPhase('connected')).toBe('remote')
+    expect(inRoles(roleForPhase('ringing'), rolesAtPhase('connected'))).toBe(false)
+    expect(inRoles(roleForPhase('connected'), rolesAtPhase('ringing'))).toBe(false)
+  })
+})
+
+describe('newEntryRole', () => {
+  const scenes: CallSceneLayout[] = [{ panel: 9, cut: 50, axis: 'x' }]
+
+  it('puts a new entry in the layout on screen, on a panel that is a call', () => {
+    expect(newEntryRole(scenes, 9, 'ringing')).toBe('ringing')
+    expect(newEntryRole(scenes, 9, 'connected')).toBe('remote')
+  })
+
+  it('gives no role on the default layout, where a role would hide the entry', () => {
+    expect(newEntryRole(scenes, 9, null)).toBeUndefined()
+  })
+
+  it('gives no role on a panel that is not a call, whatever the switch says', () => {
+    // A role here would *make* the panel a call, cutting it in two under an author who
+    // only asked for a balloon.
+    expect(newEntryRole(scenes, 3, 'ringing')).toBeUndefined()
+    expect(newEntryRole([], 9, 'connected')).toBeUndefined()
   })
 })
 

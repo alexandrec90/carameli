@@ -1,5 +1,5 @@
 import BubbleSlot from './BubbleSlot'
-import { isDialContent } from './bubbleContent'
+import { isDialContent, takesPhoneActions } from './bubbleContent'
 import type { SceneHalves } from './callSceneGeometry'
 import { CALL_TRANSCRIPT_LABELS, callSpeaker, halfFor } from './callSceneRoles'
 import PanelBubble from './PanelBubble'
@@ -32,6 +32,8 @@ interface PanelFlatBubbleProps {
   onWheelSelect: (value: string) => void
   /** The words of the call on this panel, for a `transcript` balloon. */
   transcript?: CallTranscript
+  /** Who is on the line, for a `number-hangup` balloon; absent while no call is up. */
+  party?: string
   /** Roles inked heavy right now — the speaker's. */
   lit: readonly CallRole[]
   onPhoneSubmit?: (value: string) => void
@@ -64,6 +66,7 @@ export default function PanelFlatBubble({
   pickerIndex,
   onWheelSelect,
   transcript,
+  party,
   lit,
   onPhoneSubmit,
   dialValue,
@@ -101,8 +104,9 @@ export default function PanelFlatBubble({
         dialFresh={dialFresh}
         dialled={dialled}
         onDialChange={onDialChange}
-        actions={bubble.content === 'actions' ? phoneActions : undefined}
+        actions={takesPhoneActions(bubble.content) ? phoneActions : undefined}
         lines={words}
+        party={party}
         linesLabel={
           bubble.content === 'transcript' ? CALL_TRANSCRIPT_LABELS[bubble.call ?? 'none'] : undefined
         }

@@ -68,6 +68,59 @@ export function inRoles(call: CallRole | undefined, roles: CallRole[] | null): b
 }
 
 /**
+ * Whether a balloon is drawn at this moment of the call.
+ *
+ * Its role has to be on screen, exactly as a picture's does — and a `transcript` waits for
+ * the pickup besides. There are no words before it, and a balloon standing empty over a
+ * ringing telephone reads as the call having nothing to say rather than as nobody having
+ * answered yet. "Answered" is read off the roles themselves: the far end's answered face
+ * is on screen exactly when the call is connected, so the question can be asked wherever
+ * the roles already are without a second fact carried beside them.
+ *
+ * Asked by the drawing (`PanelBubbles`), the click targets (`OverlayTargets`) and the
+ * selection outline (`overlaySelection`) alike, so a transcript the page is not drawing is
+ * also one the editor offers no handle for.
+ */
+export function bubbleDrawn(
+  bubble: { call?: CallRole; content: string },
+  roles: CallRole[] | null,
+): boolean {
+  if (!inRoles(bubble.call, roles)) return false
+  if (bubble.content !== 'transcript' || roles === null) return true
+  return roles.includes('remote')
+}
+
+/**
+ * The role a new entry takes when it is added while `phase` is the layout on screen: the
+ * far end's role for that phase, the one role drawn at that moment and not at the other.
+ *
+ * The narrowest answer on purpose. An author standing in Ringing who adds a balloon
+ * expects it in Ringing; a role drawn in both phases would have it turn up in Connected
+ * too, and `scene` would besides measure it against the whole panel while everything
+ * beside it is measured against a half. Widening it is one change in the role select.
+ */
+export function roleForPhase(phase: CallScenePhase): CallRole {
+  return rolesOnSide('a', phase)[0]
+}
+
+/**
+ * The role an entry added to `panel` should carry while `phase` is up, or none.
+ *
+ * None unless the panel is already a call: a role on a panel that has no scene would
+ * *make* it one, cutting the panel in two under an author who only asked for a balloon.
+ * And none on the default layout, where a role would put the new entry off screen — the
+ * add would then appear to have done nothing, which is the failure this exists to stop
+ * in the other direction.
+ */
+export function newEntryRole(
+  scenes: readonly CallSceneLayout[],
+  panel: number,
+  phase: CallScenePhase | null,
+): CallRole | undefined {
+  return phase !== null && callSceneOn(scenes, panel) ? roleForPhase(phase) : undefined
+}
+
+/**
  * The roles `panel` is drawing at this moment, or null for its ordinary layout — a panel
  * is a call only if its author gave it a scene *and* a call is up.
  *
