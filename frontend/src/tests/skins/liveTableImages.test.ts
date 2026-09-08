@@ -70,8 +70,8 @@ describe('withLiveRows', () => {
 
   it('puts the feed\'s rows on the surface that named it', () => {
     const images = [img({ table: liveTable(newTable(), 'calls') })]
-    const out = withLiveRows(images, { calls: [['a', '14:30', '1:05', '/comic-book/call-ended.webp']] })
-    expect(out[0]?.table?.data).toEqual([['a', '14:30', '1:05', '/comic-book/call-ended.webp']])
+    const out = withLiveRows(images, { calls: [['a', '14:30', '1:05', 'Ended']] })
+    expect(out[0]?.table?.data).toEqual([['a', '14:30', '1:05', 'Ended']])
     expect(out[0]?.table?.source).toBe('calls')
   })
 
@@ -139,7 +139,7 @@ describe('useLiveTableImages', () => {
       '+14155550001',
       '16:45',
       '',
-      '/comic-book/call-in-progress.webp',
+      'In progress',
     ])
     expect(smsList).not.toHaveBeenCalled()
   })

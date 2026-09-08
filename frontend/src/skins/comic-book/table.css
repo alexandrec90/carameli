@@ -45,8 +45,7 @@
   /* Bands, not content: every row is exactly one band tall so it stays on the line
      drawn in the picture, whatever is written in it. A row height in CSS is a minimum,
      so that only holds while everything inside the cell fits inside a band — which is
-     what --cb-ptable-sit and --cb-ptable-art (both fractions of the band, from
-     ProjectedTable.tsx) are for. */
+     what --cb-ptable-sit (a fraction of the band, from ProjectedTable.tsx) is for. */
   height: var(--cb-ptable-row);
   padding: 0 0.5em var(--cb-ptable-sit);
 
@@ -58,18 +57,6 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-/* Sized from the band and aligned to its foot, like the lettering beside it. In `em` — of
-   a font that is itself a fraction of the band — the artwork was 1.1 bands tall, so every
-   row holding one grew past its own ruled line and the heading row was the only one left
-   at the height the author asked for. */
-.cb-ptable-status {
-  display: inline-block;
-  width: var(--cb-ptable-art);
-  height: var(--cb-ptable-art);
-  object-fit: contain;
-  vertical-align: bottom;
 }
 
 /* Editor only: the band guides. They are drawn *through* the same projection as the
