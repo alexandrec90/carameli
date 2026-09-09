@@ -73,6 +73,12 @@ so diagonals read as thinner lines.
 
 Typography: `Bangers` uppercase for titles (28–48 px), headings (22–28 px), captions
 (14 px) and status bubbles (18 px); `Comic Neue` 700 sentence-case for body at 14–16 px.
+Panel-balloon lettering is the exception: it is `--cb-lettering` (`comic-book.css`), a
+floor plus a `vw` slope with **no ceiling**, because a balloon's box is a % of a panel
+that is a share of the viewport, and words pinned to a px size part company with a box
+that scales — swimming in it on a wide window, cut off on a narrow one. Everything that
+letters inside a balloon (text, field, action row) takes the token, never a size of its
+own (`bubbleLettering.test.ts`).
 
 ## Panel speech bubbles — generated, not drawn
 
@@ -496,3 +502,7 @@ unit-tested in `frontend/src/tests/skins/`.
     never bind one in edit mode** — the first puts the author's lettering into somebody's
     real thread, the second spends money from the editor.
 21. **Never fetch from a skin, and never save a live surface's rows.**
+22. **Never cap a balloon's box in px, and never cap its lettering** — the tail's aim,
+    a chain's row stacking, a tube's weld and the editor's hit box are all measured from
+    the balloon's `width` %, so a `max-width` moves every one of them off the drawing;
+    and a lettering ceiling is the point where the words stop scaling with the box.

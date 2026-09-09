@@ -13,7 +13,10 @@
   background: transparent;
   border: 0;
   outline: 0;
-  font-size: clamp(0.75rem, 2vw, 1.125rem);
+
+  /* A form control does not inherit its font, so the balloon's lettering token is
+     named again here — the same one the text block uses, never a size of its own. */
+  font-size: var(--cb-lettering);
   font-weight: 700;
   text-align: center;
   cursor: default;
@@ -56,7 +59,7 @@
   align-items: center;
   justify-content: center;
   gap: 0.4em;
-  font-size: clamp(0.75rem, 2vw, 1.125rem);
+  font-size: var(--cb-lettering);
 }
 
 .cb-bubble-action {

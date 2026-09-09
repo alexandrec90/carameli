@@ -180,7 +180,8 @@
 }
 
 /* Text floats over the bubble outline, centered in the ellipse. The bottom inset is
-   larger to keep text clear of the tail. */
+   larger to keep text clear of the tail. Sized by the shared lettering token
+   (comic-book.css), which scales with the window the way the balloon's box does. */
 .cb-panel-bubble-text {
   position: absolute;
   inset: 20% 17% 34%;
@@ -188,7 +189,7 @@
   align-items: center;
   justify-content: center;
   text-align: center;
-  font-size: clamp(0.75rem, 2vw, 1.125rem);
+  font-size: var(--cb-lettering);
   color: #111;
   line-height: 1.2;
 }
