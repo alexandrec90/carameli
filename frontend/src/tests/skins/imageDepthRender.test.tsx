@@ -97,6 +97,33 @@ describe('PanelImages depth', () => {
       .toBeTruthy()
   })
 
+  /*
+   * The same statement about the *light* on a row rather than the row itself, and it needs
+   * saying separately because a highlight is the thing somebody reaches for a z-index to
+   * fix. The band lit under the pointer rides inside the notepad's wrapper like the rows
+   * do, so the hand at depth 1 passes over it; one z-index on the band — or on the table
+   * in front of it — would lift the glow out of the paint order and light the hand.
+   */
+  it('draws a picture in front of the light thrown on the rows behind it', () => {
+    const container = draw([
+      img(NOTEPAD, { z: 0, table: newTable() }),
+      img(HAND, { z: 1 }),
+    ])
+    const row = container.querySelector('tbody tr.cb-ptable-row')
+    expect(row).not.toBeNull()
+    fireEvent.pointerEnter(row!)
+
+    const glow = container.querySelector('.cb-ptable-glow')
+    const hand = container.querySelector(`img[src="${HAND}"]`)
+    expect(glow).not.toBeNull()
+    expect(glow!.compareDocumentPosition(hand!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+
+    // Document order only decides it while neither side has stepped out of it.
+    for (const el of [glow!, container.querySelector('table.cb-ptable')!]) {
+      expect((el as HTMLElement).style.zIndex).toBe('')
+    }
+  })
+
   it('keeps a picture that belongs to another panel off this one', () => {
     const container = draw([img(HAND, { panel: 1, z: 9 }), img(NOTEPAD)])
     expect(drawnSources(container)).toEqual([NOTEPAD])

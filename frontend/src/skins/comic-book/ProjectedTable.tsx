@@ -7,11 +7,13 @@ import {
   bodyRows,
   clampScroll,
   columnPercents,
+  filledRows,
   maxScroll,
   visibleRows,
   wheelDeltaPx,
   wheelRows,
 } from './tableData'
+import TableRowGlow from './TableRowGlow'
 import { surfaceStyle } from './tableProjection'
 import './table.css'
 
@@ -28,19 +30,40 @@ interface ProjectedTableProps {
   editing: boolean
 }
 
+/** What a row reports to the surface above it, so the lit band can follow the pointer. */
+interface RowPointer {
+  onEnter(): void
+  onLeave(): void
+  onPress(down: boolean): void
+}
+
 /** A row's worth of cells, or the heading row. */
 function Row({
   cells,
   aligns,
   head,
+  pointer,
 }: {
   cells: string[]
   aligns: TableProjection['columns'][number]['align'][]
   head?: boolean
+  /**
+   * Present on a row a reader can point at — a body row with data behind it. Absent on
+   * the heading and on the blank bands {@link visibleRows} pads the window with, which
+   * are ruled lines with nothing written on them and so light up for nothing.
+   */
+  pointer?: RowPointer
 }) {
   const Cell = head ? 'th' : 'td'
   return (
-    <tr>
+    <tr
+      className={pointer ? 'cb-ptable-row' : undefined}
+      onPointerEnter={pointer?.onEnter}
+      onPointerLeave={pointer?.onLeave}
+      onPointerDown={pointer && (() => pointer.onPress(true))}
+      onPointerUp={pointer && (() => pointer.onPress(false))}
+      onPointerCancel={pointer && (() => pointer.onPress(false))}
+    >
       {cells.map((text, i) => (
         <Cell key={i} className="cb-ptable-cell" style={{ textAlign: aligns[i] ?? 'left' }}>
           {text}
@@ -66,6 +89,12 @@ function Row({
  */
 export default function ProjectedTable({ table, base, editing }: ProjectedTableProps) {
   const [rawOffset, setRawOffset] = useState(0)
+  // The visible body row the pointer is on, and whether it is being pressed. State
+  // rather than `:hover` and `:active` in the stylesheet because the light is not
+  // painted on the row: it is a band of its own behind the table (see TableRowGlow), and
+  // CSS has no way to reach across from one to the other.
+  const [hovered, setHovered] = useState<number | null>(null)
+  const [pressed, setPressed] = useState(false)
   // Carried wheel travel. A ref, not state: a trackpad emits a dozen sub-row deltas
   // where a mouse emits one whole notch, and re-rendering for each of them would be a
   // render per pixel of a scroll that has not moved a row yet.
@@ -82,6 +111,11 @@ export default function ProjectedTable({ table, base, editing }: ProjectedTableP
   const rowH = height / Math.max(1, table.rows)
   const aligns = table.columns.map(c => c.align)
   const percents = columnPercents(table.columns)
+  // Derived for the same reason the offset is: the data shrinks under the editor's hands
+  // and under a poll of a live feed, so the row that was lit a moment ago may now be a
+  // blank band — and the editor takes the pointer off the surface entirely.
+  const filled = editing ? 0 : filledRows(table, offset)
+  const lit = hovered !== null && hovered < filled ? hovered : null
 
   const onWheel = (e: ReactWheelEvent<HTMLDivElement>) => {
     // `pointer-events: none` already keeps the wheel off the surface in the editor, but
@@ -95,6 +129,15 @@ export default function ProjectedTable({ table, base, editing }: ProjectedTableP
   }
 
   const step = (rows: number) => setRawOffset(prev => clampScroll(table, prev + rows))
+
+  const rowPointer = (i: number): RowPointer => ({
+    onEnter: () => setHovered(i),
+    onLeave: () => {
+      setHovered(prev => (prev === i ? null : prev))
+      setPressed(false)
+    },
+    onPress: setPressed,
+  })
 
   const surface: CSSProperties = {
     left,
@@ -111,6 +154,10 @@ export default function ProjectedTable({ table, base, editing }: ProjectedTableP
     // stylesheet, so the arithmetic that keeps it inside is testable.
     ['--cb-ptable-row' as string]: `${rowH}px`,
     ['--cb-ptable-sit' as string]: `${rowH * BAND_SIT}px`,
+    // The lit band is drawn in the authored ink, the way the number pad's keys are. It
+    // rides as a custom property rather than as `currentcolor` because the glow is a
+    // `color-mix` in the stylesheet and `color` is what the lettering already spends.
+    ['--cb-lit-ink' as string]: table.ink,
     pointerEvents: editing ? 'none' : 'auto',
   }
 
@@ -125,6 +172,10 @@ export default function ProjectedTable({ table, base, editing }: ProjectedTableP
           guarantee that the surface *is* the surface: a cell that outgrew its band would
           otherwise take the rows with it off the bottom of the notepad. */}
       <div className="cb-ptable-clip">
+        {/* Ahead of the table in the DOM, which is what puts the light behind the
+            lettering: the band is positioned and the table is too, so the pair paint in
+            document order — the same rule that decides which picture is in front. */}
+        <TableRowGlow table={table} row={lit} pressed={pressed} />
         <table className="cb-ptable">
           <colgroup>
             {percents.map((pct, i) => (
@@ -138,7 +189,12 @@ export default function ProjectedTable({ table, base, editing }: ProjectedTableP
           )}
           <tbody>
             {visibleRows(table, offset).map((cells, i) => (
-              <Row key={i} cells={cells} aligns={aligns} />
+              <Row
+                key={i}
+                cells={cells}
+                aligns={aligns}
+                pointer={i < filled ? rowPointer(i) : undefined}
+              />
             ))}
           </tbody>
         </table>

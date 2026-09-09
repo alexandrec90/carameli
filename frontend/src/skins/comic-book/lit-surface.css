@@ -1,0 +1,102 @@
+/* The light a projected surface throws on whatever the pointer is on.
+   Loaded by ProjectedNumberPad.tsx and TableRowGlow.tsx.
+
+   **One light, two surfaces.** A key on a photographed telephone and a row on a
+   photographed notepad are the same gesture — the pointer is on a thing drawn in the
+   picture — so they are answered by the same rules rather than by two copies of them.
+   Every surface names itself in the selector lists below and brings its own
+   `--cb-lit-ink`; nothing else about it is known here, which is what lets the next
+   projected surface join by adding one selector.
+
+   Written as shared rules rather than as a class either component adds, because the pad
+   has no state to add one from: a key lights on `:hover` and `:focus-visible`, which is
+   the stylesheet's own business. The table's band is in the document only while a row is
+   under the pointer, so for it the element *is* the state.
+
+   **The lit thing is one uniform colour, fill and halo alike.** Every state paints its
+   `background-color` and the *inner* stop of its `box-shadow` from the same `color-mix`,
+   so the edge is where a soft glow starts falling off rather than a line across it. The
+   version this replaced mixed a 12% fill inside a 45% ring, which read as a dim panel
+   with a bright border drawn round it — a button that had been there all along, which is
+   the one thing a projection must not look like.
+
+   It breathes instead of sitting still: light thrown onto a photographed surface is never
+   quite steady, and a pulse is legible at an intensity a static tint has to shout at.
+
+   Outside the editor the pad paints its glyphs in `transparent` — the picture already
+   shows the keys — so for it this light is the *only* thing that says a key is under the
+   pointer and the only thing that acknowledges a press. */
+
+.cb-number-pad-button,
+.cb-ptable-glow {
+  transition: background-color 120ms ease-out, box-shadow 120ms ease-out,
+    transform 90ms ease-out;
+}
+
+/* Lit: the pointer is on a key, or on a row. */
+.cb-number-pad-button:hover,
+.cb-number-pad-button:focus-visible,
+.cb-ptable-glow {
+  animation: cb-lit-glow 1100ms ease-in-out infinite alternate;
+}
+
+@keyframes cb-lit-glow {
+  from {
+    background-color: color-mix(in srgb, var(--cb-lit-ink, currentcolor) 34%, transparent);
+    box-shadow: 0 0 0.5em 0.02em
+      color-mix(in srgb, var(--cb-lit-ink, currentcolor) 34%, transparent);
+  }
+
+  to {
+    background-color: color-mix(in srgb, var(--cb-lit-ink, currentcolor) 62%, transparent);
+    box-shadow: 0 0 1em 0.1em
+      color-mix(in srgb, var(--cb-lit-ink, currentcolor) 62%, transparent);
+  }
+}
+
+/* Pressed: the same glow flaring rather than a second effect — it floods to nearly solid
+   ink and throws a wider halo, then settles back to the lit level while the finger is
+   still down. Overrides the hover pulse, since a press is an answer to the pointer being
+   there, not a second thing happening at the same time. */
+.cb-number-pad-button:active,
+.cb-ptable-glow.is-pressed {
+  animation: cb-lit-press 260ms ease-out forwards;
+
+  /* Reads as the thing going down into the surface it is painted on. */
+  transform: scale(0.94);
+}
+
+@keyframes cb-lit-press {
+  from {
+    background-color: color-mix(in srgb, var(--cb-lit-ink, currentcolor) 96%, transparent);
+    box-shadow: 0 0 1.5em 0.28em
+      color-mix(in srgb, var(--cb-lit-ink, currentcolor) 96%, transparent);
+  }
+
+  to {
+    background-color: color-mix(in srgb, var(--cb-lit-ink, currentcolor) 78%, transparent);
+    box-shadow: 0 0 1em 0.12em
+      color-mix(in srgb, var(--cb-lit-ink, currentcolor) 78%, transparent);
+  }
+}
+
+/* Reduced motion: both states still light and the press still flares — that is the only
+   feedback either surface has — but each holds a level instead of breathing through it. */
+@media (prefers-reduced-motion: reduce) {
+  .cb-number-pad-button:hover,
+  .cb-number-pad-button:focus-visible,
+  .cb-ptable-glow {
+    animation: none;
+    background-color: color-mix(in srgb, var(--cb-lit-ink, currentcolor) 52%, transparent);
+    box-shadow: 0 0 0.75em 0.06em
+      color-mix(in srgb, var(--cb-lit-ink, currentcolor) 52%, transparent);
+  }
+
+  .cb-number-pad-button:active,
+  .cb-ptable-glow.is-pressed {
+    animation: none;
+    background-color: color-mix(in srgb, var(--cb-lit-ink, currentcolor) 88%, transparent);
+    box-shadow: 0 0 1.2em 0.18em
+      color-mix(in srgb, var(--cb-lit-ink, currentcolor) 88%, transparent);
+  }
+}

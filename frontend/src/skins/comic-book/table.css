@@ -28,7 +28,32 @@
   overflow: hidden;
 }
 
+/* The band lit behind the row under the pointer. **The light itself is not here** — it is
+   `lit-surface.css`, shared with the projected number pad's keys, because a key and a row
+   are the same gesture on the same photograph. What is here is the band's shape.
+
+   A band of its own rather than a background on the `<tr>`, because a glow is a
+   `box-shadow` and the cells are clipped for their ellipsis — a halo painted in one of
+   them would stop at that column's edge. `TableRowGlow.tsx` places it by band arithmetic,
+   so it lands on the ruled line the row's lettering sits on.
+
+   **No `z-index`, here or on the table.** Both are positioned, so the two paint in
+   document order and the light stays behind the lettering; and the whole surface rides
+   inside its own picture's wrapper, so a picture at a greater depth — the hand over the
+   notepad — paints over the light exactly as it paints over the rows. A z-index would
+   lift the highlight out of that order and put it over the hand. */
+.cb-ptable-glow {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: var(--cb-ptable-row);
+  pointer-events: none;
+}
+
 .cb-ptable {
+  /* Positioned, so it and the lit band behind it paint in document order rather than the
+     band — the only positioned one of the two — jumping over the lettering. */
+  position: relative;
   width: 100%;
   height: 100%;
   border-collapse: collapse;
@@ -39,6 +64,13 @@
   table-layout: fixed;
   font-family: 'Comic Neue', cursive;
   font-weight: 700;
+}
+
+/* A row a reader can point at. The cursor is the pad key's, for the same reason the light
+   is: the two are the same gesture on the same photograph. Only rows with data behind
+   them get it — the blank bands below the last record are ruled lines and nothing else. */
+.cb-ptable-row {
+  cursor: var(--cb-cursor-click);
 }
 
 .cb-ptable-cell {

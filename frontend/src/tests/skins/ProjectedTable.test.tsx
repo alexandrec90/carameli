@@ -39,7 +39,9 @@ function draw(over: Partial<TableProjection> = {}, editing = false) {
     Array.from(view.container.querySelectorAll('tbody tr')).map(
       tr => tr.querySelector('td')?.textContent ?? '',
     )
-  return { ...view, surface, names }
+  const rows = () => Array.from(view.container.querySelectorAll('tbody tr'))
+  const glow = () => view.container.querySelector('.cb-ptable-glow') as HTMLElement | null
+  return { ...view, surface, names, rows, glow }
 }
 
 describe('ProjectedTable', () => {
@@ -229,5 +231,152 @@ describe('ProjectedTable', () => {
   it('offers no scroll controls when there is nothing to scroll', () => {
     draw({ data: [['solo', '5550']] })
     expect(screen.queryByRole('button', { name: 'Scroll table down' })).toBeNull()
+  })
+})
+
+/*
+ * The lit band — the projected number pad's glow, answering the pointer on a row instead
+ * of on a key — literally the same rules, which `comicBookLitSurface.test.ts` owns. What
+ * is checked here is that the right band is lit at the right moment, which is the half a
+ * stylesheet cannot say.
+ *
+ * The band is placed in `--cb-ptable-row` units rather than pixels for the same reason
+ * the scroll is an index: a row is welded to a line drawn in the picture by being a whole
+ * band, and the highlight has to be welded to the same one.
+ */
+describe('ProjectedTable row highlight', () => {
+  it('lights nothing until the pointer is on a row', () => {
+    expect(draw().glow()).toBeNull()
+  })
+
+  it('lights the band the hovered row is lettered in', () => {
+    const view = draw()
+    fireEvent.pointerEnter(view.rows()[2])
+    // Band 3: the heading takes band 0, so the third body row is the fourth band down.
+    expect(view.glow()!.style.top).toBe('calc(var(--cb-ptable-row) * 3)')
+  })
+
+  it('counts the heading out of the bands when the author turns it off', () => {
+    const view = draw({ header: false })
+    fireEvent.pointerEnter(view.rows()[2])
+    expect(view.glow()!.style.top).toBe('calc(var(--cb-ptable-row) * 2)')
+  })
+
+  it('puts the light out when the pointer leaves', () => {
+    const view = draw()
+    fireEvent.pointerEnter(view.rows()[1])
+    fireEvent.pointerLeave(view.rows()[1])
+    expect(view.glow()).toBeNull()
+  })
+
+  it('moves the light rather than lighting two bands at once', () => {
+    const view = draw()
+    fireEvent.pointerEnter(view.rows()[0])
+    fireEvent.pointerLeave(view.rows()[0])
+    fireEvent.pointerEnter(view.rows()[3])
+    expect(view.container.querySelectorAll('.cb-ptable-glow')).toHaveLength(1)
+    expect(view.glow()!.style.top).toBe('calc(var(--cb-ptable-row) * 4)')
+  })
+
+  it('flares while the row is held down and settles when it is let go', () => {
+    const view = draw()
+    fireEvent.pointerEnter(view.rows()[1])
+    expect(view.glow()!.className).not.toContain('is-pressed')
+    fireEvent.pointerDown(view.rows()[1])
+    expect(view.glow()!.className).toContain('is-pressed')
+    fireEvent.pointerUp(view.rows()[1])
+    expect(view.glow()!.className).not.toContain('is-pressed')
+  })
+
+  // A press that ends off the row is a press the row never hears the end of, so the leave
+  // has to clear it too — otherwise the next band the pointer reaches lights up pressed.
+  it('drops the press when the pointer leaves mid-press', () => {
+    const view = draw()
+    fireEvent.pointerEnter(view.rows()[1])
+    fireEvent.pointerDown(view.rows()[1])
+    fireEvent.pointerLeave(view.rows()[1])
+    fireEvent.pointerEnter(view.rows()[2])
+    expect(view.glow()!.className).not.toContain('is-pressed')
+  })
+
+  /*
+   * `visibleRows` pads its window with empty rows so the surface covers the same bands
+   * whatever the data does. Those are ruled lines with nothing written on them: lighting
+   * one would say a record is there when there is not, and a whole notepad of blank bands
+   * lighting under the pointer is the projection giving itself away.
+   */
+  it('leaves the blank bands below the last record unlit and unpointed', () => {
+    const view = draw({ data: [['only', '5550']] })
+    expect(view.rows()).toHaveLength(4)
+    expect(view.rows().filter(r => r.className.includes('cb-ptable-row'))).toHaveLength(1)
+
+    fireEvent.pointerEnter(view.rows()[2])
+    expect(view.glow()).toBeNull()
+  })
+
+  it('keeps the light on the band under the pointer as the rows scroll beneath it', () => {
+    const view = draw()
+    fireEvent.pointerEnter(view.rows()[1])
+    fireEvent.wheel(view.surface!, { deltaY: WHEEL_ROW_PX })
+    // The band is the thing the pointer is on, and a band does not move: the rows slide
+    // through it. The light stays where the pointer is, over whatever is written there now.
+    expect(view.glow()!.style.top).toBe('calc(var(--cb-ptable-row) * 2)')
+    expect(view.rows()[1].textContent).toContain('name 2')
+  })
+
+  /*
+   * Derived from the data on every render rather than repaired in an effect, because the
+   * data moves on its own: a live surface polls its feed, and an author's paste can take
+   * rows away. An offset is pulled back the same way — a band lit for one frame over a
+   * record that is no longer there is the same bug one layer up.
+   */
+  it('puts the light out when the record under it goes away', () => {
+    const view = draw()
+    fireEvent.pointerEnter(view.rows()[3])
+    expect(view.glow()).not.toBeNull()
+
+    view.rerender(<ProjectedTable table={table({ data: [['last', '5559']] })} base={BASE} editing={false} />)
+    expect(view.glow()).toBeNull()
+  })
+
+  // The editor's own drag targets sit over this panel and the surface takes no pointer
+  // input there, so a band lighting under an author's drag would be light from nothing.
+  it('lights no band while the editor is open', () => {
+    const view = draw({}, true)
+    expect(view.rows().filter(r => r.className.includes('cb-ptable-row'))).toHaveLength(0)
+    fireEvent.pointerEnter(view.rows()[1])
+    expect(view.glow()).toBeNull()
+  })
+
+  /*
+   * The light goes behind the lettering, not over it. Both are positioned — the band
+   * absolutely, the table relatively — so the pair paint in document order, which is the
+   * same mechanism that decides which picture is in front of which. A `z-index` on either
+   * would take them out of that order, and `imageDepthRender.test.tsx` has the half of
+   * that which matters to a reader.
+   */
+  it('draws the lit band behind the lettering, by document order and no z-index', () => {
+    const view = draw()
+    fireEvent.pointerEnter(view.rows()[1])
+    const table = view.container.querySelector('table.cb-ptable')!
+    expect(view.glow()!.compareDocumentPosition(table) & Node.DOCUMENT_POSITION_FOLLOWING)
+      .toBeTruthy()
+
+    const rules = cssRules(SKIN_CSS['src/skins/comic-book/table.css'])
+    const positioned = rules.filter(r => /\.cb-ptable-glow|\.cb-ptable\b/.test(r.selector))
+    expect(positioned.length).toBeGreaterThan(1)
+    expect(positioned.filter(r => /z-index/.test(r.body))).toEqual([])
+
+    // Document order decides it only while *both* are positioned. An unpositioned table
+    // is painted in an earlier phase than the absolutely positioned band, so dropping
+    // this one line puts the light over the lettering however the DOM is ordered.
+    expect(rules.find(r => r.selector === '.cb-ptable')!.body).toMatch(/position:\s*relative/)
+    expect(rules.find(r => r.selector === '.cb-ptable-glow')!.body)
+      .toMatch(/position:\s*absolute/)
+  })
+
+  it('draws the light in the ink the author gave the surface', () => {
+    const { surface } = draw({ ink: '#1b3a8f' })
+    expect(surface!.style.getPropertyValue('--cb-lit-ink')).toBe('#1b3a8f')
   })
 })
