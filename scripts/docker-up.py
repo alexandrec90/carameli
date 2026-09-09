@@ -28,6 +28,30 @@ _BROKEN_RE = re.compile(r"unhealthy|exited(?! \(0\))|dead", re.IGNORECASE)
 _STARTING_RE = re.compile(r"starting|Created|created", re.IGNORECASE)
 _FAILURE_RE = re.compile(r"unhealthy|exited(?! \(0\))|dead|created", re.IGNORECASE)
 
+# The daemon lost its network state but kept the containers, so each one still pins
+# the *ID* of a network that no longer exists and fails to start against it. Matching
+# is on the hex ID deliberately: a *name* that is not found means Compose failed to
+# create the network, which is a different fault that recreating containers does not
+# fix. Seen twice here after Docker Desktop's backend exited overnight -- the built-in
+# `bridge` came back with a new ID, which is the tell that the whole network KV store
+# was rebuilt rather than restored.
+_STALE_NETWORK_RE = re.compile(r"network [0-9a-f]{12,64} not found", re.IGNORECASE)
+
+
+def stale_network_failure(output) -> bool:
+    """True when `up` failed only because containers pin a network the daemon lost.
+
+    The recovery is `--force-recreate`: it rebuilds the container objects against the
+    network Compose has just recreated. Named volumes are not touched by container
+    recreation, so `carameli_pgdata` and friends survive it.
+
+    Plain `up -d` is *not* enough on its own and that is the trap -- Compose reads the
+    service config as unchanged, reuses the container, and start fails on the same dead
+    ID it failed on last time. `docker compose start`, which is what Docker Desktop's
+    start button issues, can never work here at all: it does not create networks.
+    """
+    return any(_STALE_NETWORK_RE.search(line) for line in output)
+
 
 def _fail(message: str, body=None) -> int:
     print(f"  {message}")
@@ -47,6 +71,43 @@ def _run_step(label: str, argv, timeout: int) -> tuple[list[str], int, bool]:
     for line in output:
         print(f"  {line}")
     return output, code, timed_out
+
+
+def _start_services() -> int | None:
+    """Bring the stack up. Returns None on success, or the exit code to return.
+
+    Retries once with `--force-recreate` when, and only when, the first attempt failed
+    on a network the daemon lost -- see `stale_network_failure`. The retry is scoped to
+    that one fault deliberately: `--force-recreate` discards every container, so making
+    it the generic response to a failing `up` would turn an ordinary error, a port
+    already bound say, into a full stack rebuild.
+    """
+    output, code, timed_out = _run_step(
+        f"Starting services (timeout {UP_TIMEOUT}s)...",
+        ["docker", "compose", "up", "-d"],
+        UP_TIMEOUT,
+    )
+    if timed_out:
+        return _fail(f"[TIMEOUT] docker compose up -d timed out after {UP_TIMEOUT}s.")
+
+    if code != 0 and stale_network_failure(output):
+        print(
+            "\n  [RECOVER] Containers pin a network the daemon no longer has "
+            "(Docker Desktop restarted under them). Recreating them...\n"
+        )
+        output, code, timed_out = _run_step(
+            f"Re-running up with --force-recreate (timeout {UP_TIMEOUT}s)...",
+            ["docker", "compose", "up", "-d", "--force-recreate"],
+            UP_TIMEOUT,
+        )
+        if timed_out:
+            return _fail(
+                f"[TIMEOUT] docker compose up -d --force-recreate timed out after {UP_TIMEOUT}s."
+            )
+
+    if code != 0:
+        return _fail(f"[FAIL] docker compose up exited with code {code}", output)
+    return None
 
 
 def main() -> int:
@@ -80,16 +141,10 @@ def main() -> int:
         if code != 0:
             return _fail(f"[FAIL] docker compose build exited with code {code}", output)
 
-    # --- Step 3: Start services ---
-    output, code, timed_out = _run_step(
-        f"Starting services (timeout {UP_TIMEOUT}s)...",
-        ["docker", "compose", "up", "-d"],
-        UP_TIMEOUT,
-    )
-    if timed_out:
-        return _fail(f"[TIMEOUT] docker compose up -d timed out after {UP_TIMEOUT}s.")
-    if code != 0:
-        return _fail(f"[FAIL] docker compose up exited with code {code}", output)
+    # --- Step 3: Start services (recovering once from a lost network) ---
+    failure = _start_services()
+    if failure is not None:
+        return failure
 
     # --- Wait for health checks ---
     print("Waiting for services to become healthy...")
