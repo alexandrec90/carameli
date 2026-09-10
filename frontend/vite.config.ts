@@ -17,9 +17,42 @@ import { CONFIG_IN_REPO, editorConfigFile } from './editorConfigPath.ts'
 import { quietProxyErrors } from './proxyErrorPolicy.ts'
 import { shipLayout } from './shipLayout.ts'
 import type { Run } from './shipLayout.ts'
+import { portOffset } from './worktreePort.ts'
 
 const rootDir = dirname(fileURLToPath(import.meta.url))
 const repoRoot = resolve(rootDir, '..')
+
+/**
+ * Conventional bases, for an ordinary checkout and for the compose container — both of
+ * which derive offset 0, so `localhost:5173` keeps meaning what it always meant and
+ * `${FRONTEND_HOST_PORT:-5173}:5173` keeps mapping onto a listener.
+ *
+ * A host-Vite worktree adds `portOffset` to both, derived from its own directory name,
+ * so two agent sessions serve on different ports with nothing configured — the only
+ * thing that works across all three ways a worktree is cut here. `worktreePort.ts`
+ * carries why that is derived rather than leased from devkit's registry, which
+ * allocates the *published* `FRONTEND_HOST_PORT` and not this. An explicit `VITE_PORT`
+ * still beats both.
+ */
+const DEV_PORT = 5173
+const PREVIEW_PORT = 4173
+
+/**
+ * A port from the environment, or the conventional base.
+ *
+ * Anything unreadable falls back rather than throwing: a typo in a gitignored `.env`
+ * should start the server on the default port, not refuse to build.
+ */
+export function portFrom(
+  env: Record<string, string | undefined>,
+  key: string,
+  fallback: number,
+): number {
+  const raw = env[key]
+  if (raw === undefined || raw.trim() === '') return fallback
+  const value = Number.parseInt(raw.trim(), 10)
+  return Number.isInteger(value) && value > 0 && value < 65536 ? value : fallback
+}
 
 /** Repo-relative because git wants it that way — see `editorConfigPath.ts`. */
 const CONFIG_PATH = CONFIG_IN_REPO
@@ -141,6 +174,21 @@ export default defineConfig(({ mode }) => {
     fileEnv.VITE_PROXY_TARGET ||
     'http://127.0.0.1:8000'
 
+  // Same precedence for the ports, spelled as a merge because `portFrom` takes one
+  // lookup: `.env` first, then the real environment on top, so
+  // `VITE_PORT=5186 npm run dev` beats the file for a one-off.
+  const env = { ...fileEnv, ...process.env }
+  // One offset, applied to both bases, so a worktree's pair moves together and 4179 is
+  // always the preview for 5179.
+  //
+  // `repoRoot`, NOT `rootDir`: the worktree name is the checkout directory, and this
+  // config sits one level under it in `frontend/`. Passing `rootDir` derives from the
+  // leaf `frontend`, which matches no marker, so every worktree quietly came back 0 and
+  // asked for 5173 again — the exact failure this is here to fix, and it survived the
+  // unit tests because their synthetic paths ended at the worktree. In the container
+  // both spellings still give 0 (`/app` and `/`), so only the host path shows it.
+  const offset = portOffset(repoRoot)
+
   return {
     // comicAssetsPlugin keeps the editor's picture dropdown level with the served
     // directory while the server runs — art dropped in appears without a script or a
@@ -151,7 +199,19 @@ export default defineConfig(({ mode }) => {
     // request — the normal state for host-Vite branch previews. ./proxyErrorPolicy.ts.
     customLogger: quietProxyErrors(createLogger()),
     server: {
-      port: 5173,
+      port: portFrom(env, 'VITE_PORT', DEV_PORT + offset),
+
+      // `strictPort` is why the port above is derived rather than a constant.
+      //
+      // It was absent, which defaults to false, and the failure that buys is silent
+      // and expensive: a second dev server on this machine takes 5174 (or 5175, past
+      // whatever compose stacks already hold those), says so in one line of startup
+      // output nobody reads, and then answers on a port nobody asked for. Opening
+      // 5173 out of habit shows you *another checkout's build*, which looks close
+      // enough to yours to be believed, and every screenshot taken of it is evidence
+      // about code you did not write. A refusal to start is a worse minute and a
+      // better day.
+      strictPort: true,
 
       // The Docker-hosted MCP browser reaches the dev server via
       // host.docker.internal; Vite's host check blocks it by default.
@@ -178,6 +238,13 @@ export default defineConfig(({ mode }) => {
         '/vg': backendUrl,
         '/health': backendUrl,
       },
+    },
+    preview: {
+      // `npm run preview` serves the built `dist/`, and it collides exactly the way the
+      // dev server does — worse, because a stale `dist/` looks even more like a real
+      // build. Same offset, so the pair moves together.
+      port: portFrom(env, 'VITE_PREVIEW_PORT', PREVIEW_PORT + offset),
+      strictPort: true,
     },
     test: {
       environment: 'happy-dom',
