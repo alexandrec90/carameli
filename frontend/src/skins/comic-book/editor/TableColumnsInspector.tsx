@@ -2,6 +2,8 @@ import { useState } from 'react'
 
 import { LIVE_TABLE_FEEDS } from '../../../lib/liveTables'
 import { fitColumns, formatRows, parseRows } from '../tableData'
+import Hint from './Hint'
+import Section from './Section'
 import type { TableColumn, TableProjection } from './types'
 import type { EditorModeApi } from './useEditorMode'
 
@@ -16,6 +18,21 @@ const ALIGNS: TableColumn['align'][] = ['left', 'center', 'right']
 
 /** How much of the surface a brand-new column asks for, relative to the ones there. */
 const NEW_COLUMN: TableColumn = { label: 'Column', width: 1, align: 'left' }
+
+const COLUMNS_HINT =
+  'The headings, their share of the width, and how each column is set. On a live surface '
+  + 'the list itself is the feed’s — its cells are positional, so removing one would not '
+  + 'remove that value, it would slide every value one heading to the left — but the '
+  + 'widths, the alignment and the wording stay yours.'
+
+const CELLS_HINT =
+  'One row per line, cells split on a tab or a |. Paste straight out of a spreadsheet: '
+  + 'every row is padded or trimmed to the column count on the way in, so a ragged row '
+  + 'cannot put a cell under the wrong heading.'
+
+const WINDOW_HINT =
+  'Only the band count is on screen at once; the wheel moves the rest through, a whole '
+  + 'row at a time.'
 
 /**
  * The columns of a projected surface and the cells that go in them.
@@ -55,8 +72,9 @@ export default function TableColumnsInspector({ api, index, table }: TableColumn
   }
 
   return (
-    <>
-      <div className="cb-ed-label">columns</div>
+    // Folded: three fields per column and a six-row cell box is the biggest single block
+    // the inspector can hold, and it is a paste-once block — see ./Section.tsx.
+    <Section title="columns & rows" hint={COLUMNS_HINT}>
       {table.columns.map((c, i) => (
         <div className="cb-ed-row" key={i}>
           <label className="cb-ed-field">
@@ -129,31 +147,32 @@ export default function TableColumnsInspector({ api, index, table }: TableColumn
           the ruling in the photograph, and renaming a heading is the author's business. */}
       {table.source ? (
         <div className="cb-ed-hint">
-          Rows come from the live {LIVE_TABLE_FEEDS[table.source].label.toLowerCase()} and
-          refresh on their own, newest first. Only the band count is on screen at once; the
-          wheel moves the rest through, a whole row at a time.
+          Live {LIVE_TABLE_FEEDS[table.source].label.toLowerCase()}, newest first{' '}
+          <Hint text={`Rows come from the live records and refresh on their own. ${WINDOW_HINT}`} />
         </div>
       ) : (
         <>
-          <label className="cb-ed-field">
-            <span>rows — one per line, cells split on a tab or a |</span>
-            <textarea
-              className="cb-ed-textarea"
-              rows={6}
-              spellCheck={false}
-              value={draft ?? formatRows(table.data)}
-              placeholder="Ada Lovelace | 555-0101"
-              onChange={e => onData(e.target.value)}
-              onBlur={() => setDraft(null)}
-            />
-          </label>
+          <div className="cb-ed-row">
+            <label className="cb-ed-field">
+              <span>rows</span>
+              <textarea
+                className="cb-ed-textarea"
+                rows={6}
+                spellCheck={false}
+                value={draft ?? formatRows(table.data)}
+                placeholder="Ada Lovelace | 555-0101"
+                onChange={e => onData(e.target.value)}
+                onBlur={() => setDraft(null)}
+              />
+            </label>
+            <Hint text={CELLS_HINT} />
+          </div>
           <div className="cb-ed-hint">
-            {table.data.length} row{table.data.length === 1 ? '' : 's'} of data. Only the
-            band count is on screen at once; the wheel moves the rest through, a whole row
-            at a time.
+            {table.data.length} row{table.data.length === 1 ? '' : 's'} of data{' '}
+            <Hint text={WINDOW_HINT} />
           </div>
         </>
       )}
-    </>
+    </Section>
   )
 }

@@ -2,8 +2,10 @@ import { TAIL_DIRS, TAIL_DIR_KEYS } from '../bubbleBox'
 import type { TailDir } from '../bubbleBox'
 import { isDialContent } from '../bubbleContent'
 import type { BubbleContentKind } from '../bubbleContent'
+import { CHAIN_HINT, CONTENT_HINTS, linkHint } from './bubbleHints'
 import { BUBBLE_TYPES, BUBBLE_TYPE_KEYS } from './bubbleTypes'
 import type { BubbleType } from './bubbleTypes'
+import Hint from './Hint'
 import { linkCandidates } from './configOps'
 import type { BubbleTransform } from './types'
 import type { EditorModeApi } from './useEditorMode'
@@ -29,27 +31,6 @@ function bubbleLabel(b: BubbleTransform, i: number): string {
 }
 
 /**
- * What fills a balloon whose `text` the call supplies instead: the two kinds that read
- * the call on their panel rather than what the author typed. A table rather than two
- * more branches in the inspector, which is already at the complexity the gate allows.
- */
-const CALL_FED_HINTS: Partial<Record<BubbleContentKind, string>> = {
-  transcript:
-    "A window over one side of the call on this panel — its role's seat — filled from the "
-    + 'call itself; the text above is ignored. Drawn only once the call is answered, so it '
-    + 'is off the Ringing layout.',
-  'number-hangup':
-    "The number that is ringing or answered, with the telephone's red key at the right of "
-    + 'it — the dial + call button seen from the other end. Nothing to type or turn; the '
-    + "text above is ignored, and in the editor it shows what this panel's dial is set to.",
-}
-
-function CallFedHint({ content }: { content: BubbleContentKind }) {
-  const hint = CALL_FED_HINTS[content]
-  return hint === undefined ? null : <div className="cb-ed-hint">{hint}</div>
-}
-
-/**
  * The bubble-only half of the selection inspector: which panel it belongs to, its
  * shape and tail, how its text is presented, the text itself, the event responses —
  * the two morph targets and the hover weight — and its link.
@@ -67,6 +48,7 @@ function CallFedHint({ content }: { content: BubbleContentKind }) {
 export default function BubbleInspector({ api, index, bubble }: BubbleInspectorProps) {
   const candidates = linkCandidates(api.config.bubbles, index)
   const page = api.config.panels[bubble.panel]?.page
+  const contentHint = CONTENT_HINTS[bubble.content]
 
   return (
     <>
@@ -124,55 +106,26 @@ export default function BubbleInspector({ api, index, bubble }: BubbleInspectorP
           <option value="number-hangup">Number on the line + end call button</option>
         </select>
       </label>
-      <label className="cb-ed-field">
-        <span>
-          {bubble.content === 'wheel' || isDialContent(bubble.content)
-            ? 'options'
-            : bubble.content === 'input' || bubble.content === 'phone'
-              ? 'initial value'
-              : bubble.content === 'actions'
-                ? 'buttons'
-                : 'text'}
-        </span>
-        <textarea
-          className="cb-ed-textarea"
-          rows={2}
-          value={bubble.text}
-          onChange={e => api.setBubble(index, { text: e.target.value })}
-        />
-      </label>
-      {bubble.content === 'wheel' && (
-        <div className="cb-ed-hint">
-          Comma-delimited: each entry is one option on the wheel. Hover the bubble and
-          scroll to turn it — the picker is live outside edit mode.
-        </div>
-      )}
-      {isDialContent(bubble.content) && (
-        <div className="cb-ed-hint">
-          Comma-delimited, same as the wheel — but this is an autocomplete: the drum&apos;s
-          centre line is a real phone field, and typing into it (or punching a number pad
-          projected onto a picture on this panel) narrows the rows behind it. The first
-          option is what it starts on; Enter dials, and adds the number to the list.
-          {bubble.content === 'dial-call' && (
-            <> The telephone&apos;s green key sits at the right of the field and places the
-            same call Enter does. It stays greyed until the number in the field is one that
-            could be dialled.</>
-          )}
-        </div>
-      )}
-      {(bubble.content === 'input' || bubble.content === 'phone') && (
-        <div className="cb-ed-hint">
-          This becomes an editable field outside edit mode. Phone input formats while
-          typing from the browser locale; a leading + always uses that country code.
-        </div>
-      )}
-      {bubble.content === 'actions' && (
-        <div className="cb-ed-hint">
-          Comma-delimited: each entry is one placeholder button. They press but are
-          wired to nothing yet.
-        </div>
-      )}
-      <CallFedHint content={bubble.content} />
+      <div className="cb-ed-row">
+        <label className="cb-ed-field">
+          <span>
+            {bubble.content === 'wheel' || isDialContent(bubble.content)
+              ? 'options'
+              : bubble.content === 'input' || bubble.content === 'phone'
+                ? 'initial value'
+                : bubble.content === 'actions'
+                  ? 'buttons'
+                  : 'text'}
+          </span>
+          <textarea
+            className="cb-ed-textarea"
+            rows={2}
+            value={bubble.text}
+            onChange={e => api.setBubble(index, { text: e.target.value })}
+          />
+        </label>
+        {contentHint !== undefined && <Hint text={contentHint} />}
+      </div>
 
       {/* Event morph targets. "no change" (null) means the bubble keeps its
           resting shape for that event, which is not the same as picking the
@@ -238,8 +191,8 @@ export default function BubbleInspector({ api, index, bubble }: BubbleInspectorP
       </label>
       {candidates.length === 0 && (
         <div className="cb-ed-hint">
-          Add a second bubble to {api.config.panels[bubble.panel]?.label ?? `panel ${bubble.panel}`}
-          {' '}to link this one — a link joins two bubbles on the same panel.
+          Nothing to link to yet{' '}
+          <Hint text={linkHint(api.config.panels[bubble.panel]?.label ?? `panel ${bubble.panel}`)} />
         </div>
       )}
 
@@ -257,6 +210,7 @@ export default function BubbleInspector({ api, index, bubble }: BubbleInspectorP
           onChange={e => api.setChained(index, e.target.checked)}
         />
         <span>Scrolling chain</span>
+        {bubble.chain !== '' && <Hint text={CHAIN_HINT} />}
       </label>
 
       {/* No chain checkbox. A conversation used to be assembled here — link two balloons,
@@ -265,14 +219,8 @@ export default function BubbleInspector({ api, index, bubble }: BubbleInspectorP
           balloons that looked right and showed nothing. **+ SMS** in the toolbar is now the
           only way to make one, so the couplings are established together or not at all;
           what is left to edit is what an author actually wants to change, and it is in the
-          conversation section below. */}
-      {bubble.chain !== '' && (
-        <div className="cb-ed-hint">
-          This balloon is one column of a conversation — its settings are below. Its shape,
-          tail, rotation and lettering are the template every row on this side is stamped
-          from; its placement is where that side of the table sits.
-        </div>
-      )}
+          conversation section below — and what a chained balloon used to say about itself
+          in a paragraph here is the `?` on the checkbox above. */}
     </>
   )
 }

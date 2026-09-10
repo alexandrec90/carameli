@@ -1,10 +1,8 @@
-import { DEFAULT_QUAD } from '../tableProjection'
-import type { Quad } from '../tableProjection'
 import { FONT_SCALE } from '../tableData'
 import { newNumberPad } from './numberPadValidate'
+import QuadCorners from './QuadCorners'
 import type { ImgTransform, NumberPadProjection } from './types'
 import type { EditorModeApi } from './useEditorMode'
-import { setCorner } from './useTableCornerDrag'
 
 interface NumberPadInspectorProps {
   api: EditorModeApi
@@ -12,7 +10,10 @@ interface NumberPadInspectorProps {
   image: ImgTransform
 }
 
-const CORNERS = ['top-left', 'top-right', 'bottom-right', 'bottom-left']
+const CORNERS_HINT =
+  'Drag the magenta grips onto the keypad surface, or type the four corners here to a '
+  + 'tenth of a percent. Its three-by-four grid is an alignment guide in the editor; '
+  + 'readers see only the keys.'
 
 function numOr(value: string, fallback: number): number {
   const number = Number.parseFloat(value)
@@ -72,64 +73,16 @@ export default function NumberPadInspector({ api, index, image }: NumberPadInspe
             </label>
           </div>
 
-          {CORNERS.map((name, corner) => (
-            <div className="cb-ed-row" key={name}>
-              <label className="cb-ed-field">
-                <span>{name} X %</span>
-                <input
-                  className="cb-ed-input"
-                  type="number"
-                  step="0.1"
-                  value={Math.round((numberPad.quad[corner]?.[0] ?? 0) * 100) / 100}
-                  onChange={event =>
-                    setNumberPad({
-                      quad: setCorner(
-                        numberPad.quad,
-                        corner,
-                        numOr(event.target.value, numberPad.quad[corner]?.[0] ?? 0),
-                        numberPad.quad[corner]?.[1] ?? 0,
-                      ),
-                    })
-                  }
-                />
-              </label>
-              <label className="cb-ed-field">
-                <span>Y %</span>
-                <input
-                  className="cb-ed-input"
-                  type="number"
-                  step="0.1"
-                  value={Math.round((numberPad.quad[corner]?.[1] ?? 0) * 100) / 100}
-                  onChange={event =>
-                    setNumberPad({
-                      quad: setCorner(
-                        numberPad.quad,
-                        corner,
-                        numberPad.quad[corner]?.[0] ?? 0,
-                        numOr(event.target.value, numberPad.quad[corner]?.[1] ?? 0),
-                      ),
-                    })
-                  }
-                />
-              </label>
-            </div>
-          ))}
-
-          <button
-            type="button"
-            className="cb-ed-btn"
-            title="Put the four number-pad corners back on the picture, square"
-            onClick={() =>
-              setNumberPad({ quad: DEFAULT_QUAD.map(([x, y]) => [x, y]) as Quad })
-            }
-          >
-            Reset number-pad corners
-          </button>
-
-          <div className="cb-ed-hint">
-            Drag the magenta grips onto the keypad surface. Its three-by-four grid is an
-            alignment guide in the editor; readers see only the keys.
-          </div>
+          {/* The same eight fields the table's corners get, folded the same way — see
+              ./QuadCorners.tsx. The two surfaces differ in the colour of their grips and
+              in nothing this block does, which is why they stopped being two copies. */}
+          <QuadCorners
+            quad={numberPad.quad}
+            onChange={quad => setNumberPad({ quad })}
+            hint={CORNERS_HINT}
+            resetLabel="Reset number-pad corners"
+            resetTitle="Put the four number-pad corners back on the picture, square"
+          />
         </>
       )}
     </>
