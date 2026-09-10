@@ -318,6 +318,12 @@ surface (in `configSeed.ts`, `configHydrate.ts` and `serializeTable.ts` alike), 
   out as smudges at the few pixels a band actually is, so it is a word now
   (`CALL_STATUS_LABELS`). `.cb-ptable-clip` is the backstop — `hidden` over a window
   nothing scrolls past, not the scroll container rule 18 forbids.
+- **A row under the pointer takes one flat wash of the authored ink and nothing else** —
+  `TableRowBand.tsx`, placed by band arithmetic so it lands on the row's own ruled line.
+  Rows already have visible lettering; the number pad's glow would blur the ruling and
+  obscure that text. **No keyframes, `box-shadow` or pressed state**
+  (`ProjectedTable.test.tsx`), and **no z-index**, so pictures at greater depth cover both
+  wash and rows. Only rows backed by records wash; `visibleRows` padding stays blank.
 - **The quad is what puts the rows on the drawn lines**, seated against the artwork rather
   than by eye: bands are equal, so the bottom edge belongs *on* the last ruled line and
   the top edge exactly one band above the first (`notepadRuling.test.ts` checks the
@@ -467,8 +473,6 @@ in `frontend/src/tests/skins/`.
 7. **Never use cold or neutral fonts**, and uppercase nav and headings in CSS.
 8. **Never hard-code a panel polygon or a gutter offset.**
 9. **A panel's pattern animates only while that panel is active**, off its own clock.
-   Until 2026-08-25 this rule said the opposite, which is how eight panels came to drift
-   at once and pull the eye off the one being pointed at.
 10. **Served art is `.webp` under `public/comic-book/` exclusively** — no base64, no
     external URLs, no PNG; masters live in `frontend/assets-src/comic-book/` and re-encodes
     come from there. `frontend/assetPolicy.ts` holds the format rule, the dimension ratchet
@@ -476,9 +480,8 @@ in `frontend/src/tests/skins/`.
     what a visitor now downloads, and `assetPolicy.test.ts` checks the served tree against
     them. Panel art is fetched **only by this skin**, by the guard script in `index.html`
     whose `SKINS`/`DEFAULT` and `PANELS` must match `src/skins/registry.ts` and
-    `layoutConfig.ts` (same test). Static preload tags once fetched it for all four skins —
-    real references, so no static check saw it — which is why
-    `tests/e2e/test_asset_usage.py` compares fetched against drawn in a browser.
+    `layoutConfig.ts` (same test). `tests/e2e/test_asset_usage.py` compares fetched against
+    drawn in a browser to catch art fetched by other skins through static preload tags.
 11. **Files over 250 lines (TS/TSX/CSS) must be split before commit.**
 12. **Never link two bubbles across panels.**
 13. **Never give a panel bubble its own tail path** — the tail is a ring vertex.

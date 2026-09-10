@@ -28,7 +28,41 @@
   overflow: hidden;
 }
 
+/* The band behind the row under the pointer: **one flat wash of the authored ink, and
+   nothing else.**
+
+   Deliberately *not* what the projected number pad does to a key. That pad's glyphs are
+   painted `transparent` outside the editor, so its glow is the only thing that says a key
+   is there at all — it has to breathe, flare on the press and throw a halo to be seen. A
+   row is already written on the page. All it needs is to be picked out, and everything
+   that made the pad's light carry works against it here: a halo blurs across the ruled
+   lines above and below, and a wash strong enough to glow is a wash the row's own blue
+   lettering stops reading through. Weaker, flatter and stiller is the whole of the
+   difference, so there is no keyframe, no `box-shadow` and no pressed state in this file.
+
+   A band of its own rather than a background on the `<tr>`, because the cells are clipped
+   for their ellipsis and are the wrong box to paint a full-width row from.
+   `TableRowBand.tsx` places it by band arithmetic, so it lands on the ruled line the
+   row's lettering sits on.
+
+   **No `z-index`, here or on the table.** Both are positioned, so the two paint in
+   document order and the wash stays behind the lettering; and the whole surface rides
+   inside its own picture's wrapper, so a picture at a greater depth — the hand over the
+   notepad — paints over the band exactly as it paints over the rows. A z-index would lift
+   the highlight out of that order and put it over the hand. */
+.cb-ptable-band {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: var(--cb-ptable-row);
+  pointer-events: none;
+  background-color: color-mix(in srgb, var(--cb-ptable-ink, currentcolor) 30%, transparent);
+}
+
 .cb-ptable {
+  /* Positioned, so it and the band behind it paint in document order rather than the
+     band — the only positioned one of the two — jumping over the lettering. */
+  position: relative;
   width: 100%;
   height: 100%;
   border-collapse: collapse;
@@ -39,6 +73,12 @@
   table-layout: fixed;
   font-family: 'Comic Neue', cursive;
   font-weight: 700;
+}
+
+/* A row a reader can point at. Only rows with data behind them get it — the blank bands
+   below the last record are ruled lines and nothing else. */
+.cb-ptable-row {
+  cursor: var(--cb-cursor-click);
 }
 
 .cb-ptable-cell {

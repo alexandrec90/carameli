@@ -114,6 +114,35 @@ export function visibleRows(
 }
 
 /**
+ * How many of the slots on screen at `offset` actually hold data.
+ *
+ * {@link visibleRows} pads its window with empty rows so the surface covers the same
+ * bands whatever the data does, and those blanks are ruled lines with nothing written on
+ * them. Lighting one under the pointer would claim a row is there when there is not, so
+ * the highlight is drawn over this count rather than over the window's.
+ */
+export function filledRows(
+  t: Pick<TableProjection, 'rows' | 'header' | 'data'>,
+  offset: number,
+): number {
+  return Math.max(0, Math.min(bodyRows(t), t.data.length - clampScroll(t, offset)))
+}
+
+/**
+ * Which band a visible body row sits in, counting from the top of the surface.
+ *
+ * The heading, when there is one, takes band 0 rather than sitting above the surface (see
+ * {@link bodyRows}), so a highlight placed at `rowBand(t, i) * rowH` covers exactly the
+ * band that row's cells render in. Band arithmetic rather than a rect measured off the
+ * DOM, for the same reason the scroll is an index: the rows are welded to the lines drawn
+ * in the picture by *being* whole bands, and a measured highlight would sit wherever the
+ * layout happened to round to.
+ */
+export function rowBand(t: Pick<TableProjection, 'header'>, i: number): number {
+  return (t.header ? 1 : 0) + i
+}
+
+/**
  * Column widths as percentages summing to 100, from the author's weights.
  *
  * Weights rather than percentages in the config because adding a column to a set that
