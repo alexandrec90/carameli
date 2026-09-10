@@ -1,0 +1,110 @@
+/* The three things that keep the toolbar small: foldable blocks, the `?` badge that the
+   inspector's paragraphs became, and the field row. All three answer the same measurement
+   — `useToolbarColumns` turns toolbar *height* into toolbar *width*, so a picture carrying
+   a projected table was paying for twenty lines of prose and eight full-width coordinate
+   fields in screen area, three columns of it across the page. See Hint.tsx and
+   Section.tsx for the reasoning behind the first two. */
+
+/* Fields that belong side by side: a corner's X and Y, rows/text/ink, the two split
+   buttons. Every inspector that has one has *named* this class since it was written and
+   nothing ever defined it, so each "row" was rendering as a full-width stack — the four
+   corners of a projected table cost eight field heights instead of four. */
+.cb-ed-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.cb-ed-row > .cb-ed-field {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+/* A button sharing a row with fields — the column remover — sits on the inputs' baseline
+   rather than on the labels'. */
+.cb-ed-row > .cb-ed-btn {
+  flex: 0 0 auto;
+  margin-bottom: 8px;
+}
+
+.cb-ed-section {
+  margin-bottom: 8px;
+}
+
+.cb-ed-section-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* The heading is the control. Styled as a label rather than as a button because it opens
+   a block rather than doing anything — a `.cb-ed-btn` here would read as a fourth action
+   in a column that already has Reset, Delete and Save in it. */
+.cb-ed-section-toggle {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0;
+  background: none;
+  border: 0;
+  color: #9a9aa6;
+  font: inherit;
+  font-size: 11px;
+  text-align: left;
+  cursor: var(--cb-cursor-click);
+}
+
+.cb-ed-section-toggle:hover {
+  color: #f0f0f0;
+}
+
+/* Drawn from `aria-expanded` rather than rendered, so the caret stays out of the button's
+   `textContent` — which is where the editor's control-surface sweep reads its name. */
+.cb-ed-section-toggle::before {
+  content: '▸';
+  display: inline-block;
+  width: 10px;
+  color: #8ab4ff;
+}
+
+.cb-ed-section-toggle[aria-expanded='true']::before {
+  content: '▾';
+}
+
+.cb-ed-section-body {
+  margin-top: 6px;
+}
+
+/* The `?`. Its paragraph is in the `title`, so hovering reads the whole of it and the
+   toolbar keeps the height the paragraph used to cost. */
+.cb-ed-hint-mark {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  vertical-align: middle;
+  background: #2e2e36;
+  color: #8ab4ff;
+  border: 1px solid #4a4a54;
+  border-radius: 50%;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: help;
+  user-select: none;
+}
+
+.cb-ed-hint-mark:hover {
+  background: #3a3a44;
+  border-color: #8ab4ff;
+}
+
+/* A badge explaining one field sits beside that field's control rather than beside its
+   label, because `.cb-ed-row` lines its children up on the inputs. It stays *outside* the
+   `<label>`: the editor's control-surface sweep names a field from the first `<span>` its
+   label wraps, and a `?` inside one would rename every hinted control. */
+.cb-ed-row > .cb-ed-hint-mark {
+  align-self: center;
+  margin-bottom: 8px;
+}
