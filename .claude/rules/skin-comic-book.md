@@ -418,16 +418,20 @@ beside it, precisely what a balloon cannot see.
 | Claim | Who | Owns the panel when |
 | --- | --- | --- |
 | `CLAIM_COMPOSER` | a chain whose sender template is a field | nothing outranks it and nothing is hovered |
-| `CLAIM_FIELD` | `input`, `phone`, `dial`, `dial-call` | it is the only field on the panel |
+| `CLAIM_FIELD` | `input`, `phone`, `dial`, `dial-call` | it is the panel's first field and no composer is drawn beside it |
 | `CLAIM_POINTER` | `wheel` | only while hovered — it takes the scroll, so a composer beside it must let go |
 | `CLAIM_NONE` | lettering, `actions`, `transcript`, `number-hangup` | never |
 
-Three rules decide it in order: **the pointer wins**, then **the highest claim wins if it
-stands alone**, then **a tie owns nothing** — the config's first input is not a fact the
-reader can see. **Never re-spell this inside a balloon**: two components each carried a
-private half of it, which is why an `input` balloon drawn anywhere else sat ignoring the
-keyboard until clicked. A new content kind joins by naming a claim in `bubbleClaim`, a new
-panel-level owner by ranking above `CLAIM_FIELD`.
+Two rules decide it: **the pointer wins**, then **the panel's main field owns it** — highest
+claim, first drawn of those that tie. So the SMS panel reads as a phone: the composer is what
+you talk into, hovering the number borrows the keyboard, hovering off returns it. **The owner
+also keeps it** — `useRevealedField` restores focus whenever it goes *nowhere* (artwork, panel
+ground, a balloon's outline), never when `relatedTarget` names where it went (Tab, the call
+key), which would trap it. Both replace a state that read as a fault: a tie owning nothing, a
+stray click killing a lit panel's only focus. **Never re-spell this inside a balloon** — two
+components each carried a private half, which is why an `input` balloon drawn anywhere else
+sat ignoring the keyboard until clicked. A kind joins by naming a claim in `bubbleClaim`, an
+owner by ranking above `CLAIM_FIELD`.
 
 ## Dev-only visual editor
 
