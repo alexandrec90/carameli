@@ -320,15 +320,10 @@ surface (in `configSeed.ts`, `configHydrate.ts` and `serializeTable.ts` alike), 
   nothing scrolls past, not the scroll container rule 18 forbids.
 - **A row under the pointer takes one flat wash of the authored ink and nothing else** —
   `TableRowBand.tsx`, placed by band arithmetic so it lands on the row's own ruled line.
-  **Deliberately not the number pad's glow**, which is what it started as: the pad's
-  glyphs are `transparent` outside the editor, so its light is the only thing saying a key
-  is there and has to breathe, flare and throw a halo to be seen — while a row is already
-  written on the page, a halo blurs across the ruled lines either side of it, and a wash
-  bright enough to glow is one the row's blue lettering stops reading through. No
-  keyframes, no `box-shadow`, no pressed state; `ProjectedTable.test.tsx` asserts the
-  absence of each. It **carries no z-index** — that is what keeps a picture at a greater
-  depth over the wash as well as over the rows. Only rows with a record behind them wash:
-  the blank bands `visibleRows` pads the window with are ruled line and nothing else.
+  Rows already have visible lettering; the number pad's glow would blur the ruling and
+  obscure that text. **No keyframes, `box-shadow` or pressed state**
+  (`ProjectedTable.test.tsx`), and **no z-index**, so pictures at greater depth cover both
+  wash and rows. Only rows backed by records wash; `visibleRows` padding stays blank.
 - **The quad is what puts the rows on the drawn lines**, seated against the artwork rather
   than by eye: bands are equal, so the bottom edge belongs *on* the last ruled line and
   the top edge exactly one band above the first (`notepadRuling.test.ts` checks the
@@ -478,8 +473,6 @@ in `frontend/src/tests/skins/`.
 7. **Never use cold or neutral fonts**, and uppercase nav and headings in CSS.
 8. **Never hard-code a panel polygon or a gutter offset.**
 9. **A panel's pattern animates only while that panel is active**, off its own clock.
-   Until 2026-08-25 this rule said the opposite, which is how eight panels came to drift
-   at once and pull the eye off the one being pointed at.
 10. **Served art is `.webp` under `public/comic-book/` exclusively** — no base64, no
     external URLs, no PNG; masters live in `frontend/assets-src/comic-book/` and re-encodes
     come from there. `frontend/assetPolicy.ts` holds the format rule, the dimension ratchet
@@ -487,9 +480,8 @@ in `frontend/src/tests/skins/`.
     what a visitor now downloads, and `assetPolicy.test.ts` checks the served tree against
     them. Panel art is fetched **only by this skin**, by the guard script in `index.html`
     whose `SKINS`/`DEFAULT` and `PANELS` must match `src/skins/registry.ts` and
-    `layoutConfig.ts` (same test). Static preload tags once fetched it for all four skins —
-    real references, so no static check saw it — which is why
-    `tests/e2e/test_asset_usage.py` compares fetched against drawn in a browser.
+    `layoutConfig.ts` (same test). `tests/e2e/test_asset_usage.py` compares fetched against
+    drawn in a browser to catch art fetched by other skins through static preload tags.
 11. **Files over 250 lines (TS/TSX/CSS) must be split before commit.**
 12. **Never link two bubbles across panels.**
 13. **Never give a panel bubble its own tail path** — the tail is a ring vertex.
