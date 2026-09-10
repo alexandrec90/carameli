@@ -41,10 +41,16 @@ and views tile absolute content over it; nav is a caption box pinned top-left.
 
 `PANEL_GRIDS` (`editor/layoutConfig.ts`) is one **shared-vertex planar subdivision** per
 window shape (`landscape`/`portrait`/`square`, via `layoutKindFor`): normalised vertices
-plus one ring of indices per panel, index-parallel to `PANELS`. `panelGeometry.ts` insets
-the viewport by `OUTER_M` for the frame, then each ring by `HALF_GUTTER` **perpendicular
-to every edge** (`polygonInset.ts`) — a per-axis inset narrows by the cosine of the angle,
-so diagonals read as thinner lines.
+plus one ring of indices per panel, index-parallel to `PANELS`. `panelGeometry.ts` fits
+the frame into the viewport inset by `OUTER_M` at a **fixed aspect per window shape**
+(`PAGE_ASPECT`), centred and letterboxed, then insets each ring by `HALF_GUTTER`
+**perpendicular to every edge** (`polygonInset.ts`) — a per-axis inset narrows by the
+cosine of the angle, so diagonals read as thinner lines. The fixed aspect is what makes a
+picture's framing a property of the config rather than of the window: every panel is a
+fraction of the frame and every picture a contain-fit inside a fraction of its panel, so a
+frame that followed the window reshaped every panel on each resize and slid the pictures
+with it. The same reasoning puts a picture's pan in % of its frame and its zoom about its
+anchor point (`editor/transforms.ts`).
 
 - **The frame is not editable and panels cannot come apart** — a frame edge belongs to
   one ring, so it is never a line *between* panels and gets no handle; rings either side of

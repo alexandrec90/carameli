@@ -115,13 +115,47 @@ export function layoutKindFor(w: number, h: number): LayoutKind {
   return 'square'
 }
 
-/** The page frame: the viewport inset by {@link OUTER_M} on every side. */
+/**
+ * The page's aspect ratio (width ÷ height), one per window shape. **Fixed, not a
+ * range**: every panel is a percentage of the page frame and every picture frame a
+ * percentage of its panel, so the page's aspect is the only thing that decides what
+ * shape any of them is. With the frame following the window, a panel's shape changed
+ * on every resize, and a picture contain-fitted into it was sized by its height in a
+ * wide window and by its width in a tall one — the anchor pinned one edge while the
+ * picture's size and its other axis slid with the window. A fixed aspect is what makes
+ * "her feet on the ledge" a property of the config rather than of the window it was
+ * authored in.
+ *
+ * The cost is the letterbox: the frame is the largest rectangle of this aspect that
+ * fits inside the viewport's margins, centred, and the rest of the viewport is blank.
+ * `layoutKindFor`'s thresholds are where one fixed page gives way to the next.
+ */
+export const PAGE_ASPECT: Record<LayoutKind, number> = {
+  landscape: 16 / 10,
+  square: 1,
+  portrait: 10 / 16,
+}
+
+/**
+ * The page frame: the largest rectangle of the window shape's {@link PAGE_ASPECT} that
+ * fits inside the viewport inset by {@link OUTER_M}, centred in it. A viewport smaller
+ * than its own margins gets a zero-size frame at the margin, never a negative one.
+ */
 export function frameRect(w: number, h: number): Rect {
+  const availW = Math.max(0, w - 2 * OUTER_M)
+  const availH = Math.max(0, h - 2 * OUTER_M)
+  const aspect = PAGE_ASPECT[layoutKindFor(w, h)]
+  // Whichever axis is tight is set to its bound exactly and the other derived from it,
+  // rather than deriving both through the aspect — that round trip lands a hair past
+  // the margin.
+  const heightTight = availW > availH * aspect
+  const fw = heightTight ? availH * aspect : availW
+  const fh = heightTight ? availH : availW / aspect
   return {
-    x: OUTER_M,
-    y: OUTER_M,
-    w: Math.max(0, w - 2 * OUTER_M),
-    h: Math.max(0, h - 2 * OUTER_M),
+    x: OUTER_M + (availW - fw) / 2,
+    y: OUTER_M + (availH - fh) / 2,
+    w: fw,
+    h: fh,
   }
 }
 

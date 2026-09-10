@@ -22,15 +22,40 @@ export function clamp(v: number, min: number, max: number): number {
 }
 
 /**
- * Pan the picture *inside* its frame by a px drag. This is the second of an image's
- * two framings: {@link dragImgFrame} moves the window, this slides the picture behind
- * it. They were the same gesture back when the window was the panel and could not move.
+ * Pan the picture *inside* its frame by a px drag → % of the frame. This is the second
+ * of an image's two framings: {@link dragImgFrame} moves the window, this slides the
+ * picture behind it. They were the same gesture back when the window was the panel and
+ * could not move.
+ *
+ * The frame's px size is derived here from the panel box and the picture's own
+ * `width`/`height`, so a caller passes the same panel box it passes
+ * {@link dragImgFrame}. A pan is stored as a percentage rather than the px it was
+ * dragged by because the frame is itself a percentage of a panel that grows and shrinks
+ * with the window — a pan of forty pixels was a different fraction of the picture on
+ * every resize.
  */
-export function dragImg(t: ImgTransform, dxPx: number, dyPx: number): ImgTransform {
-  return { ...t, offsetX: t.offsetX + dxPx, offsetY: t.offsetY + dyPx }
+export function dragImg(
+  t: ImgTransform,
+  dxPx: number,
+  dyPx: number,
+  panelW: number,
+  panelH: number,
+): ImgTransform {
+  const frameW = (t.width / 100) * panelW
+  const frameH = (t.height / 100) * panelH
+  if (frameW <= 0 || frameH <= 0) return t
+  return {
+    ...t,
+    offsetX: t.offsetX + (dxPx / frameW) * 100,
+    offsetY: t.offsetY + (dyPx / frameH) * 100,
+  }
 }
 
-/** Zoom an image around its centre by a wheel/handle delta, clamped to IMG_SCALE. */
+/**
+ * Zoom an image about its anchor by a wheel/handle delta, clamped to IMG_SCALE. About
+ * the anchor, not the frame's centre: a `center bottom` picture zooms with its feet on
+ * the frame floor rather than sinking through it.
+ */
 export function scaleImg(t: ImgTransform, deltaScale: number): ImgTransform {
   return { ...t, scale: clamp(t.scale + deltaScale, IMG_SCALE.min, IMG_SCALE.max) }
 }
@@ -70,13 +95,23 @@ export function rotateBubble(b: BubbleTransform, deltaDeg: number): BubbleTransf
 
 // ─── CSS builders ────────────────────────────────────────────────────────────────
 
-/** CSS for the <img> inside the clip wrapper. */
+/**
+ * CSS for the <img> inside the clip wrapper — the contain-fit fallback drawn until the
+ * source's natural size is known. The element is sized to its frame, so a percentage
+ * translate is a percentage of the frame, and the transform origin is the anchor point
+ * — the same fraction of the box that `object-position` aligns the picture's own
+ * anchor to — so a zoom about it holds the anchored edge still. Spelled as fractions
+ * via {@link anchorToFractions} rather than passing the keyword pair through, so an
+ * anchor the keyword set does not know degrades to the centre here exactly as it does
+ * in {@link fullImgStyle}, instead of to invalid CSS.
+ */
 export function imgTransformStyle(t: ImgTransform): CSSProperties {
+  const [ax, ay] = anchorToFractions(t.anchor)
   return {
     objectFit: 'contain',
     objectPosition: t.anchor,
-    transform: `translate(${t.offsetX}px, ${t.offsetY}px) scale(${t.scale})`,
-    transformOrigin: 'center center',
+    transform: `translate(${t.offsetX}%, ${t.offsetY}%) scale(${t.scale})`,
+    transformOrigin: `${ax * 100}% ${ay * 100}%`,
   }
 }
 
@@ -96,9 +131,18 @@ export function anchorToFractions(anchor: string): [number, number] {
  * The contain-fit geometry every full-source view derives from. The box (`bounds`)
  * renders the natural image (`nat`) at `fit = min(bw/nw, bh/nh)` — the whole image
  * visible, anchored inside the box — then `translate(offset) scale(t.scale)` is
- * applied about the box centre, matching {@link imgTransformStyle}. `centerX`/`centerY`
- * are where the image's centre lands, in box coordinates; `fit` excludes the
- * transform's own zoom.
+ * applied about the **anchor point**, matching {@link imgTransformStyle}.
+ * `centerX`/`centerY` are where the image's centre lands, in box coordinates; `fit`
+ * excludes the transform's own zoom.
+ *
+ * The anchor point is the origin, not the box centre, because it is the one point the
+ * contained picture and the box share — `center bottom` puts the picture's bottom
+ * centre on the box's bottom centre — so a zoom about it leaves the anchored edge where
+ * the anchor put it. Scaling about the centre moved that edge by half the zoom, and the
+ * feet an author had rested on the frame floor sank through it at any scale but 1.
+ *
+ * The pan is a percentage of the box, so the same config pans the picture by the same
+ * fraction of itself at every viewport size.
  *
  * One function, two consumers ({@link fullImgStyle}, {@link renderedImgRect}), so the
  * picture that is drawn and the border drawn around it cannot disagree.
@@ -117,12 +161,13 @@ function containGeometry(
   // Contained content centre in box coords (before the panel transform).
   const cx = ax * (bw - fw) + fw / 2
   const cy = ay * (bh - fh) + fh / 2
-  const ox = bw / 2
-  const oy = bh / 2
+  // The anchor point of the box — the transform origin.
+  const ox = ax * bw
+  const oy = ay * bh
   return {
     fit,
-    centerX: ox + t.offsetX + t.scale * (cx - ox),
-    centerY: oy + t.offsetY + t.scale * (cy - oy),
+    centerX: ox + (t.offsetX / 100) * bw + t.scale * (cx - ox),
+    centerY: oy + (t.offsetY / 100) * bh + t.scale * (cy - oy),
   }
 }
 
@@ -142,7 +187,7 @@ function containGeometry(
  * `fit = min(bw/nw, bh/nh)` — the whole image visible, anchored inside the box;
  * this draws the natural image at that same scale (× the transform's zoom) and
  * positions its centre where the contained content's centre lands after
- * `translate(offset) scale(t.scale)` about the box centre.
+ * `translate(offset) scale(t.scale)` about the anchor point ({@link containGeometry}).
  *
  * `min`, not `max`: the cover fit this replaces filled the frame by cropping
  * whichever image dimension overshot it — a wide panel beheaded a tall picture, and

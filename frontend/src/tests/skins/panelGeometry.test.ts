@@ -10,6 +10,7 @@ import {
   insetPolygon,
   layoutKindFor,
   OUTER_M,
+  PAGE_ASPECT,
   polyBounds,
   toNormalized,
   toViewport,
@@ -72,12 +73,63 @@ describe('layoutKindFor', () => {
 })
 
 describe('frameRect and the normalised space', () => {
-  it('insets the viewport by the outer margin on every side', () => {
-    expect(F).toEqual({ x: OUTER_M, y: OUTER_M, w: W - 2 * OUTER_M, h: H - 2 * OUTER_M })
+  // The frame has one aspect per window shape and is letterboxed into the viewport.
+  // That is the whole fix for pictures wandering on resize: every panel is a fraction
+  // of the frame, so a frame that followed the window reshaped every panel with it.
+  it('holds the window shape\'s fixed aspect, whatever the window\'s own', () => {
+    for (const [w, h] of [[1600, 900], [2560, 1080], [1300, 1000], [1000, 800]]) {
+      const f = frameRect(w, h)
+      expect(f.w / f.h).toBeCloseTo(PAGE_ASPECT[layoutKindFor(w, h)], 10)
+    }
+    for (const [w, h] of [[600, 900], [400, 1000], [500, 600]]) {
+      const f = frameRect(w, h)
+      expect(f.w / f.h).toBeCloseTo(PAGE_ASPECT.portrait, 10)
+    }
+  })
+
+  it('is the largest such rectangle inside the margins, centred', () => {
+    // 1600×900 is landscape: the margin box is 1584×884, and 884 × 1.6 = 1414.4 is the
+    // width the height allows, so the height is the tight axis and the bars fall left
+    // and right.
+    const wide = frameRect(1600, 900)
+    expect(wide.h).toBe(884)
+    expect(wide.w).toBeCloseTo(1414.4, 10)
+    expect(wide.x).toBeCloseTo(OUTER_M + (1584 - 1414.4) / 2, 10)
+    expect(wide.y).toBe(OUTER_M)
+    // 1300×1000 is landscape too, but the width is now the tight axis: 1284 wide,
+    // 802.5 high, bars above and below.
+    const squat = frameRect(1300, 1000)
+    expect(squat.w).toBe(1284)
+    expect(squat.h).toBeCloseTo(802.5, 10)
+    expect(squat.x).toBe(OUTER_M)
+    expect(squat.y).toBeCloseTo(OUTER_M + (984 - 802.5) / 2, 10)
+    // A square window gets the square page edge to edge.
+    expect(frameRect(1000, 1000)).toEqual({ x: OUTER_M, y: OUTER_M, w: 984, h: 984 })
+  })
+
+  it('never leaves the margin box', () => {
+    for (const [w, h] of [[1600, 900], [600, 900], [1000, 1000], [3000, 500], [300, 3000]]) {
+      const f = frameRect(w, h)
+      expect(f.x).toBeGreaterThanOrEqual(OUTER_M)
+      expect(f.y).toBeGreaterThanOrEqual(OUTER_M)
+      expect(f.x + f.w).toBeLessThanOrEqual(w - OUTER_M + 1e-9)
+      expect(f.y + f.h).toBeLessThanOrEqual(h - OUTER_M + 1e-9)
+    }
+  })
+
+  it('gives two windows of one shape geometrically similar frames', () => {
+    // The property the pictures rest on: a panel at (0.2, 0.3)-(0.7, 0.9) of the frame
+    // has the same aspect ratio in both windows, so a picture contain-fitted into it is
+    // sized by the same axis in both.
+    const a = frameRect(1600, 900)
+    const b = frameRect(2600, 1100)
+    const panelAspect = (f: { w: number; h: number }) => (0.5 * f.w) / (0.6 * f.h)
+    expect(panelAspect(a)).toBeCloseTo(panelAspect(b), 10)
   })
 
   it('never returns a negative frame for a viewport smaller than its own margins', () => {
     expect(frameRect(4, 4)).toEqual({ x: OUTER_M, y: OUTER_M, w: 0, h: 0 })
+    expect(frameRect(4, 400)).toEqual({ x: OUTER_M, y: 200, w: 0, h: 0 })
   })
 
   it('round-trips a point through viewport pixels and back', () => {

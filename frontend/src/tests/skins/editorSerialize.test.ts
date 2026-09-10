@@ -247,7 +247,7 @@ describe('serializeConfig', () => {
     // anywhere" would now be asserting that the grid is rounded to a whole percent.
     expect(transformsOf(ts)).not.toMatch(/\d\.\d{3,}/)
     expect(ts).toContain(
-      'left: 20, top: 20, width: 55.1, height: 55.9, scale: 1, offsetX: 12, offsetY: -9,',
+      'left: 20, top: 20, width: 55.1, height: 55.9, scale: 1, offsetX: 12.4, offsetY: -8.7,',
     )
     expect(ts).toContain('{ panel: 0, top: -35, right: -12, width: 55, rotate: -5, spill: true,')
   })
