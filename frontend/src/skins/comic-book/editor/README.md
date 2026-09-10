@@ -129,6 +129,16 @@ you drag is the artwork's real rect, and nothing else is drawn around it.
 itself, so dragging could only slide the picture under a window that stayed put, and a
 second picture on the same panel had nowhere to go.
 
+**Every one of those numbers is a fraction of something that has a fixed shape**, which
+is what lets a saved framing come back identical in any window. The page frame keeps one
+aspect ratio per window shape (`PAGE_ASPECT` in `../panelGeometry.ts`) and is letterboxed
+into the viewport, so a panel's shape, and so its frames', never depends on the window.
+The pan is % of the frame, not px, and the zoom is about the anchor point, not the
+frame's centre — a `center bottom` picture zooms with its feet on the frame floor. The
+anchor was never enough on its own: it only says where the letterbox slack goes, and with
+the page following the window a wide window sized a picture by its height and a tall one
+by its width, so the same config put her somewhere else in each.
+
 **`depth` says which picture is in front.** 0 is the back, 9 the front, and pictures left
 at the same depth keep the order they were added in — so a layout that never touches the
 field draws exactly as it did before the field existed. It is what lets one scene be built

@@ -52,13 +52,25 @@ describe('imgTransformStyle', () => {
     const style = imgTransformStyle(img({ scale: 1.5, offsetX: 10, offsetY: -20 }))
     expect(style.objectFit).toBe('contain')
     expect(style.objectPosition).toBe('center bottom')
-    expect(style.transform).toBe('translate(10px, -20px) scale(1.5)')
-    expect(style.transformOrigin).toBe('center center')
+    // The pan is % of the frame and the zoom is about the anchor point, so the
+    // fallback holds the picture's feet still exactly as fullImgStyle does.
+    expect(style.transform).toBe('translate(10%, -20%) scale(1.5)')
+    expect(style.transformOrigin).toBe('50% 100%')
+  })
+
+  it('zooms about whichever corner the anchor names', () => {
+    expect(imgTransformStyle(img({ anchor: 'left top' })).transformOrigin).toBe('0% 0%')
+    expect(imgTransformStyle(img({ anchor: 'right center' })).transformOrigin).toBe('100% 50%')
+  })
+
+  it('degrades an unknown anchor to the centre rather than to invalid CSS', () => {
+    expect(imgTransformStyle(img({ anchor: 'somewhere' })).transformOrigin).toBe('50% 50%')
   })
 
   it('reproduces the identity framing at scale 1 / offset 0', () => {
     const style = imgTransformStyle(img({ anchor: 'center center' }))
-    expect(style.transform).toBe('translate(0px, 0px) scale(1)')
+    expect(style.transform).toBe('translate(0%, 0%) scale(1)')
+    expect(style.transformOrigin).toBe('50% 50%')
     expect(style.objectPosition).toBe('center center')
   })
 })
@@ -122,13 +134,25 @@ describe('fullImgStyle', () => {
     expect(renderedRect(s, 200, 100)).toEqual({ left: 0, top: 25, right: 100, bottom: 75 })
   })
 
-  it('folds the transform zoom into the reveal scale and re-centres the pan', () => {
+  it('folds the transform zoom into the reveal scale and zooms about the anchor', () => {
     // scale 2 on the 0.5 contain fit is scale(1) — a deliberate zoom past the frame
-    // is still exactly what the editor's slider promises.
+    // is still exactly what the editor's slider promises. The zoom is about the
+    // center-bottom anchor: the 200-tall render now spans -100..100, its bottom edge
+    // still on the frame floor, so the natural-size img's top is -100 (its centre at 0).
     const s = fullImgStyle({ w: 100, h: 100 }, { w: 100, h: 200 }, t({ scale: 2 }))
     expect(s.left).toBe(0)
-    expect(s.top).toBe(-50)
+    expect(s.top).toBe(-100)
     expect(s.transform).toBe('scale(1)')
+    expect(renderedRect(s, 100, 200)).toEqual({ left: 0, top: -100, right: 100, bottom: 100 })
+  })
+
+  it('pans by a percentage of the frame, not by pixels', () => {
+    // The same config in a frame twice the size pans the picture twice as far, so the
+    // pan is the same fraction of the picture in both — the property a resize needs.
+    const small = fullImgStyle({ w: 100, h: 100 }, { w: 100, h: 200 }, t({ offsetX: 10 }))
+    const large = fullImgStyle({ w: 200, h: 200 }, { w: 100, h: 200 }, t({ offsetX: 10 }))
+    expect(renderedRect(small, 100, 200).left).toBe(35)
+    expect(renderedRect(large, 100, 200).left).toBe(70)
   })
 
   // Regression for the beheaded receptionist: her 1671×1487 art, cover-fitted into
@@ -182,6 +206,39 @@ describe('renderedImgRect', () => {
     expect(r.w).toBeCloseTo(nat.w * k, 10)
     expect(r.h).toBeCloseTo(nat.h * k, 10)
   })
+
+  // The zoom is about the anchor point. Scaling about the frame's centre moved the
+  // anchored edge by half the zoom, so a picture rested on the floor at scale 1 sank
+  // through it at 1.3 and floated off it at 0.8 — the ledge only held at one zoom.
+  it('keeps the anchored edge still at every zoom', () => {
+    const nat = { w: 100, h: 200 }
+    for (const scale of [0.5, 1, 1.3, 2, 4]) {
+      const bottom = renderedImgRect(frame, nat, img({ scale, anchor: 'center bottom' }))
+      expect(bottom.y + bottom.h).toBeCloseTo(frame.y + frame.h, 10)
+      expect(bottom.x + bottom.w / 2).toBeCloseTo(frame.x + frame.w / 2, 10)
+
+      const corner = renderedImgRect(frame, nat, img({ scale, anchor: 'left top' }))
+      expect(corner.x).toBeCloseTo(frame.x, 10)
+      expect(corner.y).toBeCloseTo(frame.y, 10)
+
+      const right = renderedImgRect(frame, nat, img({ scale, anchor: 'right center' }))
+      expect(right.x + right.w).toBeCloseTo(frame.x + frame.w, 10)
+      expect(right.y + right.h / 2).toBeCloseTo(frame.y + frame.h / 2, 10)
+    }
+  })
+
+  it('keeps the same framing when the frame is scaled up uniformly', () => {
+    // The resize property end to end: a frame twice the size, the same config, and the
+    // picture's rect relative to the frame is identical — pan, zoom and anchor alike.
+    const nat = { w: 300, h: 180 }
+    const t = img({ scale: 1.4, offsetX: 7, offsetY: -3, anchor: 'right bottom' })
+    const a = renderedImgRect({ x: 0, y: 0, w: 100, h: 100 }, nat, t)
+    const b = renderedImgRect({ x: 0, y: 0, w: 200, h: 200 }, nat, t)
+    expect(b.x).toBeCloseTo(a.x * 2, 10)
+    expect(b.y).toBeCloseTo(a.y * 2, 10)
+    expect(b.w).toBeCloseTo(a.w * 2, 10)
+    expect(b.h).toBeCloseTo(a.h * 2, 10)
+  })
 })
 
 describe('surfaceBaseRect', () => {
@@ -217,8 +274,9 @@ describe('surfaceBaseRect', () => {
   })
 
   it('stays unclamped when a pan overhangs the frame, unlike imgVisibleRect', () => {
-    // offsetX 200 slides the 100-wide box to x 350..450; the frame ends at 400.
-    const panned = img({ offsetX: 200 })
+    // offsetX 50 (% of the 400 frame = 200px) slides the 100-wide box to x 350..450;
+    // the frame ends at 400.
+    const panned = img({ offsetX: 50 })
     expect(surfaceBaseRect(frame, nat, panned)).toEqual({ x: 350, y: 0, w: 100, h: 300 })
     expect(imgVisibleRect(frame, nat, panned)).toEqual({ x: 350, y: 0, w: 50, h: 300 })
   })
@@ -252,8 +310,9 @@ describe('imgVisibleRect', () => {
   })
 
   it('clamps to the frame when a pan pushes one edge out', () => {
-    // offsetX 200 slides the 100-wide box to x 450..550; the frame ends at 500.
-    expect(imgVisibleRect(bounds, nat, img({ offsetX: 200 }))).toEqual({
+    // offsetX 50 (% of the 400 frame = 200px) slides the 100-wide box to x 450..550;
+    // the frame ends at 500.
+    expect(imgVisibleRect(bounds, nat, img({ offsetX: 50 }))).toEqual({
       x: 450,
       y: 200,
       w: 50,
@@ -262,7 +321,8 @@ describe('imgVisibleRect', () => {
   })
 
   it('falls back to the frame when the picture is panned fully outside it', () => {
-    expect(imgVisibleRect(bounds, nat, img({ offsetX: 600 }))).toEqual(frame)
+    // 150% of the 400 frame is 600px: the box lands at x 850..950, past the frame.
+    expect(imgVisibleRect(bounds, nat, img({ offsetX: 150 }))).toEqual(frame)
   })
 
   it('returns the degenerate frame against a zero-size panel box', () => {
