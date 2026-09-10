@@ -5,6 +5,8 @@ import json
 import re
 from types import SimpleNamespace
 
+import pytest
+
 from conftest import load_module
 
 la = load_module("scripts/lint-all.py")
@@ -341,6 +343,72 @@ def test_detect_secrets_restores_timestamp_only_churn(monkeypatch, tmp_path, cap
     assert la.t_detect_secrets(None) == {"detect-secrets": ([], 0)}
     assert baseline.read_text(encoding="utf-8") == before
     assert "detect-secrets" not in capsys.readouterr().out
+
+
+def test_detect_secrets_failure_keeps_the_tools_own_output(monkeypatch, tmp_path):
+    # The reported defect. In a fresh worktree detect-secrets is not there, the shell
+    # says "'detect-secrets' is not recognized...", and this used to replace that with
+    # `baseline scan failed (exit 1)` -- a synthetic line with nothing in it for
+    # `get_skip_reason` to classify, so an absent tool arrived as a lint FAILURE and
+    # the session spent its turn diagnosing the toolchain. Keep the tool's own words.
+    baseline = tmp_path / ".secrets.baseline"
+    baseline.write_text('{"results": {}}', encoding="utf-8")
+    shell_error = [
+        "'detect-secrets' is not recognized as an internal or external command,",
+        "operable program or batch file.",
+    ]
+    monkeypatch.setattr(la, "run", lambda cmd: (shell_error, 1))
+    monkeypatch.setattr(la, "REPO_ROOT", tmp_path)
+
+    lines, code = la.t_detect_secrets(None)["detect-secrets"]
+
+    assert code == 1
+    assert lines[: len(shell_error)] == shell_error
+    assert "exit 1" in lines[-1]
+    assert diag.get_skip_reason(lines) == "not installed"
+
+
+# --- the missing-toolchain gate ---------------------------------------------
+# A linked worktree checks out tracked files only. Unprovisioned, all thirteen tools
+# fail on their own missing binary; the run has to name the checkout, not a tool.
+
+
+def test_main_refuses_an_unprovisioned_checkout(monkeypatch, tmp_path, capsys):
+    monkeypatch.setattr(la.preflight, "gaps", lambda root: ["no toolchain here"])
+    monkeypatch.setattr(la.preflight, "provisioning_command", lambda: "python scripts/bootstrap.py")
+    monkeypatch.setattr(la, "REPO_ROOT", tmp_path)
+    monkeypatch.setattr(
+        la, "ThreadPoolExecutor", lambda **k: pytest.fail("ran linters with no toolchain")
+    )
+
+    assert la.main([]) == 1
+
+    out = capsys.readouterr().out
+    assert "not provisioned" in out
+    assert "python scripts/bootstrap.py" in out
+    # LINT FAILED, never a pass: a run that could check nothing must not report green.
+    assert "LINT FAILED" in out
+
+
+def test_main_runs_the_linters_when_the_checkout_is_provisioned(monkeypatch, tmp_path):
+    monkeypatch.setattr(la.preflight, "gaps", lambda root: [])
+    monkeypatch.setattr(la, "REPO_ROOT", tmp_path)
+    monkeypatch.setattr(
+        la, "select_tools", lambda *a, **k: [lambda changed: {"ruff-check": ([], 0)}]
+    )
+
+    assert la.main([]) == 0
+
+
+def test_run_labels_names_the_environment_and_scope(monkeypatch):
+    monkeypatch.setattr(la, "IS_CI", False)
+    env, scope, label = la.run_labels(None)
+    assert (env, scope) == ("local", "full")
+    assert label == "scripts/lint-all.py (local)"
+
+    env, scope, label = la.run_labels(["a.py", "b.py"])
+    assert (env, scope) == ("local", "changed (2 file(s))")
+    assert label == "scripts/lint-all.py (local, changed)"
 
 
 # --- detect-secrets: one exclusion list, shared with the pre-commit hook ------

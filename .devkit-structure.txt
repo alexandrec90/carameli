@@ -51,7 +51,7 @@ complexity::scripts/diagnostics.py::filter_pytest_output = 27
 complexity::scripts/docker-prune.py::main = 20
 complexity::scripts/docker-status.py::main = 19
 complexity::scripts/hooks/deps-sync.py::main = 18
-complexity::scripts/lint-all.py::main = 18
+complexity::scripts/lint-all.py::main = 16
 complexity::scripts/run-tests.py::main = 30
 complexity::scripts/run-tests.py::run_named_target = 18
 definitions::frontend/src/skins/comic-book/bubbleChain.ts = 23
@@ -399,7 +399,7 @@ file_lines::app/api/webhooks/call_status.py = 845
 file_lines::frontend/src/api/client.ts = 845
 file_lines::frontend/src/skins/comic-book/bubbleChain.ts = 615
 file_lines::scripts/diagnostics.py = 701
-file_lines::scripts/lint-all.py = 619
+file_lines::scripts/lint-all.py = 627
 file_lines::scripts/local-e2e.py = 549
 file_lines::scripts/run-tests.py = 712
 function_lines::app/api/vsapi/calls.py::initiate_outbound_call = 99
@@ -539,3 +539,6 @@ todos::app/api/auth.py = 1
 #   file_lines::scripts/hooks/enforce-capped-bash.py -> 629
 #   file_lines::scripts/hooks/harness_config.py -> 655
 #   file_lines::scripts/hooks/structure_check.py -> 1042
+
+# 2026-09-10  recorded: Missing-toolchain gate: lint-all.py must refuse an unprovisioned checkout instead of reporting thirteen absent binaries as lint findings. The fix belongs in the runner's entry point, and the module is 127 lines past the limit; the split it wants (t_detect_secrets and its baseline diffing into their own module) is separate work. Net +8 after moving _ensure_venv_on_path out to scripts/preflight.py.
+#   file_lines::scripts/lint-all.py -> 627
