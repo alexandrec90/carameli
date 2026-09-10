@@ -188,7 +188,7 @@
   align-items: center;
   justify-content: center;
   text-align: center;
-  font-size: clamp(0.75rem, 2vw, 1.125rem);
+  font-size: var(--cb-lettering);
   color: #111;
   line-height: 1.2;
 }

@@ -11,9 +11,10 @@
 // A grid instead names each corner **once** and lets panels share it by index. A divider
 // is then the run of shared vertices between two panels, moving it is moving a vertex,
 // and a "lightning bolt" seam is that run with a vertex inserted in the middle. Nothing
-// about the outer frame or the gutter is stored: the frame is the viewport inset by
-// {@link OUTER_M}, and the gutter is `insetPolygon` shrinking every panel by the same
-// {@link HALF_GUTTER} whatever shape or angle it has.
+// about the outer frame or the gutter is stored: the frame is a fixed-aspect rectangle
+// ({@link PAGE_ASPECT}) letterboxed into the viewport inset by {@link OUTER_M}, and the
+// gutter is `insetPolygon` shrinking every panel by the same {@link HALF_GUTTER}
+// whatever shape or angle it has.
 
 import type { PanelPage } from './panels'
 import { insetPolygon, polyBounds } from './polygonInset'
@@ -137,14 +138,20 @@ export const PAGE_ASPECT: Record<LayoutKind, number> = {
 }
 
 /**
- * The page frame: the largest rectangle of the window shape's {@link PAGE_ASPECT} that
- * fits inside the viewport inset by {@link OUTER_M}, centred in it. A viewport smaller
- * than its own margins gets a zero-size frame at the margin, never a negative one.
+ * The page frame: the largest rectangle of `kind`'s {@link PAGE_ASPECT} that fits inside
+ * the viewport inset by {@link OUTER_M}, centred in it. A viewport smaller than its own
+ * margins gets a zero-size frame at the margin, never a negative one.
+ *
+ * `kind` defaults to the window's own shape, and is a parameter because the editor can
+ * hold a page at a shape the window is not: a portrait page previewed in a landscape
+ * window is the portrait frame, letterboxed on both sides, and every % inside it means
+ * exactly what it means in a portrait window. Read the kind off `(w, h)` here and that
+ * preview would draw the portrait grid on a landscape frame.
  */
-export function frameRect(w: number, h: number): Rect {
+export function frameRect(w: number, h: number, kind: LayoutKind = layoutKindFor(w, h)): Rect {
   const availW = Math.max(0, w - 2 * OUTER_M)
   const availH = Math.max(0, h - 2 * OUTER_M)
-  const aspect = PAGE_ASPECT[layoutKindFor(w, h)]
+  const aspect = PAGE_ASPECT[kind]
   // Whichever axis is tight is set to its bound exactly and the other derived from it,
   // rather than deriving both through the aspect — that round trip lands a hair past
   // the margin.
@@ -231,13 +238,13 @@ export function panelRing(grid: PanelGrid, panel: number, f: Rect): VpPt[] {
 }
 
 /**
- * The whole grid as drawable panels for a viewport: each ring mapped into the frame and
- * shrunk by the half-gutter.
+ * The whole grid as drawable panels in a page frame: each ring mapped into the frame and
+ * shrunk by the half-gutter. Takes the frame rather than the window so the caller says
+ * which shape's frame it is — see {@link frameRect}.
  */
-export function gridPolys(grid: PanelGrid, w: number, h: number): PanelPoly[] {
-  const f = frameRect(w, h)
+export function gridPolys(grid: PanelGrid, frame: Rect): PanelPoly[] {
   return grid.panels.map((_, i) => {
-    const vp = insetPolygon(panelRing(grid, i, f), HALF_GUTTER)
+    const vp = insetPolygon(panelRing(grid, i, frame), HALF_GUTTER)
     return { vp, bounds: polyBounds(vp) }
   })
 }

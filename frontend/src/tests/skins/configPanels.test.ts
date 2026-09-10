@@ -11,6 +11,7 @@ import { LAYOUT_KINDS, seedConfig, shippedGridFor } from '../../skins/comic-book
 import { PANEL_GRIDS, PANELS } from '../../skins/comic-book/editor/layoutConfig'
 import { gridProblems } from '../../skins/comic-book/editor/panelGridValidate'
 import { serializeConfigFile } from '../../skins/comic-book/editor/serialize'
+import { frameRect } from '../../skins/comic-book/panelGeometry'
 import { PANEL_PAGES } from '../../skins/comic-book/panels'
 
 // Everything that has to lengthen together when a panel is made: the list, the pattern
@@ -18,7 +19,7 @@ import { PANEL_PAGES } from '../../skins/comic-book/panels'
 
 /** A shipped classic-page panel with a picture on it, so the remap has something to hold. */
 const PARENT = seedConfig().images[0].panel
-const VIEW = { kind: 'landscape' as const, viewport: { w: 1600, h: 900 } }
+const VIEW = { kind: 'landscape' as const, frame: frameRect(1600, 900, 'landscape') }
 
 describe('isPanelList', () => {
   it('accepts the shipped list and an empty one', () => {

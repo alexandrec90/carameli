@@ -50,6 +50,12 @@
 
 /* ─── Layout shell ───────────────────────────────────────────────────────────── */
 .cb-root {
+  /* Balloon lettering, as a share of the page frame's height (--cb-frame-h, set inline
+     by Layout.tsx from usePageFrame). The balloons are fractions of the frame, so the
+     words scale with them in every window; a viewport unit would not, because the frame
+     is letterboxed and a wide window makes it no taller. Never a px, vw or vh. */
+  --cb-lettering: calc(var(--cb-frame-h, 1000px) * 0.018);
+
   position: relative;
   width: 100vw;
   height: 100vh;

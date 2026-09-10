@@ -10,6 +10,7 @@ import { tubeBetween } from './bubbleTube'
 import PanelBubble from './PanelBubble'
 import { bubbleRect } from './editor/transforms'
 import type { BubbleTransform } from './editor/types'
+import type { Rect } from './panelGeometry'
 import type { SmsConversationMessage } from '../../lib/smsConversation'
 import { useDialWheel } from './useDialWheel'
 
@@ -30,6 +31,13 @@ interface PanelBubbleChainProps {
    * stamped from the one whose side it belongs to.
    */
   members: BubbleTransform[]
+  /**
+   * The box the templates' percentages resolve against, in viewport px — the panel's, or
+   * a call half's. Its aspect spaces the rows and its size places the tubes; this is the
+   * same box `PanelChainThread` slots the conversation into, so rows and slot agree by
+   * construction rather than by measuring the slot back.
+   */
+  box: Rect
   /** True while the panel is hovered; the conversation runs from the start on each reveal. */
   visible: boolean
   /** False in edit mode: the editor overlay owns the pointer there. */
@@ -87,8 +95,8 @@ export interface LiveConversation {
  *
  * The arithmetic is all in bubbleChain.ts; this is the DOM shell, the way BubbleWheel is
  * over wheelPicker. What it adds is the state that cannot be pure — the growth timer, the
- * wheel listener, the panel's measured aspect ratio, the rewind when the panel stops being
- * hovered, and the reader's own messages.
+ * wheel listener, the rewind when the panel stops being hovered, and the reader's own
+ * messages.
  *
  * **Keys are message indices, not row indices.** That is what makes the scroll animate: a
  * message keeps its DOM node as it climbs the table, so its `top`/`right`/`width` change on
@@ -98,17 +106,17 @@ export interface LiveConversation {
  * flickering rather than as a conversation moving.
  */
 export default function PanelBubbleChain({
-  chain, members, visible, interactive, keyboard = false, onComposerHover, conversation,
+  chain, members, box, visible, interactive, keyboard = false, onComposerHover, conversation,
 }: PanelBubbleChainProps) {
   // What the reader has sent, oldest first, already marked as the sender's side. It lives
   // here rather than in the config because it is not the author's: it is gone on reload,
   // like anything typed into a page, and the editor never sees it.
   const [typed, setTyped] = useState<string[]>([])
-  // The panel's width/height ratio, which is what converts a balloon's width into the share
-  // of the panel's *height* it occupies. 1 until measured: an unmeasured chain still stacks
-  // in the right order, merely spaced as though the panel were square.
-  const [aspect, setAspect] = useState(1)
-  const [size, setSize] = useState({ width: 0, height: 0 })
+  // The box's width/height ratio, which is what converts a balloon's width into the share
+  // of the box's *height* it occupies. It comes from the same panel geometry the author's
+  // percentages were dragged out against, so nothing here measures the DOM: the page
+  // frame has a fixed aspect per window shape, and a panel's box is a fraction of it.
+  const aspect = box.h > 0 ? box.w / box.h : 1
 
   const cols = chainColumns(members)
   const live = cols !== null && isComposerContent(cols.me.content)
@@ -170,27 +178,6 @@ export default function PanelBubbleChain({
   // resume under someone who has scrolled back through the conversation would fight them.
   const steeredRef = useRef(false)
   const hostRef = useRef<HTMLDivElement>(null)
-
-  // The layer is inset to the panel box exactly (see bubbleChains.css), so measuring it
-  // measures the panel — and the rows have to be laid out against the same box the author's
-  // percentages were dragged out against. Observed rather than measured once, because the
-  // three viewport layouts reshape every panel.
-  useEffect(() => {
-    const host = hostRef.current
-    if (!host) return
-    const measure = (): void => {
-      const { width, height } = host.getBoundingClientRect()
-      if (width > 0 && height > 0) {
-        setAspect(width / height)
-        setSize({ width, height })
-      }
-    }
-    measure()
-    if (typeof ResizeObserver === 'undefined') return
-    const ro = new ResizeObserver(measure)
-    ro.observe(host)
-    return () => ro.disconnect()
-  }, [])
 
   // Rewind once the panel is no longer hovered, so the conversation plays again on the next
   // reveal rather than being found already finished. Deferred past the fade for the reason
@@ -283,12 +270,13 @@ export default function PanelBubbleChain({
     aspect,
     typing,
   )
+  // The tubes are drawn in the layer's own coordinates, so the box is taken at the origin.
+  const local = { x: 0, y: 0, w: box.w, h: box.h }
   const tubes = chainRowLinks(rows).flatMap(([below, row]) => {
-    if (size.width === 0) return []
-    const bounds = { x: 0, y: 0, w: size.width, h: size.height }
+    if (box.w <= 0 || box.h <= 0) return []
     const geo = tubeBetween(
-      bubbleRect(bounds, below.bubble),
-      bubbleRect(bounds, row.bubble),
+      bubbleRect(local, below.bubble),
+      bubbleRect(local, row.bubble),
     )
     return geo ? [{ key: `${below.key}-${row.key}`, geo }] : []
   })

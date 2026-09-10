@@ -49,6 +49,8 @@ function editorApi(config: EditorConfig, stale = false): EditorModeApi {
     setCallScene: vi.fn(),
     setPanelLabel: vi.fn(),
     setPageLabel: vi.fn(),
+    shape: null,
+    setShape: vi.fn(),
     deleteImg: vi.fn(),
     deleteBubble: vi.fn(),
     resetOne: vi.fn(),

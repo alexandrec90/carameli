@@ -192,9 +192,7 @@ export function useOverlayInteraction(
         if (!cur || !bounds) return
         // Alt pans the picture behind its frame; without it the frame itself moves.
         const nudge = (dx: number, dy: number): ImgTransform =>
-          e.altKey
-            ? dragImg(cur, dx, dy, bounds.w, bounds.h)
-            : dragImgFrame(cur, dx, dy, bounds.w, bounds.h)
+          (e.altKey ? dragImg : dragImgFrame)(cur, dx, dy, bounds.w, bounds.h)
         switch (e.key) {
           case 'ArrowLeft': api.setImg(sel.index, nudge(-step, 0)); break
           case 'ArrowRight': api.setImg(sel.index, nudge(step, 0)); break

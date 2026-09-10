@@ -79,9 +79,9 @@ export interface ChainFrame {
 }
 
 /**
- * A frame per conversation drawn on `panel`. The panel's aspect comes from its on-screen
- * box rather than from a measured element, because that is the same ratio
- * `PanelBubbleChain` measures — a panel is a panel whether the editor is up or not.
+ * A frame per conversation drawn on `panel`. The panel's aspect comes from its box, the
+ * same one `PanelBubbleChain` is handed — a panel is a panel whether the editor is up or
+ * not.
  */
 export function chainFramesOn(
   bubbles: readonly BubbleTransform[],
