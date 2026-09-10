@@ -8,6 +8,7 @@
 // sheet and the loading screen hand off seamlessly.
 
 import { clamp } from './editor/transforms'
+import type { Rect } from './panelGeometry'
 
 export const WASH_SPACING = 20     // px between dot centres (grid shared with the ripple)
 export const WASH_BAND = 220       // px depth of the growing/shrinking dot edge
@@ -72,15 +73,25 @@ export function rippleWave(diag: number, tSec: number): number {
     return (Math.sin(phase) + 1) / 2
 }
 
-// Ripple dots over the paper sheet. `gate` (0..1 per diagonal distance) fades the
-// ripple out where the sheet is not fully merged, so it never floats over raw page.
+/** The first grid centre at or after `from`: the ripple's dots sit at S/2 + k·S, k ≥ 0. */
+function firstCentre(from: number): number {
+    return WASH_SPACING / 2 + WASH_SPACING * Math.max(0, Math.ceil((from - WASH_SPACING / 2) / WASH_SPACING))
+}
+
+// Ripple dots over the paper sheet, for the cells of the *viewport's* grid whose centres
+// fall in `region` — the grid never moves with the region, which is what keeps every
+// surface drawing the same dot in the same place. `gate` (0..1 per diagonal distance)
+// fades the ripple out where the sheet is not fully merged, so it never floats over raw
+// page.
 function drawRippleDots(
-    ctx: CanvasRenderingContext2D, w: number, h: number,
+    ctx: CanvasRenderingContext2D, region: Rect,
     tSec: number, accentHex: string, gate: (diag: number) => number,
 ) {
     const [r, g, b] = parseCssColor(accentHex)
-    for (let x = WASH_SPACING / 2; x < w; x += WASH_SPACING) {
-        for (let y = WASH_SPACING / 2; y < h; y += WASH_SPACING) {
+    const right = region.x + region.w
+    const bottom = region.y + region.h
+    for (let x = firstCentre(region.x); x < right; x += WASH_SPACING) {
+        for (let y = firstCentre(region.y); y < bottom; y += WASH_SPACING) {
             const gt = gate(x + y)
             if (gt <= 0) continue
             const wave = rippleWave(x + y, tSec)
@@ -101,7 +112,58 @@ export function drawLoadingRipple(
 ) {
     ctx.fillStyle = WASH_PAPER
     ctx.fillRect(0, 0, w, h)
-    drawRippleDots(ctx, w, h, tSec, accentHex, () => 1)
+    drawRippleDots(ctx, { x: 0, y: 0, w, h }, tSec, accentHex, () => 1)
+}
+
+/**
+ * The letterbox around `sheet` on a `w` × `h` viewport, as up to four rectangles that
+ * tile it without overlapping — top and bottom the full width, left and right between
+ * them. Overlap would matter: the ripple is alpha-blended, so a corner drawn twice is a
+ * darker corner. A band thinner than a pixel is dropped rather than kept alive to draw
+ * nothing; on a viewport of the page's own aspect there are none.
+ */
+export function letterboxBands(w: number, h: number, sheet: Rect): Rect[] {
+    const top = sheet.y
+    const bottom = h - (sheet.y + sheet.h)
+    const left = sheet.x
+    const right = w - (sheet.x + sheet.w)
+    const bands: Rect[] = []
+    if (top >= 1) bands.push({ x: 0, y: 0, w, h: top })
+    if (bottom >= 1) bands.push({ x: 0, y: h - bottom, w, h: bottom })
+    if (left >= 1) bands.push({ x: 0, y: sheet.y, w: left, h: sheet.h })
+    if (right >= 1) bands.push({ x: w - right, y: sheet.y, w: right, h: sheet.h })
+    return bands
+}
+
+/**
+ * The loading screen's ripple carrying on in the letterbox around the page sheet — same
+ * grid, same wave, same clock, so the sheet the loading screen washes away reveals the
+ * ripple it was already showing, in phase, where the page does not cover it. Only the
+ * bands are painted; the sheet stays clear. Returns whether anything was drawn, which
+ * is false on a viewport the sheet fills, and the caller's cue to stop the loop.
+ */
+export function drawMarginRipple(
+    ctx: CanvasRenderingContext2D, w: number, h: number, sheet: Rect,
+    tSec: number, accentHex: string,
+): boolean {
+    ctx.clearRect(0, 0, w, h)
+    const bands = letterboxBands(w, h, sheet)
+    if (bands.length === 0) return false
+    ctx.save()
+    ctx.beginPath()
+    for (const band of bands) ctx.rect(band.x, band.y, band.w, band.h)
+    ctx.clip()
+    ctx.fillStyle = WASH_PAPER
+    for (const band of bands) ctx.fillRect(band.x, band.y, band.w, band.h)
+    // A dot centred just outside a band still reaches into it by up to its radius; the
+    // clip trims what crosses back the other way.
+    const pad = RIPPLE_BASE_R
+    for (const band of bands) {
+        const reach = { x: band.x - pad, y: band.y - pad, w: band.w + 2 * pad, h: band.h + 2 * pad }
+        drawRippleDots(ctx, reach, tSec, accentHex, () => 1)
+    }
+    ctx.restore()
+    return true
 }
 
 /**
@@ -135,6 +197,6 @@ export function drawWash(
             ctx.fill()
         }
     }
-    drawRippleDots(ctx, w, h, tSec, accentHex,
+    drawRippleDots(ctx, { x: 0, y: 0, w, h }, tSec, accentHex,
         diag => clamp((growthAt(diag) - 0.8) / 0.2, 0, 1))
 }

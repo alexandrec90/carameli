@@ -5,9 +5,11 @@ import { isBubbleRevealed } from './bubbleTube'
 import BubbleTubes from './BubbleTubes'
 import ComicPanel from './ComicPanel'
 import { LoadingOverlay, useLoadingScreen } from './LoadingOverlay'
+import MarginRipple from './MarginRipple'
 import PanelInk from './PanelInk'
 import { gridPolys, layoutKindFor } from './panelGeometry'
 import { activeLayout, useCallLayout, useDrawnImageCount } from './layoutSource'
+import { accentForPath } from './pageAccent'
 import { pageForPath } from './panels'
 import { softphoneActions } from './phoneActions'
 import { usePanelDots } from './usePanelDots'
@@ -18,18 +20,6 @@ import { usePageWash } from './usePageWash'
 import './comic-book.css'
 import './bubbles.css'
 import './bubbleChains.css'
-
-// ─── Page-accent map ─────────────────────────────────────────────────────────
-
-const PAGE_ACCENT: Record<string, string> = {
-    '/': '#FFE033',
-    '/phone-lines': '#0057B8',
-    '/extensions': '#E8003D',
-}
-
-function accentForPath(path: string): string {
-    return PAGE_ACCENT[path] ?? '#00AEEF'
-}
 
 // ─── Panel contents ─────────────────────────────────────────────────────────
 // A panel is a slot in the grid and nothing more: its label, whether it is the logo
@@ -174,6 +164,11 @@ export function Layout({ navItems, sms, softphone }: LayoutProps) {
                 className={`cb-root${editor.active ? ' cb-edit-active' : ''}`}
                 style={{ opacity: ready ? 1 : 0, transition: ready ? 'opacity 150ms ease-in' : 'none' }}
             >
+                {/* Layer 0 — the letterbox around the page sheet, carrying on the loading
+                    screen's ripple in phase with it (MarginRipple). Up only once the page is
+                    showing: under the loading sheet the same ripple is already drawn. */}
+                <MarginRipple viewport={viewport} accent={accent} active={ready} />
+
                 {/* Layer 1 — the panels (ComicPanel: dots, pictures, bubbles). The poly
                     array is sparse: a null slot is a panel on the other page. */}
                 {panelPolys.map((poly, i) => {
