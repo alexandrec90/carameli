@@ -4,6 +4,7 @@ import type { CSSProperties } from 'react'
 import { splitAt } from '../callSceneGeometry'
 import type { SceneHalves } from '../callSceneGeometry'
 import { halfFor, inRoles, rolesAtPhase } from '../callSceneRoles'
+import { fitBubble } from '../pageFit'
 import type { PanelPoly, Rect } from '../panelGeometry'
 import type { CallScenePhase } from '../phoneActions'
 import { bubbleRect, imgVisibleRect } from './transforms'
@@ -115,10 +116,13 @@ export function overlaySelection(
   natSizes: Record<string, { w: number; h: number }>,
   halvesOn: HalvesOn,
   callRoles: CallRole[] | null,
+  /** The page's balloon fit (pageFit.ts): the outline traces the balloon as drawn. */
+  fit: number,
 ): OverlaySelection {
   const { selected, config } = api
   const selImg = selected?.kind === 'img' ? config.images[selected.index] : null
-  const selBubble = selected?.kind === 'bubble' ? config.bubbles[selected.index] : null
+  const authored = selected?.kind === 'bubble' ? config.bubbles[selected.index] : null
+  const selBubble = authored ? fitBubble(authored, fit) : null
   const selPanel = panelOfSelection(selected, selImg, selBubble)
   const selPoly = selPanel === null ? null : panelPolys[selPanel]
   const selHalves = selPanel === null ? null : halvesOn(selPanel)

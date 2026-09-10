@@ -106,6 +106,13 @@ function isTypingTarget(target: EventTarget | null): boolean {
 export function useOverlayInteraction(
   api: EditorModeApi,
   panelPolys: (PanelPoly | null)[],
+  /**
+   * The page's balloon fit (pageFit.ts). A resize drag is px of *drawn* balloon per px of
+   * pointer, and the drawn balloon is the authored width times this — so the authored
+   * change is the pointer's travel over the fitted panel width, or the handle falls
+   * behind the cursor on a wide window.
+   */
+  fit: number,
 ): OverlayInteraction {
   const drag = useRef<DragState | null>(null)
 
@@ -147,7 +154,7 @@ export function useOverlayInteraction(
         d.mode === 'move'
           ? dragBubble(d.startBubble, dx, dy, bounds.w, bounds.h)
           : d.mode === 'resize'
-            ? resizeBubble(d.startBubble, dx, bounds.w)
+            ? resizeBubble(d.startBubble, dx, bounds.w * fit)
             : rotateBubble(d.startBubble, dx * BUBBLE_ROTATE_DEG)
       api.setBubble(sel.index, next)
     }

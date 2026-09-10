@@ -8,6 +8,7 @@ import { LoadingOverlay, useLoadingScreen } from './LoadingOverlay'
 import PanelInk from './PanelInk'
 import { gridPolys, layoutKindFor } from './panelGeometry'
 import { activeLayout, useCallLayout, useDrawnImageCount } from './layoutSource'
+import { fitBubbles, pageFit } from './pageFit'
 import { pageForPath } from './panels'
 import { softphoneActions } from './phoneActions'
 import { usePanelDots } from './usePanelDots'
@@ -67,7 +68,7 @@ export function Layout({ navItems, sms, softphone }: LayoutProps) {
     // Everything drawn comes from the editor's working copy when one is open, else from
     // the shipped constants (./layoutSource.ts).
     const layout = activeLayout(editor)
-    const { bubbles: bubbleT, chains: chainT, callScenes: callSceneT, grids, patterns, panels } =
+    const { bubbles: authoredBubbles, chains: chainT, callScenes: callSceneT, grids, patterns, panels } =
         layout
     // A picture whose surface names a live feed gets its cells from the records rather
     // than from the config. Applied here, between the working copy and the panels, so the
@@ -83,6 +84,12 @@ export function Layout({ navItems, sms, softphone }: LayoutProps) {
     const [viewport, setViewport] = useState<{ w: number; h: number }>(() =>
         typeof window === 'undefined' ? { w: 0, h: 0 } : { w: window.innerWidth, h: window.innerHeight })
     const layoutKind = layoutKindFor(viewport.w, viewport.h)
+
+    // Balloons at their rendered width: the one place they leave the config, so the
+    // panels, the tube layer and every chain measure the same box (see pageFit.ts). The
+    // editor applies the same factor to its own targets from the same viewport.
+    const fit = pageFit(viewport.w, viewport.h)
+    const bubbleT = useMemo(() => fitBubbles(authoredBubbles, fit), [authoredBubbles, fit])
     // Sparse, PANELS-length: a panel on the other page has an empty ring in this
     // page's grid, which gridPolys returns as a vertex-less polygon — mapped to null
     // here so every consumer can tell "not on this page" from a real shape.

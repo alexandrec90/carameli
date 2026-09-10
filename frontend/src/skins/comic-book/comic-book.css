@@ -20,17 +20,17 @@
   --cb-accent:        var(--cb-yellow);   /* overridden per-page */
   --cb-hue-deg:       0deg;
 
-  /* Panel-balloon lettering. A balloon's box is a % of its panel and a panel a share
-     of the viewport, so the box scales with the window width and with nothing else —
-     and the words in it have to scale the same way or the two part company: at a fixed
-     18px the number swam in a 300px cloud at 1920 and overflowed a 180px one at 1100.
-     The slope is 18px at a 1920px window, the width the balloons were drawn at, so the
-     page at that size is unchanged. The floor is legibility; below it the balloon
-     shrinks around its words. No ceiling on purpose: a cap is where the two scales
-     part company again, and the box cannot be capped instead — its tail, its chain
-     rows, its tube welds and its editor hit box are all measured from that width
-     (bubbleLettering.test.ts). */
-  --cb-lettering:     max(0.75rem, 0.9375vw);
+  /* Panel-balloon lettering. A balloon's box follows the window width up to the page
+     ratio in pageFit.ts, then the height — the way a contain-fitted picture does — and
+     the words in it have to follow the same measure or the two part company: at a
+     fixed 18px the number swam in a 300px cloud at 1920 and overflowed a 180px one at
+     1100. The vw term is 18px at a 1920px window, the width the balloons were drawn
+     at, so the page at that size is unchanged; the vh term is the same slope times the
+     page ratio (1.8 = 0.9375 × 1.92), so past that ratio the lettering stops with the
+     balloons. The floor is legibility; below it the balloon shrinks around its words.
+     No px ceiling: a cap is where the two scales part company again
+     (bubbleLettering.test.ts holds the three numbers to pageFit.ts). */
+  --cb-lettering:     max(0.75rem, min(0.9375vw, 1.8vh));
 
   /* Sized against native pointer chrome, not against the artwork. The generated raster
      dimensions are the scale, pinned beside the cursor checks in assetPolicy.test.ts.

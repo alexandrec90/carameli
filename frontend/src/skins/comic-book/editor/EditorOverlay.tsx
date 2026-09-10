@@ -5,6 +5,7 @@ import type { LayoutKind, PanelPoly } from '../panelGeometry'
 import { frameRect } from '../panelGeometry'
 import type { PanelPage } from '../panels'
 import EditorToolbar from './EditorToolbar'
+import { pageFit } from '../pageFit'
 import { boxOf, overlaySelection, useCallOverlay } from './overlayGeometry'
 import OverlayTargets from './OverlayTargets'
 import type { PageSelectProps } from './PageSelect'
@@ -64,7 +65,10 @@ export default function EditorOverlay({
 
   const { selected, config, mode } = api
   const shapeMode = mode === 'shapes'
-  const interaction = useOverlayInteraction(api, panelPolys)
+  // The same factor the page draws its balloons at (Layout), so a target sits on the
+  // balloon it selects and a resize handle tracks the pointer.
+  const fit = pageFit(viewport.w, viewport.h)
+  const interaction = useOverlayInteraction(api, panelPolys, fit)
 
   const grid = config.grids[page][layoutKind]
   const frame = frameRect(viewport.w, viewport.h)
@@ -75,7 +79,7 @@ export default function EditorOverlay({
   // outline and the grips are placed against the same answer the panels drew from.
   const { callRoles, halvesOn } = useCallOverlay(api.callPhase, config.callScenes, panelPolys)
   const { selImg, selPanel, selPoly, selHalves, selectedRect } =
-    overlaySelection(api, panelPolys, natSizes, halvesOn, callRoles)
+    overlaySelection(api, panelPolys, natSizes, halvesOn, callRoles, fit)
 
   return (
     <div className="cb-ed-layer">
@@ -94,6 +98,7 @@ export default function EditorOverlay({
         callRoles={callRoles}
         halvesOn={halvesOn}
         shapeMode={shapeMode}
+        fit={fit}
       />
 
       <SelectionOutline

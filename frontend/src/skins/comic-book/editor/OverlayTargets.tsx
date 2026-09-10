@@ -1,5 +1,6 @@
 import { halfFor, inRoles } from '../callSceneRoles'
 import type { SceneHalves } from '../callSceneGeometry'
+import { fitBubbles } from '../pageFit'
 import type { PanelPoly, Rect } from '../panelGeometry'
 import { assetLabel } from './assets'
 import { chainFramesOn } from './chainFrame'
@@ -43,6 +44,8 @@ interface OverlayTargetsProps {
   halvesOn: HalvesOn
   /** True in shapes mode, where only the panel targets are drawn. */
   shapeMode: boolean
+  /** The page's balloon fit (pageFit.ts) — what the page draws the balloons at. */
+  fit: number
 }
 
 /**
@@ -50,9 +53,12 @@ interface OverlayTargetsProps {
  * drawn as chrome beside them.
  */
 export default function OverlayTargets({
-  api, panelPolys, natSizes, callRoles, halvesOn, shapeMode,
+  api, panelPolys, natSizes, callRoles, halvesOn, shapeMode, fit,
 }: OverlayTargetsProps) {
   const { config } = api
+  // Targets and chain frames are placed against the balloons as *drawn*, not as authored:
+  // a target measured from the authored width sits wide of the balloon on a wide window.
+  const bubbles = fitBubbles(config.bubbles, fit)
   return (
     <>
       {/* Per-panel click targets — the backdrop for everything drawn on a panel.
@@ -101,7 +107,7 @@ export default function OverlayTargets({
           {/* One click target per bubble, placed against the panel it belongs to. They
               paint last so a bubble stays clickable where it overlaps a picture, its own
               panel — or a neighbour's, once it spills into the gutter. */}
-          {config.bubbles.map((bubble, i) => {
+          {bubbles.map((bubble, i) => {
             const poly = panelPolys[bubble.panel]
             if (!poly || !inRoles(bubble.call, callRoles)) return null
             const box = boxOf(bubble, poly.bounds, halvesOn(bubble.panel))
@@ -128,7 +134,7 @@ export default function OverlayTargets({
             poly === null
               ? null
               : chainFramesFor(
-                config.bubbles, config.chains, i, poly.bounds, halvesOn(i), callRoles,
+                bubbles, config.chains, i, poly.bounds, halvesOn(i), callRoles,
               ).map((frame, k) => (
                 <div
                   // Keyed by position as well as by id: a conversation whose two columns
