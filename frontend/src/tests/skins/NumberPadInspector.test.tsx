@@ -29,10 +29,16 @@ describe('number-pad image option', () => {
     const image = { ...seedConfig().images[0], numberPad: newNumberPad() }
     render(<ImageInspector api={api} index={0} image={image} />)
 
-    expect(screen.getByLabelText('top-left X %')).toBeTruthy()
     expect(screen.getByLabelText('ink')).toBeTruthy()
+    // The corner coordinates are folded away until asked for — they are set once, when
+    // the pad is fitted to the photograph, and eight fields left open were most of why
+    // the toolbar grew across the page.
+    expect(screen.queryByLabelText('top-left X %')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'corners' }))
+    expect(screen.getByLabelText('top-left X %')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Reset number-pad corners' })).toBeTruthy()
-    expect(screen.getByText(/three-by-four grid is an alignment guide/i)).toBeTruthy()
+    // The paragraph that used to sit under those fields is the section heading's `?`.
+    expect(screen.getByTitle(/three-by-four grid is an alignment guide/i)).toBeTruthy()
   })
 
   it('clears a number pad when the table projection is enabled', () => {

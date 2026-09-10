@@ -71,6 +71,7 @@ diff as the code that added it.
 - button: Ringing
 - button: Save
 - button: Ship
+- button: position
 - checkbox: Allow spill outside frame
 - checkbox: Project a number pad on this picture
 - checkbox: Project a table on this picture
@@ -100,35 +101,21 @@ diff as the code that added it.
 - button: Panel shapes
 - button: Reset
 - button: Reset
-- button: Reset corners
 - button: Ringing
 - button: Save
 - button: Ship
+- button: columns & rows
+- button: corners
+- button: position
 - checkbox: Allow spill outside frame
 - checkbox: First row is the column headings
 - checkbox: Project a number pad on this picture
 - checkbox: Project a table on this picture
 - color: ink
-- number: Y %
-- number: Y %
-- number: Y %
-- number: Y %
-- number: bottom-left X %
-- number: bottom-right X %
 - number: depth
 - number: rows
-- number: top-left X %
-- number: top-right X %
-- number: width
-- number: width
-- number: width
-- number: width
 - range: text
 - select: Page
-- select: align
-- select: align
-- select: align
-- select: align
 - select: anchor
 - select: call role
 - select: panel
@@ -136,10 +123,6 @@ diff as the code that added it.
 - select: shows
 - text: Ship summary
 - text: alt
-- text: heading
-- text: heading
-- text: heading
-- text: heading
 - text: page name
 - text: panel name
 
@@ -158,23 +141,16 @@ diff as the code that added it.
 - button: Panel shapes
 - button: Reset
 - button: Reset
-- button: Reset number-pad corners
 - button: Ringing
 - button: Save
 - button: Ship
+- button: corners
+- button: position
 - checkbox: Allow spill outside frame
 - checkbox: Project a number pad on this picture
 - checkbox: Project a table on this picture
 - color: ink
-- number: Y %
-- number: Y %
-- number: Y %
-- number: Y %
-- number: bottom-left X %
-- number: bottom-right X %
 - number: depth
-- number: top-left X %
-- number: top-right X %
 - range: text
 - select: Page
 - select: anchor
@@ -204,6 +180,7 @@ diff as the code that added it.
 - button: Ringing
 - button: Save
 - button: Ship
+- button: position
 - checkbox: Allow spill outside panel
 - checkbox: Bolder outline on hover
 - checkbox: Scrolling chain
@@ -239,6 +216,7 @@ diff as the code that added it.
 - button: Ringing
 - button: Save
 - button: Ship
+- button: position
 - checkbox: Allow spill outside panel
 - checkbox: Bolder outline on hover
 - checkbox: Scrolling chain
@@ -274,6 +252,7 @@ diff as the code that added it.
 - button: Ringing
 - button: Save
 - button: Ship
+- button: position
 - checkbox: Allow spill outside panel
 - checkbox: Bolder outline on hover
 - checkbox: Scrolling chain
@@ -498,6 +477,7 @@ diff as the code that added it.
 - button: Ringing
 - button: Save
 - button: Ship
+- button: position
 - checkbox: Allow spill outside panel
 - checkbox: Bolder outline on hover
 - checkbox: Scrolling chain
@@ -535,6 +515,7 @@ diff as the code that added it.
 - button: Ringing
 - button: Save
 - button: Ship
+- button: position
 - checkbox: Allow spill outside panel
 - checkbox: Bolder outline on hover
 - checkbox: Scrolling chain

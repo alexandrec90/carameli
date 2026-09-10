@@ -1,5 +1,6 @@
 import { clampDepth, DEPTH } from '../imageDepth'
 import { PANEL_ASSETS } from './assets'
+import Hint from './Hint'
 import NumberPadInspector from './NumberPadInspector'
 import TableInspector from './TableInspector'
 import type { ImgTransform } from './types'
@@ -23,6 +24,18 @@ const ANCHORS = [
   'left center', 'center center', 'right center',
   'left bottom', 'center bottom', 'right bottom',
 ]
+
+const ANCHOR_HINT =
+  'Which part of the picture survives when its aspect ratio does not match the frame’s '
+  + '— "center bottom" is what keeps a character’s feet in shot in a wide panel.'
+
+const DEPTH_HINT =
+  'Higher draws in front of the other pictures on this panel, and in front of anything '
+  + 'projected onto them — a hand over the rows on the notepad it holds. Pictures set '
+  + 'the same stay in the order they were added. The spill box below is a coarser layer '
+  + 'than this: a spilling picture is always over the panel’s ink and a clipped one '
+  + 'always under it, so a pair that has to stack in a chosen order wants the same spill '
+  + 'setting on both.'
 
 /**
  * The picture-only half of the selection inspector: which panel it sits on, which file
@@ -87,44 +100,44 @@ export default function ImageInspector({ api, index, image }: ImageInspectorProp
           onChange={e => set({ alt: e.target.value })}
         />
       </label>
-      <label className="cb-ed-field">
-        <span>anchor</span>
-        <select
-          className="cb-ed-select"
-          value={image.anchor}
-          onChange={e => set({ anchor: e.target.value })}
-        >
-          {!ANCHORS.includes(image.anchor) && <option value={image.anchor}>{image.anchor}</option>}
-          {ANCHORS.map(a => (
-            <option key={a} value={a}>{a}</option>
-          ))}
-        </select>
-      </label>
-      <label className="cb-ed-field">
-        <span>depth</span>
-        <input
-          className="cb-ed-input"
-          type="number"
-          min={DEPTH.min}
-          max={DEPTH.max}
-          step={DEPTH.step}
-          value={image.z}
-          // Falling back to the current depth, not to 0: a number field is empty for a
-          // keystroke while it is being retyped, and snapping the picture to the back of
-          // the panel on that frame reorders the page under the author's cursor.
-          onChange={e => {
-            const typed = Number.parseFloat(e.target.value)
-            set({ z: clampDepth(Number.isFinite(typed) ? typed : image.z) })
-          }}
-        />
-      </label>
-      <div className="cb-ed-hint">
-        Higher draws in front of the other pictures on this panel, and in front of
-        anything projected onto them — a hand over the rows on the notepad it holds.
-        Pictures set the same stay in the order they were added. The spill box below is a
-        coarser layer than this: a spilling picture is always over the panel&apos;s ink and
-        a clipped one always under it, so a pair that has to stack in a chosen order wants
-        the same spill setting on both.
+      <div className="cb-ed-row">
+        <label className="cb-ed-field">
+          <span>anchor</span>
+          <select
+            className="cb-ed-select"
+            value={image.anchor}
+            onChange={e => set({ anchor: e.target.value })}
+          >
+            {!ANCHORS.includes(image.anchor) && (
+              <option value={image.anchor}>{image.anchor}</option>
+            )}
+            {ANCHORS.map(a => (
+              <option key={a} value={a}>{a}</option>
+            ))}
+          </select>
+        </label>
+        <Hint text={ANCHOR_HINT} />
+      </div>
+      <div className="cb-ed-row">
+        <label className="cb-ed-field">
+          <span>depth</span>
+          <input
+            className="cb-ed-input"
+            type="number"
+            min={DEPTH.min}
+            max={DEPTH.max}
+            step={DEPTH.step}
+            value={image.z}
+            // Falling back to the current depth, not to 0: a number field is empty for a
+            // keystroke while it is being retyped, and snapping the picture to the back of
+            // the panel on that frame reorders the page under the author's cursor.
+            onChange={e => {
+              const typed = Number.parseFloat(e.target.value)
+              set({ z: clampDepth(Number.isFinite(typed) ? typed : image.z) })
+            }}
+          />
+        </label>
+        <Hint text={DEPTH_HINT} />
       </div>
       <TableInspector api={api} index={index} image={image} />
       <NumberPadInspector api={api} index={index} image={image} />

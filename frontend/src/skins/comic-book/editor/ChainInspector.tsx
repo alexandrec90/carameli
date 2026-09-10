@@ -2,7 +2,9 @@ import {
   CHAIN_ROWS, chainMembers, chainTranscript, defaultChain, isComposerContent,
   messageRows, peerPickerOn, readTranscript,
 } from '../bubbleChain'
+import { BOUND_HINT, columnHint, rowsHint, transcriptSummary } from './chainHints'
 import { parseMessages } from './chainOps'
+import Hint from './Hint'
 import type { BubbleTransform } from './types'
 import type { EditorModeApi } from './useEditorMode'
 
@@ -57,44 +59,42 @@ export default function ChainInspector({ api, index, bubble }: ChainInspectorPro
         {members.length > 1 ? 'Conversation' : 'Conversation (one column so far)'}
       </div>
       <div className="cb-ed-hint">
-        {mine
-          ? live
-            ? 'The sender — the right column. Its content is a field, so the bottom row is the composer: what a reader types there is sent as this side’s next message.'
-            : 'The sender — the right column. Give it `input` content to turn the bottom row into a composer a reader can type into.'
-          : 'The recipient — the left column.'}{' '}
-        Every row of that side is stamped from this balloon: its shape, tail, rotation and
-        lettering, at a width that follows the message. Drag it past its partner to swap the
-        two columns over.
+        {mine ? 'The sender — the right column.' : 'The recipient — the left column.'}{' '}
+        <Hint text={columnHint(mine, live)} />
       </div>
 
-      <label className="cb-ed-field">
-        <span>rows</span>
-        <input
-          className="cb-ed-input"
-          type="number"
-          min={CHAIN_ROWS.min}
-          max={CHAIN_ROWS.max}
-          step={CHAIN_ROWS.step}
-          value={chain.rows}
-          onChange={e => api.setChain(chain.id, { rows: Number(e.target.value) })}
-        />
-      </label>
-
-      <div className="cb-ed-hint">
-        The dashed frame on the panel is where those rows will land. It is the whole of
-        stretching the table: drag either balloon to move that side&apos;s column, resize one
-        to widen it, and change <em>rows</em> to set how far up the panel the conversation
-        reaches.
+      <div className="cb-ed-row">
+        <label className="cb-ed-field">
+          <span>rows</span>
+          <input
+            className="cb-ed-input"
+            type="number"
+            min={CHAIN_ROWS.min}
+            max={CHAIN_ROWS.max}
+            step={CHAIN_ROWS.step}
+            value={chain.rows}
+            onChange={e => api.setChain(chain.id, { rows: Number(e.target.value) })}
+          />
+        </label>
+        <Hint text={rowsHint(live)} />
       </div>
 
       {/* No "live SMS" checkbox, and no growth controls. A conversation added with **+ SMS**
           is bound already — that is what the button means — and how it plays is the
           renderer's business. What is left here is what an author has a reason to change. */}
-      {chain.sms && (
+      {/* The bound case says its piece in a `?`; the *unbound* one stays a block, because
+          it is a fault an author has to act on — the conversation renders empty outside
+          edit mode until the button below is pressed, and a warning nobody hovers is a
+          warning nobody reads. */}
+      {chain.sms && hasPicker && (
         <div className="cb-ed-hint">
-          {hasPicker
-            ? 'Bound to whichever number this panel’s picker balloon is showing. The transcript below is not drawn — the balloons are the real messages — and Enter in the composer sends one for money. Nothing binds and nothing sends while the editor is open.'
-            : 'This panel has no picker balloon, so there is no number to bind to and the conversation renders empty outside edit mode. Add one below.'}
+          Bound to this panel&apos;s picker <Hint text={BOUND_HINT} />
+        </div>
+      )}
+      {chain.sms && !hasPicker && (
+        <div className="cb-ed-hint">
+          This panel has no picker balloon, so there is no number to bind to and the
+          conversation renders empty outside edit mode. Add one below.
         </div>
       )}
       {chain.sms && !hasPicker && (
@@ -125,20 +125,8 @@ export default function ChainInspector({ api, index, bubble }: ChainInspectorPro
               onChange={e => api.setChain(chain.id, { messages: parseMessages(e.target.value) })}
             />
           </label>
-          <div className="cb-ed-hint">
-            {total} message{total === 1 ? '' : 's'} — {out} sent, {total - out} received — through{' '}
-            {holders} row{holders === 1 ? '' : 's'}
-            {live ? ' (the bottom row is the composer)' : ''}
-            {total > holders ? ' — the wheel scrolls the rest into view.' : '.'}
-          </div>
+          <div className="cb-ed-hint">{transcriptSummary(total, out, holders, live)}</div>
         </>
-      )}
-      {live && (
-        <div className="cb-ed-hint">
-          Outside edit mode this conversation starts at the composer alone and grows by one
-          row per message, up to the {chain.rows} it holds — after that each new message
-          pushes the oldest visible one off the top.
-        </div>
       )}
 
       {members.length < 2 && (

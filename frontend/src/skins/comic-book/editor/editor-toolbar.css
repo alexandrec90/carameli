@@ -79,10 +79,20 @@
   margin-bottom: 8px;
 }
 
+/* A field is 100px wide in a two-up row and its label is a phrase — "top-left X %".
+   Truncated rather than wrapped, because a label that wraps makes its row taller than the
+   row beside it and the two sets of inputs stop lining up. The full wording stays in
+   reach: the row's `?` says what the block is. */
 .cb-ed-field > span {
   color: #9a9aa6;
   font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
+
+/* `.cb-ed-row`, which pairs two of these on one line, is ./editor-sections.css with the
+   rest of what keeps the toolbar narrow. */
 
 .cb-ed-select,
 .cb-ed-input,

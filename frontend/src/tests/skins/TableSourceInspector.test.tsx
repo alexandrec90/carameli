@@ -13,6 +13,17 @@ function editorApi() {
 
 const CELL_PLACEHOLDER = 'Ada Lovelace | 555-0101'
 
+/**
+ * Unfold the columns-and-cells block, which the inspector now ships closed.
+ *
+ * Every assertion about what is *in* that block goes through this rather than trusting
+ * that it is open — a `queryBy(...).toBeNull()` against a folded section would pass for
+ * the wrong reason and go on passing after the control it names had been deleted.
+ */
+function openColumns() {
+  fireEvent.click(screen.getByRole('button', { name: 'columns & rows' }))
+}
+
 describe('pointing a surface at a live feed', () => {
   it('offers the feeds the app has, plus typing the cells by hand', () => {
     const image = { ...seedConfig().images[0], table: newTable() }
@@ -67,9 +78,13 @@ describe('pointing a surface at a live feed', () => {
     const image = { ...seedConfig().images[0], table: liveTable(newTable(), 'sms') }
     render(<TableInspector api={editorApi()} index={0} image={image} />)
 
+    openColumns()
     expect(screen.queryByPlaceholderText(CELL_PLACEHOLDER)).toBeNull()
-    expect(screen.getByText(/rows come from the live sms messages/i)).toBeTruthy()
-    expect(screen.getByText(/without reloading the page/i)).toBeTruthy()
+    expect(screen.getByText(/live sms messages, newest first/i)).toBeTruthy()
+    // The rest of what that block used to say is the `?` beside it, and on the feed
+    // select above — same words, one badge each instead of two paragraphs.
+    expect(screen.getByTitle(/^Rows come from the live records and refresh on their own/i)).toBeTruthy()
+    expect(screen.getByTitle(/without reloading the page/i)).toBeTruthy()
   })
 
   // A feed's cells are positional, so removing the middle column would not remove that
@@ -78,6 +93,7 @@ describe('pointing a surface at a live feed', () => {
     const image = { ...seedConfig().images[0], table: liveTable(newTable(), 'calls') }
     render(<TableInspector api={editorApi()} index={0} image={image} />)
 
+    openColumns()
     expect(screen.queryByRole('button', { name: '+ Column' })).toBeNull()
     expect(screen.queryByRole('button', { name: '−' })).toBeNull()
   })
@@ -87,6 +103,7 @@ describe('pointing a surface at a live feed', () => {
     const image = { ...seedConfig().images[0], table: liveTable(newTable(), 'calls') }
     render(<TableInspector api={api} index={0} image={image} />)
 
+    openColumns()
     const widths = screen.getAllByLabelText('width')
     expect(widths).toHaveLength(LIVE_TABLE_FEEDS.calls.columns.length)
     fireEvent.change(widths[0], { target: { value: '2.5' } })
@@ -102,6 +119,7 @@ describe('pointing a surface at a live feed', () => {
     const image = { ...seedConfig().images[0], table: newTable() }
     render(<TableInspector api={editorApi()} index={0} image={image} />)
 
+    openColumns()
     expect(screen.getByPlaceholderText(CELL_PLACEHOLDER)).toBeTruthy()
     expect(screen.getByRole('button', { name: '+ Column' })).toBeTruthy()
   })
