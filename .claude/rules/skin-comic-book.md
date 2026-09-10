@@ -318,15 +318,17 @@ surface (in `configSeed.ts`, `configHydrate.ts` and `serializeTable.ts` alike), 
   out as smudges at the few pixels a band actually is, so it is a word now
   (`CALL_STATUS_LABELS`). `.cb-ptable-clip` is the backstop — `hidden` over a window
   nothing scrolls past, not the scroll container rule 18 forbids.
-- **A row under the pointer is lit by the number pad's own light** — the same rules, in
-  `lit-surface.css`, not a copy of them, because a key and a row are the same gesture on
-  the same photograph. Each surface names itself in those selector lists and brings its own
-  `--cb-lit-ink`; a second set of lighting keyframes anywhere under the skin fails
-  `comicBookLitSurface.test.ts`. It is a band behind the table (`TableRowGlow.tsx`),
-  placed by band arithmetic and
-  **carrying no z-index** — that is what keeps a picture at a greater depth over the light
-  as well as over the rows. Only rows with a record behind them light: the blank bands
-  `visibleRows` pads the window with are ruled line and nothing else.
+- **A row under the pointer takes one flat wash of the authored ink and nothing else** —
+  `TableRowBand.tsx`, placed by band arithmetic so it lands on the row's own ruled line.
+  **Deliberately not the number pad's glow**, which is what it started as: the pad's
+  glyphs are `transparent` outside the editor, so its light is the only thing saying a key
+  is there and has to breathe, flare and throw a halo to be seen — while a row is already
+  written on the page, a halo blurs across the ruled lines either side of it, and a wash
+  bright enough to glow is one the row's blue lettering stops reading through. No
+  keyframes, no `box-shadow`, no pressed state; `ProjectedTable.test.tsx` asserts the
+  absence of each. It **carries no z-index** — that is what keeps a picture at a greater
+  depth over the wash as well as over the rows. Only rows with a record behind them wash:
+  the blank bands `visibleRows` pads the window with are ruled line and nothing else.
 - **The quad is what puts the rows on the drawn lines**, seated against the artwork rather
   than by eye: bands are equal, so the bottom edge belongs *on* the last ruled line and
   the top edge exactly one band above the first (`notepadRuling.test.ts` checks the

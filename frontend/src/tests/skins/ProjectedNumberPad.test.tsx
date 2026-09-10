@@ -69,12 +69,12 @@ describe('ProjectedNumberPad', () => {
     // Invisible on the picture: the glyphs are the accessible name, drawn in nothing.
     expect(reader.surface!.style.color).toBe('transparent')
     // The glow is drawn in the authored ink, so it has to survive that.
-    expect(reader.surface!.style.getPropertyValue('--cb-lit-ink')).toBe(ink)
+    expect(reader.surface!.style.getPropertyValue('--cb-number-pad-ink')).toBe(ink)
     reader.unmount()
 
     const editor = draw(true)
     expect(editor.surface!.style.color).not.toBe('transparent')
-    expect(editor.surface!.style.getPropertyValue('--cb-lit-ink')).toBe(ink)
+    expect(editor.surface!.style.getPropertyValue('--cb-number-pad-ink')).toBe(ink)
   })
 
   it('lands the pad on its quad with the shared projective transform', () => {

@@ -98,13 +98,14 @@ describe('PanelImages depth', () => {
   })
 
   /*
-   * The same statement about the *light* on a row rather than the row itself, and it needs
-   * saying separately because a highlight is the thing somebody reaches for a z-index to
-   * fix. The band lit under the pointer rides inside the notepad's wrapper like the rows
-   * do, so the hand at depth 1 passes over it; one z-index on the band — or on the table
-   * in front of it — would lift the glow out of the paint order and light the hand.
+   * The same statement about the *highlight* on a row rather than about the row itself, and
+   * it needs saying separately because a highlight is the thing somebody reaches for a
+   * z-index to fix. The band washed under the pointer rides inside the notepad's wrapper
+   * like the rows do, so the hand at depth 1 passes over it; one z-index on the band — or
+   * on the table in front of it — would lift the wash out of the paint order and tint the
+   * hand with it.
    */
-  it('draws a picture in front of the light thrown on the rows behind it', () => {
+  it('draws a picture in front of the band washed behind the rows', () => {
     const container = draw([
       img(NOTEPAD, { z: 0, table: newTable() }),
       img(HAND, { z: 1 }),
@@ -113,13 +114,13 @@ describe('PanelImages depth', () => {
     expect(row).not.toBeNull()
     fireEvent.pointerEnter(row!)
 
-    const glow = container.querySelector('.cb-ptable-glow')
+    const band = container.querySelector('.cb-ptable-band')
     const hand = container.querySelector(`img[src="${HAND}"]`)
-    expect(glow).not.toBeNull()
-    expect(glow!.compareDocumentPosition(hand!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(band).not.toBeNull()
+    expect(band!.compareDocumentPosition(hand!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
 
     // Document order only decides it while neither side has stepped out of it.
-    for (const el of [glow!, container.querySelector('table.cb-ptable')!]) {
+    for (const el of [band!, container.querySelector('table.cb-ptable')!]) {
       expect((el as HTMLElement).style.zIndex).toBe('')
     }
   })

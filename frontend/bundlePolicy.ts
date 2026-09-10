@@ -219,17 +219,18 @@ export const MAX_LAZY_CHUNK_BYTES = 260 * 1024
  * the `import.meta.env.DEV` test and are not in this number. Same lazy comic-book chunk,
  * still 46 of them, `package.json` untouched, so nothing new was pulled in.
  *
- * This raise (987 → 988) is the projected table's row highlight: 0.75 KB measured as this
- * branch's build (987.44 KB) against a build of the same checkout with the four changed
- * skin files reverted (986.69 KB, same `node_modules`). The bytes are `TableRowGlow.tsx`,
- * the hovered/pressed row state and its four pointer handlers in `ProjectedTable.tsx`, and
+ * This raise (987 → 988) is the projected table's row highlight: 0.57 KB measured as this
+ * branch's build (987.26 KB) against a build of the same checkout with the changed skin
+ * files reverted (986.69 KB, same `node_modules`). The bytes are `TableRowBand.tsx`, the
+ * hovered-row state and its two pointer handlers in `ProjectedTable.tsx`, and
  * `filledRows`/`rowBand` in `tableData.ts`. Same lazy comic-book chunk, still 46 of them,
  * `package.json` untouched, so nothing new was pulled in.
  *
- * The CSS ceiling below is untouched by that change, and deliberately: the light a lit row
- * is drawn in is the number pad's own, moved to `lit-surface.css` and shared rather than
- * copied. Written out a second time it cost 1.66 KB of CSS and would have wanted a raise
- * there too — the same animation, twice, is not a thing to buy shelf space for.
+ * The CSS ceiling below does not move with it, and the reason is worth keeping: the band
+ * is **one `background-color`**. It began as the number pad's glow — the same keyframes,
+ * the same halo, the same pressed flare — which is 1.66 KB of CSS written a second time
+ * and would have wanted a raise here as well. A row turns out to need none of it
+ * (`table.css` says why), so what ships is a single flat wash, and 0.24 KB.
  */
 export const MAX_TOTAL_JS_BYTES = 988 * 1024
 

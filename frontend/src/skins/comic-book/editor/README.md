@@ -560,14 +560,13 @@ panelGridCut.ts     PURE: cut one ring in two along a straight line, inserting t
 ../tableProjection.ts PURE: the corner quad -> homography -> `matrix3d`, and the layout box
 ../tableData.ts     PURE: rows visible at an offset, wheel-to-rows, column widths, cell text
 ../ProjectedTable.tsx one picture's surface: the projected table, its wheel and its keys
-../table.css        surface + cell styles, the lit row's band, and the editor-only band guides
-../TableRowGlow.tsx the band lit behind the row under the pointer, placed by band arithmetic
+../table.css        surface + cell styles, the hovered row's band, and the editor-only band guides
+../TableRowBand.tsx the flat wash behind the row under the pointer, placed by band arithmetic
 ../useLiveTableImages.ts hook + PURE: which feeds a page needs, and the rows dropped onto its surfaces
 ../../../lib/liveTables.ts PURE: the feeds, their columns, and record -> row (shared, no fetching)
 ../../../hooks/useLiveTables.ts hook: the only place a surface's rows are fetched, and the poll
 ../ProjectedNumberPad.tsx fixed 3 × 4 telephone keys on a projected surface; live buttons outside edit mode
-../number-pad.css   number-pad lettering, surface layout, and the live key's focus ring
-../lit-surface.css  SHARED: the light a projected surface throws on a hovered/pressed key or row
+../number-pad.css   number-pad lettering, surface layout, and the live key's press states
 ../BubbleActions.tsx action buttons inside a balloon, one per comma-delimited entry
 ../phoneActions.ts  PURE: label -> the telephone key it draws, and the softphone verb it runs
 ../panelGeometry.ts PURE grid -> polygon geometry: frame, normalised space, vertex constraints

@@ -2,10 +2,7 @@ import type { CSSProperties, KeyboardEvent, PointerEvent } from 'react'
 
 import type { NumberPadProjection } from './editor/types'
 import { surfaceStyle } from './tableProjection'
-// The pad's own shape, and the light a projected surface throws on the thing under the
-// pointer — shared with the projected table's rows, which is why it is not in the first.
 import './number-pad.css'
-import './lit-surface.css'
 
 interface ProjectedNumberPadProps {
   numberPad: NumberPadProjection
@@ -51,7 +48,7 @@ export default function ProjectedNumberPad({
     height,
     transform,
     color: editing ? numberPad.ink : 'transparent',
-    ['--cb-lit-ink' as string]: numberPad.ink,
+    ['--cb-number-pad-ink' as string]: numberPad.ink,
     fontSize: `${(height / 4) * numberPad.fontScale}px`,
     pointerEvents: live ? 'auto' : 'none',
     gridTemplateColumns: 'repeat(3, 1fr)',
