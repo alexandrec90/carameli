@@ -594,9 +594,10 @@ serializeNumberPad.ts PURE: a number pad as the nested block on a picture's line
 tsLiteral.ts        PURE: quoting and number rounding shared by the two serializers
 useTableCornerDrag.ts hook: dragging a corner grip, and the clamped single-corner edit
 TableCorners.tsx    the four corner grips shared by both projected content types
-TableInspector.tsx  table controls: the on/off switch, the live-feed select, rows, text, ink, headings, corners
+TableInspector.tsx  table controls: the on/off switch, the live-feed select, rows, text, ink, headings
+QuadCorners.tsx     the eight corner coordinates + Reset, folded; shared by table and number pad
 NumberPadInspector.tsx number-pad on/off, text, ink, and corner controls
-TableColumnsInspector.tsx  the columns list, and the cell-text box an authored surface has
+TableColumnsInspector.tsx  the columns list, and the cell-text box an authored surface has (folded)
 editor-table.css    corner grip and table-inspector styles
 serialize.ts        PURE serialization back to layoutConfig.ts (headers included)
 transforms.ts       PURE helpers: CSS builders, frame/drag/scale math, clamp
@@ -609,10 +610,15 @@ InspectorPanel.tsx  selection inspector: read-outs, spill, per-element reset, de
 ImageInspector.tsx  picture-only controls: panel, picture, alt, anchor
 BubbleInspector.tsx bubble-only controls: panel, type, tail, content, text, hover/click, link
 ChainInspector.tsx  the chain half of that inspector: rows, an unbound chain's messages, + column, + picker
+chainHints.ts       PURE: the conversation's wording, and the transcript summary line
+bubbleHints.ts      PURE: what each content kind does with the text box, as the field's `?`
 PageSelect.tsx      toolbar dropdown: switch page / preview the loading screen
 pageSelection.ts    PURE helpers behind PageSelect (sentinel value, selection resolution)
 ../bubbleChains.css chain row placement + the arrival/scroll animations (ships in prod)
+Hint.tsx            a paragraph as a `?` badge: the tooltip the inspector's prose became
+Section.tsx         a foldable inspector block (corners, cells, the drag read-out)
 editor.css          overlay chrome styles
+editor-sections.css foldable sections, the `?` badge, and the paired-field row
 editor-shapes.css   seam and vertex handle styles
 ```
 

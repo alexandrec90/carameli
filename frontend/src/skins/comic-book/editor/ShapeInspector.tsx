@@ -3,6 +3,7 @@ import { useState } from 'react'
 import type { LayoutKind, PanelGrid } from '../panelGeometry'
 import { constraintOf } from '../panelGeometry'
 import type { PanelPage } from '../panels'
+import Hint from './Hint'
 import type { CutAxis } from './panelGridCut'
 import { insertBend, moveVertex } from './panelGridOps'
 import PanelNameField from './PanelNameField'
@@ -30,6 +31,22 @@ const CONSTRAINT_TEXT: Record<string, string> = {
   right: 'on the right frame edge — slides up and down',
   locked: 'frame corner — fixed',
 }
+
+const GRID_HINT =
+  'A page has three grids, one per window shape, and this edits the one the window is '
+  + 'currently showing. The other two keep their own shapes.'
+
+const SPLIT_HINT =
+  'Cut this panel in two along a straight line through its middle. The upper or left half '
+  + 'keeps this panel’s name, pictures and bubbles; the other half is a new panel, on '
+  + 'every window shape of this page. The new line is then a seam like any other — drag '
+  + 'it, bend it, merge its corners.'
+
+const RESHAPE_HINT =
+  'Click a panel to cut it in two. Drag a line to move it, or a corner to move that end. '
+  + 'Double-click a line to break it — repeat for a lightning bolt. Drop a corner onto a '
+  + 'neighbouring one to merge the two; Alt-drag a corner to tear a junction back apart. '
+  + 'The outer frame and the gutters are fixed.'
 
 /** A percentage typed into a field, back as a 0..1 fraction; NaN falls back to `fallback`. */
 function fromPercent(value: string, fallback: number): number {
@@ -76,21 +93,15 @@ export default function ShapeInspector({ api, page, kind, grid, drag }: ShapeIns
   return (
     <div className="cb-ed-shape">
       <div className="cb-ed-shape-kind">
-        Editing the <strong>{kind}</strong> grid — the other two keep their own shapes.
+        Editing the <strong>{kind}</strong> grid <Hint text={GRID_HINT} />
       </div>
 
       {panelInfo && panelIndex !== null ? (
         <>
-          <div className="cb-ed-label">{panelInfo.label} panel</div>
+          <div className="cb-ed-label">{panelInfo.label} panel <Hint text={SPLIT_HINT} /></div>
           {/* Editable here as well as in content mode: a split selects the half it just
               made, and naming it is the next thing an author does. */}
           <PanelNameField api={api} panel={panelIndex} />
-          <div className="cb-ed-hint">
-            Cut it in two along a straight line through its middle. The upper or left
-            half keeps this panel&apos;s name, pictures and bubbles; the other half is a new
-            panel, on every window shape of this page. The new line is then a seam like
-            any other — drag it, bend it, merge its corners.
-          </div>
           <div className="cb-ed-row">
             <button
               type="button"
@@ -120,10 +131,7 @@ export default function ShapeInspector({ api, page, kind, grid, drag }: ShapeIns
       ) : !vertex || constraint === null ? (
         <>
           <div className="cb-ed-hint">
-            Click a panel to cut it in two. Drag a line to move it, or a corner to move
-            that end. Double-click a line to break it — repeat for a lightning bolt. Drop
-            a corner onto a neighbouring one to merge the two; Alt-drag a corner to tear
-            a junction back apart. The outer frame and the gutters are fixed.
+            Nothing selected <Hint text={RESHAPE_HINT} />
           </div>
           {seam && (
             <button
