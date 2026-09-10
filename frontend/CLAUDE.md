@@ -1,6 +1,6 @@
 # Frontend
 
-Vite serves on `:5173` and proxies `/auth`, `/vsapi`, `/vg`, and `/health` to the backend.
+Vite proxies `/api`, `/auth`, `/vsapi`, `/vg`, and `/health` to the backend.
 Browser authentication uses the HttpOnly session cookie from `/auth/session`; never put
 an API key or provider credential in the bundle.
 
@@ -15,6 +15,32 @@ an API key or provider credential in the bundle.
   authenticated entries to `/vg/1.0.0/frontend-logs`; never log secrets or message bodies.
 - Follow `.claude/rules/skin-architecture.md` and the active skin's scoped rule for skin
   work. Use the `add-skin` skill only when creating an entirely new skin.
+
+## Which port your dev server is on
+
+**A worktree does not serve on `:5173`, and opening it anyway shows you another
+checkout's build.** That page renders perfectly and is simply the wrong one, so a
+screenshot taken of it is evidence about code you did not edit — the failure this
+section exists to stop, which has cost sessions a couple of rounds each before anyone
+noticed.
+
+| Where Vite runs | Port |
+| --- | --- |
+| `docker compose` (`./frontend:/app`) | the host's `FRONTEND_HOST_PORT`, mapped onto a container that always serves 5173 |
+| host `npm run dev`, ordinary checkout | 5173 |
+| host `npm run dev`, worktree | `5173 + portOffset(<worktree dir>)`, in `5174..5188` |
+
+The offset is derived from the worktree's directory name — stable across restarts, and
+needing no `.env`, because two of the three ways a worktree is cut here run no project
+code at the time. `worktreePort.ts` carries why that is derived rather than leased from
+devkit's `ports.toml`, which allocates the published `FRONTEND_HOST_PORT` and not this.
+
+Don't compute it: **read the port off Vite's startup line**, which is the one source
+that is right in all three rows. `strictPort: true` means there is no fourth case where
+it quietly slid somewhere else — a collision (two worktrees hashing alike, or a derived
+port meeting a leased `FRONTEND_HOST_PORT`) is a startup error, and
+`VITE_PORT=5186 npm run dev` steps around it. `VITE_PREVIEW_PORT` does the same for
+`npm run preview`, which takes the same offset over base 4173.
 
 Verify frontend changes with `npm run test:run` and `npm run lint` from this directory.
 
