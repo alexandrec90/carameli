@@ -265,8 +265,9 @@ separate line layer — a separator is the two panels' own borders either side o
 (`PANEL_BUBBLE_CHAINS`) and each panel's pattern style (`PANEL_PATTERNS`, the one array
 parallel to `PANELS`); per-panel palette and dot metrics stay in `PANEL_BG_CONFIGS`
 (`panelPatterns.ts`), read via `panelBgConfig` so a panel past the palette's end wraps
-round. `hoverBold` is the balloon's own only — its tail and puffs bold with it, a tube and
-the balloon at its far end do not. `Layout.tsx` reads from these arrays: **no magic
+round. `hoverBold` is **on by default** (`NEW_BUBBLE`) and on for every shipped balloon,
+fields and chain templates included; it is the balloon's own only — its tail and puffs bold
+with it, a tube and the balloon at its far end do not. `Layout.tsx` reads from these arrays: **no magic
 framing numbers** in it or the CSS, and no bubble text. Retune through the editor.
 
 **Save overwrites `layoutConfig.ts` verbatim** with what `serialize.ts` emits, so anything
