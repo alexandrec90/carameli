@@ -13,7 +13,7 @@ import { PANEL_GRIDS } from '../../skins/comic-book/editor/layoutConfig'
 import { moveVertex } from '../../skins/comic-book/editor/panelGridOps'
 import { bubbleRect, imgRect } from '../../skins/comic-book/editor/transforms'
 import type { BubbleTransform, ImgTransform, PanelGrid } from '../../skins/comic-book/editor/types'
-import { constraintOf, gridPolys } from '../../skins/comic-book/panelGeometry'
+import { constraintOf, frameRect, gridPolys } from '../../skins/comic-book/panelGeometry'
 
 // A shapes-mode edit replaces a panel grid; these ops hold every picture and every
 // balloon still while it does. Both are stored in % of their panel's bounding box, so
@@ -21,6 +21,10 @@ import { constraintOf, gridPolys } from '../../skins/comic-book/panelGeometry'
 
 const W = 1008
 const H = 708
+/** The landscape frame in that window — what the renderer draws the panels in. */
+const F = frameRect(W, H, 'landscape')
+/** No window yet: the remap has nothing to measure in and leaves everything alone. */
+const ZERO = { x: 0, y: 0, w: 0, h: 0 }
 
 /** Two panels split by a vertical seam at x = 0.5. */
 const SPLIT: PanelGrid = {
@@ -115,9 +119,9 @@ describe('remapBubbleBox', () => {
 describe('remapImagesToGrid', () => {
   it('holds every picture still on screen when the seam between its panels moves', () => {
     const images = [img(0), img(1)]
-    const before = gridPolys(SPLIT, W, H)
-    const after = gridPolys(SPLIT_MOVED, W, H)
-    const out = remapImagesToGrid(images, SPLIT, SPLIT_MOVED, W, H)
+    const before = gridPolys(SPLIT, F)
+    const after = gridPolys(SPLIT_MOVED, F)
+    const out = remapImagesToGrid(images, SPLIT, SPLIT_MOVED, F)
     for (const i of [0, 1]) {
       expectRectClose(imgRect(after[i].bounds, out[i]), imgRect(before[i].bounds, images[i]))
     }
@@ -128,7 +132,7 @@ describe('remapImagesToGrid', () => {
 
   it('returns the same entry when the panel box did not change', () => {
     const a = img(0)
-    expect(remapImagesToGrid([a], SPLIT, cloneGrid(SPLIT), W, H)[0]).toBe(a)
+    expect(remapImagesToGrid([a], SPLIT, cloneGrid(SPLIT), F)[0]).toBe(a)
   })
 
   it('leaves alone a picture on an empty ring (a panel on the other page)', () => {
@@ -138,26 +142,26 @@ describe('remapImagesToGrid', () => {
       panels: [...SPLIT_MOVED.panels.map(r => [...r]), []],
     }
     const a = img(2)
-    expect(remapImagesToGrid([a], withEmpty, movedWithEmpty, W, H)[0]).toBe(a)
+    expect(remapImagesToGrid([a], withEmpty, movedWithEmpty, F)[0]).toBe(a)
   })
 
   it('leaves alone a picture whose panel outruns the grid', () => {
     const a = img(99)
-    expect(remapImagesToGrid([a], SPLIT, SPLIT_MOVED, W, H)[0]).toBe(a)
+    expect(remapImagesToGrid([a], SPLIT, SPLIT_MOVED, F)[0]).toBe(a)
   })
 
-  it('is a no-op with no viewport to measure in', () => {
+  it('is a no-op with no frame to measure in', () => {
     const images = [img(0)]
-    expect(remapImagesToGrid(images, SPLIT, SPLIT_MOVED, 0, 0)).toBe(images)
+    expect(remapImagesToGrid(images, SPLIT, SPLIT_MOVED, ZERO)).toBe(images)
   })
 })
 
 describe('remapBubblesToGrid', () => {
   it('holds every balloon still on screen when the seam between its panels moves', () => {
     const bubbles = [bubble(0), bubble(1)]
-    const before = gridPolys(SPLIT, W, H)
-    const after = gridPolys(SPLIT_MOVED, W, H)
-    const out = remapBubblesToGrid(bubbles, SPLIT, SPLIT_MOVED, W, H)
+    const before = gridPolys(SPLIT, F)
+    const after = gridPolys(SPLIT_MOVED, F)
+    const out = remapBubblesToGrid(bubbles, SPLIT, SPLIT_MOVED, F)
     for (const i of [0, 1]) {
       expectRectClose(bubbleRect(after[i].bounds, out[i]), bubbleRect(before[i].bounds, bubbles[i]))
     }
@@ -170,9 +174,9 @@ describe('remapBubblesToGrid', () => {
       { ...bubble(0), chain: 'thread', top: 10 },
       { ...bubble(0), chain: 'thread', top: 40 },
     ]
-    const before = gridPolys(SPLIT, W, H)[0].bounds
-    const after = gridPolys(SPLIT_MOVED, W, H)[0].bounds
-    const out = remapBubblesToGrid(column, SPLIT, SPLIT_MOVED, W, H)
+    const before = gridPolys(SPLIT, F)[0].bounds
+    const after = gridPolys(SPLIT_MOVED, F)[0].bounds
+    const out = remapBubblesToGrid(column, SPLIT, SPLIT_MOVED, F)
 
     expect(out.map(b => b.chain)).toEqual(['thread', 'thread'])
     expect(out[0].top).toBeLessThan(out[1].top)
@@ -185,17 +189,17 @@ describe('remapBubblesToGrid', () => {
 
   it('returns the same entry when the panel box did not change', () => {
     const a = bubble(0)
-    expect(remapBubblesToGrid([a], SPLIT, cloneGrid(SPLIT), W, H)[0]).toBe(a)
+    expect(remapBubblesToGrid([a], SPLIT, cloneGrid(SPLIT), F)[0]).toBe(a)
   })
 
   it('leaves alone a balloon whose panel outruns the grid', () => {
     const a = bubble(99)
-    expect(remapBubblesToGrid([a], SPLIT, SPLIT_MOVED, W, H)[0]).toBe(a)
+    expect(remapBubblesToGrid([a], SPLIT, SPLIT_MOVED, F)[0]).toBe(a)
   })
 
-  it('is a no-op with no viewport to measure in', () => {
+  it('is a no-op with no frame to measure in', () => {
     const bubbles = [bubble(0)]
-    expect(remapBubblesToGrid(bubbles, SPLIT, SPLIT_MOVED, 0, 0)).toBe(bubbles)
+    expect(remapBubblesToGrid(bubbles, SPLIT, SPLIT_MOVED, ZERO)).toBe(bubbles)
   })
 })
 
@@ -210,8 +214,8 @@ function nudgedShippedGrid() {
 
 /** The first panel the nudge actually reshapes, and the two boxes it moves between. */
 function reshapedPanel(moved: PanelGrid) {
-  const before = gridPolys(PANEL_GRIDS.classic.landscape, W, H)
-  const after = gridPolys(moved, W, H)
+  const before = gridPolys(PANEL_GRIDS.classic.landscape, F)
+  const after = gridPolys(moved, F)
   const panel = before.findIndex(
     (p, i) => p.bounds.w > 0 && JSON.stringify(p.bounds) !== JSON.stringify(after[i].bounds),
   )
@@ -225,7 +229,7 @@ describe('setGridKeepingContent', () => {
     const { panel, before, after } = reshapedPanel(moved)
 
     const cfg = { ...seedConfig(), images: [img(panel)], bubbles: [bubble(panel)] }
-    const next = setGridKeepingContent(cfg, 'classic', 'landscape', moved, { w: W, h: H })
+    const next = setGridKeepingContent(cfg, 'classic', 'landscape', moved, F)
 
     expect(next.grids.classic.landscape).toEqual(moved)
     expectRectClose(imgRect(after, next.images[0]), imgRect(before, cfg.images[0]))
@@ -243,8 +247,8 @@ describe('resetGridKeepingContent', () => {
     const { panel } = reshapedPanel(moved)
     const cfg = { ...seedConfig(), images: [img(panel)], bubbles: [bubble(panel)] }
 
-    const dragged = setGridKeepingContent(cfg, 'classic', 'landscape', moved, { w: W, h: H })
-    const back = resetGridKeepingContent(dragged, 'classic', 'landscape', { w: W, h: H })
+    const dragged = setGridKeepingContent(cfg, 'classic', 'landscape', moved, F)
+    const back = resetGridKeepingContent(dragged, 'classic', 'landscape', F)
 
     expect(back.grids.classic.landscape).toEqual(PANEL_GRIDS.classic.landscape)
     for (const field of ['left', 'top', 'width', 'height'] as const) {

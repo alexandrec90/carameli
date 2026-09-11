@@ -126,7 +126,7 @@ describe('serializeConfig', () => {
   it('carries the explanatory headers, the same-panel link rule included', () => {
     const ts = serializeConfig(seedConfig())
     expect(ts).toContain('Not parallel to PANELS: each picture names its `panel`')
-    expect(ts).toContain("the panel's own polygon scaled into it")
+    expect(ts).toContain('a rectangle of\n// picture and never a smaller comic panel')
     expect(ts).toContain('must name a bubble on the same panel')
     expect(ts).toContain("`tail` which way the tail points ('none'")
     expect(ts).toContain('Two pairs ship linked')
