@@ -289,10 +289,9 @@ when they disagreed, the bubble you could click was not the one a tube pointed a
 
 ## A picture can be a projected table surface
 
-Any picture may carry an optional `table` drawing an HTML table onto the surface it depicts
-— a notepad, a whiteboard, a screen. The field is **absent** on a picture that is not a
-surface (in `configSeed.ts`, `configHydrate.ts` and `serializeTable.ts` alike), so
-`'table' in img` is reliable.
+Any picture may carry an optional `table` drawing an HTML table onto the surface it depicts — a
+notepad, a whiteboard, a screen. The field is **absent** on a picture that is not a surface (in
+`configSeed.ts`, `configHydrate.ts` and `serializeTable.ts` alike), so `'table' in img` is reliable.
 
 - **The tilt is a projective map, not a rotation.** `tableProjection.ts` takes the four
   corners (`quad`, in % of the picture's *rendered* rect via `surfaceBaseRect`, so a pan,
@@ -315,12 +314,14 @@ surface (in `configSeed.ts`, `configHydrate.ts` and `serializeTable.ts` alike), 
   `FONT_SCALE.max + BAND_SIT <= 1` is the invariant (`tableData.test.ts`). **A cell holds
   lettering and nothing else** — artwork at the few pixels a band actually is came out as
   smudges, so the call log's status is a word (`CALL_STATUS_LABELS`). `.cb-ptable-clip` is
-  the backstop — `hidden` over a window nothing scrolls past, not a scroll container.
+  the backstop — `hidden` over a window nothing scrolls past, not the scroll container
+  rule 18 forbids.
 - **A row under the pointer takes one flat wash of the authored ink and nothing else** —
   `TableRowBand.tsx`, placed by band arithmetic so it lands on the row's own ruled line;
   the number pad's glow would blur the ruling and the lettering. **No keyframes,
   `box-shadow` or pressed state** (`ProjectedTable.test.tsx`), and **no z-index**, so deeper
-  pictures cover both wash and rows. Only rows backed by records wash; padding stays blank.
+  pictures cover both wash and rows. Only rows backed by records wash; `visibleRows`
+  padding stays blank.
 - **The quad is what puts the rows on the drawn lines**, seated against the artwork rather
   than by eye: bands are equal, so the bottom edge belongs *on* the last ruled line and
   the top edge exactly one band above the first (`notepadRuling.test.ts` checks the
@@ -329,30 +330,29 @@ surface (in `configSeed.ts`, `configHydrate.ts` and `serializeTable.ts` alike), 
   rules the sheet; the lines stopping at the writing area are the editor's band guides,
   drawn through the same projection as the rows.
 
-**A surface can show live records instead of authored cells.** `table.source` names a feed
-— `'calls'` or `'sms'`, from `TABLE_SOURCES` in `lib/liveTables.ts` — and is **absent** on
-an authored surface. The skin names a feed and is handed rows: `hooks/useLiveTables.ts` is
-the only module in the chain that touches the API and `lib/liveTables.ts` owns the columns
-and record-to-row mapping, so no customer id or endpoint appears under `skins/`. Rows are
-injected in `Layout.tsx` between the editor's working copy and the panels
-(`useLiveTableImages`), so every component below stays renderable from a plain config in a
-test and the editor keeps holding the authored surface.
+**A surface can show live records instead of authored cells.** `table.source` names a feed —
+`'calls'` or `'sms'`, from `TABLE_SOURCES` in `lib/liveTables.ts` — and is **absent** on an
+authored surface. The skin names a feed and is handed rows: `hooks/useLiveTables.ts` is the only
+module in the chain that touches the API and `lib/liveTables.ts` owns the columns and
+record-to-row mapping, so no customer id or endpoint appears under `skins/`. Rows are injected in
+`Layout.tsx` between the editor's working copy and the panels (`useLiveTableImages`), so every
+component below stays renderable from a plain config in a test and the editor keeps holding the
+authored surface.
 
-- **`data` stays empty for a live surface — a privacy invariant, not tidiness.** The feed
-  is call and message history, so saved rows would put real phone numbers into
-  `layoutConfig.ts`. Enforced three times: the injection is downstream of the editor's
-  config, `coerceTable` empties `data` when a source is set, and the inspector's feed
-  switch replaces the cells.
-- **A live surface's columns are the feed's**, because the mapper emits cells positionally;
-  widths, alignment and headings stay the author's, but the editor hides **+ Column** /
-  **−**, and `feedColumns` (`editor/tableValidate.ts`) replaces any list that is not the
-  feed's length on the way out — for one reason, a tab older than the feed's shape.
-- **Live means polling** — `useLiveTables` re-asks every `LIVE_TABLE_POLL_MS`, skips a
-  hidden tab and refreshes on `visibilitychange`, returning the *identical* row array when
-  nothing changed so a quiet poll repaints no canvas; a failed refresh keeps the rows on
-  screen. `?sim=1` frames a surface against a full table instead (`lib/simTables.ts`,
-  dev-only, `localStorage['live-tables:sim']`), built through the feed's own mapper so no
-  cell drifts out from under its heading.
+- **`data` stays empty for a live surface — a privacy invariant, not tidiness.** The feed is call
+  and message history, so saved rows would put real phone numbers into `layoutConfig.ts`. Enforced
+  three times: the injection is downstream of the editor's config, `coerceTable` empties `data`
+  when a source is set, and the inspector's feed switch replaces the cells.
+- **A live surface's columns are the feed's**, because the mapper emits cells positionally; widths,
+  alignment and headings stay the author's, but the editor hides **+ Column** / **−**, and
+  `feedColumns` (`editor/tableValidate.ts`) replaces any list that is not the feed's length on the
+  way out — for one reason, a tab older than the feed's shape.
+- **Live means polling** — `useLiveTables` re-asks every `LIVE_TABLE_POLL_MS`, skips a hidden tab
+  and refreshes on `visibilitychange`, returning the *identical* row array when nothing changed so
+  a quiet poll repaints no canvas; a failed refresh keeps the rows on screen. `?sim=1` frames a
+  surface against a full table instead (`lib/simTables.ts`, dev-only,
+  `localStorage['live-tables:sim']`), built through the feed's own mapper so no cell drifts out
+  from under its heading.
 
 ## An `actions` balloon is the telephone's keypad, not a toolbar
 
@@ -421,16 +421,16 @@ beside it, precisely what a balloon cannot see.
 | Claim | Who | Owns the panel when |
 | --- | --- | --- |
 | `CLAIM_COMPOSER` | a chain whose sender template is a field | nothing outranks it and nothing is hovered |
-| `CLAIM_FIELD` | `input`, `phone`, `dial`, `dial-call` | it is the only field on the panel |
+| `CLAIM_FIELD` | `input`, `phone`, `dial`, `dial-call` | it is the panel's first field and no composer is drawn beside it |
 | `CLAIM_POINTER` | `wheel` | only while hovered — it takes the scroll, so a composer beside it must let go |
 | `CLAIM_NONE` | lettering, `actions`, `transcript`, `number-hangup` | never |
 
-Three rules decide it in order: **the pointer wins**, then **the highest claim wins if it
-stands alone**, then **a tie owns nothing** — the config's first input is not a fact the
-reader can see. **Never re-spell this inside a balloon**: two components each carried a
-private half of it, which is why an `input` balloon drawn anywhere else sat ignoring the
-keyboard until clicked. A new content kind joins by naming a claim in `bubbleClaim`, a new
-panel-level owner by ranking above `CLAIM_FIELD`.
+**The pointer wins**, then the highest claim owns the keyboard; ties go to the first drawn.
+For SMS, hovering the number borrows the keyboard from the composer; leaving returns it.
+`useRevealedField` restores focus after a click on artwork, panel ground or a balloon outline
+(`relatedTarget === null`). It preserves deliberate focus moves to another control, including
+Tab and the call key. **Keep this routing shared**: a kind joins through `bubbleClaim`,
+and a preferred owner ranks above `CLAIM_FIELD`.
 
 ## Dev-only visual editor
 

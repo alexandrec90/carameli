@@ -3,7 +3,11 @@
 
 import json
 import re
+import sys
+from pathlib import Path
 from types import SimpleNamespace
+
+import pytest
 
 from conftest import load_module
 
@@ -343,6 +347,72 @@ def test_detect_secrets_restores_timestamp_only_churn(monkeypatch, tmp_path, cap
     assert "detect-secrets" not in capsys.readouterr().out
 
 
+def test_detect_secrets_failure_keeps_the_tools_own_output(monkeypatch, tmp_path):
+    # The reported defect. In a fresh worktree detect-secrets is not there, the shell
+    # says "'detect-secrets' is not recognized...", and this used to replace that with
+    # `baseline scan failed (exit 1)` -- a synthetic line with nothing in it for
+    # `get_skip_reason` to classify, so an absent tool arrived as a lint FAILURE and
+    # the session spent its turn diagnosing the toolchain. Keep the tool's own words.
+    baseline = tmp_path / ".secrets.baseline"
+    baseline.write_text('{"results": {}}', encoding="utf-8")
+    shell_error = [
+        "'detect-secrets' is not recognized as an internal or external command,",
+        "operable program or batch file.",
+    ]
+    monkeypatch.setattr(la, "run", lambda cmd: (shell_error, 1))
+    monkeypatch.setattr(la, "REPO_ROOT", tmp_path)
+
+    lines, code = la.t_detect_secrets(None)["detect-secrets"]
+
+    assert code == 1
+    assert lines[: len(shell_error)] == shell_error
+    assert "exit 1" in lines[-1]
+    assert diag.get_skip_reason(lines) == "not installed"
+
+
+# --- the missing-toolchain gate ---------------------------------------------
+# A linked worktree checks out tracked files only. Unprovisioned, all thirteen tools
+# fail on their own missing binary; the run has to name the checkout, not a tool.
+
+
+def test_main_refuses_an_unprovisioned_checkout(monkeypatch, tmp_path, capsys):
+    monkeypatch.setattr(la.preflight, "gaps", lambda root: ["no toolchain here"])
+    monkeypatch.setattr(la.preflight, "provisioning_command", lambda: "python scripts/bootstrap.py")
+    monkeypatch.setattr(la, "REPO_ROOT", tmp_path)
+    monkeypatch.setattr(
+        la, "ThreadPoolExecutor", lambda **k: pytest.fail("ran linters with no toolchain")
+    )
+
+    assert la.main([]) == 1
+
+    out = capsys.readouterr().out
+    assert "not provisioned" in out
+    assert "python scripts/bootstrap.py" in out
+    # LINT FAILED, never a pass: a run that could check nothing must not report green.
+    assert "LINT FAILED" in out
+
+
+def test_main_runs_the_linters_when_the_checkout_is_provisioned(monkeypatch, tmp_path):
+    monkeypatch.setattr(la.preflight, "gaps", lambda root: [])
+    monkeypatch.setattr(la, "REPO_ROOT", tmp_path)
+    monkeypatch.setattr(
+        la, "select_tools", lambda *a, **k: [lambda changed: {"ruff-check": ([], 0)}]
+    )
+
+    assert la.main([]) == 0
+
+
+def test_run_labels_names_the_environment_and_scope(monkeypatch):
+    monkeypatch.setattr(la, "IS_CI", False)
+    env, scope, label = la.run_labels(None)
+    assert (env, scope) == ("local", "full")
+    assert label == "scripts/lint-all.py (local)"
+
+    env, scope, label = la.run_labels(["a.py", "b.py"])
+    assert (env, scope) == ("local", "changed (2 file(s))")
+    assert label == "scripts/lint-all.py (local, changed)"
+
+
 # --- detect-secrets: one exclusion list, shared with the pre-commit hook ------
 
 
@@ -366,3 +436,68 @@ def test_baseline_has_no_entries_for_excluded_files():
     data = json.loads((la.REPO_ROOT / ".secrets.baseline").read_text(encoding="utf-8"))
     excluded = re.compile(la.SECRETS_EXCLUDE_RE)
     assert [f for f in (data.get("results") or {}) if excluded.search(f.replace("\\", "/"))] == []
+
+
+# --- run(): the shell-command runner every tool above funnels through --------
+# Its three contract points are the ones a mock cannot check -- the merge order of
+# stdout and stderr, the working directory, and that non-UTF-8 tool output does not
+# raise -- so these spawn a real child. `"<python>" "<script>"` is the one command
+# spelling both cmd.exe and sh parse identically, which `shell=True` makes the
+# constraint here.
+
+
+def probe(tmp_path, body: str) -> str:
+    script = tmp_path / "probe.py"
+    script.write_text(body, encoding="utf-8")
+    return f'"{sys.executable}" "{script}"'
+
+
+def test_run_returns_the_output_lines_and_the_exit_code(tmp_path):
+    cmd = probe(tmp_path, "print('one')\nprint('two')\nraise SystemExit(3)\n")
+    assert la.run(cmd) == (["one", "two"], 3)
+
+
+def test_run_returns_no_lines_for_a_silent_command(tmp_path):
+    assert la.run(probe(tmp_path, "pass\n")) == ([], 0)
+
+
+def test_run_merges_stderr_into_stdout_in_order(tmp_path):
+    # Both streams share one pipe, and the interleaving is what makes the artifact
+    # readable: a linter's diagnostic has to stay next to the file it is about.
+    cmd = probe(
+        tmp_path,
+        """
+import sys
+
+for stream, word in ((sys.stdout, "first"), (sys.stderr, "second"), (sys.stdout, "third")):
+    print(word, file=stream, flush=True)
+""",
+    )
+    assert la.run(cmd) == (["first", "second", "third"], 0)
+
+
+def test_run_executes_from_the_repo_root(tmp_path):
+    # Every command string in this module names repo-relative paths (`vulture app/`,
+    # `dotenv-linter check .env.example`), so the cwd is part of their meaning -- and
+    # it is never the cwd the agent happened to invoke the runner from.
+    lines, code = la.run(probe(tmp_path, "import os\nprint(os.getcwd())\n"))
+    assert code == 0
+    assert Path(lines[0]).resolve() == la.REPO_ROOT
+
+
+def test_run_survives_output_that_is_not_utf8(tmp_path):
+    # A tool writing bytes in the console codepage (Windows) must not take the whole
+    # lint run down with a UnicodeDecodeError raised from the runner, which reports
+    # nothing about the tool that produced it.
+    cmd = probe(
+        tmp_path,
+        """
+import sys
+
+sys.stdout.buffer.write(b"ok " + bytes([0xFF, 0x0A]))
+sys.stdout.buffer.flush()
+""",
+    )
+    lines, code = la.run(cmd)
+    assert code == 0
+    assert lines[0].startswith("ok ")
