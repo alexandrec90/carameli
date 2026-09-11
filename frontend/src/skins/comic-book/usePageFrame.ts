@@ -9,12 +9,23 @@ import { frameRect, gridPolys, layoutKindFor } from './panelGeometry'
 // window, so the window is an input to exactly one thing — where the frame sits and how
 // big it is — and nothing downstream reads `innerWidth` again.
 
+/** The window's size in px, as the one thing this module reads off it. */
+export interface Viewport {
+  w: number
+  h: number
+}
+
 /** The page frame a render is drawn in, and the shape it was chosen for. */
 export interface PageFrame {
   /** Which of the three grids is drawn. The window's, unless the editor is holding one. */
   kind: LayoutKind
   /** The frame in viewport px; zero-size before the window has reported. */
   frame: Rect
+  /**
+   * The window the frame was fitted into. Handed out for what is drawn *outside* the
+   * frame — the letterbox — so that consumer need not read the window itself.
+   */
+  viewport: Viewport
 }
 
 /**
@@ -24,7 +35,7 @@ export interface PageFrame {
  */
 export function pageFrameFor(w: number, h: number, override: LayoutKind | null): PageFrame {
   const kind = override ?? layoutKindFor(w, h)
-  return { kind, frame: frameRect(w, h, kind) }
+  return { kind, frame: frameRect(w, h, kind), viewport: { w, h } }
 }
 
 /**
@@ -59,7 +70,7 @@ export function pageFrameStyle(frame: Rect): CSSProperties {
  * lets a seam drag or a shape switch repaint without a resize.
  */
 export function usePageFrame(override: LayoutKind | null): PageFrame {
-  const [viewport, setViewport] = useState<{ w: number; h: number }>(() =>
+  const [viewport, setViewport] = useState<Viewport>(() =>
     typeof window === 'undefined' ? { w: 0, h: 0 } : { w: window.innerWidth, h: window.innerHeight })
 
   const handleResize = useCallback(() => {
