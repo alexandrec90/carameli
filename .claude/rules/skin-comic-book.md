@@ -250,6 +250,20 @@ radius stays at or above the `S·√2/2` tiling bound (below it the dots never c
 grid spacing, wavelength and speed are **shared with the loading ripple**, so the two
 surfaces align. Easing is ease-in-out cubic per phase (`washPhaseAt`).
 
+**The letterbox carries the loading ripple on** (`MarginRipple.tsx`, the bottom layer of
+`.cb-root`). The fixed page aspect leaves most windows a band either side of the page
+sheet or above and below it, and `drawMarginRipple` paints the loading screen's ripple
+there — the same grid, wave and clock (`performance.now()`), so the sheet the loading
+screen washes away reveals the ripple it was already showing, in phase, and only the page
+is new. It is the one thing on a resting page that moves, which is what rule 9 is about,
+so it stays outside the page sheet (`pageSheet`: the frame plus `OUTER_M`, never the
+gutters), and runs only while a band exists — a window of the page's aspect never
+schedules a frame. It is also gated on the page being up: under the loading sheet the
+same ripple is already drawn. It does **not** consult `prefers-reduced-motion`: the
+loading ripple it continues never did, so a sheet that moved until the page was up and
+then stopped read as the page freezing, which is what the first cut did on a machine
+with the setting on (`MarginRipple.test.tsx` holds the loop to moving under it).
+
 ### Panel ink
 
 Each panel is stroked as one closed `<polygon>` on a viewport-level SVG above the pictures
