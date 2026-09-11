@@ -1,6 +1,7 @@
 """Tests for scripts/run-tests.py pure helpers (testmon selection parsing)."""
 
 import itertools
+import sys
 
 import pytest
 from conftest import REPO_ROOT, load_module
@@ -492,3 +493,187 @@ def test_critical_skip_lines_ignores_non_critical_targets():
 
 def test_critical_skip_lines_empty():
     assert rt.critical_skip_lines([]) == []
+
+
+# ---------------------------------------------------------------------------
+# main(): argv validation, dispatch, and the artifact it leaves behind.
+#
+# It reads `sys.argv` rather than taking an argv, so every test here sets it. The
+# runner's real `logs/test-failures.log` is what the agent reads after a run, so
+# `REPO_ROOT` is redirected at tmp_path -- a test that wrote the live artifact would
+# report a clean suite from a run that never happened.
+# ---------------------------------------------------------------------------
+
+_CLEAN = {"pytest": ([], 0)}
+
+
+@pytest.fixture
+def cli(monkeypatch, tmp_path):
+    """Invoke `main()` with these args; returns the artifact path it will write."""
+
+    def configure(*args, is_ci: bool = False):
+        monkeypatch.setattr(sys, "argv", ["run-tests.py", *args])
+        monkeypatch.setattr(rt, "REPO_ROOT", tmp_path)
+        monkeypatch.setattr(rt, "IS_CI", is_ci)
+        for name in ("run_scoped", "run_all", "run_named_target", "run_local", "run_ci"):
+            monkeypatch.setattr(
+                rt, name, lambda *a, _n=name: pytest.fail(f"unexpected dispatch to {_n}")
+            )
+        return tmp_path / "logs" / "test-failures.log"
+
+    return configure
+
+
+def routes(monkeypatch, name, results=None):
+    """Record the dispatch to `name` and answer with a canned results dict."""
+    seen = []
+    monkeypatch.setattr(rt, name, lambda *a: (seen.append(a), results or _CLEAN)[1])
+    return seen
+
+
+def test_main_prints_usage_for_help(cli, capsys):
+    cli("--help")
+    assert rt.main() == 0
+    assert rt.USAGE in capsys.readouterr().out
+
+
+def test_main_rejects_an_unknown_flag(cli, capsys):
+    # The whole point of parse_cli_args raising: a typo'd flag must not fall through
+    # into the default full-suite run, which looks like success from the outside.
+    cli("--fastt")
+    assert rt.main() == 2
+    err = capsys.readouterr().err
+    assert "--fastt" in err
+    assert rt.USAGE in err
+
+
+def test_main_rejects_an_unknown_target(cli, capsys):
+    cli("--target", "unit")
+    assert rt.main() == 2
+    err = capsys.readouterr().err
+    assert "Unknown --target" in err
+    # The message has to name the alternatives; the target list is not guessable.
+    for target in rt._VALID_TARGETS:
+        assert target in err
+
+
+def test_main_rejects_changed_with_a_non_pytest_target(cli, capsys):
+    assert rt._VALID_TARGETS - {"pytest"}, "no non-pytest target to check against"
+    cli("--changed", "--target", "hook-tests")
+    assert rt.main() == 2
+    assert "--changed only applies" in capsys.readouterr().err
+
+
+def test_main_rejects_explicit_paths_with_a_non_pytest_target(cli, capsys):
+    cli("--target", "frontend-tests", "tests/unit/test_x.py")
+    assert rt.main() == 2
+    assert "Explicit test paths" in capsys.readouterr().err
+
+
+def test_main_allows_changed_and_paths_with_the_pytest_target(cli, monkeypatch):
+    # The mirror of the two rejections above: --target pytest is the one target both
+    # modifiers mean something for, so neither may be refused there.
+    cli("--target", "pytest", "tests/unit/test_x.py")
+    seen = routes(monkeypatch, "run_scoped")
+    assert rt.main() == 0
+    assert seen == [(["tests/unit/test_x.py"],)]
+
+
+def test_main_routes_explicit_paths_to_run_scoped(cli, monkeypatch):
+    # This is the vendored Stop hook's calling convention: bare pytest targets.
+    artifact = cli("tests/unit/test_x.py", "tests/unit/test_y.py::test_z")
+    seen = routes(monkeypatch, "run_scoped")
+
+    assert rt.main() == 0
+
+    assert seen == [(["tests/unit/test_x.py", "tests/unit/test_y.py::test_z"],)]
+    # An empty artifact is how this project spells "clean"; a passing run must clear
+    # whatever the previous failing run left there.
+    assert artifact.read_text(encoding="utf-8") == ""
+
+
+def test_main_routes_all_to_run_all(cli, monkeypatch):
+    cli("--all")
+    seen = routes(monkeypatch, "run_all")
+    assert rt.main() == 0
+    assert seen == [()]
+
+
+def test_main_routes_a_named_target(cli, monkeypatch):
+    cli("--target", "hook-tests")
+    seen = routes(monkeypatch, "run_named_target")
+    assert rt.main() == 0
+    assert seen == [("hook-tests",)]
+
+
+@pytest.mark.parametrize(("args", "changed"), [((), False), (("--changed",), True)])
+def test_main_runs_the_local_suite_by_default(cli, monkeypatch, args, changed):
+    cli(*args)
+    seen = routes(monkeypatch, "run_local")
+    assert rt.main() == 0
+    assert seen == [(changed,)]
+
+
+def test_main_runs_the_ci_suite_when_ci_is_set(cli, monkeypatch):
+    cli(is_ci=True)
+    seen = routes(monkeypatch, "run_ci")
+    assert rt.main() == 0
+    assert seen == [()]
+
+
+def test_main_fails_and_writes_the_failures_to_the_artifact(cli, monkeypatch):
+    artifact = cli()
+    routes(
+        monkeypatch,
+        "run_local",
+        {"pytest": (["FAILED tests/unit/test_x.py::test_boom - AssertionError: no"], 1)},
+    )
+
+    assert rt.main() == 1
+
+    text = artifact.read_text(encoding="utf-8")
+    assert "# pytest" in text
+    assert "test_boom" in text
+
+
+def test_main_fails_when_a_critical_target_was_skipped(cli, monkeypatch, capsys):
+    # A suite that never started is not a pass. digest_tests leaves `any_failed`
+    # False for an environmental skip on purpose and hands the decision here, so
+    # this is main's own judgement, not a pass-through.
+    artifact = cli()
+    routes(monkeypatch, "run_local", {"pytest": (["pytest: command not found"], 1)})
+
+    assert rt.main() == 1
+
+    assert "was skipped" in capsys.readouterr().out
+    # And the artifact says so too, rather than reading as clean.
+    assert "DID NOT RUN" in artifact.read_text(encoding="utf-8")
+
+
+def test_main_is_green_when_a_non_critical_target_was_skipped(cli, monkeypatch):
+    # The other side of that call: a paid tier with no credentials is ordinary, and
+    # failing the run on it would make every local run red.
+    cli("--target", "telnyx-sandbox")
+    routes(
+        monkeypatch,
+        "run_named_target",
+        {"telnyx-sandbox": (["telnyx: command not found"], 1)},
+    )
+    assert rt.main() == 0
+
+
+def test_main_on_ci_splits_frontend_failures_into_their_own_artifact(cli, monkeypatch, tmp_path):
+    # Backend and frontend failures are triaged separately, so a vitest failure must
+    # not land in the backend artifact -- and must still fail the run.
+    backend = cli(is_ci=True)
+    routes(
+        monkeypatch,
+        "run_ci",
+        {"frontend-tests": (["FAIL src/tests/skins/panelGeometry.test.ts > it breaks"], 1)},
+    )
+
+    assert rt.main() == 1
+
+    frontend = tmp_path / "logs" / "frontend-test-failures.log"
+    assert "# frontend-tests" in frontend.read_text(encoding="utf-8")
+    assert backend.read_text(encoding="utf-8") == ""

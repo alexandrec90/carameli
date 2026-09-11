@@ -3,6 +3,8 @@
 
 import json
 import re
+import sys
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -434,3 +436,68 @@ def test_baseline_has_no_entries_for_excluded_files():
     data = json.loads((la.REPO_ROOT / ".secrets.baseline").read_text(encoding="utf-8"))
     excluded = re.compile(la.SECRETS_EXCLUDE_RE)
     assert [f for f in (data.get("results") or {}) if excluded.search(f.replace("\\", "/"))] == []
+
+
+# --- run(): the shell-command runner every tool above funnels through --------
+# Its three contract points are the ones a mock cannot check -- the merge order of
+# stdout and stderr, the working directory, and that non-UTF-8 tool output does not
+# raise -- so these spawn a real child. `"<python>" "<script>"` is the one command
+# spelling both cmd.exe and sh parse identically, which `shell=True` makes the
+# constraint here.
+
+
+def probe(tmp_path, body: str) -> str:
+    script = tmp_path / "probe.py"
+    script.write_text(body, encoding="utf-8")
+    return f'"{sys.executable}" "{script}"'
+
+
+def test_run_returns_the_output_lines_and_the_exit_code(tmp_path):
+    cmd = probe(tmp_path, "print('one')\nprint('two')\nraise SystemExit(3)\n")
+    assert la.run(cmd) == (["one", "two"], 3)
+
+
+def test_run_returns_no_lines_for_a_silent_command(tmp_path):
+    assert la.run(probe(tmp_path, "pass\n")) == ([], 0)
+
+
+def test_run_merges_stderr_into_stdout_in_order(tmp_path):
+    # Both streams share one pipe, and the interleaving is what makes the artifact
+    # readable: a linter's diagnostic has to stay next to the file it is about.
+    cmd = probe(
+        tmp_path,
+        """
+import sys
+
+for stream, word in ((sys.stdout, "first"), (sys.stderr, "second"), (sys.stdout, "third")):
+    print(word, file=stream, flush=True)
+""",
+    )
+    assert la.run(cmd) == (["first", "second", "third"], 0)
+
+
+def test_run_executes_from_the_repo_root(tmp_path):
+    # Every command string in this module names repo-relative paths (`vulture app/`,
+    # `dotenv-linter check .env.example`), so the cwd is part of their meaning -- and
+    # it is never the cwd the agent happened to invoke the runner from.
+    lines, code = la.run(probe(tmp_path, "import os\nprint(os.getcwd())\n"))
+    assert code == 0
+    assert Path(lines[0]).resolve() == la.REPO_ROOT
+
+
+def test_run_survives_output_that_is_not_utf8(tmp_path):
+    # A tool writing bytes in the console codepage (Windows) must not take the whole
+    # lint run down with a UnicodeDecodeError raised from the runner, which reports
+    # nothing about the tool that produced it.
+    cmd = probe(
+        tmp_path,
+        """
+import sys
+
+sys.stdout.buffer.write(b"ok " + bytes([0xFF, 0x0A]))
+sys.stdout.buffer.flush()
+""",
+    )
+    lines, code = la.run(cmd)
+    assert code == 0
+    assert lines[0].startswith("ok ")
