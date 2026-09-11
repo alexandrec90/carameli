@@ -19,9 +19,9 @@ is `frontend/src/skins/comic-book/editor/README.md`.
 
 React DOM + Canvas 2D (Ben-Day dots, panel ink, wash overlay); CSS `@keyframes` and rAF
 loops, no spring libraries; `Bangers` (display) and `Comic Neue` (body) from Google Fonts
-in `index.html`. Art is `.webp` under `public/comic-book/`, grayscale at rest, colorized
-on hover. PNG masters stay **outside the served tree** — Vite copies `public/` into
-`dist/` verbatim, so masters beside the WebPs shipped ~24 MB no page requested.
+in `index.html`. Art is grayscale at rest and colorized on hover; where it lives, and why
+PNG masters stay out of `public/` (Vite copies it into `dist/` verbatim, and masters beside
+the WebPs once shipped ~24 MB no page requested), is rule 10.
 
 ## Palette
 
@@ -36,8 +36,8 @@ Each route gets **one** accent; the viewport dot background shifts to it.
 
 ## Layout — a comic page of panels
 
-`<Layout>` draws a full-viewport canvas (dot raster in the page accent, plus panel ink)
-and views tile absolute content over it; nav is a caption box pinned top-left.
+`<Layout>` draws the page — panels (dots, pictures, balloons), ink, wash and letterbox —
+over a letterboxed frame; it renders no nav chrome yet, and children are not rendered.
 
 `PANEL_GRIDS` (`editor/layoutConfig.ts`) is one **shared-vertex planar subdivision** per
 window shape (`landscape`/`portrait`/`square`, via `layoutKindFor`): normalised vertices
@@ -49,10 +49,9 @@ cosine of the angle, so diagonals read as thinner lines. The fixed aspect is wha
 every framing a property of the config rather than of the window: panels, pictures and
 balloons are all fractions of the frame, so nothing measures the DOM or reads the window
 except `usePageFrame.ts`, which also holds the page at the editor's chosen shape
-(`frameRect(w, h, kind)`). A picture's pan is % of its frame and its zoom is about its
-anchor for the same reason (`editor/transforms.ts`). Balloon lettering is `--cb-lettering`,
-a share of the frame's height set from there — never `px`, `vw` or `vh`, which do not
-follow a letterboxed frame.
+(`frameRect(w, h, kind)`) and hands the window out for the letterbox. A picture's pan is
+% of its frame and its zoom about its anchor for the same reason (`editor/transforms.ts`);
+balloon lettering is `--cb-lettering`, a share of the frame's height set from there (rule 22).
 
 - **The frame is not editable and panels cannot come apart** — a frame edge belongs to
   one ring, so it is never a line *between* panels and gets no handle; rings either side of
@@ -132,8 +131,7 @@ compete in the page's single one, where the free integers between the panel ink 
 the balloons at 5 number exactly one. Depth orders pictures **within a layer and `spill`
 picks the layer**, so a pair that must stack in a chosen order needs the same `spill` on
 both. Projected content rides inside its own picture's wrapper, which is what puts a hand
-at depth 1 over a notepad's live rows at 0; the click targets take the same order
-(`OverlayTargets`), or you would select a picture you cannot see.
+at depth 1 over a notepad's live rows at 0; the click targets take the same order (`OverlayTargets`).
 
 ### Connector tubes
 
@@ -201,11 +199,10 @@ choosing what to *say*, not who to say it to. Options resolve through `toE164`
 (`phoneInput.ts`), so one number written three ways is one thread and a name binds nothing.
 
 The skin never fetches: `App.tsx` owns `useSmsConversations()` and passes it as
-`LayoutProps.sms`, `PanelBubbles` calls `subscribe(peer)`. The hook polls
-(`SMS_POLL_MS`) only while somebody is subscribed and shares one request between
-subscribers, so a page binding nothing costs nothing, which is what lets `App` mount it
-for every skin. A sent message draws optimistically as `is-sending` and retires when its
-row returns; a refusal is `is-failed`.
+`LayoutProps.sms`; `PanelBubbles` calls `subscribe(peer)`. The hook polls (`SMS_POLL_MS`)
+only while somebody is subscribed and shares one request between subscribers, so a page
+binding nothing costs nothing, which lets `App` mount it for every skin. A sent message
+draws optimistically as `is-sending` and retires when its row returns; a refusal is `is-failed`.
 
 ## Motion
 
@@ -221,42 +218,36 @@ than its own drift, which is what keeps eight patterns reading as one page: dots
 ink up as a crest arrives, then shrink and fade behind it. Two rates and a spin are the
 whole vocabulary — `WAVE_RATE` (expanding from a point), `SWEEP_RATE` (half of it,
 crossing in a straight line), `SPIN_RATE` (a ray fan) — and all are far slower than the
-3-second radius breathe. Renderers split by what moves: `patternDrawFields.ts` drifts the
-field dots are sized from, `patternDrawRadial.ts` turns a focal one (`sunburst`, and
-`corner-burst` covering the **whole circle** because a fan spanning only the visible
-quarter rocks about a fixed axis instead of turning). Radius is left out of
-`panelPatternMotion.test.ts`'s frame signature: every style breathes, so a style that only
-breathed would otherwise pass a test for animating.
+3-second radius breathe. `patternDrawFields.ts` drifts the field dots are sized from,
+`patternDrawRadial.ts` turns a focal one (`corner-burst` covers the **whole circle**: a fan
+spanning only the visible quarter rocks about a fixed axis instead of turning). Radius is
+left out of `panelPatternMotion.test.ts`'s frame signature: every style breathes, so a
+style that only breathed would otherwise pass a test for animating.
 
 ### Page transition — the Ben-Day wash
 
-All math and drawing live in `benDayWash.ts`; `Layout.tsx` watches React Router `location`
-and drives a rAF loop on one full-viewport canvas (`.cb-wash-canvas`, blank when idle). A
+All math and drawing live in `benDayWash.ts`; `usePageWash.ts` watches React Router's
+`location` and drives a rAF loop on one full-viewport canvas (`.cb-wash-canvas`, blank when idle). A
 halftone wave travels the `x + y` diagonal from the top-left: **cover** (paper dots grow
 inside the band until they merge opaque) → **hold** (the sheet carrying the loading
 screen's ripple tinted with the incoming accent) → **reveal** (the same wave passes on and
-dots shrink behind it); the durations are the module's. The loading overlay reuses it:
-`drawLoadingRipple` for its background, exiting through the reveal (`drawWash`, cover at 1).
-
-Spacing, band depth, merge radius, ripple wavelength and speed are constants in
-`benDayWash.ts` — read them there, and keep two relationships when retuning: the merge
-radius stays at or above the `S·√2/2` tiling bound (below it the dots never close), and
-grid spacing, wavelength and speed are **shared with the loading ripple**, so the two
-surfaces align. Easing is ease-in-out cubic per phase (`washPhaseAt`).
+dots shrink behind it). Durations, spacing, band depth, merge radius, ripple wavelength
+and speed are the module's constants, eased ease-in-out cubic per phase (`washPhaseAt`);
+when retuning, keep the merge radius at or above the `S·√2/2` tiling bound (below it the
+dots never close) and grid spacing, wavelength and speed **shared with the loading
+ripple**, so the two surfaces align. The loading overlay reuses it: `drawLoadingRipple`
+for its background, exiting through the reveal (`drawWash`, cover at 1).
 
 **The letterbox carries the loading ripple on** (`MarginRipple.tsx`, the bottom layer of
-`.cb-root`). The fixed page aspect leaves most windows a band either side of the page
-sheet or above and below it, and `drawMarginRipple` paints the loading screen's ripple
-there — the same grid, wave and clock (`performance.now()`), so the sheet the loading
-screen washes away reveals the ripple it was already showing, in phase, and only the page
-is new. It is the one thing on a resting page that moves, which is what rule 9 is about,
-so it stays outside the page sheet (`pageSheet`: the frame plus `OUTER_M`, never the
-gutters), and runs only while a band exists — a window of the page's aspect never
-schedules a frame. It is also gated on the page being up: under the loading sheet the
-same ripple is already drawn. It does **not** consult `prefers-reduced-motion`: the
-loading ripple it continues never did, so a sheet that moved until the page was up and
-then stopped read as the page freezing, which is what the first cut did on a machine
-with the setting on (`MarginRipple.test.tsx` holds the loop to moving under it).
+`.cb-root`). The fixed aspect leaves most windows a band beside or above the page sheet,
+and `drawMarginRipple` paints the loading screen's ripple there — same grid, wave and
+clock — so the sheet the loading screen washes away reveals the ripple it was already
+showing, in phase. It is the one thing on a resting page that moves (rule 9 is about
+panels), so it stays outside the sheet — `pageSheet` is the frame *as drawn* plus
+`OUTER_M`, so a held shape gets its bands — runs only while a band exists, and only once
+the page is up. It does **not** consult `prefers-reduced-motion`: the loading ripple it
+continues never did, and a sheet that moves until the page is up and then stops reads as
+the page freezing (`MarginRipple.test.tsx` holds the loop to moving under it).
 
 ### Panel ink
 
@@ -326,10 +317,9 @@ notepad, a whiteboard, a screen. The field is **absent** on a picture that is no
   above its rule) in `tableData.ts` is a fraction of the band, resolved into a custom
   property by `ProjectedTable.tsx` so `table.css` spends it rather than inventing its own;
   `FONT_SCALE.max + BAND_SIT <= 1` is the invariant (`tableData.test.ts`). **A cell holds
-  lettering and nothing else** — artwork at the few pixels a band actually is came out as
-  smudges, so the call log's status is a word (`CALL_STATUS_LABELS`). `.cb-ptable-clip` is
-  the backstop — `hidden` over a window nothing scrolls past, not the scroll container
-  rule 18 forbids.
+  lettering and nothing else** — artwork at the few pixels a band is came out as smudges,
+  so the call log's status is a word (`CALL_STATUS_LABELS`). `.cb-ptable-clip` is the
+  backstop — `hidden` over a window nothing scrolls past, not a scroll container (rule 18).
 - **A row under the pointer takes one flat wash of the authored ink and nothing else** —
   `TableRowBand.tsx`, placed by band arithmetic so it lands on the row's own ruled line;
   the number pad's glow would blur the ruling and the lettering. **No keyframes,
@@ -364,9 +354,8 @@ authored surface.
 - **Live means polling** — `useLiveTables` re-asks every `LIVE_TABLE_POLL_MS`, skips a hidden tab
   and refreshes on `visibilitychange`, returning the *identical* row array when nothing changed so
   a quiet poll repaints no canvas; a failed refresh keeps the rows on screen. `?sim=1` frames a
-  surface against a full table instead (`lib/simTables.ts`, dev-only,
-  `localStorage['live-tables:sim']`), built through the feed's own mapper so no cell drifts out
-  from under its heading.
+  surface against a full table instead (`lib/simTables.ts`, dev-only, `localStorage['live-tables:sim']`),
+  built through the feed's own mapper so no cell drifts out from under its heading.
 
 ## An `actions` balloon is the telephone's keypad, not a toolbar
 
@@ -449,12 +438,15 @@ and a preferred owner ranks above `CLAIM_FIELD`.
 ## Dev-only visual editor
 
 `?edit=1` / `?edit=0` in dev, persisted in `localStorage['comic-book:edit']`, gated on
-`import.meta.env.DEV` so it is inert in prod. Click a panel, picture or bubble to select (a
-picture wins over the panel under it, a bubble over both); drag, wheel, handles and arrows
-adjust, with **Alt** swapping a picture's two framings. **+ Image**, **+ Bubble**, **+ SMS**
-and **+ Call** add to the selected panel, the first two in whichever of its layouts the call
-switch is showing. The inspector edits every field of the arrays above, with two deliberate
-gaps: **no chain control**, and no cell block or **+ Column** / **−** on a live surface.
+`import.meta.env.DEV` so it is inert in prod: `EditorOverlay.tsx` is a dynamic `import()`
+behind that gate, so Rollup drops it and `editor.css` from the build and only
+`layoutConfig.ts`, `bubbleTypes.ts` and `transforms.ts` ship. Click a panel, picture or
+bubble to select (a picture wins over the panel under it, a bubble over both); drag, wheel,
+handles and arrows adjust, with **Alt** swapping a picture's two framings. **+ Image**,
+**+ Bubble**, **+ SMS** and **+ Call** add to the selected panel, the first two in whichever
+of its layouts the call switch is showing. The inspector edits every field of the arrays
+above, with two deliberate gaps: **no chain control**, and no cell block or **+ Column** /
+**−** on a live surface.
 
 | Control | Notes |
 | --- | --- |
@@ -468,11 +460,6 @@ gaps: **no chain control**, and no cell block or **+ Column** / **−** on a liv
 | New panel | **Split top / bottom** or **left / right** cuts through the middle of the selected panel's box in all three grids of its page (`configPanels.ts` over `panelGridCut.ts`). The parent keeps its index, name, pattern and the upper/left half; the new panel is appended and the other page's grids gain an empty ring. Refused whole when any grid cannot take it. There is no delete |
 | Save | `POST /__comic-editor/save` writes `layoutConfig.ts` (dev server only); **Copy config** / **.ts** are the fallbacks. Never refused — mid-design is when it matters — but it asks once when the working copy is older than the bundle's config, with a red block above the row (`editor/configStamp.ts`); **Reset** takes the file and discards this tab's work |
 | Ship | `POST /__comic-editor/ship` saves, branches, commits, pushes and opens or updates a PR (`frontend/shipLayout.ts`). Disabled while the amber `editor/configParity.ts` list is non-empty: every caption needs a tail and both morph targets, every link must resolve within its panel, every picture needs extent and a `/comic-book/` source |
-
-`EditorOverlay.tsx` is dynamically `import()`-ed behind the DEV gate so Rollup tree-shakes
-it and `editor.css` out of production — only `layoutConfig.ts`, `bubbleTypes.ts` and
-`transforms.ts` ship. Editor math, config editing and serialization are pure and unit-tested
-in `frontend/src/tests/skins/`.
 
 ## Hard rules — the checklist; the prose above says why
 
@@ -499,11 +486,9 @@ in `frontend/src/tests/skins/`.
 13. **Never give a panel bubble its own tail path** — the tail is a ring vertex.
 14. **Never tube a chained bubble, and never give a chain more than one tail.**
 15. **Never key a chain's balloons by row** — message indices animate a scroll.
-16. **Never express a projected table's tilt as rotation angles, and never scroll it by
-    pixels.**
+16. **Never express a projected table's tilt as rotation angles, or scroll it by pixels.**
 17. **Never ink a picture, and never give a picture's frame the panel's shape.**
-18. **Never give a projected table a scroll container, scrollbar or any chrome outside
-    edit mode.**
+18. **Never give a projected table a scroll container, scrollbar or chrome outside edit mode.**
 19. **Never size anything inside a cell in `em`** — use `tableData.ts`'s band fractions.
 20. **Never let a bound (`sms: true`) chain fall back to its authored `messages`, and never
     bind one in edit mode** — the first puts the author's lettering into somebody's real

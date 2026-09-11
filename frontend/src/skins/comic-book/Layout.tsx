@@ -18,8 +18,6 @@ import { useLiveTableImages } from './useLiveTableImages'
 import { pageFrameStyle, panelPolysIn, usePageFrame } from './usePageFrame'
 import { usePageWash } from './usePageWash'
 import './comic-book.css'
-import './bubbles.css'
-import './bubbleChains.css'
 
 // ─── Panel contents ─────────────────────────────────────────────────────────
 // A panel is a slot in the grid and nothing more: its label, whether it is the logo
@@ -68,8 +66,9 @@ export function Layout({ navItems, sms, softphone }: LayoutProps) {
 
     // The page frame and which of the three grids it holds: the window's shape, or the
     // one the editor is previewing. Everything on the page is a fraction of this frame
-    // (./usePageFrame.ts), so it is the only thing here that knows the window's size.
-    const { kind: layoutKind, frame } = usePageFrame(editor.shape)
+    // (./usePageFrame.ts), so it is the only thing here that knows the window's size —
+    // the viewport comes back with it for the one layer drawn outside the frame.
+    const { kind: layoutKind, frame, viewport } = usePageFrame(editor.shape)
     // Sparse, PANELS-length: null where the panel lives on the other page.
     const panelPolys = useMemo(
         () => panelPolysIn(grids[page][layoutKind], frame),
@@ -149,7 +148,7 @@ export function Layout({ navItems, sms, softphone }: LayoutProps) {
                 {/* Layer 0 — the letterbox around the page sheet, carrying on the loading
                     screen's ripple in phase with it (MarginRipple). Up only once the page is
                     showing: under the loading sheet the same ripple is already drawn. */}
-                <MarginRipple viewport={viewport} accent={accent} active={ready} />
+                <MarginRipple viewport={viewport} frame={frame} accent={accent} active={ready} />
 
                 {/* Layer 1 — the panels (ComicPanel: dots, pictures, bubbles). The poly
                     array is sparse: a null slot is a panel on the other page. */}

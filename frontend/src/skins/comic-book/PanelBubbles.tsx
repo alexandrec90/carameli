@@ -15,6 +15,7 @@ import type { PhoneActionHandlers } from './phoneActions'
 import { browserCountry, toE164 } from './phoneInput'
 import type { UseSmsConversationsResult } from '../../hooks/useSmsConversations'
 import type { CallTranscript } from '../../lib/callTranscript'
+import './bubbles.css'
 
 /**
  * A panel with nothing dialled yet: the dial's shortlist is memoized on this array's

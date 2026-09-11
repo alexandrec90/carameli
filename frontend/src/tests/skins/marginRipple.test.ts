@@ -76,18 +76,28 @@ const area = (r: Rect) => r.w * r.h
 describe('pageSheet', () => {
   it('is the frame grown by its outer margin on every side', () => {
     const f = frameRect(WIDE.w, WIDE.h)
-    expect(pageSheet(WIDE.w, WIDE.h)).toEqual({
+    expect(pageSheet(frameRect(WIDE.w, WIDE.h))).toEqual({
       x: f.x - OUTER_M, y: f.y - OUTER_M, w: f.w + 2 * OUTER_M, h: f.h + 2 * OUTER_M,
     })
   })
 
   it('fills a viewport of the page aspect exactly', () => {
-    expect(pageSheet(EXACT.w, EXACT.h)).toEqual({ x: 0, y: 0, w: EXACT.w, h: EXACT.h })
+    expect(pageSheet(frameRect(EXACT.w, EXACT.h))).toEqual({ x: 0, y: 0, w: EXACT.w, h: EXACT.h })
   })
 
   it('keeps the page aspect of the window shape', () => {
     const f = frameRect(TALL.w, TALL.h)
     expect(f.w / f.h).toBeCloseTo(PAGE_ASPECT.portrait, 6)
+  })
+
+  it('wraps the frame it is given, not the one the window would draw', () => {
+    // The editor holding portrait in a wide window: the sheet sits round that frame,
+    // so the letterbox lands beside it rather than beside a landscape page nobody sees.
+    const held = frameRect(WIDE.w, WIDE.h, 'portrait')
+    expect(pageSheet(held)).toEqual({
+      x: held.x - OUTER_M, y: held.y - OUTER_M, w: held.w + 2 * OUTER_M, h: held.h + 2 * OUTER_M,
+    })
+    expect(pageSheet(held)).not.toEqual(pageSheet(frameRect(WIDE.w, WIDE.h)))
   })
 })
 
@@ -95,11 +105,11 @@ describe('pageSheet', () => {
 
 describe('letterboxBands', () => {
   it('is empty when the sheet covers the viewport', () => {
-    expect(letterboxBands(EXACT.w, EXACT.h, pageSheet(EXACT.w, EXACT.h))).toEqual([])
+    expect(letterboxBands(EXACT.w, EXACT.h, pageSheet(frameRect(EXACT.w, EXACT.h)))).toEqual([])
   })
 
   it('is a band each side of a wide window, and none above or below', () => {
-    const sheet = pageSheet(WIDE.w, WIDE.h)
+    const sheet = pageSheet(frameRect(WIDE.w, WIDE.h))
     const bands = letterboxBands(WIDE.w, WIDE.h, sheet)
     expect(bands).toHaveLength(2)
     expect(bands[0]).toEqual({ x: 0, y: 0, w: sheet.x, h: WIDE.h })
@@ -108,7 +118,7 @@ describe('letterboxBands', () => {
   })
 
   it('is a band above and below a tall window', () => {
-    const sheet = pageSheet(TALL.w, TALL.h)
+    const sheet = pageSheet(frameRect(TALL.w, TALL.h))
     const bands = letterboxBands(TALL.w, TALL.h, sheet)
     expect(bands).toHaveLength(2)
     expect(bands[0]).toEqual({ x: 0, y: 0, w: TALL.w, h: sheet.y })
@@ -141,7 +151,7 @@ describe('drawMarginRipple', () => {
   it('clears and draws nothing on a viewport the sheet fills', () => {
     const rec = recorder()
     const drawn = drawMarginRipple(
-      rec.ctx, EXACT.w, EXACT.h, pageSheet(EXACT.w, EXACT.h), 1.25, '#FFE033',
+      rec.ctx, EXACT.w, EXACT.h, pageSheet(frameRect(EXACT.w, EXACT.h)), 1.25, '#FFE033',
     )
     expect(drawn).toBe(false)
     expect(rec.cleared).toBe(1)
@@ -151,7 +161,7 @@ describe('drawMarginRipple', () => {
 
   it('papers and clips to the bands, and leaves the sheet clear', () => {
     const rec = recorder()
-    const sheet = pageSheet(WIDE.w, WIDE.h)
+    const sheet = pageSheet(frameRect(WIDE.w, WIDE.h))
     const drawn = drawMarginRipple(rec.ctx, WIDE.w, WIDE.h, sheet, 1.25, '#FFE033')
     const bands = letterboxBands(WIDE.w, WIDE.h, sheet)
 
@@ -172,7 +182,7 @@ describe('drawMarginRipple', () => {
 
   it('draws the loading ripple\'s own dots — same grid, same size, same instant', () => {
     const t = 3.7
-    const sheet = pageSheet(TALL.w, TALL.h)
+    const sheet = pageSheet(frameRect(TALL.w, TALL.h))
     const loading = recorder()
     drawLoadingRipple(loading.ctx, TALL.w, TALL.h, t, '#E8003D')
     const margin = recorder()

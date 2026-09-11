@@ -2,7 +2,8 @@ import { render } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import MarginRipple from '../../skins/comic-book/MarginRipple'
-import { OUTER_M } from '../../skins/comic-book/panelGeometry'
+import { frameRect, OUTER_M } from '../../skins/comic-book/panelGeometry'
+import type { LayoutKind } from '../../skins/comic-book/panelGeometry'
 
 // The loop: when the letterbox canvas paints, when it schedules another frame and when
 // it stays quiet. What a frame draws is marginRipple.test.ts.
@@ -75,8 +76,14 @@ afterEach(() => {
   window.matchMedia = realMatchMedia
 })
 
+/** The letterbox as Layout mounts it: the frame the page is drawn in, and the window. */
+function ripple(viewport: { w: number; h: number }, active: boolean, held?: LayoutKind) {
+  const frame = frameRect(viewport.w, viewport.h, held)
+  return <MarginRipple viewport={viewport} frame={frame} accent="#FFE033" active={active} />
+}
+
 function mount(viewport = WIDE, active = true) {
-  return render(<MarginRipple viewport={viewport} accent="#FFE033" active={active} />)
+  return render(ripple(viewport, active))
 }
 
 describe('MarginRipple', () => {
@@ -106,6 +113,15 @@ describe('MarginRipple', () => {
     expect(queue.size).toBe(0)
   })
 
+  it('letterboxes the frame it is handed, so a held shape gets its bands', () => {
+    // The same window, but the editor holding portrait: the page no longer fills it,
+    // and the ripple runs beside the frame actually drawn rather than the window's own.
+    render(ripple(EXACT, true, 'portrait'))
+    expect(paints).toBe(1)
+    expect(arcs).toBeGreaterThan(0)
+    expect(queue.size).toBe(1)
+  })
+
   it('draws nothing while the page is not showing', () => {
     mount(WIDE, false)
     expect(paints).toBe(0)
@@ -114,11 +130,11 @@ describe('MarginRipple', () => {
 
   it('takes up the loop when the page comes up, and the bands with a resize', () => {
     const view = mount(WIDE, false)
-    view.rerender(<MarginRipple viewport={WIDE} accent="#FFE033" active />)
+    view.rerender(ripple(WIDE, true))
     expect(paints).toBe(1)
     expect(queue.size).toBe(1)
     // Now a window the sheet fills: the loop stops on its own.
-    view.rerender(<MarginRipple viewport={EXACT} accent="#FFE033" active />)
+    view.rerender(ripple(EXACT, true))
     expect(paints).toBe(2)
     expect(arcs).toBeGreaterThan(0)
     const before = arcs

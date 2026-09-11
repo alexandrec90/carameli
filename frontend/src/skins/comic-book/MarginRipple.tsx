@@ -1,8 +1,9 @@
 import { useEffect, useRef } from 'react'
 import type { RefObject } from 'react'
 import { drawMarginRipple } from './benDayWash'
-import { frameRect, OUTER_M } from './panelGeometry'
+import { OUTER_M } from './panelGeometry'
 import type { Rect } from './panelGeometry'
+import type { Viewport } from './usePageFrame'
 
 // The letterbox. The page frame keeps a fixed aspect per window shape (panelGeometry.ts),
 // so most windows leave a band of viewport either side of it or above and below. Rather
@@ -18,16 +19,17 @@ import type { Rect } from './panelGeometry'
 
 /**
  * The page sheet: the frame plus its outer margin, the paper the panels sit on. What
- * lies outside it on the viewport is the letterbox.
+ * lies outside it on the viewport is the letterbox. Taken from the frame actually
+ * drawn (usePageFrame.ts) rather than refitted from the window, so a page the editor
+ * is holding at another shape gets its letterbox where its sheet is.
  */
-export function pageSheet(w: number, h: number): Rect {
-    const f = frameRect(w, h)
-    return { x: f.x - OUTER_M, y: f.y - OUTER_M, w: f.w + 2 * OUTER_M, h: f.h + 2 * OUTER_M }
-}
-
-export interface Viewport {
-    w: number
-    h: number
+export function pageSheet(frame: Rect): Rect {
+    return {
+        x: frame.x - OUTER_M,
+        y: frame.y - OUTER_M,
+        w: frame.w + 2 * OUTER_M,
+        h: frame.h + 2 * OUTER_M,
+    }
 }
 
 /**
@@ -36,7 +38,7 @@ export interface Viewport {
  * the same ripple is drawn there, and a second loop under it would be spent on nothing.
  */
 export function useMarginRipple(
-    viewport: Viewport, accent: string, active: boolean,
+    viewport: Viewport, frame: Rect, accent: string, active: boolean,
 ): RefObject<HTMLCanvasElement | null> {
     const canvasRef = useRef<HTMLCanvasElement | null>(null)
     const rafRef = useRef<number>(0)
@@ -51,24 +53,25 @@ export function useMarginRipple(
         if (!active || w <= 0 || h <= 0) return
         const ctx = canvas.getContext('2d')
         if (!ctx) return
-        const sheet = pageSheet(w, h)
+        const sheet = pageSheet(frame)
         const loop = () => {
             const drawn = drawMarginRipple(ctx, w, h, sheet, performance.now() / 1000, accent)
             if (drawn) rafRef.current = requestAnimationFrame(loop)
         }
         loop()
         return () => cancelAnimationFrame(rafRef.current)
-    }, [w, h, accent, active])
+    }, [w, h, frame, accent, active])
 
     return canvasRef
 }
 
 /** The letterbox canvas — the bottom layer of the page, under every panel. */
-export default function MarginRipple({ viewport, accent, active }: {
+export default function MarginRipple({ viewport, frame, accent, active }: {
     viewport: Viewport
+    frame: Rect
     accent: string
     active: boolean
 }) {
-    const ref = useMarginRipple(viewport, accent, active)
+    const ref = useMarginRipple(viewport, frame, accent, active)
     return <canvas ref={ref} className="cb-margin-canvas" aria-hidden="true" />
 }
