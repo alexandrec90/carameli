@@ -19,10 +19,11 @@ import type { NormPt } from './panelGeometry'
  * (`surfaceBaseRect` in `editor/transforms.ts`), not the frame it hangs in.
  *
  * The distinction is what keeps the surface on the photograph. The picture is
- * contain-fitted inside its frame, so the frame's letterboxing redistributes whenever
- * the window's aspect ratio changes; corners measured against the frame stay glued to
- * the frame while the photograph slides underneath them. Corners measured against the
- * rendered rect ride the picture through a resize, a pan and a zoom alike.
+ * contain-fitted inside its frame and then panned and zoomed, so the frame's
+ * letterboxing moves with every pan and zoom; corners measured against the frame stay
+ * glued to the frame while the photograph slides underneath them. Corners measured
+ * against the rendered rect ride the picture through a pan, a zoom and a change of
+ * window shape alike.
  */
 export type Quad = [NormPt, NormPt, NormPt, NormPt]
 

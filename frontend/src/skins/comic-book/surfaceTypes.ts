@@ -37,7 +37,7 @@ export interface ProjectedSurface {
   /**
    * The surface's corners, clockwise from top-left, in % of the picture's rendered
    * rect — the artwork's own pixels, not the frame it hangs in, so the surface rides
-   * the photograph through a window resize, a pan and a zoom.
+   * the photograph through a pan, a zoom and a change of window shape.
    */
   quad: [[number, number], [number, number], [number, number], [number, number]]
   /** Lettering height as a fraction of one row's height. */

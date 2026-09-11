@@ -132,7 +132,13 @@ describe('the bold stops at the balloon under the pointer', () => {
       bubble({ top: 60, right: 55, width: 40, tail: 'down-right', chain: 'chain-1' }),
     ]
     const { container } = render(
-      <PanelBubbleChain chain={chain} members={members} visible interactive />,
+      <PanelBubbleChain
+        chain={chain}
+        members={members}
+        box={{ x: 0, y: 0, w: 400, h: 300 }}
+        visible
+        interactive
+      />,
     )
     const rows = roots(container)
     expect(rows.length).toBeGreaterThan(1)

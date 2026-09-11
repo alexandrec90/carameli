@@ -40,9 +40,9 @@ function callSuffix(call: CallRole | undefined): string {
 const IMG_HEADER = `// Not parallel to PANELS: each picture names its \`panel\`, so a panel may own several or
 // none, and the array is ordered by panel only for readability. \`src\`/\`alt\` are the
 // picture itself; \`left\`/\`top\`/\`width\`/\`height\` are its frame, in % of the panel box,
-// and may go negative or past 100 to hang the frame off an edge. That frame is cut to
-// the panel's own polygon scaled into it, so an inset picture reads as a smaller comic
-// panel rather than as a bare rectangle. \`scale\`/\`offsetX\`/\`offsetY\`/\`anchor\` then
+// and may go negative or past 100 to hang the frame off an edge. The panel's own polygon
+// is the window that frame is seen through, so an inset picture is a rectangle of
+// picture and never a smaller comic panel. \`scale\`/\`offsetX\`/\`offsetY\`/\`anchor\` then
 // frame the picture *inside* its frame — the pan in % of the frame, the zoom about the
 // anchor point, so both hold at every window size; \`spill: false\` clips it there,
 // \`spill: true\` lets it bleed past.

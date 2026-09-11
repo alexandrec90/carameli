@@ -33,8 +33,9 @@ const CONSTRAINT_TEXT: Record<string, string> = {
 }
 
 const GRID_HINT =
-  'A page has three grids, one per window shape, and this edits the one the window is '
-  + 'currently showing. The other two keep their own shapes.'
+  'A page has three grids, one per window shape, and this edits the one on screen — the '
+  + 'window’s own shape, or the one held by the Shape dropdown. The other two keep their '
+  + 'own shapes.'
 
 const SPLIT_HINT =
   'Cut this panel in two along a straight line through its middle. The upper or left half '

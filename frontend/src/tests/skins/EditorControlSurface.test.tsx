@@ -71,6 +71,7 @@ const ALWAYS = [
   'button: Save',
   'button: Ship',
   'select: Page',
+  'select: Shape',
   'text: Ship summary',
   'text: page name',
 ]

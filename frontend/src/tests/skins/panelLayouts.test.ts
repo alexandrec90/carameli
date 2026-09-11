@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 
 import { PANEL_GRIDS, PANEL_PATTERNS, PANELS } from '../../skins/comic-book/editor/layoutConfig'
-import { gridPolys } from '../../skins/comic-book/panelGeometry'
+import { frameRect, gridPolys } from '../../skins/comic-book/panelGeometry'
 import type { LayoutKind } from '../../skins/comic-book/panelGeometry'
 import {
   PANEL_BG_CONFIGS,
@@ -35,7 +35,7 @@ const CLASSIC = PANELS.flatMap((p, i) => (p.page === 'classic' ? [i] : []))
 
 /** The sparse poly array Layout derives: null where the panel is on the other page. */
 function pagePolys(page: 'home' | 'classic', kind: LayoutKind) {
-  return gridPolys(PANEL_GRIDS[page][kind], 1440, 900).map(p => (p.vp.length >= 3 ? p : null))
+  return gridPolys(PANEL_GRIDS[page][kind], frameRect(1440, 900, kind)).map(p => (p.vp.length >= 3 ? p : null))
 }
 
 describe('pageForPath', () => {
@@ -61,7 +61,7 @@ describe('the home page grids', () => {
   // itself — the logo never dominates the page — rather than a total order that any new
   // corner panel breaks. If the logo is ever enlarged past its share, this fails.
   it.each(KINDS)('keeps the logo panel a minor one in the %s grid', kind => {
-    const polys = gridPolys(PANEL_GRIDS.home[kind], 1440, 900)
+    const polys = gridPolys(PANEL_GRIDS.home[kind], frameRect(1440, 900, kind))
     const [logo, ...rest] = HOME.map(i => area(polys[i].vp))
     const mean = (logo + rest.reduce((a, b) => a + b, 0)) / (rest.length + 1)
     expect(logo).toBeLessThan(mean)
