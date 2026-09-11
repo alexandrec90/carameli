@@ -311,8 +311,10 @@ different images can only crossfade. A new bubble type belongs in `bubbleShape.t
      (`peerPickerOn`), which then binds to whatever the field says.
      Edit the **text** or **initial value**, choose the shapes to
      morph to **on hover**
-     and **on click** (`— no change —` keeps the resting shape), tick **bolder outline
-     on hover** to have the pointer ink this balloon heavier as well, and pick a **link
+     and **on click** (`— no change —` keeps the resting shape), leave **bolder outline
+     on hover** ticked — it is on from the moment the balloon is added, and every balloon
+     on the page ships with it — to have the pointer ink this balloon heavier as well, or
+     untick it for one that should stay flat, and pick a **link
      to** partner to join with a connector tube. The bold is the one event response that
      is not a morph, because weight is a stroke rather than a shape; it takes the tail
      and a thought bubble's puffs with it — they are the same ring and the same class —

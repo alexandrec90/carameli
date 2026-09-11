@@ -7,6 +7,7 @@ import PanelBubbles from '../../skins/comic-book/PanelBubbles'
 import type { BubbleChain } from '../../skins/comic-book/bubbleChain'
 import BubbleInspector from '../../skins/comic-book/editor/BubbleInspector'
 import { NEW_BUBBLE, seedConfig } from '../../skins/comic-book/editor/configSeed'
+import { PANEL_BUBBLE_TRANSFORMS } from '../../skins/comic-book/editor/layoutConfig'
 import { serializeConfig } from '../../skins/comic-book/editor/serialize'
 import type { BubbleTransform } from '../../skins/comic-book/editor/types'
 import type { EditorModeApi } from '../../skins/comic-book/editor/useEditorMode'
@@ -226,12 +227,31 @@ describe('authoring the option', () => {
   })
 
   it('serializes into layoutConfig.ts beside the two morph targets', () => {
-    const off = seedConfig()
-    expect(serializeConfig(off)).toContain('hoverBold: false,')
-
     const on = seedConfig()
-    on.bubbles[0] = { ...on.bubbles[0], hoverBold: true }
-
     expect(serializeConfig(on)).toContain('hoverBold: true,')
+
+    // Both spellings, because the checkbox unticks: an emitter that wrote the default
+    // and nothing else would lose the one balloon an author deliberately left flat.
+    const off = seedConfig()
+    off.bubbles[0] = { ...off.bubbles[0], hoverBold: false }
+
+    expect(serializeConfig(off)).toContain('hoverBold: false,')
+  })
+})
+
+describe('the option is the default rather than the exception', () => {
+  // Weight is the one pointer response with no shape to choose, so it is on from the
+  // start: a balloon the author has not been back to still answers the pointer. The two
+  // morph targets keep their nulls — see the comment on NEW_BUBBLE.
+  it('ticks the box on a balloon the editor has just dropped on a panel', () => {
+    expect(NEW_BUBBLE.hoverBold).toBe(true)
+  })
+
+  // Every one, the fields and the chain templates included: the balloons that are not
+  // captions — a dial, a composer, a transcript window — are the ones a reader is most
+  // likely to be pointing *at*, so they are the last place to leave the ink flat.
+  it('is on for every balloon of the shipped layout', () => {
+    expect(PANEL_BUBBLE_TRANSFORMS.length).toBeGreaterThan(0)
+    expect(PANEL_BUBBLE_TRANSFORMS.filter(b => !b.hoverBold)).toEqual([])
   })
 })
