@@ -69,14 +69,31 @@ describe('clamp', () => {
 })
 
 describe('dragImg', () => {
-  it('adds the px deltas to the offsets and leaves scale/anchor alone', () => {
-    const next = dragImg(img({ offsetX: 4, offsetY: -2, scale: 1.5 }), 10, -20)
-    expect(next).toEqual(img({ offsetX: 14, offsetY: -22, scale: 1.5 }))
+  it('converts the px deltas to % of the frame and leaves scale/anchor alone', () => {
+    // A full-panel frame on a 200×100 panel: 10px is 5% of its width, -20px is -20%
+    // of its height.
+    const next = dragImg(img({ offsetX: 4, offsetY: -2, scale: 1.5 }), 10, -20, 200, 100)
+    expect(next).toEqual(img({ offsetX: 9, offsetY: -22, scale: 1.5 }))
+  })
+
+  it('measures against the frame, not the panel, when the frame is inset', () => {
+    // A half-width frame on a 200-wide panel is 100px, so 10px is 10% of it — twice
+    // what the same drag is on a full-panel frame. Stored as a fraction of the frame,
+    // the pan is the same fraction of the picture at every window size.
+    const next = dragImg(img({ width: 50, height: 25 }), 10, 5, 200, 100)
+    expect(next.offsetX).toBe(10)
+    expect(next.offsetY).toBe(20)
+  })
+
+  it('leaves the picture alone against a degenerate panel or frame', () => {
+    const base = img()
+    expect(dragImg(base, 10, 10, 0, 100)).toBe(base)
+    expect(dragImg(img({ width: 0 }), 10, 10, 200, 100).offsetX).toBe(0)
   })
 
   it('does not mutate the input', () => {
     const base = img()
-    dragImg(base, 5, 5)
+    dragImg(base, 5, 5, 200, 100)
     expect(base.offsetX).toBe(0)
   })
 
@@ -84,7 +101,7 @@ describe('dragImg', () => {
   // window that stays put; dragImgFrame moves the window. Before the frame existed
   // they were the same gesture, and that was the bug.
   it('leaves the frame exactly where it was', () => {
-    const next = dragImg(img({ left: 20, top: 20, width: 55, height: 55 }), 40, 40)
+    const next = dragImg(img({ left: 20, top: 20, width: 55, height: 55 }), 40, 40, 200, 100)
     expect([next.left, next.top, next.width, next.height]).toEqual([20, 20, 55, 55])
   })
 })
