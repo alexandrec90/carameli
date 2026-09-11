@@ -76,7 +76,7 @@ export function chainClaim(senderContent: string): number {
 /**
  * The balloon that owns a revealed panel's keyboard, or null when nothing does.
  *
- * Three rules, in order:
+ * Two rules, in order:
  *
  * 1. **The pointer wins.** Whatever a claimant is ranked, hovering it hands it the
  *    keyboard — which is what makes a panel with several fields navigable at all.
@@ -96,12 +96,17 @@ export function keyboardOwner(
   claims: readonly KeyboardClaim[],
   hovered: string | null,
 ): string | null {
-  const claimants = claims.filter(c => c.claim > CLAIM_NONE)
-  if (hovered !== null && claimants.some(c => c.key === hovered)) return hovered
-  const top = claimants.reduce((best, c) => Math.max(best, c.claim), CLAIM_NONE)
   // A pointer-only claim is not a default: the drum takes the keyboard by being hovered
   // and gives it straight back, so a panel holding nothing else keeps it unclaimed.
-  if (top <= CLAIM_POINTER) return null
-  // First of the top rank, in the order the panel draws them: the main field.
-  return claimants.find(c => c.claim === top)?.key ?? null
+  let rank = CLAIM_POINTER
+  let owner: string | null = null
+  for (const { key, claim } of claims) {
+    if (claim > CLAIM_NONE && key === hovered) return key
+    // Strictly higher keeps the first of equal claims, in the panel's draw order.
+    if (claim > rank) {
+      rank = claim
+      owner = key
+    }
+  }
+  return owner
 }

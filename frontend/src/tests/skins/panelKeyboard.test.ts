@@ -87,6 +87,20 @@ describe('who owns a revealed panel’s keyboard', () => {
     expect(keyboardOwner(claims, 'wheel')).toBe('wheel')
   })
 
+  it('keeps the first composer when lower claims and another composer follow', () => {
+    const claims = [
+      field('first', CLAIM_COMPOSER), field('dial', CLAIM_FIELD),
+      field('second', CLAIM_COMPOSER), field('wheel', CLAIM_POINTER),
+    ]
+    expect(keyboardOwner(claims, null)).toBe('first')
+    expect(keyboardOwner(claims, 'wheel')).toBe('wheel')
+  })
+
+  it('ignores a hovered nonclaimant that is present in the panel', () => {
+    const claims = [field('quiet', CLAIM_NONE), field('dial', CLAIM_FIELD)]
+    expect(keyboardOwner(claims, 'quiet')).toBe('dial')
+  })
+
   it('leaves a panel of nothing but a wheel unclaimed', () => {
     expect(keyboardOwner([field('wheel', CLAIM_POINTER)], null)).toBeNull()
   })

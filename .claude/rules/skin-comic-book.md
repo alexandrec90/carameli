@@ -422,16 +422,12 @@ beside it, precisely what a balloon cannot see.
 | `CLAIM_POINTER` | `wheel` | only while hovered — it takes the scroll, so a composer beside it must let go |
 | `CLAIM_NONE` | lettering, `actions`, `transcript`, `number-hangup` | never |
 
-Two rules decide it: **the pointer wins**, then **the panel's main field owns it** — highest
-claim, first drawn of those that tie. So the SMS panel reads as a phone: the composer is what
-you talk into, hovering the number borrows the keyboard, hovering off returns it. **The owner
-also keeps it** — `useRevealedField` restores focus whenever it goes *nowhere* (artwork, panel
-ground, a balloon's outline), never when `relatedTarget` names where it went (Tab, the call
-key), which would trap it. Both replace a state that read as a fault: a tie owning nothing, a
-stray click killing a lit panel's only focus. **Never re-spell this inside a balloon** — two
-components each carried a private half, which is why an `input` balloon drawn anywhere else
-sat ignoring the keyboard until clicked. A kind joins by naming a claim in `bubbleClaim`, an
-owner by ranking above `CLAIM_FIELD`.
+**The pointer wins**, then the highest claim owns the keyboard; ties go to the first drawn.
+For SMS, hovering the number borrows the keyboard from the composer; leaving returns it.
+`useRevealedField` restores focus after a click on artwork, panel ground or a balloon outline
+(`relatedTarget === null`). It preserves deliberate focus moves to another control, including
+Tab and the call key. **Keep this routing shared**: a kind joins through `bubbleClaim`,
+and a preferred owner ranks above `CLAIM_FIELD`.
 
 ## Dev-only visual editor
 
