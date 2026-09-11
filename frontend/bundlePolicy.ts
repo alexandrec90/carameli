@@ -218,8 +218,21 @@ export const MAX_LAZY_CHUNK_BYTES = 260 * 1024
  * `useEditorMode`; the inspector's two new hints and the overlay's target filter are behind
  * the `import.meta.env.DEV` test and are not in this number. Same lazy comic-book chunk,
  * still 46 of them, `package.json` untouched, so nothing new was pulled in.
+ *
+ * This raise (987 → 988) is the projected table's row highlight: 0.57 KB measured as this
+ * branch's build (987.26 KB) against a build of the same checkout with the changed skin
+ * files reverted (986.69 KB, same `node_modules`). The bytes are `TableRowBand.tsx`, the
+ * hovered-row state and its two pointer handlers in `ProjectedTable.tsx`, and
+ * `filledRows`/`rowBand` in `tableData.ts`. Same lazy comic-book chunk, still 46 of them,
+ * `package.json` untouched, so nothing new was pulled in.
+ *
+ * The CSS ceiling below does not move with it, and the reason is worth keeping: the band
+ * is **one `background-color`**. It began as the number pad's glow — the same keyframes,
+ * the same halo, the same pressed flare — which is 1.66 KB of CSS written a second time
+ * and would have wanted a raise here as well. A row turns out to need none of it
+ * (`table.css` says why), so what ships is a single flat wash, and 0.24 KB.
  */
-export const MAX_TOTAL_JS_BYTES = 987 * 1024
+export const MAX_TOTAL_JS_BYTES = 988 * 1024
 
 /**
  * Every `.css` file in `dist/assets/`, summed. Today 44.2 KB across 2 files.

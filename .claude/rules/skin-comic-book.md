@@ -324,6 +324,12 @@ surface (in `configSeed.ts`, `configHydrate.ts` and `serializeTable.ts` alike), 
   out as smudges at the few pixels a band actually is, so it is a word now
   (`CALL_STATUS_LABELS`). `.cb-ptable-clip` is the backstop — `hidden` over a window
   nothing scrolls past, not the scroll container rule 18 forbids.
+- **A row under the pointer takes one flat wash of the authored ink and nothing else** —
+  `TableRowBand.tsx`, placed by band arithmetic so it lands on the row's own ruled line.
+  Rows already have visible lettering; the number pad's glow would blur the ruling and
+  obscure that text. **No keyframes, `box-shadow` or pressed state**
+  (`ProjectedTable.test.tsx`), and **no z-index**, so pictures at greater depth cover both
+  wash and rows. Only rows backed by records wash; `visibleRows` padding stays blank.
 - **The quad is what puts the rows on the drawn lines**, seated against the artwork rather
   than by eye: bands are equal, so the bottom edge belongs *on* the last ruled line and
   the top edge exactly one band above the first (`notepadRuling.test.ts` checks the
@@ -449,7 +455,8 @@ gaps: **no chain control**, and no cell block or **+ Column** / **−** on a liv
 | --- | --- |
 | Call layout | **Default** / **Ringing** / **Connected**, present once the page has a call; on Default the call's entries are off screen with no targets or drags. A **call role** select puts an entry in the layout and moves the page to it, or nothing would appear to have happened; **call seam** / **call split** cut the panel, bounded by `CALL_CUT` since an edge cut leaves a half with no area to drag back |
 | Chain | **rows**, and **messages** on an *unbound* chain only. Chained balloons render flat in edit mode so each stays selectable, and the table's extent is a dashed frame (`chainFrame.ts`) |
-| Table corners | four grips, content mode only, band guides following — align the guides to the ruling in the photograph |
+| Table corners | four grips, content mode only, band guides following — align the guides to the ruling in the photograph. Their exact coordinates are a folded section (`QuadCorners.tsx`), shared with the number pad |
+| Prose | **The inspector explains itself in `?` badges, not paragraphs** (`Hint.tsx`), and its set-once blocks fold (`Section.tsx`). `useToolbarColumns` turns toolbar height into toolbar *width*, so a paragraph left in the flow is paid for in screen area — a notepad with a table on it put the panel across most of the page. A hint an author must **act** on — a refused split, a chain with no number to bind to, the stale-file notices — stays a block |
 | Mode | **Content** / **Panel shapes**. Picture and bubble click targets are not rendered in shapes mode — a picture-sized target would swallow every drag aimed at a line crossing it |
 | Reshape | drag a **line** or **vertex**; a frame vertex slides along its own edge and the four corners are locked. Pictures and bubbles hold their on-screen place, re-expressed against their new panel box (`editor/gridContentRemap.ts`) — only the clip follows the seam. **Double-click** a line to bend it; drag a corner **onto another** to merge (`panelGridMerge.ts`) and **Alt-drag** to tear one apart (`panelGridSplit.ts`); both refuse while the result would be invalid |
 | New panel | **Split top / bottom** or **left / right** cuts through the middle of the selected panel's box in all three grids of its page (`configPanels.ts` over `panelGridCut.ts`). The parent keeps its index, name, pattern and the upper/left half; the new panel is appended and the other page's grids gain an empty ring. Refused whole when any grid cannot take it. There is no delete |
@@ -472,8 +479,6 @@ in `frontend/src/tests/skins/`.
 7. **Never use cold or neutral fonts**, and uppercase nav and headings in CSS.
 8. **Never hard-code a panel polygon or a gutter offset.**
 9. **A panel's pattern animates only while that panel is active**, off its own clock.
-   Until 2026-08-25 this rule said the opposite, which is how eight panels came to drift
-   at once and pull the eye off the one being pointed at.
 10. **Served art is `.webp` under `public/comic-book/` exclusively** — no base64, no
     external URLs, no PNG; masters live in `frontend/assets-src/comic-book/` and re-encodes
     come from there. `frontend/assetPolicy.ts` holds the format rule, the dimension ratchet
@@ -481,9 +486,8 @@ in `frontend/src/tests/skins/`.
     what a visitor now downloads, and `assetPolicy.test.ts` checks the served tree against
     them. Panel art is fetched **only by this skin**, by the guard script in `index.html`
     whose `SKINS`/`DEFAULT` and `PANELS` must match `src/skins/registry.ts` and
-    `layoutConfig.ts` (same test). Static preload tags once fetched it for all four skins —
-    real references, so no static check saw it — which is why
-    `tests/e2e/test_asset_usage.py` compares fetched against drawn in a browser.
+    `layoutConfig.ts` (same test). `tests/e2e/test_asset_usage.py` compares fetched against
+    drawn in a browser to catch art fetched by other skins through static preload tags.
 11. **Files over 250 lines (TS/TSX/CSS) must be split before commit.**
 12. **Never link two bubbles across panels.**
 13. **Never give a panel bubble its own tail path** — the tail is a ring vertex.

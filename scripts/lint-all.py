@@ -37,6 +37,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import diagnostics
+import preflight
 import script_common
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -52,17 +53,6 @@ IS_CI = bool(os.environ.get("CI"))
 # rewritten by every clean-tree lint run once a `sync-devkit.py --pull` moved one.
 # `test_secrets_exclude_matches_pre_commit` fails if the two ever diverge again.
 SECRETS_EXCLUDE_RE = r"(\.secrets\.baseline|\.env\.example|DEVKIT_FILES\.json)$"
-
-
-def _ensure_venv_on_path() -> None:
-    """Prepend the local venv's bin dir so subprocesses resolve ruff/mypy/etc."""
-    if os.environ.get("VIRTUAL_ENV"):
-        return
-    for sub in ("Scripts", "bin"):
-        cand = REPO_ROOT / ".venv" / sub
-        if cand.exists():
-            os.environ["PATH"] = str(cand) + os.pathsep + os.environ.get("PATH", "")
-            return
 
 
 def run(cmd: str) -> tuple[list[str], int]:
@@ -457,9 +447,14 @@ def t_detect_secrets(changed: list[str] | None = None) -> dict:
         return {"detect-secrets": ([], 0)}
 
     before = baseline.read_text(encoding="utf-8")
-    _, code = run(f'detect-secrets scan --baseline ".secrets.baseline" {exclude}')
+    out, code = run(f'detect-secrets scan --baseline ".secrets.baseline" {exclude}')
     if code != 0:
-        return {"detect-secrets": ([f"detect-secrets: baseline scan failed (exit {code})"], 1)}
+        # Keep the tool's own output ahead of the summary. Dropping it is what made an
+        # absent detect-secrets -- the normal state of a fresh worktree -- read as a
+        # lint failure: `get_skip_reason` had nothing left to classify once the shell's
+        # "is not recognized" line, the one that says missing tool rather than broken
+        # repo, was thrown away. A genuine scan failure needs the output just as much.
+        return {"detect-secrets": ([*out, f"detect-secrets: scan failed (exit {code})"], 1)}
     after = baseline.read_text(encoding="utf-8")
 
     def _normalize(text: str) -> str:
@@ -554,9 +549,16 @@ def select_tools(is_ci: bool, no_secrets: bool = False):
     return tools
 
 
+def run_labels(changed: list[str] | None) -> tuple[str, str, str]:
+    """(environment, scope, artifact source label) for one run. Pure."""
+    env = "CI" if IS_CI else "local"
+    scope = "full" if changed is None else f"changed ({len(changed)} file(s))"
+    return env, scope, f"scripts/lint-all.py ({env}{'' if changed is None else ', changed'})"
+
+
 def main(argv: list[str] | None = None) -> int:
     args = _parse_args(argv)
-    _ensure_venv_on_path()
+    preflight.ensure_venv_on_path(REPO_ROOT)
     tools = select_tools(IS_CI, args.no_secrets)
 
     if args.paths is not None:
@@ -566,11 +568,17 @@ def main(argv: list[str] | None = None) -> int:
     else:
         changed = None
 
-    env = "CI" if IS_CI else "local"
-    scope = "full" if changed is None else f"changed ({len(changed)} file(s))"
-    label = f"scripts/lint-all.py ({env}{'' if changed is None else ', changed'})"
-
+    env, scope, label = run_labels(changed)
     artifact = REPO_ROOT / "logs" / "lint-errors.log"
+
+    # Whether the linters can run at all, before running thirteen of them in a checkout
+    # with no venv and no node_modules: unprovisioned, each fails on its own missing
+    # binary and the run reports a tool's name instead of the checkout. `preflight`
+    # carries why this refuses rather than linting whatever happens to be installed.
+    blocked = preflight.gaps(REPO_ROOT)
+    if blocked:
+        return preflight.report("LINT", artifact, label, blocked, preflight.provisioning_command())
+
     script_common.print_suite_header(
         "Lint Suite",
         artifact,

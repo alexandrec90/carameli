@@ -85,6 +85,15 @@ usable test suite both change: `docs/operations/local-integration-testing.md` an
 
 ## Local workflow
 
+**A fresh worktree is not provisioned — run `python scripts/bootstrap.py` first.** A
+linked worktree checks out tracked files only, so it has no `.venv` and no
+`node_modules`, and the recurring cost of that was not the install: it was agents
+reading `lint-all.py`'s red as a lint failure, working out that the red was one absent
+binary, installing that binary by hand, and leaving every other check in the worktree to
+fail the same way. `scripts/preflight.py` now stops the runners with this command
+instead, and `bootstrap.py` does all of it — the venv on the interpreter the
+`FROM python:` tag pins, the dev lock, and `npm ci`.
+
 Docker Desktop is required for database-backed tests and stack operations. Check
 `docker ps` first. Telephony services are opt-in with `--profile telephony` and may run
 only in the primary worktree because rtpengine uses host networking. That profile
@@ -168,9 +177,10 @@ include them.
 
 The host venv must run **the same Python the image runs** — that version is coordinated
 across the `FROM python:` tag in `Dockerfile`, the uv-compiled locks, `mypy.ini`,
-`ruff.toml`, and CI. Read the tag, then create the venv with
-`uv venv --python <that version>`; a bare `uv venv` silently takes the machine default
-and gives you a venv the container does not match.
+`ruff.toml`, and CI. `scripts/bootstrap.py` reads the tag and creates the venv with
+`uv venv --python <that version>`, which is why it is the entry point rather than one
+step of an install anyone types: a bare `uv venv`, and `python -m venv` in any form,
+silently take the machine default and give you a venv the container does not match.
 
 `logs/` holds per-run failure artifacts, and `scripts/prune-logs.py` bounds its growth
 from the SessionStart hook. The current artifacts (`lint-errors.log`,

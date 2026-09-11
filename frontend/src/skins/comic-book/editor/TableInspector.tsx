@@ -1,12 +1,11 @@
 import { LIVE_TABLE_FEEDS, TABLE_SOURCES } from '../../../lib/liveTables'
 import { FONT_SCALE, ROW_COUNT } from '../tableData'
-import { DEFAULT_QUAD } from '../tableProjection'
-import type { Quad } from '../tableProjection'
+import Hint from './Hint'
+import QuadCorners from './QuadCorners'
 import TableColumnsInspector from './TableColumnsInspector'
 import { authoredTable, coerceSource, liveTable, newTable } from './tableValidate'
 import type { ImgTransform, TableProjection } from './types'
 import type { EditorModeApi } from './useEditorMode'
-import { setCorner } from './useTableCornerDrag'
 
 interface TableInspectorProps {
   api: EditorModeApi
@@ -15,8 +14,18 @@ interface TableInspectorProps {
   image: ImgTransform
 }
 
-/** The quad's corners in reading order, for the coordinate fields. */
-const CORNERS = ['top-left', 'top-right', 'bottom-right', 'bottom-left']
+const CORNERS_HINT =
+  'Drag the round blue grips onto the corners of the ruled area, then set the row count '
+  + 'until the guide lines sit on the drawn ones. These fields are the same four corners '
+  + 'to a tenth of a percent, which is finer than a pointer can hit and is where the '
+  + 'illusion lives. Neither the guides nor the outline show outside the editor.'
+
+const SOURCE_HINT =
+  'Either the cells typed into this surface, or a live feed. Switching either way is a '
+  + 'fresh start rather than a merge, and both replace the columns — a feed’s cells are '
+  + 'positional, so keeping the old headings would label every column with the wrong '
+  + 'word. A feed’s rows refresh on their own: a call or a message appears on the notepad '
+  + 'without reloading the page.'
 
 /** A typed number, or the previous value when the field is mid-edit and unparseable. */
 function numOr(value: string, fallback: number): number {
@@ -26,15 +35,13 @@ function numOr(value: string, fallback: number): number {
 
 /**
  * The surface half of the picture inspector: whether this picture *is* a surface at all,
- * how many bands it is cut into, and the exact corner coordinates.
+ * what it shows, and how many bands it is cut into.
  *
  * The switch is per picture and carries nothing about notepads — any picture can be given
  * a table, which is what makes this a projection tool rather than a notepad feature.
  *
- * Both ways of placing a corner are here on purpose. The grips over the page (see
- * TableCorners.tsx) are how the quad gets roughly onto the drawn lines; these fields are
- * how it gets exactly onto them, because a pointer cannot reliably hit a tenth of a
- * percent and the whole illusion is that the last tenth is right.
+ * The exact corner coordinates are ./QuadCorners.tsx, folded, and shared with the number
+ * pad; the columns and the cells are ./TableColumnsInspector.tsx below.
  */
 export default function TableInspector({ api, index, image }: TableInspectorProps) {
   const table = image.table
@@ -82,19 +89,22 @@ export default function TableInspector({ api, index, image }: TableInspectorProp
 
       {table && (
         <>
-          <label className="cb-ed-field">
-            <span>shows</span>
-            <select
-              className="cb-ed-select"
-              value={table.source ?? ''}
-              onChange={e => setSource(e.target.value)}
-            >
-              <option value="">Cells typed below</option>
-              {TABLE_SOURCES.map(s => (
-                <option key={s} value={s}>{LIVE_TABLE_FEEDS[s].label}</option>
-              ))}
-            </select>
-          </label>
+          <div className="cb-ed-row">
+            <label className="cb-ed-field">
+              <span>shows</span>
+              <select
+                className="cb-ed-select"
+                value={table.source ?? ''}
+                onChange={e => setSource(e.target.value)}
+              >
+                <option value="">Cells typed below</option>
+                {TABLE_SOURCES.map(s => (
+                  <option key={s} value={s}>{LIVE_TABLE_FEEDS[s].label}</option>
+                ))}
+              </select>
+            </label>
+            <Hint text={SOURCE_HINT} />
+          </div>
 
           <div className="cb-ed-row">
             <label className="cb-ed-field">
@@ -139,71 +149,17 @@ export default function TableInspector({ api, index, image }: TableInspectorProp
             <span>First row is the column headings</span>
           </label>
 
-          {CORNERS.map((name, i) => (
-            <div className="cb-ed-row" key={name}>
-              <label className="cb-ed-field">
-                <span>{name} X %</span>
-                <input
-                  className="cb-ed-input"
-                  type="number"
-                  step="0.1"
-                  value={Math.round((table.quad[i]?.[0] ?? 0) * 100) / 100}
-                  onChange={e =>
-                    setTable({
-                      quad: setCorner(
-                        table.quad,
-                        i,
-                        numOr(e.target.value, table.quad[i]?.[0] ?? 0),
-                        table.quad[i]?.[1] ?? 0,
-                      ),
-                    })
-                  }
-                />
-              </label>
-              <label className="cb-ed-field">
-                <span>Y %</span>
-                <input
-                  className="cb-ed-input"
-                  type="number"
-                  step="0.1"
-                  value={Math.round((table.quad[i]?.[1] ?? 0) * 100) / 100}
-                  onChange={e =>
-                    setTable({
-                      quad: setCorner(
-                        table.quad,
-                        i,
-                        table.quad[i]?.[0] ?? 0,
-                        numOr(e.target.value, table.quad[i]?.[1] ?? 0),
-                      ),
-                    })
-                  }
-                />
-              </label>
-            </div>
-          ))}
-
-          <button
-            type="button"
-            className="cb-ed-btn"
-            title="Put the four corners back on the picture, square"
-            onClick={() => setTable({ quad: DEFAULT_QUAD.map(([x, y]) => [x, y]) as Quad })}
-          >
-            Reset corners
-          </button>
+          <QuadCorners
+            quad={table.quad}
+            onChange={quad => setTable({ quad })}
+            hint={CORNERS_HINT}
+            resetLabel="Reset corners"
+            resetTitle="Put the four corners back on the picture, square"
+          />
 
           {/* Keyed by picture so the cell block's in-progress text does not follow the
               selection onto a different surface. */}
           <TableColumnsInspector key={index} api={api} index={index} table={table} />
-
-          <div className="cb-ed-hint">
-            Drag the round blue grips onto the corners of the ruled area, then set the row
-            count until the guide lines sit on the drawn ones. Neither the guides nor the
-            outline show outside the editor.
-            {table.source
-              ? ' The rows come from the live records and refresh on their own — a call' +
-                ' or a message appears on the notepad without reloading the page.'
-              : ''}
-          </div>
         </>
       )}
     </>

@@ -483,5 +483,4 @@ scripts/sync-devkit.py::remove_retired
 scripts/sync-devkit.py::retired_present
 scripts/sync-sandbox-secrets.py::main
 scripts/sync-sandbox-secrets.py::sync
-scripts/venv-install.py::main
 scripts/weekly_summary.py::build_parser

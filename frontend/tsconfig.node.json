@@ -42,6 +42,9 @@
     "proxyErrorPolicy.test.ts",
     "shipLayout.ts",
     "shipLayout.test.ts",
-    "shipLayout.integration.test.ts"
+    "shipLayout.integration.test.ts",
+    "worktreePort.ts",
+    "worktreePort.test.ts",
+    "vitePort.test.ts"
   ]
 }

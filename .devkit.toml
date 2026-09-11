@@ -16,6 +16,22 @@ app = "app/"
 tests = "tests/"
 unit_tests = "tests/unit"
 
+# How this checkout gets provisioned. `scripts/hooks/toolchain.py` would otherwise
+# derive `python -m venv .venv && uv pip install -r requirements.txt -r
+# requirements-dev.txt` from the lockfiles on disk, and that command is wrong here:
+# `python -m venv` can only clone the interpreter running it, while this project's venv
+# has to match the `FROM python:` tag in `Dockerfile` (CLAUDE.md, "Local workflow").
+# `bootstrap.py` reads that tag and hands it to `uv venv --python`, then installs the
+# dev lock and `frontend/node_modules` -- so the SessionStart report, `ship.py
+# --preflight` and `scripts/preflight.py` all name one command that provisions
+# everything, instead of three that each provision a piece.
+#
+# The interpreter pin is deliberately NOT repeated in a `version` field here: it lives
+# in the Dockerfile, which enforces it, and a copy here would be an unenforced second
+# pin -- and `worktree.py provision` reads that same tag when the field is empty.
+[python]
+install_command = "python scripts/bootstrap.py"
+
 # The PreToolUse Bash output cap. `enforce-capped-bash.py` blocks an uncapped Bash
 # call and quotes `max_bytes` in the reason; `invoke-capped.py` applies it. One field
 # feeds both, so the number the agent is told to use is the number it gets.
