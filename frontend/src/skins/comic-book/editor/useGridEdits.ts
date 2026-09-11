@@ -1,6 +1,8 @@
 import { useCallback, useMemo } from 'react'
 
 import { logger } from '../../../lib/logger'
+import { frameRect } from '../panelGeometry'
+import type { Rect } from '../panelGeometry'
 import { splitPanel as splitPanelIn } from './configPanels'
 import { resetGridKeepingContent, setGridKeepingContent } from './gridContentRemap'
 import type { CutAxis } from './panelGridCut'
@@ -13,15 +15,17 @@ import type { EditorConfig, LayoutKind, PanelGrid, PanelPage } from './types'
 // here knows what is drawn in a panel, and nothing there knows about panel geometry.
 
 /**
- * The viewport a grid edit is being looked at through. Layout.tsx computes panel boxes
- * from `window.innerWidth/innerHeight`, and the remap that holds content still while a
- * seam is dragged must measure with those same numbers — % of a panel box only names
- * pixels once the box does. Zero (no window) makes the remap a no-op.
+ * The page frame a grid edit is being looked at through: `kind`'s fixed-aspect frame in
+ * this window, which is what Layout.tsx drew the panels in — so the remap that holds
+ * content still while a seam is dragged measures the same boxes the author sees. The
+ * kind is the caller's, not the window's: a portrait grid edited in a landscape window
+ * is on a portrait frame, and reading the kind off the window here would remap it
+ * against a landscape one. No window makes a zero frame, and the remap a no-op.
  */
-function viewportSize(): { w: number; h: number } {
+function frameFor(kind: LayoutKind): Rect {
   return typeof window === 'undefined'
-    ? { w: 0, h: 0 }
-    : { w: window.innerWidth, h: window.innerHeight }
+    ? { x: 0, y: 0, w: 0, h: 0 }
+    : frameRect(window.innerWidth, window.innerHeight, kind)
 }
 
 export interface GridEdits {
@@ -53,13 +57,13 @@ export function useGridEdits(
 ): GridEdits {
   const setGridFor = useCallback(
     (page: PanelPage, kind: LayoutKind, grid: PanelGrid) =>
-      apply(prev => setGridKeepingContent(prev, page, kind, grid, viewportSize())),
+      apply(prev => setGridKeepingContent(prev, page, kind, grid, frameFor(kind))),
     [apply],
   )
 
   const resetGridFor = useCallback(
     (page: PanelPage, kind: LayoutKind) => {
-      apply(prev => resetGridKeepingContent(prev, page, kind, viewportSize()))
+      apply(prev => resetGridKeepingContent(prev, page, kind, frameFor(kind)))
       // The default grid has fewer vertices than a bent one, so a surviving vertex
       // selection would point past the end of the table or at somebody else's corner.
       setSelected(null)
@@ -73,7 +77,7 @@ export function useGridEdits(
   // between a click and its handler, so the two are the same object.
   const splitPanel = useCallback(
     (panel: number, axis: CutAxis, kind: LayoutKind): boolean => {
-      const result = splitPanelIn(config, panel, axis, { kind, viewport: viewportSize() })
+      const result = splitPanelIn(config, panel, axis, { kind, frame: frameFor(kind) })
       if (!result) {
         logger.warn('Refused to split comic-book panel', { panel, axis })
         return false

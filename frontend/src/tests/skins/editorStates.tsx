@@ -277,6 +277,9 @@ export function mockApi(config: EditorConfig, mode: EditMode, selected: Selectio
     splitPanel: vi.fn(),
     setPanelLabel: vi.fn(),
     setPageLabel: vi.fn(),
+    // Following the window: the state an author is in until they hold a shape.
+    shape: null,
+    setShape: vi.fn(),
     deleteImg: vi.fn(),
     deleteBubble: vi.fn(),
     resetOne: vi.fn(),

@@ -26,6 +26,7 @@ diff as the code that added it.
 - button: Save
 - button: Ship
 - select: Page
+- select: Shape
 - text: Ship summary
 - text: page name
 
@@ -47,6 +48,7 @@ diff as the code that added it.
 - button: Ship
 - range: call seam
 - select: Page
+- select: Shape
 - select: call split
 - select: pattern
 - text: Ship summary
@@ -77,6 +79,7 @@ diff as the code that added it.
 - checkbox: Project a table on this picture
 - number: depth
 - select: Page
+- select: Shape
 - select: anchor
 - select: call role
 - select: panel
@@ -116,6 +119,7 @@ diff as the code that added it.
 - number: rows
 - range: text
 - select: Page
+- select: Shape
 - select: anchor
 - select: call role
 - select: panel
@@ -153,6 +157,7 @@ diff as the code that added it.
 - number: depth
 - range: text
 - select: Page
+- select: Shape
 - select: anchor
 - select: call role
 - select: panel
@@ -185,6 +190,7 @@ diff as the code that added it.
 - checkbox: Bolder outline on hover
 - checkbox: Scrolling chain
 - select: Page
+- select: Shape
 - select: call role
 - select: content
 - select: link to
@@ -221,6 +227,7 @@ diff as the code that added it.
 - checkbox: Bolder outline on hover
 - checkbox: Scrolling chain
 - select: Page
+- select: Shape
 - select: call role
 - select: content
 - select: link to
@@ -258,6 +265,7 @@ diff as the code that added it.
 - checkbox: Scrolling chain
 - number: rows
 - select: Page
+- select: Shape
 - select: call role
 - select: content
 - select: link to
@@ -288,6 +296,7 @@ diff as the code that added it.
 - button: Save
 - button: Ship
 - select: Page
+- select: Shape
 - text: Ship summary
 - text: page name
 
@@ -308,6 +317,7 @@ diff as the code that added it.
 - button: Save
 - button: Ship
 - select: Page
+- select: Shape
 - text: Ship summary
 - text: page name
 
@@ -322,6 +332,7 @@ diff as the code that added it.
 - button: Save
 - button: Ship
 - select: Page
+- select: Shape
 - text: Ship summary
 - text: page name
 
@@ -338,6 +349,7 @@ diff as the code that added it.
 - button: Split left / right
 - button: Split top / bottom
 - select: Page
+- select: Shape
 - text: Ship summary
 - text: page name
 - text: panel name
@@ -353,6 +365,7 @@ diff as the code that added it.
 - button: Save
 - button: Ship
 - select: Page
+- select: Shape
 - text: Ship summary
 - text: page name
 
@@ -367,6 +380,7 @@ diff as the code that added it.
 - button: Save
 - button: Ship
 - select: Page
+- select: Shape
 - text: Ship summary
 - text: page name
 
@@ -381,6 +395,7 @@ diff as the code that added it.
 - button: Save
 - button: Ship
 - select: Page
+- select: Shape
 - text: Ship summary
 - text: page name
 
@@ -395,6 +410,7 @@ diff as the code that added it.
 - button: Save
 - button: Ship
 - select: Page
+- select: Shape
 - text: Ship summary
 - text: page name
 
@@ -409,6 +425,7 @@ diff as the code that added it.
 - button: Save
 - button: Ship
 - select: Page
+- select: Shape
 - text: Ship summary
 - text: page name
 
@@ -423,6 +440,7 @@ diff as the code that added it.
 - button: Save
 - button: Ship
 - select: Page
+- select: Shape
 - text: Ship summary
 - text: page name
 
@@ -440,6 +458,7 @@ diff as the code that added it.
 - number: X %
 - number: Y %
 - select: Page
+- select: Shape
 - text: Ship summary
 - text: page name
 
@@ -455,6 +474,7 @@ diff as the code that added it.
 - button: Save
 - button: Ship
 - select: Page
+- select: Shape
 - text: Ship summary
 - text: page name
 
@@ -483,6 +503,7 @@ diff as the code that added it.
 - checkbox: Scrolling chain
 - number: rows
 - select: Page
+- select: Shape
 - select: call role
 - select: content
 - select: link to
@@ -521,6 +542,7 @@ diff as the code that added it.
 - checkbox: Scrolling chain
 - number: rows
 - select: Page
+- select: Shape
 - select: call role
 - select: content
 - select: link to
@@ -552,5 +574,6 @@ diff as the code that added it.
 - button: Ship
 - button: Take
 - select: Page
+- select: Shape
 - text: Ship summary
 - text: page name
