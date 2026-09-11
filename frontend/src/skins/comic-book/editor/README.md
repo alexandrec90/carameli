@@ -560,7 +560,8 @@ panelGridCut.ts     PURE: cut one ring in two along a straight line, inserting t
 ../tableProjection.ts PURE: the corner quad -> homography -> `matrix3d`, and the layout box
 ../tableData.ts     PURE: rows visible at an offset, wheel-to-rows, column widths, cell text
 ../ProjectedTable.tsx one picture's surface: the projected table, its wheel and its keys
-../table.css        surface + cell styles, and the editor-only band guides
+../table.css        surface + cell styles, the hovered row's band, and the editor-only band guides
+../TableRowBand.tsx the flat wash behind the row under the pointer, placed by band arithmetic
 ../useLiveTableImages.ts hook + PURE: which feeds a page needs, and the rows dropped onto its surfaces
 ../../../lib/liveTables.ts PURE: the feeds, their columns, and record -> row (shared, no fetching)
 ../../../hooks/useLiveTables.ts hook: the only place a surface's rows are fetched, and the poll

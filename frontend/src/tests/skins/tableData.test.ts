@@ -5,10 +5,12 @@ import {
   bodyRows,
   clampScroll,
   columnPercents,
+  filledRows,
   fitColumns,
   FONT_SCALE,
   formatRows,
   maxScroll,
+  rowBand,
   parseRows,
   scrollByRows,
   visibleRows,
@@ -208,6 +210,63 @@ describe('parseRows / formatRows', () => {
       ['Grace Hopper', '555-0102'],
     ]
     expect(parseRows(formatRows(rows), 2)).toEqual(rows)
+  })
+})
+
+/*
+ * Which bands the pointer may light, and where each one is.
+ *
+ * `visibleRows` pads its window so the surface covers the same bands whatever the data
+ * does, which is what keeps the ruled lines under the writing area covered. The padding
+ * is blank ruled line, though, so it is the one part of the window that must not answer
+ * the pointer — a notepad whose empty half lights up row by row is a notepad that has
+ * announced it is a table.
+ */
+describe('filledRows', () => {
+  it('counts the slots with a record behind them, not the slots', () => {
+    expect(filledRows(table({ data: [['solo', '5550']] }), 0)).toBe(1)
+    expect(bodyRows(table())).toBe(4)
+  })
+
+  it('fills the whole window while there is data enough for it', () => {
+    expect(filledRows(table(), 0)).toBe(4)
+    expect(filledRows(table(), 6)).toBe(4)
+  })
+
+  it('counts nothing at all for a surface with no data', () => {
+    expect(filledRows(table({ data: [] }), 0)).toBe(0)
+  })
+
+  it('counts nothing when the heading has eaten the only band', () => {
+    expect(filledRows(table({ rows: 1 }), 0)).toBe(0)
+  })
+
+  // An offset out of range is pulled back the same way the renderer pulls it back, so the
+  // count always describes the window that is actually on screen.
+  it('answers for the window a stale offset lands in, not for the offset', () => {
+    expect(filledRows(table({ data: [['solo', '5550']] }), 40)).toBe(1)
+    expect(filledRows(table(), Number.NaN)).toBe(4)
+  })
+})
+
+describe('rowBand', () => {
+  it('starts the body below the heading, which owns band 0', () => {
+    expect(rowBand({ header: true }, 0)).toBe(1)
+    expect(rowBand({ header: true }, 3)).toBe(4)
+  })
+
+  it('starts the body at the top when there is no heading', () => {
+    expect(rowBand({ header: false }, 0)).toBe(0)
+    expect(rowBand({ header: false }, 3)).toBe(3)
+  })
+
+  // The band a row is *lettered* in is the band a highlight has to cover, so the two are
+  // read off the same function rather than each counting the heading for itself.
+  it('lands every visible row inside the surface it was sliced for', () => {
+    const t = table()
+    const rows = visibleRows(t, 0)
+    expect(rows.map((_, i) => rowBand(t, i))).toEqual([1, 2, 3, 4])
+    expect(Math.max(...rows.map((_, i) => rowBand(t, i)))).toBeLessThan(t.rows)
   })
 })
 
