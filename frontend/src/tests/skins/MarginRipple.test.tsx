@@ -1,7 +1,7 @@
 import { render } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
-import MarginRipple, { prefersReducedMotion } from '../../skins/comic-book/MarginRipple'
+import MarginRipple from '../../skins/comic-book/MarginRipple'
 import { OUTER_M } from '../../skins/comic-book/panelGeometry'
 
 // The loop: when the letterbox canvas paints, when it schedules another frame and when
@@ -16,7 +16,6 @@ let queue = new Map<number, FrameRequestCallback>()
 let nextId = 1
 let paints = 0
 let arcs = 0
-let reduceMotion = false
 
 let realRaf: typeof globalThis.requestAnimationFrame
 let realCancel: typeof globalThis.cancelAnimationFrame
@@ -50,7 +49,6 @@ beforeEach(() => {
   nextId = 1
   paints = 0
   arcs = 0
-  reduceMotion = false
   realRaf = globalThis.requestAnimationFrame
   realCancel = globalThis.cancelAnimationFrame
   realGetContext = HTMLCanvasElement.prototype.getContext
@@ -63,8 +61,9 @@ beforeEach(() => {
   globalThis.cancelAnimationFrame = (id: number) => { queue.delete(id) }
   HTMLCanvasElement.prototype.getContext = (() =>
     stubContext()) as unknown as HTMLCanvasElement['getContext']
+  // A visitor who asked for reduced motion: the loop must not stop for it (see below).
   window.matchMedia = ((query: string) => ({
-    matches: reduceMotion && query.includes('prefers-reduced-motion'),
+    matches: query.includes('prefers-reduced-motion'),
     media: query,
   })) as unknown as typeof window.matchMedia
 })
@@ -128,13 +127,19 @@ describe('MarginRipple', () => {
     expect(queue.size).toBe(0)
   })
 
-  it('draws one still frame under prefers-reduced-motion', () => {
-    reduceMotion = true
-    expect(prefersReducedMotion()).toBe(true)
+  /* The first cut held one still frame under prefers-reduced-motion, and on a machine
+     with the setting on the loading ripple ran until the page was up and then stopped —
+     which reads as the page freezing. The loading screen never consulted the setting;
+     the sheet that continues it must not either. matchMedia reports `reduce` in every
+     test here, so the animating cases above are already this assertion; this one names
+     it, so a reduced-motion gate cannot come back quietly. */
+  it('keeps moving for a visitor who asked for reduced motion, as the loading screen does', () => {
+    expect(window.matchMedia('(prefers-reduced-motion: reduce)').matches).toBe(true)
     mount()
-    expect(paints).toBe(1)
-    expect(arcs).toBeGreaterThan(0)
-    expect(queue.size).toBe(0)
+    expect(queue.size).toBe(1)
+    frame()
+    expect(paints).toBe(2)
+    expect(queue.size).toBe(1)
   })
 
   it('cancels its frame on unmount', () => {

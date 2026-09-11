@@ -257,9 +257,12 @@ there — the same grid, wave and clock (`performance.now()`), so the sheet the 
 screen washes away reveals the ripple it was already showing, in phase, and only the page
 is new. It is the one thing on a resting page that moves, which is what rule 9 is about,
 so it stays outside the page sheet (`pageSheet`: the frame plus `OUTER_M`, never the
-gutters), runs only while a band exists — a window of the page's aspect never schedules a
-frame — and holds one still frame under `prefers-reduced-motion`. It is also gated on the
-page being up: under the loading sheet the same ripple is already drawn.
+gutters), and runs only while a band exists — a window of the page's aspect never
+schedules a frame. It is also gated on the page being up: under the loading sheet the
+same ripple is already drawn. It does **not** consult `prefers-reduced-motion`: the
+loading ripple it continues never did, so a sheet that moved until the page was up and
+then stopped read as the page freezing, which is what the first cut did on a machine
+with the setting on (`MarginRipple.test.tsx` holds the loop to moving under it).
 
 ### Panel ink
 

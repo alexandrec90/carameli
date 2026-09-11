@@ -12,7 +12,9 @@ import type { Rect } from './panelGeometry'
 // showed, in phase, and only the page itself is new.
 //
 // The loop runs only while there is a band to draw — a window of the page's own aspect
-// never schedules a frame — and draws one still frame under prefers-reduced-motion.
+// never schedules a frame. It does not consult prefers-reduced-motion: the loading
+// ripple it continues does not either, and a sheet that moves until the page is up and
+// then stops reads as the page having frozen, not as a preference honoured.
 
 /**
  * The page sheet: the frame plus its outer margin, the paper the panels sit on. What
@@ -21,12 +23,6 @@ import type { Rect } from './panelGeometry'
 export function pageSheet(w: number, h: number): Rect {
     const f = frameRect(w, h)
     return { x: f.x - OUTER_M, y: f.y - OUTER_M, w: f.w + 2 * OUTER_M, h: f.h + 2 * OUTER_M }
-}
-
-/** Whether the visitor asked for motion to be kept to a minimum. */
-export function prefersReducedMotion(): boolean {
-    return typeof window.matchMedia === 'function'
-        && window.matchMedia('(prefers-reduced-motion: reduce)').matches
 }
 
 export interface Viewport {
@@ -56,10 +52,9 @@ export function useMarginRipple(
         const ctx = canvas.getContext('2d')
         if (!ctx) return
         const sheet = pageSheet(w, h)
-        const still = prefersReducedMotion()
         const loop = () => {
             const drawn = drawMarginRipple(ctx, w, h, sheet, performance.now() / 1000, accent)
-            if (drawn && !still) rafRef.current = requestAnimationFrame(loop)
+            if (drawn) rafRef.current = requestAnimationFrame(loop)
         }
         loop()
         return () => cancelAnimationFrame(rafRef.current)
