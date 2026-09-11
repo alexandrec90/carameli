@@ -36,8 +36,9 @@ export const PANELS: Panel[] = [
 // and may go negative or past 100 to hang the frame off an edge. That frame is cut to
 // the panel's own polygon scaled into it, so an inset picture reads as a smaller comic
 // panel rather than as a bare rectangle. `scale`/`offsetX`/`offsetY`/`anchor` then
-// frame the picture *inside* its frame; `spill: false` clips it there, `spill: true`
-// lets it bleed past.
+// frame the picture *inside* its frame — the pan in % of the frame, the zoom about the
+// anchor point, so both hold at every window size; `spill: false` clips it there,
+// `spill: true` lets it bleed past.
 //
 // `z` is depth: which picture on the panel is drawn in front of which, 0 at the back.
 // Pictures at the same depth keep the order they are listed in here, so a page whose

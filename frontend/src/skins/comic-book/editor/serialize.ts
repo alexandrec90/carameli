@@ -43,8 +43,9 @@ const IMG_HEADER = `// Not parallel to PANELS: each picture names its \`panel\`,
 // and may go negative or past 100 to hang the frame off an edge. That frame is cut to
 // the panel's own polygon scaled into it, so an inset picture reads as a smaller comic
 // panel rather than as a bare rectangle. \`scale\`/\`offsetX\`/\`offsetY\`/\`anchor\` then
-// frame the picture *inside* its frame; \`spill: false\` clips it there, \`spill: true\`
-// lets it bleed past.
+// frame the picture *inside* its frame — the pan in % of the frame, the zoom about the
+// anchor point, so both hold at every window size; \`spill: false\` clips it there,
+// \`spill: true\` lets it bleed past.
 //
 // \`z\` is depth: which picture on the panel is drawn in front of which, 0 at the back.
 // Pictures at the same depth keep the order they are listed in here, so a page whose
@@ -213,8 +214,8 @@ export function serializeCallScenes(scenes: CallSceneLayout[]): string {
  * `layoutConfig.ts` (the four `export const` blocks, each under its explanatory
  * comment).
  *
- * Numbers are rounded for clean output: frame percentages to 1 decimal, image `scale`
- * to 2, pixel offsets and bubble percentages to integers, `rotate` to 1. `src`, `alt`
+ * Numbers are rounded for clean output: frame percentages and pan percentages to 1
+ * decimal, image `scale` to 2, bubble percentages to integers, `rotate` to 1. `src`, `alt`
  * and bubble `text` go through {@link strLiteral} so an apostrophe, a quote or a
  * backslash the author typed stays valid TS; `anchor` and the bubble enums come from
  * fixed dropdowns and are quoted plainly.
@@ -231,8 +232,8 @@ export function serializeConfig(c: EditorConfig): string {
         `  { panel: ${t.panel}, src: ${strLiteral(t.src)}, alt: ${strLiteral(t.alt)}, ` +
         `left: ${round(t.left, 1)}, top: ${round(t.top, 1)}, ` +
         `width: ${round(t.width, 1)}, height: ${round(t.height, 1)}, ` +
-        `scale: ${round(t.scale, 2)}, offsetX: ${Math.round(t.offsetX)}, ` +
-        `offsetY: ${Math.round(t.offsetY)}, anchor: '${t.anchor}', spill: ${t.spill}, ` +
+        `scale: ${round(t.scale, 2)}, offsetX: ${round(t.offsetX, 1)}, ` +
+        `offsetY: ${round(t.offsetY, 1)}, anchor: '${t.anchor}', spill: ${t.spill}, ` +
         `z: ${clampDepth(t.z)}` +
         `${callSuffix(t.call)}` +
         `${t.table ? tableSuffix(t.table) : numberPadSuffix(t.numberPad)} },`,

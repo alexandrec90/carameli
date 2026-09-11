@@ -45,10 +45,29 @@ describe('who owns a revealed panel’s keyboard', () => {
     expect(keyboardOwner([field('a', CLAIM_FIELD)], null)).toBe('a')
   })
 
-  it('gives it to nobody when two fields of equal standing are drawn', () => {
-    // Guessing would post every keystroke into whichever balloon happens to come first
-    // in the config, which is not a fact about the panel the reader can see.
-    expect(keyboardOwner([field('a', CLAIM_FIELD), field('b', CLAIM_FIELD)], null)).toBeNull()
+  it('gives it to the first of two fields of equal standing', () => {
+    // The main field: a panel holding any field at all has a live one the moment it
+    // lights, rather than several dead ones waiting to be found by the pointer.
+    expect(keyboardOwner([field('a', CLAIM_FIELD), field('b', CLAIM_FIELD)], null)).toBe('a')
+  })
+
+  it('gives the main field back the moment the pointer leaves the other one', () => {
+    // The whole of the gesture: hovering the second field borrows the keyboard, and
+    // hovering out returns it. Nothing is left owning nothing in between.
+    const claims = [field('a', CLAIM_FIELD), field('b', CLAIM_FIELD)]
+    expect(keyboardOwner(claims, 'b')).toBe('b')
+    expect(keyboardOwner(claims, null)).toBe('a')
+  })
+
+  it('reads order from the claims it is given, not from the keys', () => {
+    // The panel builds the array in draw order (PanelBubbles), so "first" means the
+    // balloon the config draws first — never the lower index or the earlier name.
+    expect(keyboardOwner([field('b', CLAIM_FIELD), field('a', CLAIM_FIELD)], null)).toBe('b')
+  })
+
+  it('still skips a claimant that claims nothing when picking the main field', () => {
+    const claims = [field('quiet', CLAIM_NONE), field('a', CLAIM_FIELD), field('b', CLAIM_FIELD)]
+    expect(keyboardOwner(claims, null)).toBe('a')
   })
 
   it('prefers a conversation’s composer to a plain field beside it', () => {
@@ -66,6 +85,20 @@ describe('who owns a revealed panel’s keyboard', () => {
   it('lets a hovered wheel take the keyboard off a composer', () => {
     const claims = [field('wheel', CLAIM_POINTER), field('chain', CLAIM_COMPOSER)]
     expect(keyboardOwner(claims, 'wheel')).toBe('wheel')
+  })
+
+  it('keeps the first composer when lower claims and another composer follow', () => {
+    const claims = [
+      field('first', CLAIM_COMPOSER), field('dial', CLAIM_FIELD),
+      field('second', CLAIM_COMPOSER), field('wheel', CLAIM_POINTER),
+    ]
+    expect(keyboardOwner(claims, null)).toBe('first')
+    expect(keyboardOwner(claims, 'wheel')).toBe('wheel')
+  })
+
+  it('ignores a hovered nonclaimant that is present in the panel', () => {
+    const claims = [field('quiet', CLAIM_NONE), field('dial', CLAIM_FIELD)]
+    expect(keyboardOwner(claims, 'quiet')).toBe('dial')
   })
 
   it('leaves a panel of nothing but a wheel unclaimed', () => {

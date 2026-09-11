@@ -61,12 +61,28 @@ export const DIST_INDEX_HTML = path.join(DIST_DIR, 'index.html')
  * Everything `index.html` loads before it can render: the entry script, the entry
  * stylesheet, and any `modulepreload` Vite emits for the entry's static import graph.
  *
- * Today that is two files totalling 274 KB — one JS chunk and one CSS file, with no
- * modulepreload at all, which is to say the entry's static graph is exactly itself.
- * A skin or a route becoming a static import is what moves this, and moving this is
- * what the whole file is for.
+ * Today that is three files totalling 311.2 KB: the entry JS chunk, the entry CSS, and
+ * one `modulepreload` for `logger`, which `src/lib/logger.ts` earns by being imported
+ * on the entry path. A skin or a route becoming a static import is what moves this, and
+ * moving this is what the whole file is for.
+ *
+ * This raise (300 → 316) is not a change in this repository: it is React 19.2.8 →
+ * 19.3.0, arriving with the `minor-and-patch` Dependabot group. 28.6 KB measured as this
+ * branch's build (311.17 KB) against the master it sits on (282.58 KB, `54b1196`), and
+ * attributed by installing `react`/`react-dom@19.3.0` alone on that master, which
+ * reproduces the eager total to within 4 bytes — `react-dom`'s own
+ * `cjs/react-dom-client.production.js` grew 87 KB unminified between the two releases.
+ * The other ten bumps in the group move nothing eager.
+ *
+ * Worth being plain about, because this is the budget's least comfortable case: every
+ * visitor now downloads 28.6 KB more than last week, and no decision here bought it.
+ * The build was checked for the cheap explanation first — a development or profiling
+ * React slipping into the output — and it is a genuine production build: no
+ * `react-dom.development`, no `Warning: ` strings, no `process.env.NODE_ENV` left
+ * standing. So the cost is upstream and the only way to decline it is to decline the
+ * upgrade.
  */
-export const MAX_EAGER_BYTES = 300 * 1024
+export const MAX_EAGER_BYTES = 316 * 1024
 
 /**
  * Ceiling for any single lazily-loaded chunk.
@@ -231,8 +247,26 @@ export const MAX_LAZY_CHUNK_BYTES = 260 * 1024
  * the same halo, the same pressed flare — which is 1.66 KB of CSS written a second time
  * and would have wanted a raise here as well. A row turns out to need none of it
  * (`table.css` says why), so what ships is a single flat wash, and 0.24 KB.
+ *
+ * This raise (988 → 1020) is the first here that `package.json` *is* touched for, and so
+ * the first that every paragraph above ends by ruling out: the `minor-and-patch`
+ * Dependabot group. 30.76 KB measured as this branch's build (1018.02 KB) against the
+ * master it sits on (987.26 KB, `54b1196`), still 46 chunks.
+ *
+ * 28.59 KB of it is React 19.3.0 in the eager entry chunk — see {@link MAX_EAGER_BYTES},
+ * which carries the attribution and the check that this is a production build. The
+ * remaining 2.17 KB is lazy and nobody's entry cost: `lucide-react` 1.41 → 1.45 adds
+ * 2.24 KB to the `carameli` skin chunk, against a few hundred bytes that came *out* of
+ * `comic-book`, `candy-shop` and `web`. `libphonenumber-js` 1.13.12 → 1.13.13 is a
+ * metadata patch and measures as nothing; the other seven bumps are dev-only toolchain
+ * (`vite`, `cspell`, `happy-dom`, `knip`, `stylelint`, the two `@types`) and reach no
+ * chunk.
+ *
+ * The ceiling is 1020 rather than flush against 1018.02 for the reason the 971 → 972
+ * paragraph gives: the default branch runs no gate, so a number set against one branch's
+ * build is passed by the next two that merge in parallel.
  */
-export const MAX_TOTAL_JS_BYTES = 988 * 1024
+export const MAX_TOTAL_JS_BYTES = 1020 * 1024
 
 /**
  * Every `.css` file in `dist/assets/`, summed. Today 44.2 KB across 2 files.

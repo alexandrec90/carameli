@@ -13,6 +13,12 @@ it alone materializes runtime + test + host tooling.
 not a venv is already active (VS Code auto-activates its terminals; uv honors
 the explicit flag over `VIRTUAL_ENV`).
 
+Creating the venv, when there is none, belongs to `scripts/bootstrap.py`: it has
+to be built on the interpreter the image runs, and the `python -m venv` this
+script used to call can only clone the interpreter running it -- the workstation
+default. Provisioning a whole checkout (venv, dev lock, `node_modules`) is
+`bootstrap.py` too; this remains the install half, and the VS Code task.
+
 Pure functions are importable for tests; side effects live under
 `__main__`/`main()`. stdlib only.
 """
@@ -23,6 +29,9 @@ import re
 import subprocess
 import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import bootstrap
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEV_LOCK = "requirements-dev.txt"
@@ -58,8 +67,9 @@ def install_commands(python: Path, uv_version: str) -> list[list[str]]:
 def main() -> int:
     python = venv_python(REPO_ROOT)
     if not python.exists():
-        print(f"[venv-install] creating virtual environment at {python.parent.parent}")
-        subprocess.run([sys.executable, "-m", "venv", str(REPO_ROOT / ".venv")], check=True)
+        created = bootstrap.create_venv(REPO_ROOT)
+        if created:
+            return created
     version = uv_pin((REPO_ROOT / DEV_LOCK).read_text(encoding="utf-8"))
     for command in install_commands(python, version):
         result = subprocess.run(command, cwd=REPO_ROOT)

@@ -105,13 +105,24 @@ export interface ImgTransform {
   width: number
   /** Frame height, in % of the panel box. */
   height: number
-  /** Zoom factor for the picture inside the frame (CSS transform: scale). */
+  /**
+   * Zoom factor for the picture inside the frame (CSS transform: scale), applied about
+   * the `anchor` point, so the anchored edge stays put at every zoom.
+   */
   scale: number
-  /** Horizontal pan of the picture inside the frame, in px. */
+  /**
+   * Horizontal pan of the picture inside the frame, in % of the frame's width. A
+   * percentage rather than px so the pan is the same fraction of the picture at every
+   * viewport size — the frame is itself a percentage of a panel that resizes with the
+   * window.
+   */
   offsetX: number
-  /** Vertical pan of the picture inside the frame, in px. */
+  /** Vertical pan of the picture inside the frame, in % of the frame's height. */
   offsetY: number
-  /** CSS object-position anchor the framing starts from, e.g. 'center bottom'. */
+  /**
+   * CSS object-position anchor the framing starts from, e.g. 'center bottom'. It is
+   * also the point `scale` zooms about.
+   */
   anchor: string
   /** When true the picture may bleed past its frame; when false it is clipped to it. */
   spill: boolean

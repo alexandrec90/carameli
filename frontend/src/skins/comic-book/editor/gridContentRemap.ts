@@ -21,10 +21,11 @@ import type {
 // These ops rewrite the stored percentages against the new box so each item's on-screen
 // rectangle is unchanged; the polygon clip alone follows the seam being dragged.
 //
-// Nothing else needs rewriting. A picture's `offsetX`/`offsetY` are px, and its `scale`,
-// anchor and any projected table or number pad are measured against the frame; a
-// bubble's `rotate` is degrees and its lettering scales with its box. All of them keep
-// the same pixels, so they render identically.
+// Nothing else needs rewriting. A picture's `offsetX`/`offsetY`, `scale`, anchor and
+// any projected table or number pad are all measured against the frame, and the frame's
+// on-screen rectangle is exactly what is held still; a bubble's `rotate` is degrees and
+// its lettering scales with its box. All of them keep the same pixels, so they render
+// identically.
 
 /** Exact equality is enough: an untouched panel's box is recomputed from the same
     vertices by the same arithmetic, so it comes back bit-identical. */

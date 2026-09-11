@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 
 import PanelBubbles from '../../skins/comic-book/PanelBubbles'
@@ -22,8 +22,9 @@ const bubble = (over: Partial<BubbleTransform> = {}): BubbleTransform => ({
   ...over,
 })
 
-function draw(bubbles: BubbleTransform[], visible = true, interactive = true) {
-  const view = render(
+/** The panel as an element, so a test can re-render it with the reveal turned off. */
+function panel(bubbles: BubbleTransform[], visible = true, interactive = true) {
+  return (
     <PanelBubbles
       bubbles={bubbles}
       chains={[]}
@@ -34,8 +35,12 @@ function draw(bubbles: BubbleTransform[], visible = true, interactive = true) {
       interactive={interactive}
       editing={false}
       sms={idleSms()}
-    />,
+    />
   )
+}
+
+function draw(bubbles: BubbleTransform[], visible = true, interactive = true) {
+  const view = render(panel(bubbles, visible, interactive))
   const balloons = () => Array.from(view.container.querySelectorAll('.cb-panel-bubble'))
   return {
     ...view,
@@ -80,25 +85,23 @@ describe('a panel with two fields of equal standing', () => {
     bubble({ content: 'input', text: 'Second' }),
   ]
 
-  it('gives the keyboard to neither until the pointer picks one', () => {
+  it('types into the main one — the first drawn — with no gesture at all', () => {
     const { fields } = draw(twoInputs())
 
-    expect(document.activeElement).not.toBe(fields()[0])
+    expect(document.activeElement).toBe(fields()[0])
     expect(document.activeElement).not.toBe(fields()[1])
   })
 
-  it('hands it to whichever one is hovered, and takes it back on the way out', () => {
+  it('lends it to whichever one is hovered, and takes it back on the way out', () => {
     const { fields, enter, leave } = draw(twoInputs())
 
-    enter(0)
-    expect(document.activeElement).toBe(fields()[0])
-
-    leave(0)
     enter(1)
     expect(document.activeElement).toBe(fields()[1])
 
+    // Hovering out of the other field returns the panel to its main one, rather than
+    // leaving the lit panel with nothing to type into.
     leave(1)
-    expect(document.activeElement).not.toBe(fields()[1])
+    expect(document.activeElement).toBe(fields()[0])
   })
 
   it('follows a pointer that crosses straight from one balloon to the other', () => {
@@ -136,5 +139,76 @@ describe('a panel with a field and a drum', () => {
 
     leave(1)
     expect(document.activeElement).toBe(fields()[0])
+  })
+})
+
+/** Let the restore's deferred frame run, and any state it settles with it. */
+async function frame(): Promise<void> {
+  await act(async () => {
+    await new Promise(resolve => {
+      requestAnimationFrame(() => resolve(undefined))
+    })
+  })
+}
+
+describe('a field whose panel is still lit', () => {
+  const lone = () => [bubble({ content: 'input', text: 'Your name' })]
+
+  it('takes the keyboard back when a press lands on nothing focusable', async () => {
+    // The artwork, the panel ground, a balloon's own outline: none of them is somewhere
+    // to type, so a press on one must not leave the lit panel with a dead field in it.
+    const { fields } = draw(lone())
+    const input = fields()[0]
+    expect(document.activeElement).toBe(input)
+
+    await act(async () => input.blur())
+    await frame()
+
+    expect(document.activeElement).toBe(input)
+  })
+
+  it('restores the caret where the reader left it, not at the end', async () => {
+    // A stray press must not silently move where the next keystroke lands.
+    const { fields } = draw(lone())
+    const input = fields()[0]
+    fireEvent.change(input, { target: { value: 'Barbara Gordon' } })
+    input.setSelectionRange(7, 7)
+
+    await act(async () => input.blur())
+    await frame()
+
+    expect(document.activeElement).toBe(input)
+    expect(input.selectionStart).toBe(7)
+  })
+
+  it('lets a deliberate move to another control have the keyboard', async () => {
+    // Tab, or a press on the telephone's call key: focus names where it went, and this
+    // is not entitled to drag it back — that would trap the keyboard on this one field.
+    const { fields } = draw(lone())
+    const input = fields()[0]
+    const elsewhere = document.createElement('button')
+    document.body.appendChild(elsewhere)
+
+    await act(async () => {
+      elsewhere.focus()
+      input.dispatchEvent(new FocusEvent('focusout', { relatedTarget: elsewhere }))
+    })
+    await frame()
+
+    expect(document.activeElement).toBe(elsewhere)
+    elsewhere.remove()
+  })
+
+  it('does not chase the keyboard once the panel has gone dark', async () => {
+    // The pointer leaving is the reason a field stops being typed into, and a blur
+    // racing that must not undo it.
+    const { fields, rerender } = draw(lone())
+    const input = fields()[0]
+
+    await act(async () => input.blur())
+    rerender(panel(lone(), false))
+    await frame()
+
+    expect(document.activeElement).not.toBe(input)
   })
 })
