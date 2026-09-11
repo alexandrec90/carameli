@@ -76,26 +76,37 @@ export function chainClaim(senderContent: string): number {
 /**
  * The balloon that owns a revealed panel's keyboard, or null when nothing does.
  *
- * Three rules, in order:
+ * Two rules, in order:
  *
  * 1. **The pointer wins.** Whatever a claimant is ranked, hovering it hands it the
  *    keyboard — which is what makes a panel with several fields navigable at all.
- * 2. **Otherwise the highest claim wins, if it is alone.** One field on a panel is the
- *    simple case and needs no gesture: it is the only thing the keyboard could mean.
- * 3. **A tie owns nothing.** Two fields of equal standing have no reason to prefer
- *    either, and guessing would swallow every keystroke into whichever one happened to
- *    be drawn first. They wait to be hovered.
+ * 2. **Otherwise the panel's main field owns it.** The highest claim, and the first of
+ *    them when several tie — so a panel that has any field at all always has a live one,
+ *    and the reader can type the moment it lights.
+ *
+ * A tie used to own nothing, on the grounds that draw order is not a fact the reader can
+ * see. But neither is it one they have to see: what they see is a panel whose fields all
+ * sit there dead until the pointer finds one, which is the click-to-focus ritual back
+ * again under another name. Ranking settles the case that matters — a conversation's
+ * composer is the main field beside the number that addresses it (CLAIM_COMPOSER), and
+ * hovering the number is how you reach it — and order settles the rest, cheaply and
+ * predictably, rather than leaving the panel mute.
  */
 export function keyboardOwner(
   claims: readonly KeyboardClaim[],
   hovered: string | null,
 ): string | null {
-  const claimants = claims.filter(c => c.claim > CLAIM_NONE)
-  if (hovered !== null && claimants.some(c => c.key === hovered)) return hovered
-  const top = claimants.reduce((best, c) => Math.max(best, c.claim), CLAIM_NONE)
   // A pointer-only claim is not a default: the drum takes the keyboard by being hovered
   // and gives it straight back, so a panel holding nothing else keeps it unclaimed.
-  if (top <= CLAIM_POINTER) return null
-  const leaders = claimants.filter(c => c.claim === top)
-  return leaders.length === 1 ? leaders[0].key : null
+  let rank = CLAIM_POINTER
+  let owner: string | null = null
+  for (const { key, claim } of claims) {
+    if (claim > CLAIM_NONE && key === hovered) return key
+    // Strictly higher keeps the first of equal claims, in the panel's draw order.
+    if (claim > rank) {
+      rank = claim
+      owner = key
+    }
+  }
+  return owner
 }
