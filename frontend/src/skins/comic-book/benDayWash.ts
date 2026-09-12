@@ -6,7 +6,11 @@
 // and the dots shrink away to reveal the incoming page (reveal). The loading
 // overlay draws the identical ripple on the identical grid, so the transition
 // sheet and the loading screen hand off seamlessly.
+//
+// What colour the ripple's dots are is benDayTint.ts — the slow lava-lamp drift of
+// hue around the route accent. This module is where each dot is and how big.
 
+import { tintField, tintSteps } from './benDayTint'
 import { clamp } from './editor/transforms'
 import type { Rect } from './panelGeometry'
 
@@ -22,17 +26,10 @@ export const WASH_TOTAL_MS = WASH_COVER_MS + WASH_HOLD_MS + WASH_REVEAL_MS
 export const WASH_MERGE_RADIUS = WASH_SPACING * 0.75
 
 export const RIPPLE_WAVE_LEN = 260 // px between crests along the x+y diagonal
-export const RIPPLE_SPEED = 0.55   // crest cycles per second (top-left → bottom-right)
+export const RIPPLE_SPEED = 0.42   // crest cycles per second (top-left → bottom-right)
 export const RIPPLE_BASE_R = 4.5   // max ripple dot radius
 
 export const WASH_PAPER = '#FAFAF2'
-
-export function parseCssColor(hex: string): [number, number, number] {
-    const r = parseInt(hex.slice(1, 3), 16)
-    const g = parseInt(hex.slice(3, 5), 16)
-    const b = parseInt(hex.slice(5, 7), 16)
-    return [r, g, b]
-}
 
 export function easeInOutCubic(p: number): number {
     return p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2
@@ -87,7 +84,7 @@ function drawRippleDots(
     ctx: CanvasRenderingContext2D, region: Rect,
     tSec: number, accentHex: string, gate: (diag: number) => number,
 ) {
-    const [r, g, b] = parseCssColor(accentHex)
+    const tint = tintSteps(accentHex)
     const right = region.x + region.w
     const bottom = region.y + region.h
     for (let x = firstCentre(region.x); x < right; x += WASH_SPACING) {
@@ -97,7 +94,7 @@ function drawRippleDots(
             const wave = rippleWave(x + y, tSec)
             const radius = RIPPLE_BASE_R * (0.12 + 0.88 * wave)
             const alpha = (0.12 + 0.68 * wave) * gt
-            ctx.fillStyle = `rgba(${r},${g},${b},${alpha.toFixed(2)})`
+            ctx.fillStyle = `rgba(${tint(tintField(x, y, tSec))},${alpha.toFixed(2)})`
             ctx.beginPath()
             ctx.arc(x, y, Math.max(0.3, radius), 0, Math.PI * 2)
             ctx.fill()

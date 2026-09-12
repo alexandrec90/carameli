@@ -32,7 +32,7 @@ the WebPs once shipped ~24 MB no page requested), is rule 10.
 | `--cb-black` / `--cb-white` | `#111111` / `#FAFAF2` | ink and text / page and balloon fill |
 | `--cb-dot-alpha` / `--cb-dot-hover-alpha` | `0.18` / `0.35` | dot opacity |
 
-Each route gets **one** accent; the viewport dot background shifts to it.
+Each route gets **one** accent; the viewport dot background shifts to it and drifts around it.
 
 ## Layout — a comic page of panels
 
@@ -226,28 +226,29 @@ style that only breathed would otherwise pass a test for animating.
 
 ### Page transition — the Ben-Day wash
 
-All math and drawing live in `benDayWash.ts`; `usePageWash.ts` watches React Router's
-`location` and drives a rAF loop on one full-viewport canvas (`.cb-wash-canvas`, blank when idle). A
-halftone wave travels the `x + y` diagonal from the top-left: **cover** (paper dots grow
-inside the band until they merge opaque) → **hold** (the sheet carrying the loading
-screen's ripple tinted with the incoming accent) → **reveal** (the same wave passes on and
-dots shrink behind it). Durations, spacing, band depth, merge radius, ripple wavelength
-and speed are the module's constants, eased ease-in-out cubic per phase (`washPhaseAt`);
-when retuning, keep the merge radius at or above the `S·√2/2` tiling bound (below it the
-dots never close) and grid spacing, wavelength and speed **shared with the loading
-ripple**, so the two surfaces align. The loading overlay reuses it: `drawLoadingRipple`
-for its background, exiting through the reveal (`drawWash`, cover at 1).
+Geometry and drawing live in `benDayWash.ts` and colour in `benDayTint.ts`; `usePageWash.ts`
+watches React Router's `location` and drives a rAF loop on one full-viewport canvas
+(`.cb-wash-canvas`, blank when idle). A halftone wave travels the `x + y` diagonal from the
+top-left: **cover** (paper dots grow inside the band until they merge opaque) → **hold** (the
+sheet carrying the loading screen's ripple) → **reveal** (the wave passes on and dots shrink
+behind it), eased ease-in-out cubic per phase (`washPhaseAt`). When retuning, keep the merge
+radius at or above the `S·√2/2` tiling bound (below it the dots never close), and grid spacing,
+wavelength and speed **shared with the loading ripple** so the two surfaces align. The loading
+overlay reuses it — `drawLoadingRipple` behind it, exiting through the reveal at cover 1.
 
-**The letterbox carries the loading ripple on** (`MarginRipple.tsx`, the bottom layer of
-`.cb-root`). The fixed aspect leaves most windows a band beside or above the page sheet,
-and `drawMarginRipple` paints the loading screen's ripple there — same grid, wave and
-clock — so the sheet the loading screen washes away reveals the ripple it was already
-showing, in phase. It is the one thing on a resting page that moves (rule 9 is about
-panels), so it stays outside the sheet — `pageSheet` is the frame *as drawn* plus
-`OUTER_M`, so a held shape gets its bands — runs only while a band exists, and only once
-the page is up. It does **not** consult `prefers-reduced-motion`: the loading ripple it
-continues never did, and a sheet that moves until the page is up and then stops reads as
-the page freezing (`MarginRipple.test.tsx` holds the loop to moving under it).
+**Colour drifts like a lava lamp** (`benDayTint.ts`) — a three-sine field turns each dot's hue up to
+`TINT_SWING_DEG` either side of the route accent, at its own saturation and lightness. Keep every tint
+wavelength several times `RIPPLE_WAVE_LEN` and every rate a fraction of `RIPPLE_SPEED`, or colour stops
+being a slower motion *through* the wave. The field is pure in **viewport** position: surfaces agree.
+
+**The letterbox carries the loading ripple on** (`MarginRipple.tsx`, the bottom layer of `.cb-root`):
+the fixed aspect leaves most windows a band beside or above the page sheet, and `drawMarginRipple`
+paints the ripple there on the same grid, wave, tint and clock, so the sheet the loading screen
+washes away reveals what it was already showing, in phase. It is the one thing on a resting page
+that moves (rule 9 is about panels), so it stays outside the sheet — `pageSheet` is the frame *as
+drawn* plus `OUTER_M`, so a held shape gets its bands — and runs only while a band exists, once the
+page is up. It does **not** consult `prefers-reduced-motion`: the ripple it continues never did, and
+a sheet that stops when the page arrives reads as the page freezing (`MarginRipple.test.tsx`).
 
 ### Panel ink
 
