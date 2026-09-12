@@ -63,6 +63,10 @@ const IMG_HEADER = `// Not parallel to PANELS: each picture names its \`panel\`,
 // rotation angles cannot express. Drag them onto the drawn lines in the editor. \`rows\` is
 // how many bands the surface is cut into, so a row always lands on the same line however
 // far the reader has scrolled; \`header\` spends the first band on the column labels.
+// \`lines\`, when present, is where each band's foot falls as a fraction of the surface's
+// height — \`rows\` + 1 values from 0 to 1, measured off the picture by the editor's *Fit
+// to ruled lines* — so a drawn ruling that is not quite even still gets a row on every
+// line; absent, the bands are equal.
 // \`data\` is every row, of which only \`rows\` are on screen at once — the wheel moves a
 // whole row at a time and there is no scrollbar. Outside the editor only those values
 // show: no outline, no guides, no bar.

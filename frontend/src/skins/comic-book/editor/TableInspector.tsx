@@ -1,9 +1,12 @@
+import { useState } from 'react'
+
 import { LIVE_TABLE_FEEDS, TABLE_SOURCES } from '../../../lib/liveTables'
 import { FONT_SCALE, ROW_COUNT } from '../tableData'
+import { fitTableToPicture } from './fitRuledLines'
 import Hint from './Hint'
 import QuadCorners from './QuadCorners'
 import TableColumnsInspector from './TableColumnsInspector'
-import { authoredTable, coerceSource, liveTable, newTable } from './tableValidate'
+import { authoredTable, coerceSource, liveTable, newTable, withRows } from './tableValidate'
 import type { ImgTransform, TableProjection } from './types'
 import type { EditorModeApi } from './useEditorMode'
 
@@ -19,6 +22,14 @@ const CORNERS_HINT =
   + 'until the guide lines sit on the drawn ones. These fields are the same four corners '
   + 'to a tenth of a percent, which is finer than a pointer can hit and is where the '
   + 'illusion lives. Neither the guides nor the outline show outside the editor.'
+
+const FIT_HINT =
+  'Reads the ruling off the picture’s own pixels: the blue lines, the red margin line where '
+  + 'there is one, and where the lines stop on the right. The corners go to that area — the '
+  + 'bottom edge on the last line, the top one band above the first — the row count becomes '
+  + 'the line count, and every band is placed on the line it was drawn at, so a ruling that '
+  + 'is not quite evenly spaced still gets a row on every line. Retyping the row count goes '
+  + 'back to equal bands; fit again after changing the picture.'
 
 const SOURCE_HINT =
   'Either the cells typed into this surface, or a live feed. Switching either way is a '
@@ -45,10 +56,36 @@ function numOr(value: string, fallback: number): number {
  */
 export default function TableInspector({ api, index, image }: TableInspectorProps) {
   const table = image.table
+  // What the last fit said, shown beside its button: a count of bands, or why it found
+  // none. Local, because it is about this click and not about the surface — it is not
+  // saved, and a second picture starts with nothing to say.
+  const [fitNote, setFitNote] = useState<string | null>(null)
 
   const setTable = (patch: Partial<TableProjection>) => {
     if (!table) return
     api.setImg(index, { table: { ...table, ...patch } })
+  }
+
+  /**
+   * Fit the surface to the ruling drawn in the picture.
+   *
+   * The surface it writes into is read *after* the picture has been decoded rather than
+   * captured before: the read is asynchronous, and an author who nudged a column width in
+   * between would otherwise have that edit overwritten by the fit. A surface switched off
+   * in the meantime is left off.
+   */
+  const fitToRuling = async () => {
+    if (!table) return
+    setFitNote('Reading the picture…')
+    const result = await fitTableToPicture(image.src)
+    if (!result.ok) {
+      setFitNote(result.reason)
+      return
+    }
+    const current = api.config.images[index]?.table
+    if (!current) return
+    api.setImg(index, { table: { ...current, ...result.fit } })
+    setFitNote(`Fitted ${result.fit.rows} bands to the lines drawn in the picture.`)
   }
 
   /**
@@ -116,7 +153,11 @@ export default function TableInspector({ api, index, image }: TableInspectorProp
                 max={ROW_COUNT.max}
                 step="1"
                 value={table.rows}
-                onChange={e => setTable({ rows: Math.round(numOr(e.target.value, table.rows)) })}
+                // A typed count is a request for equal bands: a fitted ruling is for the
+                // count it was measured at, so it goes with the old number (`withRows`).
+                onChange={e =>
+                  api.setImg(index, { table: withRows(table, Math.round(numOr(e.target.value, table.rows))) })
+                }
               />
             </label>
             <label className="cb-ed-field">
@@ -148,6 +189,26 @@ export default function TableInspector({ api, index, image }: TableInspectorProp
             />
             <span>First row is the column headings</span>
           </label>
+
+          {/* The fit is the whole of "line the table up" for a picture that carries
+              ruling, so it sits ahead of the folded corner fields rather than inside
+              them: the fields are for the last tenth of a percent, this is for the rest. */}
+          <div className="cb-ed-row">
+            <button
+              type="button"
+              className="cb-ed-btn"
+              title="Put the corners on the ruled area and a band on every drawn line"
+              onClick={() => { void fitToRuling() }}
+            >
+              Fit to ruled lines
+            </button>
+            <Hint text={FIT_HINT} />
+          </div>
+          {fitNote !== null && (
+            <p className="cb-ed-fit-note" role="status">
+              {fitNote}
+            </p>
+          )}
 
           <QuadCorners
             quad={table.quad}

@@ -98,6 +98,7 @@ diff as the code that added it.
 - button: Copy config
 - button: Default
 - button: Delete image
+- button: Fit to ruled lines
 - button: Panel shapes
 - button: Reset
 - button: Reset

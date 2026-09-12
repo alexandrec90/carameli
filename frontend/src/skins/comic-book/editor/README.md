@@ -194,13 +194,30 @@ poll rather than seeding it, so nothing is fetched while it is on, and they are 
 records run through the feed's own mapper, which is what keeps them index-parallel to the
 columns with no second list to update.
 
-The surface divides into `rows` equal bands, and the scroll offset is an **integer index
+The surface divides into `rows` bands, and the scroll offset is an **integer index
 into the data**, never a pixel position: band *k* lands in exactly the same place at every
 offset, which is what keeps the lettering on the ruling drawn in the picture. Rows outside
 the window are not in the DOM at all, so there is no scroll container and therefore no
 scrollbar to hide. Out of edit mode a reader sees only the values and scrolls with the
 wheel; the guides, the dashed outline and the corner grips exist only while the editor is
 open.
+
+**Fit to ruled lines measures the picture instead of asking you to drag.** The bands are
+equal by default, and no four corners can put equal bands on a drawn ruling — a drawn one
+wobbles by a few percent of a band from a straight fit, and corners dragged to a tenth of a
+percent leave a few percent more — which the wash behind the hovered row makes visible.
+The button (`fitRuledLines.ts` reads the picture's own pixels through a canvas,
+`ruledLines.ts` does the geometry) finds the blue lines, the red margin line where there is
+one, and where the lines stop on the right; puts the corners there — the bottom edge on the
+last line, the top one band above the first, so the heading writes on the first line the
+way a hand does; sets `rows` to the line count; and records `table.lines`, where each
+band's foot falls as a fraction of the surface's height. Those feet are the drawn lines
+pulled *back* through the quad's own homography, because under perspective equal steps in
+the surface are not equal steps in the picture. `lines` is absent for equal bands, is
+dropped when `rows` is retyped (a ruling is measured for a count), and is ignored by the
+renderer when its length does not match. The corners are in % of the picture's own pixels,
+so fitting once holds at every window size, pan and zoom; fit again after changing the
+picture.
 
 **Bubbles are drawn, not imported.** Every shape is one closed ring of the same 64
 vertices sampled from a shared ellipse, so a shape change interpolates vertex-for-
@@ -251,6 +268,10 @@ different images can only crossfade. A new bubble type belongs in `bubbleShape.t
      picker), a **Headings** checkbox, the four **corner** X/Y fields, and a **Columns**
      list where each column gets a heading, a width weight and an alignment. The cell
      text is one row per line, columns separated by a tab or a `|`.
+     - **Fit to ruled lines** does the lining-up for a picture that carries ruling:
+       corners onto the ruled area, one band per drawn line, and each band on the line
+       it was drawn at. A note beside the button says how many bands it fitted, or why it
+       found none. Retyping **Rows** afterwards goes back to equal bands.
      - **Drag the four square corner grips** onto the surface in the photograph — the
        band guides are drawn *through* the same projection, so once they sit on the
        ruled lines the rows do too. **Reset corners** puts them back.
@@ -599,6 +620,8 @@ useSeamDrag.ts      hook: which gesture a pointer means, and the grid edit it ma
 PanelSeams.tsx      the draggable line + vertex handles (shapes mode)
 ShapeInspector.tsx  shapes-mode inspector: vertex read-out, add corner, straighten, reset grid
 tableValidate.ts    PURE: a new table, and the repair of one read back out of a payload
+ruledLines.ts       PURE: the ruling in a block of pixels -> corners, band count and line feet
+fitRuledLines.ts    browser edge: a picture's pixels through a canvas into ruledLines.ts
 numberPadValidate.ts PURE: a new number pad, repair, and deep clone
 serializeTable.ts   PURE: a table as the nested block on a picture's line
 serializeNumberPad.ts PURE: a number pad as the nested block on a picture's line
@@ -646,5 +669,5 @@ All math/serialization is pure and unit-tested under
 `editorSerialize`, `pageSelection`, `editorToolbarDrag`, `bubbleShape`, `bubbleTube`,
 `bubbleChain`, `panelGeometry`, `panelGridOps`, `gridContentRemap`, `panelLayouts`, `tableProjection`,
 `tableData`, `tableConfig`, `ProjectedTable`, `liveTableImages`,
-`TableSourceInspector`) — and the live feed itself in `frontend/src/tests/lib/liveTables`
+`TableSourceInspector`, `ruledLines`, `fitRuledLines`, `TableFitInspector`) — and the live feed itself in `frontend/src/tests/lib/liveTables`
 and `frontend/src/tests/useLiveTables`.

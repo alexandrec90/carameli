@@ -327,11 +327,18 @@ notepad, a whiteboard, a screen. The field is **absent** on a picture that is no
   z-index**, so pictures at greater depth cover both wash and rows. Only rows backed by records
   wash; `visibleRows` padding stays blank.
 - **The quad is what puts the rows on the drawn lines**, seated against the artwork rather than by
-  eye: bands are equal, so the bottom edge belongs *on* the last ruled line and the top edge exactly
-  one band above the first (`notepadRuling.test.ts` checks the shipped notepad's against
-  `hand-notepad.webp`; replace the picture and those constants move in the same commit). **The
-  surface does not draw the ruling** — the drawing already rules the sheet; the lines stopping at
-  the writing area are the editor's band guides, drawn through the same projection as the rows.
+  eye: the bottom edge belongs *on* the last ruled line and the top edge exactly one band above the
+  first (`notepadRuling.test.ts` checks the shipped notepad's against `hand-notepad.webp`; replace
+  the picture and those constants move in the same commit). **Measure, don't drag**: the editor's
+  *Fit to ruled lines* (`editor/ruledLines.ts`, pure over pixels; `editor/fitRuledLines.ts` the
+  canvas edge) reads the blue rules and red margin off the picture, sets the corners and `rows`,
+  and records `table.lines` — each band's foot as a fraction of the surface, the drawn lines pulled
+  back through the quad's inverse homography — because a drawn ruling is not evenly spaced and no
+  four corners can put equal bands on it. `bandBounds` in `tableData.ts` is the one list both the
+  cells' heights and the wash are placed from; `lines` is absent for equal bands, dropped by
+  `withRows` when the count is retyped, and ignored when its length does not match. **The surface
+  does not draw the ruling** — the drawing already rules the sheet; the lines stopping at the
+  writing area are the editor's band guides, drawn through the same projection as the rows.
 
 **A surface can show live records instead of authored cells.** `table.source` names a feed —
 `'calls'` or `'sms'`, from `TABLE_SOURCES` in `lib/liveTables.ts` — and is **absent** on an

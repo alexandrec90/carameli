@@ -143,6 +143,49 @@ export function rowBand(t: Pick<TableProjection, 'header'>, i: number): number {
 }
 
 /**
+ * Whether a `lines` list is one this surface can use: `rows + 1` finite fractions running
+ * from exactly 0 to exactly 1 and strictly increasing between — so every band has a
+ * positive height and the list covers the surface and nothing beyond it.
+ *
+ * A mismatch against `rows` is the ordinary case, not an error: the author retyped the row
+ * count after a fit, and a ruling measured for a different count would put every band on
+ * the wrong line. The surface falls back to equal bands until it is fitted again.
+ */
+export function validLines(lines: unknown, rows: number): lines is number[] {
+  if (!Array.isArray(lines) || lines.length !== Math.floor(rows) + 1) return false
+  if (!lines.every(v => typeof v === 'number' && Number.isFinite(v))) return false
+  const values = lines as number[]
+  if (values[0] !== 0 || values[values.length - 1] !== 1) return false
+  return values.every((v, i) => i === 0 || v > values[i - 1]!)
+}
+
+/**
+ * Where every band's foot falls, as fractions of the surface's height — `rows + 1`
+ * values from 0 to 1. The authored `lines` when they fit the row count, equal division
+ * otherwise.
+ *
+ * Both the cells and the highlight band are placed from this one list, which is what
+ * keeps them on the same drawn line: a row's height is the difference between two entries
+ * and the wash behind it spans exactly the same two.
+ */
+export function bandBounds(t: Pick<TableProjection, 'rows' | 'lines'>): number[] {
+  const rows = Math.max(1, Math.floor(t.rows))
+  if (validLines(t.lines, rows)) return t.lines
+  return Array.from({ length: rows + 1 }, (_, k) => k / rows)
+}
+
+/** Band `k`'s top and height, as fractions of the surface's height. */
+export function bandSpan(
+  t: Pick<TableProjection, 'rows' | 'lines'>,
+  k: number,
+): { top: number; height: number } {
+  const bounds = bandBounds(t)
+  const last = bounds.length - 1
+  const i = Math.min(Math.max(0, Math.floor(k)), last - 1)
+  return { top: bounds[i]!, height: bounds[i + 1]! - bounds[i]! }
+}
+
+/**
  * Column widths as percentages summing to 100, from the author's weights.
  *
  * Weights rather than percentages in the config because adding a column to a set that

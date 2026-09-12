@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 
 import {
   BAND_SIT,
+  bandBounds,
+  bandSpan,
   bodyRows,
   clampScroll,
   columnPercents,
@@ -13,6 +15,7 @@ import {
   rowBand,
   parseRows,
   scrollByRows,
+  validLines,
   visibleRows,
   wheelDeltaPx,
   WHEEL_ROW_PX,
@@ -274,5 +277,68 @@ describe('fitColumns', () => {
   it('re-shapes every row when a column is added or removed', () => {
     expect(fitColumns([['a', 'b']], 3)).toEqual([['a', 'b', '']])
     expect(fitColumns([['a', 'b']], 1)).toEqual([['a']])
+  })
+})
+
+/*
+ * Where the bands fall. One list feeds both the cells' heights and the highlight's
+ * placement, so the two can only ever disagree by disagreeing with themselves; and a
+ * fitted ruling is used only when it is one the row count can spend.
+ */
+describe('validLines', () => {
+  it('accepts rows + 1 fractions running from 0 to 1', () => {
+    expect(validLines([0, 0.3, 0.55, 1], 3)).toBe(true)
+  })
+
+  it('refuses a list for a different row count', () => {
+    expect(validLines([0, 0.3, 0.55, 1], 4)).toBe(false)
+    expect(validLines([0, 0.3, 0.55, 1], 2)).toBe(false)
+  })
+
+  it('refuses a list that does not start at the top edge and end at the bottom', () => {
+    expect(validLines([0.01, 0.3, 0.55, 1], 3)).toBe(false)
+    expect(validLines([0, 0.3, 0.55, 0.99], 3)).toBe(false)
+  })
+
+  it('refuses a band with no height or a negative one', () => {
+    expect(validLines([0, 0.3, 0.3, 1], 3)).toBe(false)
+    expect(validLines([0, 0.5, 0.3, 1], 3)).toBe(false)
+  })
+
+  it('refuses anything that is not a list of finite numbers', () => {
+    expect(validLines(undefined, 3)).toBe(false)
+    expect(validLines([0, '0.5', 1], 2)).toBe(false)
+    expect(validLines([0, Number.NaN, 1], 2)).toBe(false)
+  })
+})
+
+describe('bandBounds / bandSpan', () => {
+  it('divides the surface equally when there is no fitted ruling', () => {
+    expect(bandBounds({ rows: 4 })).toEqual([0, 0.25, 0.5, 0.75, 1])
+    expect(bandSpan({ rows: 4 }, 2)).toEqual({ top: 0.5, height: 0.25 })
+  })
+
+  it('follows the fitted ruling when it matches the row count', () => {
+    const lines = [0, 0.2, 0.55, 1]
+    expect(bandBounds({ rows: 3, lines })).toBe(lines)
+    expect(bandSpan({ rows: 3, lines }, 1)).toEqual({ top: 0.2, height: 0.55 - 0.2 })
+  })
+
+  it('falls back to equal bands when the ruling is for another count', () => {
+    expect(bandBounds({ rows: 4, lines: [0, 0.2, 0.55, 1] })).toEqual([0, 0.25, 0.5, 0.75, 1])
+  })
+
+  it('clamps a band index to the surface rather than reading past it', () => {
+    expect(bandSpan({ rows: 4 }, 9)).toEqual({ top: 0.75, height: 0.25 })
+    expect(bandSpan({ rows: 4 }, -1)).toEqual({ top: 0, height: 0.25 })
+  })
+
+  // The two consumers read the same list, which is the invariant: a row's band and the
+  // wash behind it are the same span by construction, not by two calculations agreeing.
+  it('gives every visible row a span whose feet sum back to the whole surface', () => {
+    const t = table({ rows: 5, lines: [0, 0.18, 0.4, 0.6, 0.79, 1] })
+    const spans = Array.from({ length: t.rows }, (_, k) => bandSpan(t, k))
+    expect(spans.reduce((a, s) => a + s.height, 0)).toBeCloseTo(1, 12)
+    expect(spans[rowBand(t, 0)]!.top).toBe(0.18)
   })
 })

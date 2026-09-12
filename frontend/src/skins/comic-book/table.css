@@ -42,8 +42,10 @@
 
    A band of its own rather than a background on the `<tr>`, because the cells are clipped
    for their ellipsis and are the wrong box to paint a full-width row from.
-   `TableRowBand.tsx` places it by band arithmetic, so it lands on the ruled line the
-   row's lettering sits on.
+   `TableRowBand.tsx` places it by band arithmetic — top and height inline, in px, from
+   the same band list the rows take their heights from — so it lands on the ruled line
+   the row's lettering sits on, on a fitted surface whose bands are not all one height
+   as much as on an equal one.
 
    **No `z-index`, here or on the table.** Both are positioned, so the two paint in
    document order and the wash stays behind the lettering; and the whole surface rides
@@ -54,7 +56,6 @@
   position: absolute;
   left: 0;
   right: 0;
-  height: var(--cb-ptable-row);
   pointer-events: none;
   background-color: color-mix(in srgb, var(--cb-ptable-ink, currentcolor) 30%, transparent);
 }

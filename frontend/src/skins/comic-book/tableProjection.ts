@@ -115,11 +115,43 @@ export function unitHomography(pts: [number, number][]): number[] | null {
   return coefficients.every(Number.isFinite) ? coefficients : null
 }
 
-/** Push a point through a homography from {@link unitHomography}. Used by the tests. */
+/** Push a point through a homography from {@link unitHomography}. */
 export function applyHomography(m: number[], x: number, y: number): [number, number] {
   const [a, b, c, d, e, f, g, h] = m
   const w = g * x + h * y + 1
   return [(a * x + b * y + c) / w, (d * x + e * y + f) / w]
+}
+
+/**
+ * The homography running the other way — from the quad back onto the unit square — in
+ * the same eight-coefficient form, so {@link applyHomography} pushes points through it.
+ *
+ * This is what lets a line *measured in the picture* be stated in the surface's own
+ * space: the editor's ruled-line fit finds each drawn line in artwork pixels, pulls its
+ * ends back through this inverse, and records where the band's foot has to fall for the
+ * forward map to land it on that line. Without it a table with converging edges would put
+ * equal bands on unequal lines — under perspective, equal steps in the source are not
+ * equal steps in the picture.
+ *
+ * The adjugate of `[a b c; d e f; g h 1]`, normalised so its own last entry is 1. Null when
+ * the forward map is singular or that entry is zero, which no quad with an interior
+ * produces.
+ */
+export function invertHomography(m: number[]): number[] | null {
+  const [a, b, c, d, e, f, g, h] = m
+  const i = 1
+  const A = e * i - f * h
+  const B = -(b * i - c * h)
+  const C = b * f - c * e
+  const D = -(d * i - f * g)
+  const E = a * i - c * g
+  const F = -(a * f - c * d)
+  const G = d * h - e * g
+  const H = -(a * h - b * g)
+  const I = a * e - b * d
+  if (!Number.isFinite(I) || Math.abs(I) < 1e-12) return null
+  const inv = [A / I, B / I, C / I, D / I, E / I, F / I, G / I, H / I]
+  return inv.every(Number.isFinite) ? inv : null
 }
 
 /**

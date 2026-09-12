@@ -217,6 +217,51 @@ describe('serializeTable', () => {
     const dataBlock = ts.slice(ts.indexOf('data: ['), ts.lastIndexOf('],'))
     expect(dataBlock.split('\n').filter(l => l.includes('['))).toHaveLength(newTable().data.length + 1)
   })
+
+  /*
+   * A fitted ruling round-trips like the corners do — on one line, rounded to a
+   * ten-thousandth — and an unfitted surface writes no `lines` key at all, so the file
+   * goes on spelling "equal bands" as absence.
+   */
+  it('writes a fitted ruling on one line and reads it back', () => {
+    const t: TableProjection = { ...newTable(), rows: 3, lines: [0, 0.33333333, 0.66666667, 1] }
+    const ts = serializeTable(t)
+    expect(ts).toContain('lines: [0, 0.3333, 0.6667, 1],')
+    expect(reparseTable(ts).lines).toEqual([0, 0.3333, 0.6667, 1])
+  })
+
+  it('writes no lines key for a surface with equal bands', () => {
+    expect(serializeTable(newTable())).not.toContain('lines:')
+  })
+})
+
+describe('a fitted ruling through the working copy', () => {
+  it('comes back with its lines when they fit the row count', () => {
+    const t = coerceTable({ ...newTable(), rows: 3, lines: [0, 0.3, 0.6, 1] })
+    expect(t?.lines).toEqual([0, 0.3, 0.6, 1])
+  })
+
+  it('drops lines measured for a different row count, leaving the key absent', () => {
+    const t = coerceTable({ ...newTable(), rows: 4, lines: [0, 0.3, 0.6, 1] })
+    expect(t).toBeDefined()
+    expect('lines' in t!).toBe(false)
+  })
+
+  it('drops lines that are not a ruling at all', () => {
+    expect('lines' in coerceTable({ ...newTable(), rows: 2, lines: 'abc' })!).toBe(false)
+    expect('lines' in coerceTable({ ...newTable(), rows: 2, lines: [0, 0.7, 0.9] })!).toBe(false)
+  })
+
+  it('shares no line with the original when cloned', () => {
+    const t: TableProjection = { ...newTable(), rows: 2, lines: [0, 0.5, 1] }
+    const copy = cloneTable(t)
+    expect(copy.lines).toEqual(t.lines)
+    expect(copy.lines).not.toBe(t.lines)
+  })
+
+  it('leaves the key absent on a clone of an unfitted surface', () => {
+    expect('lines' in cloneTable(newTable())).toBe(false)
+  })
 })
 
 describe('tableSuffix', () => {

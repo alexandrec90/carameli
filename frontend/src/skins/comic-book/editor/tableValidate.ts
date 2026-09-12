@@ -1,7 +1,7 @@
 import { LIVE_TABLE_FEEDS, TABLE_SOURCES, type TableSource } from '../../../lib/liveTables'
 import { DEFAULT_QUAD, QUAD_RANGE } from '../tableProjection'
 import type { Quad } from '../tableProjection'
-import { fitColumns, FONT_SCALE, ROW_COUNT } from '../tableData'
+import { fitColumns, FONT_SCALE, ROW_COUNT, validLines } from '../tableData'
 import type { TableColumn, TableProjection } from './types'
 
 // Reading a projected table back out of a persisted working copy. Everything here is
@@ -142,9 +142,13 @@ export function coerceTable(v: unknown): TableProjection | undefined {
   const held = Array.isArray(t.columns) && t.columns.length > 0 ? t.columns.map(coerceColumn) : newTable().columns
   const source = coerceSource(t.source)
   const columns = source ? feedColumns(held, source) : held
+  const rows = Math.round(num(t.rows, 8, ROW_COUNT.min, ROW_COUNT.max))
+  // A fitted ruling is kept only when it is one this row count can use; otherwise the
+  // key is absent, so an equal-band surface comes back spelled the way it went out.
+  const lines = validLines(t.lines, rows) ? [...t.lines] : undefined
   return {
     quad,
-    rows: Math.round(num(t.rows, 8, ROW_COUNT.min, ROW_COUNT.max)),
+    rows,
     header: t.header !== false,
     columns,
     // A live surface comes back with no cells whatever the working copy held, so the
@@ -154,6 +158,7 @@ export function coerceTable(v: unknown): TableProjection | undefined {
     fontScale: num(t.fontScale, 0.5, FONT_SCALE.min, FONT_SCALE.max),
     ink: str(t.ink, '#1b3a8f'),
     ...(source ? { source } : {}),
+    ...(lines ? { lines } : {}),
   }
 }
 
@@ -164,5 +169,22 @@ export function cloneTable(t: TableProjection): TableProjection {
     quad: t.quad.map(([x, y]) => [x, y]) as Quad,
     columns: t.columns.map(c => ({ ...c })),
     data: t.data.map(row => [...row]),
+    ...(t.lines ? { lines: [...t.lines] } : {}),
   }
+}
+
+/**
+ * The same surface with `rows` retyped and its fitted ruling dropped — the key absent,
+ * not set to undefined.
+ *
+ * Dropped rather than kept because a ruling is measured *for* a row count: `rows + 1`
+ * feet, one per drawn line. A count typed over it would leave a list the renderer has to
+ * ignore anyway, and a list nobody can see in the inspector is one that comes back to
+ * life the moment the count is typed back — bands on lines the author has since moved
+ * the corners off.
+ */
+export function withRows(t: TableProjection, rows: number): TableProjection {
+  const next = { ...t, rows }
+  delete next.lines
+  return next
 }

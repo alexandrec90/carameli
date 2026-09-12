@@ -40,3 +40,11 @@
 .cb-ed-quad-grip-number-pad {
   background: #ec008c;
 }
+
+/* What the last *Fit to ruled lines* said — a band count, or why nothing was fitted.
+   Small and muted like a section heading: it is a note beside a button, not a warning. */
+.cb-ed-fit-note {
+  margin: 0 0 8px;
+  color: #9a9aa6;
+  font-size: 11px;
+}

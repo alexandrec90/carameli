@@ -36,6 +36,10 @@ export function serializeTable(t: TableProjection, indent = '  '): string {
     `${i2}quad: [${quad}],`,
     `${i2}rows: ${Math.round(t.rows)}, header: ${t.header}, ` +
       `fontScale: ${round(t.fontScale, 2)}, ink: ${strLiteral(t.ink)},`,
+    // Absent for equal bands, exactly as `source` is absent for an authored surface. One
+    // line, four places: a ten-thousandth of the surface's height is a tenth of an
+    // artwork pixel on the notepad, and the fit is not finer than the drawing.
+    ...(t.lines ? [`${i2}lines: [${t.lines.map(v => round(v, 4)).join(', ')}],`] : []),
     // Absent, not `source: undefined`, on an authored surface — the same spelling the
     // type and the hydrator use, so a config that went out without a feed comes back
     // without one. A live surface's `data` is empty by construction, so the block below
