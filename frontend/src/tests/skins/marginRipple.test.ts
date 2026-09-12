@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
+import { tintSteps } from '../../skins/comic-book/benDayTint'
 import {
   drawLoadingRipple,
   drawMarginRipple,
@@ -27,7 +28,7 @@ const EXACT = { w: 2 * OUTER_M + 1600, h: 2 * OUTER_M + 1000 }
 
 // ── A context that records what was drawn ────────────────────────────────────
 
-interface Arc { x: number; y: number; r: number }
+interface Arc { x: number; y: number; r: number; style: string }
 
 interface Recorder {
   ctx: CanvasRenderingContext2D
@@ -57,7 +58,7 @@ function recorder(): Recorder {
     beginPath: () => { pathRects = [] },
     rect: (x: number, y: number, w: number, h: number) => { pathRects.push({ x, y, w, h }) },
     clip: () => { rec.clips.push(...pathRects) },
-    arc: (x: number, y: number, r: number) => { rec.arcs.push({ x, y, r }) },
+    arc: (x: number, y: number, r: number) => { rec.arcs.push({ x, y, r, style: fillStyle }) },
     fill: () => {},
     save: () => { rec.saves += 1 },
     restore: () => { rec.restores += 1 },
@@ -180,7 +181,7 @@ describe('drawMarginRipple', () => {
     }
   })
 
-  it('draws the loading ripple\'s own dots — same grid, same size, same instant', () => {
+  it('draws the loading ripple\'s own dots — same grid, size, colour and instant', () => {
     const t = 3.7
     const sheet = pageSheet(frameRect(TALL.w, TALL.h))
     const loading = recorder()
@@ -192,9 +193,13 @@ describe('drawMarginRipple', () => {
     const byCentre = new Map(loading.arcs.map(a => [key(a), a]))
     expect(margin.arcs.length).toBeGreaterThan(0)
     for (const a of margin.arcs) {
-      // On the loading screen's grid, at the radius it drew there.
+      // On the loading screen's grid, at the radius and in the tint it drew there. The
+      // colour matters as much as the radius now that the lava tint varies with position:
+      // a field measured from the band's own origin rather than the viewport's would put
+      // a seam down the letterbox the moment the loading sheet washed away.
       expect((a.x - WASH_SPACING / 2) % WASH_SPACING).toBe(0)
       expect(byCentre.get(key(a))?.r).toBe(a.r)
+      expect(byCentre.get(key(a))?.style).toBe(a.style)
     }
     // And every loading dot in a band is here — none of the margin goes blank.
     const bands = letterboxBands(TALL.w, TALL.h, sheet)
@@ -202,5 +207,48 @@ describe('drawMarginRipple', () => {
     for (const a of loading.arcs) {
       if (bands.some(b => inside(a, b))) expect(drawn.has(key(a))).toBe(true)
     }
+  })
+
+  it('paints one colour across a band, whichever band a dot falls in', () => {
+    // A wide window's two side bands are drawn by separate passes, each with its own
+    // hue cache. The same field must reach the same colour through both.
+    const rec = recorder()
+    const sheet = pageSheet(frameRect(WIDE.w, WIDE.h))
+    drawMarginRipple(rec.ctx, WIDE.w, WIDE.h, sheet, 6.25, '#00AEEF')
+    const left = rec.arcs.filter(a => a.x < sheet.x)
+    const right = rec.arcs.filter(a => a.x > sheet.x + sheet.w)
+    expect(left.length).toBeGreaterThan(0)
+    expect(right.length).toBeGreaterThan(0)
+    // Mirrored rows of the band pair sit at the same field only by accident, so compare
+    // through the tint instead: every colour drawn is one the accent's own swing reaches.
+    const swing = new Set<string>()
+    for (let field = -1; field <= 1; field += 0.001) swing.add(tintSteps('#00AEEF')(field))
+    for (const a of rec.arcs) {
+      expect(swing.has(a.style.slice('rgba('.length, a.style.lastIndexOf(',')))).toBe(true)
+    }
+  })
+})
+
+// ── The tint reaches the drawn sheet ─────────────────────────────────────────
+
+describe('the ripple carries the lava tint', () => {
+  it('draws more than one hue across a viewport at one instant', () => {
+    // The wiring check: benDayTint.test.ts holds the field, this holds that the draw
+    // path spends it. A ripple drawn in the flat accent would pass every test there.
+    const rec = recorder()
+    drawLoadingRipple(rec.ctx, 1920, 1080, 4.5, '#FFE033')
+    const hues = new Set(rec.arcs.map(a => a.style.slice(0, a.style.lastIndexOf(','))))
+    expect(hues.size).toBeGreaterThan(3)
+  })
+
+  it('shifts the hue of a fixed dot as the drift carries on', () => {
+    const hueAt = (t: number) => {
+      const rec = recorder()
+      drawLoadingRipple(rec.ctx, 400, 400, t, '#FFE033')
+      const dot = rec.arcs.find(a => a.x === 210 && a.y === 210)
+      return dot?.style.slice(0, dot.style.lastIndexOf(','))
+    }
+    expect(hueAt(0)).toBeDefined()
+    expect(hueAt(40)).not.toBe(hueAt(0))
   })
 })
