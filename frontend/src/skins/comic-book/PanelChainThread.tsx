@@ -23,6 +23,8 @@ interface PanelChainThreadProps {
   halves: SceneHalves | null
   /** Box of the panel being drawn, in viewport coords. */
   bounds: Rect
+  /** The resolved `--cb-lettering` in px, which sizes the rows to their words. */
+  lettering: number
   /** CSS clip-path of the panel polygon, for a conversation that doesn't spill. */
   clip: string
   visible: boolean
@@ -52,6 +54,7 @@ export default function PanelChainThread({
   members,
   halves,
   bounds,
+  lettering,
   clip,
   visible,
   interactive,
@@ -77,6 +80,7 @@ export default function PanelChainThread({
         chain={chain}
         members={members}
         box={half ? half.box : bounds}
+        lettering={lettering}
         visible={visible}
         interactive={interactive}
         keyboard={keyboard}

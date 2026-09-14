@@ -44,6 +44,9 @@ const chain = (over: Partial<BubbleChain> = {}): BubbleChain => ({
 /** The panel box the templates resolve against, sized so tubes and rows have room. */
 const BOX = { x: 0, y: 0, w: 400, h: 300 }
 
+/** A lettering size the box has room for: a column holds a short line on one row. */
+const LETTERING = 12
+
 const drawn = (container: HTMLElement) => [...container.querySelectorAll('.cb-panel-bubble')]
 
 const texts = (container: HTMLElement) => drawn(container).map(el => el.textContent)
@@ -61,7 +64,7 @@ afterEach(() => vi.restoreAllMocks())
 describe('PanelBubbleChain', () => {
   it('draws vertical connector tubes between consecutive rows of each column', () => {
     const { container } = render(
-      <PanelBubbleChain box={BOX}
+      <PanelBubbleChain box={BOX} lettering={LETTERING}
         chain={chain({ rows: 4, messages: ['theirs one', '> mine one', 'theirs two', '> mine two'] })}
         members={columns()}
         visible
@@ -75,7 +78,7 @@ describe('PanelBubbleChain', () => {
   // screen, and the wheel reaches the rest.
   it('never draws more rows than the table holds', () => {
     const { container } = render(
-      <PanelBubbleChain box={BOX}
+      <PanelBubbleChain box={BOX} lettering={LETTERING}
         chain={chain({ messages: ['a', 'b', 'c', 'd', 'e'] })}
         members={columns()}
         visible
@@ -87,14 +90,14 @@ describe('PanelBubbleChain', () => {
 
   it('draws one row per message while the conversation is shorter than the table', () => {
     const { container } = render(
-      <PanelBubbleChain box={BOX} chain={chain({ messages: ['a', 'b'] })} members={columns()} visible interactive />,
+      <PanelBubbleChain box={BOX} lettering={LETTERING} chain={chain({ messages: ['a', 'b'] })} members={columns()} visible interactive />,
     )
     expect(drawn(container)).toHaveLength(2)
   })
 
   it('puts the newest message it reaches at the bottom and older ones above it', () => {
     const { container } = render(
-      <PanelBubbleChain box={BOX}
+      <PanelBubbleChain box={BOX} lettering={LETTERING}
         chain={chain({ messages: ['one', 'two', 'three', 'four'] })}
         members={columns()}
         visible
@@ -109,7 +112,7 @@ describe('PanelBubbleChain', () => {
   // theirs. The rows are the conversation's, not either column's.
   it('lets one party take two rows in a row, each on its own side', () => {
     const { container } = render(
-      <PanelBubbleChain box={BOX}
+      <PanelBubbleChain box={BOX} lettering={LETTERING}
         chain={chain({ rows: 6, messages: ['hey', 'you around?', '> just picked up', 'any luck?'] })}
         members={columns()}
         visible
@@ -119,16 +122,55 @@ describe('PanelBubbleChain', () => {
     expect(texts(container)).toEqual(['any luck?', 'just picked up', 'you around?', 'hey'])
 
     const [luck, picked, around, hey] = drawn(container)
-    // The sender's row hangs off the right column's edge...
-    expect(edges(picked).right).toBeCloseTo(5, 6)
-    // ...and the recipient's off the left column's, whatever width their messages gave them.
-    for (const el of [luck, around, hey]) expect(edges(el).left).toBeCloseTo(5, 6)
+    // The sender's row stays inside the right column (right 5, width 40)...
+    expect(edges(picked).right).toBeGreaterThanOrEqual(5)
+    expect(edges(picked).left).toBeGreaterThanOrEqual(55 - 1e-9)
+    // ...and the recipient's inside the left one, whatever width their messages gave them.
+    for (const el of [luck, around, hey]) {
+      expect(edges(el).left).toBeGreaterThanOrEqual(5 - 1e-9)
+      expect(edges(el).right).toBeGreaterThanOrEqual(55 - 1e-9)
+    }
     expect(edges(around).right).not.toBeCloseTo(5, 6)
+  })
+
+  // The zig-zag: consecutive rows of one speaker do not line up on their column's edge.
+  it('leans every other row of a speaker in from the column’s edge', () => {
+    const { container } = render(
+      <PanelBubbleChain box={BOX} lettering={LETTERING}
+        chain={chain({ rows: 6, messages: ['hey', 'you around?', 'any luck?'] })}
+        members={columns()}
+        visible
+        interactive
+      />,
+    )
+    const lefts = drawn(container).map(el => edges(el).left)
+    expect(lefts[0]).not.toBeCloseTo(lefts[1], 6)
+    expect(lefts[1]).not.toBeCloseTo(lefts[2], 6)
+    expect(lefts[0]).toBeCloseTo(lefts[2], 6)
+  })
+
+  // A message that wraps is drawn taller than the balloon's fixed aspect: the outline SVG
+  // is stretched, and stretched alike on every row of the same message.
+  it('draws a message that wraps in a taller balloon', () => {
+    const { container } = render(
+      <PanelBubbleChain box={BOX} lettering={LETTERING}
+        chain={chain({ rows: 6, messages: ['ok', 'a much longer message than the column can letter on one line'] })}
+        members={columns()}
+        visible
+        interactive
+      />,
+    )
+    const ratio = (el: Element) =>
+      (el.querySelector('.cb-panel-bubble-svg') as SVGElement).style.aspectRatio
+    const [long, short] = drawn(container)
+    expect(ratio(short)).toBe('200 / 150')
+    expect(ratio(long)).not.toBe('200 / 150')
+    expect(long.querySelector('.cb-panel-bubble-svg')?.getAttribute('preserveAspectRatio')).toBe('none')
   })
 
   it('sizes each row to its own message, so the columns have a ragged edge', () => {
     const { container } = render(
-      <PanelBubbleChain box={BOX}
+      <PanelBubbleChain box={BOX} lettering={LETTERING}
         chain={chain({ rows: 6, messages: ['ok', 'a much longer message than that one'] })}
         members={columns()}
         visible
@@ -141,7 +183,7 @@ describe('PanelBubbleChain', () => {
 
   it('moves the window rather than the table when the wheel is turned', () => {
     const { container } = render(
-      <PanelBubbleChain box={BOX}
+      <PanelBubbleChain box={BOX} lettering={LETTERING}
         chain={chain({ messages: ['one', 'two', 'three', 'four'] })}
         members={columns()}
         visible
@@ -162,7 +204,7 @@ describe('PanelBubbleChain', () => {
   // which reads as the table shrinking rather than as the thread scrolling.
   it('keeps the table full when the reader scrolls back through a long conversation', () => {
     const { container } = render(
-      <PanelBubbleChain box={BOX}
+      <PanelBubbleChain box={BOX} lettering={LETTERING}
         chain={chain({ messages: ['one', 'two', 'three', 'four', 'five'] })}
         members={columns()}
         visible
@@ -180,7 +222,7 @@ describe('PanelBubbleChain', () => {
   // already on screen, so the wheel has nothing to reach and takes nothing away either.
   it('stops at the start of a conversation shorter than the table', () => {
     const { container } = render(
-      <PanelBubbleChain box={BOX}
+      <PanelBubbleChain box={BOX} lettering={LETTERING}
         chain={chain({ messages: ['one', 'two'] })}
         members={columns()}
         visible
@@ -198,7 +240,7 @@ describe('PanelBubbleChain', () => {
   // is the drawn one mirrored, so the author sees the shape before drawing the other side.
   it('mirrors the one template a half-drawn chain has', () => {
     const { container } = render(
-      <PanelBubbleChain box={BOX}
+      <PanelBubbleChain box={BOX} lettering={LETTERING}
         chain={chain({ messages: ['theirs', '> mine'] })}
         members={[tpl({ right: 5 })]}
         visible
@@ -206,8 +248,11 @@ describe('PanelBubbleChain', () => {
       />,
     )
     const [mine, theirs] = drawn(container)
-    expect(edges(mine).right).toBeCloseTo(5, 6)
-    expect(edges(theirs).left).toBeCloseTo(5, 6)
+    // Inside the drawn column on the right, and inside its mirror on the left.
+    expect(edges(mine).right).toBeGreaterThanOrEqual(5)
+    expect(edges(mine).left).toBeGreaterThanOrEqual(55 - 1e-9)
+    expect(edges(theirs).left).toBeGreaterThanOrEqual(5 - 1e-9)
+    expect(edges(theirs).right).toBeGreaterThanOrEqual(55 - 1e-9)
   })
 })
 
@@ -218,14 +263,14 @@ describe('PanelBubbleChain live chain', () => {
   })
 
   it('starts as a lone composer, since a conversation nobody has written is empty', () => {
-    const { container } = render(<PanelBubbleChain box={BOX} {...live()} visible interactive />)
+    const { container } = render(<PanelBubbleChain box={BOX} lettering={LETTERING} {...live()} visible interactive />)
     expect(drawn(container)).toHaveLength(1)
     expect(composer()).toBeTruthy()
   })
 
   // The whole of "that's where they type in a new message and send it".
   it('appends what was sent and grows the table by one row', () => {
-    const { container } = render(<PanelBubbleChain box={BOX} {...live()} visible interactive />)
+    const { container } = render(<PanelBubbleChain box={BOX} lettering={LETTERING} {...live()} visible interactive />)
 
     fireEvent.change(composer(), { target: { value: 'first' } })
     fireEvent.keyDown(composer(), { key: 'Enter' })
@@ -245,21 +290,23 @@ describe('PanelBubbleChain live chain', () => {
   })
 
   it('sends into the sender’s column, above the composer it was typed into', () => {
-    const { container } = render(<PanelBubbleChain box={BOX} {...live({ rows: 6, messages: ['hey'] })} visible interactive />)
+    const { container } = render(<PanelBubbleChain box={BOX} lettering={LETTERING} {...live({ rows: 6, messages: ['hey'] })} visible interactive />)
 
     fireEvent.change(composer(), { target: { value: 'mine' } })
     fireEvent.keyDown(composer(), { key: 'Enter' })
 
     const [field, sent, theirs] = drawn(container)
     expect(texts(container)).toEqual(['', 'mine', 'hey'])
-    expect(edges(sent).right).toBeCloseTo(edges(field).right, 6)
+    // Inside the composer's column, which is the sender's.
+    expect(edges(sent).right).toBeGreaterThanOrEqual(edges(field).right)
+    expect(edges(sent).left).toBeGreaterThanOrEqual(edges(field).left - 1e-9)
     expect(edges(theirs).left).toBeCloseTo(5, 6)
   })
 
   // The composer costs the bottom row, so a three-row table is the field and the two newest
   // messages — still three rows, which is what the author asked for.
   it('scrolls rather than growing once the table is full', () => {
-    const { container } = render(<PanelBubbleChain box={BOX} {...live()} visible interactive />)
+    const { container } = render(<PanelBubbleChain box={BOX} lettering={LETTERING} {...live()} visible interactive />)
 
     for (const text of ['one', 'two', 'three']) {
       fireEvent.change(composer(), { target: { value: text } })
@@ -276,7 +323,7 @@ describe('PanelBubbleChain live chain', () => {
   // field's initial value, and the recipient's is not a message anyone has sent.
   it('does not speak the drawn templates’ own text', () => {
     const { container } = render(
-      <PanelBubbleChain box={BOX}
+      <PanelBubbleChain box={BOX} lettering={LETTERING}
         chain={chain()}
         members={[
           tpl({ right: 5, content: 'input', text: 'Say something' }),
@@ -291,11 +338,11 @@ describe('PanelBubbleChain live chain', () => {
   })
 
   it('keeps what the reader sent when the panel stops being hovered', () => {
-    const { container, rerender } = render(<PanelBubbleChain box={BOX} {...live()} visible interactive />)
+    const { container, rerender } = render(<PanelBubbleChain box={BOX} lettering={LETTERING} {...live()} visible interactive />)
     fireEvent.change(composer(), { target: { value: 'kept' } })
     fireEvent.keyDown(composer(), { key: 'Enter' })
 
-    rerender(<PanelBubbleChain box={BOX} {...live()} visible={false} interactive />)
+    rerender(<PanelBubbleChain box={BOX} lettering={LETTERING} {...live()} visible={false} interactive />)
 
     expect(drawn(container)).toHaveLength(2)
     expect(screen.getByText('kept')).toBeTruthy()

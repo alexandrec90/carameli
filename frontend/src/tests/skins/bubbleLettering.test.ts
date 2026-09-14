@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { FRAME_HEIGHT_VAR } from '../../skins/comic-book/usePageFrame'
+import { FRAME_HEIGHT_VAR, LETTERING_SHARE, letteringPx } from '../../skins/comic-book/usePageFrame'
 import { cssRules, SKIN_CSS } from './skinCss'
 
 // Balloon lettering follows the page frame, as the balloons do. The words used to be
@@ -31,6 +31,16 @@ describe('balloon lettering', () => {
     // A multiple of the frame height, with a px fallback for a page that has not been
     // handed one yet — and no viewport unit anywhere in it.
     expect(token).toMatch(new RegExp(`^calc\\(var\\(${FRAME_HEIGHT_VAR}, \\d+px\\) \\* [\\d.]+\\)$`))
+  })
+
+  // The layout fits a chain's rows to their words before the browser sets any type, from
+  // its own copy of the multiple. If the two drift, balloons are sized for lettering of
+  // one size and drawn with another.
+  it('is the same multiple the layout fits chain rows with', () => {
+    const token = declarationOf(ROOT, '.cb-root', '--cb-lettering')
+    const multiple = token?.match(/\* ([\d.]+)\)$/)?.[1]
+    expect(Number(multiple)).toBe(LETTERING_SHARE)
+    expect(letteringPx({ x: 0, y: 0, w: 1600, h: 1000 })).toBeCloseTo(1000 * LETTERING_SHARE, 9)
   })
 
   it.each(LETTERED)('%s takes the token and nothing viewport-relative', (selector, file) => {

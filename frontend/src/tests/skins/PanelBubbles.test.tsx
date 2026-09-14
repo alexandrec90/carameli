@@ -21,13 +21,18 @@ const bubble = (over: Partial<BubbleTransform> = {}): BubbleTransform => ({
   ...over,
 })
 
-function draw(bubbles: BubbleTransform[], onPhoneSubmit?: (value: string) => void) {
+function draw(
+  bubbles: BubbleTransform[],
+  onPhoneSubmit?: (value: string) => void,
+  lettering?: number,
+) {
   return render(
     <PanelBubbles
       bubbles={bubbles}
       chains={[]}
       panel={0}
       bounds={PANEL_BOX}
+      lettering={lettering}
       clip="none"
       isVisible={() => true}
       interactive
@@ -37,6 +42,25 @@ function draw(bubbles: BubbleTransform[], onPhoneSubmit?: (value: string) => voi
     />,
   )
 }
+
+describe('PanelBubbles lettering', () => {
+  // Not live, so the chain speaks its two balloons' own words: the second row drawn is
+  // the recipient's message.
+  const conversation = () => [
+    bubble({ content: 'text', chain: 'chain-1', right: 5, width: 40, top: 60, text: 'ok' }),
+    bubble({ content: 'text', chain: 'chain-1', right: 55, width: 40, top: 60, text: 'a message with some words in it' }),
+  ]
+  const rowWidth = (container: HTMLElement) =>
+    parseFloat((container.querySelectorAll('.cb-panel-bubble')[1] as HTMLElement).style.width)
+
+  // The lettering size is what a conversation fits its rows to; it has to reach the chain
+  // through here, or every row is drawn at its narrowest whatever the page's frame is.
+  it('hands the lettering size to its conversations', () => {
+    const narrow = rowWidth(draw(conversation(), undefined, 0).container)
+    const fitted = rowWidth(draw(conversation(), undefined, 12).container)
+    expect(fitted).toBeGreaterThan(narrow)
+  })
+})
 
 describe('PanelBubbles phone balloons', () => {
   it('dials what was typed into a phone balloon when Enter is pressed', () => {

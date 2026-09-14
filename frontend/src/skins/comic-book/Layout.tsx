@@ -13,7 +13,7 @@ import { usePanelDots } from './usePanelDots'
 import { usePanelHover } from './usePanelHover'
 import { shouldRevealImg, useEditorMode } from './editor/useEditorMode'
 import { useLiveTableImages } from './useLiveTableImages'
-import { pageFrameStyle, panelPolysIn, usePageFrame } from './usePageFrame'
+import { letteringPx, pageFrameStyle, panelPolysIn, usePageFrame } from './usePageFrame'
 import { usePageWash } from './usePageWash'
 import './comic-book.css'
 import './bubbles.css'
@@ -173,6 +173,7 @@ export function Layout({ navItems, sms, softphone }: LayoutProps) {
                             chains={chainT}
                             callScenes={callSceneT}
                             sms={sms}
+                            lettering={letteringPx(frame)}
                             natSizes={natSizes}
                             editorActive={editor.active}
                             hovered={hovered === i}

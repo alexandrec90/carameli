@@ -35,6 +35,12 @@ interface ComicPanelProps {
     callScenes: CallSceneLayout[]
     /** Passed straight to PanelBubbles, which is where a chain binds to a real thread. */
     sms: UseSmsConversationsResult
+    /**
+     * The page's lettering size in px (`letteringPx`), for fitting a chain's rows to their
+     * words. Defaults to none, as PanelBubbles documents: what a page has before the
+     * window reports a frame.
+     */
+    lettering?: number
     natSizes: Record<string, { w: number; h: number }>
     editorActive: boolean
     /**
@@ -138,7 +144,7 @@ function panelClass(
  * down through PanelBubbles, so neither half has to know the other exists.
  */
 export default function ComicPanel({
-    index, info, poly, images, bubbles, chains, callScenes, sms, natSizes,
+    index, info, poly, images, bubbles, chains, callScenes, sms, lettering = 0, natSizes,
     editorActive, hovered, isRevealed, isBubbleVisible, onNumberPadKey,
     onPhoneSubmit, phoneActions, call, dotRef, onSettled, onNatSize,
 }: ComicPanelProps) {
@@ -282,6 +288,7 @@ export default function ComicPanel({
                 transcript={scene?.transcript}
                 party={scene?.party}
                 bounds={bounds}
+                lettering={lettering}
                 clip={dotClip}
                 isVisible={isBubbleVisible}
                 interactive={!editorActive}

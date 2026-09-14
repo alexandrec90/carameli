@@ -505,6 +505,16 @@ describe('bubbleRect', () => {
     expect(r.h).toBeCloseTo(200 * BUBBLE_ASPECT, 10)
   })
 
+  // A chain row fitted to a long message is drawn taller than its aspect, and the tube
+  // aimed at it has to see that height or it lands on the row's midriff.
+  it('grows the height, and only the height, by a stretch', () => {
+    const r = bubbleRect(bounds, { top: 0, right: 0, width: 50 }, 1.5)
+    expect(r.w).toBe(200)
+    expect(r.h).toBeCloseTo(200 * BUBBLE_ASPECT * 1.5, 10)
+    expect(r.x).toBe(at(0, 0, 50).x)
+    expect(r.y).toBe(at(0, 0, 50).y)
+  })
+
   it('anchors by the right edge, not the left', () => {
     // right: 0 puts the bubble's right edge flush with the panel's.
     expect(at(0, 0, 50).x).toBe(bounds.x + bounds.w - 200)

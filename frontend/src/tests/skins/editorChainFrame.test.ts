@@ -1,9 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
-import {
-  DEFAULT_CHAIN_ROWS, bubbleHeightPct, chainColumns, chainMembers,
-} from '../../skins/comic-book/bubbleChain'
+import { DEFAULT_CHAIN_ROWS, chainColumns, chainMembers } from '../../skins/comic-book/bubbleChain'
 import type { ChainColumns } from '../../skins/comic-book/bubbleChain'
+import { bubbleHeightPct } from '../../skins/comic-book/chainLayout'
 import { addSmsConversation } from '../../skins/comic-book/editor/chainCreate'
 import { chainBoxRect, chainFramesOn, chainTableBox } from '../../skins/comic-book/editor/chainFrame'
 import { NEW_BUBBLE, patchBubble, patchChain, seedConfig } from '../../skins/comic-book/editor/configOps'

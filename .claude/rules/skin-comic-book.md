@@ -154,8 +154,15 @@ order, so one party saying two things takes two rows.
 **The members are templates, not slots.** The author draws one balloon per column — shape,
 tail, rotation, lettering, the column's edge — and every row is stamped from its side's
 template. Member 0 is the **sender**: rightmost, composer at its foot. Rows lay out
-bottom-up, each `top` the running sum of the heights below it, so a long message pushes the
-thread up by its own height; width follows the message (`messageWidth`).
+bottom-up by collision (`chainLayout.ts`): a row clears every balloon it would overlap
+horizontally and tucks in beside the one below it otherwise (`CHAIN_INTERLEAVE`), so a
+reply sits alongside the message it answers and two long messages stack. The columns may
+therefore overlap on the panel — `NEW_SMS_SENDER` does — without any two balloons
+overlapping. Each speaker's rows zig-zag, leaning inward every other message by the
+message's ordinal in the transcript (`zigzagShift`), never by its row on screen. **A row is
+sized to its words without measuring them** (`bubbleFit.ts`): wider up to the column,
+then wrapped and drawn taller as a `stretch` of the outline SVG, from the lettering size
+`Layout` hands down (`letteringPx`) — never from the DOM.
 `PANEL_BUBBLE_CHAINS` holds one entry per id in use and is **derived, not authored**
 (`syncChains`), so a chain with no members and a member with no chain are unreachable.
 

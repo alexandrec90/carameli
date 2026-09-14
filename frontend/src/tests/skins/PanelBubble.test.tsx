@@ -15,6 +15,25 @@ const bubble = (over: Partial<BubbleTransform> = {}): BubbleTransform => ({
 const puffOpacityOf = (container: HTMLElement): string =>
   (container.querySelector('.cb-bubble-puffs') as SVGGElement).style.opacity
 
+describe('PanelBubble stretch', () => {
+  const svg = (container: HTMLElement) =>
+    container.querySelector('.cb-panel-bubble-svg') as SVGSVGElement
+
+  it('draws at the authored aspect by default', () => {
+    const { container } = render(<PanelBubble bubble={bubble()} visible interactive />)
+    expect(svg(container).style.aspectRatio).toBe('200 / 150')
+  })
+
+  // The viewBox never changes — every outline is authored in it and every morph runs
+  // through it — so a taller balloon is the same drawing let stretch to a taller box.
+  it('stretches the outline box, keeping the authored viewBox', () => {
+    const { container } = render(<PanelBubble bubble={bubble()} visible interactive stretch={2} />)
+    expect(svg(container).style.aspectRatio).toBe('200 / 300')
+    expect(svg(container).getAttribute('viewBox')).toBe('0 0 200 150')
+    expect(svg(container).getAttribute('preserveAspectRatio')).toBe('none')
+  })
+})
+
 describe('PanelBubble hit target', () => {
   it('extends a chain speech stem to its fixed SVG target', () => {
     const target: [number, number] = [38, 260]

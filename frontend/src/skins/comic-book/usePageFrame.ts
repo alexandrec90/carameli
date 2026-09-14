@@ -47,6 +47,19 @@ export function panelPolysIn(grid: PanelGrid, frame: Rect): (PanelPoly | null)[]
  */
 export const FRAME_HEIGHT_VAR = '--cb-frame-h'
 
+/**
+ * The share of the frame height one em of balloon lettering is. **The same number as the
+ * `--cb-lettering` calc in `comic-book.css`**, which is the one the browser sets type by;
+ * this copy is for the layout that fits a chain's rows to their words before they are
+ * drawn (bubbleFit.ts). `bubbleLettering.test.ts` holds the two together.
+ */
+export const LETTERING_SHARE = 0.018
+
+/** The lettering size in px for `frame` — what `--cb-lettering` resolves to. */
+export function letteringPx(frame: Rect): number {
+  return frame.h * LETTERING_SHARE
+}
+
 /** The inline style that hands the frame to the stylesheet. */
 export function pageFrameStyle(frame: Rect): CSSProperties {
   return { [FRAME_HEIGHT_VAR]: `${frame.h}px` } as CSSProperties

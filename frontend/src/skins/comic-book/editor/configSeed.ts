@@ -97,12 +97,17 @@ export const NEW_BUBBLE: Omit<BubbleTransform, 'panel'> = {
  * The bottom row becomes a real field, and what a reader types there is the next message.
  * Its recipient half is this balloon mirrored (see `addSmsConversation`), so there is no
  * second constant to keep in step with it.
+ *
+ * Wide enough that the two columns *overlap* by a few percent across the panel's middle.
+ * That is deliberate: rows are placed by what they would collide with (chainLayout.ts), so
+ * two short balloons tuck in beside each other and only two long ones stack — a thread
+ * that threads, rather than two ladders with a gutter between them.
  */
 export const NEW_SMS_SENDER: Omit<BubbleTransform, 'panel'> = {
   ...NEW_BUBBLE,
   top: 62,
   right: 8,
-  width: 34,
+  width: 44,
   content: 'input',
   text: '',
 }

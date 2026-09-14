@@ -56,6 +56,12 @@ interface PanelBubblesProps {
   party?: string
   /** Box of the panel being drawn, in viewport coords — where a half's slot sits inside it. */
   bounds: Rect
+  /**
+   * The resolved `--cb-lettering` in px, which a conversation fits its rows to. Zero —
+   * the default, and what a page has before the window reports a frame — draws every row
+   * at its narrowest, the same way a zero-size frame draws nothing measurable at all.
+   */
+  lettering?: number
   /** CSS clip-path of the panel polygon, for bubbles that don't spill. */
   clip: string
   /** Whether bubble `index` (into `bubbles`) is currently revealed. */
@@ -160,6 +166,7 @@ export default function PanelBubbles({
   transcript,
   party,
   bounds,
+  lettering = 0,
   clip,
   isVisible,
   interactive,
@@ -290,6 +297,7 @@ export default function PanelBubbles({
           members={members.map(i => bubbles[i])}
           halves={halves}
           bounds={bounds}
+          lettering={lettering}
           clip={clip}
           // Every member of a chain belongs to this panel, so they reveal and hide
           // together; the sender template's answer is the conversation's.

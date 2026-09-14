@@ -137,6 +137,7 @@ describe('the bold stops at the balloon under the pointer', () => {
         chain={chain}
         members={members}
         box={{ x: 0, y: 0, w: 400, h: 300 }}
+        lettering={12}
         visible
         interactive
       />,
