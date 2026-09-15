@@ -1,11 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import type { RefObject } from 'react'
-import {
-    drawLoadingGrid, drawWash, washPhaseAt,
-    WASH_COVER_MS, WASH_HOLD_MS,
-} from './benDayWash'
+import { runBenDayGrid } from './benDayGrid'
+import { drawWash, washPhaseAt, WASH_COVER_MS, WASH_HOLD_MS } from './benDayWash'
 import { pageSpotlight } from './spotlight'
-import type { SpotlightState } from './spotlight'
 
 // The comic-book loading screen: a full-viewport sheet of Ben-Day dots lit by the
 // pointer's spotlight, with a "LOADING…" legend, shown while the page's pictures are
@@ -70,7 +67,15 @@ export function useLoadingScreen(ready: boolean, accent: string): LoadingScreen 
     }, [ready, showLoading, loaderDelay])
 
     const dotCount = useDotCycle(loadingActive)
-    useLoadingGrid(loadingActive, canvasRef, accent)
+    // The same grid, off the same loop, that `skins/context.tsx` has been drawing behind
+    // the skin's own chunk: this sheet takes the handoff mid-light, and nothing under the
+    // legend changes at the moment the chunk lands.
+    useEffect(() => {
+        const canvas = canvasRef.current
+        if (!loadingActive || !canvas) return
+        return runBenDayGrid(canvas, accent)
+    }, [loadingActive, accent])
+
     useLeaveWash(loadingLeaving, canvasRef, accent, setLoadingLeaving)
 
     return { loadingActive, loadingLeaving, previewLoading, handlePreviewLoading, dotCount, canvasRef }
@@ -86,46 +91,6 @@ function useDotCycle(active: boolean): number {
         return () => clearInterval(id)
     }, [active])
     return dotCount
-}
-
-/**
- * The lit Ben-Day grid behind the legend. Repainted only on a frame the light moved —
- * and after a resize, which leaves the bitmap blank whether or not it did.
- */
-function useLoadingGrid(
-    active: boolean, canvasRef: RefObject<HTMLCanvasElement | null>, accent: string,
-) {
-    const rafRef = useRef<number>(0)
-    useEffect(() => {
-        if (!active) return
-        const canvas = canvasRef.current
-        const ctx = canvas?.getContext('2d')
-        if (!canvas || !ctx) return
-        let shown: SpotlightState | null = null
-        const resize = () => {
-            canvas.width = window.innerWidth
-            canvas.height = window.innerHeight
-            shown = null
-        }
-        resize()
-        window.addEventListener('resize', resize)
-        const spotlight = pageSpotlight()
-        const release = spotlight.acquire()
-        const loop = (now: number) => {
-            const spot = spotlight.sample(now)
-            if (spot !== shown) {
-                shown = spot
-                drawLoadingGrid(ctx, canvas.width, canvas.height, spot, accent)
-            }
-            rafRef.current = requestAnimationFrame(loop)
-        }
-        rafRef.current = requestAnimationFrame(loop)
-        return () => {
-            window.removeEventListener('resize', resize)
-            cancelAnimationFrame(rafRef.current)
-            release()
-        }
-    }, [active, accent, canvasRef])
 }
 
 /**

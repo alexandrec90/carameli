@@ -1,49 +1,32 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
 import type { Skin } from './types'
+import { GRID_PAPER, runBenDayGrid } from './comic-book/benDayGrid'
+import { accentForPath } from './comic-book/pageAccent'
 import { skinLoaders, skinLoadingConfigs, DEFAULT_SKIN, resolveSkinName, SKIN_NAMES } from './registry'
 import type { SkinName } from './registry'
 
-// ── Comic-book skin: animated loading screen ────────────────────────────────
-
-function drawComicLoadingBg(ctx: CanvasRenderingContext2D, w: number, h: number, t: number) {
-  ctx.fillStyle = '#FAFAF2'
-  ctx.fillRect(0, 0, w, h)
-  const spacing = 20
-  const baseR = 4.5
-  const waveLen = 260
-  const waveSpeed = 0.55
-  for (let x = spacing / 2; x < w; x += spacing) {
-    for (let y = spacing / 2; y < h; y += spacing) {
-      const phase = ((x + y) / waveLen) * Math.PI * 2 - t * waveSpeed * Math.PI * 2
-      const t01 = (Math.sin(phase) + 1) / 2
-      const alpha = 0.12 + 0.68 * t01
-      ctx.fillStyle = `rgba(255,224,51,${alpha.toFixed(2)})`
-      ctx.beginPath()
-      ctx.arc(x, y, Math.max(0.3, baseR * (0.12 + 0.88 * t01)), 0, Math.PI * 2)
-      ctx.fill()
-    }
-  }
-}
+// ── Comic-book skin: the loading screen its own chunk is not there to draw ───
+//
+// This screen and the skin's `LoadingOverlay` are the same screen: the Ben-Day grid
+// from `comic-book/benDayGrid.ts` under the shared spotlight, with a legend on top. It
+// has to be drawn from here because the chunk that would draw it is what the visitor is
+// waiting for — so the grid modules are small, import nothing else from the skin, and
+// are the only part of it on the eager path (`bundlePolicy.ts`).
+//
+// Before this, it ran a ripple of its own: a sine wave travelling the dot grid on a
+// timer, which looked nothing like the still, pointer-lit grid the page hands over to,
+// so the chunk landing read as the effect being swapped out mid-load.
 
 function ComicBookLoadingScreen({ showCard }: { showCard: boolean }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
-  const rafRef = useRef<number>(0)
   const [dotCount, setDotCount] = useState(1)
 
-  // Background ripple — starts immediately so it's already moving when card pops in
+  // The route's own accent, so the grid does not change colour under the legend when the
+  // skin takes over and colours it from the same function.
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
-    const resize = () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight }
-    resize()
-    window.addEventListener('resize', resize)
-    const loop = () => {
-      const ctx = canvas.getContext('2d')
-      if (ctx) drawComicLoadingBg(ctx, canvas.width, canvas.height, performance.now() / 1000)
-      rafRef.current = requestAnimationFrame(loop)
-    }
-    rafRef.current = requestAnimationFrame(loop)
-    return () => { window.removeEventListener('resize', resize); cancelAnimationFrame(rafRef.current) }
+    return runBenDayGrid(canvas, accentForPath(window.location.pathname))
   }, [])
 
   // Cycling dots 1 → 2 → 3 → 1…
@@ -57,7 +40,8 @@ function ComicBookLoadingScreen({ showCard }: { showCard: boolean }) {
   return (
     <div style={{
       position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center',
-      minHeight: '100vh', overflow: 'hidden', background: '#FAFAF2',
+      // The paper the grid prints on, so nothing shows through before the first frame.
+      minHeight: '100vh', overflow: 'hidden', background: GRID_PAPER,
       // The skin's stylesheet is the chunk this screen is waiting for, so the drawn
       // pointer comes from the loading config rather than from `--cb-cursor-default`.
       cursor: skinLoadingConfigs['comic-book'].cursor,
@@ -80,10 +64,10 @@ function ComicBookLoadingScreen({ showCard }: { showCard: boolean }) {
       {showCard && (
         <span style={{
           position: 'relative', zIndex: 1,
-          fontFamily: "'Bangers', cursive", fontSize: '52px', letterSpacing: '4px',
+          fontFamily: "'Bangers', cursive", fontSize: '48px', letterSpacing: '6px',
           color: '#111111', lineHeight: '1',
           background: '#FFE033', border: '4px solid #111111',
-          padding: '32px 48px', display: 'inline-block',
+          padding: '12px 32px', display: 'inline-block',
           animation: 'cb-ctx-pop 450ms cubic-bezier(0.34, 1.56, 0.64, 1) both, cb-ctx-bob 1.1s ease-in-out 450ms infinite alternate',
         }}>
           LOADING
