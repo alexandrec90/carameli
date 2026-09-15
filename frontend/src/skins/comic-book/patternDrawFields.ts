@@ -1,4 +1,4 @@
-import { parseCssColor } from './benDayTint'
+import { parseCssColor } from './benDayWash'
 import { SWEEP_RATE, WAVE_RATE, travellingWave } from './patternWave'
 
 // ─── Ben-Day dot renderers: dot fields ───────────────────────────────────────

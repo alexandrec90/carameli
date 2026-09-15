@@ -1,21 +1,26 @@
 import { describe, expect, it } from 'vitest'
 
-import { tintSteps } from '../../skins/comic-book/benDayTint'
 import {
-  drawLoadingRipple,
-  drawMarginRipple,
+  drawLoadingGrid,
+  drawMarginGrid,
+  drawWash,
   letterboxBands,
-  RIPPLE_BASE_R,
+  gridDot,
+  GRID_REST_ALPHA,
+  GRID_REST_R,
+  GRID_SPOT_R,
   WASH_PAPER,
   WASH_SPACING,
 } from '../../skins/comic-book/benDayWash'
-import { pageSheet } from '../../skins/comic-book/MarginRipple'
+import { pageSheet } from '../../skins/comic-book/MarginGrid'
 import { frameRect, OUTER_M, PAGE_ASPECT } from '../../skins/comic-book/panelGeometry'
 import type { Rect } from '../../skins/comic-book/panelGeometry'
+import { SPOT_OFF, SPOT_REACH, spotlightAt } from '../../skins/comic-book/spotlight'
+import type { SpotlightState } from '../../skins/comic-book/spotlight'
 
-// The letterbox ripple's geometry: which bands it paints, that the dots it draws there
-// are the loading screen's own, and that the sheet between them stays clear. The loop
-// that drives it is MarginRipple.test.tsx.
+// The letterbox grid's geometry: which bands it paints, that the dots it draws there are
+// the loading screen's own under the same light, and that the sheet between them stays
+// clear. The loop that drives it is MarginGrid.test.tsx; the light is spotlight.test.ts.
 
 // ── Windows of three shapes ──────────────────────────────────────────────────
 
@@ -25,6 +30,9 @@ const WIDE = { w: 1920, h: 800 }
 const TALL = { w: 600, h: 1200 }
 /** Exactly the landscape page plus its margin: no bands at all. */
 const EXACT = { w: 2 * OUTER_M + 1600, h: 2 * OUTER_M + 1000 }
+
+/** A settled light on the left band of the wide window, on a grid centre. */
+const LEFT_LIT: SpotlightState = { x: 90, y: 390, presence: 1 }
 
 // ── A context that records what was drawn ────────────────────────────────────
 
@@ -40,9 +48,15 @@ interface Recorder {
   restores: number
 }
 
+/**
+ * Arcs are recorded at fill time with the style then set: the resting dots go down as
+ * one path under one style, the lit ones each under their own, and only the fill says
+ * which colour a path was painted in.
+ */
 function recorder(): Recorder {
   let fillStyle = ''
   let pathRects: Rect[] = []
+  let pathArcs: Array<Omit<Arc, 'style'>> = []
   // The counters live on the returned object itself, so a caller reads them live.
   const rec: Recorder = {
     ctx: undefined as unknown as CanvasRenderingContext2D,
@@ -55,11 +69,15 @@ function recorder(): Recorder {
     fillRect: (x: number, y: number, w: number, h: number) => {
       rec.fills.push({ x, y, w, h, style: fillStyle })
     },
-    beginPath: () => { pathRects = [] },
+    beginPath: () => { pathRects = []; pathArcs = [] },
+    moveTo: () => {},
     rect: (x: number, y: number, w: number, h: number) => { pathRects.push({ x, y, w, h }) },
     clip: () => { rec.clips.push(...pathRects) },
-    arc: (x: number, y: number, r: number) => { rec.arcs.push({ x, y, r, style: fillStyle }) },
-    fill: () => {},
+    arc: (x: number, y: number, r: number) => { pathArcs.push({ x, y, r }) },
+    fill: () => {
+      for (const a of pathArcs) rec.arcs.push({ ...a, style: fillStyle })
+      pathArcs = []
+    },
     save: () => { rec.saves += 1 },
     restore: () => { rec.restores += 1 },
   }
@@ -71,6 +89,8 @@ const inside = (p: { x: number; y: number }, r: Rect) =>
   p.x >= r.x && p.x <= r.x + r.w && p.y >= r.y && p.y <= r.y + r.h
 
 const area = (r: Rect) => r.w * r.h
+
+const alphaOf = (style: string) => Number(style.slice(style.lastIndexOf(',') + 1, -1))
 
 // ── pageSheet ────────────────────────────────────────────────────────────────
 
@@ -129,7 +149,7 @@ describe('letterboxBands', () => {
 
   it('tiles the letterbox without overlapping', () => {
     // A sheet inset on all four sides: the corners belong to the top and bottom bands
-    // alone, or the alpha ripple draws them twice and darker.
+    // alone, or the alpha dots draw them twice and darker.
     const sheet = { x: 100, y: 50, w: 300, h: 200 }
     const bands = letterboxBands(500, 300, sheet)
     expect(bands).toHaveLength(4)
@@ -146,13 +166,13 @@ describe('letterboxBands', () => {
   })
 })
 
-// ── drawMarginRipple ─────────────────────────────────────────────────────────
+// ── drawMarginGrid ───────────────────────────────────────────────────────────
 
-describe('drawMarginRipple', () => {
+describe('drawMarginGrid', () => {
   it('clears and draws nothing on a viewport the sheet fills', () => {
     const rec = recorder()
-    const drawn = drawMarginRipple(
-      rec.ctx, EXACT.w, EXACT.h, pageSheet(frameRect(EXACT.w, EXACT.h)), 1.25, '#FFE033',
+    const drawn = drawMarginGrid(
+      rec.ctx, EXACT.w, EXACT.h, pageSheet(frameRect(EXACT.w, EXACT.h)), LEFT_LIT, '#FFE033',
     )
     expect(drawn).toBe(false)
     expect(rec.cleared).toBe(1)
@@ -163,7 +183,7 @@ describe('drawMarginRipple', () => {
   it('papers and clips to the bands, and leaves the sheet clear', () => {
     const rec = recorder()
     const sheet = pageSheet(frameRect(WIDE.w, WIDE.h))
-    const drawn = drawMarginRipple(rec.ctx, WIDE.w, WIDE.h, sheet, 1.25, '#FFE033')
+    const drawn = drawMarginGrid(rec.ctx, WIDE.w, WIDE.h, sheet, LEFT_LIT, '#FFE033')
     const bands = letterboxBands(WIDE.w, WIDE.h, sheet)
 
     expect(drawn).toBe(true)
@@ -173,7 +193,7 @@ describe('drawMarginRipple', () => {
     expect(rec.saves).toBe(1)
     expect(rec.restores).toBe(1)
     // Every dot is in a band, or close enough to one that its disc reaches in.
-    const reach = RIPPLE_BASE_R + 1e-6
+    const reach = GRID_SPOT_R + 1e-6
     for (const a of rec.arcs) {
       expect(bands.some(b => inside(a, {
         x: b.x - reach, y: b.y - reach, w: b.w + 2 * reach, h: b.h + 2 * reach,
@@ -181,26 +201,29 @@ describe('drawMarginRipple', () => {
     }
   })
 
-  it('draws the loading ripple\'s own dots — same grid, size, colour and instant', () => {
-    const t = 3.7
+  it('draws the loading grid\'s own dots — same grid, size and colour under one light', () => {
     const sheet = pageSheet(frameRect(TALL.w, TALL.h))
+    // A light on the top band, so the comparison covers lit dots and resting ones.
+    const spot: SpotlightState = { x: 300, y: 40, presence: 1 }
     const loading = recorder()
-    drawLoadingRipple(loading.ctx, TALL.w, TALL.h, t, '#E8003D')
+    drawLoadingGrid(loading.ctx, TALL.w, TALL.h, spot, '#E8003D')
     const margin = recorder()
-    drawMarginRipple(margin.ctx, TALL.w, TALL.h, sheet, t, '#E8003D')
+    drawMarginGrid(margin.ctx, TALL.w, TALL.h, sheet, spot, '#E8003D')
 
     const key = (a: Arc) => `${a.x},${a.y}`
     const byCentre = new Map(loading.arcs.map(a => [key(a), a]))
     expect(margin.arcs.length).toBeGreaterThan(0)
+    let litSeen = 0
     for (const a of margin.arcs) {
-      // On the loading screen's grid, at the radius and in the tint it drew there. The
-      // colour matters as much as the radius now that the lava tint varies with position:
-      // a field measured from the band's own origin rather than the viewport's would put
-      // a seam down the letterbox the moment the loading sheet washed away.
+      // On the loading screen's grid, at the radius and in the colour it drew there. A
+      // light measured from the band's own origin rather than the viewport's would put a
+      // seam down the letterbox the moment the loading sheet washed away.
       expect((a.x - WASH_SPACING / 2) % WASH_SPACING).toBe(0)
       expect(byCentre.get(key(a))?.r).toBe(a.r)
       expect(byCentre.get(key(a))?.style).toBe(a.style)
+      if (a.r > GRID_REST_R) litSeen += 1
     }
+    expect(litSeen).toBeGreaterThan(0)
     // And every loading dot in a band is here — none of the margin goes blank.
     const bands = letterboxBands(TALL.w, TALL.h, sheet)
     const drawn = new Set(margin.arcs.map(key))
@@ -209,46 +232,85 @@ describe('drawMarginRipple', () => {
     }
   })
 
-  it('paints one colour across a band, whichever band a dot falls in', () => {
-    // A wide window's two side bands are drawn by separate passes, each with its own
-    // hue cache. The same field must reach the same colour through both.
+  it('draws every band in the one colour, whichever pass a dot falls in', () => {
     const rec = recorder()
     const sheet = pageSheet(frameRect(WIDE.w, WIDE.h))
-    drawMarginRipple(rec.ctx, WIDE.w, WIDE.h, sheet, 6.25, '#00AEEF')
+    drawMarginGrid(rec.ctx, WIDE.w, WIDE.h, sheet, SPOT_OFF, '#00AEEF')
     const left = rec.arcs.filter(a => a.x < sheet.x)
     const right = rec.arcs.filter(a => a.x > sheet.x + sheet.w)
     expect(left.length).toBeGreaterThan(0)
     expect(right.length).toBeGreaterThan(0)
-    // Mirrored rows of the band pair sit at the same field only by accident, so compare
-    // through the tint instead: every colour drawn is one the accent's own swing reaches.
-    const swing = new Set<string>()
-    for (let field = -1; field <= 1; field += 0.001) swing.add(tintSteps('#00AEEF')(field))
-    for (const a of rec.arcs) {
-      expect(swing.has(a.style.slice('rgba('.length, a.style.lastIndexOf(',')))).toBe(true)
-    }
+    expect(new Set(rec.arcs.map(a => a.style)).size).toBe(1)
+    expect(rec.arcs[0].style).toBe(`rgba(0,174,239,${GRID_REST_ALPHA})`)
   })
 })
 
-// ── The tint reaches the drawn sheet ─────────────────────────────────────────
+// ── The light reaches the drawn sheet ────────────────────────────────────────
 
-describe('the ripple carries the lava tint', () => {
-  it('draws more than one hue across a viewport at one instant', () => {
-    // The wiring check: benDayTint.test.ts holds the field, this holds that the draw
-    // path spends it. A ripple drawn in the flat accent would pass every test there.
+describe('the grid is lit by the spotlight', () => {
+  it('rests as one small, faint print with the light out', () => {
     const rec = recorder()
-    drawLoadingRipple(rec.ctx, 1920, 1080, 4.5, '#FFE033')
-    const hues = new Set(rec.arcs.map(a => a.style.slice(0, a.style.lastIndexOf(','))))
-    expect(hues.size).toBeGreaterThan(3)
+    drawLoadingGrid(rec.ctx, 400, 300, SPOT_OFF, '#FFE033')
+    expect(rec.arcs).toHaveLength(20 * 15)
+    for (const a of rec.arcs) {
+      expect(a.r).toBe(GRID_REST_R)
+      expect(alphaOf(a.style)).toBe(GRID_REST_ALPHA)
+    }
   })
 
-  it('shifts the hue of a fixed dot as the drift carries on', () => {
-    const hueAt = (t: number) => {
-      const rec = recorder()
-      drawLoadingRipple(rec.ctx, 400, 400, t, '#FFE033')
-      const dot = rec.arcs.find(a => a.x === 210 && a.y === 210)
-      return dot?.style.slice(0, dot.style.lastIndexOf(','))
+  it('swells the dot under the light to its fullest and the rest by their distance', () => {
+    // The wiring check: spotlight.test.ts holds the falloff, this holds that the draw
+    // path spends it, dot for dot.
+    const rec = recorder()
+    drawLoadingGrid(rec.ctx, 800, 600, LEFT_LIT, '#FFE033')
+    const at = (x: number, y: number) => rec.arcs.find(a => a.x === x && a.y === y)
+    expect(at(90, 390)?.r).toBe(GRID_SPOT_R)
+    for (const a of rec.arcs) {
+      const { radius, alpha } = gridDot(spotlightAt(LEFT_LIT, a.x, a.y))
+      expect(a.r).toBeCloseTo(radius, 9)
+      expect(alphaOf(a.style)).toBeCloseTo(alpha, 2)
     }
-    expect(hueAt(0)).toBeDefined()
-    expect(hueAt(40)).not.toBe(hueAt(0))
+  })
+
+  it('lights a pool the reach wide and leaves the grid beyond it at rest', () => {
+    const rec = recorder()
+    drawLoadingGrid(rec.ctx, 1200, 800, { x: 610, y: 410, presence: 1 }, '#0057B8')
+    const lit = rec.arcs.filter(a => a.r > GRID_REST_R)
+    const resting = rec.arcs.filter(a => a.r === GRID_REST_R)
+    expect(lit.length).toBeGreaterThan(50)
+    expect(resting.length).toBeGreaterThan(lit.length)
+    for (const a of lit) expect(Math.hypot(a.x - 610, a.y - 410)).toBeLessThan(SPOT_REACH)
+    for (const a of resting) expect(Math.hypot(a.x - 610, a.y - 410)).toBeGreaterThanOrEqual(SPOT_REACH)
+  })
+
+  it('dims the whole pool as the light fades rather than shrinking it', () => {
+    const full = recorder()
+    drawLoadingGrid(full.ctx, 400, 400, LEFT_LIT, '#FFE033')
+    const half = recorder()
+    drawLoadingGrid(half.ctx, 400, 400, { ...LEFT_LIT, presence: 0.5 }, '#FFE033')
+    const centreFull = full.arcs.find(a => a.x === 90 && a.y === 390)
+    const centreHalf = half.arcs.find(a => a.x === 90 && a.y === 390)
+    expect(centreHalf?.r).toBeLessThan(centreFull?.r ?? 0)
+    expect(centreHalf?.r).toBeGreaterThan(GRID_REST_R)
+    expect(alphaOf(centreHalf?.style ?? '')).toBeLessThan(alphaOf(centreFull?.style ?? ''))
+  })
+
+  it('carries the light onto the wash sheet, gated to where the sheet is solid', () => {
+    // Mid-cover: the sheet is solid behind the front and absent ahead of it. Grid dots
+    // appear only on the solid part, lit exactly as the loading screen lights them.
+    const rec = recorder()
+    drawWash(rec.ctx, 800, 600, 0.5, 0, LEFT_LIT, '#FFE033')
+    const grid = rec.arcs.filter(a => a.style.startsWith('rgba('))
+    expect(grid.length).toBeGreaterThan(0)
+    expect(grid.length).toBeLessThan(40 * 30)
+    const paper = rec.arcs.filter(a => a.style === WASH_PAPER)
+    expect(paper.length).toBeGreaterThan(grid.length)
+    const loading = recorder()
+    drawLoadingGrid(loading.ctx, 800, 600, LEFT_LIT, '#FFE033')
+    const byCentre = new Map(loading.arcs.map(a => [`${a.x},${a.y}`, a]))
+    for (const a of grid) {
+      expect(a.r).toBe(byCentre.get(`${a.x},${a.y}`)?.r)
+      expect(alphaOf(a.style)).toBeLessThanOrEqual(alphaOf(byCentre.get(`${a.x},${a.y}`)?.style ?? ''))
+    }
   })
 })

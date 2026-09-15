@@ -1,14 +1,16 @@
 import { useEffect, useRef, useState } from 'react'
 import type { RefObject } from 'react'
 import {
-    drawLoadingRipple, drawWash, washPhaseAt,
+    drawLoadingGrid, drawWash, washPhaseAt,
     WASH_COVER_MS, WASH_HOLD_MS,
 } from './benDayWash'
+import { pageSpotlight } from './spotlight'
+import type { SpotlightState } from './spotlight'
 
-// The comic-book loading screen: a full-viewport ripple sheet with a "LOADING…"
-// legend, shown while the page's pictures are still settling, washed away with the
-// same Ben-Day reveal a page transition uses. The state machine lives in
-// useLoadingScreen; LoadingOverlay is only the sheet itself.
+// The comic-book loading screen: a full-viewport sheet of Ben-Day dots lit by the
+// pointer's spotlight, with a "LOADING…" legend, shown while the page's pictures are
+// still settling, washed away with the same Ben-Day reveal a page transition uses. The
+// state machine lives in useLoadingScreen; LoadingOverlay is only the sheet itself.
 
 /** Everything Layout needs to run and render the loading screen. */
 export interface LoadingScreen {
@@ -26,7 +28,7 @@ export interface LoadingScreen {
 
 /**
  * State + animation loops for the loading screen. `ready` is "every picture on the
- * page has loaded or errored"; `accent` tints the ripple and the exit wash.
+ * page has loaded or errored"; `accent` colours the grid and the exit wash.
  */
 export function useLoadingScreen(ready: boolean, accent: string): LoadingScreen {
     // 0 on first visit (no cache), 400 on return visits (assets likely cached).
@@ -78,28 +80,40 @@ export function useLoadingScreen(ready: boolean, accent: string): LoadingScreen 
         return () => clearInterval(id)
     }, [loadingActive])
 
-    // Animated Ben-Day ripple background canvas
+    // The lit Ben-Day grid behind the legend. Repainted only on a frame the light moved —
+    // and after a resize, which leaves the bitmap blank whether or not it did.
     useEffect(() => {
         if (!loadingActive) return
         const canvas = canvasRef.current
-        if (!canvas) return
-        const resize = () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight }
+        const ctx = canvas?.getContext('2d')
+        if (!canvas || !ctx) return
+        let shown: SpotlightState | null = null
+        const resize = () => {
+            canvas.width = window.innerWidth
+            canvas.height = window.innerHeight
+            shown = null
+        }
         resize()
         window.addEventListener('resize', resize)
-        const loop = () => {
-            const ctx = canvas.getContext('2d')
-            if (!ctx) return
-            drawLoadingRipple(ctx, canvas.width, canvas.height, performance.now() / 1000, accent)
+        const spotlight = pageSpotlight()
+        const release = spotlight.acquire()
+        const loop = (now: number) => {
+            const spot = spotlight.sample(now)
+            if (spot !== shown) {
+                shown = spot
+                drawLoadingGrid(ctx, canvas.width, canvas.height, spot, accent)
+            }
             loadingRafRef.current = requestAnimationFrame(loop)
         }
         loadingRafRef.current = requestAnimationFrame(loop)
         return () => {
             window.removeEventListener('resize', resize)
             cancelAnimationFrame(loadingRafRef.current)
+            release()
         }
     }, [loadingActive, accent])
 
-    // Exit: wash the ripple sheet away to reveal the page. Reuses the wash's reveal
+    // Exit: wash the grid sheet away to reveal the page. Reuses the wash's reveal
     // phase (cover pinned at 1) so the loading screen ends exactly the way a page
     // transition does.
     useEffect(() => {
@@ -108,17 +122,23 @@ export function useLoadingScreen(ready: boolean, accent: string): LoadingScreen 
         const ctx = canvas?.getContext('2d')
         if (!canvas || !ctx) { setLoadingLeaving(false); return }
         const start = performance.now()
+        const spotlight = pageSpotlight()
+        const release = spotlight.acquire()
         const loop = (now: number) => {
             const { reveal, done } = washPhaseAt(WASH_COVER_MS + WASH_HOLD_MS + (now - start))
-            drawWash(ctx, canvas.width, canvas.height, 1, reveal, now / 1000, accent)
+            drawWash(ctx, canvas.width, canvas.height, 1, reveal, spotlight.sample(now), accent)
             if (done) {
+                release()
                 setLoadingLeaving(false)
                 return
             }
             leaveRafRef.current = requestAnimationFrame(loop)
         }
         leaveRafRef.current = requestAnimationFrame(loop)
-        return () => cancelAnimationFrame(leaveRafRef.current)
+        return () => {
+            cancelAnimationFrame(leaveRafRef.current)
+            release()
+        }
     }, [loadingLeaving, accent])
 
     return { loadingActive, loadingLeaving, previewLoading, handlePreviewLoading, dotCount, canvasRef }

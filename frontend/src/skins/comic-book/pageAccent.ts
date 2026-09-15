@@ -1,5 +1,5 @@
-// The one accent each route gets (`.claude/rules/skin-comic-book.md`, Palette): it tints
-// the loading ripple, the page-transition wash and the letterbox ripple around the page.
+// The one accent each route gets (`.claude/rules/skin-comic-book.md`, Palette): it colours
+// the loading screen's dot grid, the page-transition wash and the letterbox around the page.
 
 const PAGE_ACCENT: Record<string, string> = {
     '/': '#FFE033',

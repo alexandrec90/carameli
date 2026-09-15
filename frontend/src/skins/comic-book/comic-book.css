@@ -97,8 +97,8 @@
   overflow: visible;
 }
 
-/* Letterbox canvas — the loading screen's ripple carrying on around the page sheet
-   (MarginRipple.tsx). First child of the root, so it paints under every panel. */
+/* Letterbox canvas — the loading screen's lit dot grid carrying on around the page sheet
+   (MarginGrid.tsx). First child of the root, so it paints under every panel. */
 .cb-margin-canvas {
   position: absolute;
   inset: 0;
