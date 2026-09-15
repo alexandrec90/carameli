@@ -5,13 +5,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import EditorToolbar from '../../skins/comic-book/editor/EditorToolbar'
 import { CONFIG_KEY } from '../../skins/comic-book/editor/configOps'
 import type { EditorConfig } from '../../skins/comic-book/editor/types'
-import { useEditorMode } from '../../skins/comic-book/editor/useEditorMode'
+import { useEditorEngine } from '../../skins/comic-book/editor/useEditorMode'
 import type { SeamDragApi } from '../../skins/comic-book/editor/useSeamDrag'
 
 // The name fields wired to a REAL working copy, rather than to an api of `vi.fn()`s.
 //
 // `InspectorPanelNames.test.tsx` and `PageSelect.test.tsx` each render one component and
-// assert that a mock was called. Both would keep passing if `useEditorMode` stopped
+// assert that a mock was called. Both would keep passing if `useEditorEngine` stopped
 // exposing the mutator, if the mutator stopped reaching the config op, if `Layout.tsx`
 // stopped passing `onPageLabel` down, or if the edit stopped being persisted — which is
 // most of what "the feature" is. This file mounts the toolbar over the real hook and
@@ -53,7 +53,7 @@ const PANEL = 9
  * clicking a panel on the page, and the page is not what is under test here.
  */
 function EditorHarness() {
-  const api = useEditorMode()
+  const api = useEditorEngine()
   const selPanel = api.selected?.kind === 'panel' ? api.selected.index : null
 
   return (

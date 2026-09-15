@@ -10,7 +10,7 @@ import { seamGeometry } from '../../skins/comic-book/editor/panelGridOps'
 import type { EditMode, Selection, SelectionKind } from '../../skins/comic-book/editor/selection'
 import { EDIT_MODES, SELECTION_KINDS } from '../../skins/comic-book/editor/selection'
 import type { EditorConfig } from '../../skins/comic-book/editor/types'
-import type { EditorModeApi } from '../../skins/comic-book/editor/useEditorMode'
+import type { EditorModeApi } from '../../skins/comic-book/editor/editorContext'
 import type { SeamDragApi } from '../../skins/comic-book/editor/useSeamDrag'
 
 // Every state the editor's toolbar can be in, built from the editor's own definition of

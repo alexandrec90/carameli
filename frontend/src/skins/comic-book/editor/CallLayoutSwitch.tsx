@@ -1,5 +1,5 @@
 import type { CallScenePhase } from '../phoneActions'
-import type { EditorModeApi } from './useEditorMode'
+import type { EditorModeApi } from './editorContext'
 
 // Which layout the page's calls are showing. Three positions and not a checkbox plus a
 // phase: what a scene draws differs between ringing and connected — one figure or two,

@@ -87,12 +87,18 @@ export const MAX_EAGER_BYTES = 316 * 1024
 /**
  * Ceiling for any single lazily-loaded chunk.
  *
- * Today's largest is the `comic-book` skin at 262.55 KB, ahead of `sip.js`'s web platform
- * at 237.11 KB — the pair swapped places some raises ago and the note here went on naming
- * the softphone, so read the build rather than this sentence when it matters. A lazy chunk
- * is allowed to be much larger than an eager one — that is the whole trade the code
- * splitting buys — but not unboundedly so: past a point the route that owns it is slow
- * enough to feel broken, and the honest fix is to split it again.
+ * Today's largest is `sip.js`'s web platform at 237.11 KB, well ahead of the `comic-book`
+ * skin at 205.65 KB — the pair have swapped places twice, so read the build rather than
+ * this sentence when it matters. A lazy chunk is allowed to be much larger than an eager
+ * one — that is the whole trade the code splitting buys — but not unboundedly so: past a
+ * point the route that owns it is slow enough to feel broken, and the honest fix is to
+ * split it again.
+ *
+ * **Which chunk this number is about changed with the cut recorded at the bottom of this
+ * comment.** Every raise below is a comic-book raise, because comic-book was the binding
+ * chunk for all of them; it is not any more, and the next branch to find this failing
+ * should check which chunk failed before reading the history as though it were still
+ * about the skin. A softphone change now moves this and a skin change may not.
  *
  * This raise (260 → 261) is 0.77 KB of `benDayTint.ts`, the lava-lamp colour drift through
  * the comic-book skin's Ben-Day ripple: a three-sine field and an RGB↔HSL round trip, so
@@ -136,6 +142,9 @@ export const MAX_EAGER_BYTES = 316 * 1024
  * run of raises this comment records. It is a hooks refactor with its own tests, not a
  * line to slip into a feature branch, so it is filed rather than done here.
  *
+ * (Done now — the last paragraph below is what came of it, and the two figures this one
+ * predicted are the two it measures.)
+ *
  * This raise (268 → 269) is the pointer spotlight replacing the lava-lamp tint: 0.86 KB
  * measured as this branch's merge of master (267.81 KB) against a build of that master
  * alone (266.95 KB, `c373bb9`, same `node_modules` — the figure the paragraph above names
@@ -155,8 +164,41 @@ export const MAX_EAGER_BYTES = 316 * 1024
  * MAX_TOTAL_JS_BYTES} does *not* move for the same cost — it was left 1.73 KB clear and
  * still has 0.87 KB — and saying so here is the point, since the two have moved together
  * often enough that one moving alone would otherwise read as an error.
+ *
+ * **This is a cut, 269 → 239, and the first entry here that is not a raise.** 32.21 KB:
+ * the editor engine, out of the production bundle at last, measured as this branch's build
+ * (235.60 KB) against the master it sits on (267.81 KB, `1324a13`, same `node_modules`).
+ * Both figures are the ones the filed paragraph above predicted, to the byte.
+ *
+ * What changed is one edge. `Layout.tsx` splits into a `Layout` that mounts the engine and
+ * a `LayoutBody` that draws the page, the body reads editor state from a context whose
+ * default is inert (`editor/editorContext.ts`), and `editor/EditorProvider.tsx` — reached
+ * through the same DEV-gated `lazy()` the overlay already used — is the only thing that
+ * ever fills that context in. No module was deleted and no feature moved; the editor is
+ * exactly what it was in a dev session. Still 46 chunks, `package.json` untouched: the
+ * provider does not become a 47th because a production build folds it away entirely.
+ *
+ * **239 and not 237, and the two kilobytes are the point.** The convention everywhere
+ * above is a kilobyte of clearance, which would put this at 237 — and 237 fails, because
+ * `web` is 237.11 KB and is now the chunk this number is about. So the clearance
+ * comic-book gets here is 3.4 KB rather than 1.4, not as a favour to the skin but because
+ * the binding constraint moved to another chunk and this ceiling has to clear *that* one.
+ *
+ * A guard came with the cut, because a ceiling is a poor way to say *this must not ship*:
+ * {@link DEV_ONLY_MARKERS} greps the built JavaScript for a string only the engine needs.
+ * That is what fails, naming the engine, if someone imports a mutator from the page again
+ * — the 0.2 KB of headroom such an import would eat here is a much later and much vaguer
+ * signal than the 32 KB it actually costs.
+ *
+ * **The second cut does not move this one, and that is the paragraph above's point
+ * arriving.** Trimming `libphonenumber-js` took the comic-book chunk from 235.60 KB to
+ * 205.65 — 29.95 KB, the largest single thing in it — and this number stays at 239,
+ * because `web` is 237.11 KB and has been what it is about since the first cut. Two
+ * consecutive 30 KB reductions in the skin and the ceiling has not moved once: it is not
+ * the skin's budget any more. A comic-book branch now has 33 KB of room here and should
+ * check {@link MAX_TOTAL_JS_BYTES}, which is where its weight still shows.
  */
-export const MAX_LAZY_CHUNK_BYTES = 269 * 1024
+export const MAX_LAZY_CHUNK_BYTES = 239 * 1024
 
 /**
  * Every `.js` file in `dist/assets/`, summed. Today 956.6 KB across 46 chunks; the
@@ -361,8 +403,30 @@ export const MAX_LAZY_CHUNK_BYTES = 269 * 1024
  * same cost fits here and does not there. What is left is 0.87 KB, which is the clearance
  * the 971 → 972 paragraph asks for and not much more: the next comic-book branch should
  * expect to move this.
+ *
+ * **This is a cut, 1029 → 997.** The same 32.21 KB {@link MAX_LAZY_CHUNK_BYTES} carries
+ * and nothing else — the editor engine leaving the lazy comic-book chunk, 995.92 KB on
+ * this branch against 1028.13 KB on the master it sits on (`1324a13`), still 46 chunks,
+ * `package.json` untouched. The two deltas are the same 32,987 bytes, which is how this
+ * says the cut landed entirely in that chunk and took nothing else with it.
+ *
+ * Here the clearance is the usual kilobyte (1.08 KB), because unlike the ceiling above
+ * this number really is a sum over every chunk and no one of them binds it.
+ *
+ * **A second cut, 997 → 967.** 29.95 KB, and this time not the skin's code but its
+ * largest dependency: `libphonenumber-js` shipped every numbering plan on earth to format
+ * a phone number, 82 KB of JSON of which 60% is the leading-digit regexes that pick a
+ * format. `frontend/phoneMetadata.ts` keeps all 245 plans recognised and carries formats
+ * for 44, which is 48.6 KB, and `phoneInput.ts` moved to `libphonenumber-js/core` to take
+ * the table as an argument. 965.97 KB on this branch against 995.92 KB with the frontend
+ * changes reverted; the same 30,671 bytes come off {@link MAX_LAZY_CHUNK_BYTES}'s chunk,
+ * so nothing landed anywhere else. Still 46 chunks, `package.json` untouched — the table
+ * is generated from the package that was already there, not a new dependency.
+ *
+ * Read the two cuts together: the chunk is 205.65 KB against the 267.81 KB of the master
+ * this branch left, a quarter of it gone, and neither cut removed a feature.
  */
-export const MAX_TOTAL_JS_BYTES = 1029 * 1024
+export const MAX_TOTAL_JS_BYTES = 967 * 1024
 
 /**
  * Every `.css` file in `dist/assets/`, summed. Today 44.2 KB across 2 files.
@@ -415,6 +479,31 @@ export const MAX_TOTAL_CSS_BYTES = 48 * 1024
  * notices when that line goes, or when a new one is needed.
  */
 export const STRAY_UTILITIES: readonly string[] = ['ordinal']
+
+/**
+ * Strings whose presence in `dist/` proves a dev-only module reached a production build.
+ *
+ * The counterpart to {@link STRAY_UTILITIES} for JavaScript, and it exists because a size
+ * ceiling is a poor way to say *this particular thing must not ship*. The comic-book
+ * editor's engine sat in the lazy skin chunk for five consecutive raises of
+ * {@link MAX_LAZY_CHUNK_BYTES} — 31.2 KB of mutators downloaded by every visitor, none of
+ * which a visitor can reach — because `Layout.tsx` imported the hook that owns it and a
+ * hook cannot be called conditionally. The seam that cuts that edge is
+ * `src/skins/comic-book/editor/editorContext.ts`; this is what fails when someone
+ * reconnects it, and it fails *naming the thing* rather than as a chunk that grew.
+ *
+ * **Each entry is a literal that a test ties back to the constant it copies**, so a rename
+ * in the source moves the needle instead of quietly emptying it. That check is the whole
+ * reason this is a list of strings rather than an import: a marker that can silently stop
+ * matching is a guard that reports green having looked for nothing, which is the failure
+ * `.claude/rules/engineering.md` names and the one a build-output grep invites.
+ *
+ * A marker earns a place here by being a *string literal the module needs at runtime* —
+ * minification renames every identifier but keeps those. `comic-book:editConfig` is the
+ * localStorage key the editor's working copy is written under, reached only from
+ * `configSeed.ts` → `configOps.ts` → the engine.
+ */
+export const DEV_ONLY_MARKERS: readonly string[] = ['comic-book:editConfig']
 
 /**
  * Every webfont in `dist/assets/`, summed. Today 231 KB: five weights of Outfit, each
@@ -546,6 +635,28 @@ const escapeRegExp = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/
  */
 export function strayUtilities(css: string, utilities: readonly string[]): string[] {
   return utilities.filter(name => new RegExp(`\\.${escapeRegExp(name)}(?![\\w-])`).test(css))
+}
+
+/**
+ * Every `.js` file in `dist/assets/`, concatenated — the counterpart to
+ * {@link readBuiltCss}, and read whole for the same reason: a marker may land in any
+ * chunk, and which one it landed in is not the question being asked.
+ */
+export function readBuiltJs(): string {
+  return listBuiltAssets()
+    .filter(asset => asset.ext === '.js')
+    .map(asset => readFileSync(path.join(DIST_ASSETS_DIR, asset.name), 'utf-8'))
+    .join('\n')
+}
+
+/**
+ * Which of `markers` appear anywhere in the built JavaScript.
+ *
+ * A plain substring test, not a regex: every marker is a literal the build reproduces
+ * verbatim, so there is nothing to escape and nothing that can accidentally match.
+ */
+export function devOnlyMarkersIn(js: string, markers: readonly string[]): string[] {
+  return markers.filter(marker => js.includes(marker))
 }
 
 /**

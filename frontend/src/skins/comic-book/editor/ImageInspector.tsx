@@ -4,7 +4,7 @@ import Hint from './Hint'
 import NumberPadInspector from './NumberPadInspector'
 import TableInspector from './TableInspector'
 import type { ImgTransform } from './types'
-import type { EditorModeApi } from './useEditorMode'
+import type { EditorModeApi } from './editorContext'
 
 interface ImageInspectorProps {
   api: EditorModeApi

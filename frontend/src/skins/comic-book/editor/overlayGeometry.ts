@@ -10,7 +10,7 @@ import { bubbleRect, imgVisibleRect } from './transforms'
 import type {
   BubbleTransform, CallRole, CallSceneLayout, ImgTransform,
 } from './types'
-import type { EditorModeApi } from './useEditorMode'
+import type { EditorModeApi } from './editorContext'
 
 // What the overlay has to work out before it can draw anything: which call layout is up,
 // where each call panel's seam falls, and the box the selection occupies. None of it is

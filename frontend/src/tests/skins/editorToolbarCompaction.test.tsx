@@ -7,7 +7,7 @@ import ImageInspector from '../../skins/comic-book/editor/ImageInspector'
 import InspectorPanel from '../../skins/comic-book/editor/InspectorPanel'
 import Section from '../../skins/comic-book/editor/Section'
 import { newTable } from '../../skins/comic-book/editor/tableValidate'
-import type { EditorModeApi } from '../../skins/comic-book/editor/useEditorMode'
+import type { EditorModeApi } from '../../skins/comic-book/editor/editorContext'
 
 // What keeps the editor's control panel from covering the page.
 //

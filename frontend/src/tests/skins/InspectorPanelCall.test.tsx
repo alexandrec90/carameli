@@ -7,7 +7,7 @@ import { addCallScene } from '../../skins/comic-book/editor/callSceneCreate'
 import { CALL_CUT } from '../../skins/comic-book/editor/callSceneOps'
 import { seedConfig } from '../../skins/comic-book/editor/configSeed'
 import type { EditorConfig } from '../../skins/comic-book/editor/types'
-import type { EditorModeApi } from '../../skins/comic-book/editor/useEditorMode'
+import type { EditorModeApi } from '../../skins/comic-book/editor/editorContext'
 
 // The two halves of editing a call from the inspector: the seam, which belongs to the
 // panel, and the role, which belongs to one entry. They are deliberately in different

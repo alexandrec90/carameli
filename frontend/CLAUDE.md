@@ -85,3 +85,23 @@ a Dependabot PR per release, an audit surface. Five three.js packages sat in
 **Raising a number in any of the three is a decision about what visitors download**, and
 a one-line diff is what makes it read like one in review. Every cap sits just above
 today's cost on purpose: a budget's value is that it fails on the way up.
+
+A cap is a poor way to say *this particular thing must not ship*, though, and two guards
+say it directly rather than waiting for a number to move: `DEV_ONLY_MARKERS` greps the
+built JavaScript for a string only the comic-book editor engine needs, and
+`src/tests/skins/editorEngineIsolation.test.ts` walks the page's static value-import
+graph without needing a build. Both exist because the engine sat in the shipped bundle
+through five consecutive ceiling raises — the raises were all anyone saw.
+
+## `src/lib/phoneMetadata.json` is generated; do not edit it
+
+`libphonenumber-js` carries every numbering plan on earth and the skin needs a few.
+`phoneMetadata.ts` says which and why, `phoneMetadataGen.ts` writes the table, and
+`npm run gen:phone-metadata` is how you regenerate it — after changing the country list,
+and after any upgrade of the package. `phoneMetadata.test.ts` fails when the committed
+file is not what the generator would write, so a Dependabot bump that revises a plan
+shows up as a reviewable diff instead of as numbers that quietly stop parsing.
+
+Which countries belong in that list is answerable rather than a matter of taste:
+`python scripts/phone-countries.py` reads the numbers already in the database and reports
+the plans in use, naming any the table does not carry and any it carries for nobody.

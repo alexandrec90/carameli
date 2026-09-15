@@ -6,7 +6,7 @@ import { fitTableToPicture } from '../../skins/comic-book/editor/fitRuledLines'
 import TableInspector from '../../skins/comic-book/editor/TableInspector'
 import { newTable, withRows } from '../../skins/comic-book/editor/tableValidate'
 import type { ImgTransform, TableProjection } from '../../skins/comic-book/editor/types'
-import type { EditorModeApi } from '../../skins/comic-book/editor/useEditorMode'
+import type { EditorModeApi } from '../../skins/comic-book/editor/editorContext'
 
 // The button that lines the table up. The fit itself is `ruledLines.test.ts`; this is
 // what the inspector does with its answer — writes it into the surface, says so, and
