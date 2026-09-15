@@ -147,8 +147,23 @@ describe('stackedTop', () => {
     expect(wide).toBeLessThan(square)
   })
 
+  // A row anchored out of turn is on the panel before the rows under it in the
+  // transcript, so the row to tuck in beside is named rather than taken as the last placed.
+  it('sinks alongside the row it is told is below it, not the last one placed', () => {
+    const first = row(60, 5, 30) // right column, x 65..95
+    const stray = row(10, 40, 20) // the middle, high up, placed out of turn
+    const next = { right: 70, width: 25, stretch: 1 } // left column, overlapping neither
+    const byLast = stackedTop([first, stray], next, 1)
+    const byFirst = stackedTop([first, stray], next, 1, first)
+    expect(byFirst).toBeGreaterThan(byLast)
+    const upper = rowEllipse(row(byFirst, 70, 25), 1)
+    const lower = rowEllipse(first, 1)
+    expect(upper.y2).toBeCloseTo(lower.y1 + (lower.y2 - lower.y1) * CHAIN_INTERLEAVE, 6)
+  })
+
   it('refuses to stack on nothing', () => {
     expect(() => stackedTop([], { right: 5, width: 30, stretch: 1 }, 1)).toThrow()
+    expect(() => stackedTop([row(60, 5, 30)], { right: 5, width: 30, stretch: 1 }, 1, undefined)).not.toThrow()
   })
 })
 

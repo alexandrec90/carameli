@@ -59,8 +59,6 @@ interface PanelBubbleProps {
    * anything, which is the safe answer rather than a second rule.
    */
   keyboard?: boolean
-  /** Fixed SVG-space endpoint for a chain row's speech stem. */
-  tailTarget?: [number, number]
   /** Reports pointer ownership to the panel's keyboard router. */
   onHoverChange?: (hovered: boolean) => void
   /**
@@ -136,7 +134,6 @@ export default function PanelBubble({
   chained = false,
   stretch = 1,
   keyboard,
-  tailTarget,
   onHoverChange,
   onSubmit,
   onWheelSelect,
@@ -177,7 +174,7 @@ export default function PanelBubble({
   }
 
   const shape = resolveBubbleShape(bubble, { hover, pulsing })
-  const pathRef = useBubbleMorph(shape, bubble.tail, tailTarget)
+  const pathRef = useBubbleMorph(shape, bubble.tail)
   // The puffs trail the tail, so a thought bubble with no tail simply has none.
   const puffs = cloudPuffs(bubble.tail)
   const puffsOpacity = puffOpacity(shape)

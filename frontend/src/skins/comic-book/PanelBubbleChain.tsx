@@ -2,8 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 
 import {
   chainColumns, chainRowLinks, chainTranscript, clampHead, conversationRows, growTarget,
-  isComposerContent, messageRows, OUT_PREFIX, readTranscript, recipientStemTarget,
-  smsTranscript, stepHead, TYPING_KEY, visibleWindow,
+  isComposerContent, messageRows, OUT_PREFIX, readTranscript, smsTranscript, stepHead,
+  TYPING_KEY, visibleWindow,
 } from './bubbleChain'
 import type { BubbleChain } from './bubbleChain'
 import { tubeBetween } from './bubbleTube'
@@ -292,7 +292,6 @@ export default function PanelBubbleChain({
     )
     return geo ? [{ key: `${below.key}-${row.key}`, geo }] : []
   })
-  const newestRecipient = rows.find(row => row.side === 'in' && row.bubble.tail !== 'none')
 
   return (
     <div ref={hostRef} className="cb-chain-layer">
@@ -318,11 +317,6 @@ export default function PanelBubbleChain({
           stretch={row.stretch}
           keyboard={row.key === 'composer' && keyboard}
           onHoverChange={row.key === 'composer' ? onComposerHover : undefined}
-          tailTarget={
-            row === newestRecipient && cols
-              ? recipientStemTarget(cols.them, row, aspect)
-              : undefined
-          }
           onSubmit={row.key === 'composer' ? send : undefined}
           status={statusAt(row.key)}
         />

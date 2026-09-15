@@ -1,7 +1,6 @@
 import { useLayoutEffect, useRef } from 'react'
 import type { RefObject } from 'react'
 
-import { tailRingIndex } from './bubbleBox'
 import type { TailDir } from './bubbleBox'
 import { easeOutCubic, lerpPoints, pathD, ringPoints } from './bubbleShape'
 import type { BubbleType } from './editor/bubbleTypes'
@@ -39,14 +38,11 @@ function prefersReducedMotion(): boolean {
 export function useBubbleMorph(
   target: BubbleType,
   tail: TailDir,
-  tailTarget?: [number, number],
 ): RefObject<SVGPathElement | null> {
   const pathRef = useRef<SVGPathElement | null>(null)
   const currentRef = useRef<number[]>(ringPoints(target, tail))
   const rafRef = useRef(0)
   const firstRef = useRef(true)
-  const targetX = tailTarget?.[0]
-  const targetY = tailTarget?.[1]
 
   useLayoutEffect(() => {
     const path = pathRef.current
@@ -54,10 +50,6 @@ export function useBubbleMorph(
 
     const from = currentRef.current
     const to = ringPoints(target, tail)
-    if (targetX !== undefined && targetY !== undefined) {
-      const i = tailRingIndex(tail) * 2
-      ;[to[i], to[i + 1]] = [targetX, targetY]
-    }
     const settle = (pts: number[]): void => {
       currentRef.current = pts
       path.setAttribute('d', pathD(pts))
@@ -79,7 +71,7 @@ export function useBubbleMorph(
     }
     rafRef.current = requestAnimationFrame(step)
     return () => cancelAnimationFrame(rafRef.current)
-  }, [target, tail, targetX, targetY])
+  }, [target, tail])
 
   return pathRef
 }
