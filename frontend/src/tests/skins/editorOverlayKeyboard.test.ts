@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { PanelPoly } from '../../skins/comic-book/panelGeometry'
 import type { BubbleTransform, ImgTransform } from '../../skins/comic-book/editor/types'
-import type { EditorModeApi } from '../../skins/comic-book/editor/useEditorMode'
+import type { EditorModeApi } from '../../skins/comic-book/editor/editorContext'
 import { useOverlayKeyboard } from '../../skins/comic-book/editor/useOverlayKeyboard'
 
 // The editor overlay's keyboard half. The pointer half shares `selectionBounds` with it,

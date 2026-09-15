@@ -8,7 +8,7 @@ import QuadCorners from './QuadCorners'
 import TableColumnsInspector from './TableColumnsInspector'
 import { authoredTable, coerceSource, liveTable, newTable, withRows } from './tableValidate'
 import type { ImgTransform, TableProjection } from './types'
-import type { EditorModeApi } from './useEditorMode'
+import type { EditorModeApi } from './editorContext'
 
 interface TableInspectorProps {
   api: EditorModeApi

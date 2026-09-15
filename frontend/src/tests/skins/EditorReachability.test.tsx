@@ -2,7 +2,7 @@ import { cleanup, fireEvent } from '@testing-library/react'
 import type { Mock } from 'vitest'
 import { beforeAll, describe, expect, it, vi } from 'vitest'
 
-import type { EditorModeApi } from '../../skins/comic-book/editor/useEditorMode'
+import type { EditorModeApi } from '../../skins/comic-book/editor/editorContext'
 import { controlsIn, describeControl, EDITOR_STATES, renderState } from './editorStates'
 
 // Can an author still get at every edit the editor can make?

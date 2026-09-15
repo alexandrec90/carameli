@@ -1,11 +1,58 @@
 import {
-  formatIncompletePhoneNumber,
-  isSupportedCountry,
-  parsePhoneNumberFromString,
-} from 'libphonenumber-js/min'
-import type { CountryCode } from 'libphonenumber-js/min'
+  formatIncompletePhoneNumber as formatIncomplete,
+  isSupportedCountry as isSupported,
+  parsePhoneNumberFromString as parseFromString,
+} from 'libphonenumber-js/core'
+import type { CountryCode, MetadataJson } from 'libphonenumber-js/core'
 
-/** Infer a numbering region from an ordered browser-language list. */
+import metadata from '../../lib/phoneMetadata.json'
+
+// `/core` rather than `/min`, and the difference is the whole point: `/min` bundles every
+// numbering plan on earth (82 KB, 60% of it leading-digit regexes), `/core` takes the
+// table as an argument. `frontend/phoneMetadata.ts` says which plans that table holds and
+// why, `phoneMetadataGen.ts` writes it, and `phoneMetadata.test.ts` fails when the
+// committed file is stale. The three calls are wrapped here rather than at each site so
+// that the extra argument stays one file's business.
+//
+// **What a visitor loses for a plan whose formats are not carried: the formats.** Every
+// one of the 245 plans keeps the fields that decide *what number this is*, so `toE164`
+// answers exactly what it always did — internationally written or nationally, trunk
+// prefix and all. A trimmed plan only comes out of the as-you-type formatter ungrouped.
+//
+// That is a deliberate line and an easy one to erase by accident: trimming a plan to the
+// four fields E.164 obviously needs turns a Nigerian `08031234567` into
+// `+23408031234567`, because the rule that strips the trunk `0` lives further along the
+// entry. `phoneMetadata.ts` carries the full account and
+// `src/tests/skins/phoneInput.test.ts` holds the line with real numbers.
+
+// The table is JSON, so TypeScript infers its literal shape rather than the package's;
+// one assertion here beats one at every call.
+const md = metadata as unknown as MetadataJson
+
+const formatIncompletePhoneNumber = (value: string, country?: CountryCode): string =>
+  formatIncomplete(value, country, md)
+
+/**
+ * A predicate rather than a boolean, matching the signature `libphonenumber-js/min`
+ * exported: it is what narrows a browser locale's region string to a `CountryCode`, and
+ * without it every caller would need a cast that asserts what this already checked.
+ */
+const isSupportedCountry = (country: string): country is CountryCode =>
+  isSupported(country as CountryCode, md)
+
+// `{ defaultCountry }` rather than the bare country, because `/core`'s overloads have no
+// spelling for an undefined second argument and this reads as what it is: a default, used
+// only when the value does not name a country itself.
+const parsePhoneNumberFromString = (value: string, country?: CountryCode) =>
+  parseFromString(value, { defaultCountry: country }, md)
+
+/**
+ * Infer a numbering region from an ordered browser-language list.
+ *
+ * Every plan the full table has is still supported here, trimmed or not, because a region
+ * that cannot be a default country is a region whose visitors cannot type their own
+ * number. What a trimmed region gets is a correct E.164 and no grouping.
+ */
 export function countryFromLocales(locales: readonly string[]): CountryCode | undefined {
   for (const locale of locales) {
     try {
@@ -49,6 +96,13 @@ export function browserCountry(): CountryCode | undefined {
  * every number-shaped thing be its own conversation. Whether a carrier will *accept* it is
  * the carrier's answer to give, on a message that visibly fails, rather than something to
  * settle here by silently pretending the number was never dialled.
+ *
+ * **The trimmed metadata changes nothing here, by construction.** Every plan keeps the
+ * fields identity is decided by, so this answers for all 245 exactly as it did when the
+ * bundle carried all of them — see the note at the top of this file, and
+ * `frontend/phoneMetadata.ts` for what is actually dropped. If that ever stops being true
+ * the repair is to carry more fields, never to make this asynchronous: a *maybe* returned
+ * here is a chain bound to the wrong thread, which is the failure above by another name.
  */
 export function toE164(value: string, country?: CountryCode): string | null {
   const parsed = parsePhoneNumberFromString(value, country)
@@ -67,6 +121,10 @@ const KEYPAD_SYMBOL = /[*#]/
  * reads as a broken key rather than as a formatter with an opinion. Those two are real
  * keys on the phone in the picture, and a value holding one has stopped being a number
  * to format anyway.
+ *
+ * This is the one function the trimmed metadata is visible in: a plan whose formats are
+ * not carried comes back ungrouped rather than spaced. The digits are never altered, so
+ * what a visitor sees is their own number, plainer. See `frontend/phoneMetadata.ts`.
  */
 export function formatPhoneInput(value: string, country?: CountryCode): string {
   if (KEYPAD_SYMBOL.test(value)) return value

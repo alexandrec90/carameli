@@ -12,7 +12,7 @@ import PanelActions from './PanelActions'
 import PanelNameField from './PanelNameField'
 import Section from './Section'
 import { indicesOnPanel } from './configOps'
-import type { EditorModeApi } from './useEditorMode'
+import type { EditorModeApi } from './editorContext'
 
 interface InspectorPanelProps {
   api: EditorModeApi

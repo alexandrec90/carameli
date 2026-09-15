@@ -19,7 +19,7 @@ import {
   bootWorkingCopy, holdsNoEdits, persistConfig, storedBase, storedStamp,
 } from '../../skins/comic-book/editor/editorStorage'
 import { setPanelLabel } from '../../skins/comic-book/editor/configPanels'
-import { useEditorMode } from '../../skins/comic-book/editor/useEditorMode'
+import { useEditorEngine } from '../../skins/comic-book/editor/useEditorMode'
 import type { EditorConfig } from '../../skins/comic-book/editor/types'
 
 // What the file gained under a working copy, and taking one panel of it.
@@ -388,7 +388,7 @@ describe('holdsNoEdits', () => {
   })
 })
 
-describe('useEditorMode — a copy that is behind the file', () => {
+describe('useEditorEngine — a copy that is behind the file', () => {
   /** A payload as a tab that started before the calls existed would hold. */
   const behindPayload = (config: EditorConfig) =>
     JSON.stringify({ ...config, seedStamp: configStamp(beforeCalls()), seedBase: beforeCalls() })
@@ -410,7 +410,7 @@ describe('useEditorMode — a copy that is behind the file', () => {
 
   it('names the phone-call panel the file gained, rather than only saying it moved', () => {
     window.localStorage.setItem(CONFIG_KEY, behindPayload(edited()))
-    const { result } = renderHook(() => useEditorMode())
+    const { result } = renderHook(() => useEditorEngine())
 
     expect(result.current.stale).toBe(true)
     expect(result.current.untracked).toBe(false)
@@ -423,7 +423,7 @@ describe('useEditorMode — a copy that is behind the file', () => {
   it('takes that panel without touching the author’s own', () => {
     const authored = setPanelLabel(beforeCalls(), 0, 'Cover by the author')
     window.localStorage.setItem(CONFIG_KEY, behindPayload(authored))
-    const { result } = renderHook(() => useEditorMode())
+    const { result } = renderHook(() => useEditorEngine())
     const panel = callPanel()
 
     act(() => result.current.adoptFromFile(panel))
@@ -445,7 +445,7 @@ describe('useEditorMode — a copy that is behind the file', () => {
       CONFIG_KEY,
       JSON.stringify({ ...edited(), seedStamp: configStamp(older), seedBase: older }),
     )
-    const { result } = renderHook(() => useEditorMode())
+    const { result } = renderHook(() => useEditorEngine())
     expect(result.current.drift?.page).toContain('1 panel added to the page')
 
     act(() => result.current.adoptFromFile(callPanel()))
@@ -456,7 +456,7 @@ describe('useEditorMode — a copy that is behind the file', () => {
 
   it('clears the selection, since the entry an index named has moved', () => {
     window.localStorage.setItem(CONFIG_KEY, behindPayload(edited()))
-    const { result } = renderHook(() => useEditorMode())
+    const { result } = renderHook(() => useEditorEngine())
 
     act(() => result.current.select('img', 0))
     act(() => result.current.adoptFromFile(callPanel()))
@@ -469,7 +469,7 @@ describe('useEditorMode — a copy that is behind the file', () => {
       CONFIG_KEY,
       JSON.stringify({ ...beforeCalls(), seedStamp: configStamp(beforeCalls()) }),
     )
-    const { result } = renderHook(() => useEditorMode())
+    const { result } = renderHook(() => useEditorEngine())
 
     expect(result.current.untracked).toBe(true)
     expect(result.current.drift).toBeNull()
@@ -481,7 +481,7 @@ describe('useEditorMode — a copy that is behind the file', () => {
   // file, so the base — and everything read off it — has to survive one.
   it('keeps the base, and the report, through an edit', () => {
     window.localStorage.setItem(CONFIG_KEY, behindPayload(edited()))
-    const { result } = renderHook(() => useEditorMode())
+    const { result } = renderHook(() => useEditorEngine())
 
     act(() => result.current.setPanelLabel(0, 'Cover'))
 
@@ -492,7 +492,7 @@ describe('useEditorMode — a copy that is behind the file', () => {
   })
 
   it('starts tracking a fresh session, and stays quiet about it', () => {
-    const { result } = renderHook(() => useEditorMode())
+    const { result } = renderHook(() => useEditorEngine())
     expect(result.current.untracked).toBe(false)
     expect(result.current.stale).toBe(false)
 
@@ -507,7 +507,7 @@ describe('useEditorMode — a copy that is behind the file', () => {
   // any more and there is nothing left to take.
   it('makes the copy the file again on Reset', () => {
     window.localStorage.setItem(CONFIG_KEY, behindPayload(edited()))
-    const { result } = renderHook(() => useEditorMode())
+    const { result } = renderHook(() => useEditorEngine())
 
     act(() => result.current.resetAll())
 

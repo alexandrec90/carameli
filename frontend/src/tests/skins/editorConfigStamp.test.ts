@@ -8,7 +8,7 @@ import { setPanelLabel } from '../../skins/comic-book/editor/configPanels'
 import { seedConfig } from '../../skins/comic-book/editor/configSeed'
 import { configStamp, isStaleWorkingCopy, seedStamp } from '../../skins/comic-book/editor/configStamp'
 import { persistConfig, storedStamp } from '../../skins/comic-book/editor/editorStorage'
-import { useEditorMode } from '../../skins/comic-book/editor/useEditorMode'
+import { useEditorEngine } from '../../skins/comic-book/editor/useEditorMode'
 
 // The guard against a Save that reverts the file. Written against the incident it exists
 // for: a tab whose working copy came from an older `layoutConfig.ts` overwrote a merged
@@ -59,7 +59,7 @@ describe('configStamp', () => {
     expect(configStamp(reordered)).toBe(configStamp(config))
   })
 
-  // The stamp is reached from `useEditorMode`, which the skin imports whether or not the
+  // The stamp is reached from `useEditorEngine`, which the skin imports whether or not the
   // editor is on. Hashing the *serialized file* was the obvious way to write this and it
   // put ./serialize.ts — 13 KB of TypeScript emitter nobody outside edit mode runs — into
   // every visitor's bundle. `test:bundle` caught it once; this catches it in a second.
@@ -100,17 +100,17 @@ describe('storedStamp', () => {
   })
 })
 
-describe('useEditorMode — a working copy that predates the file', () => {
+describe('useEditorEngine — a working copy that predates the file', () => {
   it('reports a payload stamped with another file as stale', () => {
     window.localStorage.setItem(CONFIG_KEY, payload('from-an-older-file'))
-    const { result } = renderHook(() => useEditorMode())
+    const { result } = renderHook(() => useEditorEngine())
     expect(result.current.active).toBe(true)
     expect(result.current.stale).toBe(true)
   })
 
   it('reports a payload stamped with this file as current', () => {
     window.localStorage.setItem(CONFIG_KEY, payload(seedStamp()))
-    const { result } = renderHook(() => useEditorMode())
+    const { result } = renderHook(() => useEditorEngine())
     expect(result.current.stale).toBe(false)
   })
 
@@ -118,7 +118,7 @@ describe('useEditorMode — a working copy that predates the file', () => {
   // that is behind the file has not looked at the file, so the warning has to survive it.
   it('keeps the warning through an edit, and keeps writing the old stamp', () => {
     window.localStorage.setItem(CONFIG_KEY, payload('from-an-older-file'))
-    const { result } = renderHook(() => useEditorMode())
+    const { result } = renderHook(() => useEditorEngine())
 
     act(() => result.current.setPanelLabel(0, 'Cover'))
 
@@ -128,7 +128,7 @@ describe('useEditorMode — a working copy that predates the file', () => {
 
   it('adopts this file’s stamp on the first edit of an unstamped payload', () => {
     window.localStorage.setItem(CONFIG_KEY, payload(null))
-    const { result } = renderHook(() => useEditorMode())
+    const { result } = renderHook(() => useEditorEngine())
     expect(result.current.stale).toBe(false)
 
     act(() => result.current.setPanelLabel(0, 'Cover'))
@@ -141,7 +141,7 @@ describe('useEditorMode — a working copy that predates the file', () => {
   // the warning is asking for — so it has to clear it.
   it('clears the warning when the working copy is reset to the file', () => {
     window.localStorage.setItem(CONFIG_KEY, payload('from-an-older-file'))
-    const { result } = renderHook(() => useEditorMode())
+    const { result } = renderHook(() => useEditorEngine())
     expect(result.current.stale).toBe(true)
 
     act(() => result.current.resetAll())
@@ -151,7 +151,7 @@ describe('useEditorMode — a working copy that predates the file', () => {
   })
 
   it('starts a fresh session — no payload at all — unwarned', () => {
-    const { result } = renderHook(() => useEditorMode())
+    const { result } = renderHook(() => useEditorEngine())
     expect(result.current.stale).toBe(false)
     act(() => result.current.setPanelLabel(0, 'Cover'))
     expect(storedStamp(window.localStorage.getItem(CONFIG_KEY))).toBe(seedStamp())

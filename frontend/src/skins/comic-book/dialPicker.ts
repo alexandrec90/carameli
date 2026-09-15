@@ -1,4 +1,4 @@
-import type { CountryCode } from 'libphonenumber-js/min'
+import type { CountryCode } from 'libphonenumber-js/core'
 
 import { formatPhoneInput } from './phoneInput'
 
