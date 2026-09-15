@@ -8,7 +8,7 @@ import type { BubbleType } from './bubbleTypes'
 import Hint from './Hint'
 import { linkCandidates } from './configOps'
 import type { BubbleTransform } from './types'
-import type { EditorModeApi } from './useEditorMode'
+import type { EditorModeApi } from './editorContext'
 
 interface BubbleInspectorProps {
   api: EditorModeApi

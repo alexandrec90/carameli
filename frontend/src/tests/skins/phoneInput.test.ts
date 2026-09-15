@@ -98,3 +98,52 @@ describe('phone caret helpers', () => {
     expect(deleteAdjacentDigit('', 0, 'forward')).toBeNull()
   })
 })
+
+describe('a numbering plan the bundle carries but does not format', () => {
+  // The skin ships formats for 44 of libphonenumber's 245 plans and keeps the other 201
+  // recognised (`frontend/phoneMetadata.ts`). These assert the line between the two,
+  // because nothing else in this file does: every other test here uses a US, GB or FR
+  // number, so all of them passed unchanged on a table that could not parse a Nigerian
+  // number at all. A guard for a trade-off has to exercise the side being traded.
+  //
+  // Nigeria (+234) is not in FORMATTED_COUNTRIES. If it is ever added, these fail — and
+  // the repair is to move them to a plan still outside the list, never to delete them.
+
+  // The property the whole design turns on. Dropping a plan outright drops its calling
+  // code, and then this returns null for an internationally written number — an SMS thread
+  // that cannot be keyed, which is the failure `toE164` is written against.
+  it('canonicalises an internationally written number exactly as before', () => {
+    expect(toE164('+2348031234567')).toBe('+2348031234567')
+    expect(toE164('+234 803 123 4567')).toBe('+2348031234567')
+    expect(toE164('+254 712 345678')).toBe('+254712345678')
+  })
+
+  // The second half of that property, and the one that fails *quietly* when it fails: a
+  // trim that stopped at the four fields E.164 obviously needs would answer
+  // '+23408031234567' here — the trunk 0 unstripped, plausible and wrong. Identity is
+  // whole for every plan, not just for the formatted ones.
+  it('canonicalises a nationally written number, trunk prefix and all', () => {
+    expect(toE164('08031234567', 'NG' as never)).toBe('+2348031234567')
+    expect(toE164('0712345678', 'KE' as never)).toBe('+254712345678')
+  })
+
+  it('canonicalises a plan that shares a formatted calling code', () => {
+    // Antigua and Jersey are trimmed, but +1 and +44 belong to formatted plans, so these
+    // were never at risk. Here to keep the two cases from being confused if one breaks.
+    expect(toE164('+1 268 464 1234')).toBe('+12684641234')
+    expect(toE164('+44 1534 888888')).toBe('+441534888888')
+  })
+
+  it('leaves a trimmed plan ungrouped, which is the whole of what is traded', () => {
+    // The digits are never altered; only the spacing a formatted plan would have added is
+    // missing. Compare the US line, whose formats the bundle does carry.
+    expect(formatPhoneInput('08031234', 'NG' as never)).toBe('08031234')
+    expect(formatPhoneInput('2133734', 'US')).toBe('(213) 373-4')
+  })
+
+  it('still cannot attribute a national number with no region at all', () => {
+    // Unchanged by any of this: with no country there is nothing to parse against, and
+    // null is the value this function already reserves for "not a destination".
+    expect(toE164('08031234567')).toBeNull()
+  })
+})

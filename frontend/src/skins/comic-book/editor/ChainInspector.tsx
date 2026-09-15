@@ -6,7 +6,7 @@ import { BOUND_HINT, columnHint, rowsHint, transcriptSummary } from './chainHint
 import { parseMessages } from './chainOps'
 import Hint from './Hint'
 import type { BubbleTransform } from './types'
-import type { EditorModeApi } from './useEditorMode'
+import type { EditorModeApi } from './editorContext'
 
 interface ChainInspectorProps {
   api: EditorModeApi

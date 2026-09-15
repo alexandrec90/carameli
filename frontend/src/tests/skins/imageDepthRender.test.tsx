@@ -6,7 +6,7 @@ import { seedConfig } from '../../skins/comic-book/editor/configSeed'
 import ImageInspector from '../../skins/comic-book/editor/ImageInspector'
 import { newTable } from '../../skins/comic-book/editor/tableValidate'
 import type { ImgTransform } from '../../skins/comic-book/editor/types'
-import type { EditorModeApi } from '../../skins/comic-book/editor/useEditorMode'
+import type { EditorModeApi } from '../../skins/comic-book/editor/editorContext'
 
 // Depth in the DOM, where it actually decides anything. `imageDepth.test.ts` pins the
 // ordering function; these are the two ends of it — the page drawing pictures in that

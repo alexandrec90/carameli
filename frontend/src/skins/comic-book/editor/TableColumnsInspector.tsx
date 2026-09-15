@@ -5,7 +5,7 @@ import { fitColumns, formatRows, parseRows } from '../tableData'
 import Hint from './Hint'
 import Section from './Section'
 import type { TableColumn, TableProjection } from './types'
-import type { EditorModeApi } from './useEditorMode'
+import type { EditorModeApi } from './editorContext'
 
 interface TableColumnsInspectorProps {
   api: EditorModeApi

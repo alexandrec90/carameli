@@ -445,11 +445,11 @@ and a preferred owner ranks above `CLAIM_FIELD`.
 ## Dev-only visual editor
 
 `?edit=1` / `?edit=0` in dev, persisted in `localStorage['comic-book:edit']`, gated on
-`import.meta.env.DEV` so it is inert in prod: `EditorOverlay.tsx` is a dynamic `import()`
-behind that gate, so Rollup drops it and `editor.css` from the build and only
-`layoutConfig.ts`, `bubbleTypes.ts` and `transforms.ts` ship. The inspector edits every
-field of the arrays above, with two deliberate gaps: **no chain control**, and no cell
-block or **+ Column** / **−** on a live surface.
+`import.meta.env.DEV` so it is inert in prod. Two dynamic `import()`s sit behind that
+gate — `EditorOverlay.tsx` is the UI, `EditorProvider.tsx` the engine — and the page
+reads state from the inert context in `editor/editorContext.ts`, which carries why
+(rule 23). The inspector edits every field of the arrays above, with two deliberate
+gaps: **no chain control**, and no cell block or **+ Column** / **−** on a live surface.
 
 Selecting, dragging and every toolbar control are the editor README's — its *Quick start*
 and *Toolbar controls at a glance*. Three of those decisions carry beyond the toolbar:
@@ -493,3 +493,7 @@ to drag back; and **Save is never refused**, mid-design being when it matters mo
 21. **Never fetch from a skin, and never save a live surface's rows.**
 22. **Never read the window's size outside `usePageFrame.ts`, and never size balloon
     lettering in `px`, `vw` or `vh`** — everything on the page is a share of the frame.
+23. **Never import a *value* from `editor/useEditorMode.ts` or a mutator hook into what
+    the page draws** — read `editor/editorContext.ts`. Types are free; one value edge
+    ships the whole engine past the DEV gate.
+24. **Never hand-edit `src/lib/phoneMetadata.json`** — `npm run gen:phone-metadata`.

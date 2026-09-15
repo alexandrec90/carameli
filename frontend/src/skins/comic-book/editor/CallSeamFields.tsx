@@ -1,6 +1,6 @@
 import { callSceneOn } from '../callSceneRoles'
 import { CALL_CUT } from './configOps'
-import type { EditorModeApi } from './useEditorMode'
+import type { EditorModeApi } from './editorContext'
 
 // The seam, on a panel that is a phone call. It belongs to the panel and not to any one
 // entry: both halves are measured from it, so moving it from a picture's inspector would

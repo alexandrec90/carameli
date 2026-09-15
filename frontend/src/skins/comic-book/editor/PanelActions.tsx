@@ -4,7 +4,7 @@ import type { LayoutKind } from '../panelGeometry'
 import { hiddenOn } from './configPanelsRemove'
 import Hint from './Hint'
 import type { CutAxis } from './panelGridCut'
-import type { EditorModeApi } from './useEditorMode'
+import type { EditorModeApi } from './editorContext'
 
 // What can be done to a panel as a *slot*: cut it in two, take it off one window shape,
 // bring a hidden one back beside it, delete it. One component rendered by both
