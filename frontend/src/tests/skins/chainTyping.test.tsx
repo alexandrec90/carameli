@@ -45,6 +45,12 @@ const chain = (over: Partial<BubbleChain> = {}): BubbleChain => ({
 /** The panel box the templates resolve against, sized so tubes and rows have room. */
 const BOX = { x: 0, y: 0, w: 400, h: 300 }
 
+/** A lettering size the box has room for: a column holds a short line on one row. */
+const LETTERING = 12
+
+/** The same, as the pure arithmetic takes it. */
+const M = { aspect: 1, boxW: BOX.w, lettering: LETTERING }
+
 const drawn = (container: HTMLElement) => [...container.querySelectorAll('.cb-panel-bubble')]
 
 function bound(over: Partial<LiveConversation> = {}): LiveConversation {
@@ -59,18 +65,29 @@ describe('conversationRows with a typing row', () => {
   }
 
   it('appends one extra row from the recipient template, keyed for the shell', () => {
-    const rows = conversationRows([0], readTranscript(['hello']), cols(), true, 1, true)
+    const rows = conversationRows([0], readTranscript(['hello']), cols(), true, M, true)
     const typing = rows.find(r => r.key === TYPING_KEY)
     expect(typing).toBeTruthy()
     // The peer's side: aligned against the left column's edge, saying nothing.
     expect(typing?.bubble.text).toBe('')
     expect(typing?.bubble.content).toBe('text')
-    const message = rows.find(r => r.key === '0')
-    expect((typing?.bubble.right ?? 0)).toBeGreaterThan(message?.bubble.right ?? 100)
+    const left = 100 - (typing?.bubble.right ?? 0) - (typing?.bubble.width ?? 0)
+    expect(left).toBeGreaterThanOrEqual(5 - 1e-9)
+    expect(left + (typing?.bubble.width ?? 0)).toBeLessThanOrEqual(45 + 1e-9)
+  })
+
+  // The dots stand in for the reply, so they lean where it will: when the words land the
+  // balloon is where the dots were, rather than a lean to the side of them.
+  it('leans where the reply it stands in for will lean', () => {
+    const before = conversationRows([0], readTranscript(['hello']), cols(), true, M, true)
+    const typing = before.find(r => r.key === TYPING_KEY)
+    const after = conversationRows([1, 0], readTranscript(['hello', 'reply']), cols(), true, M)
+    const reply = after.find(r => r.key === '1')
+    expect(reply?.bubble.right).toBeCloseTo(typing?.bubble.right ?? -1, 6)
   })
 
   it('takes the recipient tail, as the newest thing on their side', () => {
-    const rows = conversationRows([0], readTranscript(['hello']), cols(), true, 1, true)
+    const rows = conversationRows([0], readTranscript(['hello']), cols(), true, M, true)
     const typing = rows.find(r => r.key === TYPING_KEY)
     const message = rows.find(r => r.key === '0')
     // The inbound message above the dots loses its tail to them — one tail per side.
@@ -79,7 +96,7 @@ describe('conversationRows with a typing row', () => {
   })
 
   it('adds nothing when typing is off', () => {
-    const rows = conversationRows([0], readTranscript(['hello']), cols(), true, 1)
+    const rows = conversationRows([0], readTranscript(['hello']), cols(), true, M)
     expect(rows.some(r => r.key === TYPING_KEY)).toBe(false)
   })
 })
@@ -87,7 +104,7 @@ describe('conversationRows with a typing row', () => {
 describe('PanelBubbleChain with a composing peer', () => {
   it('draws the dots row, marked is-typing, above the composer', () => {
     const { container } = render(
-      <PanelBubbleChain box={BOX}
+      <PanelBubbleChain box={BOX} lettering={LETTERING}
         chain={chain()}
         members={columns()}
         visible
@@ -103,7 +120,7 @@ describe('PanelBubbleChain with a composing peer', () => {
 
   it('draws no dots while the peer is not composing', () => {
     const { container } = render(
-      <PanelBubbleChain box={BOX}
+      <PanelBubbleChain box={BOX} lettering={LETTERING}
         chain={chain()}
         members={columns()}
         visible
@@ -122,7 +139,7 @@ describe('PanelBubbleChain with a composing peer', () => {
       )
     // A four-row chain holds three messages; with the dots up, two.
     const { rerender } = render(
-      <PanelBubbleChain box={BOX}
+      <PanelBubbleChain box={BOX} lettering={LETTERING}
         chain={chain()}
         members={columns()}
         visible
@@ -133,7 +150,7 @@ describe('PanelBubbleChain with a composing peer', () => {
     expect(screen.getByText('m0')).toBeTruthy()
 
     rerender(
-      <PanelBubbleChain box={BOX}
+      <PanelBubbleChain box={BOX} lettering={LETTERING}
         chain={chain()}
         members={columns()}
         visible

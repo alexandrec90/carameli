@@ -39,6 +39,13 @@ interface PanelBubbleChainProps {
    * construction rather than by measuring the slot back.
    */
   box: Rect
+  /**
+   * The resolved `--cb-lettering`, in px — what the words in a row are set in, and so
+   * what decides how wide a message's balloon is and how many lines it wraps to
+   * (bubbleFit.ts). Handed down from the page frame rather than read back from the
+   * stylesheet, for the same reason the aspect is: nothing here measures the DOM.
+   */
+  lettering: number
   /** True while the panel is hovered; the conversation runs from the start on each reveal. */
   visible: boolean
   /** False in edit mode: the editor overlay owns the pointer there. */
@@ -107,7 +114,8 @@ export interface LiveConversation {
  * flickering rather than as a conversation moving.
  */
 export default function PanelBubbleChain({
-  chain, members, box, visible, interactive, keyboard = false, onComposerHover, conversation,
+  chain, members, box, lettering, visible, interactive, keyboard = false, onComposerHover,
+  conversation,
 }: PanelBubbleChainProps) {
   // What the reader has sent, oldest first, already marked as the sender's side. It lives
   // here rather than in the config because it is not the author's: it is gone on reload,
@@ -118,6 +126,9 @@ export default function PanelBubbleChain({
   // percentages were dragged out against, so nothing here measures the DOM: the page
   // frame has a fixed aspect per window shape, and a panel's box is a fraction of it.
   const aspect = box.h > 0 ? box.w / box.h : 1
+  // What the rows are fitted and placed against: the box's aspect for heights, its width
+  // and the lettering size for how many glyphs a balloon holds across.
+  const metrics = { aspect, boxW: box.w, lettering }
 
   const cols = chainColumns(members)
   const live = cols !== null && isComposerContent(cols.me.content)
@@ -268,16 +279,16 @@ export default function PanelBubbleChain({
     readTranscript(messages),
     cols,
     live,
-    aspect,
+    metrics,
     typing,
   )
   // The tubes are drawn in the layer's own coordinates, so the box is taken at the origin.
   const local = { x: 0, y: 0, w: box.w, h: box.h }
-  const tubes = chainRowLinks(rows).flatMap(([below, row]) => {
+  const tubes = chainRowLinks(rows, aspect).flatMap(([below, row]) => {
     if (box.w <= 0 || box.h <= 0) return []
     const geo = tubeBetween(
-      bubbleRect(local, below.bubble),
-      bubbleRect(local, row.bubble),
+      bubbleRect(local, below.bubble, below.stretch),
+      bubbleRect(local, row.bubble, row.stretch),
     )
     return geo ? [{ key: `${below.key}-${row.key}`, geo }] : []
   })
@@ -304,11 +315,12 @@ export default function PanelBubbleChain({
           visible={visible}
           interactive={interactive}
           chained
+          stretch={row.stretch}
           keyboard={row.key === 'composer' && keyboard}
           onHoverChange={row.key === 'composer' ? onComposerHover : undefined}
           tailTarget={
             row === newestRecipient && cols
-              ? recipientStemTarget(cols.them, row.bubble, aspect)
+              ? recipientStemTarget(cols.them, row, aspect)
               : undefined
           }
           onSubmit={row.key === 'composer' ? send : undefined}

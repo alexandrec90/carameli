@@ -1,13 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
-import { BUBBLE_ASPECT } from '../../skins/comic-book/bubbleBox'
 import {
-  CHAIN_FULL_CHARS,
   CHAIN_MIN_WIDTH_RATIO,
-  CHAIN_ROW_GAP,
-  bubbleHeightPct,
   chainRowLinks,
-  chainRowTop,
   chainColumns,
   chainIds,
   chainIdsOn,
@@ -20,14 +15,17 @@ import {
   isBubbleChain,
   isComposerContent,
   messageRows,
-  messageWidth,
   mirrorColumn,
   readTranscript,
   recipientStemTarget,
+  sideOrdinals,
   stepHead,
   visibleWindow,
 } from '../../skins/comic-book/bubbleChain'
-import type { BubbleChain } from '../../skins/comic-book/bubbleChain'
+import type { BubbleChain, ChainRow } from '../../skins/comic-book/bubbleChain'
+import { fitMessage } from '../../skins/comic-book/bubbleFit'
+import { CHAIN_ROW_GAP, rowEllipse } from '../../skins/comic-book/chainLayout'
+import type { ChainMetrics } from '../../skins/comic-book/chainLayout'
 import { NEW_BUBBLE } from '../../skins/comic-book/editor/configSeed'
 import type { BubbleTransform } from '../../skins/comic-book/editor/types'
 
@@ -182,28 +180,14 @@ describe('chainTranscript', () => {
   })
 })
 
-describe('messageWidth', () => {
-  it('gives an empty message the narrowest balloon its column allows', () => {
-    expect(messageWidth('', 40)).toBeCloseTo(40 * CHAIN_MIN_WIDTH_RATIO, 6)
+describe('sideOrdinals', () => {
+  it('counts each message among its own speaker’s, in transcript order', () => {
+    const lines = readTranscript(['a', '> b', 'c', 'd', '> e'])
+    expect(sideOrdinals(lines)).toEqual([0, 0, 1, 2, 1])
   })
 
-  it('fills the column at the full-width length, and stops there', () => {
-    const full = 'x'.repeat(CHAIN_FULL_CHARS)
-    expect(messageWidth(full, 40)).toBeCloseTo(40, 6)
-    // Past it the lettering wraps and the balloon grows downward, not sideways.
-    expect(messageWidth(`${full}${full}`, 40)).toBeCloseTo(40, 6)
-  })
-
-  it('grows with the message, so a conversation has a ragged edge', () => {
-    expect(messageWidth('hi', 40)).toBeLessThan(messageWidth('hi there', 40))
-  })
-})
-
-describe('bubbleHeightPct', () => {
-  it('is the balloon’s own aspect, rescaled by the panel’s', () => {
-    expect(bubbleHeightPct(40, 1)).toBeCloseTo(40 * BUBBLE_ASPECT, 6)
-    // A panel twice as wide as it is tall: the same width % is twice the height %.
-    expect(bubbleHeightPct(40, 2)).toBeCloseTo(80 * BUBBLE_ASPECT, 6)
+  it('is empty for an empty transcript', () => {
+    expect(sideOrdinals([])).toEqual([])
   })
 })
 
@@ -241,12 +225,18 @@ describe('conversationRows', () => {
     me: tpl({ top: 60, right: 5, width: 40, tail: 'down-left' }),
     them: tpl({ top: 60, right: 55, width: 40, tail: 'down-right' }),
   }
-  // The left column's left edge — 100 - 55 - 40.
+  // The left column's left edge — 100 - 55 - 40 — and the right column's right edge.
   const THEM_LEFT = 5
+  const ME_RIGHT = 5
+  // A square box a column of 40% holds a few words across in.
+  const M: ChainMetrics = { aspect: 1, boxW: 400, lettering: 12 }
   const lines = readTranscript(['hey', 'you around?', '> just picked up'])
   const shown = visibleWindow(2, 6) // [2, 1, 0] — newest first
 
-  const rows = conversationRows(shown, lines, cols, false, 1)
+  const rows = conversationRows(shown, lines, cols, false, M)
+
+  /** A row's left edge, in the % a bubble is placed in. */
+  const leftOf = (r: ChainRow) => 100 - r.bubble.right - r.bubble.width
 
   // The author's picture: two of theirs in a row, then one of mine, bottom-up on screen.
   it('walks up the panel newest first, one row per message', () => {
@@ -254,50 +244,107 @@ describe('conversationRows', () => {
     expect(rows.map(r => r.bubble.text)).toEqual(['just picked up', 'you around?', 'hey'])
   })
 
-  it('hangs the sender’s rows off the right column and the recipient’s off the left', () => {
-    expect(rows[0].bubble.right).toBe(cols.me.right)
+  it('keeps the sender’s rows inside the right column and the recipient’s inside the left', () => {
+    expect(rows[0].bubble.right).toBeGreaterThanOrEqual(ME_RIGHT)
+    expect(leftOf(rows[0])).toBeGreaterThanOrEqual(100 - ME_RIGHT - cols.me.width - 1e-9)
     for (const r of rows.slice(1)) {
-      expect(100 - r.bubble.right - r.bubble.width).toBeCloseTo(THEM_LEFT, 6)
+      expect(leftOf(r)).toBeGreaterThanOrEqual(THEM_LEFT - 1e-9)
+      expect(leftOf(r) + r.bubble.width).toBeLessThanOrEqual(THEM_LEFT + cols.them.width + 1e-9)
     }
+  })
+
+  // The zig-zag: a speaker's consecutive balloons alternate between the column's outer
+  // edge and a lean inward, so one of any two is flush and the other is not.
+  it('leans every other row of a speaker inward from the column’s edge', () => {
+    const [, around, hey] = rows
+    const flush = [around, hey].filter(r => Math.abs(leftOf(r) - THEM_LEFT) < 1e-9)
+    expect(flush).toHaveLength(1)
+  })
+
+  it('leans by the message’s place in the transcript, not its row on screen', () => {
+    // Scroll the window by one: message 1 moves up a row and keeps its lean.
+    const scrolled = conversationRows(visibleWindow(1, 6), lines, cols, false, M)
+    const before = rows.find(r => r.key === '1')
+    const after = scrolled.find(r => r.key === '1')
+    expect(after?.bubble.right).toBeCloseTo(before?.bubble.right ?? -1, 6)
   })
 
   it('sizes each row to its own message', () => {
-    expect(rows[1].bubble.width).toBeCloseTo(messageWidth('you around?', cols.them.width), 6)
-    expect(rows[2].bubble.width).toBeCloseTo(messageWidth('hey', cols.them.width), 6)
+    const min = cols.them.width * CHAIN_MIN_WIDTH_RATIO
+    const around = fitMessage('you around?', cols.them.type, cols.them.width, min, M)
+    expect(rows[1].bubble.width).toBeCloseTo(around.width, 6)
+    expect(rows[1].stretch).toBeCloseTo(around.stretch, 6)
     expect(rows[2].bubble.width).toBeLessThan(rows[1].bubble.width)
   })
 
-  it('packs rows by their visible ellipses instead of their tail-padded boxes', () => {
+  it('stretches a row whose message wraps, and no other', () => {
+    const long = 'x'.repeat(30)
+    const wrapped = conversationRows([1, 0], readTranscript(['hey', `> ${long} ${long}`]), cols, false, M)
+    expect(wrapped[0].stretch).toBeGreaterThan(1)
+    expect(wrapped[1].stretch).toBe(1)
+  })
+
+  it('anchors the bottom row on the sender template and climbs from there', () => {
     expect(rows[0].bubble.top).toBe(cols.me.top)
     for (let i = 1; i < rows.length; i += 1) {
-      const below = rows[i - 1].bubble
-      expect(rows[i].bubble.top).toBeCloseTo(chainRowTop(below, rows[i].bubble.width, 1), 6)
-      expect(rows[i].bubble.top).toBeGreaterThan(
-        below.top - bubbleHeightPct(below.width, 1) - CHAIN_ROW_GAP,
-      )
+      expect(rowEllipse(rows[i], 1).y2).toBeLessThan(rowEllipse(rows[i - 1], 1).y2)
     }
   })
 
+  // Rows may tuck in beside each other but never over each other: two ellipses that share
+  // any horizontal span keep the row gap between them.
+  it('never lets two balloons overlap, however they interleave', () => {
+    const many = readTranscript(['hey', 'you around?', '> just picked up', 'any luck?', '> some', 'ok'])
+    const table = conversationRows(visibleWindow(5, 6), many, cols, false, M)
+    for (let i = 0; i < table.length; i += 1) {
+      for (let j = i + 1; j < table.length; j += 1) {
+        const a = rowEllipse(table[i], 1)
+        const b = rowEllipse(table[j], 1)
+        if (a.x2 <= b.x1 || b.x2 <= a.x1) continue
+        expect(a.y1 - b.y2).toBeGreaterThanOrEqual(CHAIN_ROW_GAP - 1e-9)
+      }
+    }
+  })
+
+  // The other speaker's reply sits alongside the message it answers rather than wholly
+  // above it — this is what pulls the two columns together on the panel.
+  it('tucks a reply in beside the message it answers', () => {
+    const picked = rowEllipse(rows[0], 1)
+    const around = rowEllipse(rows[1], 1)
+    expect(around.y2).toBeGreaterThan(picked.y1)
+    expect(around.y2).toBeLessThan(picked.y2)
+  })
+
   it('links rows vertically within each speaker column only', () => {
-    expect(chainRowLinks(rows).map(pair => pair.map(row => row.key))).toEqual([['1', '0']])
+    expect(chainRowLinks(rows, 1).map(pair => pair.map(row => row.key))).toEqual([['1', '0']])
     const alternating = conversationRows(
       visibleWindow(3, 6),
       readTranscript(['in one', '> out one', 'in two', '> out two']),
       cols,
       false,
-      1,
+      M,
     )
-    expect(chainRowLinks(alternating).map(pair => pair.map(row => row.side))).toEqual([
+    expect(chainRowLinks(alternating, 1).map(pair => pair.map(row => row.side))).toEqual([
       ['out', 'out'],
       ['in', 'in'],
     ])
   })
 
   it('keeps the newest recipient stem on the template-authored panel point', () => {
-    const target = recipientStemTarget(cols.them, rows[1].bubble, 1)
-    const templateTarget = recipientStemTarget(cols.them, cols.them, 1)
+    const target = recipientStemTarget(cols.them, rows[1], 1)
+    const templateTarget = recipientStemTarget(cols.them, { bubble: cols.them, stretch: 1 }, 1)
     expect(target).not.toEqual(templateTarget)
     expect(target.every(Number.isFinite)).toBe(true)
+  })
+
+  it('aims the stem through a stretched row’s own height', () => {
+    // Unrotated, so the extra height moves the target straight down the SVG and not
+    // sideways through the balloon's tilt.
+    const row = { ...rows[1], bubble: { ...rows[1].bubble, rotate: 0 } }
+    const tall = recipientStemTarget(cols.them, { ...row, stretch: 2 }, 1)
+    const plain = recipientStemTarget(cols.them, { ...row, stretch: 1 }, 1)
+    expect(tall[0]).toBeCloseTo(plain[0], 6)
+    expect(tall[1]).not.toBeCloseTo(plain[1], 6)
   })
 
   it('leaves the tail on the newest balloon of each column and nowhere else', () => {
@@ -312,7 +359,7 @@ describe('conversationRows', () => {
       lines,
       { ...cols, me: tpl({ ...cols.me, content: 'input' }) },
       false,
-      1,
+      M,
     )
     expect(live.map(r => r.bubble.content)).toEqual(['text', 'text', 'text'])
   })
@@ -323,19 +370,29 @@ describe('conversationRows', () => {
 
   it('puts the composer in the bottom row of the sender’s column when the chain is live', () => {
     const me = tpl({ ...cols.me, content: 'input', text: 'Say something' })
-    const live = conversationRows([0], readTranscript(['hey']), { ...cols, me }, true, 1)
+    const live = conversationRows([0], readTranscript(['hey']), { ...cols, me }, true, M)
 
     expect(live.map(r => r.key)).toEqual(['composer', '0'])
     expect(live[0].bubble.content).toBe('input')
     expect(live[0].bubble.top).toBe(me.top)
+    // The composer is the template itself, drawn where the author put it: no lean.
     expect(live[0].bubble.right).toBe(me.right)
+    expect(live[0].stretch).toBe(1)
     // The composer is the sender still talking, so the message above it takes no second tail.
     expect(live[0].bubble.tail).toBe('down-left')
     expect(live[1].bubble.tail).toBe('down-right')
   })
 
+  it('draws every row at its narrowest with no lettering size to fit against', () => {
+    const blind = conversationRows(shown, lines, cols, false, { ...M, lettering: 0 })
+    for (const r of blind) {
+      expect(r.bubble.width).toBeCloseTo(40 * CHAIN_MIN_WIDTH_RATIO, 6)
+      expect(r.stretch).toBe(1)
+    }
+  })
+
   it('skips a window entry the transcript has nothing at', () => {
-    expect(conversationRows([9], lines, cols, false, 1)).toEqual([])
+    expect(conversationRows([9], lines, cols, false, M)).toEqual([])
   })
 })
 

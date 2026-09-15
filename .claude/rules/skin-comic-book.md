@@ -152,8 +152,9 @@ order, so one party saying two things takes two rows.
 **The members are templates, not slots.** The author draws one balloon per column — shape,
 tail, rotation, lettering, the column's edge — and every row is stamped from its side's
 template. Member 0 is the **sender**: rightmost, composer at its foot. Rows lay out
-bottom-up, each `top` the running sum of the heights below it, so a long message pushes the
-thread up by its own height; width follows the message (`messageWidth`).
+bottom-up by collision (`chainLayout.ts`): clear of what a row would overlap, tucked in
+beside what it would not, zig-zagging by message ordinal (`zigzagShift`), and **fitted to
+its words** from `letteringPx`, never the DOM (`bubbleFit.ts`): wider, then taller (`stretch`).
 `PANEL_BUBBLE_CHAINS` holds one entry per id in use and is **derived, not authored**
 (`syncChains`), so a chain with no members and a member with no chain are unreachable.
 
@@ -176,10 +177,9 @@ typed text — the panel's aspect is handed in with its box, never measured.
   **+ SMS**) establishes both balloons, their linkage, the chain id, the composer content
   and `sms: true` in one op, and is the *only* way to make one: the couplings all have to
   hold and none announce themselves broken. Hence `grow`/`stepMs` have no control.
-- **A chained balloon takes no tube** (a row holds whatever the transcript put there, so
-  a tube would join a different sentence each turn of the wheel) and **a chain is one
-  panel's** — `chainMembers` filters on panel as well as id. Same three-place enforcement
-  as the same-panel rule.
+- **A chained balloon takes no tube** (its sentence changes with every turn of the wheel)
+  and **a chain is one panel's** — `chainMembers` filters on panel as well as id. Same
+  three-place enforcement as the same-panel rule.
 - **Only up.** The window arithmetic assumes time runs upward; a horizontal chain needs a
   second axis in every one of those functions, not a CSS change.
 - **Keys are message indices, not row indices** — a message keeps its DOM node as it moves

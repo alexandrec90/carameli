@@ -1,7 +1,6 @@
-import {
-  bubbleHeightPct, chainColumns, chainIdsOn, chainMembers, chainRowTop, defaultChain,
-} from '../bubbleChain'
+import { chainColumns, chainIdsOn, chainMembers, defaultChain } from '../bubbleChain'
 import type { ChainColumns } from '../bubbleChain'
+import { bubbleHeightPct, chainRowTop } from '../chainLayout'
 import type { Rect } from '../panelGeometry'
 import type { BubbleChain, BubbleTransform } from './types'
 
@@ -17,7 +16,8 @@ import type { BubbleChain, BubbleTransform } from './types'
 // their placements and their click targets, and the extent they imply is drawn as chrome
 // beside them. It is an *estimate* — the real rows are as wide as their messages and as
 // tall as their lettering wraps, neither of which exists until there is a transcript — so
-// it is measured from a column-width balloon per row, which is the widest a row gets.
+// it is measured from a column-width, one-line balloon per row, stacked with no
+// interleaving: the tallest a table of that many rows gets short of a message that wraps.
 
 /** A conversation's extent over its panel box, in the same % units a bubble is placed in. */
 export interface ChainBox {

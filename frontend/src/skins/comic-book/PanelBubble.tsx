@@ -43,6 +43,14 @@ interface PanelBubbleProps {
    */
   chained?: boolean
   /**
+   * How much taller than its fixed aspect the balloon is drawn, to hold its words: 1 is
+   * the ordinary box, 2 twice its height. A chain row fitted to a long message asks for
+   * it (bubbleFit.ts). The outline SVG is stretched rather than re-authored, so the
+   * ellipse, tail, hit region and lettering inset all scale together and every morph
+   * still runs vertex-for-vertex.
+   */
+  stretch?: number
+  /**
    * This field owns panel-wide keyboard input while visible, so it focuses itself the
    * moment the panel reveals it. Decided by the panel (`panelKeyboard.ts`) and never
    * here: which balloon a keystroke belongs to depends on what else is drawn beside it,
@@ -126,6 +134,7 @@ export default function PanelBubble({
   visible,
   interactive,
   chained = false,
+  stretch = 1,
   keyboard,
   tailTarget,
   onHoverChange,
@@ -245,10 +254,15 @@ export default function PanelBubble({
       onFocusCapture={hasField && interactive ? () => setFocused(true) : undefined}
       onBlurCapture={hasField && interactive ? () => setFocused(false) : undefined}
     >
+      {/* `preserveAspectRatio="none"` is what lets `stretch` work: the viewBox stays the
+          authored 200×150 and the element is simply taller, so the ring is drawn
+          stretched. At 1 it is a no-op, since the box then matches the viewBox. The
+          ink stays even because the stroke is non-scaling (bubbles.css). */}
       <svg
         className="cb-panel-bubble-svg"
         viewBox={`0 0 ${BUBBLE_VIEW.w} ${BUBBLE_VIEW.h}`}
-        style={{ aspectRatio: `${BUBBLE_VIEW.w} / ${BUBBLE_VIEW.h}` }}
+        preserveAspectRatio="none"
+        style={{ aspectRatio: `${BUBBLE_VIEW.w} / ${BUBBLE_VIEW.h * stretch}` }}
         aria-hidden="true"
       >
         {/* No `d` prop by design — useBubbleMorph owns the attribute. */}

@@ -47,6 +47,9 @@ const chain = (over: Partial<BubbleChain> = {}): BubbleChain => ({
 /** The panel box the templates resolve against, sized so tubes and rows have room. */
 const BOX = { x: 0, y: 0, w: 400, h: 300 }
 
+/** A lettering size the box has room for: a column holds a short line on one row. */
+const LETTERING = 12
+
 const drawn = (container: HTMLElement) => [...container.querySelectorAll('.cb-panel-bubble')]
 
 const composer = () => screen.getByRole('textbox', { name: 'Speech bubble text' })
@@ -58,7 +61,7 @@ function bound(over: Partial<LiveConversation> = {}): LiveConversation {
 describe('PanelBubbleChain, bound to a real conversation', () => {
   it('draws the carrier’s messages and not the authored transcript', () => {
     const { container } = render(
-      <PanelBubbleChain box={BOX}
+      <PanelBubbleChain box={BOX} lettering={LETTERING}
         chain={chain({ messages: ['authored one', 'authored two'] })}
         members={columns()}
         visible
@@ -75,7 +78,7 @@ describe('PanelBubbleChain, bound to a real conversation', () => {
 
   it('puts an outbound message in the sender’s column and an inbound one in the recipient’s', () => {
     const { container } = render(
-      <PanelBubbleChain box={BOX}
+      <PanelBubbleChain box={BOX} lettering={LETTERING}
         chain={chain()}
         members={columns()}
         visible
@@ -100,7 +103,7 @@ describe('PanelBubbleChain, bound to a real conversation', () => {
   it('sends what the composer holds instead of keeping it', () => {
     const onSend = vi.fn()
     const { container } = render(
-      <PanelBubbleChain box={BOX}
+      <PanelBubbleChain box={BOX} lettering={LETTERING}
         chain={chain()}
         members={columns()}
         visible
@@ -121,7 +124,7 @@ describe('PanelBubbleChain, bound to a real conversation', () => {
 
   it('shows a message that arrives without anyone having typed', () => {
     const { container, rerender } = render(
-      <PanelBubbleChain box={BOX}
+      <PanelBubbleChain box={BOX} lettering={LETTERING}
         chain={chain()}
         members={columns()}
         visible
@@ -132,7 +135,7 @@ describe('PanelBubbleChain, bound to a real conversation', () => {
     expect(drawn(container)).toHaveLength(1)
 
     rerender(
-      <PanelBubbleChain box={BOX}
+      <PanelBubbleChain box={BOX} lettering={LETTERING}
         chain={chain()}
         members={columns()}
         visible
@@ -150,7 +153,7 @@ describe('PanelBubbleChain, bound to a real conversation', () => {
         smsMessage({ id: `m${i}`, text: `m${i}`, at: `2026-08-26T12:00:${String(i).padStart(2, '0')}Z` }),
       )
     const { rerender } = render(
-      <PanelBubbleChain box={BOX}
+      <PanelBubbleChain box={BOX} lettering={LETTERING}
         chain={chain()}
         members={columns()}
         visible
@@ -159,7 +162,7 @@ describe('PanelBubbleChain, bound to a real conversation', () => {
       />,
     )
     rerender(
-      <PanelBubbleChain box={BOX}
+      <PanelBubbleChain box={BOX} lettering={LETTERING}
         chain={chain()}
         members={columns()}
         visible
@@ -176,7 +179,7 @@ describe('PanelBubbleChain, bound to a real conversation', () => {
 
   it('marks a message the carrier has not taken yet', () => {
     const { container } = render(
-      <PanelBubbleChain box={BOX}
+      <PanelBubbleChain box={BOX} lettering={LETTERING}
         chain={chain()}
         members={columns()}
         visible
@@ -199,7 +202,7 @@ describe('PanelBubbleChain, bound to a real conversation', () => {
 
   it('marks a message that failed to send', () => {
     const { container } = render(
-      <PanelBubbleChain box={BOX}
+      <PanelBubbleChain box={BOX} lettering={LETTERING}
         chain={chain()}
         members={columns()}
         visible
@@ -217,7 +220,7 @@ describe('PanelBubbleChain, bound to a real conversation', () => {
   it('never shows the sender marker as part of a message', () => {
     // `> ` is how a *side* is spelled in a transcript, not something anyone typed.
     render(
-      <PanelBubbleChain box={BOX}
+      <PanelBubbleChain box={BOX} lettering={LETTERING}
         chain={chain()}
         members={columns()}
         visible

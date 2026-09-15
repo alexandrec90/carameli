@@ -237,8 +237,9 @@ export function imgClipStyle(spill: boolean, reveal: boolean, clip: string): CSS
 /**
  * On-screen box of a bubble, given the bounds of the panel it belongs to.
  * `top`/`right`/`width` are percentages of that panel box, and the height follows the
- * bubble's fixed aspect ratio — which is what
- * the DOM's `height: auto` resolves to, since the outline SVG carries a viewBox.
+ * bubble's fixed aspect ratio — which is what the DOM's `height: auto` resolves to,
+ * since the outline SVG carries a viewBox — times `stretch`, for a chain row drawn taller
+ * to hold its message (PanelBubble's prop of that name; 1 everywhere else).
  *
  * Shared deliberately: the renderer needs it to aim connector tubes and the editor
  * needs it for the hit target and selection outline. When those two disagreed, a
@@ -247,6 +248,7 @@ export function imgClipStyle(spill: boolean, reveal: boolean, clip: string): CSS
 export function bubbleRect(
   bounds: { x: number; y: number; w: number; h: number },
   t: Pick<BubbleTransform, 'top' | 'right' | 'width'>,
+  stretch = 1,
 ): { x: number; y: number; w: number; h: number } {
   const w = (t.width / 100) * bounds.w
   const rightX = bounds.x + bounds.w - (t.right / 100) * bounds.w
@@ -254,7 +256,7 @@ export function bubbleRect(
     x: rightX - w,
     y: bounds.y + (t.top / 100) * bounds.h,
     w,
-    h: w * BUBBLE_ASPECT,
+    h: w * BUBBLE_ASPECT * stretch,
   }
 }
 

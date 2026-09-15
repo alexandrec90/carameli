@@ -87,7 +87,7 @@ export const MAX_EAGER_BYTES = 316 * 1024
 /**
  * Ceiling for any single lazily-loaded chunk.
  *
- * Today's largest is the `comic-book` skin at 260.29 KB, ahead of `sip.js`'s web platform
+ * Today's largest is the `comic-book` skin at 262.55 KB, ahead of `sip.js`'s web platform
  * at 237.11 KB — the pair swapped places some raises ago and the note here went on naming
  * the softphone, so read the build rather than this sentence when it matters. A lazy chunk
  * is allowed to be much larger than an eager one — that is the whole trade the code
@@ -101,11 +101,20 @@ export const MAX_EAGER_BYTES = 316 * 1024
  * 46 chunks, `package.json` untouched. It is skin-local and lazy, so it is nobody's entry
  * cost, and it buys a background the eye can rest on for as long as a page stays open.
  *
- * The ceiling is 261 rather than flush against 260.29 for the reason {@link
+ * The ceiling was 261 rather than flush against 260.29 for the reason {@link
  * MAX_TOTAL_JS_BYTES} gives: the default branch runs no gate, so a number set against one
  * branch's build is passed by the next two that merge in parallel.
+ *
+ * This raise (261 → 264) is the SMS thread fitting each balloon to its words and snaking
+ * across the panel: 2.26 KB measured as this branch's merge of master (262.55 KB) against
+ * a build of the same checkout with the branch's frontend changes reverted (260.29 KB,
+ * same `node_modules` — the figure the paragraph above names for master). The bytes are
+ * `bubbleFit.ts` (the text-fit estimate, which wraps without measuring), `chainLayout.ts`
+ * (collision placement, interleave and zig-zag) and the row stamper in `bubbleChain.ts`
+ * that gives each row its own width, stretch and lean. Still 46 chunks, `package.json`
+ * untouched. 264 rather than 263 for the same reason as before: a kilobyte clear, not flush.
  */
-export const MAX_LAZY_CHUNK_BYTES = 261 * 1024
+export const MAX_LAZY_CHUNK_BYTES = 264 * 1024
 
 /**
  * Every `.js` file in `dist/assets/`, summed. Today 956.6 KB across 46 chunks; the
@@ -286,8 +295,14 @@ export const MAX_LAZY_CHUNK_BYTES = 261 * 1024
  * of one and the total within 0.2 KB of the other — a coincidence of timing rather than
  * two costs, and worth saying so, since a raise appearing in two constants at once
  * otherwise reads as a change twice the size of the one that happened.
+ *
+ * This raise (1022 → 1024) is the same 2.26 KB {@link MAX_LAZY_CHUNK_BYTES} carries, and
+ * nothing else: the SMS thread's text fit and collision layout, all in the lazy
+ * `comic-book` chunk. 1022.87 KB on this branch against 1020.61 KB with its frontend
+ * changes reverted; the two deltas are the same 2,312 bytes, so nothing landed outside
+ * that chunk. Still 46 chunks, `package.json` untouched.
  */
-export const MAX_TOTAL_JS_BYTES = 1022 * 1024
+export const MAX_TOTAL_JS_BYTES = 1024 * 1024
 
 /**
  * Every `.css` file in `dist/assets/`, summed. Today 44.2 KB across 2 files.
@@ -316,8 +331,30 @@ export const MAX_TOTAL_JS_BYTES = 1022 * 1024
  * the only thing that says a key is under the pointer, and the static tint it replaces
  * read as a button that had always been there rather than as light thrown onto a
  * photographed surface.
+ *
+ * Not a raise, but the record matters: the SMS thread's `overflow-wrap: anywhere` rule
+ * (`bubbleChains.css`) is 62 bytes against 0.21 KB of room. The same branch first
+ * measured 0.63 KB over its base, and 0.57 KB of that was `.ordinal` — Tailwind scans
+ * every `.ts` file under `src/` for class candidates, `ordinal` became a parameter name in
+ * `chainLayout.ts`, and so the `font-variant-numeric` utility, its five `@property`
+ * registrations and their defaults landed in the *eager* `index.css`, which every visitor
+ * downloads. `src/index.css` now declines the word with `@source not inline(...)`, and
+ * {@link STRAY_UTILITIES} is what fails if that line goes.
  */
 export const MAX_TOTAL_CSS_BYTES = 48 * 1024
+
+/**
+ * Utility classes the build must not contain.
+ *
+ * Tailwind reads every file its content globs name — every `.ts` and `.tsx` file under
+ * `src/` — for anything that could be a class name, identifiers and comments included, so
+ * a TypeScript parameter called `ordinal` is enough to emit `.ordinal`, its five
+ * `@property` registrations and their defaults: 0.57 KB in the eager stylesheet for a
+ * word no element carries. Each entry here is declined in `src/index.css` with
+ * `@source not inline(...)`; {@link strayUtilities} against the real build is what
+ * notices when that line goes, or when a new one is needed.
+ */
+export const STRAY_UTILITIES: readonly string[] = ['ordinal']
 
 /**
  * Every webfont in `dist/assets/`, summed. Today 231 KB: five weights of Outfit, each
@@ -428,6 +465,29 @@ export function readEagerAssetUrls(): string[] {
   return findEagerAssetUrls(readFileSync(DIST_INDEX_HTML, 'utf-8'))
 }
 
+/** Every stylesheet in `dist/assets/`, joined — one string to search for a selector. */
+export function readBuiltCss(): string {
+  return listBuiltAssets()
+    .filter(asset => asset.ext === '.css')
+    .map(asset => readFileSync(path.join(DIST_ASSETS_DIR, asset.name), 'utf-8'))
+    .join('\n')
+}
+
+/** `text` as a regex source that matches itself literally. */
+const escapeRegExp = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+/**
+ * Which of `utilities` the stylesheet `css` still has a class selector for.
+ *
+ * A match is `.name` followed by anything that cannot continue a class name, so
+ * `.ordinal{`, `.ordinal:hover` and `.ordinal,` count and `.ordinals` and `.ordinal-x` do
+ * not — a stray utility is the exact word, and a project class that merely starts with
+ * it is not the finding.
+ */
+export function strayUtilities(css: string, utilities: readonly string[]): string[] {
+  return utilities.filter(name => new RegExp(`\\.${escapeRegExp(name)}(?![\\w-])`).test(css))
+}
+
 /**
  * The chunk a skin was split into, found by name.
  *
@@ -439,8 +499,7 @@ export function readEagerAssetUrls(): string[] {
  * folded into the eager entry, which is the regression being looked for.
  */
 export function findSkinChunk(assets: readonly BuiltAsset[], skin: string): BuiltAsset | undefined {
-  const literal = skin.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-  const pattern = new RegExp(`^${literal}-[A-Za-z0-9_-]{${CHUNK_HASH_LENGTH}}\\.js$`)
+  const pattern = new RegExp(`^${escapeRegExp(skin)}-[A-Za-z0-9_-]{${CHUNK_HASH_LENGTH}}\\.js$`)
   return assets.find(asset => pattern.test(asset.name))
 }
 
