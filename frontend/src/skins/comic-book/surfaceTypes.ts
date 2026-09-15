@@ -62,6 +62,19 @@ export interface TableProjection extends ProjectedSurface {
   rows: number
   /** Spend the first band on the column headings. */
   header: boolean
+  /**
+   * Where each band's foot falls, as a fraction of the surface's height: `rows + 1`
+   * values from 0 to 1, strictly increasing, the first the surface's top edge and the
+   * last its bottom. **Absent** for equal bands, which is what a typed row count means.
+   *
+   * Present, it is measured rather than typed: the editor's *Fit to ruled lines* reads
+   * the ruling off the picture's own pixels and records where each drawn line sits in the
+   * surface's un-projected space, so a drawing whose lines are not quite evenly spaced —
+   * every hand-drawn one — still has every row *on* a line rather than near one. A list
+   * that does not match `rows` is ignored, so retyping the row count falls back to equal
+   * bands rather than to a ruling for a different count.
+   */
+  lines?: number[]
   /** The columns, left to right. */
   columns: TableColumn[]
   /**

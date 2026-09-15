@@ -41,7 +41,10 @@ function draw(over: Partial<TableProjection> = {}, editing = false) {
     )
   const rows = () => Array.from(view.container.querySelectorAll('tbody tr'))
   const band = () => view.container.querySelector('.cb-ptable-band') as HTMLElement | null
-  return { ...view, surface, names, rows, band }
+  /** Where band `k`'s top falls on this surface, in the px the wash is placed in. */
+  const bandTop = (k: number, rowCount = 5) =>
+    `${(k / rowCount) * Number.parseFloat(surface!.style.height)}px`
+  return { ...view, surface, names, rows, band, bandTop }
 }
 
 describe('ProjectedTable', () => {
@@ -259,13 +262,14 @@ describe('ProjectedTable row highlight', () => {
     const view = draw()
     fireEvent.pointerEnter(view.rows()[2])
     // Band 3: the heading takes band 0, so the third body row is the fourth band down.
-    expect(view.band()!.style.top).toBe('calc(var(--cb-ptable-row) * 3)')
+    expect(view.band()!.style.top).toBe(view.bandTop(3))
+    expect(view.band()!.style.height).toBe(view.bandTop(1))
   })
 
   it('counts the heading out of the bands when the author turns it off', () => {
     const view = draw({ header: false })
     fireEvent.pointerEnter(view.rows()[2])
-    expect(view.band()!.style.top).toBe('calc(var(--cb-ptable-row) * 2)')
+    expect(view.band()!.style.top).toBe(view.bandTop(2))
   })
 
   it('clears the band when the pointer leaves', () => {
@@ -281,7 +285,7 @@ describe('ProjectedTable row highlight', () => {
     fireEvent.pointerLeave(view.rows()[0])
     fireEvent.pointerEnter(view.rows()[3])
     expect(view.container.querySelectorAll('.cb-ptable-band')).toHaveLength(1)
-    expect(view.band()!.style.top).toBe('calc(var(--cb-ptable-row) * 4)')
+    expect(view.band()!.style.top).toBe(view.bandTop(4))
   })
 
   /*
@@ -305,8 +309,43 @@ describe('ProjectedTable row highlight', () => {
     fireEvent.wheel(view.surface!, { deltaY: WHEEL_ROW_PX })
     // The band is the thing the pointer is on, and a band does not move: the rows slide
     // through it. The band stays where the pointer is, over whatever is written there now.
-    expect(view.band()!.style.top).toBe('calc(var(--cb-ptable-row) * 2)')
+    expect(view.band()!.style.top).toBe(view.bandTop(2))
     expect(view.rows()[1].textContent).toContain('name 2')
+  })
+
+  /*
+   * A fitted surface: the bands are where the drawing's lines are, not equal fifths. The
+   * row's own height and the wash behind it are read off the same list, so both land on
+   * the drawn line — the claim is checked on both, from the one `lines` array.
+   */
+  it('gives each row, and the wash behind it, the height of its own drawn band', () => {
+    const lines = [0, 0.18, 0.4, 0.6, 0.79, 1]
+    const view = draw({ lines })
+    const height = Number.parseFloat(view.surface!.style.height)
+    const bandPx = (k: number) => (lines[k + 1]! - lines[k]!) * height
+
+    const head = view.container.querySelector('thead tr') as HTMLElement
+    expect(Number.parseFloat(head.style.getPropertyValue('--cb-ptable-row'))).toBeCloseTo(bandPx(0), 6)
+    view.rows().forEach((el, i) => {
+      const tr = el as HTMLElement
+      expect(Number.parseFloat(tr.style.getPropertyValue('--cb-ptable-row')), `row ${i}`)
+        .toBeCloseTo(bandPx(i + 1), 6)
+      expect(Number.parseFloat(tr.style.getPropertyValue('--cb-ptable-sit')), `row ${i} sit`)
+        .toBeCloseTo(bandPx(i + 1) * BAND_SIT, 6)
+    })
+
+    fireEvent.pointerEnter(view.rows()[2])
+    expect(Number.parseFloat(view.band()!.style.top)).toBeCloseTo(lines[3]! * height, 6)
+    expect(Number.parseFloat(view.band()!.style.height)).toBeCloseTo(bandPx(3), 6)
+  })
+
+  it('ignores a fitted ruling that was measured for a different row count', () => {
+    const view = draw({ lines: [0, 0.5, 1] })
+    const height = Number.parseFloat(view.surface!.style.height)
+    view.rows().forEach(el => {
+      const tr = el as HTMLElement
+      expect(Number.parseFloat(tr.style.getPropertyValue('--cb-ptable-row'))).toBeCloseTo(height / 5, 6)
+    })
   })
 
   /*

@@ -4,11 +4,13 @@ import type { CSSProperties, WheelEvent as ReactWheelEvent } from 'react'
 import type { TableProjection } from './editor/types'
 import {
   BAND_SIT,
+  bandSpan,
   bodyRows,
   clampScroll,
   columnPercents,
   filledRows,
   maxScroll,
+  rowBand,
   visibleRows,
   wheelDeltaPx,
   wheelRows,
@@ -40,11 +42,19 @@ interface RowPointer {
 function Row({
   cells,
   aligns,
+  bandPx,
   head,
   pointer,
 }: {
   cells: string[]
   aligns: TableProjection['columns'][number]['align'][]
+  /**
+   * This row's own band height, in px. Set on the row rather than once on the surface
+   * because the bands need not be equal: a fitted surface (`table.lines`) gives each row
+   * the height of the drawn band it sits in, and the cells read the value through
+   * inheritance — the same custom property, one level closer.
+   */
+  bandPx: number
   head?: boolean
   /**
    * Present on a row a reader can point at — a body row with data behind it. Absent on
@@ -54,9 +64,14 @@ function Row({
   pointer?: RowPointer
 }) {
   const Cell = head ? 'th' : 'td'
+  const band: CSSProperties = {
+    ['--cb-ptable-row' as string]: `${bandPx}px`,
+    ['--cb-ptable-sit' as string]: `${bandPx * BAND_SIT}px`,
+  }
   return (
     <tr
       className={pointer ? 'cb-ptable-row' : undefined}
+      style={band}
       onPointerEnter={pointer?.onEnter}
       onPointerLeave={pointer?.onLeave}
     >
@@ -131,6 +146,10 @@ export default function ProjectedTable({ table, base, editing }: ProjectedTableP
     onLeave: () => setHovered(prev => (prev === i ? null : prev)),
   })
 
+  // Each band's height in px, from the one list the highlight is placed by too. Equal
+  // bands unless the surface was fitted to the picture's ruling (`table.lines`).
+  const bandPx = (k: number) => bandSpan(table, k).height * height
+
   const surface: CSSProperties = {
     left,
     top,
@@ -138,12 +157,17 @@ export default function ProjectedTable({ table, base, editing }: ProjectedTableP
     height,
     transform,
     color: table.ink,
+    // Lettering is sized from the *mean* band so every row reads at one size: a fitted
+    // surface's bands differ by a few percent, and text that changed size row by row
+    // would read as the bug it was there to hide.
     fontSize: `${rowH * table.fontScale}px`,
     // Bands are what the row count means, so the cells are sized from it rather than
     // from their contents: a tall cell would push every row below it off its line. The
     // gap above the line is the same rule applied to the one thing inside a cell that
     // can outgrow the band — a fraction of the band, resolved here rather than in the
-    // stylesheet, so the arithmetic that keeps it inside is testable.
+    // stylesheet, so the arithmetic that keeps it inside is testable. These are the mean
+    // band; every row restates them with its own height (see Row), which is the same
+    // value everywhere unless the surface has been fitted.
     ['--cb-ptable-row' as string]: `${rowH}px`,
     ['--cb-ptable-sit' as string]: `${rowH * BAND_SIT}px`,
     // The band is washed in the authored ink. It rides as a custom property rather than
@@ -167,7 +191,7 @@ export default function ProjectedTable({ table, base, editing }: ProjectedTableP
         {/* Ahead of the table in the DOM, which is what puts the wash behind the
             lettering: the band is positioned and the table is too, so the pair paint in
             document order — the same rule that decides which picture is in front. */}
-        <TableRowBand table={table} row={lit} />
+        <TableRowBand table={table} row={lit} height={height} />
         <table className="cb-ptable">
           <colgroup>
             {percents.map((pct, i) => (
@@ -176,7 +200,7 @@ export default function ProjectedTable({ table, base, editing }: ProjectedTableP
           </colgroup>
           {table.header && (
             <thead>
-              <Row cells={table.columns.map(c => c.label)} aligns={aligns} head />
+              <Row cells={table.columns.map(c => c.label)} aligns={aligns} bandPx={bandPx(0)} head />
             </thead>
           )}
           <tbody>
@@ -185,6 +209,7 @@ export default function ProjectedTable({ table, base, editing }: ProjectedTableP
                 key={i}
                 cells={cells}
                 aligns={aligns}
+                bandPx={bandPx(rowBand(table, i))}
                 pointer={i < filled ? rowPointer(i) : undefined}
               />
             ))}
