@@ -4,6 +4,12 @@
    keyframes/animations defined there. */
 @config "../tailwind.config.js";
 
+/* Tailwind reads every `.ts` file under `src/` for class candidates, identifiers and
+   comments included, so a parameter named `ordinal` is enough to emit `.ordinal` and its
+   five `@property` registrations into this eager sheet. Each word here is one that showed
+   up that way; `STRAY_UTILITIES` in bundlePolicy.ts asserts the build stays without them. */
+@source not inline("ordinal");
+
 /* ─── Design Tokens ─────────────────────────────────────────────────────────── */
 
 :root {

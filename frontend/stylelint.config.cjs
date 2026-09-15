@@ -13,6 +13,7 @@ module.exports = {
           'apply',
           'layer',
           'config',
+          'source',
           'variants',
           'responsive',
           'screen',

@@ -29,14 +29,17 @@ import {
   MAX_TOTAL_JS_BYTES,
   MIN_EXPECTED_JS_CHUNKS,
   NO_DIST_MESSAGE,
+  STRAY_UTILITIES,
   chunkHashLooksRight,
   distExists,
   findEagerAssetUrls,
   findSkinChunk,
   isFont,
   listBuiltAssets,
+  readBuiltCss,
   readEagerAssetUrls,
   skinChunksAreLazy,
+  strayUtilities,
   totalBytes,
 } from './bundlePolicy'
 import type { BuiltAsset } from './bundlePolicy'
@@ -172,6 +175,32 @@ describe('totalBytes and isFont', () => {
   })
 })
 
+describe('strayUtilities', () => {
+  const minified = '.cb-ordinal{color:red}.ordinal{--tw-ordinal:ordinal}.ordinals,.grid{display:grid}'
+
+  it('finds a utility emitted as its own rule', () => {
+    expect(strayUtilities(minified, ['ordinal'])).toEqual(['ordinal'])
+  })
+
+  it('finds a utility in a selector list or with a pseudo-class', () => {
+    expect(strayUtilities('.a,.grid:hover{display:grid}', ['grid'])).toEqual(['grid'])
+  })
+
+  it('does not mistake a longer class name for the utility', () => {
+    expect(strayUtilities(minified, ['ordinals', 'cb'])).toEqual(['ordinals'])
+    expect(strayUtilities('.cb-ordinal{}.ordinals{}', ['ordinal'])).toEqual([])
+  })
+
+  it('reports nothing for a stylesheet without them', () => {
+    expect(strayUtilities('.cb-panel{inset:0}', ['ordinal', 'grid'])).toEqual([])
+  })
+
+  it('treats regex metacharacters in a utility name literally', () => {
+    expect(strayUtilities('.w-1\\/2{width:50%}', ['w-1\\/2'])).toEqual(['w-1\\/2'])
+    expect(strayUtilities('.w-1x2{width:50%}', ['w-1.2'])).toEqual([])
+  })
+})
+
 describe('the build', () => {
   it('exists, so no budget below can pass by measuring nothing', () => {
     expect(distExists(), NO_DIST_MESSAGE).toBe(true)
@@ -284,6 +313,18 @@ describe('the build', () => {
         'budget. Tailwind is scanned per build, so this grows with the classes actually ' +
         'used rather than with the framework.',
     ).toBeLessThanOrEqual(MAX_TOTAL_CSS_BYTES)
+  })
+
+  it('emits no utility class that only a TypeScript identifier asked for', () => {
+    const stray = distExists() ? strayUtilities(readBuiltCss(), STRAY_UTILITIES) : []
+    expect(
+      stray,
+      'The build contains a Tailwind utility that no element carries — a word in a `.ts` ' +
+        'file matched a class name and the content scan emitted the rule, plus its ' +
+        '`@property` registrations, into the eager stylesheet. `src/index.css` declines ' +
+        'each of these with `@source not inline(...)`; restore the line rather than ' +
+        'shrinking STRAY_UTILITIES.',
+    ).toEqual([])
   })
 
   it('keeps webfonts within budget', () => {
