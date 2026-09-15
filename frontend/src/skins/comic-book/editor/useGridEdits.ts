@@ -71,11 +71,12 @@ export interface GridEdits {
   deletePanel(panel: number, kind: LayoutKind): boolean
 }
 
-export function useGridEdits(
-  apply: ApplyOp,
-  setSelected: SetSelection,
-  config: EditorConfig,
-): GridEdits {
+/**
+ * The two whole-grid replacements. Neither can be refused — a grid handed in is already a
+ * grid and the shipped default always exists — so these answer with nothing rather than
+ * with a boolean, and the panel list they sit beside is the half that can say no.
+ */
+function useGridShape(apply: ApplyOp, setSelected: SetSelection) {
   const setGridFor = useCallback(
     (page: PanelPage, kind: LayoutKind, grid: PanelGrid) =>
       apply(prev => setGridKeepingContent(prev, page, kind, grid, frameFor(kind))),
@@ -92,10 +93,19 @@ export function useGridEdits(
     [apply, setSelected],
   )
 
-  // Computed against the rendered config rather than inside `apply`'s updater, because
-  // the caller needs the answer now — a refused cut is reported in the inspector, and a
-  // functional update cannot hand a boolean back out. Nothing else edits the config
-  // between a click and its handler, so the two are the same object.
+  return useMemo(() => ({ setGridFor, resetGridFor }), [setGridFor, resetGridFor])
+}
+
+/**
+ * The four edits that add a panel to the list or take one off it, each answering now so
+ * the inspector can say why nothing happened.
+ *
+ * Computed against the rendered config rather than inside `apply`'s updater, because the
+ * caller needs that answer now: a refused cut is reported in the inspector, and a
+ * functional update cannot hand a boolean back out. Nothing else edits the config between
+ * a click and its handler, so the two are the same object.
+ */
+function usePanelList(apply: ApplyOp, setSelected: SetSelection, config: EditorConfig) {
   const splitPanel = useCallback(
     (panel: number, axis: CutAxis, kind: LayoutKind): boolean => {
       const result = splitPanelIn(config, panel, axis, { kind, frame: frameFor(kind) })
@@ -110,8 +120,6 @@ export function useGridEdits(
     [apply, config, setSelected],
   )
 
-  // The same shape as `splitPanel`, for the same reason: each answers now, so the
-  // inspector can say why nothing happened.
   const hidePanelOn = useCallback(
     (panel: number, kind: LayoutKind): boolean => {
       const result = hidePanelOnIn(config, panel, kind, { kind, frame: frameFor(kind) })
@@ -157,7 +165,17 @@ export function useGridEdits(
   )
 
   return useMemo(
-    () => ({ setGridFor, resetGridFor, splitPanel, hidePanelOn, showPanelOn, deletePanel }),
-    [setGridFor, resetGridFor, splitPanel, hidePanelOn, showPanelOn, deletePanel],
+    () => ({ splitPanel, hidePanelOn, showPanelOn, deletePanel }),
+    [splitPanel, hidePanelOn, showPanelOn, deletePanel],
   )
+}
+
+export function useGridEdits(
+  apply: ApplyOp,
+  setSelected: SetSelection,
+  config: EditorConfig,
+): GridEdits {
+  const shape = useGridShape(apply, setSelected)
+  const list = usePanelList(apply, setSelected, config)
+  return useMemo(() => ({ ...shape, ...list }), [shape, list])
 }
