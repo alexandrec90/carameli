@@ -7,7 +7,7 @@ import EditorOverlay from '../../skins/comic-book/editor/EditorOverlay'
 import { addCallScene } from '../../skins/comic-book/editor/callSceneCreate'
 import { seedConfig } from '../../skins/comic-book/editor/configSeed'
 import type { EditorConfig } from '../../skins/comic-book/editor/types'
-import type { EditorModeApi } from '../../skins/comic-book/editor/useEditorMode'
+import type { EditorModeApi } from '../../skins/comic-book/editor/editorContext'
 import { frameRect } from '../../skins/comic-book/panelGeometry'
 import type { PanelPoly, Rect } from '../../skins/comic-book/panelGeometry'
 

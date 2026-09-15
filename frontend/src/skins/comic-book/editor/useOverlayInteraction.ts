@@ -14,7 +14,7 @@ import {
   scaleImg,
 } from './transforms'
 import type { BubbleTransform, ImgTransform } from './types'
-import type { EditorModeApi } from './useEditorMode'
+import type { EditorModeApi } from './editorContext'
 import { useOverlayKeyboard } from './useOverlayKeyboard'
 
 /**

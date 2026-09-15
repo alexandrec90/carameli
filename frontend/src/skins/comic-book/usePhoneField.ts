@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import type { ChangeEvent, KeyboardEvent, RefObject } from 'react'
-import type { CountryCode } from 'libphonenumber-js/min'
+import type { CountryCode } from 'libphonenumber-js/core'
 
 import {
   caretAfterDigits,

@@ -3,78 +3,32 @@ import { useCallback, useMemo, useState } from 'react'
 import type { LayoutKind } from '../panelGeometry'
 import { setPanelLabel as setPanelLabelIn } from './configPanels'
 import { setPageLabel as setPageLabelIn } from './configPages'
+import type { EditorModeApi } from './editorContext'
 import { detectActive } from './editorStorage'
 import type { EditMode, Selection, SelectionKind } from './selection'
 import { useCallEdits } from './useCallEdits'
-import type { CallEdits } from './useCallEdits'
 import { useContentEdits } from './useContentEdits'
-import type { ApplyOp, ContentEdits } from './useContentEdits'
+import type { ApplyOp } from './useContentEdits'
 import { useGridEdits } from './useGridEdits'
-import type { GridEdits } from './useGridEdits'
 import { useWorkingCopy } from './useWorkingCopy'
-import type { ConfigDrift } from './configDrift'
-import type { EditorConfig } from './types'
 
 // The pure operations on a config live in ./configOps.ts and ./panelGridOps.ts, the
 // mutators in ./useContentEdits.ts, ./useCallEdits.ts and ./useGridEdits.ts, the browser
 // edges in ./editorStorage.ts and the working copy's own state in ./useWorkingCopy.ts;
 // this module is the React state between them — the edit flag, the selection, and which
 // half of the editor is in front.
+//
+// **Nothing on the drawn page may import this module for a value.** It is the root of the
+// engine, and one value edge from `Layout.tsx` put all of it in the production bundle for
+// five consecutive ceiling raises — see ./editorContext.ts, which is what the page imports
+// instead and which carries the whole account. The page gets here through
+// ./EditorProvider.tsx and a DEV-gated `lazy()`, or it does not get here at all.
 
-export type { EditMode, Selection, SelectionKind } from './selection'
-
-export interface EditorModeApi extends ContentEdits, CallEdits, GridEdits {
-  active: boolean
-  config: EditorConfig
-  /**
-   * True when this working copy was hydrated from a different `layoutConfig.ts` than the
-   * one the bundle holds — a merge, a checkout or another tab's Save moved the file under
-   * it — so writing it out would revert whatever changed there. See ./configStamp.ts.
-   */
-  stale: boolean
-  /**
-   * What the file gained since this copy started, per panel — the detail under `stale`, or
-   * null for a copy that cannot say. See ./configDrift.ts.
-   */
-  drift: ConfigDrift | null
-  /** True for a copy carrying no record of the file it came from, so drift is unknowable. */
-  untracked: boolean
-  /** Take the file's version of one panel, keeping this tab's work on the others. */
-  adoptFromFile(panel: number): void
-  selected: Selection | null
-  mode: EditMode
-  setMode(mode: EditMode): void
-  /**
-   * The window shape the page is being held at, or null to follow the window. A page has
-   * one grid per shape and the frame is letterboxed at that shape's aspect whatever the
-   * window's, so an author tunes the portrait grid on a landscape monitor by picking it
-   * here rather than by dragging the window narrow. Transient: it is a way of looking,
-   * not part of the design, so it is neither saved nor persisted.
-   */
-  shape: LayoutKind | null
-  setShape(shape: LayoutKind | null): void
-  select(kind: SelectionKind, index: number): void
-  clear(): void
-  resetAll(): void
-  /** Rename one panel. */
-  setPanelLabel(panel: number, label: string): void
-  /** Override one route's display name for this skin. */
-  setPageLabel(path: string, label: string): void
-}
-
-/**
- * True when picture `index` should render unclipped (a "full reveal") for framing: the
- * editor is active and that picture is the current selection. PanelImages uses this to
- * drop the frame clip on the selected picture so the whole of it stays visible while
- * you drag/zoom it — the outline SVG still marks where the crop lands.
- */
-export function shouldRevealImg(
-  active: boolean,
-  selected: EditorModeApi['selected'],
-  index: number,
-): boolean {
-  return active && selected?.kind === 'img' && selected.index === index
-}
+// No type re-exports here any more. They used to let a caller reach `EditorModeApi`, and
+// `Selection` behind it, through the engine's own module — harmless while the types were
+// declared here, and exactly the habit that made the value import in `Layout.tsx` look
+// ordinary. Types come from ./editorContext.ts and ./selection.ts, which is where they
+// are, and this module exports the engine and nothing else.
 
 /** The two renames: a panel's name and a route's display name, each a config op. */
 function useLabelEdits(apply: ApplyOp) {
@@ -112,8 +66,13 @@ function useHeldShape(
  * transforms and grids (seeded from constants, persisted to localStorage), a current
  * selection, and mutators. Inert (active: false) outside `import.meta.env.DEV` / the
  * edit flag.
+ *
+ * Called from ./EditorProvider.tsx and from tests, and from nowhere on the page: the name
+ * says "engine" rather than "mode" because calling it is what decides whether every module
+ * below it is downloaded by a visitor who has no editor. `useEditorMode` is now the
+ * context reader in ./editorContext.ts, which is the one the page is meant to reach for.
  */
-export function useEditorMode(): EditorModeApi {
+export function useEditorEngine(): EditorModeApi {
   const [active] = useState(detectActive)
   const copy = useWorkingCopy(active)
   const { config, apply } = copy

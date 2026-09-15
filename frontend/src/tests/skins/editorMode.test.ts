@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { resolveEditFlag } from '../../skins/comic-book/editor/editorStorage'
-import { shouldRevealImg } from '../../skins/comic-book/editor/useEditorMode'
+import { shouldRevealImg } from '../../skins/comic-book/editor/editorContext'
 
 // The pure parts of the editor-mode hook. Everything that edits the config itself
 // lives in configOps.ts and is covered by editorConfigOps.test.ts.

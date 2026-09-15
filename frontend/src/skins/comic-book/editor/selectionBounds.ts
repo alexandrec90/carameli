@@ -1,7 +1,7 @@
 import { splitAt } from '../callSceneGeometry'
 import { callSceneOn, halfFor } from '../callSceneRoles'
 import type { PanelPoly } from '../panelGeometry'
-import type { EditorModeApi } from './useEditorMode'
+import type { EditorModeApi } from './editorContext'
 
 /**
  * Box the current selection is measured against: the box of the panel the selected entry

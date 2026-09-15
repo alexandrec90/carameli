@@ -2,7 +2,7 @@ import { FONT_SCALE } from '../tableData'
 import { newNumberPad } from './numberPadValidate'
 import QuadCorners from './QuadCorners'
 import type { ImgTransform, NumberPadProjection } from './types'
-import type { EditorModeApi } from './useEditorMode'
+import type { EditorModeApi } from './editorContext'
 
 interface NumberPadInspectorProps {
   api: EditorModeApi

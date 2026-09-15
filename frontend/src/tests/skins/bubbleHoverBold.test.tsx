@@ -10,7 +10,7 @@ import { NEW_BUBBLE, seedConfig } from '../../skins/comic-book/editor/configSeed
 import { PANEL_BUBBLE_TRANSFORMS } from '../../skins/comic-book/editor/layoutConfig'
 import { serializeConfig } from '../../skins/comic-book/editor/serialize'
 import type { BubbleTransform } from '../../skins/comic-book/editor/types'
-import type { EditorModeApi } from '../../skins/comic-book/editor/useEditorMode'
+import type { EditorModeApi } from '../../skins/comic-book/editor/editorContext'
 import { idleSms } from './smsStub'
 
 /** The box a balloon's percentages are measured against — the panel's, or half of one. */

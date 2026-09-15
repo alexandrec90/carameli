@@ -5,7 +5,7 @@ import { LIVE_TABLE_FEEDS } from '../../lib/liveTables'
 import { seedConfig } from '../../skins/comic-book/editor/configSeed'
 import TableInspector from '../../skins/comic-book/editor/TableInspector'
 import { liveTable, newTable } from '../../skins/comic-book/editor/tableValidate'
-import type { EditorModeApi } from '../../skins/comic-book/editor/useEditorMode'
+import type { EditorModeApi } from '../../skins/comic-book/editor/editorContext'
 
 function editorApi() {
   return { setImg: vi.fn() } as unknown as EditorModeApi

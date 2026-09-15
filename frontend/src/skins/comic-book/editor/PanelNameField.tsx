@@ -1,4 +1,4 @@
-import type { EditorModeApi } from './useEditorMode'
+import type { EditorModeApi } from './editorContext'
 
 // A panel's name, editable wherever a panel is what is selected — which is both halves of
 // the editor, not one. ./InspectorPanel.tsx has offered it in content mode since the names

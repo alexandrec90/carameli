@@ -5,7 +5,7 @@ import ImageInspector from '../../skins/comic-book/editor/ImageInspector'
 import { seedConfig } from '../../skins/comic-book/editor/configSeed'
 import { newNumberPad } from '../../skins/comic-book/editor/numberPadValidate'
 import { newTable } from '../../skins/comic-book/editor/tableValidate'
-import type { EditorModeApi } from '../../skins/comic-book/editor/useEditorMode'
+import type { EditorModeApi } from '../../skins/comic-book/editor/editorContext'
 
 function editorApi() {
   return { config: seedConfig(), setImg: vi.fn() } as unknown as EditorModeApi
