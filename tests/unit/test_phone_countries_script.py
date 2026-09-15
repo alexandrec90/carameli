@@ -228,12 +228,12 @@ def fake_psycopg(monkeypatch):
         def format(self, **kwargs) -> Composed:
             return Composed(self.template.format(**kwargs))
 
-    psycopg = types.ModuleType("psycopg")
-    psycopg.connect = lambda url: FakeConnection(queries)  # type: ignore[attr-defined]
+    # Attributes go in through the module namespace: a `ModuleType` has no typed
+    # attributes, so assigning them by name would need a type-checker suppression each.
     sql = types.ModuleType("psycopg.sql")
-    sql.SQL = SQL  # type: ignore[attr-defined]
-    sql.Identifier = Identifier  # type: ignore[attr-defined]
-    psycopg.sql = sql  # type: ignore[attr-defined]
+    vars(sql).update({"SQL": SQL, "Identifier": Identifier})
+    psycopg = types.ModuleType("psycopg")
+    vars(psycopg).update({"connect": lambda url: FakeConnection(queries), "sql": sql})
     monkeypatch.setitem(sys.modules, "psycopg", psycopg)
     monkeypatch.setitem(sys.modules, "psycopg.sql", sql)
     return queries
@@ -247,8 +247,8 @@ def test_fetch_numbers_reads_every_column_that_holds_one(fake_psycopg):
 
 
 def test_fetch_numbers_composes_identifiers_rather_than_interpolating(fake_psycopg):
-    # The reason there is no `# noqa: S608` on that query: the table and column names go
-    # in as identifiers, so the rule has nothing to say and no reader has to check.
+    # The reason the query carries no S608 suppression: the table and column names go in
+    # as identifiers, so the rule has nothing to say and no reader has to check.
     mod.fetch_numbers("postgresql://localhost/x")
     rendered = [str(q) for q in fake_psycopg]
     assert any('"phone_lines"' in q and '"phone_number"' in q for q in rendered)
