@@ -504,6 +504,24 @@ different images can only crossfade. A new bubble type belongs in `bubbleShape.t
 `export const` blocks on the clipboard; **.ts** downloads a complete `layoutConfig.ts`.
 Both are used automatically if the Save endpoint or clipboard is unavailable.
 
+## Toolbar controls at a glance
+
+The walkthrough above is the long form; this is the same set as one table, and is what
+`.claude/rules/skin-comic-book.md` points at rather than restating.
+
+| Control | Notes |
+| --- | --- |
+| Call layout | **Default** / **Ringing** / **Connected**, present once the page has a call; on Default the call's entries are off screen with no targets or drags. A **call role** select puts an entry in the layout and moves the page to it, or nothing would appear to have happened; **call seam** / **call split** cut the panel, bounded by `CALL_CUT` since an edge cut leaves a half with no area to drag back |
+| Chain | **rows**, and **messages** on an *unbound* chain only. Chained balloons render flat in edit mode so each stays selectable, and the table's extent is a dashed frame (`chainFrame.ts`) |
+| Table corners | four grips, content mode only, band guides following — align the guides to the ruling in the photograph. Their exact coordinates are a folded section (`QuadCorners.tsx`), shared with the number pad |
+| Prose | **The inspector explains itself in `?` badges, not paragraphs** (`Hint.tsx`), and its set-once blocks fold (`Section.tsx`). `useToolbarColumns` turns toolbar height into toolbar *width*, so a paragraph left in the flow is paid for in screen area — a notepad with a table on it put the panel across most of the page. A hint an author must **act** on — a refused split, a chain with no number to bind to, the stale-file notices — stays a block |
+| Mode | **Content** / **Panel shapes**. Picture and bubble click targets are not rendered in shapes mode — a picture-sized target would swallow every drag aimed at a line crossing it |
+| Shape | **Follow the window** or one of the three; holds the page at that shape's frame in any window, so every grid is reachable without resizing (`ShapeSelect.tsx`; transient, never saved) |
+| Reshape | drag a **line** or **vertex**; a frame vertex slides along its own edge and the four corners are locked. Pictures and bubbles hold their on-screen place, re-expressed against their new panel box (`gridContentRemap.ts`) — only the clip follows the seam. **Double-click** a line to bend it; drag a corner **onto another** to merge (`panelGridMerge.ts`) and **Alt-drag** to tear one apart (`panelGridSplit.ts`); both refuse while the result would be invalid |
+| New panel | **Split top / bottom** or **left / right** cuts through the middle of the selected panel's box in all three grids of its page (`configPanels.ts` over `panelGridCut.ts`), in **either mode** (`PanelActions.tsx`). The parent keeps its index, name, pattern and the upper/left half; the new panel is appended and the other page's grids gain an empty ring. Refused whole when any grid cannot take it. **Hide on *shape*** empties the ring on the grid on screen only, its neighbour taking the space (`panelGridAbsorb.ts`); **Show *name* below / beside** cuts the selected panel and hands the half to the hidden slot; **Delete panel** removes the slot everywhere, content included, and is the one renumbering edit (`configPanelsRemove.ts`). `../../../tests/skins/EditorPanelJourneys.test.tsx` drives all four through the real overlay |
+| Save | `POST /__comic-editor/save` writes `layoutConfig.ts` (dev server only); **Copy config** / **.ts** are the fallbacks. Never refused — mid-design is when it matters — but it asks once when the working copy is older than the bundle's config, with a red block above the row (`configStamp.ts`); **Reset** takes the file and discards this tab's work |
+| Ship | `POST /__comic-editor/ship` saves, branches, commits, pushes and opens or updates a PR (`../../../shipLayout.ts`). Disabled while the amber `configParity.ts` list is non-empty: every caption needs a tail and both morph targets, every link must resolve within its panel, every picture needs extent and a `/comic-book/` source |
+
 ## Adding a picture
 
 Drop the lossless master into `frontend/assets-src/comic-book/` and it appears in the

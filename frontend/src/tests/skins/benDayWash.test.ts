@@ -3,10 +3,13 @@ import { describe, expect, it } from 'vitest'
 import {
   dotGrowth,
   easeInOutCubic,
-  rippleWave,
+  gridDot,
+  parseCssColor,
   washPhaseAt,
-  RIPPLE_WAVE_LEN,
-  RIPPLE_SPEED,
+  GRID_REST_ALPHA,
+  GRID_REST_R,
+  GRID_SPOT_ALPHA,
+  GRID_SPOT_R,
   WASH_BAND,
   WASH_COVER_MS,
   WASH_HOLD_MS,
@@ -16,7 +19,8 @@ import {
   WASH_TOTAL_MS,
 } from '../../skins/comic-book/benDayWash'
 
-// The wash's geometry and timings. What colour its dots are is benDayTint.test.ts.
+// The wash's geometry and timings, and the grid dot's size under the light. The light
+// itself is spotlight.test.ts; what the three surfaces draw with it is marginGrid.test.ts.
 
 describe('easeInOutCubic', () => {
   it('pins the endpoints and midpoint', () => {
@@ -118,30 +122,41 @@ describe('dotGrowth', () => {
   })
 })
 
-describe('rippleWave', () => {
-  it('stays within 0..1', () => {
-    for (let d = 0; d < 4000; d += 137) {
-      const v = rippleWave(d, 1.234)
-      expect(v).toBeGreaterThanOrEqual(0)
-      expect(v).toBeLessThanOrEqual(1)
+describe('parseCssColor', () => {
+  it('parses hex colors to RGB triples', () => {
+    expect(parseCssColor('#FFE033')).toEqual([255, 224, 51])
+    expect(parseCssColor('#111111')).toEqual([17, 17, 17])
+    expect(parseCssColor('#FAFAF2')).toEqual([250, 250, 242])
+  })
+})
+
+describe('gridDot', () => {
+  it('rests small and faint, and is fullest at the centre of the light', () => {
+    expect(gridDot(0)).toEqual({ radius: GRID_REST_R, alpha: GRID_REST_ALPHA })
+    expect(gridDot(1)).toEqual({ radius: GRID_SPOT_R, alpha: GRID_SPOT_ALPHA })
+  })
+
+  it('grows and darkens together as the light reaches it', () => {
+    let prev = gridDot(0)
+    for (let lit = 0.1; lit <= 1; lit += 0.1) {
+      const dot = gridDot(lit)
+      expect(dot.radius).toBeGreaterThan(prev.radius)
+      expect(dot.alpha).toBeGreaterThan(prev.alpha)
+      prev = dot
     }
   })
 
-  it('repeats with period RIPPLE_WAVE_LEN along the diagonal', () => {
-    expect(rippleWave(300 + RIPPLE_WAVE_LEN, 2)).toBeCloseTo(rippleWave(300, 2))
+  it('never merges: a lit dot stays clear of its neighbours', () => {
+    // The grid has to stay a grid under the light. At half the pitch the dots would
+    // touch and the pool would read as a solid blot, not as halftone swelling.
+    expect(GRID_SPOT_R).toBeLessThan(WASH_SPACING / 2)
+    expect(GRID_SPOT_R).toBeLessThan(WASH_MERGE_RADIUS)
   })
 
-  it('travels one wavelength toward the bottom-right per 1/RIPPLE_SPEED seconds', () => {
-    expect(rippleWave(300 + RIPPLE_WAVE_LEN, 1 / RIPPLE_SPEED)).toBeCloseTo(rippleWave(300, 0))
-  })
-
-  it('takes over two seconds to carry a crest one wavelength, so it drifts', () => {
-    // The letterbox ripple is the one thing on a resting page that moves, and it moves
-    // for as long as the page is open. Under about two seconds a crest reads as a sheet
-    // being scrolled past the window and pulls the eye off the page; over it the same
-    // wave reads as paper breathing. The tint's own, far slower rates are held against
-    // this one in benDayTint.test.ts.
-    expect(1 / RIPPLE_SPEED).toBeGreaterThan(2)
+  it('rests visibly: the resting grid is a print, not blank paper', () => {
+    expect(GRID_REST_R).toBeGreaterThan(0.5)
+    expect(GRID_REST_ALPHA).toBeGreaterThan(0.1)
+    expect(GRID_SPOT_ALPHA).toBeLessThanOrEqual(1)
   })
 })
 

@@ -420,7 +420,6 @@ function_lines::frontend/src/hooks/useSmsConversations.ts::useSmsConversations =
 function_lines::frontend/src/hooks/useSoftphone.ts::useSoftphone = 310
 function_lines::frontend/src/hooks/useSpeedDials.ts::useSpeedDials = 135
 function_lines::frontend/src/hooks/useWebhooks.ts::useWebhooks = 130
-function_lines::frontend/src/skins/comic-book/LoadingOverlay.tsx::useLoadingScreen = 95
 function_lines::frontend/src/skins/comic-book/editor/configHydrate.ts::hydrateConfig = 87
 function_lines::frontend/src/skins/comic-book/editor/useContentEdits.ts::useContentEdits = 136
 function_lines::frontend/src/skins/comic-book/editor/useSeamDrag.ts::useSeamDrag = 183

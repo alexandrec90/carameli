@@ -5,7 +5,7 @@ import { isBubbleRevealed } from './bubbleTube'
 import BubbleTubes from './BubbleTubes'
 import ComicPanel from './ComicPanel'
 import { LoadingOverlay, useLoadingScreen } from './LoadingOverlay'
-import MarginRipple from './MarginRipple'
+import MarginGrid from './MarginGrid'
 import PanelInk from './PanelInk'
 import { activeLayout, useCallLayout, useDrawnImageCount } from './layoutSource'
 import { accentForPath } from './pageAccent'
@@ -146,9 +146,9 @@ export function Layout({ navItems, sms, softphone }: LayoutProps) {
                 }}
             >
                 {/* Layer 0 — the letterbox around the page sheet, carrying on the loading
-                    screen's ripple in phase with it (MarginRipple). Up only once the page is
-                    showing: under the loading sheet the same ripple is already drawn. */}
-                <MarginRipple viewport={viewport} frame={frame} accent={accent} active={ready} />
+                    screen's lit dot grid under the same spotlight (MarginGrid). Up only once
+                    the page is showing: under the loading sheet the same grid is already drawn. */}
+                <MarginGrid viewport={viewport} frame={frame} accent={accent} active={ready} />
 
                 {/* Layer 1 — the panels (ComicPanel: dots, pictures, bubbles). The poly
                     array is sparse: a null slot is a panel on the other page. */}

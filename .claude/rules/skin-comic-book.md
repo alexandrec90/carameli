@@ -32,7 +32,7 @@ the WebPs once shipped ~24 MB no page requested), is rule 10.
 | `--cb-black` / `--cb-white` | `#111111` / `#FAFAF2` | ink and text / page and balloon fill |
 | `--cb-dot-alpha` / `--cb-dot-hover-alpha` | `0.18` / `0.35` | dot opacity |
 
-Each route gets **one** accent; the viewport dot background shifts to it and drifts around it.
+Each route gets **one** accent; the viewport dot grid takes it, flat, and only the spotlight varies it.
 
 ## Layout — a comic page of panels
 
@@ -226,29 +226,35 @@ style that only breathed would otherwise pass a test for animating.
 
 ### Page transition — the Ben-Day wash
 
-Geometry and drawing live in `benDayWash.ts` and colour in `benDayTint.ts`; `usePageWash.ts`
-watches React Router's `location` and drives a rAF loop on one full-viewport canvas
-(`.cb-wash-canvas`, blank when idle). A halftone wave travels the `x + y` diagonal from the
-top-left: **cover** (paper dots grow inside the band until they merge opaque) → **hold** (the
-sheet carrying the loading screen's ripple) → **reveal** (the wave passes on and dots shrink
-behind it), eased ease-in-out cubic per phase (`washPhaseAt`). When retuning, keep the merge
-radius at or above the `S·√2/2` tiling bound (below it the dots never close), and grid spacing,
-wavelength and speed **shared with the loading ripple** so the two surfaces align. The loading
-overlay reuses it — `drawLoadingRipple` behind it, exiting through the reveal at cover 1.
+Geometry and drawing live in `benDayWash.ts`; `usePageWash.ts` watches React Router's
+`location` and drives a rAF loop on one full-viewport canvas (`.cb-wash-canvas`, blank when
+idle). A halftone wave travels the `x + y` diagonal from the top-left: **cover** (paper dots grow
+inside the band until they merge opaque) → **hold** (the sheet carrying the loading screen's dot
+grid) → **reveal** (the wave passes on and dots shrink behind it), eased ease-in-out cubic per
+phase (`washPhaseAt`). When retuning, keep the merge radius at or above the `S·√2/2` tiling bound
+(below it the dots never close), and the grid spacing **shared with the loading sheet** so the
+two surfaces align. The loading overlay reuses it — `drawLoadingGrid` behind it, exiting through
+the reveal at cover 1.
 
-**Colour drifts like a lava lamp** (`benDayTint.ts`) — a three-sine field turns each dot's hue up to
-`TINT_SWING_DEG` either side of the route accent, at its own saturation and lightness. Keep every tint
-wavelength several times `RIPPLE_WAVE_LEN` and every rate a fraction of `RIPPLE_SPEED`, or colour stops
-being a slower motion *through* the wave. The field is pure in **viewport** position: surfaces agree.
+**The grid is still and the pointer is its light** (`spotlight.ts`). The dots sit on one viewport
+grid in the route accent, small and faint at rest; a pool of light `SPOT_REACH` wide follows the
+cursor, and each dot swells to `GRID_SPOT_R` and darkens by how far inside it it sits (`gridDot`,
+raised-cosine `spotlightFalloff`). The light chases the pointer on `SPOT_FOLLOW_MS`, comes up and
+goes out on `SPOT_FADE_MS` (out when the pointer leaves the window, at rest in the viewport centre
+until it has first moved), and `pageSpotlight()` is the **one** tracker every surface samples, so the
+loading sheet, the wash and the letterbox light the same dot the same way at the same instant. A
+loop samples it with the rAF stamp and repaints only when the sample changed (`stepSpotlight`
+returns the previous state by identity when nothing moved). Keep `GRID_SPOT_R` under half the
+pitch: a lit dot that touched its neighbours would read as a blot, not as halftone swelling.
 
-**The letterbox carries the loading ripple on** (`MarginRipple.tsx`, the bottom layer of `.cb-root`):
-the fixed aspect leaves most windows a band beside or above the page sheet, and `drawMarginRipple`
-paints the ripple there on the same grid, wave, tint and clock, so the sheet the loading screen
-washes away reveals what it was already showing, in phase. It is the one thing on a resting page
-that moves (rule 9 is about panels), so it stays outside the sheet — `pageSheet` is the frame *as
-drawn* plus `OUTER_M`, so a held shape gets its bands — and runs only while a band exists, once the
-page is up. It does **not** consult `prefers-reduced-motion`: the ripple it continues never did, and
-a sheet that stops when the page arrives reads as the page freezing (`MarginRipple.test.tsx`).
+**The letterbox carries the loading grid on** (`MarginGrid.tsx`, the bottom layer of `.cb-root`):
+the fixed aspect leaves most windows a band beside or above the page sheet, and `drawMarginGrid`
+paints the grid there on the same cells under the same light, so the sheet the loading screen
+washes away reveals what it was already showing, lit where it was lit. It stays outside the sheet —
+`pageSheet` is the frame *as drawn* plus `OUTER_M`, so a held shape gets its bands — and runs only
+while a band exists, once the page is up. It does **not** consult `prefers-reduced-motion`: the
+grid moves only as the pointer does, and a light that stopped following the hand would read as
+the page having hung (`MarginGrid.test.tsx`).
 
 ### Panel ink
 
@@ -441,26 +447,16 @@ and a preferred owner ranks above `CLAIM_FIELD`.
 `?edit=1` / `?edit=0` in dev, persisted in `localStorage['comic-book:edit']`, gated on
 `import.meta.env.DEV` so it is inert in prod: `EditorOverlay.tsx` is a dynamic `import()`
 behind that gate, so Rollup drops it and `editor.css` from the build and only
-`layoutConfig.ts`, `bubbleTypes.ts` and `transforms.ts` ship. Click a panel, picture or
-bubble to select (a picture wins over the panel under it, a bubble over both); drag, wheel,
-handles and arrows adjust, with **Alt** swapping a picture's two framings. **+ Image**,
-**+ Bubble**, **+ SMS** and **+ Call** add to the selected panel, the first two in whichever
-of its layouts the call switch is showing. The inspector edits every field of the arrays
-above, with two deliberate gaps: **no chain control**, and no cell block or **+ Column** /
-**−** on a live surface.
+`layoutConfig.ts`, `bubbleTypes.ts` and `transforms.ts` ship. The inspector edits every
+field of the arrays above, with two deliberate gaps: **no chain control**, and no cell
+block or **+ Column** / **−** on a live surface.
 
-| Control | Notes |
-| --- | --- |
-| Call layout | **Default** / **Ringing** / **Connected**, present once the page has a call; on Default the call's entries are off screen with no targets or drags. A **call role** select puts an entry in the layout and moves the page to it, or nothing would appear to have happened; **call seam** / **call split** cut the panel, bounded by `CALL_CUT` since an edge cut leaves a half with no area to drag back |
-| Chain | **rows**, and **messages** on an *unbound* chain only. Chained balloons render flat in edit mode so each stays selectable, and the table's extent is a dashed frame (`chainFrame.ts`) |
-| Table corners | four grips, content mode only, band guides following — align the guides to the ruling in the photograph. Their exact coordinates are a folded section (`QuadCorners.tsx`), shared with the number pad |
-| Prose | **The inspector explains itself in `?` badges, not paragraphs** (`Hint.tsx`), and its set-once blocks fold (`Section.tsx`). `useToolbarColumns` turns toolbar height into toolbar *width*, so a paragraph left in the flow is paid for in screen area — a notepad with a table on it put the panel across most of the page. A hint an author must **act** on — a refused split, a chain with no number to bind to, the stale-file notices — stays a block |
-| Mode | **Content** / **Panel shapes**. Picture and bubble click targets are not rendered in shapes mode — a picture-sized target would swallow every drag aimed at a line crossing it |
-| Shape | **Follow the window** or one of the three; holds the page at that shape's frame in any window, so every grid is reachable without resizing (`ShapeSelect.tsx`; transient, never saved) |
-| Reshape | drag a **line** or **vertex**; a frame vertex slides along its own edge and the four corners are locked. Pictures and bubbles hold their on-screen place, re-expressed against their new panel box (`editor/gridContentRemap.ts`) — only the clip follows the seam. **Double-click** a line to bend it; drag a corner **onto another** to merge (`panelGridMerge.ts`) and **Alt-drag** to tear one apart (`panelGridSplit.ts`); both refuse while the result would be invalid |
-| New panel | **Split top / bottom** or **left / right** cuts through the middle of the selected panel's box in all three grids of its page (`configPanels.ts` over `panelGridCut.ts`), in **either mode** (`PanelActions.tsx`). The parent keeps its index, name, pattern and the upper/left half; the new panel is appended and the other page's grids gain an empty ring. Refused whole when any grid cannot take it. **Hide on *shape*** empties the ring on the grid on screen only, its neighbour taking the space (`panelGridAbsorb.ts`); **Show *name* below / beside** cuts the selected panel and hands the half to the hidden slot; **Delete panel** removes the slot everywhere, content included, and is the one renumbering edit (`configPanelsRemove.ts`). `EditorPanelJourneys.test.tsx` drives all four through the real overlay |
-| Save | `POST /__comic-editor/save` writes `layoutConfig.ts` (dev server only); **Copy config** / **.ts** are the fallbacks. Never refused — mid-design is when it matters — but it asks once when the working copy is older than the bundle's config, with a red block above the row (`editor/configStamp.ts`); **Reset** takes the file and discards this tab's work |
-| Ship | `POST /__comic-editor/ship` saves, branches, commits, pushes and opens or updates a PR (`frontend/shipLayout.ts`). Disabled while the amber `editor/configParity.ts` list is non-empty: every caption needs a tail and both morph targets, every link must resolve within its panel, every picture needs extent and a `/comic-book/` source |
+Selecting, dragging and every toolbar control are the editor README's — its *Quick start*
+and *Toolbar controls at a glance*. Three of those decisions carry beyond the toolbar:
+**the inspector explains itself in `?` badges, not paragraphs** (`Hint.tsx`,
+`Section.tsx`), because `useToolbarColumns` spends toolbar height as *width*; a **call
+seam** / **call split** is bounded by `CALL_CUT`, an edge cut leaving a half with no area
+to drag back; and **Save is never refused**, mid-design being when it matters most.
 
 ## Hard rules — the checklist; the prose above says why
 

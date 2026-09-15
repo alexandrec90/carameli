@@ -2,19 +2,22 @@
 //
 // A wave of paper-colored halftone dots sweeps diagonally from the top-left
 // corner: dots grow until they merge into a solid sheet (cover), the sheet
-// carries the loading screen's Ben-Day ripple, then the same wave passes on
-// and the dots shrink away to reveal the incoming page (reveal). The loading
-// overlay draws the identical ripple on the identical grid, so the transition
-// sheet and the loading screen hand off seamlessly.
+// carries the loading screen's dot grid, then the same wave passes on and the
+// dots shrink away to reveal the incoming page (reveal). The loading overlay
+// draws the identical grid, so the transition sheet and the loading screen hand
+// off seamlessly.
 //
-// What colour the ripple's dots are is benDayTint.ts — the slow lava-lamp drift of
-// hue around the route accent. This module is where each dot is and how big.
+// The grid itself is still: accent dots on paper at one pitch, lit by the spotlight
+// (spotlight.ts). The dot under the pointer is at its fullest, each one further out
+// smaller and fainter, and past the light's reach the grid rests as a faint print.
+// This module is where each dot is and how big; the light is spotlight.ts.
 
-import { tintField, tintSteps } from './benDayTint'
 import { clamp } from './editor/transforms'
 import type { Rect } from './panelGeometry'
+import { spotlightAt } from './spotlight'
+import type { SpotlightState } from './spotlight'
 
-export const WASH_SPACING = 20     // px between dot centres (grid shared with the ripple)
+export const WASH_SPACING = 20     // px between dot centres (grid shared with the loading sheet)
 export const WASH_BAND = 220       // px depth of the growing/shrinking dot edge
 export const WASH_COVER_MS = 420
 export const WASH_HOLD_MS = 120
@@ -25,11 +28,21 @@ export const WASH_TOTAL_MS = WASH_COVER_MS + WASH_HOLD_MS + WASH_REVEAL_MS
 // the extra margin guarantees the sheet is fully opaque at cover = 1.
 export const WASH_MERGE_RADIUS = WASH_SPACING * 0.75
 
-export const RIPPLE_WAVE_LEN = 260 // px between crests along the x+y diagonal
-export const RIPPLE_SPEED = 0.42   // crest cycles per second (top-left → bottom-right)
-export const RIPPLE_BASE_R = 4.5   // max ripple dot radius
+/** A grid dot the light does not reach: radius in px and alpha. */
+export const GRID_REST_R = 1.5
+export const GRID_REST_ALPHA = 0.2
+/** A grid dot at the centre of the light. */
+export const GRID_SPOT_R = 5
+export const GRID_SPOT_ALPHA = 0.9
 
 export const WASH_PAPER = '#FAFAF2'
+
+export function parseCssColor(hex: string): [number, number, number] {
+    const r = parseInt(hex.slice(1, 3), 16)
+    const g = parseInt(hex.slice(3, 5), 16)
+    const b = parseInt(hex.slice(5, 7), 16)
+    return [r, g, b]
+}
 
 export function easeInOutCubic(p: number): number {
     return p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2
@@ -64,58 +77,77 @@ export function dotGrowth(diag: number, cover: number, reveal: number, maxDiag: 
     return Math.max(0, kCover - kReveal)
 }
 
-/** Ripple wave height (0..1) at diagonal distance `diag`, time `tSec`. */
-export function rippleWave(diag: number, tSec: number): number {
-    const phase = (diag / RIPPLE_WAVE_LEN) * Math.PI * 2 - tSec * RIPPLE_SPEED * Math.PI * 2
-    return (Math.sin(phase) + 1) / 2
+/**
+ * Radius and alpha of a grid dot lit `lit` (0..1) by the spotlight. Mixed rather than
+ * offset so the ends come out exact: a resting dot is the resting dot, bit for bit.
+ */
+export function gridDot(lit: number): { radius: number; alpha: number } {
+    const rest = 1 - lit
+    return {
+        radius: GRID_REST_R * rest + GRID_SPOT_R * lit,
+        alpha: GRID_REST_ALPHA * rest + GRID_SPOT_ALPHA * lit,
+    }
 }
 
-/** The first grid centre at or after `from`: the ripple's dots sit at S/2 + k·S, k ≥ 0. */
+/** The first grid centre at or after `from`: the grid's dots sit at S/2 + k·S, k ≥ 0. */
 function firstCentre(from: number): number {
     return WASH_SPACING / 2 + WASH_SPACING * Math.max(0, Math.ceil((from - WASH_SPACING / 2) / WASH_SPACING))
 }
 
-// Ripple dots over the paper sheet, for the cells of the *viewport's* grid whose centres
+// Grid dots over the paper sheet, for the cells of the *viewport's* grid whose centres
 // fall in `region` — the grid never moves with the region, which is what keeps every
 // surface drawing the same dot in the same place. `gate` (0..1 per diagonal distance)
-// fades the ripple out where the sheet is not fully merged, so it never floats over raw
-// page.
-function drawRippleDots(
+// fades the grid out where the sheet is not fully merged, so it never floats over raw
+// page. The resting dots are one colour, so they go down as one path and one fill; only
+// the lit ones — a few hundred at most, however large the viewport — carry their own.
+function drawGridDots(
     ctx: CanvasRenderingContext2D, region: Rect,
-    tSec: number, accentHex: string, gate: (diag: number) => number,
+    spot: SpotlightState, accentHex: string, gate: (diag: number) => number,
 ) {
-    const tint = tintSteps(accentHex)
+    const rgb = parseCssColor(accentHex).join(',')
     const right = region.x + region.w
     const bottom = region.y + region.h
+    // [x, y, how lit, gate] of every dot that is not a plain resting one.
+    const own: Array<[number, number, number, number]> = []
+    ctx.fillStyle = `rgba(${rgb},${GRID_REST_ALPHA})`
+    ctx.beginPath()
     for (let x = firstCentre(region.x); x < right; x += WASH_SPACING) {
         for (let y = firstCentre(region.y); y < bottom; y += WASH_SPACING) {
             const gt = gate(x + y)
             if (gt <= 0) continue
-            const wave = rippleWave(x + y, tSec)
-            const radius = RIPPLE_BASE_R * (0.12 + 0.88 * wave)
-            const alpha = (0.12 + 0.68 * wave) * gt
-            ctx.fillStyle = `rgba(${tint(tintField(x, y, tSec))},${alpha.toFixed(2)})`
-            ctx.beginPath()
-            ctx.arc(x, y, Math.max(0.3, radius), 0, Math.PI * 2)
-            ctx.fill()
+            const light = spotlightAt(spot, x, y)
+            if (light <= 0 && gt >= 1) {
+                ctx.moveTo(x + GRID_REST_R, y)
+                ctx.arc(x, y, GRID_REST_R, 0, Math.PI * 2)
+                continue
+            }
+            own.push([x, y, light, gt])
         }
+    }
+    ctx.fill()
+    for (const [x, y, light, gt] of own) {
+        const { radius, alpha } = gridDot(light)
+        ctx.fillStyle = `rgba(${rgb},${(alpha * gt).toFixed(2)})`
+        ctx.beginPath()
+        ctx.arc(x, y, radius, 0, Math.PI * 2)
+        ctx.fill()
     }
 }
 
-/** Loading-screen background: solid paper + the full Ben-Day ripple. */
-export function drawLoadingRipple(
+/** Loading-screen background: solid paper + the full lit grid. */
+export function drawLoadingGrid(
     ctx: CanvasRenderingContext2D, w: number, h: number,
-    tSec: number, accentHex: string,
+    spot: SpotlightState, accentHex: string,
 ) {
     ctx.fillStyle = WASH_PAPER
     ctx.fillRect(0, 0, w, h)
-    drawRippleDots(ctx, { x: 0, y: 0, w, h }, tSec, accentHex, () => 1)
+    drawGridDots(ctx, { x: 0, y: 0, w, h }, spot, accentHex, () => 1)
 }
 
 /**
  * The letterbox around `sheet` on a `w` × `h` viewport, as up to four rectangles that
  * tile it without overlapping — top and bottom the full width, left and right between
- * them. Overlap would matter: the ripple is alpha-blended, so a corner drawn twice is a
+ * them. Overlap would matter: the dots are alpha-blended, so a corner drawn twice is a
  * darker corner. A band thinner than a pixel is dropped rather than kept alive to draw
  * nothing; on a viewport of the page's own aspect there are none.
  */
@@ -133,15 +165,15 @@ export function letterboxBands(w: number, h: number, sheet: Rect): Rect[] {
 }
 
 /**
- * The loading screen's ripple carrying on in the letterbox around the page sheet — same
- * grid, same wave, same clock, so the sheet the loading screen washes away reveals the
- * ripple it was already showing, in phase, where the page does not cover it. Only the
+ * The loading screen's grid carrying on in the letterbox around the page sheet — same
+ * grid, same light, so the sheet the loading screen washes away reveals the grid it was
+ * already showing, lit where it was lit, where the page does not cover it. Only the
  * bands are painted; the sheet stays clear. Returns whether anything was drawn, which
  * is false on a viewport the sheet fills, and the caller's cue to stop the loop.
  */
-export function drawMarginRipple(
+export function drawMarginGrid(
     ctx: CanvasRenderingContext2D, w: number, h: number, sheet: Rect,
-    tSec: number, accentHex: string,
+    spot: SpotlightState, accentHex: string,
 ): boolean {
     ctx.clearRect(0, 0, w, h)
     const bands = letterboxBands(w, h, sheet)
@@ -154,10 +186,10 @@ export function drawMarginRipple(
     for (const band of bands) ctx.fillRect(band.x, band.y, band.w, band.h)
     // A dot centred just outside a band still reaches into it by up to its radius; the
     // clip trims what crosses back the other way.
-    const pad = RIPPLE_BASE_R
+    const pad = GRID_SPOT_R
     for (const band of bands) {
         const reach = { x: band.x - pad, y: band.y - pad, w: band.w + 2 * pad, h: band.h + 2 * pad }
-        drawRippleDots(ctx, reach, tSec, accentHex, () => 1)
+        drawGridDots(ctx, reach, spot, accentHex, () => 1)
     }
     ctx.restore()
     return true
@@ -165,17 +197,17 @@ export function drawMarginRipple(
 
 /**
  * One frame of the wash. Paper dots grow/shrink along the wave fronts; where
- * they have merged into a solid sheet, the loading ripple plays on top.
+ * they have merged into a solid sheet, the lit grid plays on top.
  */
 export function drawWash(
     ctx: CanvasRenderingContext2D, w: number, h: number,
-    cover: number, reveal: number, tSec: number, accentHex: string,
+    cover: number, reveal: number, spot: SpotlightState, accentHex: string,
 ) {
     ctx.clearRect(0, 0, w, h)
     const maxDiag = w + h
     ctx.fillStyle = WASH_PAPER
     // Grid cells share diag = x + y along anti-diagonals, so caching dotGrowth by
-    // diag (looked up again below by drawRippleDots) avoids recomputing it per cell.
+    // diag (looked up again below by drawGridDots) avoids recomputing it per cell.
     const growthByDiag = new Map<number, number>()
     const growthAt = (diag: number): number => {
         let growth = growthByDiag.get(diag)
@@ -194,6 +226,6 @@ export function drawWash(
             ctx.fill()
         }
     }
-    drawRippleDots(ctx, { x: 0, y: 0, w, h }, tSec, accentHex,
+    drawGridDots(ctx, { x: 0, y: 0, w, h }, spot, accentHex,
         diag => clamp((growthAt(diag) - 0.8) / 0.2, 0, 1))
 }

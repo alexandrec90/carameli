@@ -135,8 +135,28 @@ export const MAX_EAGER_BYTES = 316 * 1024
  * total at 995.92 KB, so cutting that edge would put both roughly 30 KB clear and end the
  * run of raises this comment records. It is a hooks refactor with its own tests, not a
  * line to slip into a feature branch, so it is filed rather than done here.
+ *
+ * This raise (268 → 269) is the pointer spotlight replacing the lava-lamp tint: 0.86 KB
+ * measured as this branch's merge of master (267.81 KB) against a build of that master
+ * alone (266.95 KB, `c373bb9`, same `node_modules` — the figure the paragraph above names
+ * for its own branch, rebuilt here). `spotlight.ts` is the whole of it — one tracker every
+ * surface samples, its raised-cosine falloff, and the eased follow and fade — and
+ * `benDayTint.ts` with its three-sine field and RGB↔HSL round trip comes *out* in the same
+ * change and is subtracted from it. So 0.86 KB is what a still grid lit by the cursor costs
+ * over a drifting one, not what the spotlight weighs. 0.12 KB of the figure is not the
+ * feature but the shape the structural ratchet asked for: `useLoadingScreen` split into
+ * `useDotCycle`, `useLoadingGrid` and `useLeaveWash` to come back under the 80-line
+ * function limit — the same trade the paragraph above records for `useGridEdits`, and
+ * nothing added. Still 46 chunks, `package.json` untouched.
+ *
+ * The ceiling has to move for 0.86 KB because the raise above left it 1.05 KB clear and
+ * this branch spends most of that: 268 would hold at 0.19 KB, which is the state the 981 →
+ * 986 paragraph describes as a ceiling passed rather than raised. {@link
+ * MAX_TOTAL_JS_BYTES} does *not* move for the same cost — it was left 1.73 KB clear and
+ * still has 0.87 KB — and saying so here is the point, since the two have moved together
+ * often enough that one moving alone would otherwise read as an error.
  */
-export const MAX_LAZY_CHUNK_BYTES = 268 * 1024
+export const MAX_LAZY_CHUNK_BYTES = 269 * 1024
 
 /**
  * Every `.js` file in `dist/assets/`, summed. Today 956.6 KB across 46 chunks; the
@@ -332,6 +352,15 @@ export const MAX_LAZY_CHUNK_BYTES = 268 * 1024
  * reason the 1020 → 1022 paragraph gives — one cost, counted once, showing up in two
  * constants because the chunk sat within a kilobyte of one and the total within half a
  * kilobyte of the other.
+ *
+ * The pointer spotlight does *not* raise this one, and that is worth a line because every
+ * comic-book change above raised both. It costs 0.86 KB — 1028.13 KB as this branch's
+ * merge of master against 1027.27 KB for that master alone (`c373bb9`), the same 880 bytes
+ * {@link MAX_LAZY_CHUNK_BYTES} measures, so again nothing landed outside that chunk. The
+ * raise above left this ceiling 1.73 KB clear where it left the chunk's 1.05 KB, so the
+ * same cost fits here and does not there. What is left is 0.87 KB, which is the clearance
+ * the 971 → 972 paragraph asks for and not much more: the next comic-book branch should
+ * expect to move this.
  */
 export const MAX_TOTAL_JS_BYTES = 1029 * 1024
 
