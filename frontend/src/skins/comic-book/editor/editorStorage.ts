@@ -1,5 +1,6 @@
 import { logger } from '../../../lib/logger'
 import { CONFIG_KEY, hydrateConfig, seedConfig } from './configOps'
+import { canonical } from './configStamp'
 import type { EditorConfig } from './types'
 
 // Where the editor's two persisted things live: the flag that says it is on, and the
@@ -122,12 +123,38 @@ export interface BootWorkingCopy {
 }
 
 /**
+ * True when a persisted copy holds nothing of the author's: it is the file the bundle
+ * now holds, or it is exactly the file it was hydrated from. Either way there is no work
+ * in it, so it is safe to drop for the file itself.
+ *
+ * `config` is the copy as {@link hydrateConfig} returns it, and the base is read through
+ * the same hydration, so the two are compared in one form: the copy was backfilled on the
+ * way in, and a base compared verbatim would differ from it on every field the payload
+ * predates. Backfilling supplies only what a payload *lacks*, so an edit — a field that is
+ * there, with the author's value — is never filled over, and two copies hydrate equal
+ * exactly when what they hold is equal.
+ */
+export function holdsNoEdits(config: EditorConfig, base: EditorConfig | null): boolean {
+  const copy = canonical(config)
+  if (copy === canonical(seedConfig())) return true
+  return base !== null && copy === canonical(hydrateConfig(JSON.stringify(base)))
+}
+
+/**
  * Read all three off the persisted payload, from **one** string. Reading storage once and
  * answering every question from that string is what stops a write landing between two
  * reads and pairing a config with another payload's stamp or base.
  *
  * `active` is false outside edit mode, where there is no working copy at all and the seed
  * is simply the layout.
+ *
+ * **A copy with no edits in it is dropped for the file.** The working copy outlives every
+ * merge, checkout and pull, so a tab opened before a change and never touched went on
+ * showing the page as it *was* — the editor and the live page disagreed about where the
+ * balloons were, and the author, seeing the file's version on the live page, had nothing
+ * in the editor to reconcile except a Reset they had no reason to think they needed.
+ * Re-seeding costs such a copy nothing, because it holds nothing; a copy with work in it
+ * is kept and warned about as before (./configStamp.ts, ./configDrift.ts).
  */
 export function bootWorkingCopy(active: boolean): BootWorkingCopy {
   if (!active || typeof window === 'undefined') {
@@ -137,7 +164,13 @@ export function bootWorkingCopy(active: boolean): BootWorkingCopy {
   // No payload at all is not an untracked copy: it is a copy that *is* the file, so it
   // gets today's seed as its base and is tracked from its first edit.
   if (raw === null) return { config: seedConfig(), stamp: null, base: seedConfig() }
-  return { config: hydrateConfig(raw), stamp: storedStamp(raw), base: storedBase(raw) }
+  const config = hydrateConfig(raw)
+  const base = storedBase(raw)
+  if (holdsNoEdits(config, base)) {
+    clearStoredConfig()
+    return { config: seedConfig(), stamp: null, base: seedConfig() }
+  }
+  return { config, stamp: storedStamp(raw), base }
 }
 
 /** Drop the working copy, so the next load re-seeds from the constants. */

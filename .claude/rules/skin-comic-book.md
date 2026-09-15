@@ -106,6 +106,15 @@ what lets any shape interpolate vertex-for-vertex into any other, so hover and c
   plus `'none'`), so a turn or a removal is an ordinary morph, not a second shape system.
   Its ink leaves the viewBox on purpose (`.cb-panel-bubble-svg` sets `overflow: visible`);
   padding the box would rescale every bubble already placed.
+- **The lettering block is inscribed in the outline, not in the box** (`bubbleText.ts`):
+  the largest rectangle inside each type's ring, set inline on the words from the shape
+  the balloon is *drawn* as, so a hover morph moves the words with the ink. The box is a
+  rectangle and the balloon is not, and an inset picked by eye ran a transcript's last
+  lines out through the ellipse's shoulders. `bubbleFit.ts` wraps against the same
+  numbers; the literal in `bubbles.css` is the fallback for a control that sets none of
+  its own and `bubbleText.test.ts` holds it to the plain ellipse's. A transcript is a
+  scroll window over that block with **no scrollbar** (`callScene.css`): the wheel scrolls
+  it, and a bar would be chrome in a hand-lettered balloon.
 
 ### A bubble — and a picture — belongs to a panel
 
@@ -294,6 +303,11 @@ a diagnosis by reading as a fault in the checked-out branch:
   `editor/configStamp.ts` fingerprints the config the payload hydrated from; a mismatch
   with the bundle's blocks the editor in red and makes Save ask once. A pre-stamp payload
   is **not** warned about — a warning on every one would be dismissed the day it was right.
+  **A copy with no edits in it is dropped for the file on boot** (`holdsNoEdits` in
+  `editor/editorStorage.ts`): a tab opened, never touched and left behind a merge used to
+  go on showing the page as it *was*, so the editor and the live page disagreed about
+  where the balloons stood and nothing in the editor explained why. Such a copy holds
+  nothing, so taking the file costs nothing; a copy with work in it is kept and warned.
 
 `bubbleRect` (`transforms.ts`) gives the bubble box's on-screen geometry to **both** the
 renderer (aiming tubes) and the editor (hit target, selection outline). Keep it shared —

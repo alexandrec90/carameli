@@ -17,6 +17,8 @@ import type {
   ImgTransform,
 } from '../../skins/comic-book/editor/types'
 import type { CallScene, PhoneActionHandlers } from '../../skins/comic-book/phoneActions'
+import { textInsetStyle } from '../../skins/comic-book/bubbleText'
+import { cssRules, SKIN_CSS } from './skinCss'
 import { idleSms } from './smsStub'
 
 // The call scene, as the page draws it once it is made of ordinary entries: three
@@ -286,6 +288,27 @@ describe('a panel with a call layout', () => {
     expect(panel.classList.contains('cb-panel-call')).toBe(false)
     expect(slots()).toHaveLength(0)
     expect(figures()).toEqual([CALL_SCENE_ALT.local])
+  })
+
+  // The words are a column that fills its box, so the box has to be one that lies inside
+  // the ink: the inscribed block, not the rectangle around the balloon. The complaint this
+  // holds: a transcript ran its last lines out through the ellipse's shoulders.
+  it('letters each transcript inside the block inscribed in its balloon', () => {
+    draw({ call: connected(TALK) })
+    for (const log of screen.getAllByRole('log')) {
+      expect((log as HTMLElement).style.inset).toBe(textInsetStyle(NEW_CALL_TRANSCRIPT.type).inset)
+    }
+  })
+
+  // jsdom draws no scrollbar, so the rule is read off the stylesheet: the window scrolls
+  // (the wheel needs a scroll container) and draws no bar for it, in both spellings.
+  it('scrolls the transcript without drawing a scrollbar', () => {
+    const rules = cssRules(SKIN_CSS['src/skins/comic-book/callScene.css'])
+    const window = rules.find(r => r.selector === '.cb-panel-bubble-text.cb-call-transcript')
+    expect(window?.body).toMatch(/overflow-y\s*:\s*auto/)
+    expect(window?.body).toMatch(/scrollbar-width\s*:\s*none/)
+    const webkit = rules.find(r => r.selector === '.cb-call-transcript::-webkit-scrollbar')
+    expect(webkit?.body).toMatch(/display\s*:\s*none/)
   })
 
   it('draws the call in the editor too, which is what makes it editable', () => {

@@ -292,6 +292,7 @@ export default function PanelBubble({
         editableKind={editableKind}
         dial={dial}
         transcript={transcript}
+        shape={shape}
         font={font}
         enabled={interactive}
         revealed={visible && holdsKeyboard}

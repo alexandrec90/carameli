@@ -2,9 +2,10 @@ import { describe, expect, it } from 'vitest'
 
 import { BUBBLE_ASPECT, BUBBLE_ELLIPSE_N } from '../../skins/comic-book/bubbleBox'
 import {
-  GLYPH_EM, LINE_HEIGHT, TEXT_BAND, TEXT_INSET, fitMessage, glyphsPerLine, textBand, wrapLines,
+  GLYPH_EM, LINE_HEIGHT, fitMessage, glyphsPerLine, textBand, wrapLines,
 } from '../../skins/comic-book/bubbleFit'
 import type { FitMetrics } from '../../skins/comic-book/bubbleFit'
+import { textInset } from '../../skins/comic-book/bubbleText'
 import { BUBBLE_TYPE_KEYS } from '../../skins/comic-book/editor/bubbleTypes'
 import { cssRules, SKIN_CSS } from './skinCss'
 
@@ -16,17 +17,13 @@ import { cssRules, SKIN_CSS } from './skinCss'
 /** A box four hundred wide, lettered at twelve: a 40% column holds about seventeen glyphs. */
 const M: FitMetrics = { boxW: 400, lettering: 12 }
 
-describe('TEXT_INSET and LINE_HEIGHT', () => {
-  // The estimate wraps at the width the stylesheet gives the words. If the two drift, the
-  // balloon is sized for a wrap that never happens.
-  it('mirror the .cb-panel-bubble-text rule in bubbles.css', () => {
+describe('LINE_HEIGHT', () => {
+  // The estimate stacks lines at the height the stylesheet gives them. If the two drift,
+  // the balloon is sized for a column that never happens. (The inset the estimate wraps
+  // at is not mirrored: both the estimate and the drawing read it from bubbleText.ts.)
+  it('mirrors the .cb-panel-bubble-text rule in bubbles.css', () => {
     const css = SKIN_CSS['src/skins/comic-book/bubbles.css']
     const rule = cssRules(css).find(r => r.selector === '.cb-panel-bubble-text')
-    const inset = rule?.body.match(/inset\s*:\s*(\d+)%\s+(\d+)%\s+(\d+)%\s*;/)
-    expect(inset).toBeTruthy()
-    expect(Number(inset?.[1]) / 100).toBe(TEXT_INSET.top)
-    expect(Number(inset?.[2]) / 100).toBe(TEXT_INSET.side)
-    expect(Number(inset?.[3]) / 100).toBe(TEXT_INSET.bottom)
     const lineHeight = rule?.body.match(/line-height\s*:\s*([\d.]+)\s*;/)
     expect(Number(lineHeight?.[1])).toBe(LINE_HEIGHT)
   })
@@ -42,22 +39,30 @@ describe('GLYPH_EM', () => {
 })
 
 describe('textBand', () => {
-  it('is no taller than the inset allows', () => {
-    expect(textBand()).toBeLessThanOrEqual(1 - TEXT_INSET.top - TEXT_INSET.bottom)
+  it('is no taller than the inset allows, for every type', () => {
+    for (const type of BUBBLE_TYPE_KEYS) {
+      const { top, bottom } = textInset(type)
+      expect(textBand(type)).toBeLessThanOrEqual(1 - top - bottom)
+    }
   })
 
   // The lettering block's corners must stay inside the ellipse: at the block's width the
   // ellipse is only so tall, and that chord is the band.
   it('keeps a block of the lettering’s width inside the ellipse', () => {
-    const halfText = (1 - 2 * TEXT_INSET.side) / 2
-    const halfBand = textBand() / 2
-    const inside =
-      (halfText / BUBBLE_ELLIPSE_N.rx) ** 2 + (halfBand / BUBBLE_ELLIPSE_N.ry) ** 2
-    expect(inside).toBeLessThanOrEqual(1 + 1e-9)
+    for (const type of BUBBLE_TYPE_KEYS) {
+      const halfText = (1 - 2 * textInset(type).side) / 2
+      const halfBand = textBand(type) / 2
+      const inside =
+        (halfText / BUBBLE_ELLIPSE_N.rx) ** 2 + (halfBand / BUBBLE_ELLIPSE_N.ry) ** 2
+      expect(inside).toBeLessThanOrEqual(1 + 1e-9)
+    }
   })
 
-  it('is what TEXT_BAND holds', () => {
-    expect(TEXT_BAND).toBe(textBand())
+  // The block is inscribed in the ellipse, so the chord at its width *is* its height and
+  // the band is the whole inset. A band short of it would be air the words cannot use.
+  it('fills the inset for the plain ellipse', () => {
+    const { top, bottom } = textInset('soft')
+    expect(textBand('soft')).toBeCloseTo(1 - top - bottom, 9)
   })
 })
 
@@ -86,7 +91,7 @@ describe('wrapLines', () => {
 
 describe('glyphsPerLine', () => {
   it('counts what the inset leaves of the balloon, in glyph advances', () => {
-    const usablePx = (40 / 100) * M.boxW * (1 - 2 * TEXT_INSET.side)
+    const usablePx = (40 / 100) * M.boxW * (1 - 2 * textInset('soft').side)
     expect(glyphsPerLine(40, 'soft', M)).toBe(Math.floor(usablePx / (GLYPH_EM.soft * M.lettering)))
   })
 
@@ -124,7 +129,7 @@ describe('fitMessage', () => {
     const lines = wrapLines(text, glyphsPerLine(width, 'soft', M)).length
     const need = lines * LINE_HEIGHT * M.lettering
     const boxH = (width / 100) * M.boxW * BUBBLE_ASPECT
-    expect(stretch).toBeCloseTo(Math.max(1, need / (TEXT_BAND * boxH)), 9)
+    expect(stretch).toBeCloseTo(Math.max(1, need / (textBand('soft') * boxH)), 9)
   })
 
   // The one-word case the wrap rule exists for: it neither crops nor keeps widening.

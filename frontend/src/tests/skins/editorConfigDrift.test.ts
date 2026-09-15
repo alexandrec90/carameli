@@ -9,13 +9,14 @@ import {
   addBubble,
   addCallScene,
   addImg,
+  hydrateConfig,
   patchBubble,
   patchPattern,
   seedConfig,
 } from '../../skins/comic-book/editor/configOps'
 import { configStamp, seedStamp } from '../../skins/comic-book/editor/configStamp'
 import {
-  bootWorkingCopy, persistConfig, storedBase, storedStamp,
+  bootWorkingCopy, holdsNoEdits, persistConfig, storedBase, storedStamp,
 } from '../../skins/comic-book/editor/editorStorage'
 import { setPanelLabel } from '../../skins/comic-book/editor/configPanels'
 import { useEditorMode } from '../../skins/comic-book/editor/useEditorMode'
@@ -321,12 +322,82 @@ describe('bootWorkingCopy', () => {
     expect(boot.stamp).toBe('stamp-1')
     expect(boot.base).toBeNull()
   })
+
+  // The other way a tab ends up behind the file, and the common one: opened, never touched,
+  // and the file moved on. Such a copy holds nothing, so it is dropped for the file — the
+  // editor then shows what the live page shows, instead of a page from before the merge
+  // that the author has no edit to explain.
+  it('drops a copy that is exactly the file it came from, once the file has moved', () => {
+    persistConfig(beforeCalls(), configStamp(beforeCalls()), beforeCalls())
+
+    const boot = bootWorkingCopy(true)
+
+    expect(configStamp(boot.config)).toBe(seedStamp())
+    expect(configStamp(boot.base as EditorConfig)).toBe(seedStamp())
+    expect(boot.stamp).toBeNull()
+    expect(window.localStorage.getItem(CONFIG_KEY)).toBeNull()
+  })
+
+  // A Save writes the copy over the file and the bundle reloads with it: the copy is now
+  // the file, whatever base it was carrying, and must not go on reporting its own saved
+  // work as something the file gained.
+  it('drops a copy that is the file the bundle holds, whatever it was hydrated from', () => {
+    persistConfig(seedConfig(), configStamp(beforeCalls()), beforeCalls())
+
+    const boot = bootWorkingCopy(true)
+
+    expect(configStamp(boot.base as EditorConfig)).toBe(seedStamp())
+    expect(window.localStorage.getItem(CONFIG_KEY)).toBeNull()
+  })
+
+  it('keeps a copy with work in it, behind the file or not', () => {
+    const authored = setPanelLabel(beforeCalls(), 0, 'Cover by the author')
+    persistConfig(authored, configStamp(beforeCalls()), beforeCalls())
+
+    const boot = bootWorkingCopy(true)
+
+    expect(boot.config.panels[0].label).toBe('Cover by the author')
+    expect(configStamp(boot.base as EditorConfig)).toBe(configStamp(beforeCalls()))
+    expect(window.localStorage.getItem(CONFIG_KEY)).not.toBeNull()
+  })
+
+  // An untracked copy can only be compared with the file itself; one that differs from it
+  // is kept, because nothing says whether the difference is the author's.
+  it('keeps an untracked copy that differs from the file', () => {
+    persistConfig(bare(), 'stamp-1', null)
+    expect(bootWorkingCopy(true).base).toBeNull()
+    expect(window.localStorage.getItem(CONFIG_KEY)).not.toBeNull()
+  })
+})
+
+describe('holdsNoEdits', () => {
+  /** A copy as boot holds it: read back through hydration, like the payload it came from. */
+  const hydrated = (config: EditorConfig) => hydrateConfig(JSON.stringify(config))
+
+  it('is true for the file itself and for a copy equal to its base', () => {
+    expect(holdsNoEdits(seedConfig(), null)).toBe(true)
+    // The base is compared through the same hydration as the copy: read verbatim it would
+    // lack every field the payload predates — here the call roles — and never match.
+    expect(holdsNoEdits(hydrated(beforeCalls()), beforeCalls())).toBe(true)
+  })
+
+  it('is false once the copy differs from both', () => {
+    const authored = setPanelLabel(beforeCalls(), 0, 'Cover by the author')
+    expect(holdsNoEdits(hydrated(authored), beforeCalls())).toBe(false)
+    expect(holdsNoEdits(hydrated(beforeCalls()), null)).toBe(false)
+  })
 })
 
 describe('useEditorMode — a copy that is behind the file', () => {
   /** A payload as a tab that started before the calls existed would hold. */
   const behindPayload = (config: EditorConfig) =>
     JSON.stringify({ ...config, seedStamp: configStamp(beforeCalls()), seedBase: beforeCalls() })
+  /**
+   * That tab with work in it. A copy that is exactly its base is dropped for the file on
+   * boot (see `bootWorkingCopy` above), so every case about the warning starts from one
+   * the author has touched.
+   */
+  const edited = () => setPanelLabel(beforeCalls(), 1, 'Retitled by the author')
 
   beforeEach(() => {
     window.localStorage.clear()
@@ -338,7 +409,7 @@ describe('useEditorMode — a copy that is behind the file', () => {
   })
 
   it('names the phone-call panel the file gained, rather than only saying it moved', () => {
-    window.localStorage.setItem(CONFIG_KEY, behindPayload(beforeCalls()))
+    window.localStorage.setItem(CONFIG_KEY, behindPayload(edited()))
     const { result } = renderHook(() => useEditorMode())
 
     expect(result.current.stale).toBe(true)
@@ -372,7 +443,7 @@ describe('useEditorMode — a copy that is behind the file', () => {
     const older = { ...beforeCalls(), panels: beforeCalls().panels.slice(0, -1) }
     window.localStorage.setItem(
       CONFIG_KEY,
-      JSON.stringify({ ...beforeCalls(), seedStamp: configStamp(older), seedBase: older }),
+      JSON.stringify({ ...edited(), seedStamp: configStamp(older), seedBase: older }),
     )
     const { result } = renderHook(() => useEditorMode())
     expect(result.current.drift?.page).toContain('1 panel added to the page')
@@ -384,7 +455,7 @@ describe('useEditorMode — a copy that is behind the file', () => {
   })
 
   it('clears the selection, since the entry an index named has moved', () => {
-    window.localStorage.setItem(CONFIG_KEY, behindPayload(beforeCalls()))
+    window.localStorage.setItem(CONFIG_KEY, behindPayload(edited()))
     const { result } = renderHook(() => useEditorMode())
 
     act(() => result.current.select('img', 0))
@@ -409,7 +480,7 @@ describe('useEditorMode — a copy that is behind the file', () => {
   // An edit is not a reconciliation: the author dragging a balloon has not looked at the
   // file, so the base — and everything read off it — has to survive one.
   it('keeps the base, and the report, through an edit', () => {
-    window.localStorage.setItem(CONFIG_KEY, behindPayload(beforeCalls()))
+    window.localStorage.setItem(CONFIG_KEY, behindPayload(edited()))
     const { result } = renderHook(() => useEditorMode())
 
     act(() => result.current.setPanelLabel(0, 'Cover'))
@@ -435,7 +506,7 @@ describe('useEditorMode — a copy that is behind the file', () => {
   // Reset is the other half of the deal: the copy becomes the file, so it is not behind it
   // any more and there is nothing left to take.
   it('makes the copy the file again on Reset', () => {
-    window.localStorage.setItem(CONFIG_KEY, behindPayload(beforeCalls()))
+    window.localStorage.setItem(CONFIG_KEY, behindPayload(edited()))
     const { result } = renderHook(() => useEditorMode())
 
     act(() => result.current.resetAll())
