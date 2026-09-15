@@ -48,6 +48,13 @@ describe('pageFrameFor', () => {
     expect(frame.w).toBe(0)
     expect(frame.h).toBe(0)
   })
+
+  it('hands the window out with the frame, for what is drawn outside it', () => {
+    // The letterbox is the viewport minus the sheet, and it must not read the window
+    // itself; it gets the same numbers the frame was fitted into, held shape or not.
+    expect(pageFrameFor(1600, 900, null).viewport).toEqual({ w: 1600, h: 900 })
+    expect(pageFrameFor(1600, 900, 'portrait').viewport).toEqual({ w: 1600, h: 900 })
+  })
 })
 
 describe('panelPolysIn', () => {
@@ -78,6 +85,7 @@ describe('usePageFrame', () => {
     const { result } = renderHook(() => usePageFrame(null))
     expect(result.current.kind).toBe('landscape')
     expect(result.current.frame).toEqual(frameRect(1600, 900))
+    expect(result.current.viewport).toEqual({ w: 1600, h: 900 })
 
     act(() => {
       setWindow(600, 900)
@@ -85,6 +93,7 @@ describe('usePageFrame', () => {
     })
     expect(result.current.kind).toBe('portrait')
     expect(result.current.frame).toEqual(frameRect(600, 900))
+    expect(result.current.viewport).toEqual({ w: 600, h: 900 })
   })
 
   it('keeps the frame identity while nothing about it changes', () => {

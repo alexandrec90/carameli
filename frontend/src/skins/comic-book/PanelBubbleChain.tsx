@@ -13,6 +13,7 @@ import type { BubbleTransform } from './editor/types'
 import type { Rect } from './panelGeometry'
 import type { SmsConversationMessage } from '../../lib/smsConversation'
 import { useDialWheel } from './useDialWheel'
+import './bubbleChains.css'
 
 /**
  * How long after a chain is hidden its conversation rewinds to the start. Past the
