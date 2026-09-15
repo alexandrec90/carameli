@@ -588,6 +588,37 @@ blocked commit or a rejected push comes back verbatim in that line, with a remin
 The summary box is optional. What you type becomes both the branch slug and the commit
 subject; empty falls back to a generic one.
 
+### Where an edit is implemented
+
+Config edits live in `configOps.ts` (React-free; it re-exports `configSeed.ts` and
+`configHydrate.ts`), grid edits in `panelGridOps.ts`, and the chain list's lifecycle in
+`chainOps.ts`. `reconcile.ts` settles links, ids and lists after any bubble-touching edit;
+`chainCreate.ts` builds a whole conversation, and `chainFrame.ts` is where the editor puts
+its rows.
+
+## The working copy, and the two ways it bites
+
+Save writes the served tree directly, and the editor's own copy of the design lives in
+`localStorage`, outliving every merge, checkout and pull. Both facts have cost sessions a
+diagnosis by reading as a fault in the checked-out branch.
+
+- **A `layoutConfig.ts` you did not edit is somebody's unsaved design.** A tab left open
+  mid-design plants half-built balloons in whatever worktree ran the dev server. Answer:
+  `git stash push -- <that file>`, never fill in the missing tails by hand.
+- **A tab *behind* the file overwrites it.** A tab opened before a change writes the
+  pre-change layout back on its next Save, indistinguishable from a revert.
+  `editor/configStamp.ts` fingerprints the config the payload hydrated from; a mismatch
+  with the bundle's blocks the editor in red and makes Save ask once. A pre-stamp payload
+  is **not** warned about — a warning on every one would be dismissed the day it was
+  right.
+
+**A copy with no edits in it is dropped for the file on boot** (`holdsNoEdits` in
+`editorStorage.ts`). A tab opened, never touched and left behind a merge used to go on
+showing the page as it *was*, so the editor and the live page disagreed about where the
+balloons stood and nothing in the editor explained why. Such a copy holds nothing of the
+author's — it equals the file, or the file it was hydrated from — so taking the file costs
+nothing. A copy with work in it is kept, and warned about as above.
+
 ## Dev-only / zero prod cost
 
 The editor is gated behind `import.meta.env.DEV && (?edit=1 OR localStorage flag)`.

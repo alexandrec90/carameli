@@ -286,28 +286,14 @@ framing numbers** in it or the CSS, and no bubble text. Retune in the editor.
 
 **Save overwrites `layoutConfig.ts` verbatim** with what `serialize.ts` emits, so anything
 that module does not write is deleted on the first save — hence the comments emitted as
-headers, and no default, helper or `NEW_IMAGE` living there. Config edits live in
-`configOps.ts` (React-free; re-exports `configSeed.ts` and `configHydrate.ts`), grid edits
-in `panelGridOps.ts`, the chain list's lifecycle in `chainOps.ts`; `reconcile.ts` settles
-links, ids and lists after any bubble-touching edit, `chainCreate.ts` builds a whole
-conversation, `chainFrame.ts` is where the editor puts its rows.
-Two hazards follow from Save writing the served tree directly, and both have cost sessions
-a diagnosis by reading as a fault in the checked-out branch:
-
-- **A `layoutConfig.ts` you did not edit is somebody's unsaved design** — a tab left open
-  mid-design plants half-built balloons in whatever worktree ran the dev server. Answer:
-  `git stash push -- <that file>`, never fill in the missing tails by hand.
-- **A tab *behind* the file overwrites it.** The working copy lives in `localStorage` and
-  outlives every merge, checkout and pull, so a tab opened before a change writes the
-  pre-change layout back on its next Save, indistinguishable from a revert.
-  `editor/configStamp.ts` fingerprints the config the payload hydrated from; a mismatch
-  with the bundle's blocks the editor in red and makes Save ask once. A pre-stamp payload
-  is **not** warned about — a warning on every one would be dismissed the day it was right.
-  **A copy with no edits in it is dropped for the file on boot** (`holdsNoEdits` in
-  `editor/editorStorage.ts`): a tab opened, never touched and left behind a merge used to
-  go on showing the page as it *was*, so the editor and the live page disagreed about
-  where the balloons stood and nothing in the editor explained why. Such a copy holds
-  nothing, so taking the file costs nothing; a copy with work in it is kept and warned.
+headers, and no default, helper or `NEW_IMAGE` living there. `reconcile.ts` settles links,
+ids and lists after any bubble-touching edit; which module owns which edit is the editor
+README's *Where an edit is implemented*.
+Save writes the served tree directly and the working copy lives in `localStorage`, so an
+unsaved design can land in your worktree and a stale tab can write the layout back over a
+change. `configStamp.ts` blocks a behind-the-file tab in red; a copy holding none of the
+author's work is dropped for the file on boot (`holdsNoEdits`, `editorStorage.ts`), one with
+work in it is kept and warned. Both hazards: the editor README's *The working copy*.
 
 `bubbleRect` (`transforms.ts`) gives the bubble box's on-screen geometry to **both** the
 renderer (aiming tubes) and the editor (hit target, selection outline). Keep it shared —
