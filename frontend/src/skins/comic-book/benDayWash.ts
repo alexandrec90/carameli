@@ -1,4 +1,4 @@
-// Ben-Day wash — the comic-book skin's page-transition and loading-screen effect.
+// Ben-Day wash — the comic-book skin's page-transition and loading-screen exit.
 //
 // A wave of paper-colored halftone dots sweeps diagonally from the top-left
 // corner: dots grow until they merge into a solid sheet (cover), the sheet
@@ -7,17 +7,15 @@
 // draws the identical grid, so the transition sheet and the loading screen hand
 // off seamlessly.
 //
-// The grid itself is still: accent dots on paper at one pitch, lit by the spotlight
-// (spotlight.ts). The dot under the pointer is at its fullest, each one further out
-// smaller and fainter, and past the light's reach the grid rests as a faint print.
-// This module is where each dot is and how big; the light is spotlight.ts.
+// The grid itself — where each dot is, how big it is under the light and what colour it
+// prints in — is `benDayGrid.ts`, which every paper surface shares. This module is the
+// wave that passes over it, and the letterbox the page sits in.
 
 import { clamp } from './editor/transforms'
+import { drawGridDots, GRID_PAPER, GRID_SPACING, GRID_SPOT_R } from './benDayGrid'
 import type { Rect } from './panelGeometry'
-import { spotlightAt } from './spotlight'
 import type { SpotlightState } from './spotlight'
 
-export const WASH_SPACING = 20     // px between dot centres (grid shared with the loading sheet)
 export const WASH_BAND = 220       // px depth of the growing/shrinking dot edge
 export const WASH_COVER_MS = 420
 export const WASH_HOLD_MS = 120
@@ -26,23 +24,7 @@ export const WASH_TOTAL_MS = WASH_COVER_MS + WASH_HOLD_MS + WASH_REVEAL_MS
 
 // Dots on a square grid of spacing S merge into a solid plane at radius S·√2/2;
 // the extra margin guarantees the sheet is fully opaque at cover = 1.
-export const WASH_MERGE_RADIUS = WASH_SPACING * 0.75
-
-/** A grid dot the light does not reach: radius in px and alpha. */
-export const GRID_REST_R = 1.5
-export const GRID_REST_ALPHA = 0.2
-/** A grid dot at the centre of the light. */
-export const GRID_SPOT_R = 5
-export const GRID_SPOT_ALPHA = 0.9
-
-export const WASH_PAPER = '#FAFAF2'
-
-export function parseCssColor(hex: string): [number, number, number] {
-    const r = parseInt(hex.slice(1, 3), 16)
-    const g = parseInt(hex.slice(3, 5), 16)
-    const b = parseInt(hex.slice(5, 7), 16)
-    return [r, g, b]
-}
+export const WASH_MERGE_RADIUS = GRID_SPACING * 0.75
 
 export function easeInOutCubic(p: number): number {
     return p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2
@@ -78,76 +60,9 @@ export function dotGrowth(diag: number, cover: number, reveal: number, maxDiag: 
 }
 
 /**
- * Radius and alpha of a grid dot lit `lit` (0..1) by the spotlight. Mixed rather than
- * offset so the ends come out exact: a resting dot is the resting dot, bit for bit.
- */
-export function gridDot(lit: number): { radius: number; alpha: number } {
-    const rest = 1 - lit
-    return {
-        radius: GRID_REST_R * rest + GRID_SPOT_R * lit,
-        alpha: GRID_REST_ALPHA * rest + GRID_SPOT_ALPHA * lit,
-    }
-}
-
-/** The first grid centre at or after `from`: the grid's dots sit at S/2 + k·S, k ≥ 0. */
-function firstCentre(from: number): number {
-    return WASH_SPACING / 2 + WASH_SPACING * Math.max(0, Math.ceil((from - WASH_SPACING / 2) / WASH_SPACING))
-}
-
-// Grid dots over the paper sheet, for the cells of the *viewport's* grid whose centres
-// fall in `region` — the grid never moves with the region, which is what keeps every
-// surface drawing the same dot in the same place. `gate` (0..1 per diagonal distance)
-// fades the grid out where the sheet is not fully merged, so it never floats over raw
-// page. The resting dots are one colour, so they go down as one path and one fill; only
-// the lit ones — a few hundred at most, however large the viewport — carry their own.
-function drawGridDots(
-    ctx: CanvasRenderingContext2D, region: Rect,
-    spot: SpotlightState, accentHex: string, gate: (diag: number) => number,
-) {
-    const rgb = parseCssColor(accentHex).join(',')
-    const right = region.x + region.w
-    const bottom = region.y + region.h
-    // [x, y, how lit, gate] of every dot that is not a plain resting one.
-    const own: Array<[number, number, number, number]> = []
-    ctx.fillStyle = `rgba(${rgb},${GRID_REST_ALPHA})`
-    ctx.beginPath()
-    for (let x = firstCentre(region.x); x < right; x += WASH_SPACING) {
-        for (let y = firstCentre(region.y); y < bottom; y += WASH_SPACING) {
-            const gt = gate(x + y)
-            if (gt <= 0) continue
-            const light = spotlightAt(spot, x, y)
-            if (light <= 0 && gt >= 1) {
-                ctx.moveTo(x + GRID_REST_R, y)
-                ctx.arc(x, y, GRID_REST_R, 0, Math.PI * 2)
-                continue
-            }
-            own.push([x, y, light, gt])
-        }
-    }
-    ctx.fill()
-    for (const [x, y, light, gt] of own) {
-        const { radius, alpha } = gridDot(light)
-        ctx.fillStyle = `rgba(${rgb},${(alpha * gt).toFixed(2)})`
-        ctx.beginPath()
-        ctx.arc(x, y, radius, 0, Math.PI * 2)
-        ctx.fill()
-    }
-}
-
-/** Loading-screen background: solid paper + the full lit grid. */
-export function drawLoadingGrid(
-    ctx: CanvasRenderingContext2D, w: number, h: number,
-    spot: SpotlightState, accentHex: string,
-) {
-    ctx.fillStyle = WASH_PAPER
-    ctx.fillRect(0, 0, w, h)
-    drawGridDots(ctx, { x: 0, y: 0, w, h }, spot, accentHex, () => 1)
-}
-
-/**
  * The letterbox around `sheet` on a `w` × `h` viewport, as up to four rectangles that
  * tile it without overlapping — top and bottom the full width, left and right between
- * them. Overlap would matter: the dots are alpha-blended, so a corner drawn twice is a
+ * them. Overlap would matter: a gated dot is alpha-blended, so a corner drawn twice is a
  * darker corner. A band thinner than a pixel is dropped rather than kept alive to draw
  * nothing; on a viewport of the page's own aspect there are none.
  */
@@ -182,7 +97,7 @@ export function drawMarginGrid(
     ctx.beginPath()
     for (const band of bands) ctx.rect(band.x, band.y, band.w, band.h)
     ctx.clip()
-    ctx.fillStyle = WASH_PAPER
+    ctx.fillStyle = GRID_PAPER
     for (const band of bands) ctx.fillRect(band.x, band.y, band.w, band.h)
     // A dot centred just outside a band still reaches into it by up to its radius; the
     // clip trims what crosses back the other way.
@@ -205,7 +120,7 @@ export function drawWash(
 ) {
     ctx.clearRect(0, 0, w, h)
     const maxDiag = w + h
-    ctx.fillStyle = WASH_PAPER
+    ctx.fillStyle = GRID_PAPER
     // Grid cells share diag = x + y along anti-diagonals, so caching dotGrowth by
     // diag (looked up again below by drawGridDots) avoids recomputing it per cell.
     const growthByDiag = new Map<number, number>()
@@ -217,8 +132,8 @@ export function drawWash(
         }
         return growth
     }
-    for (let x = WASH_SPACING / 2; x < w; x += WASH_SPACING) {
-        for (let y = WASH_SPACING / 2; y < h; y += WASH_SPACING) {
+    for (let x = GRID_SPACING / 2; x < w; x += GRID_SPACING) {
+        for (let y = GRID_SPACING / 2; y < h; y += GRID_SPACING) {
             const growth = growthAt(x + y)
             if (growth <= 0) continue
             ctx.beginPath()

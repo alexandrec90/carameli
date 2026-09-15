@@ -13,7 +13,7 @@ import {
   stepSpotlight,
 } from '../../skins/comic-book/spotlight'
 import type { SpotlightState } from '../../skins/comic-book/spotlight'
-import { WASH_SPACING } from '../../skins/comic-book/benDayWash'
+import { GRID_SPACING } from '../../skins/comic-book/benDayGrid'
 
 // The spotlight: the pointer as the one light on the Ben-Day grid. The step function
 // and the falloff are held here; that the three drawing surfaces spend it is
@@ -64,7 +64,7 @@ describe('spotlightFalloff', () => {
   it('is a pool many dots wide, not a highlight on one', () => {
     // The effect is a grid swelling under the hand. A reach under a few pitches would
     // light one dot at a time and read as a cursor trail.
-    expect(SPOT_REACH).toBeGreaterThan(WASH_SPACING * 6)
+    expect(SPOT_REACH).toBeGreaterThan(GRID_SPACING * 6)
   })
 })
 

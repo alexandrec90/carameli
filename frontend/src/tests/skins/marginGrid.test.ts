@@ -2,15 +2,18 @@ import { describe, expect, it } from 'vitest'
 
 import {
   drawLoadingGrid,
+  gridDotRadius,
+  gridInk,
+  GRID_ALPHA,
+  GRID_PAPER,
+  GRID_REST_R,
+  GRID_SPACING,
+  GRID_SPOT_R,
+} from '../../skins/comic-book/benDayGrid'
+import {
   drawMarginGrid,
   drawWash,
   letterboxBands,
-  gridDot,
-  GRID_REST_ALPHA,
-  GRID_REST_R,
-  GRID_SPOT_R,
-  WASH_PAPER,
-  WASH_SPACING,
 } from '../../skins/comic-book/benDayWash'
 import { pageSheet } from '../../skins/comic-book/MarginGrid'
 import { frameRect, OUTER_M, PAGE_ASPECT } from '../../skins/comic-book/panelGeometry'
@@ -49,9 +52,9 @@ interface Recorder {
 }
 
 /**
- * Arcs are recorded at fill time with the style then set: the resting dots go down as
- * one path under one style, the lit ones each under their own, and only the fill says
- * which colour a path was painted in.
+ * Arcs are recorded at fill time with the style then set: the field goes down as one
+ * path under one style — every dot the same ink, whatever the light is doing to its
+ * size — and only the wash's gated dots carry a style of their own.
  */
 function recorder(): Recorder {
   let fillStyle = ''
@@ -189,7 +192,7 @@ describe('drawMarginGrid', () => {
     expect(drawn).toBe(true)
     expect(rec.clips).toEqual(bands)
     expect(rec.fills.map(f => ({ x: f.x, y: f.y, w: f.w, h: f.h }))).toEqual(bands)
-    expect(rec.fills.every(f => f.style === WASH_PAPER)).toBe(true)
+    expect(rec.fills.every(f => f.style === GRID_PAPER)).toBe(true)
     expect(rec.saves).toBe(1)
     expect(rec.restores).toBe(1)
     // Every dot is in a band, or close enough to one that its disc reaches in.
@@ -218,7 +221,7 @@ describe('drawMarginGrid', () => {
       // On the loading screen's grid, at the radius and in the colour it drew there. A
       // light measured from the band's own origin rather than the viewport's would put a
       // seam down the letterbox the moment the loading sheet washed away.
-      expect((a.x - WASH_SPACING / 2) % WASH_SPACING).toBe(0)
+      expect((a.x - GRID_SPACING / 2) % GRID_SPACING).toBe(0)
       expect(byCentre.get(key(a))?.r).toBe(a.r)
       expect(byCentre.get(key(a))?.style).toBe(a.style)
       if (a.r > GRID_REST_R) litSeen += 1
@@ -241,21 +244,32 @@ describe('drawMarginGrid', () => {
     expect(left.length).toBeGreaterThan(0)
     expect(right.length).toBeGreaterThan(0)
     expect(new Set(rec.arcs.map(a => a.style)).size).toBe(1)
-    expect(rec.arcs[0].style).toBe(`rgba(0,174,239,${GRID_REST_ALPHA})`)
+    expect(rec.arcs[0].style).toBe(`rgba(${gridInk('#00AEEF').join(',')},${GRID_ALPHA})`)
   })
 })
 
 // ── The light reaches the drawn sheet ────────────────────────────────────────
 
 describe('the grid is lit by the spotlight', () => {
-  it('rests as one small, faint print with the light out', () => {
+  it('rests as one small print in full ink with the light out', () => {
     const rec = recorder()
     drawLoadingGrid(rec.ctx, 400, 300, SPOT_OFF, '#FFE033')
     expect(rec.arcs).toHaveLength(20 * 15)
     for (const a of rec.arcs) {
       expect(a.r).toBe(GRID_REST_R)
-      expect(alphaOf(a.style)).toBe(GRID_REST_ALPHA)
+      expect(alphaOf(a.style)).toBe(GRID_ALPHA)
     }
+  })
+
+  /* The grid is a print, and a print does not brighten where you look at it. Every dot
+     on the sheet is the same ink — the only thing the light touches is the size — so a
+     pointer nowhere near the corner leaves the corner as readable as the pool. */
+  it('prints the whole sheet in one flat ink, lit and unlit alike', () => {
+    const rec = recorder()
+    drawLoadingGrid(rec.ctx, 800, 600, LEFT_LIT, '#FFE033')
+    const ink = `rgba(${gridInk('#FFE033').join(',')},${GRID_ALPHA})`
+    expect(new Set(rec.arcs.map(a => a.style))).toEqual(new Set([ink]))
+    expect(new Set(rec.arcs.map(a => a.r)).size).toBeGreaterThan(1)
   })
 
   it('swells the dot under the light to its fullest and the rest by their distance', () => {
@@ -266,9 +280,7 @@ describe('the grid is lit by the spotlight', () => {
     const at = (x: number, y: number) => rec.arcs.find(a => a.x === x && a.y === y)
     expect(at(90, 390)?.r).toBe(GRID_SPOT_R)
     for (const a of rec.arcs) {
-      const { radius, alpha } = gridDot(spotlightAt(LEFT_LIT, a.x, a.y))
-      expect(a.r).toBeCloseTo(radius, 9)
-      expect(alphaOf(a.style)).toBeCloseTo(alpha, 2)
+      expect(a.r).toBeCloseTo(gridDotRadius(spotlightAt(LEFT_LIT, a.x, a.y)), 9)
     }
   })
 
@@ -283,7 +295,7 @@ describe('the grid is lit by the spotlight', () => {
     for (const a of resting) expect(Math.hypot(a.x - 610, a.y - 410)).toBeGreaterThanOrEqual(SPOT_REACH)
   })
 
-  it('dims the whole pool as the light fades rather than shrinking it', () => {
+  it('eases the whole pool back to the resting print as the light goes out', () => {
     const full = recorder()
     drawLoadingGrid(full.ctx, 400, 400, LEFT_LIT, '#FFE033')
     const half = recorder()
@@ -292,7 +304,8 @@ describe('the grid is lit by the spotlight', () => {
     const centreHalf = half.arcs.find(a => a.x === 90 && a.y === 390)
     expect(centreHalf?.r).toBeLessThan(centreFull?.r ?? 0)
     expect(centreHalf?.r).toBeGreaterThan(GRID_REST_R)
-    expect(alphaOf(centreHalf?.style ?? '')).toBeLessThan(alphaOf(centreFull?.style ?? ''))
+    // A half-present light is a smaller dot in the same ink, not a fainter one.
+    expect(centreHalf?.style).toBe(centreFull?.style)
   })
 
   it('carries the light onto the wash sheet, gated to where the sheet is solid', () => {
@@ -303,7 +316,7 @@ describe('the grid is lit by the spotlight', () => {
     const grid = rec.arcs.filter(a => a.style.startsWith('rgba('))
     expect(grid.length).toBeGreaterThan(0)
     expect(grid.length).toBeLessThan(40 * 30)
-    const paper = rec.arcs.filter(a => a.style === WASH_PAPER)
+    const paper = rec.arcs.filter(a => a.style === GRID_PAPER)
     expect(paper.length).toBeGreaterThan(grid.length)
     const loading = recorder()
     drawLoadingGrid(loading.ctx, 800, 600, LEFT_LIT, '#FFE033')
