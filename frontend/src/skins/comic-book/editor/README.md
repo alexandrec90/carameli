@@ -447,8 +447,9 @@ different images can only crossfade. A new bubble type belongs in `bubbleShape.t
      seam's end — on its body the result would be a T-junction), so a corner can be
      placed exactly in line with a seam it does not join.
    - **Click a panel, then Split top / bottom or Split left / right** to make a new
-     panel: a straight cut through the middle of the panel's box, on all three window
-     shapes of its page at once. The upper or left half keeps the panel's name,
+     panel — offered in **either mode**, wherever a panel is selected, beside **Hide**
+     and **Delete** (`PanelActions.tsx`): a straight cut through the middle of the
+     panel's box, on all three window shapes of its page at once. The upper or left half keeps the panel's name,
      pattern, pictures and bubbles; the other half is appended to `PANELS` as a new
      panel with a numbered copy of the name (`Mechanic` → `Mechanic 2`) and the same
      pattern, and is selected. The new line is an ordinary seam — drag it, bend it,
@@ -458,8 +459,23 @@ different images can only crossfade. A new bubble type belongs in `bubbleShape.t
      inspector, when any of the three grids cannot take it — a panel whose outline
      bends back across its own middle; straighten it first. A panel made this way has
      no shipped shape, so **Reset shapes** leaves it with an empty ring on that window
-     shape until it is split off again; and there is no delete — merge its seams away
-     and it keeps its slot.
+     shape until it is shown again.
+   - **Hide on *shape*** takes the selected panel off the grid on screen and no other:
+     its space goes to the neighbour across its longest boundary (`panelGridAbsorb.ts`),
+     the seam between them is erased, and the panel keeps its slot, its name and its
+     pictures and bubbles — it is simply not drawn at that shape, exactly as a panel is
+     not drawn on the page it is not on. A page can therefore show five panels in
+     landscape and three in portrait. Refused when nothing can take the space — the
+     panel is the only one on that grid, or the two outlines touch in two places.
+   - A hidden panel is listed under the selected panel's actions as **Show *name*
+     below** / **beside**: it comes back as the lower or right half of the selected
+     panel, cut exactly as a split is, on this grid only. The rows appear only while the
+     page has a panel hidden on the shape on screen.
+   - **Delete panel** takes it off every shape and out of `PANELS`, pictures and bubbles
+     with it (`configPanelsRemove.ts`). This is the one edit after which a panel index
+     moves — every later panel and everything naming one by index moves down one — so it
+     is one pure function, and the editor drops its selection. Refused whole when some
+     grid of the page cannot give the space away: hide it there first.
    - Rename a panel from the **name** field of its inspector, in either mode.
    - **Arrow keys** nudge the selected vertex (hold **⇧** for x10); **Esc** deselects.
    - The gutter between panels stays the same width at every angle — it is measured
@@ -575,7 +591,10 @@ bubbleTypes.ts      BubbleType + BUBBLE_TYPES (lettering font per type) — ship
 layoutConfig.ts     PANELS (the slots `panel` indexes — label, isLogo, page) beside the framing data
 serializePanels.ts  the PANELS block of layoutConfig.ts, prose and all
 configPanels.ts     PURE: split a panel — list, patterns and all six grids together — and rename one
+configPanelsRemove.ts PURE: hide a panel on one shape, show it again, delete it (the one renumbering edit)
 panelGridCut.ts     PURE: cut one ring in two along a straight line, inserting the crossings
+panelGridAbsorb.ts  PURE: erase the seam to a neighbour so a ring empties, and cut into an empty slot
+PanelActions.tsx    what a selected panel can have done to it: split, hide, show a hidden one, delete — both modes
 ../PanelImages.tsx  one panel's pictures: filters the array by panel, frames and clips each
 ../bubbleBox.ts     PURE authoring box: viewBox, base ellipse, TAIL_DIRS + tail geometry
 ../bubbleShape.ts   PURE outline geometry: the shared vertex ring, per-type modulation, morph lerp

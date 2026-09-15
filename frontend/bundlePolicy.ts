@@ -113,8 +113,30 @@ export const MAX_EAGER_BYTES = 316 * 1024
  * (collision placement, interleave and zig-zag) and the row stamper in `bubbleChain.ts`
  * that gives each row its own width, stretch and lean. Still 46 chunks, `package.json`
  * untouched. 264 rather than 263 for the same reason as before: a kilobyte clear, not flush.
+ *
+ * This raise (264 → 268) is hiding a panel per window shape, deleting one outright, and
+ * cutting either from the inspector or the toolbar: 3.71 KB measured as this branch's
+ * build (266.95 KB) against a build of the same checkout with the branch's comic-book and
+ * test changes reverted (263.24 KB, same `node_modules`). The bytes are
+ * `configPanelsRemove.ts` (hide, show and delete over a whole config),
+ * `panelGridAbsorb.ts` (which neighbour takes the freed space, and the cut that gives it
+ * back) and `PanelActions.tsx`. 0.15 KB of the 3.71 is not the feature but the shape the
+ * structural ratchet asked for: `useGridEdits` split into `useGridShape` and
+ * `usePanelList` to come back under the 80-line function limit. Still 46 chunks,
+ * `package.json` untouched.
+ *
+ * Note what this ceiling is really holding up, because the next raise should not have to
+ * rediscover it: **31.2 KB of that 266.95 is the dev-only editor engine, shipping to every
+ * production visitor.** `Layout.tsx` imports `useEditorMode` statically — it is a hook, so
+ * the call cannot be conditional — and that one edge pulls in `useWorkingCopy`,
+ * `useContentEdits`, `useCallEdits`, `useGridEdits`, `configPanels`, `configPages` and
+ * `editorStorage`. Only the overlay's *UI* is behind the `import.meta.env.DEV` gate and
+ * the lazy `import()`. Stubbing the engine out measures the chunk at 235.60 KB and the
+ * total at 995.92 KB, so cutting that edge would put both roughly 30 KB clear and end the
+ * run of raises this comment records. It is a hooks refactor with its own tests, not a
+ * line to slip into a feature branch, so it is filed rather than done here.
  */
-export const MAX_LAZY_CHUNK_BYTES = 264 * 1024
+export const MAX_LAZY_CHUNK_BYTES = 268 * 1024
 
 /**
  * Every `.js` file in `dist/assets/`, summed. Today 956.6 KB across 46 chunks; the
@@ -301,8 +323,17 @@ export const MAX_LAZY_CHUNK_BYTES = 264 * 1024
  * `comic-book` chunk. 1022.87 KB on this branch against 1020.61 KB with its frontend
  * changes reverted; the two deltas are the same 2,312 bytes, so nothing landed outside
  * that chunk. Still 46 chunks, `package.json` untouched.
+ *
+ * This raise (1024 → 1029) is the same 3.71 KB {@link MAX_LAZY_CHUNK_BYTES} carries, and
+ * nothing else: hiding, deleting and cutting a panel, all in the lazy `comic-book` chunk.
+ * 1027.27 KB on this branch against 1023.56 KB with its comic-book and test changes
+ * reverted; the two deltas are the same 3,795 bytes, so nothing landed outside that
+ * chunk. Still 46 chunks, `package.json` untouched. Both ceilings move for the same
+ * reason the 1020 → 1022 paragraph gives — one cost, counted once, showing up in two
+ * constants because the chunk sat within a kilobyte of one and the total within half a
+ * kilobyte of the other.
  */
-export const MAX_TOTAL_JS_BYTES = 1024 * 1024
+export const MAX_TOTAL_JS_BYTES = 1029 * 1024
 
 /**
  * Every `.css` file in `dist/assets/`, summed. Today 44.2 KB across 2 files.

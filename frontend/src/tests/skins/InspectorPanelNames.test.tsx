@@ -17,7 +17,7 @@ describe('InspectorPanel names', () => {
       setImg: vi.fn(),
     } as unknown as EditorModeApi
 
-    render(<InspectorPanel api={api} panel={9} />)
+    render(<InspectorPanel api={api} panel={9} kind="landscape" />)
 
     const name = screen.getByRole('textbox', { name: 'panel name' })
     expect((name as HTMLInputElement).value).toBe('Phone')

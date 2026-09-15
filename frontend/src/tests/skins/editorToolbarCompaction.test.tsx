@@ -139,7 +139,7 @@ describe('the selection read-out', () => {
     const index = config.images.findIndex(i => !i.table && !i.numberPad)
     const api = editorApi(config)
     render(
-      <InspectorPanel api={{ ...api, selected: { kind: 'img', index } }} panel={config.images[index].panel} />,
+      <InspectorPanel api={{ ...api, selected: { kind: 'img', index } }} panel={config.images[index].panel} kind="landscape" />,
     )
 
     expect(screen.queryByText('offsetY')).toBeNull()
@@ -154,7 +154,7 @@ describe('the selection read-out', () => {
     const index = config.images.findIndex(i => !i.table && !i.numberPad)
     const api = editorApi(config)
     render(
-      <InspectorPanel api={{ ...api, selected: { kind: 'img', index } }} panel={config.images[index].panel} />,
+      <InspectorPanel api={{ ...api, selected: { kind: 'img', index } }} panel={config.images[index].panel} kind="landscape" />,
     )
 
     expect(screen.getByTitle(/the round grip pans the picture inside/)).toBeTruthy()

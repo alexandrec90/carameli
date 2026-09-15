@@ -1,3 +1,4 @@
+import type { LayoutKind } from '../panelGeometry'
 import { PATTERN_STYLES, PATTERN_STYLE_KEYS } from '../panelPatterns'
 import type { PanelBgStyle } from '../panelPatterns'
 import { assetLabel } from './assets'
@@ -7,6 +8,7 @@ import CallSeamFields from './CallSeamFields'
 import ChainInspector from './ChainInspector'
 import Hint from './Hint'
 import ImageInspector from './ImageInspector'
+import PanelActions from './PanelActions'
 import PanelNameField from './PanelNameField'
 import Section from './Section'
 import { indicesOnPanel } from './configOps'
@@ -16,6 +18,8 @@ interface InspectorPanelProps {
   api: EditorModeApi
   /** Index of the panel the selection sits on, into the config's panel list. */
   panel: number
+  /** The grid on screen, for the panel actions that act on one shape or hold it still. */
+  kind: LayoutKind
 }
 
 /** Trim drag-produced floats to 2 decimals for the read-out (drops trailing zeros). */
@@ -29,7 +33,9 @@ const KEYS = {
     'Drag to move the frame · corner handle resizes it · the round grip pans the picture '
     + 'inside · wheel zooms · arrows nudge (⇧×10, ⌥ pans) · +/− · Del · Esc',
   bubble: 'Drag to move · handle to resize/rotate · arrows nudge (⇧×10) · +/− · Del · Esc',
-  panel: 'Click a picture or a bubble on this panel to edit it, or add another below.',
+  panel:
+    'Click a picture or a bubble on this panel to edit it, or add another below. The panel '
+    + 'itself can be cut in two, hidden on one window shape, or deleted.',
 }
 
 /**
@@ -38,7 +44,7 @@ const KEYS = {
  * controls live in ImageInspector and BubbleInspector. Rendered inside the toolbar by
  * EditorOverlay only when something is selected.
  */
-export default function InspectorPanel({ api, panel }: InspectorPanelProps) {
+export default function InspectorPanel({ api, panel, kind }: InspectorPanelProps) {
   const { selected, config } = api
   if (!selected) return null
 
@@ -50,7 +56,8 @@ export default function InspectorPanel({ api, panel }: InspectorPanelProps) {
   // A selected panel is a slot, not a drawn thing: it has no transform to read out and
   // nothing to reset — but the slot does own two editable attributes, its name and its
   // Ben-Day background pattern. It also exists so "+ Image" / "+ Bubble" have somewhere
-  // to add, and (in shapes mode) so a panel can be cut in two.
+  // to add, and so the slot itself can be cut, hidden on a shape, or deleted — the same
+  // PanelActions shapes mode shows, because a panel is selected in either.
   if (selected.kind === 'panel') {
     const imgs = indicesOnPanel(config.images, panel).length
     const bubbles = indicesOnPanel(config.bubbles, panel).length
@@ -74,6 +81,7 @@ export default function InspectorPanel({ api, panel }: InspectorPanelProps) {
         <div className="cb-ed-hint">
           {imgs} picture{imgs === 1 ? '' : 's'} · {bubbles} bubble{bubbles === 1 ? '' : 's'}
         </div>
+        <PanelActions api={api} panel={panel} kind={kind} />
       </>
     )
   }
