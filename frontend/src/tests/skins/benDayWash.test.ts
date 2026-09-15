@@ -3,24 +3,19 @@ import { describe, expect, it } from 'vitest'
 import {
   dotGrowth,
   easeInOutCubic,
-  gridDot,
-  parseCssColor,
   washPhaseAt,
-  GRID_REST_ALPHA,
-  GRID_REST_R,
-  GRID_SPOT_ALPHA,
-  GRID_SPOT_R,
   WASH_BAND,
   WASH_COVER_MS,
   WASH_HOLD_MS,
   WASH_MERGE_RADIUS,
   WASH_REVEAL_MS,
-  WASH_SPACING,
   WASH_TOTAL_MS,
 } from '../../skins/comic-book/benDayWash'
+import { GRID_SPACING } from '../../skins/comic-book/benDayGrid'
 
-// The wash's geometry and timings, and the grid dot's size under the light. The light
-// itself is spotlight.test.ts; what the three surfaces draw with it is marginGrid.test.ts.
+// The wash's geometry and timings. The grid the wave passes over is benDayGrid.test.ts,
+// the light is spotlight.test.ts, and what the surfaces draw with both is
+// marginGrid.test.ts.
 
 describe('easeInOutCubic', () => {
   it('pins the endpoints and midpoint', () => {
@@ -122,47 +117,9 @@ describe('dotGrowth', () => {
   })
 })
 
-describe('parseCssColor', () => {
-  it('parses hex colors to RGB triples', () => {
-    expect(parseCssColor('#FFE033')).toEqual([255, 224, 51])
-    expect(parseCssColor('#111111')).toEqual([17, 17, 17])
-    expect(parseCssColor('#FAFAF2')).toEqual([250, 250, 242])
-  })
-})
-
-describe('gridDot', () => {
-  it('rests small and faint, and is fullest at the centre of the light', () => {
-    expect(gridDot(0)).toEqual({ radius: GRID_REST_R, alpha: GRID_REST_ALPHA })
-    expect(gridDot(1)).toEqual({ radius: GRID_SPOT_R, alpha: GRID_SPOT_ALPHA })
-  })
-
-  it('grows and darkens together as the light reaches it', () => {
-    let prev = gridDot(0)
-    for (let lit = 0.1; lit <= 1; lit += 0.1) {
-      const dot = gridDot(lit)
-      expect(dot.radius).toBeGreaterThan(prev.radius)
-      expect(dot.alpha).toBeGreaterThan(prev.alpha)
-      prev = dot
-    }
-  })
-
-  it('never merges: a lit dot stays clear of its neighbours', () => {
-    // The grid has to stay a grid under the light. At half the pitch the dots would
-    // touch and the pool would read as a solid blot, not as halftone swelling.
-    expect(GRID_SPOT_R).toBeLessThan(WASH_SPACING / 2)
-    expect(GRID_SPOT_R).toBeLessThan(WASH_MERGE_RADIUS)
-  })
-
-  it('rests visibly: the resting grid is a print, not blank paper', () => {
-    expect(GRID_REST_R).toBeGreaterThan(0.5)
-    expect(GRID_REST_ALPHA).toBeGreaterThan(0.1)
-    expect(GRID_SPOT_ALPHA).toBeLessThanOrEqual(1)
-  })
-})
-
 describe('wash coverage', () => {
   it('merge radius makes fully grown dots cover the plane', () => {
     // Circles on a square grid of spacing S tile the plane at radius ≥ S·√2/2.
-    expect(WASH_MERGE_RADIUS).toBeGreaterThanOrEqual((WASH_SPACING * Math.SQRT2) / 2)
+    expect(WASH_MERGE_RADIUS).toBeGreaterThanOrEqual((GRID_SPACING * Math.SQRT2) / 2)
   })
 })
