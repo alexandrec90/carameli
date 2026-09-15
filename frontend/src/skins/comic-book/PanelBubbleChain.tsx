@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 
 import {
-  chainColumns, chainRowLinks, chainTranscript, clampHead, conversationRows, growTarget,
+  chainColumns, chainRowLinks, chainTranscript, clampHead, growTarget,
   isComposerContent, messageRows, OUT_PREFIX, readTranscript, smsTranscript, stepHead,
   TYPING_KEY, visibleWindow,
 } from './bubbleChain'
 import type { BubbleChain } from './bubbleChain'
+import { conversationRows } from './chainRows'
 import { tubeBetween } from './bubbleTube'
 import PanelBubble from './PanelBubble'
 import { bubbleRect } from './editor/transforms'

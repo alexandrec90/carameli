@@ -3,7 +3,7 @@ import type { FitMetrics } from './bubbleFit'
 import type { BubbleTransform } from './editor/types'
 
 // Where a conversation's balloons go, once each one knows its size. Pure geometry in the
-// panel box's % units, used by `conversationRows` (bubbleChain.ts) and nothing measured.
+// panel box's % units, used by `conversationRows` (chainRows.ts) and nothing measured.
 //
 // The rule this replaces was two ruled columns: every row of a side hung from the same
 // edge and sat wholly above the row below it, whichever side that was. A conversation of
@@ -135,7 +135,7 @@ export function chainRowTop(
  *
  * `below` is the row before this one in the conversation, which is the last one placed
  * unless the caller placed some rows out of order — an anchored balloon, say, that had to
- * be on the panel before the rows that must clear it (see `placeRows`, bubbleChain.ts).
+ * be on the panel before the rows that must clear it (see `placeRows`, chainRows.ts).
  */
 export function stackedTop(
   placed: readonly PlacedRow[],

@@ -9,7 +9,6 @@ import {
   chainMembers,
   chainTranscript,
   clampHead,
-  conversationRows,
   defaultChain,
   growTarget,
   isBubbleChain,
@@ -26,6 +25,7 @@ import type { BubbleChain, ChainRow } from '../../skins/comic-book/bubbleChain'
 import { fitMessage } from '../../skins/comic-book/bubbleFit'
 import { anchorOf } from '../../skins/comic-book/chainAnchor'
 import { CHAIN_ROW_GAP, rowEllipse } from '../../skins/comic-book/chainLayout'
+import { conversationRows } from '../../skins/comic-book/chainRows'
 import type { ChainMetrics } from '../../skins/comic-book/chainLayout'
 import { NEW_BUBBLE } from '../../skins/comic-book/editor/configSeed'
 import type { BubbleTransform } from '../../skins/comic-book/editor/types'

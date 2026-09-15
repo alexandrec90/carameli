@@ -13,7 +13,7 @@ import type { BubbleTransform } from './editor/types'
 // placed by its anchor instead: the tip of its tail, or the centre of its ellipse when it
 // has none. It grows and shrinks around that point, and the tail keeps pointing where the
 // author pointed it. Pure geometry, in the panel box's % units; `placeRows` in
-// bubbleChain.ts is what calls it.
+// chainRows.ts is what calls it.
 
 /** A point on the panel: x in % of the box width, y in % of its height — `top`'s units. */
 export type PanelPoint = [number, number]

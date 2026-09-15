@@ -4,9 +4,10 @@ import { describe, expect, it, vi } from 'vitest'
 import PanelBubbleChain from '../../skins/comic-book/PanelBubbleChain'
 import type { LiveConversation } from '../../skins/comic-book/PanelBubbleChain'
 import {
-  chainColumns, conversationRows, readTranscript, TYPING_KEY,
+  chainColumns, readTranscript, TYPING_KEY,
 } from '../../skins/comic-book/bubbleChain'
 import type { BubbleChain } from '../../skins/comic-book/bubbleChain'
+import { conversationRows } from '../../skins/comic-book/chainRows'
 import { NEW_BUBBLE } from '../../skins/comic-book/editor/configSeed'
 import type { BubbleTransform } from '../../skins/comic-book/editor/types'
 import { smsMessage } from './smsStub'
