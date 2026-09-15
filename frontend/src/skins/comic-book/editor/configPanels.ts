@@ -1,4 +1,4 @@
-import type { LayoutKind } from '../panelGeometry'
+import type { LayoutKind, Rect } from '../panelGeometry'
 import { PANEL_PAGES } from '../panels'
 import type { Panel } from '../panels'
 import { PATTERN_STYLE_KEYS } from '../panelPatterns'
@@ -45,10 +45,10 @@ export function nextPanelLabel(base: string, taken: string[]): string {
   }
 }
 
-/** Which grid the author is looking at, so its content can be held still. */
+/** Which grid the author is looking at, and the frame it is drawn in, so its content can be held still. */
 export interface SplitView {
   kind: LayoutKind
-  viewport: { w: number; h: number }
+  frame: Rect
 }
 
 /**
@@ -65,7 +65,8 @@ export interface SplitView {
  * parent — they name it — and in the grid the author is looking at they are also held
  * still on screen (`view`), so a picture that spanned the whole panel now hangs over
  * the new seam rather than shrinking into the top half. The other two grids are not
- * on screen and get no such treatment; the author sees them by resizing the window.
+ * on screen and get no such treatment; the author reaches them through the toolbar's
+ * shape selector.
  *
  * The other page's grids gain an empty ring, as every panel has on the page it is not
  * on. `cutPanel` does the geometry; this decides what goes with it.
@@ -90,9 +91,8 @@ export function splitPanel(
       const cut = cutPanel(grid, panel, axis)
       if (!cut || cut.index !== index) return null
       if (view && view.kind === kind) {
-        const { w, h } = view.viewport
-        next.images = remapImagesToGrid(next.images, grid, cut.grid, w, h)
-        next.bubbles = remapBubblesToGrid(next.bubbles, grid, cut.grid, w, h)
+        next.images = remapImagesToGrid(next.images, grid, cut.grid, view.frame)
+        next.bubbles = remapBubblesToGrid(next.bubbles, grid, cut.grid, view.frame)
       }
       next.grids[page][kind] = cut.grid
     }

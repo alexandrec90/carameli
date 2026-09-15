@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from 'react'
 
+import type { LayoutKind } from '../panelGeometry'
 import { setPanelLabel as setPanelLabelIn } from './configPanels'
 import { setPageLabel as setPageLabelIn } from './configPages'
 import { detectActive } from './editorStorage'
@@ -7,7 +8,7 @@ import type { EditMode, Selection, SelectionKind } from './selection'
 import { useCallEdits } from './useCallEdits'
 import type { CallEdits } from './useCallEdits'
 import { useContentEdits } from './useContentEdits'
-import type { ContentEdits } from './useContentEdits'
+import type { ApplyOp, ContentEdits } from './useContentEdits'
 import { useGridEdits } from './useGridEdits'
 import type { GridEdits } from './useGridEdits'
 import { useWorkingCopy } from './useWorkingCopy'
@@ -43,6 +44,15 @@ export interface EditorModeApi extends ContentEdits, CallEdits, GridEdits {
   selected: Selection | null
   mode: EditMode
   setMode(mode: EditMode): void
+  /**
+   * The window shape the page is being held at, or null to follow the window. A page has
+   * one grid per shape and the frame is letterboxed at that shape's aspect whatever the
+   * window's, so an author tunes the portrait grid on a landscape monitor by picking it
+   * here rather than by dragging the window narrow. Transient: it is a way of looking,
+   * not part of the design, so it is neither saved nor persisted.
+   */
+  shape: LayoutKind | null
+  setShape(shape: LayoutKind | null): void
   select(kind: SelectionKind, index: number): void
   clear(): void
   resetAll(): void
@@ -64,6 +74,37 @@ export function shouldRevealImg(
   index: number,
 ): boolean {
   return active && selected?.kind === 'img' && selected.index === index
+}
+
+/** The two renames: a panel's name and a route's display name, each a config op. */
+function useLabelEdits(apply: ApplyOp) {
+  const setPanelLabel = useCallback(
+    (panel: number, label: string) => apply(prev => setPanelLabelIn(prev, panel, label)),
+    [apply],
+  )
+  const setPageLabel = useCallback(
+    (path: string, label: string) => apply(prev => setPageLabelIn(prev, path, label)),
+    [apply],
+  )
+  return { setPanelLabel, setPageLabel }
+}
+
+/**
+ * The window shape the page is held at, or null to follow the window. Switching it drops
+ * the selection: each grid has its own vertex table, so a vertex index carried across
+ * would name a different corner or none.
+ */
+function useHeldShape(
+  setSelected: (next: Selection | null) => void,
+): [LayoutKind | null, (next: LayoutKind | null) => void] {
+  const [shape, setShapeState] = useState<LayoutKind | null>(null)
+  const setShape = useCallback((next: LayoutKind | null) => {
+    setShapeState(prev => {
+      if (prev !== next) setSelected(null)
+      return next
+    })
+  }, [setSelected])
+  return [shape, setShape]
 }
 
 /**
@@ -93,6 +134,8 @@ export function useEditorMode(): EditorModeApi {
     })
   }, [])
 
+  const [shape, setShape] = useHeldShape(setSelected)
+
   const clear = useCallback(() => setSelected(null), [])
 
   // The call edits first: the content adds need to know which layout is on screen, and
@@ -101,15 +144,7 @@ export function useEditorMode(): EditorModeApi {
   const content = useContentEdits(apply, setSelected, call.callPhase)
   const grid = useGridEdits(apply, setSelected, config)
 
-  const setPanelLabel = useCallback(
-    (panel: number, label: string) => apply(prev => setPanelLabelIn(prev, panel, label)),
-    [apply],
-  )
-
-  const setPageLabel = useCallback(
-    (path: string, label: string) => apply(prev => setPageLabelIn(prev, path, label)),
-    [apply],
-  )
+  const { setPanelLabel, setPageLabel } = useLabelEdits(apply)
 
   const resetAll = useCallback(() => {
     copy.reset()
@@ -138,6 +173,8 @@ export function useEditorMode(): EditorModeApi {
       selected,
       mode,
       setMode,
+      shape,
+      setShape,
       select,
       clear,
       resetAll,
@@ -146,8 +183,8 @@ export function useEditorMode(): EditorModeApi {
     }),
     [
       content, call, grid, active, config, copy.stale, copy.drift, copy.untracked,
-      adoptFromFile, selected, mode, setMode, select, clear, resetAll, setPanelLabel,
-      setPageLabel,
+      adoptFromFile, selected, mode, setMode, shape, setShape, select, clear, resetAll,
+      setPanelLabel, setPageLabel,
     ],
   )
 }

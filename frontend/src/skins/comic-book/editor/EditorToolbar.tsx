@@ -10,6 +10,7 @@ import LayoutWarnings from './LayoutWarnings'
 import PageSelect from './PageSelect'
 import type { PageSelectProps } from './PageSelect'
 import ShapeInspector from './ShapeInspector'
+import ShapeSelect from './ShapeSelect'
 import type { EditorModeApi } from './useEditorMode'
 import { useLayoutTransport } from './useLayoutTransport'
 import type { SeamDragApi } from './useSeamDrag'
@@ -74,6 +75,7 @@ export default function EditorToolbar({ api, selPanel, pageSelect, shapes }: Edi
       </div>
 
       <PageSelect {...pageSelect} />
+      <ShapeSelect shape={api.shape} onShape={api.setShape} />
 
       {mode === 'shapes' ? (
         <ShapeInspector api={api} page={shapes.page} kind={shapes.kind} grid={shapes.grid} drag={shapes.drag} />

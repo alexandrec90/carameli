@@ -113,7 +113,7 @@ export interface ImgTransform {
   /**
    * Horizontal pan of the picture inside the frame, in % of the frame's width. A
    * percentage rather than px so the pan is the same fraction of the picture at every
-   * viewport size — the frame is itself a percentage of a panel that resizes with the
+   * viewport size — the frame is itself a percentage of a panel that scales with the
    * window.
    */
   offsetX: number

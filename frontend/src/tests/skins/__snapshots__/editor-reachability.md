@@ -395,6 +395,32 @@ A mutator listed with no control is one an author cannot invoke from the toolbar
 
 - content/panel → select: pattern
 
+## setShape
+
+- content/bubble → select: Shape
+- content/bubble[bound, no picker] → select: Shape
+- content/bubble[chain of one] → select: Shape
+- content/bubble[chained] → select: Shape
+- content/bubble[linked] → select: Shape
+- content/img → select: Shape
+- content/img[number pad] → select: Shape
+- content/img[table] → select: Shape
+- content/nothing → select: Shape
+- content/nothing[behind the file] → select: Shape
+- content/panel → select: Shape
+- content/seam → select: Shape
+- content/vertex → select: Shape
+- shapes/bubble → select: Shape
+- shapes/bubble[chained] → select: Shape
+- shapes/bubble[linked] → select: Shape
+- shapes/img → select: Shape
+- shapes/img[number pad] → select: Shape
+- shapes/img[table] → select: Shape
+- shapes/nothing → select: Shape
+- shapes/panel → select: Shape
+- shapes/seam → select: Shape
+- shapes/vertex → select: Shape
+
 ## splitPanel
 
 - shapes/panel → button: Split left / right

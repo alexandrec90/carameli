@@ -1,4 +1,4 @@
-import { parseCssColor } from './benDayWash'
+import { parseCssColor } from './benDayTint'
 import { SPIN_RATE, WAVE_RATE, travellingWave } from './patternWave'
 
 // ─── Ben-Day dot renderers: focal patterns ───────────────────────────────────

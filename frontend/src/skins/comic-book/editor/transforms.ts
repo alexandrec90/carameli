@@ -30,9 +30,9 @@ export function clamp(v: number, min: number, max: number): number {
  * The frame's px size is derived here from the panel box and the picture's own
  * `width`/`height`, so a caller passes the same panel box it passes
  * {@link dragImgFrame}. A pan is stored as a percentage rather than the px it was
- * dragged by because the frame is itself a percentage of a panel that grows and shrinks
- * with the window — a pan of forty pixels was a different fraction of the picture on
- * every resize.
+ * dragged by because the frame is itself a percentage of a panel that scales with the
+ * window — a pan of forty pixels would be a different fraction of the picture on every
+ * monitor.
  */
 export function dragImg(
   t: ImgTransform,
@@ -363,12 +363,12 @@ export function renderedImgRect(
  * The box a projected surface's `quad` percentages measure: the picture's rendered
  * rect ({@link renderedImgRect}), in the same coordinate space as `frame`.
  *
- * The frame is the wrong base on purpose. The picture is contain-fitted inside it, so
- * the frame's letterboxing redistributes whenever the window's aspect ratio changes —
+ * The frame is the wrong base on purpose. The picture is contain-fitted inside it and
+ * then panned and zoomed, so the frame's letterboxing moves with every pan and zoom —
  * a quad measured against the frame stays glued to the frame while the photograph
- * slides underneath it, and the projected rows walk off the ruled lines on the first
- * resize. Measured against the rendered rect, the quad is a property of the artwork
- * and rides it through a resize, a pan and a zoom alike.
+ * slides underneath it, and the projected rows walk off the ruled lines. Measured
+ * against the rendered rect, the quad is a property of the artwork and rides it
+ * through a pan, a zoom and a change of window shape alike.
  *
  * Deliberately **unclamped**, unlike {@link imgVisibleRect}: a surface keeps its place
  * on picture pixels the panel clip happens to cut off, so a pan that pushes the notepad

@@ -385,10 +385,9 @@ export function messageWidth(text: string, full: number): number {
  *
  * The balloon's box is its width times {@link BUBBLE_ASPECT} — the outline SVG carries a
  * viewBox and the DOM height resolves from it — so converting that to a share of the panel
- * needs the panel's own aspect ratio (`width / height`), which only the DOM knows. That is
- * the one measured number in the layout, and it is a *ratio*, so a chain laid out before
- * the panel has been measured (aspect 1) is still laid out in the right order and merely
- * spaced as though the panel were square.
+ * needs the panel's own aspect ratio (`width / height`). That ratio is a property of the
+ * grid, not of the window: the page frame holds a fixed aspect per window shape, so the
+ * caller reads it off the panel box it drew and nothing is measured back from the DOM.
  */
 export function bubbleHeightPct(width: number, panelAspect: number): number {
   return width * BUBBLE_ASPECT * panelAspect

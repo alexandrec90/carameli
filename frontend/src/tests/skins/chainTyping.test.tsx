@@ -42,6 +42,9 @@ const chain = (over: Partial<BubbleChain> = {}): BubbleChain => ({
   ...over,
 })
 
+/** The panel box the templates resolve against, sized so tubes and rows have room. */
+const BOX = { x: 0, y: 0, w: 400, h: 300 }
+
 const drawn = (container: HTMLElement) => [...container.querySelectorAll('.cb-panel-bubble')]
 
 function bound(over: Partial<LiveConversation> = {}): LiveConversation {
@@ -84,7 +87,7 @@ describe('conversationRows with a typing row', () => {
 describe('PanelBubbleChain with a composing peer', () => {
   it('draws the dots row, marked is-typing, above the composer', () => {
     const { container } = render(
-      <PanelBubbleChain
+      <PanelBubbleChain box={BOX}
         chain={chain()}
         members={columns()}
         visible
@@ -100,7 +103,7 @@ describe('PanelBubbleChain with a composing peer', () => {
 
   it('draws no dots while the peer is not composing', () => {
     const { container } = render(
-      <PanelBubbleChain
+      <PanelBubbleChain box={BOX}
         chain={chain()}
         members={columns()}
         visible
@@ -119,7 +122,7 @@ describe('PanelBubbleChain with a composing peer', () => {
       )
     // A four-row chain holds three messages; with the dots up, two.
     const { rerender } = render(
-      <PanelBubbleChain
+      <PanelBubbleChain box={BOX}
         chain={chain()}
         members={columns()}
         visible
@@ -130,7 +133,7 @@ describe('PanelBubbleChain with a composing peer', () => {
     expect(screen.getByText('m0')).toBeTruthy()
 
     rerender(
-      <PanelBubbleChain
+      <PanelBubbleChain box={BOX}
         chain={chain()}
         members={columns()}
         visible

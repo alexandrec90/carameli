@@ -69,12 +69,14 @@ export default function PanelChainThread({
   // conversation may lean off the panel in the first place. Its half is the
   // conversation's too, for the same reason.
   const sender = members[0]
+  const half = halfFor(sender.call, halves)
 
   return (
-    <BubbleSlot half={halfFor(sender.call, halves)} bounds={bounds} clip={clip} spill={sender.spill}>
+    <BubbleSlot half={half} bounds={bounds} clip={clip} spill={sender.spill}>
       <PanelBubbleChain
         chain={chain}
         members={members}
+        box={half ? half.box : bounds}
         visible={visible}
         interactive={interactive}
         keyboard={keyboard}

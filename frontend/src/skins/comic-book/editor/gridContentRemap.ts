@@ -76,12 +76,15 @@ export function remapBubbleBox(t: BubbleTransform, from: Rect, to: Rect): Bubble
 
 /**
  * One panel-indexed array re-expressed from one grid's panel boxes to another's,
- * measured at the given viewport — the same `window.innerWidth/innerHeight` the renderer
- * draws with, because % of a box only names pixels once the box does.
+ * measured in the given page frame — the same frame the renderer drew the panels in,
+ * because % of a box only names pixels once the box does. The frame's aspect is fixed
+ * per shape, so this is nearly scale-free; the gutter is the exception, a constant px
+ * inset that is a different fraction of a small frame than of a large one, which is why
+ * the frame on screen is passed rather than a nominal one.
  *
  * An item is left alone (same reference) when there is nothing sound to remap against:
  * its panel's box did not change, either box is degenerate (an empty ring — the panel
- * lives on the other page — or a collapsed panel), or the viewport has no size yet.
+ * lives on the other page — or a collapsed panel), or the frame has no size yet.
  */
 function remapPanelItems<T extends { panel: number }>(
   items: T[],
@@ -103,11 +106,10 @@ export function remapImagesToGrid(
   images: ImgTransform[],
   from: PanelGrid,
   to: PanelGrid,
-  w: number,
-  h: number,
+  frame: Rect,
 ): ImgTransform[] {
-  if (w <= 0 || h <= 0) return images
-  return remapPanelItems(images, gridPolys(from, w, h), gridPolys(to, w, h), remapImgFrame)
+  if (frame.w <= 0 || frame.h <= 0) return images
+  return remapPanelItems(images, gridPolys(from, frame), gridPolys(to, frame), remapImgFrame)
 }
 
 /**
@@ -121,11 +123,10 @@ export function remapBubblesToGrid(
   bubbles: BubbleTransform[],
   from: PanelGrid,
   to: PanelGrid,
-  w: number,
-  h: number,
+  frame: Rect,
 ): BubbleTransform[] {
-  if (w <= 0 || h <= 0) return bubbles
-  return remapPanelItems(bubbles, gridPolys(from, w, h), gridPolys(to, w, h), remapBubbleBox)
+  if (frame.w <= 0 || frame.h <= 0) return bubbles
+  return remapPanelItems(bubbles, gridPolys(from, frame), gridPolys(to, frame), remapBubbleBox)
 }
 
 /**
@@ -138,12 +139,12 @@ export function setGridKeepingContent(
   page: PanelPage,
   kind: LayoutKind,
   grid: PanelGrid,
-  viewport: { w: number; h: number },
+  frame: Rect,
 ): EditorConfig {
   const from = config.grids[page][kind]
   const next = setGrid(config, page, kind, grid)
-  next.images = remapImagesToGrid(next.images, from, grid, viewport.w, viewport.h)
-  next.bubbles = remapBubblesToGrid(next.bubbles, from, grid, viewport.w, viewport.h)
+  next.images = remapImagesToGrid(next.images, from, grid, frame)
+  next.bubbles = remapBubblesToGrid(next.bubbles, from, grid, frame)
   return next
 }
 
@@ -157,9 +158,9 @@ export function resetGridKeepingContent(
   config: EditorConfig,
   page: PanelPage,
   kind: LayoutKind,
-  viewport: { w: number; h: number },
+  frame: Rect,
 ): EditorConfig {
   return setGridKeepingContent(
-    config, page, kind, shippedGridFor(page, kind, config.panels.length), viewport,
+    config, page, kind, shippedGridFor(page, kind, config.panels.length), frame,
   )
 }

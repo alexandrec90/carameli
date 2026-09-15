@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest'
 import {
   dotGrowth,
   easeInOutCubic,
-  parseCssColor,
   rippleWave,
   washPhaseAt,
   RIPPLE_WAVE_LEN,
@@ -17,13 +16,7 @@ import {
   WASH_TOTAL_MS,
 } from '../../skins/comic-book/benDayWash'
 
-describe('parseCssColor', () => {
-  it('parses hex colors to RGB triples', () => {
-    expect(parseCssColor('#FFE033')).toEqual([255, 224, 51])
-    expect(parseCssColor('#111111')).toEqual([17, 17, 17])
-    expect(parseCssColor('#FAFAF2')).toEqual([250, 250, 242])
-  })
-})
+// The wash's geometry and timings. What colour its dots are is benDayTint.test.ts.
 
 describe('easeInOutCubic', () => {
   it('pins the endpoints and midpoint', () => {
@@ -140,6 +133,15 @@ describe('rippleWave', () => {
 
   it('travels one wavelength toward the bottom-right per 1/RIPPLE_SPEED seconds', () => {
     expect(rippleWave(300 + RIPPLE_WAVE_LEN, 1 / RIPPLE_SPEED)).toBeCloseTo(rippleWave(300, 0))
+  })
+
+  it('takes over two seconds to carry a crest one wavelength, so it drifts', () => {
+    // The letterbox ripple is the one thing on a resting page that moves, and it moves
+    // for as long as the page is open. Under about two seconds a crest reads as a sheet
+    // being scrolled past the window and pulls the eye off the page; over it the same
+    // wave reads as paper breathing. The tint's own, far slower rates are held against
+    // this one in benDayTint.test.ts.
+    expect(1 / RIPPLE_SPEED).toBeGreaterThan(2)
   })
 })
 

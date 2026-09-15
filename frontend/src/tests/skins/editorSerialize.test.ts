@@ -126,7 +126,7 @@ describe('serializeConfig', () => {
   it('carries the explanatory headers, the same-panel link rule included', () => {
     const ts = serializeConfig(seedConfig())
     expect(ts).toContain('Not parallel to PANELS: each picture names its `panel`')
-    expect(ts).toContain("the panel's own polygon scaled into it")
+    expect(ts).toContain('a rectangle of\n// picture and never a smaller comic panel')
     expect(ts).toContain('must name a bubble on the same panel')
     expect(ts).toContain("`tail` which way the tail points ('none'")
     expect(ts).toContain('Two pairs ship linked')
@@ -178,7 +178,7 @@ describe('serializeConfig', () => {
       '{ panel: 0, top: -35, right: -12, width: 55, rotate: -5, spill: true, ' +
         "type: 'soft', tail: 'down-left', content: 'text', " +
         'text: "It\'s Carameli!", linkTo: 1, ' +
-        "hoverType: 'cloud', clickType: 'lightning', hoverBold: false, chain: '' },",
+        "hoverType: 'cloud', clickType: 'lightning', hoverBold: true, chain: '' },",
     )
   })
 
@@ -225,7 +225,7 @@ describe('serializeConfig', () => {
       clickType: null,
     })
     const ts = serializeConfig(cfg)
-    expect(ts).toContain("linkTo: null, hoverType: null, clickType: null, hoverBold: false, chain: '' },")
+    expect(ts).toContain("linkTo: null, hoverType: null, clickType: null, hoverBold: true, chain: '' },")
     expect(ts).not.toContain("'null'")
   })
 

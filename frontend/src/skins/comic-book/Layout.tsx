@@ -1,35 +1,23 @@
-import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useMemo, useRef, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import type { LayoutProps } from '../types'
 import { isBubbleRevealed } from './bubbleTube'
 import BubbleTubes from './BubbleTubes'
 import ComicPanel from './ComicPanel'
 import { LoadingOverlay, useLoadingScreen } from './LoadingOverlay'
+import MarginRipple from './MarginRipple'
 import PanelInk from './PanelInk'
-import { gridPolys, layoutKindFor } from './panelGeometry'
 import { activeLayout, useCallLayout, useDrawnImageCount } from './layoutSource'
+import { accentForPath } from './pageAccent'
 import { pageForPath } from './panels'
 import { softphoneActions } from './phoneActions'
 import { usePanelDots } from './usePanelDots'
 import { usePanelHover } from './usePanelHover'
 import { shouldRevealImg, useEditorMode } from './editor/useEditorMode'
 import { useLiveTableImages } from './useLiveTableImages'
+import { pageFrameStyle, panelPolysIn, usePageFrame } from './usePageFrame'
 import { usePageWash } from './usePageWash'
 import './comic-book.css'
-import './bubbles.css'
-import './bubbleChains.css'
-
-// ─── Page-accent map ─────────────────────────────────────────────────────────
-
-const PAGE_ACCENT: Record<string, string> = {
-    '/': '#FFE033',
-    '/phone-lines': '#0057B8',
-    '/extensions': '#E8003D',
-}
-
-function accentForPath(path: string): string {
-    return PAGE_ACCENT[path] ?? '#00AEEF'
-}
 
 // ─── Panel contents ─────────────────────────────────────────────────────────
 // A panel is a slot in the grid and nothing more: its label, whether it is the logo
@@ -76,22 +64,15 @@ export function Layout({ navItems, sms, softphone }: LayoutProps) {
 
     const settledCountRef = useRef(0)
 
-    // The viewport, not the polygons. The shapes are *derived* from it, the page and
-    // the grid just below, which is what lets a drag in the shape editor repaint
-    // immediately: holding computed polygons in state meant nothing but a resize
-    // could change them.
-    const [viewport, setViewport] = useState<{ w: number; h: number }>(() =>
-        typeof window === 'undefined' ? { w: 0, h: 0 } : { w: window.innerWidth, h: window.innerHeight })
-    const layoutKind = layoutKindFor(viewport.w, viewport.h)
-    // Sparse, PANELS-length: a panel on the other page has an empty ring in this
-    // page's grid, which gridPolys returns as a vertex-less polygon — mapped to null
-    // here so every consumer can tell "not on this page" from a real shape.
+    // The page frame and which of the three grids it holds: the window's shape, or the
+    // one the editor is previewing. Everything on the page is a fraction of this frame
+    // (./usePageFrame.ts), so it is the only thing here that knows the window's size —
+    // the viewport comes back with it for the one layer drawn outside the frame.
+    const { kind: layoutKind, frame, viewport } = usePageFrame(editor.shape)
+    // Sparse, PANELS-length: null where the panel lives on the other page.
     const panelPolys = useMemo(
-        () => (viewport.w > 0 && viewport.h > 0
-            ? gridPolys(grids[page][layoutKind], viewport.w, viewport.h)
-                .map(p => (p.vp.length >= 3 ? p : null))
-            : []),
-        [grids, page, layoutKind, viewport.w, viewport.h],
+        () => panelPolysIn(grids[page][layoutKind], frame),
+        [grids, page, layoutKind, frame],
     )
     // Natural (intrinsic) pixel size of each loaded source, captured on load and keyed
     // by `src`. Drives fullImgStyle (the real framing); absent until the img loads,
@@ -154,26 +135,21 @@ export function Layout({ navItems, sms, softphone }: LayoutProps) {
     // the rest hold the frame they froze on. See usePanelDots / panelDotAnim.
     const dotRefs = usePanelDots(patterns, hovered)
 
-    // ── Resize handler — record the viewport; the polygons follow ─────────────
-    const handleResize = useCallback(() => {
-        const w = window.innerWidth
-        const h = window.innerHeight
-        setViewport(prev => (prev.w === w && prev.h === h ? prev : { w, h }))
-    }, [])
-
-    useLayoutEffect(() => { handleResize() }, [handleResize])
-
-    useEffect(() => {
-        window.addEventListener('resize', handleResize)
-        return () => { window.removeEventListener('resize', handleResize) }
-    }, [handleResize])
-
     return (
         <>
             <div
                 className={`cb-root${editor.active ? ' cb-edit-active' : ''}`}
-                style={{ opacity: ready ? 1 : 0, transition: ready ? 'opacity 150ms ease-in' : 'none' }}
+                style={{
+                    opacity: ready ? 1 : 0,
+                    transition: ready ? 'opacity 150ms ease-in' : 'none',
+                    ...pageFrameStyle(frame),
+                }}
             >
+                {/* Layer 0 — the letterbox around the page sheet, carrying on the loading
+                    screen's ripple in phase with it (MarginRipple). Up only once the page is
+                    showing: under the loading sheet the same ripple is already drawn. */}
+                <MarginRipple viewport={viewport} frame={frame} accent={accent} active={ready} />
+
                 {/* Layer 1 — the panels (ComicPanel: dots, pictures, bubbles). The poly
                     array is sparse: a null slot is a panel on the other page. */}
                 {panelPolys.map((poly, i) => {
@@ -230,7 +206,7 @@ export function Layout({ navItems, sms, softphone }: LayoutProps) {
                         page={page}
                         natSizes={natSizes}
                         layoutKind={layoutKind}
-                        viewport={viewport}
+                        frame={frame}
                         pageSelect={{
                             navItems,
                             pageLabels: editor.config.pageLabels,

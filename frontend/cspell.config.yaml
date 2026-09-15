@@ -80,6 +80,7 @@ words:
   - normalised
   - normalises
   - parameterised
+  - quantised
   - rasterised
   - recognisably
   # Test-fixture shorthand (customer ids, vitest's unstubAllGlobals, distances)

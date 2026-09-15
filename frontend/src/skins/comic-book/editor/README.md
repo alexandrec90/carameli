@@ -332,8 +332,10 @@ different images can only crossfade. A new bubble type belongs in `bubbleShape.t
      (`peerPickerOn`), which then binds to whatever the field says.
      Edit the **text** or **initial value**, choose the shapes to
      morph to **on hover**
-     and **on click** (`— no change —` keeps the resting shape), tick **bolder outline
-     on hover** to have the pointer ink this balloon heavier as well, and pick a **link
+     and **on click** (`— no change —` keeps the resting shape), leave **bolder outline
+     on hover** ticked — it is on from the moment the balloon is added, and every balloon
+     on the page ships with it — to have the pointer ink this balloon heavier as well, or
+     untick it for one that should stay flat, and pick a **link
      to** partner to join with a connector tube. The bold is the one event response that
      is not a morph, because weight is a stroke rather than a shape; it takes the tail
      and a thought bubble's puffs with it — they are the same ring and the same class —
@@ -461,9 +463,12 @@ different images can only crossfade. A new bubble type belongs in `bubbleShape.t
    - The gutter between panels stays the same width at every angle — it is measured
      perpendicular to each edge, not per axis — and every panel stays inside the outer
      frame. Neither is a rule applied afterwards; both fall out of the geometry.
-   - **Reset shapes** in the inspector restores the current window shape's grid, for
-     the current page. Each page's three grids are edited independently: resize the
-     window to reach another shape, switch pages to reach the other page's grids.
+   - **Reset shapes** in the inspector restores the grid on screen, for the current
+     page. Each page's three grids are edited independently: the **Shape** dropdown in
+     the toolbar holds the page at any of the three in any window — the frame is
+     letterboxed at that shape's fixed aspect, so a portrait page tuned on a landscape
+     monitor is the same page a phone shows — and switching pages reaches the other
+     page's grids. **Follow the window** hands the choice back to the window's own shape.
    - **Content holds its place** through every shape edit, reset included: a panel is
      only the window its pictures and balloons are seen through, so each affected
      frame and each affected balloon is re-expressed against its new panel box
@@ -601,6 +606,7 @@ panelGridCut.ts     PURE: cut one ring in two along a straight line, inserting t
 ../BubbleActions.tsx action buttons inside a balloon, one per comma-delimited entry
 ../phoneActions.ts  PURE: label -> the telephone key it draws, and the softphone verb it runs
 ../panelGeometry.ts PURE grid -> polygon geometry: frame, normalised space, vertex constraints
+../usePageFrame.ts  the page frame in this window, at the window's shape or the editor's held one
 ../panelPatterns.ts pattern style registry + per-panel palette/dot tuning (PANEL_BG_CONFIGS)
 ../polygonInset.ts  PURE polygon maths: the perpendicular gutter inset, bounding box
 panelGridOps.ts     PURE grid edits: move vertex, insert/remove bend, seam listing
@@ -648,6 +654,7 @@ chainHints.ts       PURE: the conversation's wording, and the transcript summary
 bubbleHints.ts      PURE: what each content kind does with the text box, as the field's `?`
 PageSelect.tsx      toolbar dropdown: switch page / preview the loading screen
 pageSelection.ts    PURE helpers behind PageSelect (sentinel value, selection resolution)
+ShapeSelect.tsx     toolbar dropdown: hold the page at a window shape, or follow the window
 ../bubbleChains.css chain row placement + the arrival/scroll animations (ships in prod)
 Hint.tsx            a paragraph as a `?` badge: the tooltip the inspector's prose became
 Section.tsx         a foldable inspector block (corners, cells, the drag read-out)

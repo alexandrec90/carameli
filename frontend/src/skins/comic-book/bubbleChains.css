@@ -19,9 +19,8 @@
  * `overflow`: the table spills into the gutter like any other bubble, and a chain that
  * shouldn't gets wrapped in `.cb-bubble-clip` by PanelBubbles instead.
  *
- * It is also the element the conversation measures itself against: a row's height comes
- * from its width, and turning one into the other needs the panel's aspect ratio, which
- * only the box knows. That is what the ResizeObserver in PanelBubbleChain watches.
+ * Nothing measures it: a row's height comes from its width through the box's aspect
+ * ratio, and PanelBubbleChain is handed the same box this layer is inset to.
  */
 .cb-chain-layer {
   position: absolute;

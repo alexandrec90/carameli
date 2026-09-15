@@ -73,7 +73,13 @@ export const NEW_BUBBLE: Omit<BubbleTransform, 'panel'> = {
   linkTo: null,
   hoverType: null,
   clickType: null,
-  hoverBold: false,
+  // On, unlike the two morph targets beside it. Those name a *shape* and so cannot have a
+  // sensible default — `null` is the editor declining to guess which of three the author
+  // meant — but weight is one answer with no alternative, and every balloon on the page
+  // wants it: a balloon that does not ink up under the pointer reads as scenery rather
+  // than as something the reader has found. Untick it for the rare balloon that should
+  // stay flat.
+  hoverBold: true,
   chain: '',
 }
 

@@ -87,12 +87,25 @@ export const MAX_EAGER_BYTES = 316 * 1024
 /**
  * Ceiling for any single lazily-loaded chunk.
  *
- * Today's largest is `sip.js`'s web platform at 243 KB, reached only by opening the
- * softphone. A lazy chunk is allowed to be much larger than an eager one — that is the
- * whole trade the code splitting buys — but not unboundedly so: past a point the route
- * that owns it is slow enough to feel broken, and the honest fix is to split it again.
+ * Today's largest is the `comic-book` skin at 260.29 KB, ahead of `sip.js`'s web platform
+ * at 237.11 KB — the pair swapped places some raises ago and the note here went on naming
+ * the softphone, so read the build rather than this sentence when it matters. A lazy chunk
+ * is allowed to be much larger than an eager one — that is the whole trade the code
+ * splitting buys — but not unboundedly so: past a point the route that owns it is slow
+ * enough to feel broken, and the honest fix is to split it again.
+ *
+ * This raise (260 → 261) is 0.77 KB of `benDayTint.ts`, the lava-lamp colour drift through
+ * the comic-book skin's Ben-Day ripple: a three-sine field and an RGB↔HSL round trip, so
+ * each dot's hue can be turned a little way off the route accent. Measured as this
+ * branch's build (260.29 KB) against the master it sits on (259.52 KB, `cc7f55e`), still
+ * 46 chunks, `package.json` untouched. It is skin-local and lazy, so it is nobody's entry
+ * cost, and it buys a background the eye can rest on for as long as a page stays open.
+ *
+ * The ceiling is 261 rather than flush against 260.29 for the reason {@link
+ * MAX_TOTAL_JS_BYTES} gives: the default branch runs no gate, so a number set against one
+ * branch's build is passed by the next two that merge in parallel.
  */
-export const MAX_LAZY_CHUNK_BYTES = 260 * 1024
+export const MAX_LAZY_CHUNK_BYTES = 261 * 1024
 
 /**
  * Every `.js` file in `dist/assets/`, summed. Today 956.6 KB across 46 chunks; the
@@ -265,8 +278,16 @@ export const MAX_LAZY_CHUNK_BYTES = 260 * 1024
  * The ceiling is 1020 rather than flush against 1018.02 for the reason the 971 → 972
  * paragraph gives: the default branch runs no gate, so a number set against one branch's
  * build is passed by the next two that merge in parallel.
+ *
+ * This raise (1020 → 1022) is the same 0.77 KB {@link MAX_LAZY_CHUNK_BYTES} carries, and
+ * nothing else: `benDayTint.ts` in the lazy `comic-book` chunk. 1020.61 KB on this branch
+ * against 1019.84 KB on the master it sits on (`cc7f55e`), still 46 chunks,
+ * `package.json` untouched. Both ceilings move because the skin chunk was within 0.5 KB
+ * of one and the total within 0.2 KB of the other — a coincidence of timing rather than
+ * two costs, and worth saying so, since a raise appearing in two constants at once
+ * otherwise reads as a change twice the size of the one that happened.
  */
-export const MAX_TOTAL_JS_BYTES = 1020 * 1024
+export const MAX_TOTAL_JS_BYTES = 1022 * 1024
 
 /**
  * Every `.css` file in `dist/assets/`, summed. Today 44.2 KB across 2 files.

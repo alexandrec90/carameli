@@ -132,6 +132,34 @@ describe('frameRect and the normalised space', () => {
     expect(frameRect(4, 400)).toEqual({ x: OUTER_M, y: 200, w: 0, h: 0 })
   })
 
+  // The editor holds a page at a shape the window is not. The frame is then that
+  // shape's, letterboxed into the window it happens to be in — which is what makes a
+  // portrait grid tuned on a landscape monitor the same page a phone shows.
+  it('draws a held shape at its own aspect, letterboxed into a window of another', () => {
+    const held = frameRect(1600, 900, 'portrait')
+    expect(held.w / held.h).toBeCloseTo(PAGE_ASPECT.portrait, 10)
+    expect(held.h).toBe(884)
+    expect(held.w).toBeCloseTo(884 * PAGE_ASPECT.portrait, 10)
+    expect(held.x).toBeCloseTo(OUTER_M + (1584 - held.w) / 2, 10)
+    // And a held shape that is the window's own is exactly the frame it would get anyway.
+    expect(frameRect(1600, 900, 'landscape')).toEqual(frameRect(1600, 900))
+  })
+
+  it('gives two windows of one shape geometrically similar panels', () => {
+    // The property the frame test above proves is carried through gridPolys: the rings
+    // are exactly similar, and the drawn panels similar to within the gutter, which is
+    // a fixed px inset and so a slightly larger share of a smaller frame.
+    const grid = splitGrid([0.6, 0], [0.35, 1])
+    const small = gridPolys(grid, frameRect(1200, 800))
+    const large = gridPolys(grid, frameRect(2600, 1300))
+    for (const i of [0, 1]) {
+      const a = small[i].bounds
+      const b = large[i].bounds
+      expect(a.w / a.h).toBeCloseTo(b.w / b.h, 1)
+      expect(a.w / a.h).not.toBeCloseTo(b.w / b.h, 6)
+    }
+  })
+
   it('round-trips a point through viewport pixels and back', () => {
     const p: NormPt = [0.37, 0.62]
     const back = toNormalized(toViewport(p, F), F)
@@ -238,7 +266,7 @@ describe('gridPolys gutters', () => {
    * vertices, walked the other way round).
    */
   function gutterAcrossSeam(grid: PanelGrid): number[] {
-    const [left, right] = gridPolys(grid, W, H)
+    const [left, right] = gridPolys(grid, F)
     return [
       distToLine(left.vp[1], right.vp[3], right.vp[0]),
       distToLine(left.vp[2], right.vp[3], right.vp[0]),
@@ -271,7 +299,7 @@ describe('gridPolys gutters', () => {
   })
 
   it('keeps every panel inside the page frame', () => {
-    const polys = gridPolys(splitGrid([0.6, 0], [0.35, 1]), W, H)
+    const polys = gridPolys(splitGrid([0.6, 0], [0.35, 1]), F)
     for (const poly of polys) {
       expect(poly.bounds.x).toBeGreaterThanOrEqual(F.x)
       expect(poly.bounds.y).toBeGreaterThanOrEqual(F.y)
@@ -289,7 +317,7 @@ describe('gridPolys gutters', () => {
         [1, 5, 6, 3, 2],
       ],
     }
-    const [left, right] = gridPolys(bolt, W, H)
+    const [left, right] = gridPolys(bolt, F)
     expect(left.vp).toHaveLength(5)
     expect(right.vp).toHaveLength(5)
     // The kink survives the inset: the middle point is still left of both its neighbours.

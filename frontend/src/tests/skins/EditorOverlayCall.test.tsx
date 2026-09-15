@@ -8,6 +8,7 @@ import { addCallScene } from '../../skins/comic-book/editor/callSceneCreate'
 import { seedConfig } from '../../skins/comic-book/editor/configSeed'
 import type { EditorConfig } from '../../skins/comic-book/editor/types'
 import type { EditorModeApi } from '../../skins/comic-book/editor/useEditorMode'
+import { frameRect } from '../../skins/comic-book/panelGeometry'
 import type { PanelPoly, Rect } from '../../skins/comic-book/panelGeometry'
 
 vi.mock('../../skins/comic-book/editor/useToolbarColumns', () => ({
@@ -100,6 +101,8 @@ function editorApi(config: EditorConfig, over: Partial<EditorModeApi> = {}): Edi
     setCallScene: vi.fn(),
     setPanelLabel: vi.fn(),
     setPageLabel: vi.fn(),
+    shape: null,
+    setShape: vi.fn(),
     deleteImg: vi.fn(),
     deleteBubble: vi.fn(),
     resetOne: vi.fn(),
@@ -117,7 +120,7 @@ function draw(config: EditorConfig, over: Partial<EditorModeApi> = {}) {
         page="classic"
         natSizes={{}}
         layoutKind="landscape"
-        viewport={{ w: 1200, h: 800 }}
+        frame={frameRect(1200, 800, 'landscape')}
         pageSelect={{
           navItems: [],
           pageLabels: config.pageLabels,

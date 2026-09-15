@@ -1,8 +1,7 @@
 import { useEffect } from 'react'
 
 import { logger } from '../../../lib/logger'
-import type { LayoutKind, PanelPoly } from '../panelGeometry'
-import { frameRect } from '../panelGeometry'
+import type { LayoutKind, PanelPoly, Rect } from '../panelGeometry'
 import type { PanelPage } from '../panels'
 import EditorToolbar from './EditorToolbar'
 import { boxOf, overlaySelection, useCallOverlay } from './overlayGeometry'
@@ -29,10 +28,10 @@ interface EditorOverlayProps {
   /** Natural pixel size of each loaded source, keyed by `src` — sizes the visible
       image rect the hover and selection outlines trace. */
   natSizes: Record<string, { w: number; h: number }>
-  /** Which of the three grids this window is showing, so shape edits reach the right one. */
+  /** Which of the three grids the page is showing, so shape edits reach the right one. */
   layoutKind: LayoutKind
-  /** Viewport size in px — the shape editor needs the page frame, not the panels. */
-  viewport: { w: number; h: number }
+  /** The page frame the panels were drawn in — the shape editor places its seams in it. */
+  frame: Rect
   pageSelect: PageSelectProps
 }
 
@@ -56,7 +55,7 @@ export default function EditorOverlay({
   page,
   natSizes,
   layoutKind,
-  viewport,
+  frame,
   pageSelect,
 }: EditorOverlayProps) {
   useEffect(() => {
@@ -68,7 +67,6 @@ export default function EditorOverlay({
   const interaction = useOverlayInteraction(api, panelPolys)
 
   const grid = config.grids[page][layoutKind]
-  const frame = frameRect(viewport.w, viewport.h)
   const drag = useSeamDrag(api, page, layoutKind, grid, frame)
 
   // Which layout the calls are showing, where each seam falls, and the box the selection
