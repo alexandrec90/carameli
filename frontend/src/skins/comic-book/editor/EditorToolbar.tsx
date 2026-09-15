@@ -80,7 +80,7 @@ export default function EditorToolbar({ api, selPanel, pageSelect, shapes }: Edi
       {mode === 'shapes' ? (
         <ShapeInspector api={api} page={shapes.page} kind={shapes.kind} grid={shapes.grid} drag={shapes.drag} />
       ) : api.selected && selPanel !== null ? (
-        <InspectorPanel api={api} panel={selPanel} />
+        <InspectorPanel api={api} panel={selPanel} kind={shapes.kind} />
       ) : (
         <div className="cb-ed-hint">Click a panel, a picture or a bubble to select it.</div>
       )}

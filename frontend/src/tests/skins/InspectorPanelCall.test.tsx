@@ -39,17 +39,17 @@ function apiFor(config: EditorConfig, over: Partial<EditorModeApi> = {}): Editor
 describe('the seam, on a selected panel', () => {
   it('offers it only on a panel that is a phone call', () => {
     const plain = apiFor(seedConfig())
-    const { unmount } = render(<InspectorPanel api={plain} panel={CALL_PANEL} />)
+    const { unmount } = render(<InspectorPanel api={plain} panel={CALL_PANEL} kind="landscape" />)
     expect(screen.queryByRole('slider', { name: 'call seam' })).toBeNull()
     unmount()
 
-    render(<InspectorPanel api={apiFor(calling())} panel={CALL_PANEL} />)
+    render(<InspectorPanel api={apiFor(calling())} panel={CALL_PANEL} kind="landscape" />)
     expect(screen.getByRole('slider', { name: 'call seam' })).toBeTruthy()
   })
 
   it('drags the seam across the panel, held inside the range', () => {
     const setCallScene = vi.fn()
-    render(<InspectorPanel api={apiFor(calling(), { setCallScene })} panel={CALL_PANEL} />)
+    render(<InspectorPanel api={apiFor(calling(), { setCallScene })} panel={CALL_PANEL} kind="landscape" />)
 
     const seam = screen.getByRole<HTMLInputElement>('slider', { name: 'call seam' })
     // A cut at 0 leaves a half with no area, and nothing to drag it back by — so the
@@ -64,7 +64,7 @@ describe('the seam, on a selected panel', () => {
 
   it('turns the split from side by side to stacked', () => {
     const setCallScene = vi.fn()
-    render(<InspectorPanel api={apiFor(calling(), { setCallScene })} panel={CALL_PANEL} />)
+    render(<InspectorPanel api={apiFor(calling(), { setCallScene })} panel={CALL_PANEL} kind="landscape" />)
 
     const split = screen.getByRole<HTMLSelectElement>('combobox', { name: 'call split' })
     expect(split.value).toBe('x')
@@ -89,7 +89,7 @@ describe('the role, on a selected entry', () => {
 
   it('offers every role, plus the panel’s ordinary layout', () => {
     const { api } = withFigure()
-    render(<InspectorPanel api={api} panel={CALL_PANEL} />)
+    render(<InspectorPanel api={api} panel={CALL_PANEL} kind="landscape" />)
 
     const select = screen.getByRole<HTMLSelectElement>('combobox', { name: 'call role' })
     expect([...select.options].map(o => o.text))
@@ -100,7 +100,7 @@ describe('the role, on a selected entry', () => {
   it('moves a picture into another half by giving it another role', () => {
     const setImg = vi.fn()
     const { api, index } = withFigure({ setImg })
-    render(<InspectorPanel api={api} panel={CALL_PANEL} />)
+    render(<InspectorPanel api={api} panel={CALL_PANEL} kind="landscape" />)
 
     fireEvent.change(screen.getByRole('combobox', { name: 'call role' }), {
       target: { value: 'local' },
@@ -113,7 +113,7 @@ describe('the role, on a selected entry', () => {
     // page is on Default would appear to do nothing at all.
     const setCallPhase = vi.fn()
     const { api } = withFigure({ setCallPhase })
-    render(<InspectorPanel api={api} panel={CALL_PANEL} />)
+    render(<InspectorPanel api={api} panel={CALL_PANEL} kind="landscape" />)
 
     fireEvent.change(screen.getByRole('combobox', { name: 'call role' }), {
       target: { value: 'remote' },
@@ -126,7 +126,7 @@ describe('the role, on a selected entry', () => {
   it('leaves a layout the author already chose alone', () => {
     const setCallPhase = vi.fn()
     const { api } = withFigure({ setCallPhase, callPhase: 'ringing' })
-    render(<InspectorPanel api={api} panel={CALL_PANEL} />)
+    render(<InspectorPanel api={api} panel={CALL_PANEL} kind="landscape" />)
 
     fireEvent.change(screen.getByRole('combobox', { name: 'call role' }), {
       target: { value: 'local' },
@@ -140,7 +140,7 @@ describe('the role, on a selected entry', () => {
     const setImg = vi.fn()
     const setCallPhase = vi.fn()
     const { api, index } = withFigure({ setImg, setCallPhase, callPhase: 'ringing' })
-    render(<InspectorPanel api={api} panel={CALL_PANEL} />)
+    render(<InspectorPanel api={api} panel={CALL_PANEL} kind="landscape" />)
 
     fireEvent.change(screen.getByRole('combobox', { name: 'call role' }), {
       target: { value: '' },
@@ -158,7 +158,7 @@ describe('the role, on a selected entry', () => {
       b => b.panel === CALL_PANEL && b.call === 'local',
     )
     const api = apiFor(config, { selected: { kind: 'bubble', index }, setBubble })
-    render(<InspectorPanel api={api} panel={CALL_PANEL} />)
+    render(<InspectorPanel api={api} panel={CALL_PANEL} kind="landscape" />)
 
     fireEvent.change(screen.getByRole('combobox', { name: 'call role' }), {
       target: { value: 'remote' },

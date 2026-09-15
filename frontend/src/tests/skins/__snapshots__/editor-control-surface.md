@@ -41,11 +41,15 @@ diff as the code that added it.
 - button: Content
 - button: Copy config
 - button: Default
+- button: Delete panel
+- button: Hide on landscape
 - button: Panel shapes
 - button: Reset
 - button: Ringing
 - button: Save
 - button: Ship
+- button: Split left / right
+- button: Split top / bottom
 - range: call seam
 - select: Page
 - select: Shape
@@ -342,6 +346,8 @@ diff as the code that added it.
 - button: .ts
 - button: Content
 - button: Copy config
+- button: Delete panel
+- button: Hide on landscape
 - button: Panel shapes
 - button: Reset
 - button: Reset landscape shapes
@@ -556,6 +562,28 @@ diff as the code that added it.
 - text: page name
 - text: panel name
 - textarea: text
+
+## shapes/panel[one hidden]
+
+- button: .ts
+- button: Content
+- button: Copy config
+- button: Delete panel
+- button: Hide on landscape
+- button: Panel shapes
+- button: Reset
+- button: Reset landscape shapes
+- button: Save
+- button: Ship
+- button: Show Pensive girl below
+- button: Show Pensive girl beside
+- button: Split left / right
+- button: Split top / bottom
+- select: Page
+- select: Shape
+- text: Ship summary
+- text: page name
+- text: panel name
 
 ## content/nothing[behind the file]
 

@@ -4,6 +4,11 @@ import { logger } from '../../../lib/logger'
 import { frameRect } from '../panelGeometry'
 import type { Rect } from '../panelGeometry'
 import { splitPanel as splitPanelIn } from './configPanels'
+import {
+  deletePanel as deletePanelIn,
+  hidePanelOn as hidePanelOnIn,
+  showPanelOn as showPanelOnIn,
+} from './configPanelsRemove'
 import { resetGridKeepingContent, setGridKeepingContent } from './gridContentRemap'
 import type { CutAxis } from './panelGridCut'
 import type { SetSelection } from './selection'
@@ -48,13 +53,30 @@ export interface GridEdits {
    * still. Returns false, changing nothing, when the cut is refused (./configPanels.ts).
    */
   splitPanel(panel: number, axis: CutAxis, kind: LayoutKind): boolean
+  /**
+   * Take `panel` off the grid on screen (`kind`) and no other: its neighbour takes the
+   * space, and it stays on the other two window shapes. False when nothing can take it.
+   */
+  hidePanelOn(panel: number, kind: LayoutKind): boolean
+  /**
+   * Bring a panel hidden on `kind`'s grid back, as the lower or right half of `from` cut
+   * along `axis`, and select it. False when the cut is refused.
+   */
+  showPanelOn(panel: number, kind: LayoutKind, from: number, axis: CutAxis): boolean
+  /**
+   * Delete `panel` from every grid and the list, its pictures and balloons with it. Every
+   * later panel moves down one (./configPanelsRemove.ts). False when some grid of its page
+   * cannot give the space away, in which case nothing changes.
+   */
+  deletePanel(panel: number, kind: LayoutKind): boolean
 }
 
-export function useGridEdits(
-  apply: ApplyOp,
-  setSelected: SetSelection,
-  config: EditorConfig,
-): GridEdits {
+/**
+ * The two whole-grid replacements. Neither can be refused — a grid handed in is already a
+ * grid and the shipped default always exists — so these answer with nothing rather than
+ * with a boolean, and the panel list they sit beside is the half that can say no.
+ */
+function useGridShape(apply: ApplyOp, setSelected: SetSelection) {
   const setGridFor = useCallback(
     (page: PanelPage, kind: LayoutKind, grid: PanelGrid) =>
       apply(prev => setGridKeepingContent(prev, page, kind, grid, frameFor(kind))),
@@ -71,10 +93,19 @@ export function useGridEdits(
     [apply, setSelected],
   )
 
-  // Computed against the rendered config rather than inside `apply`'s updater, because
-  // the caller needs the answer now — a refused cut is reported in the inspector, and a
-  // functional update cannot hand a boolean back out. Nothing else edits the config
-  // between a click and its handler, so the two are the same object.
+  return useMemo(() => ({ setGridFor, resetGridFor }), [setGridFor, resetGridFor])
+}
+
+/**
+ * The four edits that add a panel to the list or take one off it, each answering now so
+ * the inspector can say why nothing happened.
+ *
+ * Computed against the rendered config rather than inside `apply`'s updater, because the
+ * caller needs that answer now: a refused cut is reported in the inspector, and a
+ * functional update cannot hand a boolean back out. Nothing else edits the config between
+ * a click and its handler, so the two are the same object.
+ */
+function usePanelList(apply: ApplyOp, setSelected: SetSelection, config: EditorConfig) {
   const splitPanel = useCallback(
     (panel: number, axis: CutAxis, kind: LayoutKind): boolean => {
       const result = splitPanelIn(config, panel, axis, { kind, frame: frameFor(kind) })
@@ -89,8 +120,62 @@ export function useGridEdits(
     [apply, config, setSelected],
   )
 
-  return useMemo(
-    () => ({ setGridFor, resetGridFor, splitPanel }),
-    [setGridFor, resetGridFor, splitPanel],
+  const hidePanelOn = useCallback(
+    (panel: number, kind: LayoutKind): boolean => {
+      const result = hidePanelOnIn(config, panel, kind, { kind, frame: frameFor(kind) })
+      if (!result) {
+        logger.warn('Refused to hide comic-book panel', { panel, kind })
+        return false
+      }
+      apply(() => result)
+      // The hidden panel has no target on this grid to keep a selection on.
+      setSelected(null)
+      return true
+    },
+    [apply, config, setSelected],
   )
+
+  const showPanelOn = useCallback(
+    (panel: number, kind: LayoutKind, from: number, axis: CutAxis): boolean => {
+      const result = showPanelOnIn(config, panel, kind, from, axis, { kind, frame: frameFor(kind) })
+      if (!result) {
+        logger.warn('Refused to show comic-book panel', { panel, kind, from, axis })
+        return false
+      }
+      apply(() => result)
+      setSelected({ kind: 'panel', index: panel })
+      return true
+    },
+    [apply, config, setSelected],
+  )
+
+  const deletePanel = useCallback(
+    (panel: number, kind: LayoutKind): boolean => {
+      const result = deletePanelIn(config, panel, { kind, frame: frameFor(kind) })
+      if (!result) {
+        logger.warn('Refused to delete comic-book panel', { panel })
+        return false
+      }
+      apply(() => result)
+      // Every index past the deleted slot moved, so no selection survives.
+      setSelected(null)
+      return true
+    },
+    [apply, config, setSelected],
+  )
+
+  return useMemo(
+    () => ({ splitPanel, hidePanelOn, showPanelOn, deletePanel }),
+    [splitPanel, hidePanelOn, showPanelOn, deletePanel],
+  )
+}
+
+export function useGridEdits(
+  apply: ApplyOp,
+  setSelected: SetSelection,
+  config: EditorConfig,
+): GridEdits {
+  const shape = useGridShape(apply, setSelected)
+  const list = usePanelList(apply, setSelected, config)
+  return useMemo(() => ({ ...shape, ...list }), [shape, list])
 }

@@ -112,7 +112,7 @@ what lets any shape interpolate vertex-for-vertex into any other, so hover and c
 Neither transform array is index-parallel to the panels: each entry names its own `panel`,
 and that is the whole association — placement is measured against that panel's box, and
 hovering it reveals its bubbles (`isBubbleRevealed` in `bubbleTube.ts`). `PANELS` is the
-one surviving parallelism and the editor only *appends* to it, so an index never moves. A
+one surviving parallelism; only `deletePanel` (`configPanelsRemove.ts`) renumbers it. A
 picture has **two independent framings**: `left`/`top`/`width`/`height` over the panel box
 (% of it), `scale`/`offsetX`/`offsetY`/`anchor` within that frame.
 

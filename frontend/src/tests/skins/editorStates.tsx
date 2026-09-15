@@ -3,6 +3,7 @@ import { MemoryRouter } from 'react-router-dom'
 import { vi } from 'vitest'
 
 import { defaultChain, peerPickerOn } from '../../skins/comic-book/bubbleChain'
+import { hidePanelOn } from '../../skins/comic-book/editor/configPanelsRemove'
 import { seedConfig } from '../../skins/comic-book/editor/configSeed'
 import EditorToolbar from '../../skins/comic-book/editor/EditorToolbar'
 import { seamGeometry } from '../../skins/comic-book/editor/panelGridOps'
@@ -209,8 +210,28 @@ const BEHIND_STATE: EditorState = {
   },
 }
 
+/**
+ * A page with one of its panels hidden on the shape on screen. The only state that offers
+ * the Show buttons — `showPanelOn` is reachable from nowhere else, because the shipped
+ * config draws every panel on every shape — so without this the sweep would call it
+ * unreachable, truthfully, and fail a green editor. Which panel is hidden is derived: the
+ * last one on the selected panel's page, so the state keeps describing "a hidden
+ * neighbour" as the shipped list is edited.
+ */
+const HIDDEN_STATE: EditorState = {
+  name: 'shapes/panel[one hidden]',
+  mode: 'shapes',
+  selected: { kind: 'panel', index: PANEL },
+  derive: config => {
+    const page = config.panels[PANEL].page
+    const candidates = config.panels.flatMap((p, i) => (i !== PANEL && p.page === page ? [i] : []))
+    const hidden = candidates[candidates.length - 1]
+    return hidden === undefined ? config : (hidePanelOn(config, hidden, 'landscape') ?? config)
+  },
+}
+
 /** Every state worth mounting, in a stable order — the grid, the repairs, then the merge. */
-export const EDITOR_STATES: EditorState[] = [...GRID_STATES, ...REPAIR_STATES, BEHIND_STATE]
+export const EDITOR_STATES: EditorState[] = [...GRID_STATES, ...REPAIR_STATES, HIDDEN_STATE, BEHIND_STATE]
 
 /**
  * Enough of the shape-drag API for the shape inspector to render truthfully in each
@@ -275,6 +296,9 @@ export function mockApi(config: EditorConfig, mode: EditMode, selected: Selectio
     addChainColumn: vi.fn(),
     setPattern: vi.fn(),
     splitPanel: vi.fn(),
+    hidePanelOn: vi.fn(),
+    showPanelOn: vi.fn(),
+    deletePanel: vi.fn(),
     setPanelLabel: vi.fn(),
     setPageLabel: vi.fn(),
     // Following the window: the state an author is in until they hold a shape.

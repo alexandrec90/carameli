@@ -81,6 +81,18 @@ A mutator listed with no control is one an author cannot invoke from the toolbar
 - content/img[number pad] → button: Delete image
 - content/img[table] → button: Delete image
 
+## deletePanel
+
+- content/panel → button: Delete panel
+- shapes/panel → button: Delete panel
+- shapes/panel[one hidden] → button: Delete panel
+
+## hidePanelOn
+
+- content/panel → button: Hide on landscape
+- shapes/panel → button: Hide on landscape
+- shapes/panel[one hidden] → button: Hide on landscape
+
 ## resetAll
 
 - content/bubble → button: Reset
@@ -104,6 +116,7 @@ A mutator listed with no control is one an author cannot invoke from the toolbar
 - shapes/img[table] → button: Reset
 - shapes/nothing → button: Reset
 - shapes/panel → button: Reset
+- shapes/panel[one hidden] → button: Reset
 - shapes/seam → button: Reset
 - shapes/vertex → button: Reset
 
@@ -117,6 +130,7 @@ A mutator listed with no control is one an author cannot invoke from the toolbar
 - shapes/img[table] → button: Reset landscape shapes
 - shapes/nothing → button: Reset landscape shapes
 - shapes/panel → button: Reset landscape shapes
+- shapes/panel[one hidden] → button: Reset landscape shapes
 - shapes/seam → button: Reset landscape shapes
 - shapes/vertex → button: Reset landscape shapes
 
@@ -347,6 +361,8 @@ A mutator listed with no control is one an author cannot invoke from the toolbar
 - shapes/nothing → button: Panel shapes
 - shapes/panel → button: Content
 - shapes/panel → button: Panel shapes
+- shapes/panel[one hidden] → button: Content
+- shapes/panel[one hidden] → button: Panel shapes
 - shapes/seam → button: Content
 - shapes/seam → button: Panel shapes
 - shapes/vertex → button: Content
@@ -375,6 +391,7 @@ A mutator listed with no control is one an author cannot invoke from the toolbar
 - shapes/img[table] → text: page name
 - shapes/nothing → text: page name
 - shapes/panel → text: page name
+- shapes/panel[one hidden] → text: page name
 - shapes/seam → text: page name
 - shapes/vertex → text: page name
 
@@ -390,6 +407,7 @@ A mutator listed with no control is one an author cannot invoke from the toolbar
 - content/img[table] → text: panel name
 - content/panel → text: panel name
 - shapes/panel → text: panel name
+- shapes/panel[one hidden] → text: panel name
 
 ## setPattern
 
@@ -418,10 +436,20 @@ A mutator listed with no control is one an author cannot invoke from the toolbar
 - shapes/img[table] → select: Shape
 - shapes/nothing → select: Shape
 - shapes/panel → select: Shape
+- shapes/panel[one hidden] → select: Shape
 - shapes/seam → select: Shape
 - shapes/vertex → select: Shape
 
+## showPanelOn
+
+- shapes/panel[one hidden] → button: Show Pensive girl below
+- shapes/panel[one hidden] → button: Show Pensive girl beside
+
 ## splitPanel
 
+- content/panel → button: Split left / right
+- content/panel → button: Split top / bottom
 - shapes/panel → button: Split left / right
 - shapes/panel → button: Split top / bottom
+- shapes/panel[one hidden] → button: Split left / right
+- shapes/panel[one hidden] → button: Split top / bottom
