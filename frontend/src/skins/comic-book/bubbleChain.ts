@@ -1,8 +1,5 @@
-import { BUBBLE_ASPECT, tailTip } from './bubbleBox'
 import { isDialContent } from './bubbleContent'
-import { fitMessage } from './bubbleFit'
-import { stackedTop, tubeBlocked, zigzagShift } from './chainLayout'
-import type { ChainMetrics, PlacedRow } from './chainLayout'
+import { tubeBlocked } from './chainLayout'
 import type { BubbleTransform } from './editor/types'
 
 // A bubble *chain* is an SMS conversation, drawn the way a phone draws one: two columns
@@ -31,13 +28,15 @@ import type { BubbleTransform } from './editor/types'
 // is stamped from the template of the side it belongs to. The table is rigid on purpose:
 // two columns, at most `rows` rows, the composer at the bottom right.
 //
-// **The rows are laid out from the bottom up**, anchored on the sender template, because
-// that is where a conversation happens: the newest message sits where the composer is and
-// older ones climb away. Each row is placed by what it would collide with (chainLayout.ts):
-// it clears every balloon it overlaps horizontally and tucks partway in beside the one
-// below it otherwise, so a long message pushes the thread up by its own height while a
-// short reply sits alongside the message it answers. Each speaker's rows zig-zag across
-// their column as they climb, so the thread snakes rather than ruling two columns.
+// **The rows are laid out from the bottom up**, and the bottom is where the author drew
+// it: the newest balloon of each side — the one still talking, the one with the tail —
+// sits on its template's anchor (chainAnchor.ts), the tip the author aimed at a mouth,
+// however wide or tall its words make it. Every older row is placed by what it would
+// collide with (chainLayout.ts): it clears every balloon it overlaps horizontally and
+// tucks partway in beside the one below it otherwise, so a long message pushes the thread
+// up by its own height while a short reply sits alongside the message it answers. Each
+// speaker's rows zig-zag across their column as they climb, so the thread snakes rather
+// than ruling two columns.
 //
 // **Bubble size follows the message.** A three-word reply is a small balloon, a longer one
 // fills its column, and a longer one still wraps and grows *tall* — see bubbleFit.ts. The
@@ -51,6 +50,10 @@ import type { BubbleTransform } from './editor/types'
 //   live — the sender template is a text input, so a reader types a message and Enter
 //          pushes it into the thread. `content: 'input'` on that balloon is the whole
 //          switch; the composer keeps the bottom row and the messages start one row up.
+//
+// Cutting the rows and placing them is chainRows.ts — everything with a measurement in
+// it — and this file is the model underneath: what a chain is, who belongs to it, the
+// transcript it reads and the window over that transcript.
 //
 // Everything here is pure. PanelBubbleChain.tsx is the DOM shell over it, the way
 // BubbleWheel.tsx is over wheelPicker.ts — it owns only what cannot be a function: the
@@ -397,32 +400,6 @@ export function chainRowLinks(rows: readonly ChainRow[], panelAspect: number): [
   return links
 }
 
-/** Convert the recipient template's authored stem tip into one rendered row's SVG space. */
-export function recipientStemTarget(
-  template: BubbleTransform,
-  row: PlacedRow & { bubble: Pick<BubbleTransform, 'rotate'> },
-  panelAspect: number,
-): [number, number] {
-  const [tipX, tipY] = tailTip(template.tail)
-  const b = row.bubble
-  const rowHeight = b.width * BUBBLE_ASPECT * row.stretch
-  const templateX = 100 - template.right - template.width / 2
-  const templateY = template.top / panelAspect + template.width * BUBBLE_ASPECT / 2
-  const rowX = 100 - b.right - b.width / 2
-  const rowY = b.top / panelAspect + rowHeight / 2
-  const dx = templateX - rowX
-  const dy = templateY - rowY
-  const rad = (-b.rotate * Math.PI) / 180
-  const localX = dx * Math.cos(rad) - dy * Math.sin(rad)
-    + (tipX / 200 - 0.5) * template.width
-  const localY = dx * Math.sin(rad) + dy * Math.cos(rad)
-    + (tipY / 150 - 0.5) * template.width * BUBBLE_ASPECT
-  return [
-    (localX / b.width + 0.5) * 200,
-    (localY / rowHeight + 0.5) * 150,
-  ]
-}
-
 /**
  * Each message's ordinal among its own speaker's messages — the count of same-side lines
  * before it in the whole transcript. What the zig-zag leans by: a property of the message,
@@ -436,125 +413,6 @@ export function sideOrdinals(lines: readonly ChainLine[]): number[] {
     seen[side] += 1
     return ordinal
   })
-}
-
-/**
- * How rows land on the table. `place` puts a balloon at the anchor while nothing is placed,
- * then where {@link stackedTop} says it clears or tucks in against everything below; `stamp`
- * cuts a row from its side's template first — fitted to `text`, leaning by its ordinal.
- */
-function rowStamper(cols: ChainColumns, metrics: ChainMetrics) {
-  // The left column's left edge, which is what its balloons are aligned against.
-  const themLeft = 100 - cols.them.right - cols.them.width
-  const placed: PlacedRow[] = []
-  const place = (bubble: BubbleTransform, stretch: number): BubbleTransform => {
-    const top = placed.length > 0
-      ? stackedTop(placed, { ...bubble, stretch }, metrics.aspect)
-      : cols.me.top
-    const row = { ...bubble, top }
-    placed.push({ bubble: row, stretch })
-    return row
-  }
-  const stamp = (out: boolean, text: string, ordinal: number, tail: BubbleTransform['tail']) => {
-    const template = out ? cols.me : cols.them
-    const fit = fitMessage(
-      text,
-      template.type,
-      template.width,
-      template.width * CHAIN_MIN_WIDTH_RATIO,
-      metrics,
-    )
-    const shift = zigzagShift(ordinal, out, template.width - fit.width)
-    const bubble = place(
-      {
-        ...template,
-        width: fit.width,
-        right: out ? cols.me.right + shift : 100 - themLeft - shift - fit.width,
-        tail,
-        // A message is lettering, whatever the template it was stamped from does: the
-        // sender's template is routinely an input, and cloning that would put a field in
-        // every balloon of the right column.
-        content: 'text',
-        text,
-        // The templates are linked to each other — that linkage is the chain — and a
-        // stamped row is not a balloon anything can link to.
-        linkTo: null,
-      },
-      fit.stretch,
-    )
-    return { bubble, stretch: fit.stretch }
-  }
-  return { place, stamp }
-}
-
-/**
- * The whole conversation as placed balloons, bottom row first.
- *
- * `shown` is the window over the transcript, newest first ({@link visibleWindow}), so this
- * walks up the panel in exactly that order: the composer if the chain is live, then the
- * newest message, then the one before it. The first row sits at the anchor and each one
- * after it is placed by `stackedTop` against everything below — clear of what it would
- * overlap, tucked in beside what it would not — so the rows tile without a fixed pitch.
- *
- * Three details are what make it read as a conversation rather than as a list:
- *
- * - **Alignment.** The sender's balloons hang from their column's right edge and the
- *   recipient's from its left, so a short message stays on its own side of the panel
- *   instead of drifting toward the middle as it shrinks — leaning inward every other
- *   message (`zigzagShift`), so the column is a zig-zag rather than a rule.
- * - **Size.** Each balloon is fitted to its own message (`fitMessage`): wider up to its
- *   column, then taller, so long words wrap and long messages stretch the balloon.
- * - **One tail per side.** Only the newest balloon of each column keeps its template's
- *   tail — the one still being said. A tail on every balloon reads as a crowd all talking
- *   at once, which is exactly what a thread is not.
- *
- * `typing` adds one extra row at the foot of the recipient's column — the peer
- * mid-composition, drawn as dots by the shell (see {@link TYPING_KEY}). It is the
- * newest thing on their side, so it takes their template's tail and the messages above
- * it lose theirs, exactly as a newest message would; the caller shrinks the window by
- * one row while it is up so the table's height budget still holds.
- */
-export function conversationRows(
-  shown: readonly number[],
-  lines: readonly ChainLine[],
-  cols: ChainColumns,
-  live: boolean,
-  metrics: ChainMetrics,
-  typing = false,
-): ChainRow[] {
-  const rows: ChainRow[] = []
-  const tailed = { out: false, in: false }
-  const ordinals = sideOrdinals(lines)
-  const { place, stamp } = rowStamper(cols, metrics)
-
-  if (live) {
-    rows.push({ key: 'composer', side: 'out', bubble: place(cols.me, 1), stretch: 1 })
-    tailed.out = true
-  }
-
-  if (typing) {
-    // As narrow as a balloon gets: dots, not words. An empty fit is that floor. It leans
-    // where the reply it stands in for will lean — the next of the recipient's messages —
-    // so the words land where the dots were.
-    const next = lines.filter(line => !line.out).length
-    rows.push({ key: TYPING_KEY, side: 'in', ...stamp(false, '', next, cols.them.tail) })
-    tailed.in = true
-  }
-
-  for (const m of shown) {
-    const line = lines[m]
-    if (!line) continue
-    const side = line.out ? 'out' : 'in'
-    const template = line.out ? cols.me : cols.them
-    rows.push({
-      key: String(m),
-      side,
-      ...stamp(line.out, line.text, ordinals[m], tailed[side] ? 'none' : template.tail),
-    })
-    tailed[side] = true
-  }
-
-  return rows
 }
 
 /** Pull a head index into `[0, total)`; -1 for an empty transcript (nothing to show). */

@@ -3,7 +3,7 @@ import type { FitMetrics } from './bubbleFit'
 import type { BubbleTransform } from './editor/types'
 
 // Where a conversation's balloons go, once each one knows its size. Pure geometry in the
-// panel box's % units, used by `conversationRows` (bubbleChain.ts) and nothing measured.
+// panel box's % units, used by `conversationRows` (chainRows.ts) and nothing measured.
 //
 // The rule this replaces was two ruled columns: every row of a side hung from the same
 // edge and sat wholly above the row below it, whichever side that was. A conversation of
@@ -126,20 +126,25 @@ export function chainRowTop(
  * The `top` of the next row up, given every row already placed (bottom first) and the
  * row's own width, side edge and stretch.
  *
- * Its ellipse's bottom goes as low as two limits allow: it sinks alongside the last row
- * to {@link CHAIN_INTERLEAVE} of that ellipse, and it clears, by {@link CHAIN_ROW_GAP},
- * every placed row whose ellipse it would overlap horizontally — within
- * {@link CHAIN_COL_GAP} of touching counts as overlapping. Directly over the row below it
- * the second limit binds and the row stacks exactly as {@link chainRowTop} stacks it.
+ * Its ellipse's bottom goes as low as two limits allow: it sinks alongside the row
+ * `below` it to {@link CHAIN_INTERLEAVE} of that ellipse, and it clears, by
+ * {@link CHAIN_ROW_GAP}, every placed row whose ellipse it would overlap horizontally —
+ * within {@link CHAIN_COL_GAP} of touching counts as overlapping. Directly over the row
+ * below it the second limit binds and the row stacks exactly as {@link chainRowTop}
+ * stacks it.
+ *
+ * `below` is the row before this one in the conversation, which is the last one placed
+ * unless the caller placed some rows out of order — an anchored balloon, say, that had to
+ * be on the panel before the rows that must clear it (see `placeRows`, chainRows.ts).
  */
 export function stackedTop(
   placed: readonly PlacedRow[],
   next: Pick<BubbleTransform, 'right' | 'width'> & { stretch: number },
   panelAspect: number,
+  below: PlacedRow | undefined = placed[placed.length - 1],
 ): number {
-  const last = placed[placed.length - 1]
-  if (!last) throw new Error('stackedTop needs a row to stack on')
-  const lastE = rowEllipse(last, panelAspect)
+  if (!below) throw new Error('stackedTop needs a row to stack on')
+  const lastE = rowEllipse(below, panelAspect)
   let bottom = lastE.y1 + (lastE.y2 - lastE.y1) * CHAIN_INTERLEAVE
   const left = 100 - next.right - next.width
   const x1 = left + next.width * (BUBBLE_ELLIPSE_N.cx - BUBBLE_ELLIPSE_N.rx) - CHAIN_COL_GAP

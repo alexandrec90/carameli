@@ -37,9 +37,10 @@ export interface ChainBox {
  * Horizontally it is simply the two columns' outer edges — the sender's right edge and the
  * recipient's left one — because a row never leaves the column it belongs to.
  *
- * Vertically it climbs, which is the part worth stating: rows anchor at the sender's own
- * `top` and stack **upward** from it (`.claude/rules/skin-comic-book.md`, "Only up"), so
- * the template is the table's *floor* and the ceiling is however far `rows` of balloons
+ * Vertically it climbs, which is the part worth stating: the newest row sits on the
+ * sender's own tail tip — the composer *is* the template, at its `top` — and the rest
+ * stack **upward** from it (`.claude/rules/skin-comic-book.md`, "Only up"), so the
+ * template is the table's *floor* and the ceiling is however far `rows` of balloons
  * reach above it. That is why moving the sender down lengthens nothing and moving it up
  * pushes the whole conversation off the panel — the behaviour this frame makes visible.
  */

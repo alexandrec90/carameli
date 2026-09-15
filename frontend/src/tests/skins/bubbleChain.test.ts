@@ -9,7 +9,6 @@ import {
   chainMembers,
   chainTranscript,
   clampHead,
-  conversationRows,
   defaultChain,
   growTarget,
   isBubbleChain,
@@ -17,14 +16,16 @@ import {
   messageRows,
   mirrorColumn,
   readTranscript,
-  recipientStemTarget,
   sideOrdinals,
   stepHead,
+  TYPING_KEY,
   visibleWindow,
 } from '../../skins/comic-book/bubbleChain'
 import type { BubbleChain, ChainRow } from '../../skins/comic-book/bubbleChain'
 import { fitMessage } from '../../skins/comic-book/bubbleFit'
+import { anchorOf } from '../../skins/comic-book/chainAnchor'
 import { CHAIN_ROW_GAP, rowEllipse } from '../../skins/comic-book/chainLayout'
+import { conversationRows } from '../../skins/comic-book/chainRows'
 import type { ChainMetrics } from '../../skins/comic-book/chainLayout'
 import { NEW_BUBBLE } from '../../skins/comic-book/editor/configSeed'
 import type { BubbleTransform } from '../../skins/comic-book/editor/types'
@@ -253,20 +254,29 @@ describe('conversationRows', () => {
     }
   })
 
-  // The zig-zag: a speaker's consecutive balloons alternate between the column's outer
-  // edge and a lean inward, so one of any two is flush and the other is not.
+  // A longer thread, for the rows above the two anchored ones: three of theirs stacked
+  // up the left column, two of mine up the right.
+  const many = readTranscript(['hey', 'you around?', '> just picked up', 'any luck?', '> some', 'ok'])
+  const table = conversationRows(visibleWindow(5, 6), many, cols, false, M)
+  const at = (t: readonly ChainRow[], key: string): ChainRow => {
+    const found = t.find(r => r.key === key)
+    if (!found) throw new Error(`no row ${key}`)
+    return found
+  }
+
+  // The zig-zag: a speaker's stacked balloons alternate between the column's outer edge
+  // and a lean inward, by the message's ordinal on that side.
   it('leans every other row of a speaker inward from the column’s edge', () => {
-    const [, around, hey] = rows
-    const flush = [around, hey].filter(r => Math.abs(leftOf(r) - THEM_LEFT) < 1e-9)
-    expect(flush).toHaveLength(1)
+    const flush = (r: ChainRow) => Math.abs(leftOf(r) - THEM_LEFT) < 1e-9
+    expect(flush(at(table, '0'))).toBe(true) // their first
+    expect(flush(at(table, '1'))).toBe(false) // their second
+    expect(flush(at(table, '3'))).toBe(true) // their third
   })
 
   it('leans by the message’s place in the transcript, not its row on screen', () => {
     // Scroll the window by one: message 1 moves up a row and keeps its lean.
-    const scrolled = conversationRows(visibleWindow(1, 6), lines, cols, false, M)
-    const before = rows.find(r => r.key === '1')
-    const after = scrolled.find(r => r.key === '1')
-    expect(after?.bubble.right).toBeCloseTo(before?.bubble.right ?? -1, 6)
+    const scrolled = conversationRows(visibleWindow(4, 6), many, cols, false, M)
+    expect(at(scrolled, '1').bubble.right).toBeCloseTo(at(table, '1').bubble.right, 6)
   })
 
   it('sizes each row to its own message', () => {
@@ -284,35 +294,95 @@ describe('conversationRows', () => {
     expect(wrapped[1].stretch).toBe(1)
   })
 
-  it('anchors the bottom row on the sender template and climbs from there', () => {
-    expect(rows[0].bubble.top).toBe(cols.me.top)
-    for (let i = 1; i < rows.length; i += 1) {
-      expect(rowEllipse(rows[i], 1).y2).toBeLessThan(rowEllipse(rows[i - 1], 1).y2)
+  /** Where a row's tail points on the panel — or its ellipse centre, with no tail. */
+  const anchorOfRow = (r: ChainRow) => anchorOf(r.bubble, 1, r.stretch)
+  const expectSamePoint = (a: readonly number[], b: readonly number[]) => {
+    expect(a[0]).toBeCloseTo(b[0], 6)
+    expect(a[1]).toBeCloseTo(b[1], 6)
+  }
+
+  // The author placed each template by its tail — on a character's mouth — and the
+  // newest balloon of each side is drawn on that same point, not at the template's
+  // corner, which a balloon of another size would carry the tail away from.
+  it('keeps the newest row of each side on its template’s tail tip', () => {
+    // Both fitted narrower than their templates, or the test would hold for any rule.
+    expect(rows[0].bubble.width).toBeLessThan(cols.me.width)
+    expect(rows[1].bubble.width).toBeLessThan(cols.them.width)
+    expectSamePoint(anchorOfRow(rows[0]), anchorOf(cols.me, 1))
+    expectSamePoint(anchorOfRow(rows[1]), anchorOf(cols.them, 1))
+    expect(rows[0].bubble.top).not.toBeCloseTo(cols.me.top, 6)
+  })
+
+  it('holds the tip still while a long message stretches the balloon', () => {
+    const long = 'x'.repeat(30)
+    const [tall] = conversationRows([0], readTranscript([`> ${long} ${long}`]), cols, false, M)
+    expect(tall.stretch).toBeGreaterThan(1)
+    expectSamePoint(anchorOfRow(tall), anchorOf(cols.me, 1))
+  })
+
+  it('centres a tailless template’s newest row on its ellipse instead', () => {
+    const bare = { ...cols, them: tpl({ ...cols.them, tail: 'none' }) }
+    const [, around] = conversationRows(shown, lines, bare, false, M)
+    expect(around.bubble.tail).toBe('none')
+    expectSamePoint(anchorOfRow(around), anchorOf(bare.them, 1))
+  })
+
+  it('puts the typing row on the recipient template’s tail tip', () => {
+    const [dots] = conversationRows([], [], cols, false, M, true)
+    expect(dots.key).toBe(TYPING_KEY)
+    expectSamePoint(anchorOfRow(dots), anchorOf(cols.them, 1))
+  })
+
+  it('climbs from the anchored rows, each older row above the one below it', () => {
+    const stacked = table.filter(r => r.bubble.tail === 'none')
+    expect(stacked.length).toBe(table.length - 2)
+    for (const r of stacked) {
+      const below = table[table.indexOf(r) - 1]
+      expect(rowEllipse(r, 1).y2).toBeLessThan(rowEllipse(below, 1).y2)
     }
   })
 
   // Rows may tuck in beside each other but never over each other: two ellipses that share
   // any horizontal span keep the row gap between them.
-  it('never lets two balloons overlap, however they interleave', () => {
-    const many = readTranscript(['hey', 'you around?', '> just picked up', 'any luck?', '> some', 'ok'])
-    const table = conversationRows(visibleWindow(5, 6), many, cols, false, M)
-    for (let i = 0; i < table.length; i += 1) {
-      for (let j = i + 1; j < table.length; j += 1) {
-        const a = rowEllipse(table[i], 1)
-        const b = rowEllipse(table[j], 1)
+  const expectNoOverlap = (t: readonly ChainRow[]) => {
+    for (let i = 0; i < t.length; i += 1) {
+      for (let j = i + 1; j < t.length; j += 1) {
+        const a = rowEllipse(t[i], 1)
+        const b = rowEllipse(t[j], 1)
         if (a.x2 <= b.x1 || b.x2 <= a.x1) continue
-        expect(a.y1 - b.y2).toBeGreaterThanOrEqual(CHAIN_ROW_GAP - 1e-9)
+        // Whichever is the upper one, the gap between them is at least the row gap.
+        expect(Math.max(a.y1 - b.y2, b.y1 - a.y2)).toBeGreaterThanOrEqual(CHAIN_ROW_GAP - 1e-9)
       }
     }
+  }
+
+  it('never lets two balloons overlap, however they interleave', () => {
+    expectNoOverlap(table)
+  })
+
+  // The recipient's newest message is anchored wherever the author drew their template,
+  // which can be right where the sender's older rows would otherwise have stacked. Those
+  // rows must clear it even though it comes later in the transcript than they do.
+  it('stacks older rows clear of an anchored row that comes later in the transcript', () => {
+    // Their template straight above mine, in the same column.
+    const stackedCols = {
+      me: tpl({ top: 60, right: 5, width: 40, tail: 'down-left', content: 'input' }),
+      them: tpl({ top: 30, right: 5, width: 40, tail: 'down-right' }),
+    }
+    const thread = readTranscript(['hey', '> a', '> b'])
+    const live = conversationRows(visibleWindow(2, 6), thread, stackedCols, true, M)
+    expect(live.map(r => r.key)).toEqual(['composer', '2', '1', '0'])
+    expectSamePoint(anchorOfRow(at(live, '0')), anchorOf(stackedCols.them, 1))
+    expectNoOverlap(live)
   })
 
   // The other speaker's reply sits alongside the message it answers rather than wholly
   // above it — this is what pulls the two columns together on the panel.
   it('tucks a reply in beside the message it answers', () => {
-    const picked = rowEllipse(rows[0], 1)
-    const around = rowEllipse(rows[1], 1)
-    expect(around.y2).toBeGreaterThan(picked.y1)
-    expect(around.y2).toBeLessThan(picked.y2)
+    const picked = rowEllipse(at(table, '2'), 1)
+    const luck = rowEllipse(at(table, '3'), 1)
+    expect(picked.y2).toBeGreaterThan(luck.y1)
+    expect(picked.y2).toBeLessThan(luck.y2)
   })
 
   it('links rows vertically within each speaker column only', () => {
@@ -328,23 +398,6 @@ describe('conversationRows', () => {
       ['out', 'out'],
       ['in', 'in'],
     ])
-  })
-
-  it('keeps the newest recipient stem on the template-authored panel point', () => {
-    const target = recipientStemTarget(cols.them, rows[1], 1)
-    const templateTarget = recipientStemTarget(cols.them, { bubble: cols.them, stretch: 1 }, 1)
-    expect(target).not.toEqual(templateTarget)
-    expect(target.every(Number.isFinite)).toBe(true)
-  })
-
-  it('aims the stem through a stretched row’s own height', () => {
-    // Unrotated, so the extra height moves the target straight down the SVG and not
-    // sideways through the balloon's tilt.
-    const row = { ...rows[1], bubble: { ...rows[1].bubble, rotate: 0 } }
-    const tall = recipientStemTarget(cols.them, { ...row, stretch: 2 }, 1)
-    const plain = recipientStemTarget(cols.them, { ...row, stretch: 1 }, 1)
-    expect(tall[0]).toBeCloseTo(plain[0], 6)
-    expect(tall[1]).not.toBeCloseTo(plain[1], 6)
   })
 
   it('leaves the tail on the newest balloon of each column and nowhere else', () => {
@@ -374,9 +427,9 @@ describe('conversationRows', () => {
 
     expect(live.map(r => r.key)).toEqual(['composer', '0'])
     expect(live[0].bubble.content).toBe('input')
-    expect(live[0].bubble.top).toBe(me.top)
+    expect(live[0].bubble.top).toBeCloseTo(me.top, 6)
     // The composer is the template itself, drawn where the author put it: no lean.
-    expect(live[0].bubble.right).toBe(me.right)
+    expect(live[0].bubble.right).toBeCloseTo(me.right, 6)
     expect(live[0].stretch).toBe(1)
     // The composer is the sender still talking, so the message above it takes no second tail.
     expect(live[0].bubble.tail).toBe('down-left')

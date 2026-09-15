@@ -66,14 +66,6 @@ describe('PanelBubble lettering', () => {
 })
 
 describe('PanelBubble hit target', () => {
-  it('extends a chain speech stem to its fixed SVG target', () => {
-    const target: [number, number] = [38, 260]
-    const { container } = render(
-      <PanelBubble bubble={bubble({ tail: 'down-left' })} visible interactive tailTarget={target} />,
-    )
-    expect(container.querySelector('.cb-bubble-shape')?.getAttribute('d')).toContain('38 260')
-  })
-
   it('targets an unpainted hit region, not the painted outline or its rectangular wrapper', () => {
     const { container } = render(<PanelBubble bubble={bubble()} visible interactive />)
 

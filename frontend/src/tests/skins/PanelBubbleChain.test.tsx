@@ -41,8 +41,12 @@ const chain = (over: Partial<BubbleChain> = {}): BubbleChain => ({
   ...over,
 })
 
-/** The panel box the templates resolve against, sized so tubes and rows have room. */
-const BOX = { x: 0, y: 0, w: 400, h: 300 }
+/**
+ * The panel box the templates resolve against, sized so tubes and rows have room: tall
+ * enough that the row gap (`CHAIN_ROW_GAP`, 1.5% of the height) clears a tube's minimum
+ * even between two rows stacked straight over each other.
+ */
+const BOX = { x: 0, y: 0, w: 400, h: 600 }
 
 /** A lettering size the box has room for: a column holds a short line on one row. */
 const LETTERING = 12
@@ -133,17 +137,18 @@ describe('PanelBubbleChain', () => {
     expect(edges(around).right).not.toBeCloseTo(5, 6)
   })
 
-  // The zig-zag: consecutive rows of one speaker do not line up on their column's edge.
+  // The zig-zag: consecutive stacked rows of one speaker do not line up on their column's
+  // edge. The bottom row is the exception — it sits on its template's tail tip instead.
   it('leans every other row of a speaker in from the column’s edge', () => {
     const { container } = render(
       <PanelBubbleChain box={BOX} lettering={LETTERING}
-        chain={chain({ rows: 6, messages: ['hey', 'you around?', 'any luck?'] })}
+        chain={chain({ rows: 6, messages: ['hey', 'you around?', 'any luck?', 'still there?'] })}
         members={columns()}
         visible
         interactive
       />,
     )
-    const lefts = drawn(container).map(el => edges(el).left)
+    const [, ...lefts] = drawn(container).map(el => edges(el).left)
     expect(lefts[0]).not.toBeCloseTo(lefts[1], 6)
     expect(lefts[1]).not.toBeCloseTo(lefts[2], 6)
     expect(lefts[0]).toBeCloseTo(lefts[2], 6)
@@ -300,7 +305,9 @@ describe('PanelBubbleChain live chain', () => {
     // Inside the composer's column, which is the sender's.
     expect(edges(sent).right).toBeGreaterThanOrEqual(edges(field).right)
     expect(edges(sent).left).toBeGreaterThanOrEqual(edges(field).left - 1e-9)
-    expect(edges(theirs).left).toBeCloseTo(5, 6)
+    // And theirs stays in the recipient's column, on their template's tail tip.
+    expect(edges(theirs).left).toBeGreaterThanOrEqual(5 - 1e-9)
+    expect(edges(theirs).right).toBeGreaterThanOrEqual(55 - 1e-9)
   })
 
   // The composer costs the bottom row, so a three-row table is the field and the two newest
