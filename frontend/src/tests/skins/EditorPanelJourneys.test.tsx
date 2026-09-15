@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { CONFIG_KEY } from '../../skins/comic-book/editor/configSeed'
 import EditorOverlay from '../../skins/comic-book/editor/EditorOverlay'
-import { useEditorMode } from '../../skins/comic-book/editor/useEditorMode'
+import { useEditorEngine } from '../../skins/comic-book/editor/useEditorMode'
 import { frameRect } from '../../skins/comic-book/panelGeometry'
 import { panelPolysIn } from '../../skins/comic-book/usePageFrame'
 
@@ -32,7 +32,7 @@ const FRAME = frameRect(1600, 900, 'landscape')
 
 /** The classic page in a landscape window, wired as Layout.tsx wires it. */
 function Editor() {
-  const api = useEditorMode()
+  const api = useEditorEngine()
   const grid = api.config.grids.classic.landscape
   const panelPolys = useMemo(() => panelPolysIn(grid, FRAME), [grid])
   return (

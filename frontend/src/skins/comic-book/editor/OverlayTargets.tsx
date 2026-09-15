@@ -9,7 +9,7 @@ import { boxOf, rectStyle } from './overlayGeometry'
 import type { HalvesOn } from './overlayGeometry'
 import { bubbleRect, imgVisibleRect } from './transforms'
 import type { BubbleChain, BubbleTransform, CallRole } from './types'
-import type { EditorModeApi } from './useEditorMode'
+import type { EditorModeApi } from './editorContext'
 
 /**
  * Chain frames for one panel, each conversation measured against the box its own balloons

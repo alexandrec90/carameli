@@ -17,9 +17,11 @@
 
 import { describe, expect, it } from 'vitest'
 
+import { CONFIG_KEY } from './src/skins/comic-book/editor/configOps'
 import { SKIN_NAMES } from './src/skins/registry'
 import {
   CHUNK_HASH_LENGTH,
+  DEV_ONLY_MARKERS,
   DIST_ASSETS_DIR,
   FORBIDDEN_DIST_EXTENSIONS,
   MAX_EAGER_BYTES,
@@ -31,12 +33,14 @@ import {
   NO_DIST_MESSAGE,
   STRAY_UTILITIES,
   chunkHashLooksRight,
+  devOnlyMarkersIn,
   distExists,
   findEagerAssetUrls,
   findSkinChunk,
   isFont,
   listBuiltAssets,
   readBuiltCss,
+  readBuiltJs,
   readEagerAssetUrls,
   skinChunksAreLazy,
   strayUtilities,
@@ -201,6 +205,32 @@ describe('strayUtilities', () => {
   })
 })
 
+describe('devOnlyMarkersIn', () => {
+  it('finds a marker anywhere in the concatenated build', () => {
+    expect(devOnlyMarkersIn('x=1;const k="comic-book:editConfig";', DEV_ONLY_MARKERS))
+      .toEqual(['comic-book:editConfig'])
+  })
+
+  it('reports nothing for a build that does not hold one', () => {
+    expect(devOnlyMarkersIn('const k="comic-book:edit";', DEV_ONLY_MARKERS)).toEqual([])
+  })
+
+  it('names every marker it found, not just the first', () => {
+    expect(devOnlyMarkersIn('a"one"b"two"', ['one', 'two', 'three'])).toEqual(['one', 'two'])
+  })
+})
+
+describe('DEV_ONLY_MARKERS', () => {
+  // The vacuity guard. A marker is a copy of a string that lives in `src/`, and a copy
+  // that stops matching its original is a grep for something no build contains — which
+  // passes, for as long as it takes someone to notice the thing it was watching came
+  // back. Tying each literal to the constant it copies makes a rename a failure here
+  // rather than a silent hole in the build assertion below.
+  it('is still the key the editor writes its working copy under', () => {
+    expect(DEV_ONLY_MARKERS).toContain(CONFIG_KEY)
+  })
+})
+
 describe('the build', () => {
   it('exists, so no budget below can pass by measuring nothing', () => {
     expect(distExists(), NO_DIST_MESSAGE).toBe(true)
@@ -324,6 +354,20 @@ describe('the build', () => {
         '`@property` registrations, into the eager stylesheet. `src/index.css` declines ' +
         'each of these with `@source not inline(...)`; restore the line rather than ' +
         'shrinking STRAY_UTILITIES.',
+    ).toEqual([])
+  })
+
+  it('ships no part of the dev-only comic-book editor engine', () => {
+    const found = distExists() ? devOnlyMarkersIn(readBuiltJs(), DEV_ONLY_MARKERS) : []
+    expect(
+      found,
+      'The production build contains a string only the dev editor needs, so the module ' +
+        'that owns it — and everything it imports — is being downloaded by visitors who ' +
+        'have no editor. The usual cause is a page component importing a *value* from ' +
+        '`editor/useEditorMode.ts` or one of the mutator hooks: that edge defeats the ' +
+        '`import.meta.env.DEV` gate, because a hook has to be called unconditionally. ' +
+        'Read state from `editor/editorContext.ts` instead, which is inert without a ' +
+        'provider, and let `editor/EditorProvider.tsx` stay the only way in.',
     ).toEqual([])
   })
 

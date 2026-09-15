@@ -1,5 +1,5 @@
 import { callSceneOn } from '../callSceneRoles'
-import type { EditorModeApi } from './useEditorMode'
+import type { EditorModeApi } from './editorContext'
 
 // The four things that can be added to a panel. One row, one shape of button, because
 // the differences between them are entirely in what they drop on the page — and writing

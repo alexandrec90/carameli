@@ -1,6 +1,6 @@
 import type { Rect } from '../panelGeometry'
 import type { ProjectedSurface } from './types'
-import type { EditorModeApi } from './useEditorMode'
+import type { EditorModeApi } from './editorContext'
 import { useSurfaceCornerDrag } from './useTableCornerDrag'
 import './editor-table.css'
 

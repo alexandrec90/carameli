@@ -13,7 +13,7 @@ import { pageForPath } from './panels'
 import { softphoneActions } from './phoneActions'
 import { usePanelDots } from './usePanelDots'
 import { usePanelHover } from './usePanelHover'
-import { shouldRevealImg, useEditorMode } from './editor/useEditorMode'
+import { shouldRevealImg, useEditorApi, useEditorMode } from './editor/editorContext'
 import { useLiveTableImages } from './useLiveTableImages'
 import { letteringPx, pageFrameStyle, panelPolysIn, usePageFrame } from './usePageFrame'
 import { usePageWash } from './usePageWash'
@@ -36,20 +36,53 @@ import './comic-book.css'
 // entry `i` names the Ben-Day background style drawn behind panel `i`, with its
 // colors and dot metrics tuned in PANEL_BG_CONFIGS (./panelPatterns.ts).
 
-// ─── Dev-only editor overlay (lazy) ────────────────────────────────────────────
-// Gated on import.meta.env.DEV at module scope: in a production build this static
-// `false` lets Rollup eliminate the branch and drop the overlay's chunk entirely.
+// ─── Dev-only editor (lazy) ────────────────────────────────────────────────────
+// Both gated on import.meta.env.DEV at module scope: in a production build this static
+// `false` lets Rollup eliminate the branch and drop each chunk entirely.
+//
+// The overlay is the editor's *UI*. The provider is its engine, and it is the one that
+// matters to what a visitor downloads: LayoutBody has to ask for editor state on every
+// render — a hook cannot be called conditionally — and while it asked the engine's own
+// module for it, that edge shipped 31.2 KB of mutators to everyone. It asks a context
+// instead (./editor/editorContext.ts, which carries the account), and this is the only
+// thing that ever fills that context in.
 const EditorOverlay = import.meta.env.DEV
     ? lazy(() => import('./editor/EditorOverlay'))
+    : null
+const EditorProvider = import.meta.env.DEV
+    ? lazy(() => import('./editor/EditorProvider'))
     : null
 
 // ─── Layout ──────────────────────────────────────────────────────────────────
 
+/**
+ * The page, plus the dev editor above it when there is one.
+ *
+ * Two components rather than one because the engine has to sit *above* everything that
+ * reads it, and the only way to load it conditionally is to load it late. In a production
+ * build `EditorProvider` folds to null and this is `LayoutBody` with a branch in front of
+ * it; in a dev session the body mounts once, after the provider resolves — `fallback` is
+ * null rather than the body itself precisely so that it mounts once rather than twice.
+ */
+export function Layout(props: LayoutProps) {
+    if (!EditorProvider) return <LayoutBody {...props} />
+    return (
+        <Suspense fallback={null}>
+            <EditorProvider>
+                <LayoutBody {...props} />
+            </EditorProvider>
+        </Suspense>
+    )
+}
+
 // children intentionally not rendered — panels-only foundation phase. navItems
 // only feeds the dev editor's page selector (no in-page nav chrome yet).
-export function Layout({ navItems, sms, softphone }: LayoutProps) {
+function LayoutBody({ navItems, sms, softphone }: LayoutProps) {
     const location = useLocation()
     const editor = useEditorMode()
+    // Null in a build and in any test that does not mount the provider, which is what
+    // keeps the mutators off the page: the overlay below is the only thing that takes it.
+    const editorApi = useEditorApi()
     const page = pageForPath(location.pathname)
 
     // Everything drawn comes from the editor's working copy when one is open, else from
@@ -199,10 +232,10 @@ export function Layout({ navItems, sms, softphone }: LayoutProps) {
             </div>
 
             {/* Dev-only editor overlay — never reached in a production build */}
-            {EditorOverlay && editor.active && (
+            {EditorOverlay && editorApi?.active && (
                 <Suspense fallback={null}>
                     <EditorOverlay
-                        api={editor}
+                        api={editorApi}
                         panelPolys={panelPolys}
                         page={page}
                         natSizes={natSizes}
@@ -210,10 +243,10 @@ export function Layout({ navItems, sms, softphone }: LayoutProps) {
                         frame={frame}
                         pageSelect={{
                             navItems,
-                            pageLabels: editor.config.pageLabels,
+                            pageLabels: editorApi.config.pageLabels,
                             previewingLoading: loading.previewLoading,
                             onPreviewLoading: loading.handlePreviewLoading,
-                            onPageLabel: editor.setPageLabel,
+                            onPageLabel: editorApi.setPageLabel,
                         }}
                     />
                 </Suspense>

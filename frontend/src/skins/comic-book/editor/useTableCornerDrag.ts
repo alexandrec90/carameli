@@ -5,7 +5,7 @@ import type { Rect } from '../panelGeometry'
 import { QUAD_RANGE, quadViewport } from '../tableProjection'
 import type { Quad } from '../tableProjection'
 import type { ImgTransform, NumberPadProjection, ProjectedSurface, TableProjection } from './types'
-import type { EditorModeApi } from './useEditorMode'
+import type { EditorModeApi } from './editorContext'
 
 // Dragging the four corners of a projected surface. The gesture is the whole tilt
 // control: there is no rotate slider and no perspective field, because a plane already

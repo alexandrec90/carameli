@@ -5,7 +5,7 @@ import Hint from './Hint'
 import PanelActions from './PanelActions'
 import { insertBend, moveVertex } from './panelGridOps'
 import PanelNameField from './PanelNameField'
-import type { EditorModeApi } from './useEditorMode'
+import type { EditorModeApi } from './editorContext'
 import type { SeamDragApi } from './useSeamDrag'
 
 // The toolbar half of the shape editor: which page and which of its three grids is in

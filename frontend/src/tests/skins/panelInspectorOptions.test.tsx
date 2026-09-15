@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 import BubbleInspector from '../../skins/comic-book/editor/BubbleInspector'
 import ImageInspector from '../../skins/comic-book/editor/ImageInspector'
 import { seedConfig } from '../../skins/comic-book/editor/configSeed'
-import type { EditorModeApi } from '../../skins/comic-book/editor/useEditorMode'
+import type { EditorModeApi } from '../../skins/comic-book/editor/editorContext'
 
 function apiFor(panel: number, kind: 'image' | 'bubble'): EditorModeApi {
   const config = seedConfig()

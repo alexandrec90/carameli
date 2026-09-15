@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 import InspectorPanel from '../../skins/comic-book/editor/InspectorPanel'
 import { seedConfig } from '../../skins/comic-book/editor/configSeed'
-import type { EditorModeApi } from '../../skins/comic-book/editor/useEditorMode'
+import type { EditorModeApi } from '../../skins/comic-book/editor/editorContext'
 
 describe('InspectorPanel names', () => {
   it('renames the owning panel while a picture on it is selected', () => {

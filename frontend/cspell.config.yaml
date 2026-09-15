@@ -74,6 +74,8 @@ words:
   # British spellings used deliberately in prose (devkit upstream matches)
   - behaviour
   - behaviours
+  - canonicalise
+  - canonicalises
   - neighbour
   - neighbours
   - neighbouring
@@ -83,6 +85,7 @@ words:
   - quantised
   - rasterised
   - recognisably
+  - recognised
   # Test-fixture shorthand (customer ids, vitest's unstubAllGlobals, distances)
   - cust
   - dists

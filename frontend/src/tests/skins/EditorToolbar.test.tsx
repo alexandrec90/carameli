@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import EditorToolbar from '../../skins/comic-book/editor/EditorToolbar'
 import { seedConfig } from '../../skins/comic-book/editor/configSeed'
 import type { EditorConfig } from '../../skins/comic-book/editor/types'
-import type { EditorModeApi } from '../../skins/comic-book/editor/useEditorMode'
+import type { EditorModeApi } from '../../skins/comic-book/editor/editorContext'
 import type { SeamDragApi } from '../../skins/comic-book/editor/useSeamDrag'
 
 vi.mock('../../skins/comic-book/editor/useToolbarColumns', () => ({

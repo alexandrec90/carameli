@@ -24,7 +24,7 @@ import type { UseSoftphoneResult } from '../../hooks/useSoftphone'
  * identity is stable: the grids and pictures are memo dependencies in Layout, and a fresh
  * object per render would recompute every polygon on the page each frame.
  */
-const SHIPPED_LAYOUT: EditorConfig = {
+export const SHIPPED_LAYOUT: EditorConfig = {
   pageLabels: PAGE_LABELS,
   panels: PANELS,
   images: PANEL_IMG_TRANSFORMS,

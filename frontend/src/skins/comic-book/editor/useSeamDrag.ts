@@ -9,7 +9,7 @@ import { mergeVertices, snapTarget } from './panelGridMerge'
 import type { SeamGeometry } from './panelGridOps'
 import { insertBend, isRemovableBend, moveVertex, moveVertices, removeVertex, seamGeometry } from './panelGridOps'
 import { snapAligned, tearDrag } from './panelGridSplit'
-import type { EditorModeApi } from './useEditorMode'
+import type { EditorModeApi } from './editorContext'
 
 // The pointer and keyboard half of the shape editor. Every actual grid edit is a pure
 // function from ./panelGridOps.ts; this hook decides which one a gesture means and hands

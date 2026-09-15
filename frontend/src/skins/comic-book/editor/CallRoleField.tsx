@@ -1,7 +1,7 @@
 import { CALL_ROLE_LABELS, CALL_ROLES, isCallRole } from '../callSceneRoles'
 import type { SelectionKind } from './selection'
 import type { CallRole } from './types'
-import type { EditorModeApi } from './useEditorMode'
+import type { EditorModeApi } from './editorContext'
 
 // Which layer of the panel an entry belongs to, and — if it is the call's — which half
 // it is framed against. It sits above the kind-specific fields in the inspector because
