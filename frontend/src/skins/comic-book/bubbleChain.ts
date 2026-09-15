@@ -439,6 +439,55 @@ export function sideOrdinals(lines: readonly ChainLine[]): number[] {
 }
 
 /**
+ * How rows land on the table. `place` puts a balloon at the anchor while nothing is placed,
+ * then where {@link stackedTop} says it clears or tucks in against everything below; `stamp`
+ * cuts a row from its side's template first — fitted to `text`, leaning by its ordinal.
+ */
+function rowStamper(cols: ChainColumns, metrics: ChainMetrics) {
+  // The left column's left edge, which is what its balloons are aligned against.
+  const themLeft = 100 - cols.them.right - cols.them.width
+  const placed: PlacedRow[] = []
+  const place = (bubble: BubbleTransform, stretch: number): BubbleTransform => {
+    const top = placed.length > 0
+      ? stackedTop(placed, { ...bubble, stretch }, metrics.aspect)
+      : cols.me.top
+    const row = { ...bubble, top }
+    placed.push({ bubble: row, stretch })
+    return row
+  }
+  const stamp = (out: boolean, text: string, ordinal: number, tail: BubbleTransform['tail']) => {
+    const template = out ? cols.me : cols.them
+    const fit = fitMessage(
+      text,
+      template.type,
+      template.width,
+      template.width * CHAIN_MIN_WIDTH_RATIO,
+      metrics,
+    )
+    const shift = zigzagShift(ordinal, out, template.width - fit.width)
+    const bubble = place(
+      {
+        ...template,
+        width: fit.width,
+        right: out ? cols.me.right + shift : 100 - themLeft - shift - fit.width,
+        tail,
+        // A message is lettering, whatever the template it was stamped from does: the
+        // sender's template is routinely an input, and cloning that would put a field in
+        // every balloon of the right column.
+        content: 'text',
+        text,
+        // The templates are linked to each other — that linkage is the chain — and a
+        // stamped row is not a balloon anything can link to.
+        linkTo: null,
+      },
+      fit.stretch,
+    )
+    return { bubble, stretch: fit.stretch }
+  }
+  return { place, stamp }
+}
+
+/**
  * The whole conversation as placed balloons, bottom row first.
  *
  * `shown` is the window over the transcript, newest first ({@link visibleWindow}), so this
@@ -474,49 +523,9 @@ export function conversationRows(
   typing = false,
 ): ChainRow[] {
   const rows: ChainRow[] = []
-  // The left column's left edge, which is what its balloons are aligned against.
-  const themLeft = 100 - cols.them.right - cols.them.width
   const tailed = { out: false, in: false }
   const ordinals = sideOrdinals(lines)
-  const placed: PlacedRow[] = []
-  const place = (bubble: BubbleTransform, stretch: number): BubbleTransform => {
-    const top = placed.length > 0
-      ? stackedTop(placed, { ...bubble, stretch }, metrics.aspect)
-      : cols.me.top
-    const row = { ...bubble, top }
-    placed.push({ bubble: row, stretch })
-    return row
-  }
-  /** A row stamped from its side's template: fitted to `text`, leaning by its ordinal. */
-  const stamp = (out: boolean, text: string, ordinal: number, tail: BubbleTransform['tail']) => {
-    const template = out ? cols.me : cols.them
-    const fit = fitMessage(
-      text,
-      template.type,
-      template.width,
-      template.width * CHAIN_MIN_WIDTH_RATIO,
-      metrics,
-    )
-    const shift = zigzagShift(ordinal, out, template.width - fit.width)
-    const bubble = place(
-      {
-        ...template,
-        width: fit.width,
-        right: out ? cols.me.right + shift : 100 - themLeft - shift - fit.width,
-        tail,
-        // A message is lettering, whatever the template it was stamped from does: the
-        // sender's template is routinely an input, and cloning that would put a field in
-        // every balloon of the right column.
-        content: 'text',
-        text,
-        // The templates are linked to each other — that linkage is the chain — and a
-        // stamped row is not a balloon anything can link to.
-        linkTo: null,
-      },
-      fit.stretch,
-    )
-    return { bubble, stretch: fit.stretch }
-  }
+  const { place, stamp } = rowStamper(cols, metrics)
 
   if (live) {
     rows.push({ key: 'composer', side: 'out', bubble: place(cols.me, 1), stretch: 1 })

@@ -96,31 +96,31 @@ describe('glyphsPerLine', () => {
 })
 
 describe('fitMessage', () => {
-  const fit = (text: string, over: Partial<FitMetrics> = {}) =>
+  const fitAt = (text: string, over: Partial<FitMetrics> = {}) =>
     fitMessage(text, 'soft', 40, 40 * 0.42, { ...M, ...over })
 
   it('gives an empty message the narrowest balloon its column allows', () => {
-    expect(fit('')).toEqual({ width: 40 * 0.42, stretch: 1 })
+    expect(fitAt('')).toEqual({ width: 40 * 0.42, stretch: 1 })
   })
 
   it('grows with the message, so a conversation has a ragged edge', () => {
-    expect(fit('hi').width).toBeLessThanOrEqual(fit('hi there').width)
-    expect(fit('hi there').width).toBeLessThan(fit('hi there, you around?').width)
+    expect(fitAt('hi').width).toBeLessThanOrEqual(fitAt('hi there').width)
+    expect(fitAt('hi there').width).toBeLessThan(fitAt('hi there, you around?').width)
   })
 
   it('fills the column and stops there, growing tall instead', () => {
-    const long = fit('a message long enough to fill the column and then some more')
+    const long = fitAt('a message long enough to fill the column and then some more')
     expect(long.width).toBe(40)
     expect(long.stretch).toBeGreaterThan(1)
   })
 
   it('keeps a message that fits one line at the balloon’s ordinary aspect', () => {
-    expect(fit('yes').stretch).toBe(1)
+    expect(fitAt('yes').stretch).toBe(1)
   })
 
   it('asks for exactly the lines the wrap needs, over the band the ellipse allows', () => {
     const text = 'x'.repeat(10) + ' ' + 'y'.repeat(10) + ' ' + 'z'.repeat(10)
-    const { width, stretch } = fit(text)
+    const { width, stretch } = fitAt(text)
     const lines = wrapLines(text, glyphsPerLine(width, 'soft', M)).length
     const need = lines * LINE_HEIGHT * M.lettering
     const boxH = (width / 100) * M.boxW * BUBBLE_ASPECT
@@ -129,14 +129,14 @@ describe('fitMessage', () => {
 
   // The one-word case the wrap rule exists for: it neither crops nor keeps widening.
   it('wraps one long word inside a column-wide balloon rather than widening past it', () => {
-    const word = fit('w'.repeat(60))
+    const word = fitAt('w'.repeat(60))
     expect(word.width).toBe(40)
     expect(word.stretch).toBeGreaterThan(1)
     expect(wrapLines('w'.repeat(60), glyphsPerLine(40, 'soft', M)).length).toBeGreaterThan(1)
   })
 
   it('never goes below the narrowest, however small the lettering', () => {
-    expect(fit('a', { lettering: 1 }).width).toBe(40 * 0.42)
+    expect(fitAt('a', { lettering: 1 }).width).toBe(40 * 0.42)
   })
 
   it('takes a column narrower than the minimum as the minimum', () => {
@@ -144,11 +144,11 @@ describe('fitMessage', () => {
   })
 
   it('falls back to the narrowest, unstretched balloon with nothing to measure against', () => {
-    expect(fit('a long message with no lettering size', { lettering: 0 })).toEqual({
+    expect(fitAt('a long message with no lettering size', { lettering: 0 })).toEqual({
       width: 40 * 0.42,
       stretch: 1,
     })
-    expect(fit('a long message in a box with no width', { boxW: 0 })).toEqual({
+    expect(fitAt('a long message in a box with no width', { boxW: 0 })).toEqual({
       width: 40 * 0.42,
       stretch: 1,
     })
