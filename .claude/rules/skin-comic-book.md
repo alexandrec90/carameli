@@ -447,26 +447,16 @@ and a preferred owner ranks above `CLAIM_FIELD`.
 `?edit=1` / `?edit=0` in dev, persisted in `localStorage['comic-book:edit']`, gated on
 `import.meta.env.DEV` so it is inert in prod: `EditorOverlay.tsx` is a dynamic `import()`
 behind that gate, so Rollup drops it and `editor.css` from the build and only
-`layoutConfig.ts`, `bubbleTypes.ts` and `transforms.ts` ship. Click a panel, picture or
-bubble to select (a picture wins over the panel under it, a bubble over both); drag, wheel,
-handles and arrows adjust, with **Alt** swapping a picture's two framings. **+ Image**,
-**+ Bubble**, **+ SMS** and **+ Call** add to the selected panel, the first two in whichever
-of its layouts the call switch is showing. The inspector edits every field of the arrays
-above, with two deliberate gaps: **no chain control**, and no cell block or **+ Column** /
-**−** on a live surface.
+`layoutConfig.ts`, `bubbleTypes.ts` and `transforms.ts` ship. The inspector edits every
+field of the arrays above, with two deliberate gaps: **no chain control**, and no cell
+block or **+ Column** / **−** on a live surface.
 
-| Control | Notes |
-| --- | --- |
-| Call layout | **Default** / **Ringing** / **Connected**, present once the page has a call; on Default the call's entries are off screen with no targets or drags. A **call role** select puts an entry in the layout and moves the page to it, or nothing would appear to have happened; **call seam** / **call split** cut the panel, bounded by `CALL_CUT` since an edge cut leaves a half with no area to drag back |
-| Chain | **rows**, and **messages** on an *unbound* chain only. Chained balloons render flat in edit mode so each stays selectable, and the table's extent is a dashed frame (`chainFrame.ts`) |
-| Table corners | four grips, content mode only, band guides following — align the guides to the ruling in the photograph. Their exact coordinates are a folded section (`QuadCorners.tsx`), shared with the number pad |
-| Prose | **The inspector explains itself in `?` badges, not paragraphs** (`Hint.tsx`), and its set-once blocks fold (`Section.tsx`). `useToolbarColumns` turns toolbar height into toolbar *width*, so a paragraph left in the flow is paid for in screen area — a notepad with a table on it put the panel across most of the page. A hint an author must **act** on — a refused split, a chain with no number to bind to, the stale-file notices — stays a block |
-| Mode | **Content** / **Panel shapes**. Picture and bubble click targets are not rendered in shapes mode — a picture-sized target would swallow every drag aimed at a line crossing it |
-| Shape | **Follow the window** or one of the three; holds the page at that shape's frame in any window, so every grid is reachable without resizing (`ShapeSelect.tsx`; transient, never saved) |
-| Reshape | drag a **line** or **vertex**; a frame vertex slides along its own edge and the four corners are locked. Pictures and bubbles hold their on-screen place, re-expressed against their new panel box (`editor/gridContentRemap.ts`) — only the clip follows the seam. **Double-click** a line to bend it; drag a corner **onto another** to merge (`panelGridMerge.ts`) and **Alt-drag** to tear one apart (`panelGridSplit.ts`); both refuse while the result would be invalid |
-| New panel | **Split top / bottom** or **left / right** cuts through the middle of the selected panel's box in all three grids of its page (`configPanels.ts` over `panelGridCut.ts`). The parent keeps its index, name, pattern and the upper/left half; the new panel is appended and the other page's grids gain an empty ring. Refused whole when any grid cannot take it. There is no delete |
-| Save | `POST /__comic-editor/save` writes `layoutConfig.ts` (dev server only); **Copy config** / **.ts** are the fallbacks. Never refused — mid-design is when it matters — but it asks once when the working copy is older than the bundle's config, with a red block above the row (`editor/configStamp.ts`); **Reset** takes the file and discards this tab's work |
-| Ship | `POST /__comic-editor/ship` saves, branches, commits, pushes and opens or updates a PR (`frontend/shipLayout.ts`). Disabled while the amber `editor/configParity.ts` list is non-empty: every caption needs a tail and both morph targets, every link must resolve within its panel, every picture needs extent and a `/comic-book/` source |
+Selecting, dragging and every toolbar control are the editor README's — its *Quick start*
+and *Toolbar controls at a glance*. Three of those decisions carry beyond the toolbar:
+**the inspector explains itself in `?` badges, not paragraphs** (`Hint.tsx`,
+`Section.tsx`), because `useToolbarColumns` spends toolbar height as *width*; a **call
+seam** / **call split** is bounded by `CALL_CUT`, an edge cut leaving a half with no area
+to drag back; and **Save is never refused**, mid-design being when it matters most.
 
 ## Hard rules — the checklist; the prose above says why
 
