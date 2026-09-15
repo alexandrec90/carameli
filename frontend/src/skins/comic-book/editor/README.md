@@ -519,7 +519,7 @@ The walkthrough above is the long form; this is the same set as one table, and i
 | Shape | **Follow the window** or one of the three; holds the page at that shape's frame in any window, so every grid is reachable without resizing (`ShapeSelect.tsx`; transient, never saved) |
 | Reshape | drag a **line** or **vertex**; a frame vertex slides along its own edge and the four corners are locked. Pictures and bubbles hold their on-screen place, re-expressed against their new panel box (`gridContentRemap.ts`) — only the clip follows the seam. **Double-click** a line to bend it; drag a corner **onto another** to merge (`panelGridMerge.ts`) and **Alt-drag** to tear one apart (`panelGridSplit.ts`); both refuse while the result would be invalid |
 | New panel | **Split top / bottom** or **left / right** cuts through the middle of the selected panel's box in all three grids of its page (`configPanels.ts` over `panelGridCut.ts`), in **either mode** (`PanelActions.tsx`). The parent keeps its index, name, pattern and the upper/left half; the new panel is appended and the other page's grids gain an empty ring. Refused whole when any grid cannot take it. **Hide on *shape*** empties the ring on the grid on screen only, its neighbour taking the space (`panelGridAbsorb.ts`); **Show *name* below / beside** cuts the selected panel and hands the half to the hidden slot; **Delete panel** removes the slot everywhere, content included, and is the one renumbering edit (`configPanelsRemove.ts`). `../../../tests/skins/EditorPanelJourneys.test.tsx` drives all four through the real overlay |
-| Save | `POST /__comic-editor/save` writes `layoutConfig.ts` (dev server only); **Copy config** / **.ts** are the fallbacks. Never refused — mid-design is when it matters — but it asks once when the working copy is older than the bundle's config, with a red block above the row (`configStamp.ts`); **Reset** takes the file and discards this tab's work |
+| Save | `POST /__comic-editor/save` writes `layoutConfig.ts` (dev server only); **Copy config** / **.ts** are the fallbacks. Never refused — mid-design is when it matters — but it asks once when the working copy is older than the bundle's config, with a red block above the row (`configStamp.ts`); **Reset** takes the file and discards this tab's work. A working copy with no edits in it takes the file by itself on the next load (`editorStorage.ts`), so a tab left open across a merge shows what the live page shows |
 | Ship | `POST /__comic-editor/ship` saves, branches, commits, pushes and opens or updates a PR (`../../../shipLayout.ts`). Disabled while the amber `configParity.ts` list is non-empty: every caption needs a tail and both morph targets, every link must resolve within its panel, every picture needs extent and a `/comic-book/` source |
 
 ## Adding a picture
@@ -587,6 +587,37 @@ blocked commit or a rejected push comes back verbatim in that line, with a remin
 
 The summary box is optional. What you type becomes both the branch slug and the commit
 subject; empty falls back to a generic one.
+
+### Where an edit is implemented
+
+Config edits live in `configOps.ts` (React-free; it re-exports `configSeed.ts` and
+`configHydrate.ts`), grid edits in `panelGridOps.ts`, and the chain list's lifecycle in
+`chainOps.ts`. `reconcile.ts` settles links, ids and lists after any bubble-touching edit;
+`chainCreate.ts` builds a whole conversation, and `chainFrame.ts` is where the editor puts
+its rows.
+
+## The working copy, and the two ways it bites
+
+Save writes the served tree directly, and the editor's own copy of the design lives in
+`localStorage`, outliving every merge, checkout and pull. Both facts have cost sessions a
+diagnosis by reading as a fault in the checked-out branch.
+
+- **A `layoutConfig.ts` you did not edit is somebody's unsaved design.** A tab left open
+  mid-design plants half-built balloons in whatever worktree ran the dev server. Answer:
+  `git stash push -- <that file>`, never fill in the missing tails by hand.
+- **A tab *behind* the file overwrites it.** A tab opened before a change writes the
+  pre-change layout back on its next Save, indistinguishable from a revert.
+  `editor/configStamp.ts` fingerprints the config the payload hydrated from; a mismatch
+  with the bundle's blocks the editor in red and makes Save ask once. A pre-stamp payload
+  is **not** warned about — a warning on every one would be dismissed the day it was
+  right.
+
+**A copy with no edits in it is dropped for the file on boot** (`holdsNoEdits` in
+`editorStorage.ts`). A tab opened, never touched and left behind a merge used to go on
+showing the page as it *was*, so the editor and the live page disagreed about where the
+balloons stood and nothing in the editor explained why. Such a copy holds nothing of the
+author's — it equals the file, or the file it was hydrated from — so taking the file costs
+nothing. A copy with work in it is kept, and warned about as above.
 
 ## Dev-only / zero prod cost
 

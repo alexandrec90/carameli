@@ -179,11 +179,13 @@
   transition: opacity 200ms ease-out;
 }
 
-/* Text floats over the bubble outline, centered in the ellipse. The bottom inset is
-   larger to keep text clear of the tail. */
+/* Text floats over the bubble outline, centered in the ellipse. The inset is the
+   fallback for a control that sets none: lettering carries its own inline from
+   bubbleText.ts, the block inscribed in the shape drawn right now (hence the transition,
+   on the morph's duration), and these literals are that block for the plain ellipse. */
 .cb-panel-bubble-text {
   position: absolute;
-  inset: 20% 17% 34%;
+  inset: 18.75% 21.49% 41.42%;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -191,6 +193,7 @@
   font-size: var(--cb-lettering);
   color: #111;
   line-height: 1.2;
+  transition: inset 180ms ease-out;
 }
 
 /* The one piece of bubble content that is a real control rather than lettering, so

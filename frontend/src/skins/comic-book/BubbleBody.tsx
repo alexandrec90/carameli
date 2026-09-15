@@ -4,8 +4,10 @@ import BubbleActions from './BubbleActions'
 import BubbleDial from './BubbleDial'
 import BubbleInput from './BubbleInput'
 import BubbleNumberHangup from './BubbleNumberHangup'
+import { textInsetStyle } from './bubbleText'
 import BubbleTypingDots from './BubbleTypingDots'
 import BubbleWheel from './BubbleWheel'
+import type { BubbleType } from './editor/bubbleTypes'
 import type { BubbleTransform } from './editor/types'
 import type { PhoneActionHandlers } from './phoneActions'
 import { splitOptions } from './wheelPicker'
@@ -22,6 +24,12 @@ interface BubbleBodyProps {
   dial: boolean
   /** A window on the call rather than on the balloon's own `text`. */
   transcript: boolean
+  /**
+   * The shape the balloon is drawn as right now — resting, hovered or pulsing — which is
+   * what its lettering block is inscribed in (bubbleText.ts). The resolved shape rather
+   * than `bubble.type`, so a hover that morphs the outline moves the words with it.
+   */
+  shape: BubbleType
   /** The lettering the current shape asks for. */
   font: string
   /** False in edit mode: the editor overlay owns the pointer there. */
@@ -70,6 +78,7 @@ export default function BubbleBody({
   editableKind,
   dial,
   transcript,
+  shape,
   font,
   enabled,
   revealed,
@@ -150,7 +159,7 @@ export default function BubbleBody({
       <div
         ref={logRef}
         className="cb-panel-bubble-text cb-call-transcript"
-        style={{ fontFamily: `'${font}', cursive` }}
+        style={{ fontFamily: `'${font}', cursive`, ...textInsetStyle(shape) }}
         role="log"
         aria-label={linesLabel}
         aria-live="polite"
@@ -175,7 +184,10 @@ export default function BubbleBody({
   }
 
   return (
-    <span className="cb-panel-bubble-text" style={{ fontFamily: `'${font}', cursive` }}>
+    <span
+      className="cb-panel-bubble-text"
+      style={{ fontFamily: `'${font}', cursive`, ...textInsetStyle(shape) }}
+    >
       {status === 'typing' ? <BubbleTypingDots /> : bubble.text}
     </span>
   )

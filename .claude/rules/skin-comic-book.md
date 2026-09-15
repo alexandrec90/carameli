@@ -110,6 +110,15 @@ what lets any shape interpolate vertex-for-vertex into any other, so hover and c
   plus `'none'`), so a turn or a removal is an ordinary morph, not a second shape system.
   Its ink leaves the viewBox on purpose (`.cb-panel-bubble-svg` sets `overflow: visible`);
   padding the box would rescale every bubble already placed.
+- **The lettering block is inscribed in the outline, not in the box** (`bubbleText.ts`):
+  the largest rectangle inside each type's ring, set inline on the words from the shape
+  the balloon is *drawn* as, so a hover morph moves the words with the ink. The box is a
+  rectangle and the balloon is not, and an inset picked by eye ran a transcript's last
+  lines out through the ellipse's shoulders. `bubbleFit.ts` wraps against the same
+  numbers; the literal in `bubbles.css` is the fallback for a control that sets none of
+  its own and `bubbleText.test.ts` holds it to the plain ellipse's. A transcript is a
+  scroll window over that block with **no scrollbar** (`callScene.css`): the wheel scrolls
+  it, and a bar would be chrome in a hand-lettered balloon.
 
 ### A bubble — and a picture — belongs to a panel
 
@@ -295,23 +304,14 @@ framing numbers** in it or the CSS, and no bubble text. Retune in the editor.
 
 **Save overwrites `layoutConfig.ts` verbatim** with what `serialize.ts` emits, so anything
 that module does not write is deleted on the first save — hence the comments emitted as
-headers, and no default, helper or `NEW_IMAGE` living there. Config edits live in
-`configOps.ts` (React-free; re-exports `configSeed.ts` and `configHydrate.ts`), grid edits
-in `panelGridOps.ts`, the chain list's lifecycle in `chainOps.ts`; `reconcile.ts` settles
-links, ids and lists after any bubble-touching edit, `chainCreate.ts` builds a whole
-conversation, `chainFrame.ts` is where the editor puts its rows.
-Two hazards follow from Save writing the served tree directly, and both have cost sessions
-a diagnosis by reading as a fault in the checked-out branch:
-
-- **A `layoutConfig.ts` you did not edit is somebody's unsaved design** — a tab left open
-  mid-design plants half-built balloons in whatever worktree ran the dev server. Answer:
-  `git stash push -- <that file>`, never fill in the missing tails by hand.
-- **A tab *behind* the file overwrites it.** The working copy lives in `localStorage` and
-  outlives every merge, checkout and pull, so a tab opened before a change writes the
-  pre-change layout back on its next Save, indistinguishable from a revert.
-  `editor/configStamp.ts` fingerprints the config the payload hydrated from; a mismatch
-  with the bundle's blocks the editor in red and makes Save ask once. A pre-stamp payload
-  is **not** warned about — a warning on every one would be dismissed the day it was right.
+headers, and no default, helper or `NEW_IMAGE` living there. `reconcile.ts` settles links,
+ids and lists after any bubble-touching edit; which module owns which edit is the editor
+README's *Where an edit is implemented*.
+Save writes the served tree directly and the working copy lives in `localStorage`, so an
+unsaved design can land in your worktree and a stale tab can write the layout back over a
+change. `configStamp.ts` blocks a behind-the-file tab in red; a copy holding none of the
+author's work is dropped for the file on boot (`holdsNoEdits`, `editorStorage.ts`), one with
+work in it is kept and warned. Both hazards: the editor README's *The working copy*.
 
 `bubbleRect` (`transforms.ts`) gives the bubble box's on-screen geometry to **both** the
 renderer (aiming tubes) and the editor (hit target, selection outline). Keep it shared —

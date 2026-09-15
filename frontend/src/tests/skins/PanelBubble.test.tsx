@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 
+import { textInsetStyle } from '../../skins/comic-book/bubbleText'
 import PanelBubble from '../../skins/comic-book/PanelBubble'
 import { NEW_BUBBLE } from '../../skins/comic-book/editor/configSeed'
 import type { BubbleTransform } from '../../skins/comic-book/editor/types'
@@ -31,6 +32,36 @@ describe('PanelBubble stretch', () => {
     expect(svg(container).style.aspectRatio).toBe('200 / 300')
     expect(svg(container).getAttribute('viewBox')).toBe('0 0 200 150')
     expect(svg(container).getAttribute('preserveAspectRatio')).toBe('none')
+  })
+})
+
+describe('PanelBubble lettering', () => {
+  const textOf = (container: HTMLElement) =>
+    container.querySelector('.cb-panel-bubble-text') as HTMLElement
+
+  // The block is inscribed in the outline the balloon is *drawn* as, so the words move in
+  // when a hover morphs the ellipse into a burst — and back out when the pointer leaves.
+  it('letters inside the shape the balloon currently has', () => {
+    const { container } = render(
+      <PanelBubble bubble={bubble({ text: 'hello', hoverType: 'lightning' })} visible interactive />,
+    )
+    const root = container.querySelector('.cb-panel-bubble') as HTMLDivElement
+    expect(textOf(container).style.inset).toBe(textInsetStyle('soft').inset)
+
+    fireEvent.pointerEnter(root)
+    expect(textOf(container).style.inset).toBe(textInsetStyle('lightning').inset)
+
+    fireEvent.pointerLeave(root)
+    expect(textOf(container).style.inset).toBe(textInsetStyle('soft').inset)
+  })
+
+  it('letters a burst in a smaller block than a speech balloon', () => {
+    const soft = render(<PanelBubble bubble={bubble({ text: 'a' })} visible interactive />)
+    const burst = render(
+      <PanelBubble bubble={bubble({ text: 'a', type: 'lightning' })} visible interactive />,
+    )
+    expect(textOf(soft.container).style.inset).not.toBe(textOf(burst.container).style.inset)
+    expect(textOf(burst.container).style.inset).toBe(textInsetStyle('lightning').inset)
   })
 })
 

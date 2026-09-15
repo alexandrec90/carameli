@@ -4,6 +4,7 @@ import { resolve } from 'node:path'
 import { act, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
+import { setPanelLabel } from '../../skins/comic-book/editor/configPanels'
 import { seedConfig } from '../../skins/comic-book/editor/configSeed'
 import { configStamp, isStaleWorkingCopy, seedStamp } from '../../skins/comic-book/editor/configStamp'
 import { persistConfig, storedStamp } from '../../skins/comic-book/editor/editorStorage'
@@ -16,9 +17,15 @@ import { useEditorEngine } from '../../skins/comic-book/editor/useEditorMode'
 const CONFIG_KEY = 'comic-book:editConfig'
 const FLAG_KEY = 'comic-book:edit'
 
-/** A payload as the editor writes one, with whatever stamp the case is about. */
+/**
+ * A payload as the editor writes one, with whatever stamp the case is about — and with
+ * work in it. A copy that holds nothing of the author's is dropped for the file on boot
+ * (editorConfigDrift.test.ts), so the warning these cases are about is only ever shown
+ * over a copy somebody has edited.
+ */
+const authored = () => setPanelLabel(seedConfig(), 0, 'Cover, as the author left it')
 const payload = (stamp: string | null) =>
-  JSON.stringify(stamp === null ? seedConfig() : { ...seedConfig(), seedStamp: stamp })
+  JSON.stringify(stamp === null ? authored() : { ...authored(), seedStamp: stamp })
 
 beforeEach(() => {
   window.localStorage.clear()

@@ -1,4 +1,5 @@
 import { BUBBLE_ASPECT, BUBBLE_ELLIPSE_N } from './bubbleBox'
+import { textInset } from './bubbleText'
 import type { BubbleType } from './editor/bubbleTypes'
 
 // How much balloon a message needs, worked out without measuring it.
@@ -19,15 +20,14 @@ import type { BubbleType } from './editor/bubbleTypes'
 // a short reply is a small round balloon and a paragraph is a full-column tall one, which
 // is the proportion a letterer would choose.
 
-/**
- * The lettering block's inset within the balloon box, as fractions of it. **Mirrors
- * `.cb-panel-bubble-text` in bubbles.css** — `inset: 20% 17% 34%` — and `bubbleFit.test.ts`
- * holds the two together, because a fit computed against one inset and drawn inside
- * another wraps at the wrong width.
- */
-export const TEXT_INSET = { top: 0.2, side: 0.17, bottom: 0.34 } as const
+// The lettering block's inset is `textInset(type)` from bubbleText.ts — the rectangle the
+// drawing letters into, read from the same place, so a fit computed against one inset and
+// drawn inside another (which wraps at the wrong width) has no way to arise.
 
-/** Line height of the lettering, in em. Mirrors the same rule; same test. */
+/**
+ * Line height of the lettering, in em. **Mirrors `.cb-panel-bubble-text` in bubbles.css**,
+ * and `bubbleFit.test.ts` holds the two together.
+ */
 export const LINE_HEIGHT = 1.2
 
 /**
@@ -51,23 +51,22 @@ export interface FitMetrics {
 }
 
 /**
- * Share of the balloon box's height the lettering may fill.
+ * Share of the balloon box's height the lettering may fill in a balloon of `type`.
  *
- * Smaller than the inset alone allows, because the inset is a rectangle and the balloon
- * is an ellipse: the block's corners leave the outline before its edges do. The band is
- * the ellipse's vertical chord at the lettering's *width* — as tall as the ellipse is
- * where the lines are widest — so a block that fills it keeps its corners inside the ink.
+ * Never more than the inset allows, and never more than the ellipse's vertical chord at
+ * the lettering's *width* — as tall as the ellipse is where the lines are widest — so a
+ * block that fills it keeps its corners inside the ink. The inset is inscribed in that
+ * ellipse (bubbleText.ts), so today the two agree exactly; the chord stays as the guard
+ * that would catch an inset retuned past it.
  */
-export function textBand(): number {
-  const band = 1 - TEXT_INSET.top - TEXT_INSET.bottom
-  const halfText = (1 - 2 * TEXT_INSET.side) / 2
+export function textBand(type: BubbleType): number {
+  const inset = textInset(type)
+  const band = 1 - inset.top - inset.bottom
+  const halfText = (1 - 2 * inset.side) / 2
   const ratio = halfText / BUBBLE_ELLIPSE_N.rx
   const chord = 2 * BUBBLE_ELLIPSE_N.ry * Math.sqrt(Math.max(0, 1 - ratio * ratio))
   return Math.min(band, chord)
 }
-
-/** {@link textBand}, evaluated once. */
-export const TEXT_BAND = textBand()
 
 /**
  * The lines `text` wraps into at `perLine` glyphs a line: greedy on words, and a word
@@ -117,7 +116,7 @@ export interface BubbleFit {
 export function glyphsPerLine(widthPct: number, type: BubbleType, m: FitMetrics): number {
   const glyph = GLYPH_EM[type] * m.lettering
   if (glyph <= 0) return Number.POSITIVE_INFINITY
-  const usable = (widthPct / 100) * m.boxW * (1 - 2 * TEXT_INSET.side)
+  const usable = (widthPct / 100) * m.boxW * (1 - 2 * textInset(type).side)
   return Math.floor(usable / glyph)
 }
 
@@ -139,13 +138,13 @@ export function fitMessage(
   m: FitMetrics,
 ): BubbleFit {
   const glyph = GLYPH_EM[type] * m.lettering
-  const usable = 1 - 2 * TEXT_INSET.side
+  const usable = 1 - 2 * textInset(type).side
   const chars = text.trim().replace(/\s+/g, ' ').length
   const oneLine = m.boxW > 0 ? ((chars * glyph) / usable / m.boxW) * 100 : 0
   const width = Math.min(column, Math.max(min, oneLine))
   const lines = wrapLines(text, glyphsPerLine(width, type, m)).length
   const need = lines * LINE_HEIGHT * m.lettering
   const boxH = (width / 100) * m.boxW * BUBBLE_ASPECT
-  const stretch = boxH > 0 ? Math.max(1, need / (TEXT_BAND * boxH)) : 1
+  const stretch = boxH > 0 ? Math.max(1, need / (textBand(type) * boxH)) : 1
   return { width, stretch }
 }
