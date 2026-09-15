@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { seedConfig } from '../../skins/comic-book/editor/configSeed'
 import EditorToolbar from '../../skins/comic-book/editor/EditorToolbar'
 import type { EditMode, Selection } from '../../skins/comic-book/editor/selection'
-import { controlSurface, dragFor, mockApi } from './editorStates'
+import { controlSurface, dragFor, EDITOR_STATES, mockApi, renderState } from './editorStates'
 
 // The editor's control surface, written down.
 //
@@ -86,6 +86,18 @@ const CALL_SWITCH = ['button: Default', 'button: Ringing', 'button: Connected']
 /** The four things that can be added to the selected panel. */
 const ADDERS = ['button: + Image', 'button: + Bubble', 'button: + SMS', 'button: + Call']
 
+/**
+ * What can be done to the selected panel as a slot. Offered in *both* modes: the splits
+ * lived in shapes mode alone and were reported lost by an author who had selected a panel
+ * in content mode and found nothing there about making another.
+ */
+const PANEL_ACTIONS = [
+  'button: Split top / bottom',
+  'button: Split left / right',
+  'button: Hide on landscape',
+  'button: Delete panel',
+]
+
 describe('editor control surface', () => {
   it('content mode, nothing selected: the page controls and the transport', () => {
     renderToolbar('content', null, null)
@@ -96,7 +108,7 @@ describe('editor control surface', () => {
   // The panel's own two attributes — what it is called and what its Ben-Day background
   // does — plus the four things that can be added to it. Panel 9 is the shipped phone
   // call, so its seam and axis are here too; a panel that is not one shows neither.
-  it('content mode, a panel selected: the panel name, its pattern, and what can be added', () => {
+  it('content mode, a panel selected: the panel name, its pattern, what can be added, and the panel actions', () => {
     renderToolbar('content', { kind: 'panel', index: 9 }, 9)
 
     expect(controlSurface()).toEqual(
@@ -104,6 +116,7 @@ describe('editor control surface', () => {
         ...ALWAYS,
         ...ADDERS,
         ...CALL_SWITCH,
+        ...PANEL_ACTIONS,
         'text: panel name',
         'select: pattern',
         'range: call seam',
@@ -142,19 +155,33 @@ describe('editor control surface', () => {
   // The case this file was written for. Shapes mode showed the panel's name as static
   // text beside the two Split buttons, so the moment straight after a split — which
   // selects the new half, here, with nothing else to do to it — had no way to name it.
-  it('shapes mode, a panel selected: the two splits AND the panel name', () => {
+  it('shapes mode, a panel selected: the panel actions AND the panel name', () => {
     renderToolbar('shapes', { kind: 'panel', index: 9 }, 9)
 
     expect(controlSurface()).toEqual(
-      [
-        ...ALWAYS,
-        'button: Split top / bottom',
-        'button: Split left / right',
-        'button: Reset landscape shapes',
-        'text: panel name',
-      ].sort(),
+      [...ALWAYS, ...PANEL_ACTIONS, 'button: Reset landscape shapes', 'text: panel name'].sort(),
     )
   })
+
+  // A panel taken off one shape is not gone: it is offered back, as either half of the
+  // panel that is selected, from both modes. The state is the derived one the reachability
+  // sweep uses, so the two guards agree on what "one hidden" means.
+  it.each<[EditMode]>([['content'], ['shapes']])(
+    'offers a panel hidden on the shape on screen back beside the selected panel, in %s mode',
+    mode => {
+      const hiddenState = EDITOR_STATES.find(state => state.name === 'shapes/panel[one hidden]')!
+      const api = renderState({ ...hiddenState, mode })
+      const hidden = api.config.panels.findIndex(
+        (p, i) => p.page === api.config.panels[9].page && api.config.grids[p.page].landscape.panels[i].length === 0,
+      )
+      expect(hidden).toBeGreaterThanOrEqual(0)
+      const label = api.config.panels[hidden].label
+
+      const surface = controlSurface()
+      expect(surface).toContain(`button: Show ${label} below`)
+      expect(surface).toContain(`button: Show ${label} beside`)
+    },
+  )
 
   it('shapes mode, nothing selected: the grid reset, and no content controls', () => {
     renderToolbar('shapes', null, null)

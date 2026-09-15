@@ -20,6 +20,13 @@
   min-width: 0;
 }
 
+/* A row of buttons whose lettering may outgrow the column — "Split left / right",
+   "Show Pensive girl beside" — drops the overflow onto a second line instead of
+   clipping it at the toolbar's edge, where "Split left /" read as a broken control. */
+.cb-ed-row-wrap {
+  flex-wrap: wrap;
+}
+
 /* A button sharing a row with fields — the column remover — sits on the inputs' baseline
    rather than on the labels'. */
 .cb-ed-row > .cb-ed-btn {

@@ -112,7 +112,7 @@ what lets any shape interpolate vertex-for-vertex into any other, so hover and c
 Neither transform array is index-parallel to the panels: each entry names its own `panel`,
 and that is the whole association — placement is measured against that panel's box, and
 hovering it reveals its bubbles (`isBubbleRevealed` in `bubbleTube.ts`). `PANELS` is the
-one surviving parallelism and the editor only *appends* to it, so an index never moves. A
+one surviving parallelism; only `deletePanel` (`configPanelsRemove.ts`) renumbers it. A
 picture has **two independent framings**: `left`/`top`/`width`/`height` over the panel box
 (% of it), `scale`/`offsetX`/`offsetY`/`anchor` within that frame.
 
@@ -458,7 +458,7 @@ above, with two deliberate gaps: **no chain control**, and no cell block or **+ 
 | Mode | **Content** / **Panel shapes**. Picture and bubble click targets are not rendered in shapes mode — a picture-sized target would swallow every drag aimed at a line crossing it |
 | Shape | **Follow the window** or one of the three; holds the page at that shape's frame in any window, so every grid is reachable without resizing (`ShapeSelect.tsx`; transient, never saved) |
 | Reshape | drag a **line** or **vertex**; a frame vertex slides along its own edge and the four corners are locked. Pictures and bubbles hold their on-screen place, re-expressed against their new panel box (`editor/gridContentRemap.ts`) — only the clip follows the seam. **Double-click** a line to bend it; drag a corner **onto another** to merge (`panelGridMerge.ts`) and **Alt-drag** to tear one apart (`panelGridSplit.ts`); both refuse while the result would be invalid |
-| New panel | **Split top / bottom** or **left / right** cuts through the middle of the selected panel's box in all three grids of its page (`configPanels.ts` over `panelGridCut.ts`). The parent keeps its index, name, pattern and the upper/left half; the new panel is appended and the other page's grids gain an empty ring. Refused whole when any grid cannot take it. There is no delete |
+| New panel | **Split top / bottom** or **left / right** cuts through the middle of the selected panel's box in all three grids of its page (`configPanels.ts` over `panelGridCut.ts`), in **either mode** (`PanelActions.tsx`). The parent keeps its index, name, pattern and the upper/left half; the new panel is appended and the other page's grids gain an empty ring. Refused whole when any grid cannot take it. **Hide on *shape*** empties the ring on the grid on screen only, its neighbour taking the space (`panelGridAbsorb.ts`); **Show *name* below / beside** cuts the selected panel and hands the half to the hidden slot; **Delete panel** removes the slot everywhere, content included, and is the one renumbering edit (`configPanelsRemove.ts`). `EditorPanelJourneys.test.tsx` drives all four through the real overlay |
 | Save | `POST /__comic-editor/save` writes `layoutConfig.ts` (dev server only); **Copy config** / **.ts** are the fallbacks. Never refused — mid-design is when it matters — but it asks once when the working copy is older than the bundle's config, with a red block above the row (`editor/configStamp.ts`); **Reset** takes the file and discards this tab's work |
 | Ship | `POST /__comic-editor/ship` saves, branches, commits, pushes and opens or updates a PR (`frontend/shipLayout.ts`). Disabled while the amber `editor/configParity.ts` list is non-empty: every caption needs a tail and both morph targets, every link must resolve within its panel, every picture needs extent and a `/comic-book/` source |
 

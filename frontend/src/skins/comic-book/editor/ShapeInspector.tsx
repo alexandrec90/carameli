@@ -1,10 +1,8 @@
-import { useState } from 'react'
-
 import type { LayoutKind, PanelGrid } from '../panelGeometry'
 import { constraintOf } from '../panelGeometry'
 import type { PanelPage } from '../panels'
 import Hint from './Hint'
-import type { CutAxis } from './panelGridCut'
+import PanelActions from './PanelActions'
 import { insertBend, moveVertex } from './panelGridOps'
 import PanelNameField from './PanelNameField'
 import type { EditorModeApi } from './useEditorMode'
@@ -12,8 +10,8 @@ import type { SeamDragApi } from './useSeamDrag'
 
 // The toolbar half of the shape editor: which page and which of its three grids is in
 // front, what the selected corner is and what it is allowed to do, and the edits a
-// pointer cannot make — an exact coordinate, straightening a bend back out, and cutting
-// a panel in two.
+// pointer cannot make — an exact coordinate, straightening a bend back out, and what
+// can be done to a selected panel as a slot (PanelActions.tsx, shared with content mode).
 
 interface ShapeInspectorProps {
   api: EditorModeApi
@@ -37,12 +35,6 @@ const GRID_HINT =
   + 'window’s own shape, or the one held by the Shape dropdown. The other two keep their '
   + 'own shapes.'
 
-const SPLIT_HINT =
-  'Cut this panel in two along a straight line through its middle. The upper or left half '
-  + 'keeps this panel’s name, pictures and bubbles; the other half is a new panel, on '
-  + 'every window shape of this page. The new line is then a seam like any other — drag '
-  + 'it, bend it, merge its corners.'
-
 const RESHAPE_HINT =
   'Click a panel to cut it in two. Drag a line to move it, or a corner to move that end. '
   + 'Double-click a line to break it — repeat for a lightning bolt. Drop a corner onto a '
@@ -62,15 +54,6 @@ export default function ShapeInspector({ api, page, kind, grid, drag }: ShapeIns
   const seam = api.selected?.kind === 'seam' ? drag.seams[api.selected.index] ?? null : null
   const panelIndex = api.selected?.kind === 'panel' ? api.selected.index : null
   const panelInfo = panelIndex === null ? null : (api.config.panels[panelIndex] ?? null)
-
-  // Which panel the last refused cut was aimed at. Keyed by panel rather than cleared
-  // on selection change so the note goes away by itself once the author moves on, with
-  // no effect needed to reset it.
-  const [refused, setRefused] = useState<number | null>(null)
-  const split = (axis: CutAxis) => {
-    if (panelIndex === null) return
-    setRefused(api.splitPanel(panelIndex, axis, kind) ? null : panelIndex)
-  }
 
   const setAxis = (axis: 0 | 1, value: string) => {
     if (index === null || !vertex) return
@@ -99,35 +82,11 @@ export default function ShapeInspector({ api, page, kind, grid, drag }: ShapeIns
 
       {panelInfo && panelIndex !== null ? (
         <>
-          <div className="cb-ed-label">{panelInfo.label} panel <Hint text={SPLIT_HINT} /></div>
+          <div className="cb-ed-label">{panelInfo.label} panel</div>
           {/* Editable here as well as in content mode: a split selects the half it just
               made, and naming it is the next thing an author does. */}
           <PanelNameField api={api} panel={panelIndex} />
-          <div className="cb-ed-row">
-            <button
-              type="button"
-              className="cb-ed-btn"
-              title="Cut a horizontal line through the middle: one panel above, one below"
-              onClick={() => split('across')}
-            >
-              Split top / bottom
-            </button>
-            <button
-              type="button"
-              className="cb-ed-btn"
-              title="Cut a vertical line through the middle: one panel left, one right"
-              onClick={() => split('down')}
-            >
-              Split left / right
-            </button>
-          </div>
-          {refused === panelIndex && (
-            <div className="cb-ed-shape-note">
-              Refused: on at least one of this page&apos;s three grids a straight cut through
-              the middle would not divide this panel cleanly — its outline bends back on
-              itself, or a corner sits too close to the cut. Reshape it and try again.
-            </div>
-          )}
+          <PanelActions api={api} panel={panelIndex} kind={kind} />
         </>
       ) : !vertex || constraint === null ? (
         <>

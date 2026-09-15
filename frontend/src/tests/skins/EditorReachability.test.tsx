@@ -179,8 +179,18 @@ describe('every editor mutator stays reachable', () => {
   })
 
   // Renaming is the feature that was lost, so it is also stated outright: a snapshot
-  // records what is true, and this records what must stay true.
-  it.each([['setPanelLabel'], ['setPageLabel'], ['splitPanel'], ['resetAll']])(
+  // records what is true, and this records what must stay true. The panel lifecycle —
+  // make one, hide it on a shape, show it again, delete it — joined the list the day it
+  // was reported missing, so that dropping any of the four is a red test, not a `-u`.
+  it.each([
+    ['setPanelLabel'],
+    ['setPageLabel'],
+    ['splitPanel'],
+    ['hidePanelOn'],
+    ['showPanelOn'],
+    ['deletePanel'],
+    ['resetAll'],
+  ])(
     '%s is reachable from the toolbar',
     method => {
       expect(reached.get(method) ?? []).not.toHaveLength(0)
