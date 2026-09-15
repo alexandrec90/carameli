@@ -113,8 +113,24 @@ export const MAX_EAGER_BYTES = 316 * 1024
  * (collision placement, interleave and zig-zag) and the row stamper in `bubbleChain.ts`
  * that gives each row its own width, stretch and lean. Still 46 chunks, `package.json`
  * untouched. 264 rather than 263 for the same reason as before: a kilobyte clear, not flush.
+ *
+ * This raise (264 → 265) is the pointer spotlight replacing the lava-lamp tint: 0.86 KB
+ * measured as this branch's build (264.10 KB) against a build of the same checkout with
+ * the branch's frontend changes reverted (263.24 KB, same `node_modules`). `spotlight.ts`
+ * is the whole of it — one tracker every surface samples, its raised-cosine falloff, and
+ * the eased follow and fade — and `benDayTint.ts` with its three-sine field and RGB↔HSL
+ * round trip comes *out* in the same change and is subtracted from it. So 0.86 KB is what
+ * a still grid lit by the cursor costs over a drifting one, not what the spotlight weighs.
+ *
+ * 0.12 KB of that figure is not the feature: it is the 119 bytes between this build and
+ * the branch's previous head (`fb1470d`, as CI built it), which is `useLoadingScreen`
+ * splitting into `useDotCycle`, `useLoadingGrid` and `useLeaveWash` because it had grown
+ * past the structure check's function-length limit. Nothing was added — the cost is the
+ * parameter lists and the call sites that pass them, which is what extracting a closure
+ * into a hook costs, the same trade the 973 → 981 paragraph below records. Still 46
+ * chunks, `package.json` untouched.
  */
-export const MAX_LAZY_CHUNK_BYTES = 264 * 1024
+export const MAX_LAZY_CHUNK_BYTES = 265 * 1024
 
 /**
  * Every `.js` file in `dist/assets/`, summed. Today 956.6 KB across 46 chunks; the
@@ -301,8 +317,20 @@ export const MAX_LAZY_CHUNK_BYTES = 264 * 1024
  * `comic-book` chunk. 1022.87 KB on this branch against 1020.61 KB with its frontend
  * changes reverted; the two deltas are the same 2,312 bytes, so nothing landed outside
  * that chunk. Still 46 chunks, `package.json` untouched.
+ *
+ * This raise (1024 → 1026) is the same 0.86 KB {@link MAX_LAZY_CHUNK_BYTES} carries, and
+ * nothing else: the pointer spotlight in the lazy `comic-book` chunk. 1024.42 KB on this
+ * branch against 1023.56 KB with its frontend changes reverted; the two deltas are the
+ * same 882 bytes, so nothing landed outside that chunk. Still 46 chunks, `package.json`
+ * untouched.
+ *
+ * It moves two where the chunk ceiling moves one because the two started at different
+ * distances from their builds: master sat 0.44 KB under this one and 0.76 KB under that,
+ * so a flush 1025 would leave less room than any raise above has. That is the 971 → 972
+ * paragraph's failure, and the clearance is measured from where each ceiling stood rather
+ * than applied as a flat number.
  */
-export const MAX_TOTAL_JS_BYTES = 1024 * 1024
+export const MAX_TOTAL_JS_BYTES = 1026 * 1024
 
 /**
  * Every `.css` file in `dist/assets/`, summed. Today 44.2 KB across 2 files.
