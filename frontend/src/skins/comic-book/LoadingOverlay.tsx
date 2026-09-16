@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { RefObject } from 'react'
+import { slowLoaderDelay } from '../../lib/slowLoading'
 import { runBenDayGrid } from './benDayGrid'
 import { drawWash, washPhaseAt, WASH_COVER_MS, WASH_HOLD_MS } from './benDayWash'
 import { pageSpotlight } from './spotlight'
@@ -28,8 +29,10 @@ export interface LoadingScreen {
  * page has loaded or errored"; `accent` colours the grid and the exit wash.
  */
 export function useLoadingScreen(ready: boolean, accent: string): LoadingScreen {
-    // 0 on first visit (no cache), 400 on return visits (assets likely cached).
-    const loaderDelay = localStorage.getItem('comic-book:loaded') ? 400 : 0
+    // 0 on first visit (no cache), 400 on return visits (assets likely cached), 0 again
+    // under `?slow=1` — a sheet held up for a second that spends 400 ms of it waiting to
+    // appear is not the sheet the brake was turned on to watch.
+    const loaderDelay = slowLoaderDelay(localStorage.getItem('comic-book:loaded') ? 400 : 0)
     const [showLoading, setShowLoading] = useState(false)
     // True while the loading sheet is being washed away to reveal the ready page.
     const [loadingLeaving, setLoadingLeaving] = useState(false)

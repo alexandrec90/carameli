@@ -1,6 +1,7 @@
 import { lazy, Suspense, useCallback, useMemo, useRef, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import type { LayoutProps } from '../types'
+import { useSlowReady } from '../../hooks/useSlowLoading'
 import { isBubbleRevealed } from './bubbleTube'
 import BubbleTubes from './BubbleTubes'
 import ComicPanel from './ComicPanel'
@@ -139,8 +140,11 @@ function LayoutBody({ navItems, sms, softphone }: LayoutProps) {
         if (settledCountRef.current >= imgCount) setLoaded(true)
     }, [imgCount])
 
-    // A page with no pictures has no load events to wait for.
-    const ready = loaded || imgCount === 0
+    // A page with no pictures has no load events to wait for. `?slow=1` holds the answer
+    // back for a second (dev only, no-op otherwise) — gated here rather than inside
+    // useLoadingScreen so the sheet's exit wash, the page's fade-in and MarginGrid still
+    // start on the same render, which is the handoff the brake exists to show.
+    const ready = useSlowReady(loaded || imgCount === 0)
 
     /** Remember a source's natural size the first time it loads. */
     const recordNatSize = useCallback((src: string, size: { w: number; h: number }) => {

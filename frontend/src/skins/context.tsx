@@ -2,6 +2,7 @@ import React, { createContext, useCallback, useContext, useEffect, useRef, useSt
 import type { Skin } from './types'
 import { GRID_PAPER, runBenDayGrid } from './comic-book/benDayGrid'
 import { accentForPath } from './comic-book/pageAccent'
+import { slowLoad, slowLoaderDelay } from '../lib/slowLoading'
 import { skinLoaders, skinLoadingConfigs, DEFAULT_SKIN, resolveSkinName, SKIN_NAMES } from './registry'
 import type { SkinName } from './registry'
 
@@ -109,10 +110,12 @@ export function SkinProvider({ children }: { children: React.ReactNode }) {
     setShowLoader(false)
 
     // Only reveal the loading UI after 200 ms — fast / cached loads finish
-    // before the timer fires and the loading screen never appears at all.
-    const loaderTimer = setTimeout(() => setShowLoader(true), 200)
+    // before the timer fires and the loading screen never appears at all. `?slow=1`
+    // drops the debounce and holds the chunk for a second, which is that same sentence
+    // turned into the reason you cannot see this screen when you want to (dev only).
+    const loaderTimer = setTimeout(() => setShowLoader(true), slowLoaderDelay(200))
 
-    skinLoaders[skinName]().then((m) => {
+    slowLoad(skinLoaders[skinName]()).then((m) => {
       clearTimeout(loaderTimer)
       setSkin(m.default)
     })
