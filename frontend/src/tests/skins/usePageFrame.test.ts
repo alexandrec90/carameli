@@ -1,11 +1,12 @@
 import { act, renderHook } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 
-import { frameRect, layoutKindFor, PAGE_ASPECT } from '../../skins/comic-book/panelGeometry'
+import { frameRect, layoutKindFor, OUTER_M, PAGE_ASPECT } from '../../skins/comic-book/panelGeometry'
 import {
   FRAME_HEIGHT_VAR,
   pageFrameFor,
   pageFrameStyle,
+  pageSheet,
   panelPolysIn,
   usePageFrame,
 } from '../../skins/comic-book/usePageFrame'
@@ -49,11 +50,33 @@ describe('pageFrameFor', () => {
     expect(frame.h).toBe(0)
   })
 
-  it('hands the window out with the frame, for what is drawn outside it', () => {
-    // The letterbox is the viewport minus the sheet, and it must not read the window
-    // itself; it gets the same numbers the frame was fitted into, held shape or not.
-    expect(pageFrameFor(1600, 900, null).viewport).toEqual({ w: 1600, h: 900 })
-    expect(pageFrameFor(1600, 900, 'portrait').viewport).toEqual({ w: 1600, h: 900 })
+})
+
+describe('pageSheet', () => {
+  /** Wider than the landscape page: letterbox left and right. */
+  const WIDE = { w: 1920, h: 800 }
+  /** Exactly the landscape page plus its margin: no letterbox at all. */
+  const EXACT = { w: 2 * OUTER_M + 1600, h: 2 * OUTER_M + 1000 }
+
+  it('is the frame grown by its outer margin on every side', () => {
+    const f = frameRect(WIDE.w, WIDE.h)
+    expect(pageSheet(f)).toEqual({
+      x: f.x - OUTER_M, y: f.y - OUTER_M, w: f.w + 2 * OUTER_M, h: f.h + 2 * OUTER_M,
+    })
+  })
+
+  it('fills a viewport of the page aspect exactly', () => {
+    expect(pageSheet(frameRect(EXACT.w, EXACT.h))).toEqual({ x: 0, y: 0, w: EXACT.w, h: EXACT.h })
+  })
+
+  it('wraps the frame it is given, not the one the window would draw', () => {
+    // The editor holding portrait in a wide window: the sheet sits round that frame,
+    // so the paper shows beside it rather than beside a landscape page nobody sees.
+    const held = frameRect(WIDE.w, WIDE.h, 'portrait')
+    expect(pageSheet(held)).toEqual({
+      x: held.x - OUTER_M, y: held.y - OUTER_M, w: held.w + 2 * OUTER_M, h: held.h + 2 * OUTER_M,
+    })
+    expect(pageSheet(held)).not.toEqual(pageSheet(frameRect(WIDE.w, WIDE.h)))
   })
 })
 
@@ -85,7 +108,6 @@ describe('usePageFrame', () => {
     const { result } = renderHook(() => usePageFrame(null))
     expect(result.current.kind).toBe('landscape')
     expect(result.current.frame).toEqual(frameRect(1600, 900))
-    expect(result.current.viewport).toEqual({ w: 1600, h: 900 })
 
     act(() => {
       setWindow(600, 900)
@@ -93,7 +115,6 @@ describe('usePageFrame', () => {
     })
     expect(result.current.kind).toBe('portrait')
     expect(result.current.frame).toEqual(frameRect(600, 900))
-    expect(result.current.viewport).toEqual({ w: 600, h: 900 })
   })
 
   it('keeps the frame identity while nothing about it changes', () => {

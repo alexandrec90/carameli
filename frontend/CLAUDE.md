@@ -58,11 +58,11 @@ had accumulated two type errors that only showed to whoever opened it in an edit
 
 **Every loading screen in the app is invisible on a warm dev machine, and that is by
 design.** Each of the three gates — the skin chunk (`skins/context.tsx`), the session
-(`App.tsx`), the comic-book page's pictures (`skins/comic-book/Layout.tsx`) — draws
+(`App.tsx`), the comic-book page's pictures (`skins/comic-book/pageReveal.ts`) — draws
 nothing for the first 200–400 ms, so a cached load opens the gate inside its own debounce
-and the screen never paints at all. The exit animations are where that bites: the
-comic-book sheet washes away into the page it was covering, and a transition you cannot
-see run is a transition you cannot tune.
+and the screen never paints at all. The exit is where that bites: the comic-book page
+wipes in over the paper it was loading on, and a transition you cannot see run is a
+transition you cannot tune.
 
 `?slow=1` drops all three debounces to zero and holds each gate for a second, so each
 screen paints and each transition plays at a cold visitor's pace. `?slow=<ms>` picks a
@@ -73,6 +73,17 @@ the picker — which drops the query but does re-run the chunk gate — stays sl
 Each gate holds for its *own* second rather than sharing one deadline. A shared deadline
 would be spent by the first gate, and the last one, the only one with a transition to
 show, would never hold at all.
+
+**On the comic-book skin the three gates share one screen, so what `?slow=1` shows is
+three seconds of the same paper, then the wipe.** The paper — the pointer-lit Ben-Day
+grid with the LOADING legend — is mounted by `SkinProvider` under the app for the skin's
+whole life (`persistent` in `skins/registry.ts`), and the session gate and the pictures
+gate say they are still loading through `hooks/useLoadingHold.ts` rather than drawing a
+screen of their own. Before that, each gate drew its own: under `?slow=1` the legend
+popped three times with a bare frame between each, the session gate's screen was a CSS
+dot pattern that did not follow the pointer, and the exit was a halftone wash whose paper
+dots read as giant Ben-Day dots over the page. A gate that draws its own screen again
+brings all of that back — hold instead.
 
 `lib/slowLoading.ts` is the flag and the promise-side hold; `hooks/useSlowLoading.ts` is
 the hook the two boolean gates report through. **It costs a production build nothing**,

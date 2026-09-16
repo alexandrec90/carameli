@@ -39,6 +39,12 @@ export interface SkinLoadingConfig {
       drawn artwork has to spell the url and hotspot out here rather than name a token.
       `loadingScreen.test.tsx` keeps this in step with `--cb-cursor-default`. */
   cursor?: string
+  /** The screen outlives the load: `SkinProvider` keeps it mounted under the app for
+      the skin's whole life, and the gates below it — the session in `App.tsx`, a page's
+      pictures — say what is still loading through `hooks/useLoadingHold.ts` instead of
+      drawing a screen of their own. One legend spans every gate, where one screen per
+      gate was three legends popping in turn with a bare frame between them. */
+  persistent?: boolean
 }
 
 export const skinLoadingConfigs: Record<SkinName, SkinLoadingConfig> = {
@@ -57,18 +63,20 @@ export const skinLoadingConfigs: Record<SkinName, SkinLoadingConfig> = {
     text: 'Loading…',
     textStyle: { fontFamily: 'sans-serif', fontSize: '18px', color: '#333' },
   },
+  // The paper (`skins/context.tsx`): the Ben-Day grid on a canvas, with this card as the
+  // legend on top while anything loads. `background` is the paper under the canvas's
+  // first frame; the trailing dots are drawn by the screen, cycling, so `text` has none.
   'comic-book': {
+    persistent: true,
     background: '#FAFAF2',
-    backgroundImage: 'radial-gradient(circle, #FFE033 1.5px, transparent 1.5px)',
-    backgroundSize: '12px 12px',
     card: {
       background: '#FFE033',
       border: '4px solid #111111',
       boxShadow: '6px 6px 0 #111111',
-      padding: '32px 48px',
+      padding: '12px 32px',
     },
-    text: 'LOADING...',
-    textStyle: { fontFamily: "'Bangers', cursive", fontSize: '52px', letterSpacing: '4px', color: '#111111', lineHeight: '1' },
+    text: 'LOADING',
+    textStyle: { fontFamily: "'Bangers', cursive", fontSize: '48px', letterSpacing: '6px', color: '#111111', lineHeight: '1' },
     cursor: "url('/comic-book/pointer-cursor.webp') 2 1, default",
   },
 }

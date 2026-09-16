@@ -16,8 +16,8 @@ export interface PageSelectProps {
  * Toolbar dropdown that switches the page being edited. The editor overlay
  * blocks the panels' own click navigation, so this is the only way to move
  * between pages in edit mode. Picking a page replays the Ben-Day wash
- * transition; the extra "Loading screen" entry previews the loading overlay,
- * and leaving it replays the loading screen's exit wash.
+ * transition; the extra "Loading screen" entry hides the page and shows the paper
+ * with its legend, and leaving it replays the page's wipe in (pageReveal.ts).
  */
 export default function PageSelect({
   navItems,

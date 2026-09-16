@@ -1,19 +1,19 @@
-// Ben-Day wash — the comic-book skin's page-transition and loading-screen exit.
+// Ben-Day wash — the comic-book skin's page transition.
 //
 // A wave of paper-colored halftone dots sweeps diagonally from the top-left
 // corner: dots grow until they merge into a solid sheet (cover), the sheet
-// carries the loading screen's dot grid, then the same wave passes on and the
-// dots shrink away to reveal the incoming page (reveal). The loading overlay
-// draws the identical grid, so the transition sheet and the loading screen hand
-// off seamlessly.
+// carries the paper's dot grid, then the same wave passes on and the dots
+// shrink away to reveal the incoming page (reveal). The paper under the page
+// draws the identical grid, so the sheet the wave leaves behind in the letterbox
+// is the grid that was already there.
 //
 // The grid itself — where each dot is, how big it is under the light and what colour it
 // prints in — is `benDayGrid.ts`, which every paper surface shares. This module is the
-// wave that passes over it, and the letterbox the page sits in.
+// wave that passes over it. The first load is not a wash: the page wipes in over the
+// paper with no dots at all (`pageReveal.ts`).
 
 import { clamp } from './editor/transforms'
-import { drawGridDots, GRID_PAPER, GRID_SPACING, GRID_SPOT_R } from './benDayGrid'
-import type { Rect } from './panelGeometry'
+import { drawGridDots, GRID_PAPER, GRID_SPACING } from './benDayGrid'
 import type { SpotlightState } from './spotlight'
 
 export const WASH_BAND = 220       // px depth of the growing/shrinking dot edge
@@ -57,57 +57,6 @@ export function dotGrowth(diag: number, cover: number, reveal: number, maxDiag: 
     const kCover = clamp((cover * span - diag) / WASH_BAND, 0, 1)
     const kReveal = clamp((reveal * span - diag) / WASH_BAND, 0, 1)
     return Math.max(0, kCover - kReveal)
-}
-
-/**
- * The letterbox around `sheet` on a `w` × `h` viewport, as up to four rectangles that
- * tile it without overlapping — top and bottom the full width, left and right between
- * them. Overlap would matter: a gated dot is alpha-blended, so a corner drawn twice is a
- * darker corner. A band thinner than a pixel is dropped rather than kept alive to draw
- * nothing; on a viewport of the page's own aspect there are none.
- */
-export function letterboxBands(w: number, h: number, sheet: Rect): Rect[] {
-    const top = sheet.y
-    const bottom = h - (sheet.y + sheet.h)
-    const left = sheet.x
-    const right = w - (sheet.x + sheet.w)
-    const bands: Rect[] = []
-    if (top >= 1) bands.push({ x: 0, y: 0, w, h: top })
-    if (bottom >= 1) bands.push({ x: 0, y: h - bottom, w, h: bottom })
-    if (left >= 1) bands.push({ x: 0, y: sheet.y, w: left, h: sheet.h })
-    if (right >= 1) bands.push({ x: w - right, y: sheet.y, w: right, h: sheet.h })
-    return bands
-}
-
-/**
- * The loading screen's grid carrying on in the letterbox around the page sheet — same
- * grid, same light, so the sheet the loading screen washes away reveals the grid it was
- * already showing, lit where it was lit, where the page does not cover it. Only the
- * bands are painted; the sheet stays clear. Returns whether anything was drawn, which
- * is false on a viewport the sheet fills, and the caller's cue to stop the loop.
- */
-export function drawMarginGrid(
-    ctx: CanvasRenderingContext2D, w: number, h: number, sheet: Rect,
-    spot: SpotlightState, accentHex: string,
-): boolean {
-    ctx.clearRect(0, 0, w, h)
-    const bands = letterboxBands(w, h, sheet)
-    if (bands.length === 0) return false
-    ctx.save()
-    ctx.beginPath()
-    for (const band of bands) ctx.rect(band.x, band.y, band.w, band.h)
-    ctx.clip()
-    ctx.fillStyle = GRID_PAPER
-    for (const band of bands) ctx.fillRect(band.x, band.y, band.w, band.h)
-    // A dot centred just outside a band still reaches into it by up to its radius; the
-    // clip trims what crosses back the other way.
-    const pad = GRID_SPOT_R
-    for (const band of bands) {
-        const reach = { x: band.x - pad, y: band.y - pad, w: band.w + 2 * pad, h: band.h + 2 * pad }
-        drawGridDots(ctx, reach, spot, accentHex, () => 1)
-    }
-    ctx.restore()
-    return true
 }
 
 /**
