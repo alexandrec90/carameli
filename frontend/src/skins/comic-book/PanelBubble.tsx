@@ -69,6 +69,13 @@ interface PanelBubbleProps {
    */
   onSubmit?: (value: string) => void
   /**
+   * Passed through to an `input` balloon: what is in the field, on every keystroke. Only a
+   * chain's composer supplies one, and supplying it is also what makes the field wrap —
+   * see BubbleInput, where the two are deliberately the same question, and `fitComposer`
+   * in bubbleFit.ts for what the chain does with the answer.
+   */
+  onDraftChange?: (value: string) => void
+  /**
    * Passed through to a `wheel` balloon: the picked option, reported on mount and on every
    * turn. Only the balloon a panel reads a phone number off supplies one.
    */
@@ -136,6 +143,7 @@ export default function PanelBubble({
   keyboard,
   onHoverChange,
   onSubmit,
+  onDraftChange,
   onWheelSelect,
   dialValue = '',
   dialFresh = false,
@@ -302,6 +310,7 @@ export default function PanelBubble({
         dialFresh={dialFresh}
         onDialChange={onDialChange}
         onSubmit={onSubmit}
+        onDraftChange={onDraftChange}
         onWheelSelect={onWheelSelect}
         actions={actions}
         status={status}

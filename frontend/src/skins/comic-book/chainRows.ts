@@ -1,4 +1,5 @@
 import { fitMessage } from './bubbleFit'
+import type { BubbleFit } from './bubbleFit'
 import { CHAIN_MIN_WIDTH_RATIO, TYPING_KEY, sideOrdinals } from './bubbleChain'
 import type { ChainColumns, ChainLine, ChainRow } from './bubbleChain'
 import { anchorOf, placeOnAnchor } from './chainAnchor'
@@ -102,7 +103,8 @@ function placeRows(rows: readonly ChainRow[], cols: ChainColumns, aspect: number
  * The whole conversation as placed balloons, bottom row first.
  *
  * `shown` is the window over the transcript, newest first ({@link visibleWindow}), so this
- * walks up the panel in exactly that order: the composer if the chain is live, then the
+ * walks up the panel in exactly that order: the composer if the chain is live — `composer`
+ * is its fit, from {@link fitComposer}, and `null` on a chain that has none — then the
  * newest message, then the one before it. The newest row of each side sits on its
  * template's anchor and each other row is placed by `stackedTop` against everything below
  * — clear of what it would overlap, tucked in beside what it would not — so the rows tile
@@ -115,7 +117,9 @@ function placeRows(rows: readonly ChainRow[], cols: ChainColumns, aspect: number
  *   instead of drifting toward the middle as it shrinks — leaning inward every other
  *   message (`zigzagShift`), so the column is a zig-zag rather than a rule.
  * - **Size.** Each balloon is fitted to its own message (`fitMessage`): wider up to its
- *   column, then taller, so long words wrap and long messages stretch the balloon.
+ *   column, then taller, so long words wrap and long messages stretch the balloon. The
+ *   composer is fitted the same way to the draft in it (`fitComposer`), keeping its
+ *   template's width, so a message being typed grows the field it is being typed into.
  * - **One tail per side.** Only the newest balloon of each column keeps its template's
  *   tail — the one still being said. A tail on every balloon reads as a crowd all talking
  *   at once, which is exactly what a thread is not.
@@ -130,7 +134,7 @@ export function conversationRows(
   shown: readonly number[],
   lines: readonly ChainLine[],
   cols: ChainColumns,
-  live: boolean,
+  composer: BubbleFit | null,
   metrics: ChainMetrics,
   typing = false,
 ): ChainRow[] {
@@ -138,8 +142,12 @@ export function conversationRows(
   const tailed = { out: false, in: false }
   const ordinals = sideOrdinals(lines)
 
-  if (live) {
-    rows.push({ key: 'composer', side: 'out', bubble: cols.me, stretch: 1 })
+  if (composer) {
+    // The template itself, at the width the author drew it — only its height answers to
+    // the draft, and `placeRows` then hangs that height off the tail tip. Its `bubble` is
+    // not stamped the way a message is: the field's content and its initial text are the
+    // author's, and stamping would letter them instead of putting a field there.
+    rows.push({ key: 'composer', side: 'out', bubble: cols.me, stretch: composer.stretch })
     tailed.out = true
   }
 
