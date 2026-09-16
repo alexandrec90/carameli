@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { WASH_REVEAL_MS } from '../../skins/comic-book/benDayWash'
 import { LoadingOverlay, useLoadingScreen } from '../../skins/comic-book/LoadingOverlay'
 import { SPOT_FADE_MS } from '../../skins/comic-book/spotlight'
+import { useSlowReady } from '../../hooks/useSlowLoading'
 
 // The loading sheet's loops: the lit grid behind the legend, which repaints only on a
 // frame the light moved or the window resized, and the wash that takes the sheet away
@@ -49,6 +50,12 @@ function stubContext(): CanvasRenderingContext2D {
 
 function Harness({ ready }: { ready: boolean }) {
   const screen = useLoadingScreen(ready, '#FFE033')
+  return <LoadingOverlay screen={screen} />
+}
+
+/** Layout's own composition: `?slow=1`'s hold in front of the sheet's state machine. */
+function BrakedHarness({ ready, ms }: { ready: boolean; ms: number }) {
+  const screen = useLoadingScreen(useSlowReady(ready, ms), '#FFE033')
   return <LoadingOverlay screen={screen} />
 }
 
@@ -144,5 +151,49 @@ describe('the loading sheet', () => {
     expect(clears).toBe(before + 3)
     expect(queue.size).toBe(0)
     expect(view.container.querySelector('.cb-loading-overlay')).toBeNull()
+  })
+})
+
+// This is the gate `?slow=1` exists for: a page of cached pictures settles inside the
+// sheet's own delay, so on a warm machine the sheet never paints and its wash — the one
+// transition the flag is turned on to watch — never runs at all.
+describe('the loading sheet under the `?slow=1` brake', () => {
+  it('paints the sheet on a load that would otherwise have shown nothing', () => {
+    // Ready from the first render, the way a fully cached page is.
+    const { container } = render(<BrakedHarness ready ms={1000} />)
+    act(() => { vi.advanceTimersByTime(0) })
+
+    expect(container.querySelector('.cb-loading-overlay')).not.toBeNull()
+    frame()
+    expect(papers).toBe(1)
+  })
+
+  it('holds the sheet up for the whole brake, then hands off to the wash', () => {
+    const view = render(<BrakedHarness ready ms={1000} />)
+    act(() => { vi.advanceTimersByTime(0) })
+    frame()
+
+    act(() => { vi.advanceTimersByTime(999) })
+    expect(view.container.querySelector('.cb-loading-overlay')).not.toBeNull()
+    expect(view.container.querySelector('.cb-loading-leaving')).toBeNull()
+
+    act(() => { vi.advanceTimersByTime(1) })
+    expect(view.container.querySelector('.cb-loading-leaving')).not.toBeNull()
+
+    // And the wash still runs to completion and takes the sheet with it.
+    clock = performance.now()
+    frame()
+    frame(WASH_REVEAL_MS * 2)
+    expect(view.container.querySelector('.cb-loading-overlay')).toBeNull()
+  })
+
+  // The other half of the brake — dropping this sheet's own 400 ms return-visit delay to
+  // zero — is `slowLoaderDelay`, covered in `tests/lib/slowLoading.test.ts`. It cannot be
+  // asserted from here: `useLoadingScreen` reads the resolved flag rather than taking a
+  // delay, so it is 0 in a test process with no `?slow` in its URL.
+  it('changes nothing with the brake off', () => {
+    const { container } = render(<BrakedHarness ready ms={0} />)
+    act(() => { vi.advanceTimersByTime(0) })
+    expect(container.querySelector('.cb-loading-overlay')).toBeNull()
   })
 })

@@ -54,6 +54,34 @@ so an ordinary identifier can fail CI having passed `lint:types` locally. There 
 nothing checked it: `tsc --noEmit` alone builds no referenced project, so the config
 had accumulated two type errors that only showed to whoever opened it in an editor.
 
+## `?slow=1` is how you look at a loading screen
+
+**Every loading screen in the app is invisible on a warm dev machine, and that is by
+design.** Each of the three gates — the skin chunk (`skins/context.tsx`), the session
+(`App.tsx`), the comic-book page's pictures (`skins/comic-book/Layout.tsx`) — draws
+nothing for the first 200–400 ms, so a cached load opens the gate inside its own debounce
+and the screen never paints at all. The exit animations are where that bites: the
+comic-book sheet washes away into the page it was covering, and a transition you cannot
+see run is a transition you cannot tune.
+
+`?slow=1` drops all three debounces to zero and holds each gate for a second, so each
+screen paints and each transition plays at a cold visitor's pace. `?slow=<ms>` picks a
+different hold (capped at 30 s) when a second is not long enough; `?slow=0` turns it off,
+and in between it is remembered in `localStorage['loading:slow']` so switching skins from
+the picker — which drops the query but does re-run the chunk gate — stays slow.
+
+Each gate holds for its *own* second rather than sharing one deadline. A shared deadline
+would be spent by the first gate, and the last one, the only one with a transition to
+show, would never hold at all.
+
+`lib/slowLoading.ts` is the flag and the promise-side hold; `hooks/useSlowLoading.ts` is
+the hook the two boolean gates report through. **It costs a production build nothing**,
+which is the bar `?sim=1`, `?smsSim=1` and `?callSim=1` already meet: the flag is behind
+`import.meta.env.DEV` and folds away, and because a hook cannot be called conditionally,
+`useSlowReady` is *chosen* at build time — the real hook in development, the identity on
+`ready` in a build. Reverting that fold is not free and not invisible: it puts the total
+JavaScript 12 bytes over `bundlePolicy.ts`'s ratchet, so `npm run test:bundle` fails.
+
 ## What a visitor downloads has three budgets, and they do not overlap
 
 Nothing in a bundler complains about weight, so each of these is a file of ratchets and

@@ -1,5 +1,7 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { RefObject } from 'react'
+import { useSlowReady } from '../../hooks/useSlowLoading'
+import { slowLoaderDelay } from '../../lib/slowLoading'
 import { runBenDayGrid } from './benDayGrid'
 import { drawWash, washPhaseAt, WASH_COVER_MS, WASH_HOLD_MS } from './benDayWash'
 import { pageSpotlight } from './spotlight'
@@ -8,6 +10,22 @@ import { pageSpotlight } from './spotlight'
 // pointer's spotlight, with a "LOADING…" legend, shown while the page's pictures are
 // still settling, washed away with the same Ben-Day reveal a page transition uses. The
 // state machine lives in useLoadingScreen; LoadingOverlay is only the sheet itself.
+
+/**
+ * Count only drawn pictures, reporting each load or error through `markSettled`.
+ * The page, letterbox and loading sheet share this answer so the slow-loading brake
+ * holds their handoff together. A page with no pictures has no events to wait for.
+ */
+export function usePageReady(imgCount: number, ms?: number) {
+    const settledCountRef = useRef(0)
+    const [loaded, setLoaded] = useState(false)
+    const markSettled = useCallback(() => {
+        settledCountRef.current += 1
+        if (settledCountRef.current >= imgCount) setLoaded(true)
+    }, [imgCount])
+    const ready = useSlowReady(loaded || imgCount === 0, ms)
+    return [ready, markSettled] as const
+}
 
 /** Everything Layout needs to run and render the loading screen. */
 export interface LoadingScreen {
@@ -28,8 +46,10 @@ export interface LoadingScreen {
  * page has loaded or errored"; `accent` colours the grid and the exit wash.
  */
 export function useLoadingScreen(ready: boolean, accent: string): LoadingScreen {
-    // 0 on first visit (no cache), 400 on return visits (assets likely cached).
-    const loaderDelay = localStorage.getItem('comic-book:loaded') ? 400 : 0
+    // 0 on first visit (no cache), 400 on return visits (assets likely cached), 0 again
+    // under `?slow=1` — a sheet held up for a second that spends 400 ms of it waiting to
+    // appear is not the sheet the brake was turned on to watch.
+    const loaderDelay = slowLoaderDelay(localStorage.getItem('comic-book:loaded') ? 400 : 0)
     const [showLoading, setShowLoading] = useState(false)
     // True while the loading sheet is being washed away to reveal the ready page.
     const [loadingLeaving, setLoadingLeaving] = useState(false)

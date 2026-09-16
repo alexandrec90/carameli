@@ -1,10 +1,10 @@
-import { lazy, Suspense, useCallback, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useMemo, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import type { LayoutProps } from '../types'
 import { isBubbleRevealed } from './bubbleTube'
 import BubbleTubes from './BubbleTubes'
 import ComicPanel from './ComicPanel'
-import { LoadingOverlay, useLoadingScreen } from './LoadingOverlay'
+import { LoadingOverlay, useLoadingScreen, usePageReady } from './LoadingOverlay'
 import MarginGrid from './MarginGrid'
 import PanelInk from './PanelInk'
 import { activeLayout, useCallLayout, useDrawnImageCount } from './layoutSource'
@@ -95,8 +95,6 @@ function LayoutBody({ navItems, sms, softphone }: LayoutProps) {
     // editor keeps holding — and saving — the authored surface with no rows in it.
     const imgT = useLiveTableImages(layout.images)
 
-    const settledCountRef = useRef(0)
-
     // The page frame and which of the three grids it holds: the window's shape, or the
     // one the editor is previewing. Everything on the page is a fraction of this frame
     // (./usePageFrame.ts), so it is the only thing here that knows the window's size —
@@ -113,8 +111,6 @@ function LayoutBody({ navItems, sms, softphone }: LayoutProps) {
     // rather than by index because two pictures may be the same file, and the second
     // should not have to wait for its own load to learn a size already known.
     const [natSizes, setNatSizes] = useState<Record<string, { w: number; h: number }>>({})
-    // True once every panel image has loaded or errored.
-    const [loaded, setLoaded] = useState(false)
 
     // Which panel the pointer is over, or null. Bubble reveal moved off CSS :hover
     // and into state because the tube layer is a viewport-level sibling of the panels
@@ -134,13 +130,7 @@ function LayoutBody({ navItems, sms, softphone }: LayoutProps) {
     // actually *drawn* — one the renderer skips never mounts, so it never settles, and
     // counting it would hold the loader up forever (drawnImageCount owns both reasons).
     const imgCount = useDrawnImageCount(imgT, panels, page, callSceneT, call)
-    const markSettled = useCallback(() => {
-        settledCountRef.current += 1
-        if (settledCountRef.current >= imgCount) setLoaded(true)
-    }, [imgCount])
-
-    // A page with no pictures has no load events to wait for.
-    const ready = loaded || imgCount === 0
+    const [ready, markSettled] = usePageReady(imgCount)
 
     /** Remember a source's natural size the first time it loads. */
     const recordNatSize = useCallback((src: string, size: { w: number; h: number }) => {
