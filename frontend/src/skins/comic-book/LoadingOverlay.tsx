@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { RefObject } from 'react'
+import { useSlowReady } from '../../hooks/useSlowLoading'
 import { slowLoaderDelay } from '../../lib/slowLoading'
 import { runBenDayGrid } from './benDayGrid'
 import { drawWash, washPhaseAt, WASH_COVER_MS, WASH_HOLD_MS } from './benDayWash'
@@ -9,6 +10,22 @@ import { pageSpotlight } from './spotlight'
 // pointer's spotlight, with a "LOADING…" legend, shown while the page's pictures are
 // still settling, washed away with the same Ben-Day reveal a page transition uses. The
 // state machine lives in useLoadingScreen; LoadingOverlay is only the sheet itself.
+
+/**
+ * Count only drawn pictures, reporting each load or error through `markSettled`.
+ * The page, letterbox and loading sheet share this answer so the slow-loading brake
+ * holds their handoff together. A page with no pictures has no events to wait for.
+ */
+export function usePageReady(imgCount: number, ms?: number) {
+    const settledCountRef = useRef(0)
+    const [loaded, setLoaded] = useState(false)
+    const markSettled = useCallback(() => {
+        settledCountRef.current += 1
+        if (settledCountRef.current >= imgCount) setLoaded(true)
+    }, [imgCount])
+    const ready = useSlowReady(loaded || imgCount === 0, ms)
+    return [ready, markSettled] as const
+}
 
 /** Everything Layout needs to run and render the loading screen. */
 export interface LoadingScreen {
