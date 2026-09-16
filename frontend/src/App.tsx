@@ -10,14 +10,20 @@ import { useCallSimulation } from './hooks/useCallSimulation'
 import type { UseSoftphoneResult } from './hooks/useSoftphone'
 import { detectCallSim } from './lib/callSimulation'
 import { detectSmsSim } from './lib/smsSimulation'
+import { slowLoaderDelay } from './lib/slowLoading'
+import { useSlowReady } from './hooks/useSlowLoading'
 import { ROUTES, NAV_ITEMS } from './routes'
 import { skinLoadingConfigs, resolveSkinName, DEFAULT_SKIN } from './skins/registry'
 
-// 0 on first visit (nothing cached — will be slow), 400 on return visits (likely cached).
-const LOADER_DELAY = localStorage.getItem('app:loaded') ? 400 : 0
+// 0 on first visit (nothing cached — will be slow), 400 on return visits (likely cached),
+// and 0 again under `?slow=1`, which is here to make this screen visible.
+const LOADER_DELAY = slowLoaderDelay(localStorage.getItem('app:loaded') ? 400 : 0)
 
 export default function App() {
-  const { ready } = useAuth()
+  const { ready: sessionReady } = useAuth()
+  // `?slow=1` holds this gate shut for a second after the session arrives (dev only, no-op
+  // otherwise), so the screen below is on screen long enough to look at.
+  const ready = useSlowReady(sessionReady)
   const [showLoader, setShowLoader] = useState(false)
 
   useEffect(() => {
