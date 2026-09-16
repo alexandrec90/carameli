@@ -63,4 +63,12 @@ describe('the Vite config graph', () => {
     expect(configGraph()).toContain('devWatchPolicy.ts')
     expect(configGraph()).toContain('proxyErrorPolicy.ts')
   })
+
+  it('reaches the port helper where devkit vendors it, not a local copy', () => {
+    // `worktreePort.ts` is devkit's, delivered by `sync-devkit.py --pull` under
+    // `src/` and drift-checked there. A copy beside the config would import fine
+    // and then silently stop receiving upstream fixes.
+    expect(configGraph()).toContain(join('src', 'worktreePort.ts'))
+    expect(configGraph()).not.toContain('worktreePort.ts')
+  })
 })

@@ -24,7 +24,9 @@
     "src"
   ],
   "exclude": [
-    "node_modules"
+    "node_modules",
+    "src/worktreePort.ts",
+    "src/worktreePort.test.ts"
   ],
   "references": [
     {
