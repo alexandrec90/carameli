@@ -31,8 +31,8 @@ noticed.
 | host `npm run dev`, worktree | `5173 + portOffset(<worktree dir>)`, in `5174..5188` |
 
 The offset is derived from the worktree's directory name — stable across restarts, and
-needing no `.env`, because two of the three ways a worktree is cut here run no project
-code at the time. `worktreePort.ts` carries why that is derived rather than leased from
+needing no `.env`, because most of the ways a worktree is cut here run no project
+code at the time. `src/worktreePort.ts` carries why that is derived rather than leased from
 devkit's `ports.toml`, which allocates the published `FRONTEND_HOST_PORT` and not this.
 
 Don't compute it: **read the port off Vite's startup line**, which is the one source
