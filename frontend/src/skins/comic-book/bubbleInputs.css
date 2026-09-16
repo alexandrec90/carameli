@@ -25,6 +25,31 @@
   opacity: 1;
 }
 
+/* A field whose words wrap instead of scrolling sideways: a chain's composer, and only
+   ever one whose balloon is being fitted to the same draft (BubbleInput's `wraps`).
+
+   It is a textarea, so three of its defaults have to go — the drag handle, the scrollbar
+   and the browser's own rows-tall box. Its height is written inline from what the words
+   took; `rows="1"` is the floor an empty field keeps, and `resize: none` is what stops a
+   reader dragging the field out of the ink around it.
+
+   `overflow: hidden` is the same bet the fit makes: the estimate that sized the balloon
+   errs roomy (bubbleFit.ts), so the lines fit inside it, and clipping is the honest
+   failure mode if a line of unusually wide lettering ever proves it wrong — a scrollbar
+   here would be a form control drawn on hand-lettered artwork. */
+.cb-bubble-wrapping .cb-bubble-input {
+  display: block;
+  padding: 0 0.25em;
+  line-height: 1.2;
+  overflow: hidden;
+  resize: none;
+
+  /* The one break rule the fit assumes of the drawing: a word longer than the line
+     breaks inside itself rather than widening the balloon past its column. Same rule as
+     a chain's message rows take (bubbleChains.css). */
+  overflow-wrap: anywhere;
+}
+
 /* The comic caret shared by the phone dial and the SMS composer. */
 .cb-dial-caret {
   position: absolute;

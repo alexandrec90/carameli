@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest'
 
 import { BUBBLE_ASPECT, BUBBLE_ELLIPSE_N } from '../../skins/comic-book/bubbleBox'
 import {
-  GLYPH_EM, LINE_HEIGHT, fitMessage, glyphsPerLine, textBand, wrapLines,
+  GLYPH_EM, LINE_HEIGHT, fitComposer, fitMessage, glyphsPerLine, stretchFor, textBand,
+  wrapLines,
 } from '../../skins/comic-book/bubbleFit'
 import type { FitMetrics } from '../../skins/comic-book/bubbleFit'
 import { textInset } from '../../skins/comic-book/bubbleText'
@@ -163,5 +164,47 @@ describe('fitMessage', () => {
     const soft = fitMessage('hello there', 'soft', 60, 10, M)
     const cloud = fitMessage('hello there', 'cloud', 60, 10, M)
     expect(cloud.width).toBeGreaterThan(soft.width)
+  })
+})
+
+describe('fitComposer', () => {
+  const composer = (draft: string, over: Partial<FitMetrics> = {}) =>
+    fitComposer(draft, 'soft', 40, { ...M, ...over })
+
+  // The difference from fitMessage, and the reason there are two functions: a field is a
+  // target. One that shrank to what had been typed so far would move out from under the
+  // pointer between keystrokes, and an empty one would be a dot rather than an invitation.
+  it('keeps the author’s width whatever is typed into it', () => {
+    expect(composer('').width).toBe(40)
+    expect(composer('hi').width).toBe(40)
+    expect(composer('a message long enough to wrap onto several lines of it').width).toBe(40)
+  })
+
+  it('draws an empty composer at the balloon the author placed', () => {
+    expect(composer('')).toEqual({ width: 40, stretch: 1 })
+  })
+
+  it('grows taller as the draft wraps, so the words stay inside the ink', () => {
+    const short = composer('hi')
+    const long = composer('a message long enough to wrap onto several lines of it')
+    expect(short.stretch).toBe(1)
+    expect(long.stretch).toBeGreaterThan(1)
+    expect(composer(`${'w'.repeat(200)}`).stretch).toBeGreaterThan(long.stretch)
+  })
+
+  it('shrinks back when the draft is sent and the field empties', () => {
+    expect(composer('a message long enough to wrap onto several lines of it').stretch)
+      .toBeGreaterThan(1)
+    expect(composer('').stretch).toBe(1)
+  })
+
+  it('asks for the same height a message of the same words at that width would', () => {
+    const draft = 'a message long enough to wrap onto several lines of it'
+    expect(composer(draft).stretch).toBeCloseTo(stretchFor(draft, 'soft', 40, M), 9)
+  })
+
+  it('stays unstretched with nothing to measure against', () => {
+    expect(composer('a long draft', { lettering: 0 })).toEqual({ width: 40, stretch: 1 })
+    expect(composer('a long draft', { boxW: 0 })).toEqual({ width: 40, stretch: 1 })
   })
 })

@@ -7,6 +7,7 @@ import {
   chainColumns, readTranscript, TYPING_KEY,
 } from '../../skins/comic-book/bubbleChain'
 import type { BubbleChain } from '../../skins/comic-book/bubbleChain'
+import { fitComposer } from '../../skins/comic-book/bubbleFit'
 import { conversationRows } from '../../skins/comic-book/chainRows'
 import { NEW_BUBBLE } from '../../skins/comic-book/editor/configSeed'
 import type { BubbleTransform } from '../../skins/comic-book/editor/types'
@@ -64,9 +65,11 @@ describe('conversationRows with a typing row', () => {
     if (!c) throw new Error('columns() must resolve')
     return c
   }
+  /** An empty composer at the sender template's own width: how a live chain starts. */
+  const composer = () => fitComposer('', cols().me.type, cols().me.width, M)
 
   it('appends one extra row from the recipient template, keyed for the shell', () => {
-    const rows = conversationRows([0], readTranscript(['hello']), cols(), true, M, true)
+    const rows = conversationRows([0], readTranscript(['hello']), cols(), composer(), M, true)
     const typing = rows.find(r => r.key === TYPING_KEY)
     expect(typing).toBeTruthy()
     // The peer's side: aligned against the left column's edge, saying nothing.
@@ -80,15 +83,15 @@ describe('conversationRows with a typing row', () => {
   // The dots stand in for the reply, so they lean where it will: when the words land the
   // balloon is where the dots were, rather than a lean to the side of them.
   it('leans where the reply it stands in for will lean', () => {
-    const before = conversationRows([0], readTranscript(['hello']), cols(), true, M, true)
+    const before = conversationRows([0], readTranscript(['hello']), cols(), composer(), M, true)
     const typing = before.find(r => r.key === TYPING_KEY)
-    const after = conversationRows([1, 0], readTranscript(['hello', 'reply']), cols(), true, M)
+    const after = conversationRows([1, 0], readTranscript(['hello', 'reply']), cols(), composer(), M)
     const reply = after.find(r => r.key === '1')
     expect(reply?.bubble.right).toBeCloseTo(typing?.bubble.right ?? -1, 6)
   })
 
   it('takes the recipient tail, as the newest thing on their side', () => {
-    const rows = conversationRows([0], readTranscript(['hello']), cols(), true, M, true)
+    const rows = conversationRows([0], readTranscript(['hello']), cols(), composer(), M, true)
     const typing = rows.find(r => r.key === TYPING_KEY)
     const message = rows.find(r => r.key === '0')
     // The inbound message above the dots loses its tail to them — one tail per side.
@@ -97,7 +100,7 @@ describe('conversationRows with a typing row', () => {
   })
 
   it('adds nothing when typing is off', () => {
-    const rows = conversationRows([0], readTranscript(['hello']), cols(), true, M)
+    const rows = conversationRows([0], readTranscript(['hello']), cols(), composer(), M)
     expect(rows.some(r => r.key === TYPING_KEY)).toBe(false)
   })
 })

@@ -6,6 +6,7 @@ import {
   TYPING_KEY, visibleWindow,
 } from './bubbleChain'
 import type { BubbleChain } from './bubbleChain'
+import { fitComposer } from './bubbleFit'
 import { conversationRows } from './chainRows'
 import { tubeBetween } from './bubbleTube'
 import PanelBubble from './PanelBubble'
@@ -122,6 +123,12 @@ export default function PanelBubbleChain({
   // here rather than in the config because it is not the author's: it is gone on reload,
   // like anything typed into a page, and the editor never sees it.
   const [typed, setTyped] = useState<string[]>([])
+  // What is in the composer right now, which is what its balloon is fitted to. It is the
+  // field's own value reported back up (BubbleInput's `onDraftChange`) rather than this
+  // component's to set: the field stays the thing being typed into, and this is only the
+  // copy the *drawing* needs — the size of a balloon is decided here, with the box and the
+  // lettering size, like every other balloon in the table.
+  const [draft, setDraft] = useState('')
   // The box's width/height ratio, which is what converts a balloon's width into the share
   // of the box's *height* it occupies. It comes from the same panel geometry the author's
   // percentages were dragged out against, so nothing here measures the DOM: the page
@@ -133,6 +140,10 @@ export default function PanelBubbleChain({
 
   const cols = chainColumns(members)
   const live = cols !== null && isComposerContent(cols.me.content)
+  // The composer's balloon, sized to the draft in it: the author's width, and whatever
+  // height the words wrap to (bubbleFit.ts). Null on a chain with no composer, which is
+  // also how `conversationRows` is told there is no bottom row to spend.
+  const composer = cols && live ? fitComposer(draft, cols.me.type, cols.me.width, metrics) : null
   // A chain that asked to be bound and was not — the panel has no number yet, or has one
   // half-typed. It must not answer its own composer. `typed` below is a single array on
   // this component, so it does not belong to any peer and outlives every change of one:
@@ -267,6 +278,19 @@ export default function PanelBubbleChain({
 
   if (!cols) return null
 
+  /**
+   * What only the composer row gets, and every other row gets none of: the panel's
+   * keyboard, the hover that claims it, where Enter sends, and the draft its balloon is
+   * fitted to. One question asked once — which row is the field — rather than the same
+   * comparison repeated down the props of every balloon in the table.
+   */
+  const composerProps = (key: string) => key !== 'composer' ? {} : {
+    keyboard,
+    onHoverChange: onComposerHover,
+    onSubmit: send,
+    onDraftChange: setDraft,
+  }
+
   /** How far a message has got, for the balloon's ink. Undefined once it is simply sent. */
   const statusAt = (key: string): 'sending' | 'failed' | 'typing' | undefined => {
     if (key === TYPING_KEY) return 'typing'
@@ -279,7 +303,7 @@ export default function PanelBubbleChain({
     visibleWindow(head, windowRows),
     readTranscript(messages),
     cols,
-    live,
+    composer,
     metrics,
     typing,
   )
@@ -316,10 +340,8 @@ export default function PanelBubbleChain({
           interactive={interactive}
           chained
           stretch={row.stretch}
-          keyboard={row.key === 'composer' && keyboard}
-          onHoverChange={row.key === 'composer' ? onComposerHover : undefined}
-          onSubmit={row.key === 'composer' ? send : undefined}
           status={statusAt(row.key)}
+          {...composerProps(row.key)}
         />
       ))}
     </div>
