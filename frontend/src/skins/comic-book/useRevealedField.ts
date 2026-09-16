@@ -21,7 +21,7 @@ import type { RefObject } from 'react'
  * them — undoing them would trap Tab on a page whose controls are otherwise unreachable.
  */
 export function useRevealedField(
-  inputRef: RefObject<HTMLInputElement | null>,
+  inputRef: RefObject<HTMLInputElement | HTMLTextAreaElement | null>,
   revealed: boolean,
   enabled: boolean,
 ): void {
@@ -54,10 +54,14 @@ export function useRevealedField(
         if (start !== null && end !== null) input.setSelectionRange(start, end)
       })
     }
-    input.addEventListener('focusout', onFocusOut)
+    // Subscribed through the element as an `HTMLElement`, which is the interface
+    // `focusout` and its event type live on: TypeScript cannot resolve the overload
+    // across the union of the two elements a balloon's field can be.
+    const host: HTMLElement = input
+    host.addEventListener('focusout', onFocusOut)
     return () => {
       cancelAnimationFrame(frame)
-      input.removeEventListener('focusout', onFocusOut)
+      host.removeEventListener('focusout', onFocusOut)
     }
   }, [inputRef, revealed, enabled])
 }

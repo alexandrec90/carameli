@@ -183,8 +183,16 @@ keeps its size while it moves** — twenty messages through six rows is six at e
 position, never thinning toward the top (`stepHead`'s `floor`; the head stops at
 `growTarget`). **Live** is `content: 'input'` (or `'phone'`) on the sender template: the
 composer takes the bottom row and messages start one up. The arithmetic is pure in
-`bubbleChain.ts`; `PanelBubbleChain.tsx` adds only the growth timer, wheel listener and
-typed text — the panel's aspect is handed in with its box, never measured.
+`bubbleChain.ts`; `PanelBubbleChain.tsx` adds only the growth timer, wheel listener,
+typed text and the draft — the panel's aspect is handed in with its box, never measured.
+
+**The composer is fitted too, to the draft in it** (`fitComposer`) — an `input` field
+wraps its words and its balloon grows taller around its tail tip while they are typed,
+where a plain `input` scrolled the sentence sideways out of a balloon that could not
+follow. Two halves, and neither works alone: `BubbleInput` draws a **`textarea`** when
+`onDraftChange` is supplied, and supplying it is what the chain does to keep the draft it
+fits against. It is the composer's **height only** — a field is a target, and one that
+shrank to what had been typed would move out from under the pointer between keystrokes.
 
 - **A conversation is made whole or not at all.** `addSmsConversation` (the editor's
   **+ SMS**) establishes both balloons, their linkage, the chain id, the composer content

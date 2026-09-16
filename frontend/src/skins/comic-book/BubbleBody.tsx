@@ -50,6 +50,8 @@ interface BubbleBodyProps {
   dialFresh: boolean
   onDialChange?: (value: string, fresh: boolean) => void
   onSubmit?: (value: string) => void
+  /** A field's contents on every keystroke, for whoever is fitting the balloon to them. */
+  onDraftChange?: (value: string) => void
   onWheelSelect?: (value: string) => void
   actions?: PhoneActionHandlers
   status?: 'sending' | 'failed' | 'typing'
@@ -91,6 +93,7 @@ export default function BubbleBody({
   dialFresh,
   onDialChange,
   onSubmit,
+  onDraftChange,
   onWheelSelect,
   actions,
   status,
@@ -104,10 +107,12 @@ export default function BubbleBody({
         key={`${editableKind}:${bubble.text}`}
         kind={editableKind}
         initialValue={bubble.text}
+        shape={shape}
         font={font}
         enabled={enabled}
         revealed={revealed}
         onSubmit={onSubmit}
+        onDraftChange={onDraftChange}
       />
     )
   }
