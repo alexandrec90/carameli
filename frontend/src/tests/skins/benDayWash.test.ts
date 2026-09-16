@@ -15,7 +15,7 @@ import { GRID_SPACING } from '../../skins/comic-book/benDayGrid'
 
 // The wash's geometry and timings. The grid the wave passes over is benDayGrid.test.ts,
 // the light is spotlight.test.ts, and what the surfaces draw with both is
-// marginGrid.test.ts.
+// gridLight.test.ts.
 
 describe('easeInOutCubic', () => {
   it('pins the endpoints and midpoint', () => {

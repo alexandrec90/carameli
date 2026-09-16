@@ -1,11 +1,11 @@
 // The Ben-Day grid — the printed dot field every paper surface in the skin shows.
 //
-// One grid of ink dots at a fixed pitch over the *viewport*, drawn by the skin's
-// loading screen (`skins/context.tsx`, up while the chunk loads), the page's loading
-// sheet (`LoadingOverlay.tsx`), the letterbox around the page (`MarginGrid.tsx`) and
-// the page-transition wash (`benDayWash.ts`). The cells are anchored to the viewport
-// rather than to the region a caller asks for, so every surface prints the same dot in
-// the same place and each handoff between them is seamless.
+// One grid of ink dots at a fixed pitch over the *viewport*, drawn by the skin's paper
+// (`skins/context.tsx` — the loading screen, mounted under the page for the skin's
+// whole life and showing in the letterbox around it) and by the page-transition wash
+// (`benDayWash.ts`). The cells are anchored to the viewport rather than to the region a
+// caller asks for, so both surfaces print the same dot in the same place and the wash
+// leaves behind exactly the grid that was under it.
 //
 // **The ink is flat; the light changes the shape and nothing else.** Every dot is the
 // same opaque colour wherever it is, so the field is there to read on a resting page.
@@ -16,14 +16,14 @@
 // clear `GRID_MIN_CONTRAST` on the paper, because a pale accent printed flat is the
 // invisible grid this replaces.
 //
-// This module is imported by the loading screen that renders *before* the comic-book
-// chunk, so whatever it imports is in the eager bundle every visitor downloads whatever
-// skin they land on (`bundlePolicy.ts`). Keep it to the grid — no stylesheet, no page
+// This module is imported by the paper, which renders *before* the comic-book chunk,
+// so whatever it imports is in the eager bundle every visitor downloads whatever skin
+// they land on (`bundlePolicy.ts`). Keep it to the grid — no stylesheet, no page
 // geometry — with `spotlight.ts` its only skin import and **no React**: being shared
 // between the entry and a lazy chunk is what decides how Rollup splits it, and pulling
 // React into that shared set moved 10 KB of `jsx-runtime` into a chunk of its own and
 // added an import of it to all 38 lazy chunks. `runBenDayGrid` is an effect body, not
-// a hook, for that reason; its two callers each wrap it in four lines of their own.
+// a hook, for that reason.
 
 import { pageSpotlight, spotlightAt } from './spotlight'
 import type { SpotlightState } from './spotlight'
@@ -192,15 +192,16 @@ export function drawLoadingGrid(
 }
 
 /**
- * Paints a full-viewport loading grid on `canvas` and keeps it painted, returning the
- * teardown. Both loading screens run it — the one the skin's chunk is loading behind and
- * the one the page's pictures are loading behind — so the chunk arriving changes the
- * legend on top of the grid and nothing underneath it.
+ * Paints a full-viewport grid on `canvas` and keeps it painted, returning the teardown.
+ * The paper runs it (`skins/context.tsx`), once per route accent.
  *
- * Repainted only on a frame the light actually moved, and after a resize, which leaves
- * the bitmap blank whether or not it did. It does not consult `prefers-reduced-motion`:
- * the grid moves only as the hand does, and a light that stopped following the pointer
- * would read as the page having hung rather than as a preference honoured.
+ * Painted once on the spot — sizing the bitmap blanks it, and the call is made from an
+ * effect after a commit, so a first paint left to the next frame is a frame of bare
+ * paper at every re-inking — then repainted only on a frame the light actually moved,
+ * and after a resize, which leaves the bitmap blank whether or not it did. It does not
+ * consult `prefers-reduced-motion`: the grid moves only as the hand does, and a light
+ * that stopped following the pointer would read as the page having hung rather than as
+ * a preference honoured.
  */
 export function runBenDayGrid(canvas: HTMLCanvasElement, accent: string): () => void {
     const ctx = canvas.getContext('2d')
@@ -215,13 +216,17 @@ export function runBenDayGrid(canvas: HTMLCanvasElement, accent: string): () => 
     window.addEventListener('resize', resize)
     const spotlight = pageSpotlight()
     const release = spotlight.acquire()
-    let raf = 0
-    const loop = (now: number) => {
+    const paint = (now: number) => {
         const spot = spotlight.sample(now)
         if (spot !== shown) {
             shown = spot
             drawLoadingGrid(ctx, canvas.width, canvas.height, spot, accent)
         }
+    }
+    paint(performance.now())
+    let raf = 0
+    const loop = (now: number) => {
+        paint(now)
         raf = requestAnimationFrame(loop)
     }
     raf = requestAnimationFrame(loop)
