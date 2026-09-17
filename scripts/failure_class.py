@@ -50,7 +50,20 @@ _BROKEN_RUNTIME = [
     "DLL load failed",
     "requireNative",
 ]
+# The DB guard in `tests/conftest.py`, which refuses to TRUNCATE a database nothing
+# marks as disposable. It is environmental by every measure that matters here: it is a
+# fact about `DATABASE_URL` on this machine, no change to the code under test can clear
+# it, and it stops the session before a single test runs. Unclassified it was a bare
+# non-zero exit with no parseable pytest output, so the artifact said "exit code
+# indicated failure but no parseable lines" -- and the genuine hook-test failure in the
+# same run was read as that one expected red and only surfaced from CI.
+#
+# Matched on the guard's own opening words rather than on `RuntimeError`, which is a
+# perfectly ordinary thing for a real test to raise.
+_DB_GUARD = "refusing to empty the database"
+
 _ENV_ERROR = [
+    _DB_GUARD,
     "ConnectionRefusedError",
     "InvalidPasswordError",
     "OperationalError",
@@ -80,6 +93,12 @@ def get_skip_reason(lines: list[str]) -> str | None:
         return None
     if any(p in text for p in _MISSING_TOOL):
         return "not installed"
+    # Named rather than folded into "environment error", because the remedy is specific
+    # and the guard already prints it: point DATABASE_URL at `carameli_test`, or set
+    # CARAMELI_ALLOW_DB_TRUNCATE=1. A reader who sees the generic label goes looking for
+    # a service that is down.
+    if _DB_GUARD in text:
+        return "the DB guard refused a non-disposable database"
     if any(p in text for p in _ENV_ERROR):
         return "environment error"
     return None

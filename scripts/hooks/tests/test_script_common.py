@@ -99,3 +99,83 @@ def test_emit_report_omits_results_line_when_no_counts(capsys, tmp_path):
         failed=False,
     )
     assert "Results:" not in capsys.readouterr().out
+
+
+# --- load_script -----------------------------------------------------------
+
+
+def test_load_script_imports_a_hyphenated_runner(tmp_path):
+    """`run-tests.py` and `lint-all.py` are not importable names, and the alternative
+    to this is a second copy of whatever is shared -- which is how `--changed` came to
+    mean two different sets of files in the two runners at once."""
+    (tmp_path / "scripts").mkdir()
+    (tmp_path / "scripts" / "a-runner.py").write_text("VALUE = 7\n", encoding="utf-8")
+
+    module = sc.load_script("scripts/a-runner.py", tmp_path)
+    assert module.VALUE == 7
+
+
+def test_load_script_registers_before_executing(tmp_path):
+    """The rule this exists to follow, and the whole reason it is a shared helper.
+
+    `@dataclass` under `from __future__ import annotations` resolves its own field
+    annotations by looking the defining module up in `sys.modules` BY NAME. An
+    unregistered module makes that lookup return None and the import dies inside
+    `dataclasses` with a traceback pointing at CPython, not at the loader -- so a
+    loader that skips this works on every plain module and breaks the day its target
+    grows a dataclass.
+
+    Reversion check: drop the `sys.modules[name] = module` line and this raises.
+    """
+    (tmp_path / "scripts").mkdir()
+    (tmp_path / "scripts" / "b-runner.py").write_text(
+        "from __future__ import annotations\n"
+        "from dataclasses import dataclass\n"
+        "\n"
+        "@dataclass(frozen=True)\n"
+        "class Shape:\n"
+        "    parts: list[str]\n",
+        encoding="utf-8",
+    )
+
+    module = sc.load_script("scripts/b-runner.py", tmp_path)
+    assert module.Shape(parts=["a"]).parts == ["a"]
+
+
+def test_load_script_returns_the_same_module_twice(tmp_path):
+    """One copy per name, so two runners importing the same helper monkeypatch the
+    same object -- a second copy is a stub installed where nothing reads it."""
+    (tmp_path / "scripts").mkdir()
+    (tmp_path / "scripts" / "c-runner.py").write_text("VALUE = 1\n", encoding="utf-8")
+
+    first = sc.load_script("scripts/c-runner.py", tmp_path)
+    first.VALUE = 2
+    assert sc.load_script("scripts/c-runner.py", tmp_path).VALUE == 2
+
+
+def test_load_script_leaves_nothing_registered_when_the_target_raises(tmp_path):
+    """A half-executed module in `sys.modules` would be handed to the next caller as
+    if it had loaded."""
+    import sys
+
+    (tmp_path / "scripts").mkdir()
+    (tmp_path / "scripts" / "d-runner.py").write_text(
+        "raise RuntimeError('boom')\n", encoding="utf-8"
+    )
+
+    try:
+        sc.load_script("scripts/d-runner.py", tmp_path)
+    except RuntimeError:
+        pass
+    else:
+        raise AssertionError("the target's exception must reach the caller")
+    assert "_carameli_d_runner" not in sys.modules
+
+
+def test_load_script_refuses_a_path_that_is_not_there(tmp_path):
+    try:
+        sc.load_script("scripts/nope.py", tmp_path)
+    except (ImportError, FileNotFoundError):
+        pass
+    else:
+        raise AssertionError("a missing script must refuse rather than answer empty")

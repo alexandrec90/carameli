@@ -597,3 +597,26 @@ def test_digest_tests_skips_env_error_source():
     assert "npm error could not be found" in text
     # The target that DID pass contributes nothing.
     assert "# pytest" not in text
+
+
+def test_an_unparsed_target_names_itself_its_exit_code_and_its_output():
+    """The fallback carried none of the three, and each cost a diagnostic cycle: a run
+    with two red targets named neither of them."""
+    body = diag._unparsed_body("pytest", 2, ["first line", "the real reason"])
+    assert "pytest" in body[0]
+    assert "exited 2" in body[0]
+    assert "the real reason" in body
+
+
+def test_an_unparsed_target_with_no_output_says_so():
+    body = diag._unparsed_body("hook-tests", 1, [])
+    assert "hook-tests" in body[0]
+    assert any("no output at all" in line for line in body)
+
+
+def test_a_long_unparsed_tail_keeps_the_end_not_the_start():
+    """A pytest run that ends badly ends with the reason; the head is the banner."""
+    lines = [f"line {n}" for n in range(200)]
+    body = diag._unparsed_body("pytest", 1, lines)
+    assert "line 199" in body
+    assert any("suppressed" in line for line in body)

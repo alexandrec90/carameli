@@ -51,10 +51,10 @@ complexity::scripts/lint-all.py::main = 16
 complexity::scripts/run-tests.py::main = 30
 complexity::scripts/run-tests.py::run_named_target = 18
 definitions::frontend/src/skins/comic-book/editor/transforms.ts = 25
-definitions::scripts/diagnostics.py = 29
-definitions::scripts/lint-all.py = 35
+definitions::scripts/diagnostics.py = 30
+definitions::scripts/lint-all.py = 36
 definitions::scripts/local-e2e.py = 21
-definitions::scripts/run-tests.py = 22
+definitions::scripts/run-tests.py = 23
 dependency::frontend/package.json::@eslint/js = 1
 dependency::frontend/package.json::@fontsource/outfit = 1
 dependency::frontend/package.json::@tailwindcss/postcss = 1
@@ -390,10 +390,10 @@ dependency::requirements.txt::websockets = 1
 dependency::requirements.txt::wrapt = 1
 file_lines::app/api/webhooks/call_status.py = 845
 file_lines::frontend/src/api/client.ts = 845
-file_lines::scripts/diagnostics.py = 701
-file_lines::scripts/lint-all.py = 627
+file_lines::scripts/diagnostics.py = 726
+file_lines::scripts/lint-all.py = 653
 file_lines::scripts/local-e2e.py = 549
-file_lines::scripts/run-tests.py = 712
+file_lines::scripts/run-tests.py = 761
 function_lines::app/api/vsapi/calls.py::initiate_outbound_call = 99
 function_lines::app/api/webhooks/call_status.py::jambonz_call_status_webhook = 104
 function_lines::app/api/webhooks/call_status.py::jambonz_dtmf_result_webhook = 82
@@ -532,3 +532,14 @@ todos::app/api/auth.py = 1
 
 # 2026-09-10  recorded: Missing-toolchain gate: lint-all.py must refuse an unprovisioned checkout instead of reporting thirteen absent binaries as lint findings. The fix belongs in the runner's entry point, and the module is 127 lines past the limit; the split it wants (t_detect_secrets and its baseline diffing into their own module) is separate work. Net +8 after moving _ensure_venv_on_path out to scripts/preflight.py.
 #   file_lines::scripts/lint-all.py -> 627
+
+# 2026-09-17  recorded: Four harness-defect fixes from the /triage-harness sweep, each in a runner that was already past these limits and has nowhere else to put a line. run-tests.py +2 definitions and +21 lines for `changed_touches_python`: `--changed` ran the ENTIRE backend suite for a frontend-only diff (nine .ts/.tsx files and one .md), testmon selected 999/1, the xdist fallback fired, and with Docker down it died on the tests/conftest.py DB guard -- so a change that cannot touch Python reported TESTS FAILED. lint-all.py +1 definition and +23 lines for `_detect_secrets_absent`: an absent detect-secrets, which is the normal state of a fresh worktree, was reported as `scan failed (exit 1)` and read as a repository problem rather than a missing tool; extracted rather than inlined so t_detect_secrets stays under function_lines. diagnostics.py +1 definition and +22 lines for `_unparsed_body`: the artifact's fallback named neither the target nor its exit code nor any output, so a run with two red targets -- an expected DB-guard refusal and a genuine hook-test failure -- produced a log naming neither, and the real failure only surfaced from CI. None of the three modules' deferred splits is re-argued here; the sweep's job was the defects, and each of these is smaller than the diff that would have split its file.
+#   definitions::scripts/diagnostics.py -> 30
+#   definitions::scripts/lint-all.py -> 36
+#   definitions::scripts/run-tests.py -> 23
+#   file_lines::scripts/diagnostics.py -> 726
+#   file_lines::scripts/lint-all.py -> 651
+#   file_lines::scripts/run-tests.py -> 761
+
+# 2026-09-17  recorded: lint-all.py +2 lines: the not-installed line is spelled 'detect-secrets is not installed', matching `failure_class._MISSING_TOOL` exactly so it classifies as environmental wherever it is read rather than only where it is produced, with the one-line comment saying so. Same defect fix as the record above.
+#   file_lines::scripts/lint-all.py -> 653

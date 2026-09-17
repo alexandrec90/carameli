@@ -677,3 +677,88 @@ def test_main_on_ci_splits_frontend_failures_into_their_own_artifact(cli, monkey
     frontend = tmp_path / "logs" / "frontend-test-failures.log"
     assert "# frontend-tests" in frontend.read_text(encoding="utf-8")
     assert backend.read_text(encoding="utf-8") == ""
+
+
+# --- --changed must not run the backend suite for a frontend-only diff ---------
+
+
+def test_a_frontend_only_diff_does_not_touch_python():
+    """The reported run: nine `.ts`/`.tsx` files and one `.md`, no Python at all.
+
+    testmon selected `999/1`, `pick_fast_command` read that as a useless index and fell
+    back to the full xdist run, and with Docker down that died on the `tests/conftest.py`
+    DB guard -- so a change that cannot touch Python reported TESTS FAILED.
+    """
+    changed = [
+        "frontend/src/App.tsx",
+        "frontend/src/lib/api.ts",
+        "frontend/src/styles/panel.css",
+        "docs/notes.md",
+    ]
+    assert not rt.changed_touches_python(changed)
+
+
+def test_one_python_file_anywhere_brings_the_suite_back():
+    assert rt.changed_touches_python(["frontend/src/App.tsx", "app/models.py"])
+
+
+def test_anything_unrecognised_counts_as_touching_python():
+    """Conservative in the one direction that matters: a `.toml`, a Dockerfile or a
+    fixture can change what the suite does, and the test is "provably irrelevant"."""
+    for path in ("pyproject.toml", "Dockerfile", "tests/fixtures/order.json", "Makefile"):
+        assert rt.changed_touches_python([path]), path
+
+
+def test_an_empty_changed_set_runs_the_suite():
+    """Nothing detected is not nothing changed -- a detached HEAD, a fresh clone, a git
+    that would not answer. Skipping there would be a green run of no tests."""
+    assert rt.changed_touches_python([])
+
+
+def test_a_git_that_will_not_answer_runs_the_suite(monkeypatch):
+    def explode(_paths=None):
+        raise OSError("git is not on PATH")
+
+    monkeypatch.setattr(rt.lint_all, "changed_files", explode)
+    assert rt.changed_touches_python()
+
+
+def test_run_local_skips_pytest_for_a_frontend_only_diff(monkeypatch, capsys):
+    """End to end through `run_local`: the skip is green and nothing is spawned.
+
+    Reversion check: delete the guard in `run_local` and this spawns the suite.
+    """
+    monkeypatch.setattr(rt, "host_db_fallback", lambda: None)
+    monkeypatch.setattr(rt, "changed_touches_python", lambda: False)
+    monkeypatch.setattr(
+        rt, "run_argv", lambda *a, **k: pytest.fail("ran pytest for a frontend diff")
+    )
+
+    assert rt.run_local(True) == {"pytest": ([], 0)}
+    assert "holds no Python" in capsys.readouterr().out
+
+
+def test_run_local_still_runs_pytest_when_python_changed(monkeypatch):
+    monkeypatch.setattr(rt, "host_db_fallback", lambda: None)
+    monkeypatch.setattr(rt, "changed_touches_python", lambda: True)
+    monkeypatch.setattr(rt, "pick_fast_command", lambda: "pytest --testmon")
+    seen = []
+
+    def record(argv, **_kwargs):
+        seen.append(argv)
+        return [], 0
+
+    monkeypatch.setattr(rt, "run_argv", record)
+
+    rt.run_local(True)
+    assert seen, "a Python change must still reach pytest"
+
+
+def test_a_full_run_never_asks_about_the_changed_set(monkeypatch):
+    """`--changed` gates this and nothing else: a bare `run-tests.py` is the whole
+    suite by definition and must not consult git at all."""
+    monkeypatch.setattr(rt, "host_db_fallback", lambda: None)
+    monkeypatch.setattr(rt, "changed_touches_python", lambda *a: pytest.fail("asked on a full run"))
+    monkeypatch.setattr(rt, "run_argv", lambda *a, **k: ([], 0))
+
+    rt.run_local(False)

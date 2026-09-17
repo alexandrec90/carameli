@@ -182,6 +182,15 @@ across the `FROM python:` tag in `Dockerfile`, the uv-compiled locks, `mypy.ini`
 step of an install anyone types: a bare `uv venv`, and `python -m venv` in any form,
 silently take the machine default and give you a venv the container does not match.
 
+**Node is coordinated the same way and had nothing saying so.** The pin is
+`.github/actions/setup-node-env/action.yml`'s `node-version`, mirrored in `.nvmrc` so
+the mismatch is visible before a test run rather than after one. It is not cosmetic:
+Node 22+ ships an experimental built-in `localStorage` global that evaluates to
+`undefined` unless `--localstorage-file` is passed, and under vitest's `globals: true`
+that shadows happy-dom's. A workstation on v26 therefore failed 46 frontend tests
+across 7 files while the same suite was green in CI — and the stop gate then blocked
+every session on failures no branch had caused.
+
 `logs/` holds per-run failure artifacts, and `scripts/prune-logs.py` bounds its growth
 from the SessionStart hook. The current artifacts (`lint-errors.log`,
 `test-failures.log`, ...) are protected from pruning at any age — the runners read a

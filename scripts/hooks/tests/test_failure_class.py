@@ -77,3 +77,25 @@ def test_get_skip_reason_broken_runtime_outranks_missing_tool():
 
 def test_get_skip_reason_empty():
     assert fc.get_skip_reason([]) is None
+
+
+def test_the_db_guard_is_an_environment_skip_with_its_own_name():
+    """The reported run had two red targets -- this expected refusal and a genuine
+    hook-test failure -- and the artifact named neither, so the real one was read as
+    the expected one and only surfaced from CI.
+
+    Named rather than folded into "environment error": the remedy is specific and the
+    guard already prints it, and a reader who sees the generic label goes looking for a
+    service that is down.
+    """
+    lines = [
+        "E   RuntimeError: refusing to empty the database 'carameli' on localhost:5432:",
+        "E   the test session TRUNCATEs every table before it starts",
+    ]
+    assert fc.get_skip_reason(lines) == "the DB guard refused a non-disposable database"
+
+
+def test_an_ordinary_runtime_error_is_not_the_db_guard():
+    """Matched on the guard's own opening words, never on `RuntimeError` -- which is a
+    perfectly ordinary thing for a real test to raise."""
+    assert fc.get_skip_reason(["E   RuntimeError: the widget exploded"]) is None

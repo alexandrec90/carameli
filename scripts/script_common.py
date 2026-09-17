@@ -15,8 +15,11 @@ only differ in how they produce results; the terminal-facing shell is uniform.
 printing/file-writing parts. They belong here instead.)
 """
 
+import importlib.util
 import os
+import sys
 from pathlib import Path
+from types import ModuleType
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -28,6 +31,37 @@ SKIP = "skip"
 
 _BANNER_BAR = "  " + "=" * 42
 _BANNER_WIDTH = len(_BANNER_BAR)
+
+
+def load_script(rel: str, repo_root: Path = REPO_ROOT) -> ModuleType:
+    """Import a hyphenated runner by path, so one can reuse another's pure helpers.
+
+    `run-tests.py` and `lint-all.py` are not importable names, and the alternative to
+    this is a second copy of whatever is being shared -- which is how `--changed` came
+    to mean two different sets of files in the two runners at once.
+
+    **Registered in `sys.modules` before `exec_module`**, and that is not a cache: a
+    `@dataclass` under `from __future__ import annotations` resolves its own field
+    annotations by looking the defining module up by name, and an unregistered module
+    makes that lookup return `None` and the import die inside `dataclasses` with a
+    traceback pointing at CPython. A loader that skips this works today and breaks the
+    day the target grows a dataclass.
+    """
+    path = repo_root / rel
+    name = f"_carameli_{path.stem.replace('-', '_')}"
+    if name in sys.modules:
+        return sys.modules[name]
+    spec = importlib.util.spec_from_file_location(name, path)
+    if spec is None or spec.loader is None:
+        raise ImportError(f"cannot load {path}")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[name] = module
+    try:
+        spec.loader.exec_module(module)
+    except BaseException:
+        sys.modules.pop(name, None)
+        raise
+    return module
 
 
 def venv_rel_parts(name: str, os_name: str = os.name) -> tuple[str, str, str]:
