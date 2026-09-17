@@ -509,6 +509,29 @@ def _skip_body(lines: list[str]) -> list[str]:
     return [*body[:kept], f"... ({len(body) - kept} more line(s) suppressed)"]
 
 
+def _unparsed_body(name: str, code: int, lines: list[str]) -> list[str]:
+    """What to record for a red target whose output the parser could not read. Pure.
+
+    Three things the one-sentence fallback did not carry, and each of them cost a
+    diagnostic cycle: **which** target (a run with two red targets named neither),
+    **what exit code** (a 1 and a 5 mean different things), and **any of the output**.
+
+    The tail rather than the head: a pytest run that ends badly ends with the reason,
+    and the head is the banner.
+    """
+    body = last_resort(lines)
+    head = [
+        f"(no parseable {name} output; the target exited {code}. "
+        f"Re-run it manually -- the raw tail follows.)"
+    ]
+    if not body:
+        return [*head, "(the target produced no output at all)"]
+    if len(body) <= _SKIP_BODY_MAX:
+        return [*head, *body]
+    kept = _SKIP_BODY_MAX - 1
+    return [*head, f"... ({len(body) - kept} earlier line(s) suppressed)", *body[-kept:]]
+
+
 def digest_tests(
     results: dict[str, tuple[list[str], int]],
     source_label: str,
@@ -560,13 +583,15 @@ def digest_tests(
         body = parser(lines)
         sections.append(f"# {header}")
         sections.append(f"# fix: {fix_hint}")
-        sections.extend(
-            body
-            if body
-            else [
-                "(exit code indicated failure but no parseable lines -- re-run the runner manually)"
-            ]
-        )
+        # The fallback used to be one sentence with no target, no exit code and none of
+        # the output. A run with two red targets -- an expected DB-guard refusal and a
+        # genuine hook-test failure -- then produced an artifact naming neither, the
+        # real failure was read as the expected one, and it only surfaced from CI.
+        #
+        # Whatever the parser could not read, the raw lines are still the only evidence
+        # there is, so the tail of them goes in. Tail rather than head: a pytest run
+        # that ends badly ends with the reason.
+        sections.extend(body if body else _unparsed_body(name, code, lines))
         sections.append("")
 
     artifact_body = [*sections, *skip_sections]

@@ -34,6 +34,11 @@ from pathlib import Path
 import diagnostics
 import script_common
 
+# `changed_files` only -- the one definition on this machine of "what changed", shared
+# so `--changed` here and `--changed` there cannot disagree about it. Hyphenated, hence
+# the loader; `script_common` is already on `sys.path` for both.
+lint_all = script_common.load_script("scripts/lint-all.py")
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 IS_CI = bool(os.environ.get("CI"))
 
@@ -510,6 +515,47 @@ _HOST_TIER_NOTE = (
 )
 
 
+def changed_touches_python(paths: list[str] | None = None) -> bool:
+    """Whether the working-tree diff holds anything pytest could be affected by.
+
+    `--changed` used to run the **entire** backend suite for a frontend-only diff. The
+    reported case was nine `.ts`/`.tsx` files and one `.md`, no Python at all: testmon
+    selected `999/1`, `pick_fast_command` read that as "the index is useless" and fell
+    back to the full xdist run -- which, with Docker down, died on the `tests/conftest.py`
+    DB guard. So a change that cannot touch Python reported TESTS FAILED, twice over.
+
+    The fallback is right and stays: a stale `.testmondata` selecting nothing is the one
+    failure mode that reports green having run the wrong tests. What was missing is the
+    question in front of it. Asked from the same `changed_files` the linter uses, so the
+    two halves of `--changed` agree on what changed.
+
+    Conservative in the one direction that matters: anything that is not plainly a
+    frontend or docs file counts, because a `.toml`, a `Dockerfile` or a fixture can
+    absolutely change what the suite does. An unreadable git answers True.
+    """
+    if paths is None:
+        try:
+            paths = lint_all.changed_files()
+        except (OSError, subprocess.SubprocessError):
+            return True
+    # Used verbatim once given: `changed_files` drops paths that no longer exist on
+    # disk, which is right for a linter (a deleted file has nothing to lint) and wrong
+    # here -- re-filtering a caller's list would let a deleted `.py` vanish from the
+    # question and turn a Python change into "frontend only".
+    files = list(paths)
+    if not files:
+        # Nothing detected is not the same as nothing changed -- a detached HEAD, a
+        # fresh clone, a git that would not answer. Run the suite.
+        return True
+    return not all(f.endswith(_NO_PYTHON_SUFFIXES) for f in files)
+
+
+# Suffixes that cannot change what pytest does. Deliberately short: the test is
+# "provably irrelevant", not "probably irrelevant", and everything unlisted runs
+# the suite.
+_NO_PYTHON_SUFFIXES = (".ts", ".tsx", ".js", ".jsx", ".css", ".scss", ".md", ".svg")
+
+
 def run_local(changed: bool) -> dict[str, tuple[list[str], int]]:
     host_env = host_db_fallback()
     if host_env is not None:
@@ -521,6 +567,9 @@ def run_local(changed: bool) -> dict[str, tuple[list[str], int]]:
         print(_HOST_TIER_NOTE)
         lines, code = run_argv(host_argv(_PYTEST_FULL), extra_env=host_env)
         return {"pytest": (lines, code)}
+    if changed and not changed_touches_python():
+        print("\nSkipping pytest -- the changed set holds no Python.")
+        return {"pytest": ([], 0)}
     pytest_cmd = pick_fast_command() if changed else _PYTEST_FULL
     mode = "changed-only (testmon)" if changed else "full (parallel, xdist)"
     print(f"\nRunning pytest -- {mode} ...")

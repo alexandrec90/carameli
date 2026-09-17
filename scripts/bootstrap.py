@@ -140,13 +140,32 @@ def install_python(root: Path = REPO_ROOT) -> int:
     return subprocess.run([sys.executable, str(script)], cwd=root).returncode
 
 
+def frontend_installed(frontend_dir: Path) -> bool:
+    """Whether `node_modules` holds an install, rather than merely existing.
+
+    `is_dir()` on `node_modules` was the test, and it is true of an EMPTY directory --
+    which is what an interrupted `npm ci`, a partly-deleted tree, or a `git clean` that
+    left the folder behind all leave. The primary checkout sat in exactly that state:
+    bootstrap printed "provisioned" and returned 0 while vitest could not resolve vite,
+    so the one command whose job is to make the toolchain work reported success for a
+    checkout with no toolchain in it.
+
+    `.package-lock.json` is npm's own marker of a completed install and `.bin/` is what
+    every runner actually resolves through; either is enough, and requiring both would
+    call a `--omit` install broken. Both are *inside* `node_modules`, so neither can
+    survive the directory being emptied.
+    """
+    modules = frontend_dir / "node_modules"
+    return (modules / ".package-lock.json").is_file() or (modules / ".bin").is_dir()
+
+
 def install_frontend(root: Path = REPO_ROOT, cfg: harness_config.Config | None = None) -> int:
     """Install `node_modules` when this project has a frontend that lacks one."""
     config = harness_config.load(root) if cfg is None else cfg
     frontend = config.frontend
     if not frontend.enabled or not (root / frontend.dir).is_dir():
         return 0
-    if (root / frontend.dir / "node_modules").is_dir():
+    if frontend_installed(root / frontend.dir):
         return 0
     print(f"[bootstrap] installing {frontend.dir}/node_modules")
     return subprocess.run(npm_argv(root, frontend.dir), cwd=root).returncode

@@ -95,13 +95,54 @@ def test_npm_argv_resolves_the_launcher_to_a_real_path(tmp_path):
 
 
 def test_install_frontend_is_a_no_op_when_node_modules_is_there(tmp_path, monkeypatch):
-    (tmp_path / "frontend" / "node_modules").mkdir(parents=True)
+    modules = tmp_path / "frontend" / "node_modules"
+    modules.mkdir(parents=True)
+    (modules / ".package-lock.json").write_text("{}", encoding="utf-8")
     monkeypatch.setattr(
         subprocess, "run", lambda *a, **k: pytest.fail("re-installed an installed tree")
     )
     cfg = harness_config.Config(frontend=harness_config.FrontendConfig(enabled=True))
 
     assert bootstrap.install_frontend(tmp_path, cfg) == 0
+
+
+def test_an_empty_node_modules_is_not_an_install(tmp_path, monkeypatch):
+    """The reported dead end, and the one command whose whole job is to prevent it.
+
+    The check was `node_modules.is_dir()`, which is true of an EMPTY directory -- what
+    an interrupted `npm ci`, a partly-deleted tree or a `git clean` that left the folder
+    behind all produce. The primary checkout sat in exactly that state: bootstrap
+    printed "checkout provisioned -- lint, tests and the commit gate can run" and
+    returned 0 while vitest could not resolve vite.
+
+    Reversion check: put `is_dir()` back and this stops installing.
+    """
+    (tmp_path / "frontend" / "node_modules").mkdir(parents=True)
+    seen = []
+    monkeypatch.setattr(
+        subprocess,
+        "run",
+        lambda argv, **k: seen.append(argv) or subprocess.CompletedProcess(argv, 0),
+    )
+    cfg = harness_config.Config(frontend=harness_config.FrontendConfig(enabled=True))
+
+    assert bootstrap.install_frontend(tmp_path, cfg) == 0
+    assert seen, "an empty node_modules must be installed into, not reported as provisioned"
+
+
+def test_a_bin_directory_alone_counts_as_installed(tmp_path):
+    """`.bin/` is what every runner resolves through, and an `--omit` install can leave
+    no `.package-lock.json`. Either marker is enough; requiring both would call a real
+    install broken."""
+    modules = tmp_path / "frontend" / "node_modules"
+    (modules / ".bin").mkdir(parents=True)
+    assert bootstrap.frontend_installed(tmp_path / "frontend")
+
+
+def test_neither_marker_means_not_installed(tmp_path):
+    modules = tmp_path / "frontend" / "node_modules"
+    (modules / "vite").mkdir(parents=True)
+    assert not bootstrap.frontend_installed(tmp_path / "frontend")
 
 
 def test_install_frontend_skips_a_checkout_with_no_frontend(tmp_path, monkeypatch):

@@ -416,6 +416,29 @@ def t_dotenv(changed: list[str] | None = None) -> dict:
     return {"dotenv-linter": run("dotenv-linter check " + " ".join(envs))}
 
 
+def _detect_secrets_absent() -> dict | None:
+    """A clean skip when `detect-secrets` is not on PATH, else None. Asked first.
+
+    The two answers read as opposite things and the code gave them the same words. A
+    scan that *ran* and exited non-zero says the repository has a problem; a
+    `detect-secrets` that is not installed -- the normal state of a fresh worktree,
+    which checks out tracked files only and has no `.venv` -- says the machine does.
+    Both printed `detect-secrets: scan failed (exit 1)`, so the second read as the
+    first, and this pass's own promise never to block the suite read as broken.
+
+    "not installed" is the exact phrase `failure_class.get_skip_reason` classifies as
+    environmental, which is what keeps it out of the failure artifact. That is the
+    opposite of the `_GIT_UNAVAILABLE_LINE` case above, whose wording deliberately
+    avoids the phrase: there the tool IS present and nothing was linted, which must
+    stay loud.
+    """
+    if shutil.which("detect-secrets") is not None:
+        return None
+    # "is not installed" is the exact phrase `failure_class._MISSING_TOOL` matches, so
+    # the line classifies as environmental wherever it is read, not only here.
+    return {"detect-secrets": (["detect-secrets is not installed -- skipped"], 0)}
+
+
 def t_detect_secrets(changed: list[str] | None = None) -> dict:
     """Scan for secrets; auto-acknowledge new findings into the baseline.
 
@@ -437,6 +460,9 @@ def t_detect_secrets(changed: list[str] | None = None) -> dict:
     # The scan reads the whole tree; only worth it when a non-baseline file moved.
     if changed is not None and not _sel(changed, lambda f: f != ".secrets.baseline"):
         return {"detect-secrets": ([], 0)}
+
+    if (absent := _detect_secrets_absent()) is not None:
+        return absent
 
     exclude = f'--exclude-files "{SECRETS_EXCLUDE_RE}"'
     baseline = REPO_ROOT / ".secrets.baseline"

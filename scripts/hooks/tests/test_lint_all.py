@@ -300,6 +300,7 @@ def test_alembic_fresh_db_reports_broken_migrations(monkeypatch):
 def test_detect_secrets_silent_when_baseline_unchanged(monkeypatch, capsys):
     # `scan --update` runs but leaves the (real, existing) baseline byte-identical,
     # so nothing may be printed -- the old raw-rescan comparison cried wolf here.
+    monkeypatch.setattr(la.shutil, "which", lambda _name: "/usr/bin/detect-secrets")
     monkeypatch.setattr(la, "run", lambda cmd: ([], 0))
     assert la.t_detect_secrets(None) == {"detect-secrets": ([], 0)}
     assert "detect-secrets" not in capsys.readouterr().out
@@ -318,6 +319,7 @@ def test_detect_secrets_reports_new_findings_from_baseline_diff(monkeypatch, tmp
 
     monkeypatch.setattr(la, "run", fake_run)
     monkeypatch.setattr(la, "REPO_ROOT", tmp_path)
+    monkeypatch.setattr(la.shutil, "which", lambda _name: "/usr/bin/detect-secrets")
     assert la.t_detect_secrets(None) == {"detect-secrets": ([], 0)}
     assert "1 new finding(s)" in capsys.readouterr().out
 
@@ -342,32 +344,53 @@ def test_detect_secrets_restores_timestamp_only_churn(monkeypatch, tmp_path, cap
 
     monkeypatch.setattr(la, "run", fake_run)
     monkeypatch.setattr(la, "REPO_ROOT", tmp_path)
+    monkeypatch.setattr(la.shutil, "which", lambda _name: "/usr/bin/detect-secrets")
     assert la.t_detect_secrets(None) == {"detect-secrets": ([], 0)}
     assert baseline.read_text(encoding="utf-8") == before
     assert "detect-secrets" not in capsys.readouterr().out
 
 
-def test_detect_secrets_failure_keeps_the_tools_own_output(monkeypatch, tmp_path):
-    # The reported defect. In a fresh worktree detect-secrets is not there, the shell
-    # says "'detect-secrets' is not recognized...", and this used to replace that with
-    # `baseline scan failed (exit 1)` -- a synthetic line with nothing in it for
-    # `get_skip_reason` to classify, so an absent tool arrived as a lint FAILURE and
-    # the session spent its turn diagnosing the toolchain. Keep the tool's own words.
+def test_detect_secrets_that_is_not_installed_never_reaches_the_scan(monkeypatch, tmp_path):
+    """The reported defect, fixed at the question rather than at the wording.
+
+    In a fresh worktree detect-secrets is not there. The scan ran anyway, the shell
+    said "'detect-secrets' is not recognized...", and this reported
+    `detect-secrets: scan failed (exit 1)` -- a missing tool arriving as a repository
+    problem, and this pass's own promise never to block the suite reading as broken.
+    An earlier fix kept the shell's own words so `get_skip_reason` could classify them;
+    the answer now is not to ask the shell at all.
+
+    Reversion check: delete the `_detect_secrets_absent` call and this spawns a scan.
+    """
     baseline = tmp_path / ".secrets.baseline"
     baseline.write_text('{"results": {}}', encoding="utf-8")
-    shell_error = [
-        "'detect-secrets' is not recognized as an internal or external command,",
-        "operable program or batch file.",
-    ]
-    monkeypatch.setattr(la, "run", lambda cmd: (shell_error, 1))
     monkeypatch.setattr(la, "REPO_ROOT", tmp_path)
+    monkeypatch.setattr(la.shutil, "which", lambda _name: None)
+    monkeypatch.setattr(la, "run", lambda cmd: pytest.fail("scanned with no detect-secrets"))
+
+    lines, code = la.t_detect_secrets(None)["detect-secrets"]
+
+    assert code == 0, "a missing tool must not fail the suite"
+    assert diag.get_skip_reason(lines) == "not installed"
+
+
+def test_a_scan_that_ran_and_failed_still_keeps_the_tools_own_output(monkeypatch, tmp_path):
+    """The other half, and why the earlier fix stays. A scan that actually ran and
+    exited non-zero is a finding about the repository, and the tool's own lines are
+    the only thing in it worth reading."""
+    baseline = tmp_path / ".secrets.baseline"
+    baseline.write_text('{"results": {}}', encoding="utf-8")
+    scan_error = ["Potential secrets about to be committed to git repo!", "Secret Type: AWS Key"]
+    monkeypatch.setattr(la, "REPO_ROOT", tmp_path)
+    monkeypatch.setattr(la.shutil, "which", lambda _name: "/usr/bin/detect-secrets")
+    monkeypatch.setattr(la, "run", lambda cmd: (scan_error, 1))
 
     lines, code = la.t_detect_secrets(None)["detect-secrets"]
 
     assert code == 1
-    assert lines[: len(shell_error)] == shell_error
+    assert lines[: len(scan_error)] == scan_error
     assert "exit 1" in lines[-1]
-    assert diag.get_skip_reason(lines) == "not installed"
+    assert diag.get_skip_reason(lines) is None, "a real finding must not read as a skip"
 
 
 # --- the missing-toolchain gate ---------------------------------------------
@@ -379,6 +402,7 @@ def test_main_refuses_an_unprovisioned_checkout(monkeypatch, tmp_path, capsys):
     monkeypatch.setattr(la.preflight, "gaps", lambda root: ["no toolchain here"])
     monkeypatch.setattr(la.preflight, "provisioning_command", lambda: "python scripts/bootstrap.py")
     monkeypatch.setattr(la, "REPO_ROOT", tmp_path)
+    monkeypatch.setattr(la.shutil, "which", lambda _name: "/usr/bin/detect-secrets")
     monkeypatch.setattr(
         la, "ThreadPoolExecutor", lambda **k: pytest.fail("ran linters with no toolchain")
     )
@@ -395,6 +419,7 @@ def test_main_refuses_an_unprovisioned_checkout(monkeypatch, tmp_path, capsys):
 def test_main_runs_the_linters_when_the_checkout_is_provisioned(monkeypatch, tmp_path):
     monkeypatch.setattr(la.preflight, "gaps", lambda root: [])
     monkeypatch.setattr(la, "REPO_ROOT", tmp_path)
+    monkeypatch.setattr(la.shutil, "which", lambda _name: "/usr/bin/detect-secrets")
     monkeypatch.setattr(
         la, "select_tools", lambda *a, **k: [lambda changed: {"ruff-check": ([], 0)}]
     )
