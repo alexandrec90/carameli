@@ -6,8 +6,7 @@ import {
   TYPING_KEY, visibleWindow,
 } from './bubbleChain'
 import type { BubbleChain } from './bubbleChain'
-import { fitComposer } from './bubbleFit'
-import { conversationRows } from './chainRows'
+import { conversationRows, fitRow } from './chainRows'
 import { tubeBetween } from './bubbleTube'
 import PanelBubble from './PanelBubble'
 import { bubbleRect } from './editor/transforms'
@@ -140,10 +139,10 @@ export default function PanelBubbleChain({
 
   const cols = chainColumns(members)
   const live = cols !== null && isComposerContent(cols.me.content)
-  // The composer's balloon, sized to the draft in it: the author's width, and whatever
-  // height the words wrap to (bubbleFit.ts). Null on a chain with no composer, which is
-  // also how `conversationRows` is told there is no bottom row to spend.
-  const composer = cols && live ? fitComposer(draft, cols.me.type, cols.me.width, metrics) : null
+  // The composer's balloon, inflated to the draft in it the way a message's is to its
+  // words (chainRows.ts). Null on a chain with no composer, which is also how
+  // `conversationRows` is told there is no bottom row to spend.
+  const composer = cols && live ? fitRow(draft, cols.me, metrics) : null
   // A chain that asked to be bound and was not — the panel has no number yet, or has one
   // half-typed. It must not answer its own composer. `typed` below is a single array on
   // this component, so it does not belong to any peer and outlives every change of one:

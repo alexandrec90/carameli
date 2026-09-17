@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest'
 
 import { BUBBLE_ASPECT, BUBBLE_ELLIPSE_N } from '../../skins/comic-book/bubbleBox'
 import {
-  GLYPH_EM, LINE_HEIGHT, fitComposer, fitMessage, glyphsPerLine, stretchFor, textBand,
-  wrapLines,
+  GLYPH_EM, GROW_BIAS, LINE_HEIGHT, biasedStretch, fitMessage, glyphsPerLine, stretchFor,
+  textBand, wrapLines,
 } from '../../skins/comic-book/bubbleFit'
 import type { FitMetrics } from '../../skins/comic-book/bubbleFit'
 import { textInset } from '../../skins/comic-book/bubbleText'
@@ -101,12 +101,61 @@ describe('glyphsPerLine', () => {
   })
 })
 
+describe('GROW_BIAS', () => {
+  // Above zero a balloon leans tall as it inflates; at one its height would grow as the
+  // square of its width, a pillar. Either end is a balloon nobody would letter.
+  it('leans tall without turning a balloon into a pillar', () => {
+    expect(GROW_BIAS).toBeGreaterThan(0)
+    expect(GROW_BIAS).toBeLessThan(1)
+  })
+
+  it('allows the narrowest balloon no stretch, and more the wider it inflates', () => {
+    expect(biasedStretch(1)).toBe(1)
+    expect(biasedStretch(2)).toBeGreaterThan(biasedStretch(1.5))
+    expect(biasedStretch(2)).toBeLessThan(2)
+  })
+})
+
 describe('fitMessage', () => {
+  const COLUMN = 40
+  const MIN = 40 * 0.42
   const fitAt = (text: string, over: Partial<FitMetrics> = {}) =>
-    fitMessage(text, 'soft', 40, 40 * 0.42, { ...M, ...over })
+    fitMessage(text, 'soft', COLUMN, MIN, { ...M, ...over })
+  /** The width one unwrapped line of `text` would take, the old fit's first answer. */
+  const oneLine = (text: string) =>
+    ((text.length * GLYPH_EM.soft * M.lettering) / (1 - 2 * textInset('soft').side) / M.boxW) * 100
 
   it('gives an empty message the narrowest balloon its column allows', () => {
-    expect(fitAt('')).toEqual({ width: 40 * 0.42, stretch: 1 })
+    expect(fitAt('')).toEqual({ width: MIN, stretch: 1 })
+  })
+
+  it('keeps a message that fits one line of the narrowest balloon at its ordinary aspect', () => {
+    expect(fitAt('yes')).toEqual({ width: MIN, stretch: 1 })
+  })
+
+  // A balloon, not a caption: a message a little too long for the narrowest balloon
+  // widens it *and* stretches it, and wraps, rather than widening to a one-line strip.
+  it('inflates in both directions at once, wrapping rather than stretching into a strip', () => {
+    const text = 'hi there, you around?'
+    const { width, stretch } = fitAt(text)
+    expect(width).toBeGreaterThan(MIN)
+    expect(width).toBeLessThan(COLUMN)
+    expect(stretch).toBeGreaterThan(1)
+    expect(wrapLines(text, glyphsPerLine(width, 'soft', M)).length).toBeGreaterThan(1)
+    expect(width).toBeLessThan(oneLine(text))
+  })
+
+  // The fit is the *smallest* balloon whose wrap the bias allows: it never stretches past
+  // what its width permits, and one hair narrower would have to.
+  it('takes the smallest balloon whose wrap stays within the bias', () => {
+    for (const text of ['hi there', 'hi there, you around?', 'hello there my old friend, how have you been']) {
+      const { width, stretch } = fitAt(text)
+      expect(stretch).toBeLessThanOrEqual(biasedStretch(width / MIN) + 1e-9)
+      if (width < COLUMN) {
+        const narrower = width * 0.999
+        expect(stretchFor(text, 'soft', narrower, M)).toBeGreaterThan(biasedStretch(narrower / MIN))
+      }
+    }
   })
 
   it('grows with the message, so a conversation has a ragged edge', () => {
@@ -114,14 +163,22 @@ describe('fitMessage', () => {
     expect(fitAt('hi there').width).toBeLessThan(fitAt('hi there, you around?').width)
   })
 
-  it('fills the column and stops there, growing tall instead', () => {
-    const long = fitAt('a message long enough to fill the column and then some more')
-    expect(long.width).toBe(40)
-    expect(long.stretch).toBeGreaterThan(1)
+  it('never shrinks as a message is extended a word at a time', () => {
+    const words = 'a message long enough to fill the column and then some more'.split(' ')
+    let last = { width: 0, stretch: 0 }
+    for (let n = 1; n <= words.length; n += 1) {
+      const fit = fitAt(words.slice(0, n).join(' '))
+      expect(fit.width).toBeGreaterThanOrEqual(last.width - 1e-9)
+      last = fit
+    }
   })
 
-  it('keeps a message that fits one line at the balloon’s ordinary aspect', () => {
-    expect(fitAt('yes').stretch).toBe(1)
+  it('fills the column and stops there, growing tall instead', () => {
+    const long = fitAt(
+      'a message long enough to fill the column and then some more, and then more again after that',
+    )
+    expect(long.width).toBe(COLUMN)
+    expect(long.stretch).toBeGreaterThan(biasedStretch(COLUMN / MIN))
   })
 
   it('asks for exactly the lines the wrap needs, over the band the ellipse allows', () => {
@@ -135,14 +192,14 @@ describe('fitMessage', () => {
 
   // The one-word case the wrap rule exists for: it neither crops nor keeps widening.
   it('wraps one long word inside a column-wide balloon rather than widening past it', () => {
-    const word = fitAt('w'.repeat(60))
-    expect(word.width).toBe(40)
+    const word = fitAt('w'.repeat(120))
+    expect(word.width).toBe(COLUMN)
     expect(word.stretch).toBeGreaterThan(1)
-    expect(wrapLines('w'.repeat(60), glyphsPerLine(40, 'soft', M)).length).toBeGreaterThan(1)
+    expect(wrapLines('w'.repeat(120), glyphsPerLine(COLUMN, 'soft', M)).length).toBeGreaterThan(1)
   })
 
   it('never goes below the narrowest, however small the lettering', () => {
-    expect(fitAt('a', { lettering: 1 }).width).toBe(40 * 0.42)
+    expect(fitAt('a', { lettering: 1 }).width).toBe(MIN)
   })
 
   it('takes a column narrower than the minimum as the minimum', () => {
@@ -151,60 +208,23 @@ describe('fitMessage', () => {
 
   it('falls back to the narrowest, unstretched balloon with nothing to measure against', () => {
     expect(fitAt('a long message with no lettering size', { lettering: 0 })).toEqual({
-      width: 40 * 0.42,
+      width: MIN,
       stretch: 1,
     })
     expect(fitAt('a long message in a box with no width', { boxW: 0 })).toEqual({
-      width: 40 * 0.42,
+      width: MIN,
       stretch: 1,
     })
   })
 
-  it('letters wider faces into wider balloons', () => {
-    const soft = fitMessage('hello there', 'soft', 60, 10, M)
-    const cloud = fitMessage('hello there', 'cloud', 60, 10, M)
+  // Only the line count widens a balloon, so a wider face needs a wider balloon exactly
+  // where its lines break sooner — never a narrower one.
+  it('letters wider faces into balloons at least as wide', () => {
+    const text = 'hi there, you around?'
+    const soft = fitMessage(text, 'soft', 60, 10, M)
+    const cloud = fitMessage(text, 'cloud', 60, 10, M)
     expect(cloud.width).toBeGreaterThan(soft.width)
-  })
-})
-
-describe('fitComposer', () => {
-  const composer = (draft: string, over: Partial<FitMetrics> = {}) =>
-    fitComposer(draft, 'soft', 40, { ...M, ...over })
-
-  // The difference from fitMessage, and the reason there are two functions: a field is a
-  // target. One that shrank to what had been typed so far would move out from under the
-  // pointer between keystrokes, and an empty one would be a dot rather than an invitation.
-  it('keeps the author’s width whatever is typed into it', () => {
-    expect(composer('').width).toBe(40)
-    expect(composer('hi').width).toBe(40)
-    expect(composer('a message long enough to wrap onto several lines of it').width).toBe(40)
-  })
-
-  it('draws an empty composer at the balloon the author placed', () => {
-    expect(composer('')).toEqual({ width: 40, stretch: 1 })
-  })
-
-  it('grows taller as the draft wraps, so the words stay inside the ink', () => {
-    const short = composer('hi')
-    const long = composer('a message long enough to wrap onto several lines of it')
-    expect(short.stretch).toBe(1)
-    expect(long.stretch).toBeGreaterThan(1)
-    expect(composer(`${'w'.repeat(200)}`).stretch).toBeGreaterThan(long.stretch)
-  })
-
-  it('shrinks back when the draft is sent and the field empties', () => {
-    expect(composer('a message long enough to wrap onto several lines of it').stretch)
-      .toBeGreaterThan(1)
-    expect(composer('').stretch).toBe(1)
-  })
-
-  it('asks for the same height a message of the same words at that width would', () => {
-    const draft = 'a message long enough to wrap onto several lines of it'
-    expect(composer(draft).stretch).toBeCloseTo(stretchFor(draft, 'soft', 40, M), 9)
-  })
-
-  it('stays unstretched with nothing to measure against', () => {
-    expect(composer('a long draft', { lettering: 0 })).toEqual({ width: 40, stretch: 1 })
-    expect(composer('a long draft', { boxW: 0 })).toEqual({ width: 40, stretch: 1 })
+    expect(fitMessage('hello there', 'cloud', 60, 10, M).width)
+      .toBeGreaterThanOrEqual(fitMessage('hello there', 'soft', 60, 10, M).width)
   })
 })

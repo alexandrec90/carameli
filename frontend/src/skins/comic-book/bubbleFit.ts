@@ -15,14 +15,17 @@ import type { BubbleType } from './editor/bubbleTypes'
 // (what a width % resolves against) and how big the lettering is (`--cb-lettering`, a
 // share of the frame height). Both arrive in {@link FitMetrics}; nothing here measures.
 //
-// **Width first, then height.** A message grows its balloon sideways until the column is
-// full, and only then wraps and grows it *tall* — a stretched ellipse, see `stretch` — so
-// a short reply is a small round balloon and a paragraph is a full-column tall one, which
-// is the proportion a letterer would choose.
+// **A balloon inflates.** A message grows its balloon in both directions at once, the way
+// a balloon fills, leaning tall (`GROW_BIAS`): a short reply is a small round balloon, a
+// longer one is a bigger and somewhat taller one, and only once it is as wide as its
+// column does it grow *tall* alone — a stretched ellipse, see `stretch`. The earlier fit
+// went wide first and then tall, and a thread of it was one-line captions until the column
+// filled; a field fitted the same way, pinned to its column's width, only ever got taller,
+// which is not what a balloon does when more is said into it.
 //
 // A chain's **composer** is fitted by the same arithmetic against what is being typed into
-// it right now ({@link fitComposer}), so the field a reader is filling grows with its own
-// words instead of scrolling them sideways out of a balloon that cannot follow.
+// it right now (`fitRow` in chainRows.ts), so the field a reader is filling grows with its
+// own words instead of scrolling them sideways out of a balloon that cannot follow.
 
 // The lettering block's inset is `textInset(type)` from bubbleText.ts — the rectangle the
 // drawing letters into, read from the same place, so a fit computed against one inset and
@@ -127,7 +130,7 @@ export function glyphsPerLine(widthPct: number, type: BubbleType, m: FitMetrics)
 /**
  * How much taller than its box a balloon of `type` and `width`% must be drawn to hold
  * `text` wrapped at that width — the `stretch` of a {@link BubbleFit}, on its own, for
- * the two callers that already know how wide the balloon is.
+ * a caller that already knows how wide the balloon is.
  *
  * 1 whenever the wrap fits the type's lettering band, which includes a balloon with
  * nothing in it: no words is no reason to draw a taller balloon.
@@ -145,14 +148,38 @@ export function stretchFor(
 }
 
 /**
+ * How much a balloon leans tall as it inflates: one grown to `k` times its narrowest
+ * width may be `k ** GROW_BIAS` times taller than its aspect before it widens any
+ * further. 0 would inflate uniformly — the same round balloon at every size — and 1 would
+ * grow the height as the square of the width. Half leans tall without turning a balloon
+ * into a pillar: the column is the scarce direction in a conversation, so a balloon
+ * spends its words on height a little sooner than on width.
+ */
+export const GROW_BIAS = 0.5
+
+/** Bisection steps for {@link fitMessage}: a width to within a millionth of the range. */
+const GROW_STEPS = 20
+
+/** The stretch a balloon inflated to `k` times its narrowest width may take before widening. */
+export function biasedStretch(k: number): number {
+  return k ** GROW_BIAS
+}
+
+/**
  * Fit `text` into a balloon of type `type` whose column is `column` % wide and whose
  * narrowest allowed balloon is `min` %.
  *
- * Width is what one line of the message needs, clamped into `[min, column]`; height is
- * whatever the wrap at that width then asks for, as a stretch of the box. A message that
- * fits its column on one line has `stretch` 1 — the balloon this replaces — and no
- * message is ever narrower than `min`, because a two-letter reply still needs to read as
- * a balloon rather than a dot.
+ * The balloon inflates from `min`: it is the smallest one, `k` times its narrowest width,
+ * whose wrap at that width needs no more stretch than {@link biasedStretch} allows it, so
+ * width and height grow together and the height a little faster. Once `k` reaches the
+ * column the width stops there and the height is whatever the wrap then asks for. A
+ * message that fits one line of the narrowest balloon has `stretch` 1 and `width` `min`,
+ * and no message is ever narrower than `min`, because a two-letter reply still needs to
+ * read as a balloon rather than a dot. A column narrower than `min` is the width.
+ *
+ * The search is a bisection over `k`: the wrap's stretch falls as the balloon widens and
+ * the allowance rises, so the answer is one crossing, and the upper end always fits, so
+ * the words stay inside the ink even where a greedy wrap is not quite monotone.
  */
 export function fitMessage(
   text: string,
@@ -161,34 +188,25 @@ export function fitMessage(
   min: number,
   m: FitMetrics,
 ): BubbleFit {
-  const glyph = GLYPH_EM[type] * m.lettering
-  const usable = 1 - 2 * textInset(type).side
-  const chars = text.trim().replace(/\s+/g, ' ').length
-  const oneLine = m.boxW > 0 ? ((chars * glyph) / usable / m.boxW) * 100 : 0
-  const width = Math.min(column, Math.max(min, oneLine))
+  const floor = Math.min(column, min)
+  const reach = floor > 0 ? column / floor : 1
+  const fits = (k: number): boolean =>
+    stretchFor(text, type, floor * k, m) <= biasedStretch(k)
+  let k = 1
+  if (reach > 1 && !fits(1)) {
+    if (fits(reach)) {
+      let lo = 1
+      let hi = reach
+      for (let i = 0; i < GROW_STEPS; i += 1) {
+        const mid = (lo + hi) / 2
+        if (fits(mid)) hi = mid
+        else lo = mid
+      }
+      k = hi
+    } else {
+      k = reach
+    }
+  }
+  const width = floor * k
   return { width, stretch: stretchFor(text, type, width, m) }
-}
-
-/**
- * Fit a chain's composer around the draft someone is typing into it.
- *
- * **Width is the author's, not the draft's** — the one way this differs from
- * {@link fitMessage}, and the difference is that a composer is a *target*. A message is
- * finished, so it may be as narrow as its words; a field that shrank to what had been
- * typed so far would move out from under the pointer between keystrokes, and an empty one
- * would be the dot {@link fitMessage}'s `min` exists to prevent. So the field stays the
- * width the author drew the template and only its height answers to the draft — which is
- * also the direction it can grow without leaving its column.
- *
- * It grows *upward*, because `placeRows` puts the newest row of a side on its template's
- * tail tip (chainAnchor.ts): the tail stays on the point the author aimed it at and the
- * messages above make room, which is where a phone's composer grows too.
- */
-export function fitComposer(
-  draft: string,
-  type: BubbleType,
-  width: number,
-  m: FitMetrics,
-): BubbleFit {
-  return { width, stretch: stretchFor(draft, type, width, m) }
 }

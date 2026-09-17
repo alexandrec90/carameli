@@ -313,9 +313,11 @@ describe('PanelBubbleChain live chain', () => {
 
     const [field, sent, theirs] = drawn(container)
     expect(texts(container)).toEqual(['', 'mine', 'hey'])
-    // Inside the composer's column, which is the sender's.
-    expect(edges(sent).right).toBeGreaterThanOrEqual(edges(field).right)
-    expect(edges(sent).left).toBeGreaterThanOrEqual(edges(field).left - 1e-9)
+    // Both inside the sender's column — the template's span, `right: 5` and 40 wide.
+    for (const el of [field, sent]) {
+      expect(edges(el).right).toBeGreaterThanOrEqual(5 - 1e-9)
+      expect(edges(el).left).toBeGreaterThanOrEqual(55 - 1e-9)
+    }
     // And theirs stays in the recipient's column, on their template's tail tip.
     expect(edges(theirs).left).toBeGreaterThanOrEqual(5 - 1e-9)
     expect(edges(theirs).right).toBeGreaterThanOrEqual(55 - 1e-9)

@@ -71,8 +71,8 @@ interface PanelBubbleProps {
   /**
    * Passed through to an `input` balloon: what is in the field, on every keystroke. Only a
    * chain's composer supplies one, and supplying it is also what makes the field wrap —
-   * see BubbleInput, where the two are deliberately the same question, and `fitComposer`
-   * in bubbleFit.ts for what the chain does with the answer.
+   * see BubbleInput, where the two are deliberately the same question, and `fitRow` in
+   * chainRows.ts for what the chain does with the answer.
    */
   onDraftChange?: (value: string) => void
   /**

@@ -37,7 +37,7 @@ interface BubbleInputProps {
   /**
    * Called with the field's contents on every change, for whoever is drawing the balloon
    * around it. A chain's composer supplies it: the balloon is fitted to that same draft
-   * (`fitComposer` in bubbleFit.ts), so the ink grows with the words.
+   * (`fitRow` in chainRows.ts), so the ink grows with the words.
    *
    * **Its presence is what makes a plain-text field wrap** rather than scroll its words
    * sideways, and that is deliberately one question rather than two. Wrapping inside a

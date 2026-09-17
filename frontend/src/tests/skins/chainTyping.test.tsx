@@ -7,8 +7,7 @@ import {
   chainColumns, readTranscript, TYPING_KEY,
 } from '../../skins/comic-book/bubbleChain'
 import type { BubbleChain } from '../../skins/comic-book/bubbleChain'
-import { fitComposer } from '../../skins/comic-book/bubbleFit'
-import { conversationRows } from '../../skins/comic-book/chainRows'
+import { conversationRows, fitRow } from '../../skins/comic-book/chainRows'
 import { NEW_BUBBLE } from '../../skins/comic-book/editor/configSeed'
 import type { BubbleTransform } from '../../skins/comic-book/editor/types'
 import { smsMessage } from './smsStub'
@@ -66,7 +65,7 @@ describe('conversationRows with a typing row', () => {
     return c
   }
   /** An empty composer at the sender template's own width: how a live chain starts. */
-  const composer = () => fitComposer('', cols().me.type, cols().me.width, M)
+  const composer = () => fitRow('', cols().me, M)
 
   it('appends one extra row from the recipient template, keyed for the shell', () => {
     const rows = conversationRows([0], readTranscript(['hello']), cols(), composer(), M, true)
