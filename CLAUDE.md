@@ -100,16 +100,24 @@ only in the primary worktree because rtpengine uses host networking. That profil
 ships no SBC and no feature server, so a softphone cannot register against it;
 putting a real phone on an extension is `docs/operations/softphone-demo.md`.
 
-**Start the stack with `python scripts/docker-up.py`, not Docker Desktop's start button.**
-That button issues `docker compose start`, which never creates a network, so after the
-daemon loses its network state — Docker Desktop's backend exiting overnight has done it
-twice here — every press fails with `network <hex id> not found` and the stack cannot be
-started from the UI at all. Plain `up -d` does not heal it either: Compose reads the
-config as unchanged, reuses the container, and start fails on the same dead ID.
-`docker-up.py` detects that message and retries once with `--force-recreate`, which
-rebuilds the container objects against the new network. Named volumes are untouched by
-container recreation, so `carameli_pgdata` survives it; the tell that this is what
-happened, rather than a prune, is the built-in `bridge` network coming back with a new ID.
+**A stopped stack starts from Docker Desktop's start button or from
+`python scripts/docker-up.py`; only the script heals `network <hex id> not found`.**
+The button issues `docker compose start`, which starts the containers that exist and
+never creates a network, so it fails when the containers pin a network the daemon no
+longer has. Every occurrence here traced to devkit's 04:00 `devkit-docker-prune` job
+running `docker network prune`, which deletes any network with no *running* container —
+half an hour after `devkit-docker-stop-idle` had parked this stack with `docker stop`.
+It was blamed on Docker Desktop's backend exiting overnight until the prune log was
+read on 2026-09-17; the built-in `bridge` network getting a new ID is not a tell of
+anything, dockerd recreates it on every engine start. devkit no longer prunes
+networks, so a recurrence means something else is deleting them under stopped
+containers. Plain `up -d` does not heal it either: Compose reads the config as
+unchanged, reuses the container, and start fails on the same dead ID. `docker-up.py`
+detects that message and retries once with `--force-recreate`, which rebuilds the
+container objects against the new network. Named volumes are untouched by container
+recreation, so `carameli_pgdata` survives it. "Stop: Docker Stack" runs
+`docker compose stop` for the same reason: `down` deletes the containers, after which
+nothing in Docker Desktop can bring the stack back.
 
 Avoid destructive or disruptive lifecycle commands without confirmation:
 
