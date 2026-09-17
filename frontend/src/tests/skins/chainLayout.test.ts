@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { BUBBLE_ASPECT, BUBBLE_ELLIPSE_N } from '../../skins/comic-book/bubbleBox'
 import {
   CHAIN_COL_GAP,
-  CHAIN_INTERLEAVE,
+  CHAIN_ORDER_STEP,
   CHAIN_ROW_GAP,
   CHAIN_ZIGZAG,
   bubbleHeightPct,
@@ -100,14 +100,27 @@ describe('stackedTop', () => {
     expect(top).toBeCloseTo(chainRowTop(below.bubble, 30, 1), 6)
   })
 
-  // Other column, no shared span: the row sinks alongside the one below it, to the
-  // interleave share of that ellipse.
-  it('tucks a row in beside one it does not overlap', () => {
+  // Other column, no shared span: the row sinks alongside the one below it, stopping the
+  // order step above that ellipse's bottom — level would say nothing about which came first.
+  it('tucks a row in beside one it does not overlap, a step above its bottom', () => {
     const below = row(60, 5, 30) // x 65..95
     const top = stackedTop([below], { right: 70, width: 25, stretch: 1 }, 1) // x 5..30
     const upper = rowEllipse(row(top, 70, 25), 1)
     const lower = rowEllipse(below, 1)
-    expect(upper.y2).toBeCloseTo(lower.y1 + (lower.y2 - lower.y1) * CHAIN_INTERLEAVE, 6)
+    expect(upper.y2).toBeCloseTo(lower.y2 - (lower.y2 - lower.y1) * CHAIN_ORDER_STEP, 6)
+    expect(upper.y2).toBeGreaterThan(lower.y1)
+  })
+
+  // The two rows at the foot are the author's, and the one placed last may end lower than
+  // the first; a row above both must end above *both*, so the higher-ending one binds.
+  it('ends a step above every newer row, not only the one placed last', () => {
+    const first = row(60, 5, 30) // right column, x 65..95
+    const lower = row(70, 70, 30) // left column, x 5..35, ending lower than `first`
+    const top = stackedTop([first, lower], { right: 40, width: 20, stretch: 1 }, 1) // the middle
+    const upper = rowEllipse(row(top, 40, 20), 1)
+    const e = rowEllipse(first, 1)
+    expect(upper.y2).toBeCloseTo(e.y2 - (e.y2 - e.y1) * CHAIN_ORDER_STEP, 6)
+    expect(upper.y2).toBeLessThan(rowEllipse(lower, 1).y2 - (e.y2 - e.y1) * CHAIN_ORDER_STEP)
   })
 
   it('treats rows nearer than the column gap as overlapping', () => {
@@ -147,23 +160,8 @@ describe('stackedTop', () => {
     expect(wide).toBeLessThan(square)
   })
 
-  // A row anchored out of turn is on the panel before the rows under it in the
-  // transcript, so the row to tuck in beside is named rather than taken as the last placed.
-  it('sinks alongside the row it is told is below it, not the last one placed', () => {
-    const first = row(60, 5, 30) // right column, x 65..95
-    const stray = row(10, 40, 20) // the middle, high up, placed out of turn
-    const next = { right: 70, width: 25, stretch: 1 } // left column, overlapping neither
-    const byLast = stackedTop([first, stray], next, 1)
-    const byFirst = stackedTop([first, stray], next, 1, first)
-    expect(byFirst).toBeGreaterThan(byLast)
-    const upper = rowEllipse(row(byFirst, 70, 25), 1)
-    const lower = rowEllipse(first, 1)
-    expect(upper.y2).toBeCloseTo(lower.y1 + (lower.y2 - lower.y1) * CHAIN_INTERLEAVE, 6)
-  })
-
   it('refuses to stack on nothing', () => {
     expect(() => stackedTop([], { right: 5, width: 30, stretch: 1 }, 1)).toThrow()
-    expect(() => stackedTop([row(60, 5, 30)], { right: 5, width: 30, stretch: 1 }, 1, undefined)).not.toThrow()
   })
 })
 

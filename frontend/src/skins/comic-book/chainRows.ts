@@ -37,8 +37,10 @@ interface Stamp {
  * The `newest` row of a side is the template as the author drew it: its full width, at
  * its own edge, so that with a message that fits on one line it is the balloon in the
  * editor, exactly. Only a message that wraps changes it, and only by making it taller
- * (`stretch`) — the author sized and placed it by hand, and the one thing a message may
- * do to it is need more room. The rows above it are fitted to their words.
+ * (`stretch`) — the author sized it by hand, and the one thing a message may do to it is
+ * need more room. Where it sits is {@link placeRows}'s: on its anchor at the foot of the
+ * thread, above the other side's newer messages otherwise. The rows above it are fitted
+ * to their words.
  *
  * The tail follows from `newest` rather than being passed in: one per side is the rule
  * (see {@link conversationRows}), and a second argument saying so is one that can
@@ -80,39 +82,43 @@ function stampRow(
 }
 
 /**
+ * Whether row `i` sits on its template's anchor rather than stacking: the foot of the
+ * thread, which is the bottom row and — when that is the composer, a field rather than a
+ * message — the recipient's balloon drawn beside it. Nothing else does, whichever side it
+ * is the newest of. The recipient's newest message is anchored while it is the newest
+ * message, but once the sender has said something after it, it climbs above that reply
+ * like any other row: a balloon whose bottom sat level with, or below, a newer one would
+ * say the wrong thing about which was said first, and that order is what the reader has.
+ */
+function anchored(rows: readonly ChainRow[], i: number): boolean {
+  return i === 0 || (i === 1 && rows[0].key === 'composer' && rows[1].side === 'in')
+}
+
+/**
  * Put the cut rows on the panel, bottom row first.
  *
- * The newest row of each side goes first, on its template's anchor (chainAnchor.ts):
- * the balloon still talking is the template as the author drew it, and when its words
- * have stretched it taller it grows away from the tip they aimed, which stays put. Every
- * other row is then placed
- * in conversation order by {@link stackedTop} against everything already on the panel —
- * tucked in alongside the row below it, clear of every balloon it would overlap. The
- * anchored rows are placed before their turn precisely so that they are among the
- * balloons the others must clear: the recipient's newest message can be five rows up the
- * transcript and still sit at the foot of the panel, beside the composer.
+ * The rows at the foot go on their templates' anchors (chainAnchor.ts): the balloon still
+ * talking is the template as the author drew it, and when its words have stretched it
+ * taller it grows away from the tip they aimed, which stays put. Every other row is then
+ * placed in conversation order by {@link stackedTop} against everything already on the
+ * panel — a step above the bottom of every newer balloon, clear of every balloon it would
+ * overlap. Which rows are anchored is {@link anchored}; they are always the first, so the
+ * rows already placed when a row's turn comes are exactly the rows newer than it.
  */
 function placeRows(rows: readonly ChainRow[], cols: ChainColumns, aspect: number): ChainRow[] {
   const out = [...rows]
   const placed: PlacedRow[] = []
-  const newest = {
-    out: rows.findIndex(row => row.side === 'out'),
-    in: rows.findIndex(row => row.side === 'in'),
-  }
   const settle = (i: number, at: Pick<BubbleTransform, 'top' | 'right'>): void => {
     out[i] = { ...out[i], bubble: { ...out[i].bubble, ...at } }
     placed.push({ bubble: out[i].bubble, stretch: out[i].stretch })
   }
-  for (const i of [newest.out, newest.in]) {
-    if (i < 0) continue
-    const template = out[i].side === 'out' ? cols.me : cols.them
-    settle(i, placeOnAnchor(anchorOf(template, aspect), out[i].bubble, out[i].stretch, aspect))
-  }
   out.forEach((row, i) => {
-    if (i === newest.out || i === newest.in) return
-    // Row 0 is the newest of its side, so every row here has a settled one below it.
-    const below = { bubble: out[i - 1].bubble, stretch: out[i - 1].stretch }
-    const top = stackedTop(placed, { ...row.bubble, stretch: row.stretch }, aspect, below)
+    if (anchored(rows, i)) {
+      const template = row.side === 'out' ? cols.me : cols.them
+      settle(i, placeOnAnchor(anchorOf(template, aspect), row.bubble, row.stretch, aspect))
+      return
+    }
+    const top = stackedTop(placed, { ...row.bubble, stretch: row.stretch }, aspect)
     settle(i, { top, right: row.bubble.right })
   })
   return out
@@ -124,10 +130,11 @@ function placeRows(rows: readonly ChainRow[], cols: ChainColumns, aspect: number
  * `shown` is the window over the transcript, newest first ({@link visibleWindow}), so this
  * walks up the panel in exactly that order: the composer if the chain is live — `composer`
  * is its fit, from {@link fitComposer}, and `null` on a chain that has none — then the
- * newest message, then the one before it. The newest row of each side is its template as
- * drawn, on its anchor, and each other row is placed by `stackedTop` against everything
- * below — clear of what it would overlap, tucked in beside what it would not — so the
- * rows tile without a fixed pitch ({@link placeRows}).
+ * newest message, then the one before it. The rows at the foot are their templates as
+ * drawn, on their anchors, and each other row is placed by `stackedTop` against everything
+ * below — clear of what it would overlap, tucked in beside what it would not, and always
+ * ending a little above every newer balloon, so the bottoms read in transcript order
+ * — and the rows tile without a fixed pitch ({@link placeRows}).
  *
  * Three details are what make it read as a conversation rather than as a list:
  *

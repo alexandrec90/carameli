@@ -165,12 +165,16 @@ order, so one party saying two things takes two rows.
 **The members are templates, not slots.** The author draws one balloon per column — shape,
 tail, rotation, lettering, the column's edge — and every row is stamped from its side's
 template. Member 0 is the **sender**: rightmost, composer at its foot. **The newest row of
-each side starts as its template** — the size and place drawn in the editor, growing only
-taller when its words wrap, its tail tip never moving (`chainAnchor.ts`). Older rows lay
-out bottom-up by collision (`chainLayout.ts`): clear of what a row would overlap, tucked
-in beside what it would not, zig-zagging by message ordinal (`zigzagShift`), and **fitted
-to its words** from `letteringPx`, never the DOM (`bubbleFit.ts`): wider, then taller
-(`stretch`).
+each side starts as its template** — the size drawn in the editor, growing only taller
+when its words wrap — and **the foot of the thread sits where its template was drawn**,
+its tail tip never moving (`chainAnchor.ts`): the newest message, or the composer with the
+recipient's newest beside it. Every other row lays out bottom-up by collision
+(`chainLayout.ts`): clear of what it would overlap, tucked in beside what it would not,
+and **ending a small step above every newer balloon** (`CHAIN_ORDER_STEP`) so the bottoms
+read in transcript order — a side's newest climbs above the other side's newer reply
+rather than holding its anchor level with it. Rows zig-zag by message ordinal
+(`zigzagShift`) and are **fitted to their words** from `letteringPx`, never the DOM
+(`bubbleFit.ts`): wider, then taller (`stretch`).
 `PANEL_BUBBLE_CHAINS` holds one entry per id in use and is **derived, not authored**
 (`syncChains`), so a chain with no members and a member with no chain are unreachable.
 

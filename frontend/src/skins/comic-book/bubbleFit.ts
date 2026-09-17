@@ -180,9 +180,9 @@ export function fitMessage(
  * width the author drew the template and only its height answers to the draft — which is
  * also the direction it can grow without leaving its column.
  *
- * It grows *upward*, because `placeRows` puts the newest row of a side on its template's
- * tail tip (chainAnchor.ts): the tail stays on the point the author aimed it at and the
- * messages above make room, which is where a phone's composer grows too.
+ * It grows *upward*, because `placeRows` puts the composer on its template's tail tip
+ * (chainAnchor.ts): the tail stays on the point the author aimed it at and the messages
+ * above make room, which is where a phone's composer grows too.
  */
 export function fitComposer(
   draft: string,
