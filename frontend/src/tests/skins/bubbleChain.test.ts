@@ -281,12 +281,13 @@ describe('conversationRows', () => {
     expect(at(scrolled, '1').bubble.right).toBeCloseTo(at(table, '1').bubble.right, 6)
   })
 
-  it('sizes each row to its own message', () => {
+  it('sizes each older row to its own message', () => {
     const min = cols.them.width * CHAIN_MIN_WIDTH_RATIO
     const around = fitMessage('you around?', cols.them.type, cols.them.width, min, M)
-    expect(rows[1].bubble.width).toBeCloseTo(around.width, 6)
-    expect(rows[1].stretch).toBeCloseTo(around.stretch, 6)
-    expect(rows[2].bubble.width).toBeLessThan(rows[1].bubble.width)
+    expect(at(table, '1').bubble.width).toBeCloseTo(around.width, 6)
+    expect(at(table, '1').stretch).toBeCloseTo(around.stretch, 6)
+    expect(at(table, '0').bubble.width).toBeLessThan(at(table, '1').bubble.width)
+    expect(at(table, '1').bubble.width).toBeLessThan(cols.them.width)
   })
 
   it('stretches a row whose message wraps, and no other', () => {
@@ -303,23 +304,32 @@ describe('conversationRows', () => {
     expect(a[1]).toBeCloseTo(b[1], 6)
   }
 
-  // The author placed each template by its tail — on a character's mouth — and the
-  // newest balloon of each side is drawn on that same point, not at the template's
-  // corner, which a balloon of another size would carry the tail away from.
-  it('keeps the newest row of each side on its template’s tail tip', () => {
-    // Both fitted narrower than their templates, or the test would hold for any rule.
-    expect(rows[0].bubble.width).toBeLessThan(cols.me.width)
-    expect(rows[1].bubble.width).toBeLessThan(cols.them.width)
-    expectSamePoint(anchorOfRow(rows[0]), anchorOf(cols.me, 1))
-    expectSamePoint(anchorOfRow(rows[1]), anchorOf(cols.them, 1))
-    expect(rows[0].bubble.top).not.toBeCloseTo(cols.me.top, 6)
+  // The author drew each template by hand — sized it, placed it, aimed its tail at a
+  // character's mouth — and the newest balloon of each side starts as that drawing: a
+  // message that fits on one line leaves it exactly as drawn, not shrunk to its words,
+  // not leaned, not hung from a corner.
+  it('starts the newest row of each side at its template’s size and place', () => {
+    const [mine, theirs] = rows
+    for (const [row, template] of [[mine, cols.me], [theirs, cols.them]] as const) {
+      expect(row.bubble.width).toBe(template.width)
+      expect(row.stretch).toBe(1)
+      expect(row.bubble.top).toBeCloseTo(template.top, 6)
+      expect(row.bubble.right).toBeCloseTo(template.right, 6)
+      expect(row.bubble.rotate).toBe(template.rotate)
+      expect(row.bubble.tail).toBe(template.tail)
+    }
+    // A short message does not shrink it — the same words in an older row are narrower.
+    expect(at(table, '3').bubble.width).toBeLessThan(cols.them.width)
   })
 
-  it('holds the tip still while a long message stretches the balloon', () => {
+  it('grows the newest row taller for a message that wraps, holding its tail tip still', () => {
     const long = 'x'.repeat(30)
     const [tall] = conversationRows([0], readTranscript([`> ${long} ${long}`]), cols, null, M)
     expect(tall.stretch).toBeGreaterThan(1)
+    expect(tall.bubble.width).toBe(cols.me.width)
     expectSamePoint(anchorOfRow(tall), anchorOf(cols.me, 1))
+    // A tail pointing down keeps its tip, so the extra height goes upward.
+    expect(tall.bubble.top).toBeLessThan(cols.me.top)
   })
 
   it('centres a tailless template’s newest row on its ellipse instead', () => {
@@ -329,9 +339,12 @@ describe('conversationRows', () => {
     expectSamePoint(anchorOfRow(around), anchorOf(bare.them, 1))
   })
 
-  it('puts the typing row on the recipient template’s tail tip', () => {
+  it('draws the typing row as the recipient’s template, where the reply will land', () => {
     const [dots] = conversationRows([], [], cols, null, M, true)
     expect(dots.key).toBe(TYPING_KEY)
+    expect(dots.bubble.width).toBe(cols.them.width)
+    expect(dots.bubble.top).toBeCloseTo(cols.them.top, 6)
+    expect(dots.bubble.right).toBeCloseTo(cols.them.right, 6)
     expectSamePoint(anchorOfRow(dots), anchorOf(cols.them, 1))
   })
 
@@ -462,10 +475,11 @@ describe('conversationRows', () => {
     expect(empty[0].stretch).toBe(1)
   })
 
-  it('draws every row at its narrowest with no lettering size to fit against', () => {
-    const blind = conversationRows(shown, lines, cols, null, { ...M, lettering: 0 })
+  it('draws every older row at its narrowest with no lettering size to fit against', () => {
+    const blind = conversationRows(visibleWindow(5, 6), many, cols, null, { ...M, lettering: 0 })
     for (const r of blind) {
-      expect(r.bubble.width).toBeCloseTo(40 * CHAIN_MIN_WIDTH_RATIO, 6)
+      const newest = r.bubble.tail !== 'none'
+      expect(r.bubble.width).toBeCloseTo(newest ? 40 : 40 * CHAIN_MIN_WIDTH_RATIO, 6)
       expect(r.stretch).toBe(1)
     }
   })

@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 import PanelBubbles from '../../skins/comic-book/PanelBubbles'
 import { NEW_BUBBLE } from '../../skins/comic-book/editor/configSeed'
-import type { BubbleTransform } from '../../skins/comic-book/editor/types'
+import type { BubbleChain, BubbleTransform } from '../../skins/comic-book/editor/types'
 import { idleSms } from './smsStub'
 
 // Which balloons on a panel dial, and which only look like they might. A `phone` balloon
@@ -25,11 +25,12 @@ function draw(
   bubbles: BubbleTransform[],
   onPhoneSubmit?: (value: string) => void,
   lettering?: number,
+  chains: BubbleChain[] = [],
 ) {
   return render(
     <PanelBubbles
       bubbles={bubbles}
-      chains={[]}
+      chains={chains}
       panel={0}
       bounds={PANEL_BOX}
       lettering={lettering}
@@ -44,20 +45,29 @@ function draw(
 }
 
 describe('PanelBubbles lettering', () => {
-  // Not live, so the chain speaks its two balloons' own words: the second row drawn is
-  // the recipient's message.
   const conversation = () => [
-    bubble({ content: 'text', chain: 'chain-1', right: 5, width: 40, top: 60, text: 'ok' }),
-    bubble({ content: 'text', chain: 'chain-1', right: 55, width: 40, top: 60, text: 'a message with some words in it' }),
+    bubble({ content: 'text', chain: 'chain-1', right: 5, width: 40, top: 60, text: '' }),
+    bubble({ content: 'text', chain: 'chain-1', right: 55, width: 40, top: 60, text: '' }),
   ]
+  // Two of theirs, then one of mine: the third row drawn is their *older* message, the
+  // one that is fitted to its words. The newest of each side is its template's size
+  // whatever the lettering, so neither of the first two could show the size arriving.
+  const chain = (): BubbleChain => ({
+    id: 'chain-1',
+    grow: false,
+    stepMs: 900,
+    rows: 6,
+    sms: false,
+    messages: ['a message with some words in it', 'another one from them', '> ok'],
+  })
   const rowWidth = (container: HTMLElement) =>
-    parseFloat((container.querySelectorAll('.cb-panel-bubble')[1] as HTMLElement).style.width)
+    parseFloat((container.querySelectorAll('.cb-panel-bubble')[2] as HTMLElement).style.width)
 
   // The lettering size is what a conversation fits its rows to; it has to reach the chain
   // through here, or every row is drawn at its narrowest whatever the page's frame is.
   it('hands the lettering size to its conversations', () => {
-    const narrow = rowWidth(draw(conversation(), undefined, 0).container)
-    const fitted = rowWidth(draw(conversation(), undefined, 12).container)
+    const narrow = rowWidth(draw(conversation(), undefined, 0, [chain()]).container)
+    const fitted = rowWidth(draw(conversation(), undefined, 12, [chain()]).container)
     expect(fitted).toBeGreaterThan(narrow)
   })
 })
