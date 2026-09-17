@@ -18,6 +18,17 @@ import type { BubbleTransform } from './editor/types'
 // chainAnchor for where the newest one sits, chainLayout for where the rest tile — is
 // reached from here and from nowhere else in the chain model.
 
+/** One message as {@link stampRow} needs it: who said it, what it says, where it falls. */
+interface Stamp {
+  /** The sender's column, as against the recipient's. */
+  out: boolean
+  text: string
+  /** Its place among its side's messages, which is what the zig-zag leans by. */
+  ordinal: number
+  /** The newest of its side: the one still being said, and so the one with the tail. */
+  newest: boolean
+}
+
 /**
  * Cut a row from its side's template: fitted to `text`, leaning inward by its ordinal
  * from its column's outer edge, and still at its template's `top` — {@link placeRows}
@@ -28,15 +39,15 @@ import type { BubbleTransform } from './editor/types'
  * editor, exactly. Only a message that wraps changes it, and only by making it taller
  * (`stretch`) — the author sized and placed it by hand, and the one thing a message may
  * do to it is need more room. The rows above it are fitted to their words.
+ *
+ * The tail follows from `newest` rather than being passed in: one per side is the rule
+ * (see {@link conversationRows}), and a second argument saying so is one that can
+ * disagree with the first.
  */
 function stampRow(
   cols: ChainColumns,
   metrics: ChainMetrics,
-  out: boolean,
-  text: string,
-  ordinal: number,
-  tail: BubbleTransform['tail'],
-  newest: boolean,
+  { out, text, ordinal, newest }: Stamp,
 ): Pick<ChainRow, 'bubble' | 'stretch'> {
   const template = out ? cols.me : cols.them
   // The left column's left edge, which is what its balloons are aligned against.
@@ -54,7 +65,7 @@ function stampRow(
       ...template,
       width: fit.width,
       right: out ? cols.me.right + shift : 100 - themLeft - shift - fit.width,
-      tail,
+      tail: newest ? template.tail : 'none',
       // A message is lettering, whatever the template it was stamped from does: the
       // sender's template is routinely an input, and cloning that would put a field in
       // every balloon of the right column.
@@ -164,7 +175,11 @@ export function conversationRows(
     // The recipient's template with dots in it instead of words: it stands in for the
     // reply, which lands in the same balloon, so the words appear where the dots were.
     const next = lines.filter(line => !line.out).length
-    rows.push({ key: TYPING_KEY, side: 'in', ...stampRow(cols, metrics, false, '', next, cols.them.tail, true) })
+    rows.push({
+      key: TYPING_KEY,
+      side: 'in',
+      ...stampRow(cols, metrics, { out: false, text: '', ordinal: next, newest: true }),
+    })
     tailed.in = true
   }
 
@@ -172,10 +187,8 @@ export function conversationRows(
     const line = lines[m]
     if (!line) continue
     const side = line.out ? 'out' : 'in'
-    const template = line.out ? cols.me : cols.them
-    const newest = !tailed[side]
-    const tail = newest ? template.tail : 'none'
-    rows.push({ key: String(m), side, ...stampRow(cols, metrics, line.out, line.text, ordinals[m], tail, newest) })
+    const stamp = { out: line.out, text: line.text, ordinal: ordinals[m], newest: !tailed[side] }
+    rows.push({ key: String(m), side, ...stampRow(cols, metrics, stamp) })
     tailed[side] = true
   }
 
