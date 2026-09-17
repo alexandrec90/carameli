@@ -80,9 +80,10 @@ Those two balloons are **templates, not slots**. Neither is drawn where it sits 
 edit mode; each row of the conversation is *stamped* from the template of its side —
 shape, tail, rotation and lettering — at a width that follows the message and, once the
 column is full, a height that follows the wrap. Rows are placed by collision rather than
-ruled: a reply tucks in beside the message it answers and every other message of a
-speaker leans inward, so the thread snakes. That is what lets the two columns interleave
-freely, so one party can send two in a row:
+ruled: a reply tucks in beside the message it answers, ending a small step above it so
+the bottoms of the balloons still read in order, and every other message of a speaker
+leans inward, so the thread snakes. That is what lets the two columns interleave freely,
+so one party can send two in a row:
 
 ```text
 them:  Hey, are you around?

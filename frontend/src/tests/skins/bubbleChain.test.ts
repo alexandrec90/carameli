@@ -24,7 +24,7 @@ import {
 import type { BubbleChain, ChainRow } from '../../skins/comic-book/bubbleChain'
 import { fitComposer, fitMessage } from '../../skins/comic-book/bubbleFit'
 import { anchorOf } from '../../skins/comic-book/chainAnchor'
-import { CHAIN_ROW_GAP, rowEllipse } from '../../skins/comic-book/chainLayout'
+import { CHAIN_ORDER_STEP, CHAIN_ROW_GAP, rowEllipse } from '../../skins/comic-book/chainLayout'
 import { conversationRows } from '../../skins/comic-book/chainRows'
 import type { ChainMetrics } from '../../skins/comic-book/chainLayout'
 import { NEW_BUBBLE } from '../../skins/comic-book/editor/configSeed'
@@ -304,22 +304,55 @@ describe('conversationRows', () => {
     expect(a[1]).toBeCloseTo(b[1], 6)
   }
 
-  // The author drew each template by hand — sized it, placed it, aimed its tail at a
-  // character's mouth — and the newest balloon of each side starts as that drawing: a
-  // message that fits on one line leaves it exactly as drawn, not shrunk to its words,
-  // not leaned, not hung from a corner.
-  it('starts the newest row of each side at its template’s size and place', () => {
+  // The author drew each template by hand — sized it, aimed its tail at a character's
+  // mouth — and the newest balloon of each side starts as that drawing: a message that
+  // fits on one line leaves it exactly as drawn, not shrunk to its words, not leaned.
+  it('starts the newest row of each side at its template’s size', () => {
     const [mine, theirs] = rows
     for (const [row, template] of [[mine, cols.me], [theirs, cols.them]] as const) {
       expect(row.bubble.width).toBe(template.width)
       expect(row.stretch).toBe(1)
-      expect(row.bubble.top).toBeCloseTo(template.top, 6)
-      expect(row.bubble.right).toBeCloseTo(template.right, 6)
       expect(row.bubble.rotate).toBe(template.rotate)
       expect(row.bubble.tail).toBe(template.tail)
     }
     // A short message does not shrink it — the same words in an older row are narrower.
     expect(at(table, '3').bubble.width).toBeLessThan(cols.them.width)
+  })
+
+  // ...and the one at the foot of the thread is placed as drawn too, not hung from a corner.
+  it('keeps the newest message where its template was drawn', () => {
+    const [mine] = rows
+    expect(mine.bubble.top).toBeCloseTo(cols.me.top, 6)
+    expect(mine.bubble.right).toBeCloseTo(cols.me.right, 6)
+  })
+
+  // A live chain's foot is two balloons: the composer, and the recipient's newest beside
+  // it — for as long as it is the newest message. The author drew that pair.
+  it('keeps the recipient’s newest beside the composer while it is the newest message', () => {
+    const me = tpl({ ...cols.me, content: 'input' })
+    const theirs = readTranscript(['hey', 'you around?'])
+    const live = conversationRows(visibleWindow(1, 6), theirs, { ...cols, me }, composerOn(me), M)
+    expect(live.map(r => r.key)).toEqual(['composer', '1', '0'])
+    expectSamePoint(anchorOfRow(live[1]), anchorOf(cols.them, 1))
+    // Once the sender replies, that reply is the foot and theirs climbs above it.
+    const replied = conversationRows(visibleWindow(2, 6), lines, { ...cols, me }, composerOn(me), M)
+    expect(replied.map(r => r.key)).toEqual(['composer', '2', '1', '0'])
+    expect(rowEllipse(replied[2], 1).y2).toBeLessThan(rowEllipse(replied[1], 1).y2)
+  })
+
+  // Height is time. A speaker's newest balloon holds its template's place only at the
+  // foot of the thread: once the other side has said something newer, it climbs above that
+  // reply instead, so that in A1, A2, B1, A3 the bottom of B1 is above A3's and below A2's.
+  it('lifts a side’s newest above the other side’s newer message, between its neighbours in time', () => {
+    const thread = readTranscript(['> a1', '> a2', 'b1', '> a3'])
+    const placed = conversationRows(visibleWindow(3, 6), thread, cols, null, M)
+    expect(placed.map(r => r.key)).toEqual(['3', '2', '1', '0'])
+    const bottom = (key: string) => rowEllipse(at(placed, key), 1).y2
+    expect(bottom('2')).toBeLessThan(bottom('3'))
+    expect(bottom('2')).toBeGreaterThan(bottom('1'))
+    // Not on its anchor: level with the sender's newest would say nothing about the order.
+    expect(anchorOfRow(at(placed, '2'))[1]).toBeLessThan(anchorOf(cols.them, 1)[1])
+    expect(at(placed, '2').bubble.tail).toBe(cols.them.tail)
   })
 
   it('grows the newest row taller for a message that wraps, holding its tail tip still', () => {
@@ -334,7 +367,8 @@ describe('conversationRows', () => {
 
   it('centres a tailless template’s newest row on its ellipse instead', () => {
     const bare = { ...cols, them: tpl({ ...cols.them, tail: 'none' }) }
-    const [, around] = conversationRows(shown, lines, bare, null, M)
+    // Theirs is the newest message, so it is the foot of the thread and sits as drawn.
+    const [around] = conversationRows([1, 0], readTranscript(['> hi', 'around?']), bare, null, M)
     expect(around.bubble.tail).toBe('none')
     expectSamePoint(anchorOfRow(around), anchorOf(bare.them, 1))
   })
@@ -348,13 +382,21 @@ describe('conversationRows', () => {
     expectSamePoint(anchorOfRow(dots), anchorOf(cols.them, 1))
   })
 
-  it('climbs from the anchored rows, each older row above the one below it', () => {
-    const stacked = table.filter(r => r.bubble.tail === 'none')
-    expect(stacked.length).toBe(table.length - 2)
-    for (const r of stacked) {
-      const below = table[table.indexOf(r) - 1]
-      expect(rowEllipse(r, 1).y2).toBeLessThan(rowEllipse(below, 1).y2)
+  // Every row above the foot ends a step above every newer balloon, whichever column it
+  // is in, so reading the bottoms down the panel reads the transcript in order.
+  const expectOrdered = (t: readonly ChainRow[], anchoredRows: number) => {
+    for (let i = anchoredRows; i < t.length; i += 1) {
+      const older = rowEllipse(t[i], 1)
+      for (let j = 0; j < i; j += 1) {
+        const newer = rowEllipse(t[j], 1)
+        expect(older.y2).toBeLessThanOrEqual(newer.y2 - (newer.y2 - newer.y1) * CHAIN_ORDER_STEP + 1e-9)
+      }
     }
+  }
+
+  it('climbs from the anchored row, every older row ending a step above every newer one', () => {
+    expectOrdered(table, 1)
+    expect(table.filter(r => r.bubble.tail === 'none').length).toBe(table.length - 2)
   })
 
   // Rows may tuck in beside each other but never over each other: two ellipses that share
@@ -375,11 +417,10 @@ describe('conversationRows', () => {
     expectNoOverlap(table)
   })
 
-  // The recipient's newest message is anchored wherever the author drew their template,
-  // which can be right where the sender's older rows would otherwise have stacked. Those
-  // rows must clear it even though it comes later in the transcript than they do.
-  it('stacks older rows clear of an anchored row that comes later in the transcript', () => {
-    // Their template straight above mine, in the same column.
+  // The recipient's template can be drawn right where the sender's rows stack — straight
+  // above the composer, say. Their newest message, two of the sender's ago, does not sit
+  // there under those rows: it climbs above them with the rest of the thread.
+  it('stacks the recipient’s newest above the sender’s newer rows rather than on its anchor', () => {
     const stackedCols = {
       me: tpl({ top: 60, right: 5, width: 40, tail: 'down-left', content: 'input' }),
       them: tpl({ top: 30, right: 5, width: 40, tail: 'down-right' }),
@@ -387,7 +428,8 @@ describe('conversationRows', () => {
     const thread = readTranscript(['hey', '> a', '> b'])
     const live = conversationRows(visibleWindow(2, 6), thread, stackedCols, composerOn(stackedCols.me), M)
     expect(live.map(r => r.key)).toEqual(['composer', '2', '1', '0'])
-    expectSamePoint(anchorOfRow(at(live, '0')), anchorOf(stackedCols.them, 1))
+    expect(rowEllipse(at(live, '0'), 1).y2).toBeLessThan(rowEllipse(at(live, '1'), 1).y1)
+    expectOrdered(live, 1)
     expectNoOverlap(live)
   })
 
