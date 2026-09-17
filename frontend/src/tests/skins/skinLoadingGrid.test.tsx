@@ -1,4 +1,5 @@
 import { render } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 // The skin's chunk is what a loading screen is waiting for, so every loader here stays
@@ -19,11 +20,10 @@ import { accentForPath } from '../../skins/comic-book/pageAccent'
 import { SPOT_FADE_MS, SPOT_REACH } from '../../skins/comic-book/spotlight'
 import { SkinProvider } from '../../skins/context'
 
-// The screen the comic-book chunk is loading behind draws the *same* Ben-Day grid the
-// skin itself draws, under the same pointer light — so the chunk arriving changes the
-// legend and nothing under it. It used to run a ripple of its own here: a sine wave
+// The paper the comic-book chunk is loading behind: the skin's own Ben-Day grid under
+// the pointer light, on one canvas that stays under the page once the chunk lands
+// (comicBookPaper.test.tsx). It used to run a ripple of its own here: a sine wave
 // travelling the grid on a timer, which is what the tests below would catch coming back.
-// The in-skin half of the handoff is LoadingOverlay.test.tsx.
 
 interface Arc { x: number; y: number; r: number; style: string }
 
@@ -101,13 +101,12 @@ afterEach(() => {
 })
 
 function renderScreen() {
-  return render(<SkinProvider><div>page</div></SkinProvider>)
+  return render(<MemoryRouter><SkinProvider><div>page</div></SkinProvider></MemoryRouter>)
 }
 
 describe('the loading screen the comic-book chunk is not there to draw', () => {
   it('prints the skin\'s own grid: one flat ink on the paper, at the grid\'s centres', () => {
     renderScreen()
-    frame()
 
     const ink = `rgba(${gridInk(accentForPath('/')).join(',')},${GRID_ALPHA})`
     expect(paints).toBe(1)
@@ -152,6 +151,15 @@ describe('the loading screen the comic-book chunk is not there to draw', () => {
     const far = arcs.filter(a => Math.hypot(a.x - 120, a.y - 90) > SPOT_REACH)
     expect(far.length).toBeGreaterThan(0)
     for (const a of far) expect(a.r).toBe(GRID_REST_R)
+  })
+
+  /* Painted from the effect that sizes the canvas, not from the frame after it: the
+     canvas is re-inked on every route change, and a paint left to the next frame is a
+     frame of bare paper in the letterbox at each one. */
+  it('is painted as soon as it is mounted, before any frame has run', () => {
+    renderScreen()
+    expect(paints).toBe(1)
+    expect(queue.size).toBe(1)
   })
 
   it('papers the screen behind the grid, so nothing shows through before the first frame', () => {

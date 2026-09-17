@@ -1,21 +1,21 @@
 import { lazy, Suspense, useCallback, useMemo, useState } from 'react'
 import { useLocation } from 'react-router-dom'
+import { LoadingHold } from '../../hooks/useLoadingHold'
 import type { LayoutProps } from '../types'
 import { isBubbleRevealed } from './bubbleTube'
 import BubbleTubes from './BubbleTubes'
 import ComicPanel from './ComicPanel'
-import { LoadingOverlay, useLoadingScreen, usePageReady } from './LoadingOverlay'
-import MarginGrid from './MarginGrid'
 import PanelInk from './PanelInk'
 import { activeLayout, useCallLayout, useDrawnImageCount } from './layoutSource'
 import { accentForPath } from './pageAccent'
+import { usePageReady, usePageReveal } from './pageReveal'
 import { pageForPath } from './panels'
 import { softphoneActions } from './phoneActions'
 import { usePanelDots } from './usePanelDots'
 import { usePanelHover } from './usePanelHover'
 import { shouldRevealImg, useEditorApi, useEditorMode } from './editor/editorContext'
 import { useLiveTableImages } from './useLiveTableImages'
-import { letteringPx, pageFrameStyle, panelPolysIn, usePageFrame } from './usePageFrame'
+import { letteringPx, pageFrameStyle, pageSheet, panelPolysIn, usePageFrame } from './usePageFrame'
 import { usePageWash } from './usePageWash'
 import './comic-book.css'
 
@@ -61,13 +61,16 @@ const EditorProvider = import.meta.env.DEV
  * Two components rather than one because the engine has to sit *above* everything that
  * reads it, and the only way to load it conditionally is to load it late. In a production
  * build `EditorProvider` folds to null and this is `LayoutBody` with a branch in front of
- * it; in a dev session the body mounts once, after the provider resolves — `fallback` is
- * null rather than the body itself precisely so that it mounts once rather than twice.
+ * it; in a dev session the body mounts once, after the provider resolves — the fallback
+ * is not the body itself precisely so that it mounts once rather than twice. It is a
+ * hold on the loading screen instead: the session gate above has just opened, the body
+ * that would hold it is not mounted yet, and the paper would otherwise take its legend
+ * down for the length of the engine's chunk and pop it up again.
  */
 export function Layout(props: LayoutProps) {
     if (!EditorProvider) return <LayoutBody {...props} />
     return (
-        <Suspense fallback={null}>
+        <Suspense fallback={<LoadingHold />}>
             <EditorProvider>
                 <LayoutBody {...props} />
             </EditorProvider>
@@ -97,9 +100,8 @@ function LayoutBody({ navItems, sms, softphone }: LayoutProps) {
 
     // The page frame and which of the three grids it holds: the window's shape, or the
     // one the editor is previewing. Everything on the page is a fraction of this frame
-    // (./usePageFrame.ts), so it is the only thing here that knows the window's size —
-    // the viewport comes back with it for the one layer drawn outside the frame.
-    const { kind: layoutKind, frame, viewport } = usePageFrame(editor.shape)
+    // (./usePageFrame.ts), so it is the only thing here that knows the window's size.
+    const { kind: layoutKind, frame } = usePageFrame(editor.shape)
     // Sparse, PANELS-length: null where the panel lives on the other page.
     const panelPolys = useMemo(
         () => panelPolysIn(grids[page][layoutKind], frame),
@@ -151,7 +153,8 @@ function LayoutBody({ navItems, sms, softphone }: LayoutProps) {
     const phoneActions = softphoneActions(softphone)
     const accent = accentForPath(location.pathname)
     const washRef = usePageWash(location.pathname, accent)
-    const loading = useLoadingScreen(ready, accent)
+    const reveal = usePageReveal(ready)
+    const sheet = pageSheet(frame)
 
     // ── Ben-Day dot canvases ──────────────────────────────────────────────────
     // One rAF loop for every panel, but only the hovered panel's pattern moves —
@@ -160,18 +163,23 @@ function LayoutBody({ navItems, sms, softphone }: LayoutProps) {
 
     return (
         <>
+            {/* Clipped to nothing until the page is ready, then wiped in over the paper
+                (pageReveal.ts). The root itself paints no background: the paper's grid,
+                mounted under the app by skins/context.tsx, shows through everywhere the
+                sheet below does not cover — the letterbox around the page. */}
             <div
-                className={`cb-root${editor.active ? ' cb-edit-active' : ''}`}
-                style={{
-                    opacity: ready ? 1 : 0,
-                    transition: ready ? 'opacity 150ms ease-in' : 'none',
-                    ...pageFrameStyle(frame),
-                }}
+                className={`cb-root${editor.active ? ' cb-edit-active' : ''}`
+                    + `${reveal.revealed ? '' : ' cb-page-hidden'}${reveal.wiping ? ' cb-page-wipe' : ''}`}
+                style={pageFrameStyle(frame)}
+                onAnimationEnd={e => reveal.onAnimationEnd(e.animationName)}
             >
-                {/* Layer 0 — the letterbox around the page sheet, carrying on the loading
-                    screen's lit dot grid under the same spotlight (MarginGrid). Up only once
-                    the page is showing: under the loading sheet the same grid is already drawn. */}
-                <MarginGrid viewport={viewport} frame={frame} accent={accent} active={ready} />
+                {/* Layer 0 — the page sheet: the paper the panels sit on, the frame plus
+                    its outer margin. Everything outside it is the letterbox. */}
+                <div
+                    className="cb-page-sheet"
+                    style={{ left: sheet.x, top: sheet.y, width: sheet.w, height: sheet.h }}
+                    aria-hidden="true"
+                />
 
                 {/* Layer 1 — the panels (ComicPanel: dots, pictures, bubbles). The poly
                     array is sparse: a null slot is a panel on the other page. */}
@@ -234,17 +242,13 @@ function LayoutBody({ navItems, sms, softphone }: LayoutProps) {
                         pageSelect={{
                             navItems,
                             pageLabels: editorApi.config.pageLabels,
-                            previewingLoading: loading.previewLoading,
-                            onPreviewLoading: loading.handlePreviewLoading,
+                            previewingLoading: reveal.previewLoading,
+                            onPreviewLoading: reveal.handlePreviewLoading,
                             onPageLabel: editorApi.setPageLabel,
                         }}
                     />
                 </Suspense>
             )}
-
-            {/* Loading indicator — outside cb-root so it's visible while the page is
-                opacity:0. Stays mounted through the leave wash (see LoadingOverlay). */}
-            <LoadingOverlay screen={loading} />
         </>
     )
 }

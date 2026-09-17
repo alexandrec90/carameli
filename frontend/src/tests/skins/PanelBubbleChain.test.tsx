@@ -63,6 +63,17 @@ const edges = (el: Element) => {
 
 const composer = () => screen.getByRole('textbox', { name: 'Speech bubble text' })
 
+/**
+ * How much taller than its aspect a balloon is drawn, read back off the outline the way
+ * the browser sees it: `stretch` reaches the DOM as the SVG's `aspect-ratio`, which is
+ * the authored width over the authored height times the stretch (see PanelBubble).
+ */
+const stretchOf = (el: Element) => {
+  const svg = el.querySelector<SVGElement>('.cb-panel-bubble-svg')
+  const [w, h] = (svg?.style.aspectRatio ?? '').split('/').map(part => parseFloat(part))
+  return h / w
+}
+
 afterEach(() => vi.restoreAllMocks())
 
 describe('PanelBubbleChain', () => {
@@ -342,6 +353,26 @@ describe('PanelBubbleChain live chain', () => {
     )
     expect(drawn(container)).toHaveLength(1)
     expect(screen.queryByText('placeholder')).toBeNull()
+  })
+
+  // The field is a textarea, so a long message wraps inside the ink instead of scrolling
+  // sideways out of it, and the balloon is fitted to the same draft so there is somewhere
+  // for the second line to go. Both halves fail on their own: words with no room wrap out
+  // through the outline, room with no wrapping is a taller balloon holding one long line.
+  it('grows the composer’s balloon around what is being typed into it', () => {
+    const { container } = render(<PanelBubbleChain box={BOX} lettering={LETTERING} {...live()} visible interactive />)
+    const field = composer()
+    expect(field.tagName).toBe('TEXTAREA')
+    const before = stretchOf(drawn(container)[0])
+
+    fireEvent.change(field, { target: { value: 'a message long enough to wrap onto more than one line' } })
+
+    const typing = stretchOf(drawn(container)[0])
+    expect(typing).toBeGreaterThan(before)
+
+    // And back to the balloon the author drew once the message is gone from the field.
+    fireEvent.change(composer(), { target: { value: '' } })
+    expect(stretchOf(drawn(container)[0])).toBeCloseTo(before, 9)
   })
 
   it('keeps what the reader sent when the panel stops being hovered', () => {

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'reac
 import type { CSSProperties } from 'react'
 
 import type { LayoutKind, PanelGrid, PanelPoly, Rect } from './panelGeometry'
-import { frameRect, gridPolys, layoutKindFor } from './panelGeometry'
+import { frameRect, gridPolys, layoutKindFor, OUTER_M } from './panelGeometry'
 
 // The one place the window's size enters the skin. Everything drawn is a fraction of
 // the page frame, and the frame is a fixed-aspect rectangle letterboxed into the
@@ -10,7 +10,7 @@ import { frameRect, gridPolys, layoutKindFor } from './panelGeometry'
 // big it is — and nothing downstream reads `innerWidth` again.
 
 /** The window's size in px, as the one thing this module reads off it. */
-export interface Viewport {
+interface Viewport {
   w: number
   h: number
 }
@@ -21,11 +21,6 @@ export interface PageFrame {
   kind: LayoutKind
   /** The frame in viewport px; zero-size before the window has reported. */
   frame: Rect
-  /**
-   * The window the frame was fitted into. Handed out for what is drawn *outside* the
-   * frame — the letterbox — so that consumer need not read the window itself.
-   */
-  viewport: Viewport
 }
 
 /**
@@ -35,7 +30,23 @@ export interface PageFrame {
  */
 export function pageFrameFor(w: number, h: number, override: LayoutKind | null): PageFrame {
   const kind = override ?? layoutKindFor(w, h)
-  return { kind, frame: frameRect(w, h, kind), viewport: { w, h } }
+  return { kind, frame: frameRect(w, h, kind) }
+}
+
+/**
+ * The page sheet: the frame plus its outer margin, the paper the panels sit on. What
+ * lies outside it on the viewport is the letterbox, where the skin's paper — the
+ * Ben-Day grid mounted under the app by `skins/context.tsx` — shows through. Taken from
+ * the frame *as drawn* rather than refitted from the window, so a page the editor is
+ * holding at another shape gets its sheet where its frame is.
+ */
+export function pageSheet(frame: Rect): Rect {
+  return {
+    x: frame.x - OUTER_M,
+    y: frame.y - OUTER_M,
+    w: frame.w + 2 * OUTER_M,
+    h: frame.h + 2 * OUTER_M,
+  }
 }
 
 /**

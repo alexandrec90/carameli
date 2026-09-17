@@ -11,6 +11,7 @@ import type { UseSoftphoneResult } from './hooks/useSoftphone'
 import { detectCallSim } from './lib/callSimulation'
 import { detectSmsSim } from './lib/smsSimulation'
 import { slowLoaderDelay } from './lib/slowLoading'
+import { useLoadingHold } from './hooks/useLoadingHold'
 import { useSlowReady } from './hooks/useSlowLoading'
 import { ROUTES, NAV_ITEMS } from './routes'
 import { skinLoadingConfigs, resolveSkinName, DEFAULT_SKIN } from './skins/registry'
@@ -24,6 +25,10 @@ export default function App() {
   // `?slow=1` holds this gate shut for a second after the session arrives (dev only, no-op
   // otherwise), so the screen below is on screen long enough to look at.
   const ready = useSlowReady(sessionReady)
+  // A persistent loading screen (`skins/registry.ts`) is already up under this, and is
+  // told through the hold that the session is still on its way. Every other skin's
+  // screen is drawn below; nothing listens to the hold then, and it costs nothing.
+  useLoadingHold(!ready)
   const [showLoader, setShowLoader] = useState(false)
 
   useEffect(() => {
@@ -35,6 +40,7 @@ export default function App() {
   if (!ready) {
     const skinName = resolveSkinName(localStorage.getItem('skin') ?? DEFAULT_SKIN)
     const cfg = skinLoadingConfigs[skinName]
+    if (cfg.persistent) return null
     return (
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'center',

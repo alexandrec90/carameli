@@ -26,6 +26,10 @@
   // and a file can't belong to both this project and the referencing `src` one
   // (TS6305). Keeping the modules, their tests, and vite.config.ts in one project
   // satisfies both. Vitest's default include still picks the tests up.
+  //
+  // `src/worktreePort.ts` is the one exception: devkit vendors it under `src/`,
+  // where the drift gate looks, so it stays there and `tsconfig.json` excludes it
+  // to keep it out of both projects at once.
   "include": [
     "vite.config.ts",
     "configImports.test.ts",
@@ -46,8 +50,8 @@
     "shipLayout.ts",
     "shipLayout.test.ts",
     "shipLayout.integration.test.ts",
-    "worktreePort.ts",
-    "worktreePort.test.ts",
+    "src/worktreePort.ts",
+    "src/worktreePort.test.ts",
     "vitePort.test.ts"
   ]
 }

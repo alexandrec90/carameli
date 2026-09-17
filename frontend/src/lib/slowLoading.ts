@@ -7,9 +7,9 @@ import { logger } from './logger'
 // the screens impossible to *look at* on a warm dev machine: the skin chunk comes from
 // the module cache, the session request is answered on localhost, and a page of cached
 // pictures fires its load events in the same frame, so all three gates open inside their
-// own debounce and nothing is ever painted. The exit animations are the part that
-// suffers most — the comic-book loading sheet washes away into the page it was covering,
-// and there is no way to tune a transition you cannot see run.
+// own debounce and nothing is ever painted. The exit is the part that suffers most —
+// the comic-book page wipes in over the paper it was loading on, and there is no way to
+// tune a transition you cannot see run.
 //
 // `?slow=1` drops every debounce to zero and holds each gate open for a second, so each
 // screen paints and each transition out of it plays at the pace a first-time visitor on
@@ -18,10 +18,12 @@ import { logger } from './logger'
 // nothing and drops no query, but does re-run the chunk gate — stays slow too.
 //
 // Three gates share the flag: the skin chunk (`skins/context.tsx`), the session
-// (`App.tsx`), and the comic-book page's pictures (`skins/comic-book/Layout.tsx`). Each
-// holds for its own second rather than sharing one deadline, because the point is to
-// watch them one at a time — a shared deadline would be spent by the first gate and the
-// last one, the only one with a transition, would never hold at all.
+// (`App.tsx`), and the comic-book page's pictures (`skins/comic-book/pageReveal.ts`).
+// Each holds for its own second rather than sharing one deadline, because the point is
+// to watch them one at a time — a shared deadline would be spent by the first gate and
+// the last one, the only one with a transition, would never hold at all. For the
+// comic-book skin the three hold one screen (`hooks/useLoadingHold.ts`), so what you
+// see is three seconds of the same paper and legend, then the wipe.
 //
 // Dev-only twice over, like the simulation flags: this resolves to 0 outside
 // `import.meta.env.DEV`, and {@link SLOW_LOADING_MS} repeats the test inline so a

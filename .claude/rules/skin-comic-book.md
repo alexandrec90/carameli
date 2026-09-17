@@ -40,7 +40,7 @@ cyan are the two that move.
 
 ## Layout — a comic page of panels
 
-`<Layout>` draws the page — panels (dots, pictures, balloons), ink, wash and letterbox —
+`<Layout>` draws the page — the sheet, panels (dots, pictures, balloons), ink and wash —
 over a letterboxed frame; it renders no nav chrome yet, and children are not rendered.
 
 `PANEL_GRIDS` (`editor/layoutConfig.ts`) is one **shared-vertex planar subdivision** per
@@ -186,8 +186,16 @@ keeps its size while it moves** — twenty messages through six rows is six at e
 position, never thinning toward the top (`stepHead`'s `floor`; the head stops at
 `growTarget`). **Live** is `content: 'input'` (or `'phone'`) on the sender template: the
 composer takes the bottom row and messages start one up. The arithmetic is pure in
-`bubbleChain.ts`; `PanelBubbleChain.tsx` adds only the growth timer, wheel listener and
-typed text — the panel's aspect is handed in with its box, never measured.
+`bubbleChain.ts`; `PanelBubbleChain.tsx` adds only the growth timer, wheel listener,
+typed text and the draft — the panel's aspect is handed in with its box, never measured.
+
+**The composer is fitted too, to the draft in it** (`fitComposer`) — an `input` field
+wraps its words and its balloon grows taller around its tail tip while they are typed,
+where a plain `input` scrolled the sentence sideways out of a balloon that could not
+follow. Two halves, and neither works alone: `BubbleInput` draws a **`textarea`** when
+`onDraftChange` is supplied, and supplying it is what the chain does to keep the draft it
+fits against. It is the composer's **height only** — a field is a target, and one that
+shrank to what had been typed would move out from under the pointer between keystrokes.
 
 - **A conversation is made whole or not at all.** `addSmsConversation` (the editor's
   **+ SMS**) establishes both balloons, their linkage, the chain id, the composer content
@@ -245,12 +253,15 @@ style that only breathed would otherwise pass a test for animating.
 The wave lives in `benDayWash.ts` and the grid it passes over in `benDayGrid.ts`;
 `usePageWash.ts` watches React Router's `location` and drives a rAF loop on one
 full-viewport canvas (`.cb-wash-canvas`, blank when idle). A halftone wave travels the `x + y` diagonal from the top-left: **cover** (paper dots grow
-inside the band until they merge opaque) → **hold** (the sheet carrying the loading screen's dot
-grid) → **reveal** (the wave passes on and dots shrink behind it), eased ease-in-out cubic per
-phase (`washPhaseAt`). When retuning, keep the merge radius at or above the `S·√2/2` tiling bound
-(below it the dots never close), and the grid spacing **shared with the loading sheet** so the
-two surfaces align. The loading overlay reuses it — `drawLoadingGrid` behind it, exiting through
-the reveal at cover 1.
+inside the band until they merge opaque) → **hold** (the sheet carrying the paper's dot grid) →
+**reveal** (the wave passes on and dots shrink behind it), eased ease-in-out cubic per phase
+(`washPhaseAt`). When retuning, keep the merge radius at or above the `S·√2/2` tiling bound
+(below it the dots never close), and the grid spacing **shared with the paper** so the two
+surfaces align. **The wash is for turning pages only.** The first load is a wipe
+(`pageReveal.ts`): `.cb-root` is clipped to nothing while the page's pictures settle and then
+wiped in over the paper along the same diagonal by a `clip-path` animation (`cb-page-wipe`),
+a straight edge with no dots. The wash used to double as the loading screen's exit, and its
+paper dots shrinking over a page nobody had seen yet read as giant Ben-Day dots on it.
 
 **The grid is still and the pointer is its light** (`benDayGrid.ts` + `spotlight.ts`). The dots sit
 on one viewport grid in flat accent ink, small at rest; a pool of light `SPOT_REACH` wide follows
@@ -261,30 +272,28 @@ the pool reads as a spotlight crossing a print rather than as the print coming o
 cursor. Only the wash's `gate` ever fades a dot, where its sheet has not merged solid yet. The
 light chases the pointer on `SPOT_FOLLOW_MS`, comes up and goes out on `SPOT_FADE_MS` (out when
 the pointer leaves the window, at rest in the viewport centre until it has first moved), and
-`pageSpotlight()` is the **one** tracker every surface samples, so the loading sheet, the wash and
-the letterbox light the same dot the same way at the same instant. A loop samples it with the rAF
+`pageSpotlight()` is the **one** tracker every surface samples, so the paper and the wash light
+the same dot the same way at the same instant. A loop samples it with the rAF
 stamp and repaints only when the sample changed (`stepSpotlight` returns the previous state by
 identity when nothing moved). Keep `GRID_SPOT_R` under half the pitch: a lit dot that touched its
 neighbours would read as a blot, not as halftone swelling.
 
-**The screen before the chunk draws the same grid** (`skins/context.tsx`). `SkinProvider` shows a
-loading screen while the skin's chunk is still in flight, and it runs `runBenDayGrid` on the route
-accent — the same field, the same tracker — so the chunk landing changes the legend and nothing
-under it. It used to animate a sine ripple of its own here, which is what made the handoff read as
-one effect being swapped for another. That is why `benDayGrid.ts`, `spotlight.ts` and
-`pageAccent.ts` are small and import nothing else from the skin: being on the eager path, whatever
-they pull in every visitor downloads, and **React in particular must stay out of them** — sharing
-it between the entry and a lazy chunk splits `jsx-runtime` into a chunk of its own
-(`bundlePolicy.ts`). `runBenDayGrid` is an effect body for that reason, not a hook.
-
-**The letterbox carries the loading grid on** (`MarginGrid.tsx`, the bottom layer of `.cb-root`):
-the fixed aspect leaves most windows a band beside or above the page sheet, and `drawMarginGrid`
-paints the grid there on the same cells under the same light, so the sheet the loading screen
-washes away reveals what it was already showing, lit where it was lit. It stays outside the sheet —
-`pageSheet` is the frame *as drawn* plus `OUTER_M`, so a held shape gets its bands — and runs only
-while a band exists, once the page is up. It does **not** consult `prefers-reduced-motion`: the
-grid moves only as the pointer does, and a light that stopped following the hand would read as
-the page having hung (`MarginGrid.test.tsx`).
+**The paper is one canvas for the skin's whole life, and the skin does not draw it**
+(`skins/context.tsx`). `SkinProvider` mounts the paper — `runBenDayGrid` on the route accent, the
+legend on top — under the app while the chunk is in flight and *keeps it there* once the chunk
+lands: the page sits on it, and it shows in the letterbox around the page sheet (`.cb-page-sheet`,
+the frame plus `OUTER_M` from `pageSheet` in `usePageFrame.ts`; `.cb-root` paints no background).
+The session gate and the pictures gate say they are still loading through
+`hooks/useLoadingHold.ts` rather than drawing a screen of their own — one legend across three
+gates, on one grid that never re-lights. The earlier design drew a screen per gate and handed the
+grid between them cell for cell, and the handoffs still read as freezes and reloads; a skin-side
+loading sheet or a letterbox canvas brings them back. That is why `benDayGrid.ts`, `spotlight.ts`
+and `pageAccent.ts` are small and import nothing else from the skin: being on the eager path,
+whatever they pull in every visitor downloads, and **React in particular must stay out of them**
+— sharing it between the entry and a lazy chunk splits `jsx-runtime` into a chunk of its own
+(`bundlePolicy.ts`). `runBenDayGrid` is an effect body for that reason, not a hook. It does
+**not** consult `prefers-reduced-motion`: the grid moves only as the pointer does, and a light
+that stopped following the hand would read as the page having hung.
 
 ### Panel ink
 

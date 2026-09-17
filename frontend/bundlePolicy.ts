@@ -425,8 +425,22 @@ export const MAX_LAZY_CHUNK_BYTES = 239 * 1024
  *
  * Read the two cuts together: the chunk is 205.65 KB against the 267.81 KB of the master
  * this branch left, a quarter of it gone, and neither cut removed a feature.
+ *
+ * **This raise (967 → 969)** is the SMS composer wrapping its words and its balloon
+ * growing to hold them: a `textarea` branch in `BubbleInput` with the layout effect that
+ * grows it, `fitComposer`/`stretchFor` in `bubbleFit.ts`, the draft the chain now keeps to
+ * fit against, and the caret's own wrap (`wrapCaretLines` and the two functions beside it)
+ * so the lettered caret still finds the line it is standing on. 1.08 KB, measured as this
+ * branch (991,212 B) against the same tree with `frontend/src` reverted (990,108 B), still
+ * 46 chunks, `package.json` untouched. **All 1,104 bytes are in the lazy `comic-book`
+ * chunk** (208,988 → 210,092 B) and no other chunk moved a byte, which is the shape a
+ * skin-local change should have: it is nobody's entry cost.
+ *
+ * 969 rather than flush against 968.0 KB for the reason the paragraphs above give — the
+ * default branch runs no gate, so the kilobyte of clearance is what lets the next branch
+ * measure itself against a ceiling that still holds.
  */
-export const MAX_TOTAL_JS_BYTES = 967 * 1024
+export const MAX_TOTAL_JS_BYTES = 969 * 1024
 
 /**
  * Every `.css` file in `dist/assets/`, summed. Today 44.2 KB across 2 files.
@@ -464,8 +478,16 @@ export const MAX_TOTAL_JS_BYTES = 967 * 1024
  * registrations and their defaults landed in the *eager* `index.css`, which every visitor
  * downloads. `src/index.css` now declines the word with `@source not inline(...)`, and
  * {@link STRAY_UTILITIES} is what fails if that line goes.
+ *
+ * This raise (48 → 49) is the SMS composer's wrapping field (`.cb-bubble-wrapping` in
+ * `bubbleInputs.css`): the textarea defaults a balloon cannot have — the drag handle, the
+ * scrollbar, the browser's own rows-tall box — plus the break rule the fit assumes of it.
+ * 134 bytes against a build that had 60 of room, which is why a rule this small moves a
+ * kilobyte ceiling. The check above is what says it is the *lazy* sheet: `comic-book.css`
+ * 16,797 → 16,931 B with `index.css` unchanged at 32,295, so no identifier on this branch
+ * became a Tailwind class candidate the way `ordinal` did.
  */
-export const MAX_TOTAL_CSS_BYTES = 48 * 1024
+export const MAX_TOTAL_CSS_BYTES = 49 * 1024
 
 /**
  * Utility classes the build must not contain.

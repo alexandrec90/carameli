@@ -17,7 +17,7 @@ import { CONFIG_IN_REPO, editorConfigFile } from './editorConfigPath.ts'
 import { quietProxyErrors } from './proxyErrorPolicy.ts'
 import { shipLayout } from './shipLayout.ts'
 import type { Run } from './shipLayout.ts'
-import { portOffset } from './worktreePort.ts'
+import { portOffset } from './src/worktreePort.ts'
 
 const rootDir = dirname(fileURLToPath(import.meta.url))
 const repoRoot = resolve(rootDir, '..')
@@ -29,7 +29,7 @@ const repoRoot = resolve(rootDir, '..')
  *
  * A host-Vite worktree adds `portOffset` to both, derived from its own directory name,
  * so two agent sessions serve on different ports with nothing configured — the only
- * thing that works across all three ways a worktree is cut here. `worktreePort.ts`
+ * thing that works across every way a worktree is cut here. `src/worktreePort.ts`
  * carries why that is derived rather than leased from devkit's registry, which
  * allocates the *published* `FRONTEND_HOST_PORT` and not this. An explicit `VITE_PORT`
  * still beats both.

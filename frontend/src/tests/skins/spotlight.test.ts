@@ -16,8 +16,8 @@ import type { SpotlightState } from '../../skins/comic-book/spotlight'
 import { GRID_SPACING } from '../../skins/comic-book/benDayGrid'
 
 // The spotlight: the pointer as the one light on the Ben-Day grid. The step function
-// and the falloff are held here; that the three drawing surfaces spend it is
-// marginGrid.test.ts, and the loops that sample it are MarginGrid.test.tsx.
+// and the falloff are held here; that the drawing surfaces spend it is
+// gridLight.test.ts, and the loop that samples it is skinLoadingGrid.test.tsx.
 
 // A settled light at a point — where the tests below usually start from.
 const LIT: SpotlightState = { x: 400, y: 300, presence: 1 }

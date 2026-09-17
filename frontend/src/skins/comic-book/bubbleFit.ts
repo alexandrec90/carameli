@@ -19,6 +19,10 @@ import type { BubbleType } from './editor/bubbleTypes'
 // full, and only then wraps and grows it *tall* — a stretched ellipse, see `stretch` — so
 // a short reply is a small round balloon and a paragraph is a full-column tall one, which
 // is the proportion a letterer would choose.
+//
+// A chain's **composer** is fitted by the same arithmetic against what is being typed into
+// it right now ({@link fitComposer}), so the field a reader is filling grows with its own
+// words instead of scrolling them sideways out of a balloon that cannot follow.
 
 // The lettering block's inset is `textInset(type)` from bubbleText.ts — the rectangle the
 // drawing letters into, read from the same place, so a fit computed against one inset and
@@ -121,6 +125,26 @@ export function glyphsPerLine(widthPct: number, type: BubbleType, m: FitMetrics)
 }
 
 /**
+ * How much taller than its box a balloon of `type` and `width`% must be drawn to hold
+ * `text` wrapped at that width — the `stretch` of a {@link BubbleFit}, on its own, for
+ * the two callers that already know how wide the balloon is.
+ *
+ * 1 whenever the wrap fits the type's lettering band, which includes a balloon with
+ * nothing in it: no words is no reason to draw a taller balloon.
+ */
+export function stretchFor(
+  text: string,
+  type: BubbleType,
+  width: number,
+  m: FitMetrics,
+): number {
+  const lines = wrapLines(text, glyphsPerLine(width, type, m)).length
+  const need = lines * LINE_HEIGHT * m.lettering
+  const boxH = (width / 100) * m.boxW * BUBBLE_ASPECT
+  return boxH > 0 ? Math.max(1, need / (textBand(type) * boxH)) : 1
+}
+
+/**
  * Fit `text` into a balloon of type `type` whose column is `column` % wide and whose
  * narrowest allowed balloon is `min` %.
  *
@@ -142,9 +166,29 @@ export function fitMessage(
   const chars = text.trim().replace(/\s+/g, ' ').length
   const oneLine = m.boxW > 0 ? ((chars * glyph) / usable / m.boxW) * 100 : 0
   const width = Math.min(column, Math.max(min, oneLine))
-  const lines = wrapLines(text, glyphsPerLine(width, type, m)).length
-  const need = lines * LINE_HEIGHT * m.lettering
-  const boxH = (width / 100) * m.boxW * BUBBLE_ASPECT
-  const stretch = boxH > 0 ? Math.max(1, need / (textBand(type) * boxH)) : 1
-  return { width, stretch }
+  return { width, stretch: stretchFor(text, type, width, m) }
+}
+
+/**
+ * Fit a chain's composer around the draft someone is typing into it.
+ *
+ * **Width is the author's, not the draft's** — the one way this differs from
+ * {@link fitMessage}, and the difference is that a composer is a *target*. A message is
+ * finished, so it may be as narrow as its words; a field that shrank to what had been
+ * typed so far would move out from under the pointer between keystrokes, and an empty one
+ * would be the dot {@link fitMessage}'s `min` exists to prevent. So the field stays the
+ * width the author drew the template and only its height answers to the draft — which is
+ * also the direction it can grow without leaving its column.
+ *
+ * It grows *upward*, because `placeRows` puts the newest row of a side on its template's
+ * tail tip (chainAnchor.ts): the tail stays on the point the author aimed it at and the
+ * messages above make room, which is where a phone's composer grows too.
+ */
+export function fitComposer(
+  draft: string,
+  type: BubbleType,
+  width: number,
+  m: FitMetrics,
+): BubbleFit {
+  return { width, stretch: stretchFor(draft, type, width, m) }
 }

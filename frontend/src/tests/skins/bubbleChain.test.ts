@@ -22,7 +22,7 @@ import {
   visibleWindow,
 } from '../../skins/comic-book/bubbleChain'
 import type { BubbleChain, ChainRow } from '../../skins/comic-book/bubbleChain'
-import { fitMessage } from '../../skins/comic-book/bubbleFit'
+import { fitComposer, fitMessage } from '../../skins/comic-book/bubbleFit'
 import { anchorOf } from '../../skins/comic-book/chainAnchor'
 import { CHAIN_ROW_GAP, rowEllipse } from '../../skins/comic-book/chainLayout'
 import { conversationRows } from '../../skins/comic-book/chainRows'
@@ -233,8 +233,10 @@ describe('conversationRows', () => {
   const M: ChainMetrics = { aspect: 1, boxW: 400, lettering: 12 }
   const lines = readTranscript(['hey', 'you around?', '> just picked up'])
   const shown = visibleWindow(2, 6) // [2, 1, 0] — newest first
+  /** An empty composer on `me`: the fit a live chain's bottom row starts at. */
+  const composerOn = (me: BubbleTransform) => fitComposer('', me.type, me.width, M)
 
-  const rows = conversationRows(shown, lines, cols, false, M)
+  const rows = conversationRows(shown, lines, cols, null, M)
 
   /** A row's left edge, in the % a bubble is placed in. */
   const leftOf = (r: ChainRow) => 100 - r.bubble.right - r.bubble.width
@@ -257,7 +259,7 @@ describe('conversationRows', () => {
   // A longer thread, for the rows above the two anchored ones: three of theirs stacked
   // up the left column, two of mine up the right.
   const many = readTranscript(['hey', 'you around?', '> just picked up', 'any luck?', '> some', 'ok'])
-  const table = conversationRows(visibleWindow(5, 6), many, cols, false, M)
+  const table = conversationRows(visibleWindow(5, 6), many, cols, null, M)
   const at = (t: readonly ChainRow[], key: string): ChainRow => {
     const found = t.find(r => r.key === key)
     if (!found) throw new Error(`no row ${key}`)
@@ -275,7 +277,7 @@ describe('conversationRows', () => {
 
   it('leans by the message’s place in the transcript, not its row on screen', () => {
     // Scroll the window by one: message 1 moves up a row and keeps its lean.
-    const scrolled = conversationRows(visibleWindow(4, 6), many, cols, false, M)
+    const scrolled = conversationRows(visibleWindow(4, 6), many, cols, null, M)
     expect(at(scrolled, '1').bubble.right).toBeCloseTo(at(table, '1').bubble.right, 6)
   })
 
@@ -290,7 +292,7 @@ describe('conversationRows', () => {
 
   it('stretches a row whose message wraps, and no other', () => {
     const long = 'x'.repeat(30)
-    const wrapped = conversationRows([1, 0], readTranscript(['hey', `> ${long} ${long}`]), cols, false, M)
+    const wrapped = conversationRows([1, 0], readTranscript(['hey', `> ${long} ${long}`]), cols, null, M)
     expect(wrapped[0].stretch).toBeGreaterThan(1)
     expect(wrapped[1].stretch).toBe(1)
   })
@@ -322,7 +324,7 @@ describe('conversationRows', () => {
 
   it('grows the newest row taller for a message that wraps, holding its tail tip still', () => {
     const long = 'x'.repeat(30)
-    const [tall] = conversationRows([0], readTranscript([`> ${long} ${long}`]), cols, false, M)
+    const [tall] = conversationRows([0], readTranscript([`> ${long} ${long}`]), cols, null, M)
     expect(tall.stretch).toBeGreaterThan(1)
     expect(tall.bubble.width).toBe(cols.me.width)
     expectSamePoint(anchorOfRow(tall), anchorOf(cols.me, 1))
@@ -332,13 +334,13 @@ describe('conversationRows', () => {
 
   it('centres a tailless template’s newest row on its ellipse instead', () => {
     const bare = { ...cols, them: tpl({ ...cols.them, tail: 'none' }) }
-    const [, around] = conversationRows(shown, lines, bare, false, M)
+    const [, around] = conversationRows(shown, lines, bare, null, M)
     expect(around.bubble.tail).toBe('none')
     expectSamePoint(anchorOfRow(around), anchorOf(bare.them, 1))
   })
 
   it('draws the typing row as the recipient’s template, where the reply will land', () => {
-    const [dots] = conversationRows([], [], cols, false, M, true)
+    const [dots] = conversationRows([], [], cols, null, M, true)
     expect(dots.key).toBe(TYPING_KEY)
     expect(dots.bubble.width).toBe(cols.them.width)
     expect(dots.bubble.top).toBeCloseTo(cols.them.top, 6)
@@ -383,7 +385,7 @@ describe('conversationRows', () => {
       them: tpl({ top: 30, right: 5, width: 40, tail: 'down-right' }),
     }
     const thread = readTranscript(['hey', '> a', '> b'])
-    const live = conversationRows(visibleWindow(2, 6), thread, stackedCols, true, M)
+    const live = conversationRows(visibleWindow(2, 6), thread, stackedCols, composerOn(stackedCols.me), M)
     expect(live.map(r => r.key)).toEqual(['composer', '2', '1', '0'])
     expectSamePoint(anchorOfRow(at(live, '0')), anchorOf(stackedCols.them, 1))
     expectNoOverlap(live)
@@ -404,7 +406,7 @@ describe('conversationRows', () => {
       visibleWindow(3, 6),
       readTranscript(['in one', '> out one', 'in two', '> out two']),
       cols,
-      false,
+      null,
       M,
     )
     expect(chainRowLinks(alternating, 1).map(pair => pair.map(row => row.side))).toEqual([
@@ -424,7 +426,7 @@ describe('conversationRows', () => {
       shown,
       lines,
       { ...cols, me: tpl({ ...cols.me, content: 'input' }) },
-      false,
+      null,
       M,
     )
     expect(live.map(r => r.bubble.content)).toEqual(['text', 'text', 'text'])
@@ -436,7 +438,7 @@ describe('conversationRows', () => {
 
   it('puts the composer in the bottom row of the sender’s column when the chain is live', () => {
     const me = tpl({ ...cols.me, content: 'input', text: 'Say something' })
-    const live = conversationRows([0], readTranscript(['hey']), { ...cols, me }, true, M)
+    const live = conversationRows([0], readTranscript(['hey']), { ...cols, me }, composerOn(me), M)
 
     expect(live.map(r => r.key)).toEqual(['composer', '0'])
     expect(live[0].bubble.content).toBe('input')
@@ -449,8 +451,32 @@ describe('conversationRows', () => {
     expect(live[1].bubble.tail).toBe('down-right')
   })
 
+  // The composer answers to what is being typed into it the way a message answers to its
+  // words — taller, never narrower, and around the tail tip the author aimed.
+  it('grows the composer upward as its draft wraps, and shrinks it back when sent', () => {
+    const me = tpl({ ...cols.me, content: 'input', text: 'Say something' })
+    const draft = 'a message long enough to wrap onto more than one line of the balloon'
+    // One of the sender's own messages, which is the row that stacks above the composer.
+    const thread = readTranscript(['> earlier'])
+    const typing = conversationRows([0], thread, { ...cols, me },
+      fitComposer(draft, me.type, me.width, M), M)
+    const empty = conversationRows([0], thread, { ...cols, me }, composerOn(me), M)
+
+    expect(typing[0].stretch).toBeGreaterThan(1)
+    // As wide as the author drew it, whatever is in it: a field is a target, not a word count.
+    expect(typing[0].bubble.width).toBe(me.width)
+    // Taller around the same tail tip, so the words push the thread up instead of the
+    // tail sliding off the mouth it was aimed at.
+    expectSamePoint(anchorOfRow(typing[0]), anchorOf(me, 1))
+    expect(typing[0].bubble.top).toBeLessThan(empty[0].bubble.top)
+    // And the message above it is pushed clear rather than drawn through.
+    expect(at(typing, '0').bubble.top).toBeLessThan(at(empty, '0').bubble.top)
+    expectNoOverlap(typing)
+    expect(empty[0].stretch).toBe(1)
+  })
+
   it('draws every older row at its narrowest with no lettering size to fit against', () => {
-    const blind = conversationRows(visibleWindow(5, 6), many, cols, false, { ...M, lettering: 0 })
+    const blind = conversationRows(visibleWindow(5, 6), many, cols, null, { ...M, lettering: 0 })
     for (const r of blind) {
       const newest = r.bubble.tail !== 'none'
       expect(r.bubble.width).toBeCloseTo(newest ? 40 : 40 * CHAIN_MIN_WIDTH_RATIO, 6)
@@ -459,7 +485,7 @@ describe('conversationRows', () => {
   })
 
   it('skips a window entry the transcript has nothing at', () => {
-    expect(conversationRows([9], lines, cols, false, M)).toEqual([])
+    expect(conversationRows([9], lines, cols, null, M)).toEqual([])
   })
 })
 

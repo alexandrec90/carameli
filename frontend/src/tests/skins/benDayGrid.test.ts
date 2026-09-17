@@ -19,7 +19,7 @@ import { PAGE_ACCENTS, PAGE_FALLBACK_ACCENT } from '../../skins/comic-book/pageA
 
 // The printed field: that its ink reads on the paper whatever a route accents with, and
 // that the light changes a dot's size and nothing else. What each surface draws with it
-// is marginGrid.test.ts; the light itself is spotlight.test.ts.
+// is gridLight.test.ts; the light itself is spotlight.test.ts.
 
 const PAPER_LUMINANCE = relativeLuminance(parseCssColor(GRID_PAPER))
 
