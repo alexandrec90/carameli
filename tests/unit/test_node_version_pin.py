@@ -162,6 +162,40 @@ def test_the_frontend_container_runs_the_pinned_node() -> None:
     )
 
 
+def test_npm_refuses_an_unsupported_interpreter_by_itself() -> None:
+    """`frontend/.npmrc` is what makes `npm ci` the check rather than this file.
+
+    Without `engine-strict`, npm downgrades every `engines` violation to an EBADENGINE
+    warning in the install log and builds the tree anyway -- which is how the breakage
+    this module exists for got in. The setting has to be committed to have any effect on
+    CI or a fresh clone, and `.npmrc` is gitignored by default here (it is where a
+    registry token lands), so the negation in `.gitignore` is load-bearing too: delete
+    it and the file goes invisible without anything failing.
+    """
+    npmrc = REPO / "frontend" / ".npmrc"
+    assert npmrc.exists(), "frontend/.npmrc is gone -- npm is back to warning and building"
+    assert re.search(r"^engine-strict\s*=\s*true", npmrc.read_text("utf-8"), re.MULTILINE), (
+        "frontend/.npmrc no longer sets engine-strict=true"
+    )
+
+
+def test_the_manifest_declares_the_pinned_line() -> None:
+    """`engines.node` in package.json is the half `engine-strict` enforces for the repo
+    itself, so a workstation on the wrong Node is refused at its own manifest rather
+    than on whichever dependency happens to floor highest."""
+    manifest = json.loads((REPO / "frontend" / "package.json").read_text(encoding="utf-8"))
+    declared = (manifest.get("engines") or {}).get("node")
+    assert declared, "frontend/package.json declares no engines.node"
+    assert satisfies(_pinned_candidate(), declared), (
+        f"package.json requires node {declared!r}, which .nvmrc's {_pinned_major()} "
+        "does not satisfy"
+    )
+    assert not satisfies((_pinned_major() - 1, _LINE_END, _LINE_END), declared), (
+        f"package.json's {declared!r} also admits Node {_pinned_major() - 1} -- it is "
+        "floored below the pin, so the pinned line is not actually required"
+    )
+
+
 def test_the_pin_satisfies_every_locked_engine_constraint() -> None:
     """The reversion check for the cspell 10.3.0 breakage: put the pin back to 20 and
     cspell, jsdom, undici and twenty-odd others report themselves as unrunnable here."""
