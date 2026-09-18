@@ -12,9 +12,10 @@ annotated-types==0.7.0
     # via
     #   -c requirements.txt
     #   pydantic
-anyio==4.12.1
+anyio==4.15.1
     # via
     #   -c requirements.txt
+    #   -r requirements.in
     #   httpx
     #   schemathesis
     #   starlette
@@ -272,7 +273,7 @@ starlette==1.6.0
     #   -r requirements.in
     #   fastapi
     #   prometheus-fastapi-instrumentator
-typing-extensions==4.15.0
+typing-extensions==4.16.0
     # via
     #   -c requirements.txt
     #   alembic
