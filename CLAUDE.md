@@ -183,13 +183,20 @@ step of an install anyone types: a bare `uv venv`, and `python -m venv` in any f
 silently take the machine default and give you a venv the container does not match.
 
 **Node is coordinated the same way and had nothing saying so.** The pin is
-`.github/actions/setup-node-env/action.yml`'s `node-version`, mirrored in `.nvmrc` so
-the mismatch is visible before a test run rather than after one. It is not cosmetic:
-Node 22+ ships an experimental built-in `localStorage` global that evaluates to
-`undefined` unless `--localstorage-file` is passed, and under vitest's `globals: true`
-that shadows happy-dom's. A workstation on v26 therefore failed 46 frontend tests
-across 7 files while the same suite was green in CI — and the stop gate then blocked
-every session on failures no branch had caused.
+`.github/actions/setup-node-env/action.yml`'s `node-version`, mirrored in `.nvmrc` and in
+the `frontend` service's `image:` so the mismatch is visible before a test run rather than
+after one. `tests/unit/test_node_version_pin.py` is what keeps the three in step, and it
+checks the pin against the `engines.node` of every package in `frontend/package-lock.json`
+— because the pin is not free to lag: a dependency bump that raises a floor above it takes
+out an `npm run lint` step, and reads as a broken lint rather than a stale pin.
+
+It is not cosmetic in the other direction either. Node 22+ ships an experimental built-in
+`localStorage` global that evaluates to `undefined` unless `--localstorage-file` is passed,
+and under vitest's `globals: true` that shadows happy-dom's. A workstation on v26 failed 46
+frontend tests across 7 files while the same suite was green on CI's Node 20 — and the stop
+gate then blocked every session on failures no branch had caused. The repair is
+`frontend/src/tests/setup/webStorage.ts`, and now that CI is past 22.4 itself, it is
+load-bearing there too rather than a courtesy to workstations.
 
 `logs/` holds per-run failure artifacts, and `scripts/prune-logs.py` bounds its growth
 from the SessionStart hook. The current artifacts (`lint-errors.log`,
