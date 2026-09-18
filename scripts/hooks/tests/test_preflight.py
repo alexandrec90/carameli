@@ -1,6 +1,7 @@
 """Tests for scripts/preflight.py -- what stops a gate running, and what it says."""
 
 import os
+from types import SimpleNamespace
 
 from conftest import REPO_ROOT, load_module
 
@@ -74,6 +75,150 @@ def test_missing_frontend_is_silent_where_there_is_no_frontend(tmp_path):
     assert preflight.missing_frontend(tmp_path, _cfg()) == ""
     (tmp_path / "frontend").mkdir()
     assert preflight.missing_frontend(tmp_path, _cfg(frontend=False)) == ""
+
+
+# --- the Node pin ----------------------------------------------------------
+
+
+def _node(version):
+    """A `subprocess.run` stand-in that reports `version` from `node --version`."""
+
+    def run(argv, **kwargs):
+        assert argv == ["node", "--version"]
+        return SimpleNamespace(stdout=version, returncode=0)
+
+    return run
+
+
+def _pinned(root, line):
+    (root / "frontend" / "node_modules").mkdir(parents=True, exist_ok=True)
+    (root / ".nvmrc").write_text(f"{line}\n", encoding="utf-8")
+
+
+def test_node_major_reduces_every_spelling():
+    assert preflight.node_major("v24.8.1") == "24"
+    assert preflight.node_major("24.8.1") == "24"
+    assert preflight.node_major("24") == "24"
+    assert preflight.node_major("") == ""
+    assert preflight.node_major("not a version") == ""
+
+
+def test_node_gap_is_the_pure_core_of_the_check():
+    """`node_mismatch` only adds the tier guards and the two probes; every wording
+    decision is here, so this is where the four cases are pinned down."""
+    assert preflight.node_gap("", "v20.20.2", present=True) == ""
+    assert preflight.node_gap("24", "v24.21.0", present=True) == ""
+    assert "not on PATH" in preflight.node_gap("24", "", present=False)
+    assert "answers no version" in preflight.node_gap("24", "", present=True)
+    assert ".nvmrc pins 24" in preflight.node_gap("24", "v20.20.2", present=True)
+
+
+def test_a_matching_node_is_silent(tmp_path):
+    _pinned(tmp_path, "24")
+    found = preflight.gaps(
+        tmp_path, _cfg(), which=_which(*preflight.HOST_TOOLS, "node"), run=_node("v24.8.1\n")
+    )
+    assert found == []
+
+
+def test_a_newer_patch_on_the_pinned_line_is_not_a_mismatch(tmp_path):
+    """`.nvmrc` names a release line, and setup-node resolves it to that line's newest
+    patch. Comparing anything but the major reports every machine a fortnight behind."""
+    _pinned(tmp_path, "24")
+    assert (
+        preflight.node_mismatch(tmp_path, _cfg(), which=_which("node"), run=_node("v24.99.0")) == ""
+    )
+
+
+def test_a_mismatched_node_names_both_versions_and_the_fix(tmp_path):
+    _pinned(tmp_path, "24")
+    line = preflight.node_mismatch(tmp_path, _cfg(), which=_which("node"), run=_node("v20.20.2"))
+
+    assert "v20.20.2" in line
+    assert ".nvmrc pins 24" in line
+    assert "nvm install 24 && nvm use 24" in line
+
+
+def test_an_absent_node_is_reported_with_the_same_fix(tmp_path):
+    _pinned(tmp_path, "24")
+    line = preflight.node_mismatch(tmp_path, _cfg(), which=_which(), run=_node(""))
+
+    assert "not on PATH" in line
+    assert "nvm install 24" in line
+
+
+def test_a_node_that_answers_no_version_is_the_uninstalled_pin(tmp_path):
+    """The shape this actually takes on Windows: nvm reads `.nvmrc` itself, finds the
+    line absent, and says so on stderr -- so stdout is empty while `node` is on PATH.
+    Reported as the uninstalled pin it is, not as a missing binary."""
+    _pinned(tmp_path, "24")
+    line = preflight.node_mismatch(tmp_path, _cfg(), which=_which("node"), run=_node(""))
+
+    assert "answers no version" in line
+    assert "nvm install 24 && nvm use 24" in line
+    assert "not on PATH" not in line
+
+
+def test_nvms_own_words_never_reach_the_gap_line(tmp_path):
+    """nvm-windows answers "Node.js v24.x.x is not installed or cannot be found." --
+    three phrases `_MISSING_TOOL` matches. Carried into the line, it would turn the
+    run's one loud finding into a skip, and a skip is reported as a pass."""
+    _pinned(tmp_path, "24")
+
+    def stderr_only(argv, **kwargs):
+        return SimpleNamespace(
+            stdout="", stderr="Node.js v24.x.x is not installed or cannot be found.", returncode=1
+        )
+
+    line = preflight.node_mismatch(tmp_path, _cfg(), which=_which("node"), run=stderr_only)
+
+    assert line
+    assert failure_class.get_skip_reason([line]) is None
+
+
+def test_the_fix_never_hard_codes_a_version(tmp_path):
+    """The whole point of reading `.nvmrc`: moving the pin must not mean editing this
+    module. A literal here would keep telling everyone to install the old line."""
+    _pinned(tmp_path, "31")
+    line = preflight.node_mismatch(tmp_path, _cfg(), which=_which("node"), run=_node("v24.8.1"))
+
+    assert "nvm install 31 && nvm use 31" in line
+    assert "24" not in line.replace("v24.8.1", "")
+
+
+def test_a_repo_that_pins_no_node_has_nothing_to_say(tmp_path):
+    (tmp_path / "frontend" / "node_modules").mkdir(parents=True)
+    assert not (tmp_path / ".nvmrc").exists()
+    assert (
+        preflight.node_mismatch(tmp_path, _cfg(), which=_which("node"), run=_node("v20.20.2")) == ""
+    )
+
+
+def test_the_node_check_is_skipped_wherever_the_frontend_tier_is(tmp_path):
+    # Same two conditions as missing_frontend: the app image carries no frontend/, and
+    # a project can switch the tier off. Neither has a Node gate to run.
+    _pinned(tmp_path, "24")
+    wrong = {"which": _which("node"), "run": _node("v20.20.2")}
+    assert preflight.node_mismatch(tmp_path, _cfg(frontend=False), **wrong) == ""
+
+    bare = tmp_path / "no-frontend"
+    bare.mkdir()
+    (bare / ".nvmrc").write_text("24\n", encoding="utf-8")
+    assert preflight.node_mismatch(bare, _cfg(), **wrong) == ""
+
+
+def test_the_repo_pin_is_what_this_reads():
+    assert preflight.pinned_node(REPO_ROOT) == (REPO_ROOT / ".nvmrc").read_text("utf-8").strip()
+
+
+def test_running_node_is_silent_rather_than_raising_when_node_cannot_be_run():
+    """A node on PATH that will not execute is not a pin mismatch to shout about; the
+    frontend tools will report their own failure with more to say than this can."""
+
+    def explode(argv, **kwargs):
+        raise OSError("bad exe")
+
+    assert preflight.running_node(which=_which("node"), run=explode) == ""
 
 
 # --- wording ---------------------------------------------------------------
