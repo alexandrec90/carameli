@@ -1,8 +1,27 @@
 """Tests for scripts/script_common.py venv path resolution."""
 
+import pytest
+
 from conftest import load_module
 
 sc = load_module("scripts/script_common.py")
+
+
+def test_pinned_python_reads_the_pin_file(tmp_path):
+    (tmp_path / ".python-version").write_text("3.99\n", encoding="utf-8")
+
+    assert sc.pinned_python(tmp_path) == "3.99"
+
+
+def test_pinned_python_raises_rather_than_guessing(tmp_path):
+    """A silent default is the failure every caller of this reads the pin to avoid: a
+    lock compiled for, or a venv built on, whatever interpreter happened to be around."""
+    with pytest.raises(FileNotFoundError):
+        sc.pinned_python(tmp_path)
+
+
+def test_the_repo_pin_is_readable():
+    assert sc.pinned_python().startswith("3.")
 
 
 def test_venv_rel_parts_windows():
