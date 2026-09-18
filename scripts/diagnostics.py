@@ -129,6 +129,22 @@ def _keep_markdownlint(l: str) -> bool:
     return bool(re.search(r":\d+:\d+", l)) or bool(re.search(r":\d+ ", l))
 
 
+def _keep_cspell(l: str) -> bool:
+    # `--relative` findings carry a `path:line:col - Unknown word (foo)` locator. The
+    # second clause is for the failure with no locator at all: cspell refusing to start
+    # on an unsupported Node prints one line and exits 1, and that line is the whole
+    # diagnosis.
+    return bool(re.search(r":\d+:\d+", l)) or "Unsupported" in l
+
+
+def _keep_knip(l: str) -> bool:
+    # knip prints section headers ("Unused files (3)") followed by bare paths, with no
+    # per-line locator to match on. Keep anything with content and let the header/path
+    # pairing carry the meaning; the progress spinner is already stripped by --no-progress
+    # upstream of this.
+    return bool(l.strip())
+
+
 def _keep_pip_audit(l: str) -> bool:
     return bool(re.search(r"PYSEC|CVE|vulnerability|Name|---", l))
 
@@ -162,6 +178,16 @@ LINT_SECTIONS = [
     ("eslint", "npm --prefix frontend run lint:eslint -- --fix", _keep_eslint),
     ("tsc", "npm --prefix frontend run lint:types", _keep_tsc),
     ("stylelint", "npm --prefix frontend run lint:css -- --fix", _keep_stylelint),
+    (
+        "cspell",
+        "npm --prefix frontend run lint:spelling  # or add the word to cspell.config.yaml",
+        _keep_cspell,
+    ),
+    (
+        "knip",
+        "npm --prefix frontend run lint:deadweight  # delete it, or export it from an entry point",
+        _keep_knip,
+    ),
     (
         "markdownlint",
         'npm --prefix frontend exec -- markdownlint "**/*.md" --fix',

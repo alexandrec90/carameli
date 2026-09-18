@@ -51,8 +51,8 @@ complexity::scripts/lint-all.py::main = 16
 complexity::scripts/run-tests.py::main = 30
 complexity::scripts/run-tests.py::run_named_target = 18
 definitions::frontend/src/skins/comic-book/editor/transforms.ts = 25
-definitions::scripts/diagnostics.py = 30
-definitions::scripts/lint-all.py = 36
+definitions::scripts/diagnostics.py = 32
+definitions::scripts/lint-all.py = 40
 definitions::scripts/local-e2e.py = 21
 definitions::scripts/run-tests.py = 23
 dependency::frontend/package.json::@eslint/js = 1
@@ -390,8 +390,8 @@ dependency::requirements.txt::websockets = 1
 dependency::requirements.txt::wrapt = 1
 file_lines::app/api/webhooks/call_status.py = 845
 file_lines::frontend/src/api/client.ts = 845
-file_lines::scripts/diagnostics.py = 726
-file_lines::scripts/lint-all.py = 653
+file_lines::scripts/diagnostics.py = 752
+file_lines::scripts/lint-all.py = 689
 file_lines::scripts/local-e2e.py = 549
 file_lines::scripts/run-tests.py = 761
 function_lines::app/api/vsapi/calls.py::initiate_outbound_call = 99
@@ -543,3 +543,9 @@ todos::app/api/auth.py = 1
 
 # 2026-09-17  recorded: lint-all.py +2 lines: the not-installed line is spelled 'detect-secrets is not installed', matching `failure_class._MISSING_TOOL` exactly so it classifies as environmental wherever it is read rather than only where it is produced, with the one-line comment saying so. Same defect fix as the record above.
 #   file_lines::scripts/lint-all.py -> 653
+
+# 2026-09-18  recorded: Wiring cspell and knip into the gate. They were in `npm run lint` and in no CI job, pre-commit hook or ship gate, so the only automatic check of either was nobody's: that is how cspell 10.3.0, whose engines.node excluded the pinned Node 20, merged in d71d0ae and took out the spelling step with every gate green. lint-all.py +4 definitions / +36 lines for t_cspell, t_knip and their two predicates; diagnostics.py +2 / +26 for the keep filters and LINT_SECTIONS entries, without which digest_lint drops a failing tool's result and leaves any_failed False -- a red check reported as a pass, the same hole one layer down. NB this is the FOURTH consecutive raise on file_lines::scripts/lint-all.py (627 -> 651 -> 653 -> 689), so per .claude/rules/engineering.md it is a defect report, not a raise. What fills each file, measured rather than guessed: lint-all.py is 14 tool runners plus a 105-line detect-secrets block (SECRETS_EXCLUDE_RE, _detect_secrets_absent, t_detect_secrets) that is the deferred split the 2026-09-10 record already named -- extracting it alone returns the module to ~581 lines. diagnostics.py is two unrelated digesters sharing a file: the lint half (keep filters, LINT_SECTIONS, digest_lint) ends at line 256 and the pytest/vitest half runs from 263 to the end, and the docstring names both callers, so the seam is the one its imports already show. Neither split is re-argued here and neither is more than a day; the next change to touch either file should do it instead of recording a fifth.
+#   definitions::scripts/diagnostics.py -> 32
+#   definitions::scripts/lint-all.py -> 40
+#   file_lines::scripts/diagnostics.py -> 752
+#   file_lines::scripts/lint-all.py -> 689
