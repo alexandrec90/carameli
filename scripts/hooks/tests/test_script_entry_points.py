@@ -40,6 +40,19 @@ def test_docker_down_main_clears_the_artifact_on_success(monkeypatch):
     assert cleared == [docker_down.ARTIFACT]
 
 
+def test_docker_down_stops_and_keeps_the_containers(monkeypatch):
+    """`compose stop`, never `down`. Docker Desktop's start button issues `compose
+    start`, which only starts containers that still exist; a `down` here meant the
+    stack could never again be started from the UI, only from the task."""
+    ran = []
+    monkeypatch.setattr(docker_down.dc, "run", lambda argv: (ran.append(argv), (["ok"], 0))[1])
+    monkeypatch.setattr(docker_down.dc, "clear_artifact", lambda _name: None)
+
+    assert docker_down.main() == 0
+    assert ran == [["docker", "compose", "stop"]]
+    assert "down" not in ran[0], "deletes the containers Desktop would start"
+
+
 def test_docker_fix_main_reports_a_ready_engine_without_real_side_effects(monkeypatch):
     monkeypatch.setattr(docker_fix, "kill_process", lambda _name: [])
     monkeypatch.setattr(docker_fix.time, "sleep", lambda _seconds: None)
