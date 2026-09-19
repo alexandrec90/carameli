@@ -30,10 +30,12 @@ interface Box { x0: number; x1: number; y0: number; y1: number }
 
 /**
  * jsdom has no SVG geometry implementation, so a shape's `isPointInFill` is modelled:
- * the point is inside when it lies in `box`. The identity screen matrix keeps the
- * probe's viewport→user-space transform a no-op.
+ * the point is inside when it lies in `box`. `isPointInStroke` is modelled the same
+ * way off `stroke`, and answers false for a shape given none — a shape with no stroke
+ * has no stroke to be in. The identity screen matrix keeps the probe's
+ * viewport→user-space transform a no-op.
  */
-function geometry(svg: SVGSVGElement, shape: SVGElement, box: Box): void {
+function geometry(svg: SVGSVGElement, shape: SVGElement, box: Box, stroke?: Box): void {
   // jsdom's own createSVGPoint returns a point with no matrixTransform, so the
   // element gets an own one — once, since a defined property is not configurable.
   if (!Object.prototype.hasOwnProperty.call(svg, 'createSVGPoint')) {
@@ -49,6 +51,10 @@ function geometry(svg: SVGSVGElement, shape: SVGElement, box: Box): void {
     getScreenCTM: { value: () => ({ inverse: () => ({}) }) },
     isPointInFill: { value: (point: DOMPoint) =>
       point.x >= box.x0 && point.x <= box.x1 && point.y >= box.y0 && point.y <= box.y1 },
+    isPointInStroke: { value: (point: DOMPoint) =>
+      stroke !== undefined &&
+      point.x >= stroke.x0 && point.x <= stroke.x1 &&
+      point.y >= stroke.y0 && point.y <= stroke.y1 },
   })
 }
 
@@ -194,19 +200,57 @@ describe('usePanelHover', () => {
     // A tube joining two of the hovered panel's balloons runs through the gutter and
     // is drawn only while both balloons show. It is that panel's ink, so the pointer
     // riding it between the two mouths keeps the hover exactly as the balloons do.
-    function drawTube(over: { visible?: boolean; panel?: string } = {}): void {
-      const svg = document.createElementNS(SVG_NS, 'svg')
-      svg.classList.add('cb-tube-svg')
+    /** One tube: a corridor filling x 100..130, y 50..60, with a rail stroked along its top. */
+    function tubeElement(svg: SVGSVGElement, visible: boolean): SVGGElement {
       const tube = document.createElementNS(SVG_NS, 'g')
       tube.classList.add('cb-tube')
-      if (over.visible !== false) tube.classList.add('is-visible')
-      tube.dataset.cbPanel = over.panel ?? '0'
+      if (visible) tube.classList.add('is-visible')
       const fill = document.createElementNS(SVG_NS, 'path')
       fill.classList.add('cb-tube-fill')
       geometry(svg, fill, { x0: 100, x1: 130, y0: 50, y1: 60 })
       tube.appendChild(fill)
+      // The rail's own fill is `none`, and its stroke straddles the corridor's edge:
+      // half over the fill, half — y 46..50 — over the neighbour's ground.
+      const rail = document.createElementNS(SVG_NS, 'path')
+      rail.classList.add('cb-tube-rail')
+      geometry(svg, rail, { x0: 0, x1: 0, y0: 0, y1: 0 }, { x0: 100, x1: 130, y0: 46, y1: 54 })
+      tube.appendChild(rail)
+      return tube
+    }
+
+    /** A tube between two linked balloons: the viewport-level SVG, naming its panel. */
+    function drawTube(over: { visible?: boolean; panel?: string } = {}): void {
+      const svg = document.createElementNS(SVG_NS, 'svg')
+      svg.classList.add('cb-tube-svg')
+      const tube = tubeElement(svg, over.visible !== false)
+      tube.dataset.cbPanel = over.panel ?? '0'
       svg.appendChild(tube)
       document.body.appendChild(svg)
+    }
+
+    /**
+     * A chain's tube, as PanelBubbleChain draws it: on the chain's own SVG inside the
+     * panel element, naming no panel — the element it is in says whose it is.
+     */
+    function drawChainTube(over: { panel?: string; clipped?: boolean } = {}): void {
+      const panel = document.createElement('div')
+      panel.className = 'cb-panel'
+      panel.dataset.cbPanel = over.panel ?? '0'
+      const layer = document.createElement('div')
+      layer.className = 'cb-chain-layer'
+      const svg = document.createElementNS(SVG_NS, 'svg')
+      svg.classList.add('cb-chain-tubes')
+      svg.appendChild(tubeElement(svg, true))
+      layer.appendChild(svg)
+      if (over.clipped) {
+        const clip = document.createElement('div')
+        clip.className = 'cb-bubble-clip'
+        clip.appendChild(layer)
+        panel.appendChild(clip)
+      } else {
+        panel.appendChild(layer)
+      }
+      document.body.appendChild(panel)
     }
 
     it('keeps the hover along a visible tube of the hovered panel', () => {
@@ -225,6 +269,45 @@ describe('usePanelHover', () => {
     it('ignores a faded tube, and one belonging to another panel', () => {
       drawTube({ visible: false })
       drawTube({ panel: '1' })
+      const { result } = renderHook(() => usePanelHover(POLYS, [], {}))
+
+      move(30, 20)
+      move(115, 55)
+      expect(result.current).toBe(1)
+    })
+
+    it('counts a rail — the visible edge stroked half outside the corridor', () => {
+      drawTube()
+      const { result } = renderHook(() => usePanelHover(POLYS, [], {}))
+
+      move(30, 20)
+      // Above the fill, on the rail's outer half: ink the reader can see.
+      move(115, 47)
+      expect(result.current).toBe(0)
+      // Past the rail: the neighbour's ground.
+      move(115, 44)
+      expect(result.current).toBe(1)
+    })
+
+    it("keeps the hover along a chain's own tube, drawn inside the panel element", () => {
+      drawChainTube()
+      const { result } = renderHook(() => usePanelHover(POLYS, [], {}))
+
+      move(30, 20)
+      // (115, 55) is panel 1's polygon, on the link joining two of panel 0's rows.
+      move(115, 55)
+      expect(result.current).toBe(0)
+      // And on its rail.
+      move(115, 47)
+      expect(result.current).toBe(0)
+
+      move(115, 65)
+      expect(result.current).toBe(1)
+    })
+
+    it("does not stick to a chain tube clipped to its panel, or to a neighbour's", () => {
+      drawChainTube({ clipped: true })
+      drawChainTube({ panel: '1' })
       const { result } = renderHook(() => usePanelHover(POLYS, [], {}))
 
       move(30, 20)

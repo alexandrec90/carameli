@@ -5,22 +5,46 @@ import type { ImgBoxFn } from './panelHover'
 import type { ImgTransform } from './editor/types'
 import type { PanelPoly } from './panelGeometry'
 
+/** Which part of a shape a point is tested against: what it fills, or what it strokes. */
+type Region = 'fill' | 'stroke'
+
 /**
- * Whether the viewport point is inside the fill of an SVG shape, in that shape's own
- * space. False wherever the geometry API is missing — a test DOM has none — rather
- * than a throw from inside a pointermove listener.
+ * Whether the viewport point is inside the given region of an SVG shape, in that
+ * shape's own space. False wherever the geometry API is missing — a test DOM has none
+ * — rather than a throw from inside a pointermove listener.
  */
-function shapeHolds(svg: SVGSVGElement, shape: SVGGeometryElement, x: number, y: number): boolean {
-  if (typeof shape.getScreenCTM !== 'function' || typeof shape.isPointInFill !== 'function') {
-    return false
-  }
+function shapeHolds(
+  svg: SVGSVGElement,
+  shape: SVGGeometryElement,
+  x: number,
+  y: number,
+  region: Region = 'fill',
+): boolean {
+  const test = region === 'fill' ? shape.isPointInFill : shape.isPointInStroke
+  if (typeof shape.getScreenCTM !== 'function' || typeof test !== 'function') return false
   const matrix = shape.getScreenCTM()
   if (!matrix) return false
   const point = svg.createSVGPoint()
   if (typeof point.matrixTransform !== 'function') return false
   point.x = x
   point.y = y
-  return shape.isPointInFill(point.matrixTransform(matrix.inverse()))
+  return test.call(shape, point.matrixTransform(matrix.inverse()))
+}
+
+/** Whether the point is on the visible part of a connector tube: its fill or a rail. */
+function tubeHolds(tube: Element, x: number, y: number): boolean {
+  const svg = tube.closest<SVGSVGElement>('svg')
+  if (!svg || typeof svg.createSVGPoint !== 'function') return false
+  for (const fill of tube.querySelectorAll<SVGGeometryElement>('.cb-tube-fill')) {
+    if (shapeHolds(svg, fill, x, y)) return true
+  }
+  // The rails are stroked and their fill is `none`, so it is the stroke that is asked:
+  // a rail is drawn half outside the corridor it edges, and a pointer riding that
+  // visible half is on the tube as surely as one in the white between the rails.
+  for (const rail of tube.querySelectorAll<SVGGeometryElement>('.cb-tube-rail')) {
+    if (shapeHolds(svg, rail, x, y, 'stroke')) return true
+  }
+  return false
 }
 
 /**
@@ -41,6 +65,15 @@ function shapeHolds(svg: SVGSVGElement, shape: SVGGeometryElement, x: number, y:
  * cusps cut inside it, and reading that would release the panel, hide the balloon,
  * restore the outline and loop. It is also the very region the balloon's own hover
  * and click answer to, so the panel stays lit exactly while the balloon is live.
+ *
+ * Tubes are drawn in two places, and both are this panel's ink. A tube between two
+ * linked balloons lives on one viewport-level SVG outside every panel element, and
+ * names its panel (BubbleTubes). A chain's tubes — the links running up an SMS
+ * conversation — are drawn by the chain itself, inside the panel element that holds
+ * its rows (PanelBubbleChain), and name nothing: the element they are in already says
+ * whose they are. A hover that read only the named ones let go of a conversation the
+ * moment the pointer crossed one of its links over the seam, though the link was
+ * visibly joining two balloons of the panel it was leaving.
  */
 function overDrawnInk(x: number, y: number, panel: number): boolean {
   const host = document.querySelector(`.cb-panel[data-cb-panel="${panel}"]`)
@@ -53,14 +86,15 @@ function overDrawnInk(x: number, y: number, panel: number): boolean {
         if (shapeHolds(svg, shape, x, y)) return true
       }
     }
+    // A chain clipped to its panel is cut at the seam like its balloons are, and a
+    // tube cut there cannot be pointed at from the far side.
+    for (const tube of host.querySelectorAll('.cb-tube.is-visible')) {
+      if (tube.closest('.cb-bubble-clip')) continue
+      if (tubeHolds(tube, x, y)) return true
+    }
   }
-  // Tubes live on one viewport-level SVG, outside every panel element; each names
-  // the panel whose balloons it joins. Only the fill: a tube's rails are its edges.
-  for (const tube of document.querySelectorAll(
-    `.cb-tube.is-visible[data-cb-panel="${panel}"] .cb-tube-fill`)) {
-    const svg = tube.closest<SVGSVGElement>('svg')
-    if (!svg || typeof svg.createSVGPoint !== 'function') continue
-    if (shapeHolds(svg, tube as SVGGeometryElement, x, y)) return true
+  for (const tube of document.querySelectorAll(`.cb-tube.is-visible[data-cb-panel="${panel}"]`)) {
+    if (tubeHolds(tube, x, y)) return true
   }
   return false
 }
