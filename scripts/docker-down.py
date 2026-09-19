@@ -1,5 +1,12 @@
 #!/usr/bin/env python3
-"""Stops and removes all Docker Compose containers.
+"""Stops the Docker Compose containers and keeps them.
+
+`docker compose stop`, not `down`: a stopped container is one Docker Desktop's start
+button (`compose start`) can bring back, and a deleted one is not -- after a `down`
+the stack can only ever be started again from the task. Stopped is also the state the
+nightly `stop-idle` job leaves and the one `restart: unless-stopped` respects across
+reboots. Named volumes survive either way; run `docker compose down` by hand when the
+containers themselves should go.
 
 On failure writes output to logs/docker/down.log; on success clears it.
 """
@@ -9,15 +16,16 @@ import sys
 import docker_common as dc
 
 ARTIFACT = "down.log"
+COMMAND = ["docker", "compose", "stop"]
 
 
 def main() -> int:
     print("\n=== Carameli Docker Stop ===")
     print(f"Artifact : {dc.DOCKER_LOG_DIR / ARTIFACT}")
-    print("Command  : docker compose down\n")
+    print(f"Command  : {' '.join(COMMAND)}\n")
 
     print("Stopping containers...")
-    output, code = dc.run(["docker", "compose", "down"])
+    output, code = dc.run(COMMAND)
     for line in output:
         print(f"  {line}")
 
@@ -26,12 +34,12 @@ def main() -> int:
         print(dc.banner("STACK STOPPED"))
         return 0
 
-    print(f"  [FAIL] docker compose down exited with code {code}")
+    print(f"  [FAIL] {' '.join(COMMAND)} exited with code {code}")
     dc.write_artifact(
         ARTIFACT,
         dc.format_artifact(
             "Failed task: Stop: Docker Stack",
-            ["=== docker compose down ===", *output],
+            [f"=== {' '.join(COMMAND)} ===", *output],
         ),
     )
     print(f"\nErrors written to: {dc.DOCKER_LOG_DIR / ARTIFACT}")

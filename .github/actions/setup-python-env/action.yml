@@ -8,7 +8,7 @@
 # `uv sync`: there is nothing for it to sync from.
 name: Set up Python env
 description: >-
-  Set up Python 3.12 with pip caching and install the compiled runtime + dev
+  Set up the Python named by `.python-version` and install the compiled runtime + dev
   locks. The repository must already be checked out (a local composite action
   runs from the workspace), so callers keep their own actions/checkout step —
   its args (ref, fetch-depth) differ per job.
@@ -26,7 +26,7 @@ runs:
   steps:
     - uses: actions/setup-python@v7
       with:
-        python-version: "3.12"
+        python-version-file: .python-version
     - name: Install uv (version from the compiled dev lock)
       shell: bash
       run: |

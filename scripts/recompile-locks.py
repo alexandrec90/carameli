@@ -12,6 +12,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import script_common
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 ARTIFACT = REPO_ROOT / "logs" / "deps-lock-errors.log"
 
@@ -22,8 +24,13 @@ LOCK_SPECS: tuple[tuple[str, str, str | None], ...] = (
 )
 
 
-def compile_commands(python: str) -> list[list[str]]:
-    """Return the ordered universal-compile commands for all lock layers."""
+def compile_commands(python: str, target_version: str | None = None) -> list[list[str]]:
+    """Return the ordered universal-compile commands for all lock layers.
+
+    `--python-version` is the repo's pin, not the interpreter running this script: a
+    workstation on a newer Python must still produce locks the container can install.
+    """
+    target_version = target_version or script_common.pinned_python(REPO_ROOT)
     commands: list[list[str]] = []
     for source, output, constraint in LOCK_SPECS:
         command = [
@@ -34,7 +41,7 @@ def compile_commands(python: str) -> list[list[str]]:
             "compile",
             "--universal",
             "--python-version",
-            "3.12",
+            target_version,
             source,
             "-o",
             output,

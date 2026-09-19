@@ -312,7 +312,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version-file: .python-version
           cache: pip
       - run: pip install -r requirements.txt -r requirements-dev.txt
       - name: Run backend unit tests
@@ -336,7 +336,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "24"
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
@@ -419,7 +419,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version-file: .python-version
           cache: pip
       - run: pip install -r requirements.txt -r requirements-dev.txt
       - name: Full unit suite
@@ -445,7 +445,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "24"
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
@@ -460,7 +460,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version-file: .python-version
           cache: pip
       - run: pip install -r requirements.txt -r requirements-dev.txt
       - run: playwright install --with-deps
@@ -513,7 +513,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version-file: .python-version
           cache: pip
       - run: pip install -r requirements.txt -r requirements-dev.txt
       - run: pytest tests/unit/test_migration_concerns.py -v -m slow
@@ -541,7 +541,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version-file: .python-version
           cache: pip
       - run: pip install -r requirements.txt -r requirements-dev.txt
       - run: pytest tests/integration/test_resilience.py -v
@@ -554,7 +554,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version-file: .python-version
           cache: pip
       - run: pip install -r requirements.txt -r requirements-dev.txt mutmut
       - name: Run mutation tests

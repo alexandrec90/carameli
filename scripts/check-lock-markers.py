@@ -25,10 +25,16 @@ import re
 import sys
 from pathlib import Path
 
+import script_common
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
+# The hint has to name the same `--python-version` the locks were compiled with, or it
+# tells the reader to regenerate them against a different interpreter than the one the
+# image runs -- which is the failure it is trying to help them out of.
 FIX_HINT = (
-    "# fix: python -m uv pip compile --universal --python-version 3.12 "
+    f"# fix: python -m uv pip compile --universal "
+    f"--python-version {script_common.pinned_python(REPO_ROOT)} "
     "requirements.in -o requirements.txt (same for -test and -dev; or run "
     "python scripts/recompile-locks.py)"
 )

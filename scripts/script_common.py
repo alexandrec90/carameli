@@ -64,6 +64,26 @@ def load_script(rel: str, repo_root: Path = REPO_ROOT) -> ModuleType:
     return module
 
 
+PYTHON_PIN = ".python-version"
+
+
+def pinned_python(repo_root: Path = REPO_ROOT) -> str:
+    """The interpreter version this repo is pinned to, read from `.python-version`.
+
+    Every script that has to name a Python version -- the lock compiler, the ephemeral
+    `uv run` fallback, the fix hints printed at people -- reads it here instead of
+    spelling it out. A literal in one of those is not a duplicate of the pin, it is a
+    *second* pin that no one remembers to move: `tests/unit/test_python_version_pin.py`
+    can only gate the copies it knows about, and the ones it does not are found when a
+    lock is compiled for an interpreter the image does not run.
+
+    Deliberately unguarded. A missing `.python-version` is a broken checkout, and the
+    failure everything here exists to prevent is precisely the quiet fallback to a
+    default, so this raises rather than guessing.
+    """
+    return (repo_root / PYTHON_PIN).read_text(encoding="utf-8").strip()
+
+
 def venv_rel_parts(name: str, os_name: str = os.name) -> tuple[str, str, str]:
     """OS-correct (.venv subdir, bindir, filename) for a console script.
 

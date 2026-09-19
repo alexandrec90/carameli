@@ -10,13 +10,18 @@ import type { BubbleTransform } from './editor/types'
 // short messages then read as two ladders with a corridor of nothing between them. Two
 // changes make it read as a thread instead:
 //
-// - **Rows interleave where they can.** A row is placed by what it would actually collide
-//   with: it must clear the ellipse of every row *beside* which it would overlap
-//   horizontally, and beyond that it may sink partway down alongside the row below it —
-//   {@link CHAIN_INTERLEAVE} — so a reply on the other side tucks in next to the message
-//   it answers rather than a full balloon above it. A long message that fills its column
-//   still stacks, because it overlaps everything. That is what lets the two columns be
-//   drawn *close* — overlapping, even — without any two balloons overlapping.
+// - **Rows interleave where they can, and height is time.** A row is placed by what it
+//   would actually collide with: it must clear the ellipse of every row *beside* which it
+//   would overlap horizontally, and beyond that it sinks alongside the newer rows until
+//   its bottom is a small step above the bottom of every one of them —
+//   {@link CHAIN_ORDER_STEP} — so a reply on the other side tucks in next to the message
+//   it answers rather than a full balloon above it, and the bottoms of the balloons still
+//   read in transcript order: whichever column a balloon is in, the one said just before
+//   it ends a little higher up the panel, the one said just after a little lower. A long
+//   message that fills its column still stacks, because it overlaps everything. That is
+//   what lets the two columns be drawn *close* — overlapping, even — without any two
+//   balloons overlapping, and without two balloons on opposite sides sitting level, which
+//   would leave nothing to say which was said first.
 // - **Each speaker's rows zig-zag.** A row alternates between its column's outer edge
 //   and a lean inward ({@link CHAIN_ZIGZAG}), by its ordinal among that speaker's
 //   messages in the whole transcript — not its row on screen, or every balloon would
@@ -34,11 +39,13 @@ export const CHAIN_ROW_GAP = 1.5
 export const CHAIN_COL_GAP = 2
 
 /**
- * How far a row may sink alongside the row below it, as a fraction of that row's ellipse
- * height: 0.5 lets it come down to the lower ellipse's midline, 0 makes every row sit
- * wholly above the last (the old ruled table), 1 would let two rows sit level.
+ * The least distance an older row's ellipse bottom sits above a newer row's, as a fraction
+ * of the newer row's ellipse height. It is the offset that says which of two balloons
+ * beside each other was said first: 0 would let them sit level and say nothing, 1 would
+ * put every row wholly above the last (the old ruled table). A quarter is enough to read
+ * and leaves a short reply tucked in alongside most of the message it answers.
  */
-export const CHAIN_INTERLEAVE = 0.5
+export const CHAIN_ORDER_STEP = 0.25
 
 /**
  * How far into its column's slack a leaning row moves, as a fraction of that slack — the
@@ -123,34 +130,34 @@ export function chainRowTop(
 }
 
 /**
- * The `top` of the next row up, given every row already placed (bottom first) and the
- * row's own width, side edge and stretch.
+ * The `top` of the next row up, given every row already placed — all of them newer than
+ * it, bottom first — and the row's own width, side edge and stretch.
  *
- * Its ellipse's bottom goes as low as two limits allow: it sinks alongside the row
- * `below` it to {@link CHAIN_INTERLEAVE} of that ellipse, and it clears, by
- * {@link CHAIN_ROW_GAP}, every placed row whose ellipse it would overlap horizontally —
- * within {@link CHAIN_COL_GAP} of touching counts as overlapping. Directly over the row
- * below it the second limit binds and the row stacks exactly as {@link chainRowTop}
- * stacks it.
+ * Its ellipse's bottom goes as low as two limits allow. Against *every* placed row it
+ * stops {@link CHAIN_ORDER_STEP} of that row's ellipse above that row's bottom, so that
+ * the bottoms of the balloons run in transcript order however the columns interleave; and
+ * it clears, by {@link CHAIN_ROW_GAP}, every placed row whose ellipse it would overlap
+ * horizontally — within {@link CHAIN_COL_GAP} of touching counts as overlapping. Directly
+ * over the row below it the second limit binds and the row stacks exactly as
+ * {@link chainRowTop} stacks it; beside it, the first does, and the row tucks in.
  *
- * `below` is the row before this one in the conversation, which is the last one placed
- * unless the caller placed some rows out of order — an anchored balloon, say, that had to
- * be on the panel before the rows that must clear it (see `placeRows`, chainRows.ts).
+ * The order limit is taken against every row rather than the one just below because the
+ * two at the foot are placed by the author, not by this rule (`placeRows`, chainRows.ts),
+ * and nothing says which of them ends lower.
  */
 export function stackedTop(
   placed: readonly PlacedRow[],
   next: Pick<BubbleTransform, 'right' | 'width'> & { stretch: number },
   panelAspect: number,
-  below: PlacedRow | undefined = placed[placed.length - 1],
 ): number {
-  if (!below) throw new Error('stackedTop needs a row to stack on')
-  const lastE = rowEllipse(below, panelAspect)
-  let bottom = lastE.y1 + (lastE.y2 - lastE.y1) * CHAIN_INTERLEAVE
+  if (placed.length === 0) throw new Error('stackedTop needs a row to stack on')
+  let bottom = Infinity
   const left = 100 - next.right - next.width
   const x1 = left + next.width * (BUBBLE_ELLIPSE_N.cx - BUBBLE_ELLIPSE_N.rx) - CHAIN_COL_GAP
   const x2 = left + next.width * (BUBBLE_ELLIPSE_N.cx + BUBBLE_ELLIPSE_N.rx) + CHAIN_COL_GAP
   for (const row of placed) {
     const e = rowEllipse(row, panelAspect)
+    bottom = Math.min(bottom, e.y2 - (e.y2 - e.y1) * CHAIN_ORDER_STEP)
     if (e.x2 > x1 && e.x1 < x2) bottom = Math.min(bottom, e.y1 - CHAIN_ROW_GAP)
   }
   const h = bubbleHeightPct(next.width, panelAspect, next.stretch)

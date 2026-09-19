@@ -1,6 +1,6 @@
 """Tests for scripts/check-lock-markers.py (lockfile env-marker gate)."""
 
-from conftest import load_module
+from conftest import REPO_ROOT, load_module
 
 clm = load_module("scripts/check-lock-markers.py")
 
@@ -102,3 +102,12 @@ def test_main_flags_missing_lock_file(tmp_path, monkeypatch, capsys):
     )
     assert clm.main() == 1
     assert "not found" in capsys.readouterr().out
+
+
+def test_fix_hint_names_the_pinned_interpreter():
+    """The hint tells the reader how to regenerate the locks. Naming a different
+    `--python-version` than the one they were compiled with sends them to a lock the
+    image cannot install -- so it reads `.python-version`, like every other caller."""
+    pin = (REPO_ROOT / ".python-version").read_text(encoding="utf-8").strip()
+
+    assert f"--python-version {pin} " in clm.FIX_HINT

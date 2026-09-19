@@ -8,7 +8,7 @@ __pycache__
 .ruff_cache
 .hypothesis
 
-# Frontend — runs in its own node:20-slim container; Python image needs none of it
+# Frontend — runs in its own node:24-slim container; Python image needs none of it
 frontend/
 
 # Logs

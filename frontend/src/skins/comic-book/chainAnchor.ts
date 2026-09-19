@@ -9,10 +9,10 @@ import type { BubbleTransform } from './editor/types'
 // — dragged until it points at a character's mouth. A row stamped from that template is
 // as wide as its words and as tall as they wrap (bubbleFit.ts), so it is rarely the
 // template's size, and a balloon hung from the template's `top`/`right` corner would
-// carry its tip somewhere else with every message. So the newest row of each side is
-// placed by its anchor instead: the tip of its tail, or the centre of its ellipse when it
-// has none. It grows and shrinks around that point, and the tail keeps pointing where the
-// author pointed it. Pure geometry, in the panel box's % units; `placeRows` in
+// carry its tip somewhere else with every message. So the rows at the foot of the thread
+// are placed by their anchor instead: the tip of the tail, or the centre of the ellipse
+// when there is none. A balloon grows and shrinks around that point, and its tail keeps
+// pointing where the author pointed it. Pure geometry, in the panel box's % units; `placeRows` in
 // chainRows.ts is what calls it.
 
 /** A point on the panel: x in % of the box width, y in % of its height — `top`'s units. */

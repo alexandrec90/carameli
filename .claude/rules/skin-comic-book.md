@@ -168,10 +168,14 @@ template. Member 0 is the **sender**: rightmost, composer at its foot. **Every r
 fitted to its words** from `letteringPx`, never the DOM (`fitRow`, `bubbleFit.ts`): a
 balloon inflates from `CHAIN_MIN_WIDTH_RATIO` of its column, wider and taller together
 and leaning tall (`GROW_BIAS`), until it is as wide as the template the author drew, and
-from there taller alone (`stretch`). **The newest row of each side hangs on its template's
-tail tip**, which never moves (`chainAnchor.ts`); older rows lay out bottom-up by
-collision (`chainLayout.ts`): clear of what a row would overlap, tucked in beside what it
-would not, zig-zagging by message ordinal (`zigzagShift`).
+from there taller alone (`stretch`). **The foot of the thread sits on its template's
+anchor**, its tail tip never moving (`chainAnchor.ts`): the newest message, or the
+composer with the recipient's newest beside it. Every other row lays out bottom-up by
+collision (`chainLayout.ts`): clear of what it would overlap, tucked in beside what it
+would not, and **ending a small step above every newer balloon** (`CHAIN_ORDER_STEP`) so
+the bottoms read in transcript order — a side's newest climbs above the other side's newer
+reply rather than holding its anchor level with it. Rows zig-zag by message ordinal
+(`zigzagShift`).
 `PANEL_BUBBLE_CHAINS` holds one entry per id in use and is **derived, not authored**
 (`syncChains`), so a chain with no members and a member with no chain are unreachable.
 

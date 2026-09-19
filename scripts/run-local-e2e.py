@@ -17,7 +17,7 @@ Two things this runner handles that a bare `pytest tests/local_e2e` does not:
    pytest and httpx.
 
 Usage: python scripts/run-local-e2e.py [-k EXPR] [extra pytest args]
-   or: uv run --python 3.12 --no-project scripts/run-local-e2e.py
+   or: uv run --python "$(cat .python-version)" --no-project scripts/run-local-e2e.py
 """
 
 import os
@@ -111,13 +111,14 @@ def resolve_pytest_cmd(
     if venv_python.exists():
         return [str(venv_python), "-m", "pytest"], "project venv (.venv)"
     if has_uv:
-        cmd = ["uv", "run", "--python", "3.12", "--no-project"]
+        cmd = ["uv", "run", "--python", script_common.pinned_python(REPO_ROOT), "--no-project"]
         for dep in EPHEMERAL_DEPS:
             cmd += ["--with", dep]
         cmd.append("pytest")
         return cmd, "ephemeral uv environment"
+    pin = script_common.pinned_python(REPO_ROOT)
     return None, (
-        "no .venv and no uv on PATH — create the venv (`uv venv --python 3.12`) or install uv"
+        f"no .venv and no uv on PATH — create the venv (`uv venv --python {pin}`) or install uv"
     )
 
 
