@@ -156,6 +156,20 @@ def _is_instruction(f: str) -> bool:
     return f == "CLAUDE.md" or f.startswith(".claude/")
 
 
+# Mirrors the globs in package.json's `lint:spelling`: every markdown file in the repo,
+# plus the frontend sources. Keep the two in step -- a file this misses is a file the
+# --changed mode silently stops spell-checking.
+_SPELL_FE_EXT = (*_FE_SCRIPT_EXT, ".json", ".yml", ".yaml")
+
+
+def _is_spellable(f: str) -> bool:
+    return _is_md(f) or (f.startswith("frontend/src/") and f.endswith(_SPELL_FE_EXT))
+
+
+def _is_frontend(f: str) -> bool:
+    return f.startswith("frontend/")
+
+
 # ---------------------------------------------------------------------------
 # Per-tool runners. Each returns {report_name: (lines, exit_code)}. Tools that
 # auto-fix do so before the reporting pass so only unfixable issues are reported.
@@ -202,6 +216,26 @@ def t_stylelint(changed: list[str] | None = None) -> dict:
     if changed is not None and not _sel(changed, _is_fe_css):
         return {"stylelint": ([], 0)}
     return {"stylelint": run("npm --prefix frontend run lint:css -- --fix")}
+
+
+def t_cspell(changed: list[str] | None = None) -> dict:
+    # Was in `npm run lint` and in no gate at all, which is how a cspell that could not
+    # start on the pinned Node merged green (see tests/unit/test_node_version_pin.py).
+    # `test_lint_all_covers_every_frontend_lint_script` is what keeps it here.
+    #
+    # Gated, not file-scoped: the npm script owns the globs, and passing a changed-file
+    # subset would apply the repo's cspell.config.yaml to paths it does not expect.
+    if changed is not None and not _sel(changed, _is_spellable):
+        return {"cspell": ([], 0)}
+    return {"cspell": run("npm --prefix frontend run lint:spelling")}
+
+
+def t_knip(changed: list[str] | None = None) -> dict:
+    # Whole-project reachability analysis, so it cannot scope to files: an export stops
+    # being dead because of an edit somewhere else. Gate on any frontend change.
+    if changed is not None and not _sel(changed, _is_frontend):
+        return {"knip": ([], 0)}
+    return {"knip": run("npm --prefix frontend run lint:deadweight")}
 
 
 def t_markdownlint(changed: list[str] | None = None) -> dict:
@@ -526,6 +560,8 @@ LOCAL_TOOLS = [
     t_eslint,
     t_tsc,
     t_stylelint,
+    t_cspell,
+    t_knip,
     t_markdownlint,
     t_mypy,
     t_pip_audit,

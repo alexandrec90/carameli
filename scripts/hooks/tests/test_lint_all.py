@@ -1,6 +1,7 @@
 """Tests for scripts/lint-all.py tool-set composition (local vs CI) and the
 --changed scoping mode."""
 
+import inspect
 import json
 import re
 import sys
@@ -157,8 +158,104 @@ def test_markdownlint_skips_when_only_a_transcript_changed(monkeypatch):
     }
 
 
+def test_lint_all_covers_every_frontend_lint_script():
+    """`npm run lint` and the gate's idea of "lint" must be the same set of checks.
+
+    They were not: `lint:spelling` and `lint:deadweight` existed only in the npm chain,
+    so cspell and knip ran when a human typed `npm run lint` and in no CI job, no
+    pre-commit hook and no ship-time gate. That is how a cspell whose `engines.node`
+    excluded the pinned interpreter merged green -- nothing that runs automatically had
+    ever executed it. Asserting the registry by name rather than counting tools is the
+    point: a new `lint:*` script fails here until it is wired up.
+    """
+    package_json = json.loads(
+        (Path(la.REPO_ROOT) / "frontend/package.json").read_text(encoding="utf-8")
+    )
+    scripts = package_json["scripts"]
+    chain = scripts["lint"]
+
+    steps = {name for name in scripts if name.startswith("lint:")}
+    assert steps, "no lint:* scripts found -- this test would pass vacuously"
+
+    # The aggregate must invoke each one, or `npm run lint` is itself incomplete.
+    missing_from_chain = {step for step in steps if f"npm run {step}" not in chain}
+    assert not missing_from_chain, (
+        f"`npm run lint` does not invoke {sorted(missing_from_chain)} -- either chain it "
+        "or delete the script"
+    )
+
+    # ...and lint-all.py, which is what CI and ship actually run, must invoke each one.
+    # Read the REGISTERED tools' own source, not the whole file: a `t_cspell` that
+    # exists but was dropped from CI_TOOLS is exactly the state this guards against,
+    # and grepping the module would still find its command string and pass.
+    registered = {tool.__name__ for tool in la.CI_TOOLS}
+    wired = "\n".join(inspect.getsource(tool) for tool in la.CI_TOOLS)
+    unwired = {step for step in steps if f"run {step}" not in wired}
+    assert not unwired, (
+        f"{sorted(unwired)} run only from `npm run lint`, never from lint-all.py -- CI, "
+        f"pre-commit and ship all go through lint-all.py, so those checks are enforced "
+        f"nowhere. Registered tools: {sorted(registered)}"
+    )
+
+
+def test_every_tool_result_reaches_the_artifact():
+    """`digest_lint` walks `LINT_SECTIONS`, so a result whose name has no entry there is
+    dropped: the tool runs, fails, and leaves `any_failed` False and the artifact empty.
+
+    That is the same shape as a tool missing from the registry -- a gate reporting green
+    having reported nothing -- and it is one careless `return {"newtool": ...}` away at
+    any time. Calling each tool with an empty changed-list returns its skip dict without
+    executing anything, which is enough to learn the names it can emit.
+    """
+    reported = {name for name, _, _ in diag.LINT_SECTIONS}
+    # alembic-check is read out of `results` directly, after the loop, because it
+    # synthesises a file locator when the tool emits none.
+    reported.add("alembic-check")
+
+    emitted = set()
+    for tool in la.LOCAL_TOOLS:
+        emitted |= set(tool([]))
+
+    assert emitted, "no tool names collected -- this test would pass vacuously"
+    assert emitted <= reported, (
+        f"{sorted(emitted - reported)} would be dropped by digest_lint: add a "
+        "LINT_SECTIONS entry (report name, fix hint, keep filter) in scripts/diagnostics.py"
+    )
+
+
+def test_spelling_and_deadweight_run_in_ci():
+    for tool in (la.t_cspell, la.t_knip):
+        assert tool in la.LOCAL_TOOLS
+        assert tool in la.CI_TOOLS
+
+
+@pytest.mark.parametrize(
+    ("changed", "tool", "expected"),
+    [
+        # cspell's globs cover every markdown file in the repo, not just the frontend's.
+        (["docs/operations/softphone-demo.md"], "t_cspell", "lint:spelling"),
+        (["frontend/src/skins/context.tsx"], "t_cspell", "lint:spelling"),
+        (["frontend/src/skins/comic-book/panels.json"], "t_cspell", "lint:spelling"),
+        # knip reads the manifest and the configs, not only the sources.
+        (["frontend/package.json"], "t_knip", "lint:deadweight"),
+        (["frontend/src/main.tsx"], "t_knip", "lint:deadweight"),
+    ],
+)
+def test_spelling_and_deadweight_run_on_a_relevant_change(monkeypatch, changed, tool, expected):
+    seen = []
+    monkeypatch.setattr(la, "run", lambda cmd: seen.append(cmd) or ([], 0))
+
+    getattr(la, tool)(changed)
+
+    assert len(seen) == 1
+    assert expected in seen[0]
+    assert "--prefix frontend" in seen[0]
+
+
 def test_gated_tools_skip_when_no_relevant_change():
     py_only = ["app/services/x.py"]
+    assert la.t_cspell(py_only) == {"cspell": ([], 0)}
+    assert la.t_knip(py_only) == {"knip": ([], 0)}
     assert la.t_eslint(py_only) == {"eslint": ([], 0)}
     assert la.t_tsc(py_only) == {"tsc": ([], 0)}
     assert la.t_stylelint(py_only) == {"stylelint": ([], 0)}

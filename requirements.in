@@ -6,6 +6,7 @@ alembic>=1.19.2
 pydantic>=2.13.5
 pydantic-settings>=2.15.0
 arq>=0.28.0
+anyio>=4.14.2  # CVE-2026-63374, CVE-2026-64847 — 4.14.1 and earlier are vulnerable
 cryptography>=50.0.1  # CVE-2026-69247 — 49.0.0 and earlier are vulnerable
 httpx>=0.28.0
 redis[hiredis]>=5.0.0

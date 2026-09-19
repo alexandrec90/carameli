@@ -150,7 +150,7 @@ services:
   #     - app
 
   frontend:
-    image: node:20-slim
+    image: node:24-slim
     restart: unless-stopped
     stop_grace_period: 3s
     working_dir: /app

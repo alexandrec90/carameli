@@ -40,8 +40,8 @@ describe('installing it', () => {
     const target = { localStorage: working }
 
     expect(installStorage(target, 'localStorage')).toBe(false)
-    // The guard is what makes this a no-op on CI's Node 20, where happy-dom's own
-    // storage is in place: replacing it would throw away whatever a test had stored.
+    // The guard is what makes this a no-op wherever happy-dom's own storage is in
+    // place: replacing it would throw away whatever a test had stored.
     expect(target.localStorage).toBe(working)
     expect(target.localStorage.getItem('skin')).toBe('carameli')
   })
@@ -76,9 +76,9 @@ describe('installing it', () => {
 
 describe('the environment the suite actually runs in', () => {
   it('has a usable localStorage and sessionStorage', () => {
-    // The reversion check: drop the `setupFiles` entry and this fails on Node >= 22.4
-    // while still passing on CI's Node 20 — so it is asserted here as well as relied on
-    // by every test that stores a skin.
+    // The reversion check: drop the `setupFiles` entry and this fails on Node >= 22.4,
+    // which since the pin moved to 24 means CI too — so it is asserted here as well as
+    // relied on by every test that stores a skin.
     expect(storageWorks(globalThis, 'localStorage')).toBe(true)
     expect(storageWorks(globalThis, 'sessionStorage')).toBe(true)
 

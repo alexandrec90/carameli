@@ -102,6 +102,44 @@ jobs:
           name: mutation-report
           path: reports/mutation-report.txt
 
+  node-pin:
+    # The runtime pin is the one dependency nothing else watches. npm's floors are
+    # checked on every PR by tests/unit/test_node_version_pin.py, but that only fires
+    # once a package has already moved past us -- which is five months after a line goes
+    # end-of-life, and arrives disguised as a broken linter. This asks the other
+    # question, weekly: is the pinned line still supported, and is there a newer LTS the
+    # lock already admits.
+    #
+    # No composite action and no lock install: the script is stdlib-only on purpose, so
+    # setup-python alone is the whole environment. Its only network call is the Node
+    # release schedule, and an unreachable one exits 0 rather than inventing a verdict.
+    name: Node pin support window
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version-file: .python-version
+      - name: Check the Node pin
+        run: python scripts/check-node-pin.py
+      - name: Surface the finding on the run
+        # A notice in a job log is a notice nobody reads. An EOL pin fails the step
+        # above and the scheduled-failure sweep files it as an issue; a newer-LTS
+        # proposal passes, so the step summary is where it has to land to be seen.
+        if: always() && hashFiles('logs/node-pin.log') != ''
+        run: |
+          {
+            echo "### Node pin"
+            echo
+            echo '```'
+            cat logs/node-pin.log
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          while IFS= read -r line; do
+            case "$line" in \#*|"") continue ;; esac
+            echo "::warning file=.nvmrc,line=1::$line"
+          done < logs/node-pin.log
+
   weekly-reliability-report:
     name: Weekly reliability summary
     runs-on: ubuntu-latest

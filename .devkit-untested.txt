@@ -458,7 +458,6 @@ scripts/run-local-e2e.py::extract_failure_blocks
 scripts/run-local-e2e.py::find_unreported_tests
 scripts/run-local-e2e.py::get_fix_hint
 scripts/run-local-e2e.py::main
-scripts/run-local-e2e.py::resolve_pytest_cmd
 scripts/run-local-e2e.py::stream_lines
 scripts/run-tests.py::pick_fast_command
 scripts/run-tests.py::run_argv
