@@ -20,99 +20,41 @@ target (`@img/sharp-win32-ia32` declares `^20.9.0`), and npm skips the ones whos
 
 from __future__ import annotations
 
+import importlib
 import json
 import re
+import sys
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(REPO / "scripts"))
+
+# `import_module` rather than an `import` statement: the path has to be extended first,
+# and an import below that line is E402. Suppressing the rule would be a dead directive
+# the moment anyone reorders this, and a suppression is a thing to justify -- a plain
+# function call needs neither.
+node_pin = importlib.import_module("node_pin")
 
 NODE_VERSION = re.compile(r"^\s*node-version:\s*[\"']?(\d+)", re.MULTILINE)
 NODE_IMAGE = re.compile(r"^\s*image:\s*node:(\d+)", re.MULTILINE)
 
-# A pin like "24" means "whatever 24.x actions/setup-node resolves to", so the pin is
-# tested as the newest conceivable release on that line. Anything else would read
-# `^20.19.0` as unsatisfied by a pin of `20`, which is how CI has always resolved it.
-_LINE_END = 1 << 30
-
-Version = tuple[int, int, int]
-
-
-def _parse_version(text: str) -> Version:
-    """`v12.22.7`, `0.4` and `24` all become a comparable triple."""
-    parts = text.strip().lstrip("v=").split(".")
-    numbers = [int(re.match(r"\d+", part).group()) for part in parts if re.match(r"\d+", part)]
-    numbers += [0] * (3 - len(numbers))
-    return (numbers[0], numbers[1], numbers[2])
-
-
-def _upper_bound(text: str, caret: bool) -> Version:
-    """The exclusive ceiling `^`/`~` put on a (possibly partial) version."""
-    cleaned = text.strip().lstrip("v=")
-    parts = [part for part in cleaned.split(".") if part]
-    major, minor, patch = _parse_version(cleaned)
-    if caret:
-        if major:
-            return (major + 1, 0, 0)
-        # Below 1.0.0 every place is breaking: ^0.2.3 is <0.3.0, ^0.0.3 is <0.0.4.
-        if minor or len(parts) < 3:
-            return (0, minor + 1, 0) if len(parts) > 1 else (1, 0, 0)
-        return (0, 0, patch + 1)
-    return (major, minor + 1, 0) if len(parts) > 1 else (major + 1, 0, 0)
-
-
-def _satisfies_comparator(candidate: Version, comparator: str) -> bool:
-    comparator = comparator.strip()
-    if not comparator or comparator in {"*", "x"}:
-        return True
-    for operator in (">=", "<=", ">", "<"):
-        if comparator.startswith(operator):
-            other = _parse_version(comparator[len(operator) :])
-            if operator == ">=":
-                return candidate >= other
-            if operator == "<=":
-                return candidate <= other
-            if operator == ">":
-                return candidate > other
-            return candidate < other
-    if comparator[0] in "^~":
-        rest = comparator[1:]
-        return _parse_version(rest) <= candidate < _upper_bound(rest, caret=comparator[0] == "^")
-    # A bare `20` or `20.x` is that release line, which is what a pin names too.
-    return _parse_version(comparator)[0] == candidate[0]
-
-
-def satisfies(candidate: Version, node_range: str) -> bool:
-    """Whether `candidate` is admitted by an npm `engines.node` range.
-
-    Supports the forms the lockfile actually uses: `||` alternatives, space-separated
-    comparators within one alternative, `^`/`~`, the four inequalities, bare release
-    lines and `*`.
-    """
-    for alternative in node_range.split("||"):
-        comparators = re.findall(r"(?:[<>]=?|[\^~])?\s*v?\d[\w.\-]*|\*", alternative)
-        if comparators and all(
-            _satisfies_comparator(candidate, comparator.replace(" ", ""))
-            for comparator in comparators
-        ):
-            return True
-    return False
+# The range parser lives in `scripts/node_pin.py`, not here. `check-node-pin.py` asks the
+# same question of a *candidate* line before proposing a move, and two implementations of
+# "does the tree run on 26" is one answer nobody exercises.
+satisfies = node_pin.satisfies
+_LINE_END = node_pin.LINE_END
 
 
 def _pinned_major() -> int:
-    return int((REPO / ".nvmrc").read_text(encoding="utf-8").strip())
+    return node_pin.pinned_major(REPO)
 
 
-def _pinned_candidate() -> Version:
-    return (_pinned_major(), _LINE_END, _LINE_END)
+def _pinned_candidate() -> node_pin.Version:
+    return node_pin.line(_pinned_major())
 
 
 def _engine_requirements() -> list[tuple[str, str]]:
-    lock = json.loads((REPO / "frontend" / "package-lock.json").read_text(encoding="utf-8"))
-    return [
-        (name or "<root>", package["engines"]["node"])
-        for name, package in lock["packages"].items()
-        if not package.get("optional") and (package.get("engines") or {}).get("node")
-    ]
+    return node_pin.engine_constraints(REPO)
 
 
 def test_the_repo_pins_a_node_line() -> None:
@@ -228,5 +170,5 @@ def test_the_range_parser_reads_the_forms_the_lockfile_uses() -> None:
     assert not satisfies((24, _LINE_END, _LINE_END), "^20.9.0")
     assert not satisfies((24, _LINE_END, _LINE_END), "<24.0.0")
     assert satisfies((24, _LINE_END, _LINE_END), "~24")
-    assert _upper_bound("0.0.3", caret=True) == (0, 0, 4)
-    assert _upper_bound("0.2.3", caret=True) == (0, 3, 0)
+    assert node_pin.upper_bound("0.0.3", caret=True) == (0, 0, 4)
+    assert node_pin.upper_bound("0.2.3", caret=True) == (0, 3, 0)
