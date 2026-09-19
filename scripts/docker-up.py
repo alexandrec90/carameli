@@ -28,18 +28,21 @@ _BROKEN_RE = re.compile(r"unhealthy|exited(?! \(0\))|dead", re.IGNORECASE)
 _STARTING_RE = re.compile(r"starting|Created|created", re.IGNORECASE)
 _FAILURE_RE = re.compile(r"unhealthy|exited(?! \(0\))|dead|created", re.IGNORECASE)
 
-# The daemon lost its network state but kept the containers, so each one still pins
-# the *ID* of a network that no longer exists and fails to start against it. Matching
-# is on the hex ID deliberately: a *name* that is not found means Compose failed to
-# create the network, which is a different fault that recreating containers does not
-# fix. Seen twice here after Docker Desktop's backend exited overnight -- the built-in
-# `bridge` came back with a new ID, which is the tell that the whole network KV store
-# was rebuilt rather than restored.
+# The containers survived but each one still pins the *ID* of a network that no longer
+# exists, and fails to start against it. Matching is on the hex ID deliberately: a
+# *name* that is not found means Compose failed to create the network, which is a
+# different fault that recreating containers does not fix. Every occurrence here was
+# devkit's 04:00 prune job running `docker network prune` on a stack `stop-idle` had
+# parked at 03:30 -- that command counts only a *running* container as a reference. It
+# was blamed on Docker Desktop's backend exiting overnight until the prune log was read
+# on 2026-09-17 (a new ID on the built-in `bridge` proves nothing; dockerd recreates it
+# on every start). devkit no longer prunes networks, so a recurrence means something
+# else is deleting them under stopped containers.
 _STALE_NETWORK_RE = re.compile(r"network [0-9a-f]{12,64} not found", re.IGNORECASE)
 
 
 def stale_network_failure(output) -> bool:
-    """True when `up` failed only because containers pin a network the daemon lost.
+    """True when `up` failed only because containers pin a network that is gone.
 
     The recovery is `--force-recreate`: it rebuilds the container objects against the
     network Compose has just recreated. Named volumes are not touched by container
@@ -77,7 +80,7 @@ def _start_services() -> int | None:
     """Bring the stack up. Returns None on success, or the exit code to return.
 
     Retries once with `--force-recreate` when, and only when, the first attempt failed
-    on a network the daemon lost -- see `stale_network_failure`. The retry is scoped to
+    on a network that is gone -- see `stale_network_failure`. The retry is scoped to
     that one fault deliberately: `--force-recreate` discards every container, so making
     it the generic response to a failing `up` would turn an ordinary error, a port
     already bound say, into a full stack rebuild.
@@ -93,7 +96,7 @@ def _start_services() -> int | None:
     if code != 0 and stale_network_failure(output):
         print(
             "\n  [RECOVER] Containers pin a network the daemon no longer has "
-            "(Docker Desktop restarted under them). Recreating them...\n"
+            "(something pruned it while they were stopped). Recreating them...\n"
         )
         output, code, timed_out = _run_step(
             f"Re-running up with --force-recreate (timeout {UP_TIMEOUT}s)...",
