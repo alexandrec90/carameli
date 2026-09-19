@@ -1,5 +1,5 @@
 import { fitMessage } from './bubbleFit'
-import type { BubbleFit } from './bubbleFit'
+import type { BubbleFit, FitMetrics } from './bubbleFit'
 import { CHAIN_MIN_WIDTH_RATIO, TYPING_KEY, sideOrdinals } from './bubbleChain'
 import type { ChainColumns, ChainLine, ChainRow } from './bubbleChain'
 import { anchorOf, placeOnAnchor } from './chainAnchor'
@@ -30,17 +30,26 @@ interface Stamp {
 }
 
 /**
+ * Fit `text` to a balloon stamped from `template`: as wide as its column at most, and
+ * never narrower than {@link CHAIN_MIN_WIDTH_RATIO} of it, inflating between the two
+ * (`fitMessage`). Every row of a chain is fitted by this one call — the composer to its
+ * draft, a message to its words — so what someone typed is drawn as the balloon they
+ * typed it in when Enter turns the one into the other.
+ */
+export function fitRow(text: string, template: BubbleTransform, m: FitMetrics): BubbleFit {
+  return fitMessage(text, template.type, template.width, template.width * CHAIN_MIN_WIDTH_RATIO, m)
+}
+
+/**
  * Cut a row from its side's template: fitted to `text`, leaning inward by its ordinal
  * from its column's outer edge, and still at its template's `top` — {@link placeRows}
  * decides that, once every row of the table is cut.
  *
- * The `newest` row of a side is the template as the author drew it: its full width, at
- * its own edge, so that with a message that fits on one line it is the balloon in the
- * editor, exactly. Only a message that wraps changes it, and only by making it taller
- * (`stretch`) — the author sized it by hand, and the one thing a message may do to it is
- * need more room. Where it sits is {@link placeRows}'s: on its anchor at the foot of the
- * thread, above the other side's newer messages otherwise. The rows above it are fitted
- * to their words.
+ * The `newest` row of a side keeps its template's edge — no lean — and its tail; its size
+ * is its words', like every other row's. The template the author drew is the column: the
+ * widest a balloon on that side can be, and where its tip points. Where it sits is
+ * {@link placeRows}'s: on its template's anchor at the foot of the thread, above the
+ * other side's newer messages otherwise.
  *
  * The tail follows from `newest` rather than being passed in: one per side is the rule
  * (see {@link conversationRows}), and a second argument saying so is one that can
@@ -54,13 +63,7 @@ function stampRow(
   const template = out ? cols.me : cols.them
   // The left column's left edge, which is what its balloons are aligned against.
   const themLeft = 100 - cols.them.right - cols.them.width
-  const fit = fitMessage(
-    text,
-    template.type,
-    template.width,
-    newest ? template.width : template.width * CHAIN_MIN_WIDTH_RATIO,
-    metrics,
-  )
+  const fit = fitRow(text, template, metrics)
   const shift = newest ? 0 : zigzagShift(ordinal, out, template.width - fit.width)
   return {
     bubble: {
@@ -98,12 +101,12 @@ function anchored(rows: readonly ChainRow[], i: number): boolean {
  * Put the cut rows on the panel, bottom row first.
  *
  * The rows at the foot go on their templates' anchors (chainAnchor.ts): the balloon still
- * talking is the template as the author drew it, and when its words have stretched it
- * taller it grows away from the tip they aimed, which stays put. Every other row is then
- * placed in conversation order by {@link stackedTop} against everything already on the
- * panel — a step above the bottom of every newer balloon, clear of every balloon it would
- * overlap. Which rows are anchored is {@link anchored}; they are always the first, so the
- * rows already placed when a row's turn comes are exactly the rows newer than it.
+ * talking is fitted to its words like any other, and it grows and shrinks away from the
+ * tip the author aimed, which stays put. Every other row is then placed in conversation
+ * order by {@link stackedTop} against everything already on the panel — a step above the
+ * bottom of every newer balloon, clear of every balloon it would overlap. Which rows are
+ * anchored is {@link anchored}; they are always the first, so the rows already placed when
+ * a row's turn comes are exactly the rows newer than it.
  */
 function placeRows(rows: readonly ChainRow[], cols: ChainColumns, aspect: number): ChainRow[] {
   const out = [...rows]
@@ -129,12 +132,12 @@ function placeRows(rows: readonly ChainRow[], cols: ChainColumns, aspect: number
  *
  * `shown` is the window over the transcript, newest first ({@link visibleWindow}), so this
  * walks up the panel in exactly that order: the composer if the chain is live — `composer`
- * is its fit, from {@link fitComposer}, and `null` on a chain that has none — then the
- * newest message, then the one before it. The rows at the foot are their templates as
- * drawn, on their anchors, and each other row is placed by `stackedTop` against everything
- * below — clear of what it would overlap, tucked in beside what it would not, and always
- * ending a little above every newer balloon, so the bottoms read in transcript order
- * — and the rows tile without a fixed pitch ({@link placeRows}).
+ * is its fit, from {@link fitRow}, and `null` on a chain that has none — then the newest
+ * message, then the one before it. The rows at the foot sit on their templates' anchors,
+ * and each other row is placed by `stackedTop` against everything below — clear of what it
+ * would overlap, tucked in beside what it would not, and always ending a little above
+ * every newer balloon, so the bottoms read in transcript order — and the rows tile without
+ * a fixed pitch ({@link placeRows}).
  *
  * Three details are what make it read as a conversation rather than as a list:
  *
@@ -142,11 +145,11 @@ function placeRows(rows: readonly ChainRow[], cols: ChainColumns, aspect: number
  *   recipient's from its left, so a short message stays on its own side of the panel
  *   instead of drifting toward the middle as it shrinks — leaning inward every other
  *   message (`zigzagShift`), so the column is a zig-zag rather than a rule.
- * - **Size.** Each older balloon is fitted to its own message (`fitMessage`): wider up to
- *   its column, then taller, so long words wrap and long messages stretch the balloon.
- *   The newest of each side keeps the template's size and only ever grows taller. The
- *   composer is fitted the same way to the draft in it (`fitComposer`), keeping its
- *   template's width, so a message being typed grows the field it is being typed into.
+ * - **Size.** Every balloon is fitted to its own message (`fitRow`): it inflates from
+ *   its narrowest, wider and taller together, up to its column and then taller alone, so
+ *   long words wrap and long messages stretch the balloon. The composer is fitted the
+ *   same way to the draft in it, so a message being typed grows the field it is being
+ *   typed into, and is drawn as that same balloon once it is sent.
  * - **One tail per side.** Only the newest balloon of each column keeps its template's
  *   tail — the one still being said. A tail on every balloon reads as a crowd all talking
  *   at once, which is exactly what a thread is not.
@@ -170,11 +173,16 @@ export function conversationRows(
   const ordinals = sideOrdinals(lines)
 
   if (composer) {
-    // The template itself, at the width the author drew it — only its height answers to
-    // the draft, and `placeRows` then hangs that height off the tail tip. Its `bubble` is
-    // not stamped the way a message is: the field's content and its initial text are the
-    // author's, and stamping would letter them instead of putting a field there.
-    rows.push({ key: 'composer', side: 'out', bubble: cols.me, stretch: composer.stretch })
+    // The template at the size the draft inflates it to, which `placeRows` then hangs off
+    // the tail tip. Its `bubble` is not stamped the way a message is: the field's content
+    // and its initial text are the author's, and stamping would letter them instead of
+    // putting a field there.
+    rows.push({
+      key: 'composer',
+      side: 'out',
+      bubble: { ...cols.me, width: composer.width },
+      stretch: composer.stretch,
+    })
     tailed.out = true
   }
 

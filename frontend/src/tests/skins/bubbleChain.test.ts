@@ -22,10 +22,14 @@ import {
   visibleWindow,
 } from '../../skins/comic-book/bubbleChain'
 import type { BubbleChain, ChainRow } from '../../skins/comic-book/bubbleChain'
-import { fitComposer, fitMessage } from '../../skins/comic-book/bubbleFit'
+import { fitMessage } from '../../skins/comic-book/bubbleFit'
 import { anchorOf } from '../../skins/comic-book/chainAnchor'
-import { CHAIN_ORDER_STEP, CHAIN_ROW_GAP, rowEllipse } from '../../skins/comic-book/chainLayout'
-import { conversationRows } from '../../skins/comic-book/chainRows'
+import {
+  CHAIN_ORDER_STEP,
+  CHAIN_ROW_GAP,
+  rowEllipse,
+} from '../../skins/comic-book/chainLayout'
+import { conversationRows, fitRow } from '../../skins/comic-book/chainRows'
 import type { ChainMetrics } from '../../skins/comic-book/chainLayout'
 import { NEW_BUBBLE } from '../../skins/comic-book/editor/configSeed'
 import type { BubbleTransform } from '../../skins/comic-book/editor/types'
@@ -234,12 +238,18 @@ describe('conversationRows', () => {
   const lines = readTranscript(['hey', 'you around?', '> just picked up'])
   const shown = visibleWindow(2, 6) // [2, 1, 0] — newest first
   /** An empty composer on `me`: the fit a live chain's bottom row starts at. */
-  const composerOn = (me: BubbleTransform) => fitComposer('', me.type, me.width, M)
+  const composerOn = (me: BubbleTransform) => fitRow('', me, M)
 
   const rows = conversationRows(shown, lines, cols, null, M)
 
   /** A row's left edge, in the % a bubble is placed in. */
   const leftOf = (r: ChainRow) => 100 - r.bubble.right - r.bubble.width
+  /** Where a row's tail points on the panel — or its ellipse centre, with no tail. */
+  const anchorOfRow = (r: ChainRow) => anchorOf(r.bubble, 1, r.stretch)
+  const expectSamePoint = (a: readonly number[], b: readonly number[]) => {
+    expect(a[0]).toBeCloseTo(b[0], 6)
+    expect(a[1]).toBeCloseTo(b[1], 6)
+  }
 
   // The author's picture: two of theirs in a row, then one of mine, bottom-up on screen.
   it('walks up the panel newest first, one row per message', () => {
@@ -297,33 +307,24 @@ describe('conversationRows', () => {
     expect(wrapped[1].stretch).toBe(1)
   })
 
-  /** Where a row's tail points on the panel — or its ellipse centre, with no tail. */
-  const anchorOfRow = (r: ChainRow) => anchorOf(r.bubble, 1, r.stretch)
-  const expectSamePoint = (a: readonly number[], b: readonly number[]) => {
-    expect(a[0]).toBeCloseTo(b[0], 6)
-    expect(a[1]).toBeCloseTo(b[1], 6)
-  }
-
   // The author drew each template by hand — sized it, aimed its tail at a character's
-  // mouth — and the newest balloon of each side starts as that drawing: a message that
-  // fits on one line leaves it exactly as drawn, not shrunk to its words, not leaned.
-  it('starts the newest row of each side at its template’s size', () => {
+  // mouth — and the newest balloon of each side is stamped from that drawing, fitted to
+  // its words like every other row: the template is the column, the widest the balloon
+  // gets, and where its tip points.
+  it('sizes the newest row of each side to its words, inside its template', () => {
     const [mine, theirs] = rows
-    for (const [row, template] of [[mine, cols.me], [theirs, cols.them]] as const) {
-      expect(row.bubble.width).toBe(template.width)
-      expect(row.stretch).toBe(1)
+    const stamped = [[mine, cols.me, 'just picked up'], [theirs, cols.them, 'you around?']] as const
+    for (const [row, template, text] of stamped) {
+      const fit = fitRow(text, template, M)
+      expect(row.bubble.width).toBeCloseTo(fit.width, 6)
+      expect(row.stretch).toBeCloseTo(fit.stretch, 6)
+      expect(row.bubble.width).toBeLessThan(template.width)
       expect(row.bubble.rotate).toBe(template.rotate)
       expect(row.bubble.tail).toBe(template.tail)
     }
-    // A short message does not shrink it — the same words in an older row are narrower.
-    expect(at(table, '3').bubble.width).toBeLessThan(cols.them.width)
-  })
-
-  // ...and the one at the foot of the thread is placed as drawn too, not hung from a corner.
-  it('keeps the newest message where its template was drawn', () => {
-    const [mine] = rows
-    expect(mine.bubble.top).toBeCloseTo(cols.me.top, 6)
-    expect(mine.bubble.right).toBeCloseTo(cols.me.right, 6)
+    // Only the foot of the thread hangs on its template's tip. Theirs is older than mine
+    // here, so it climbs above it instead — the case below.
+    expectSamePoint(anchorOfRow(mine), anchorOf(cols.me, 1))
   })
 
   // A live chain's foot is two balloons: the composer, and the recipient's newest beside
@@ -373,12 +374,12 @@ describe('conversationRows', () => {
     expectSamePoint(anchorOfRow(around), anchorOf(bare.them, 1))
   })
 
-  it('draws the typing row as the recipient’s template, where the reply will land', () => {
+  it('draws the typing row as the recipient’s smallest balloon, on the tip the reply will land on', () => {
     const [dots] = conversationRows([], [], cols, null, M, true)
     expect(dots.key).toBe(TYPING_KEY)
-    expect(dots.bubble.width).toBe(cols.them.width)
-    expect(dots.bubble.top).toBeCloseTo(cols.them.top, 6)
-    expect(dots.bubble.right).toBeCloseTo(cols.them.right, 6)
+    // Nothing said yet: the narrowest balloon the column allows, where the words will be.
+    expect(dots.bubble.width).toBeCloseTo(cols.them.width * CHAIN_MIN_WIDTH_RATIO, 6)
+    expect(dots.stretch).toBe(1)
     expectSamePoint(anchorOfRow(dots), anchorOf(cols.them, 1))
   })
 
@@ -484,29 +485,31 @@ describe('conversationRows', () => {
 
     expect(live.map(r => r.key)).toEqual(['composer', '0'])
     expect(live[0].bubble.content).toBe('input')
-    expect(live[0].bubble.top).toBeCloseTo(me.top, 6)
-    // The composer is the template itself, drawn where the author put it: no lean.
-    expect(live[0].bubble.right).toBeCloseTo(me.right, 6)
+    // An empty composer is the smallest balloon the column allows, on the tip the author
+    // aimed — not leaned, not hung from a corner.
+    expect(live[0].bubble.width).toBeCloseTo(me.width * CHAIN_MIN_WIDTH_RATIO, 6)
     expect(live[0].stretch).toBe(1)
+    expectSamePoint(anchorOfRow(live[0]), anchorOf(me, 1))
     // The composer is the sender still talking, so the message above it takes no second tail.
     expect(live[0].bubble.tail).toBe('down-left')
     expect(live[1].bubble.tail).toBe('down-right')
   })
 
   // The composer answers to what is being typed into it the way a message answers to its
-  // words — taller, never narrower, and around the tail tip the author aimed.
-  it('grows the composer upward as its draft wraps, and shrinks it back when sent', () => {
+  // words — wider and taller together, around the tail tip the author aimed.
+  it('inflates the composer around its tail tip as its draft grows, and shrinks it back when sent', () => {
     const me = tpl({ ...cols.me, content: 'input', text: 'Say something' })
     const draft = 'a message long enough to wrap onto more than one line of the balloon'
     // One of the sender's own messages, which is the row that stacks above the composer.
     const thread = readTranscript(['> earlier'])
     const typing = conversationRows([0], thread, { ...cols, me },
-      fitComposer(draft, me.type, me.width, M), M)
+      fitRow(draft, me, M), M)
     const empty = conversationRows([0], thread, { ...cols, me }, composerOn(me), M)
 
     expect(typing[0].stretch).toBeGreaterThan(1)
-    // As wide as the author drew it, whatever is in it: a field is a target, not a word count.
-    expect(typing[0].bubble.width).toBe(me.width)
+    // Wider than the empty field, and never wider than the column the author drew.
+    expect(typing[0].bubble.width).toBeGreaterThan(empty[0].bubble.width)
+    expect(typing[0].bubble.width).toBeLessThanOrEqual(me.width)
     // Taller around the same tail tip, so the words push the thread up instead of the
     // tail sliding off the mouth it was aimed at.
     expectSamePoint(anchorOfRow(typing[0]), anchorOf(me, 1))
@@ -515,13 +518,13 @@ describe('conversationRows', () => {
     expect(at(typing, '0').bubble.top).toBeLessThan(at(empty, '0').bubble.top)
     expectNoOverlap(typing)
     expect(empty[0].stretch).toBe(1)
+    expect(empty[0].bubble.width).toBeCloseTo(me.width * CHAIN_MIN_WIDTH_RATIO, 6)
   })
 
-  it('draws every older row at its narrowest with no lettering size to fit against', () => {
+  it('draws every row at its narrowest with no lettering size to fit against', () => {
     const blind = conversationRows(visibleWindow(5, 6), many, cols, null, { ...M, lettering: 0 })
     for (const r of blind) {
-      const newest = r.bubble.tail !== 'none'
-      expect(r.bubble.width).toBeCloseTo(newest ? 40 : 40 * CHAIN_MIN_WIDTH_RATIO, 6)
+      expect(r.bubble.width).toBeCloseTo(40 * CHAIN_MIN_WIDTH_RATIO, 6)
       expect(r.stretch).toBe(1)
     }
   })
@@ -665,5 +668,38 @@ describe('isBubbleChain', () => {
     ['a non-string message', { ...chain(), messages: ['hi', 3] }],
   ])('rejects %s', (_label, value) => {
     expect(isBubbleChain(value)).toBe(false)
+  })
+})
+
+describe('fitRow', () => {
+  const me = tpl({ width: 40, tail: 'down-left' })
+  const MIN = me.width * CHAIN_MIN_WIDTH_RATIO
+  const M: ChainMetrics = { aspect: 1, boxW: 400, lettering: 12 }
+  const draft = 'a message long enough to wrap onto more than one line of the balloon'
+
+  // One fit for the field and for the message it becomes: what someone typed is drawn as
+  // the balloon they typed it in once Enter turns the one into the other.
+  it('is the message fit, between the column and its narrowest balloon', () => {
+    expect(fitRow(draft, me, M)).toEqual(fitMessage(draft, me.type, me.width, MIN, M))
+  })
+
+  it('starts an empty field at the narrowest balloon, unstretched', () => {
+    expect(fitRow('', me, M)).toEqual({ width: MIN, stretch: 1 })
+  })
+
+  it('inflates with the draft, wider and taller, and shrinks back when it empties', () => {
+    const short = fitRow('hi there', me, M)
+    const long = fitRow(draft, me, M)
+    expect(short.width).toBeGreaterThan(MIN)
+    expect(short.stretch).toBeGreaterThan(1)
+    expect(long.width).toBeGreaterThan(short.width)
+    expect(long.width).toBeLessThanOrEqual(me.width)
+    expect(long.stretch).toBeGreaterThan(short.stretch)
+    expect(fitRow('', me, M)).toEqual({ width: MIN, stretch: 1 })
+  })
+
+  it('stays at its narrowest with nothing to measure against', () => {
+    expect(fitRow(draft, me, { ...M, lettering: 0 })).toEqual({ width: MIN, stretch: 1 })
+    expect(fitRow(draft, me, { ...M, boxW: 0 })).toEqual({ width: MIN, stretch: 1 })
   })
 })

@@ -164,17 +164,18 @@ order, so one party saying two things takes two rows.
 
 **The members are templates, not slots.** The author draws one balloon per column — shape,
 tail, rotation, lettering, the column's edge — and every row is stamped from its side's
-template. Member 0 is the **sender**: rightmost, composer at its foot. **The newest row of
-each side starts as its template** — the size drawn in the editor, growing only taller
-when its words wrap — and **the foot of the thread sits where its template was drawn**,
-its tail tip never moving (`chainAnchor.ts`): the newest message, or the composer with the
-recipient's newest beside it. Every other row lays out bottom-up by collision
-(`chainLayout.ts`): clear of what it would overlap, tucked in beside what it would not,
-and **ending a small step above every newer balloon** (`CHAIN_ORDER_STEP`) so the bottoms
-read in transcript order — a side's newest climbs above the other side's newer reply
-rather than holding its anchor level with it. Rows zig-zag by message ordinal
-(`zigzagShift`) and are **fitted to their words** from `letteringPx`, never the DOM
-(`bubbleFit.ts`): wider, then taller (`stretch`).
+template. Member 0 is the **sender**: rightmost, composer at its foot. **Every row is
+fitted to its words** from `letteringPx`, never the DOM (`fitRow`, `bubbleFit.ts`): a
+balloon inflates from `CHAIN_MIN_WIDTH_RATIO` of its column, wider and taller together
+and leaning tall (`GROW_BIAS`), until it is as wide as the template the author drew, and
+from there taller alone (`stretch`). **The foot of the thread sits on its template's
+anchor**, its tail tip never moving (`chainAnchor.ts`): the newest message, or the
+composer with the recipient's newest beside it. Every other row lays out bottom-up by
+collision (`chainLayout.ts`): clear of what it would overlap, tucked in beside what it
+would not, and **ending a small step above every newer balloon** (`CHAIN_ORDER_STEP`) so
+the bottoms read in transcript order — a side's newest climbs above the other side's newer
+reply rather than holding its anchor level with it. Rows zig-zag by message ordinal
+(`zigzagShift`).
 `PANEL_BUBBLE_CHAINS` holds one entry per id in use and is **derived, not authored**
 (`syncChains`), so a chain with no members and a member with no chain are unreachable.
 
@@ -193,13 +194,15 @@ composer takes the bottom row and messages start one up. The arithmetic is pure 
 `bubbleChain.ts`; `PanelBubbleChain.tsx` adds only the growth timer, wheel listener,
 typed text and the draft — the panel's aspect is handed in with its box, never measured.
 
-**The composer is fitted too, to the draft in it** (`fitComposer`) — an `input` field
-wraps its words and its balloon grows taller around its tail tip while they are typed,
-where a plain `input` scrolled the sentence sideways out of a balloon that could not
-follow. Two halves, and neither works alone: `BubbleInput` draws a **`textarea`** when
+**The composer is fitted too, to the draft in it** (`fitRow`, the same fit as a
+message's, so a sent message is drawn as the balloon it was typed in) — an `input` field
+wraps its words and its balloon inflates around its tail tip while they are typed, where
+a plain `input` scrolled the sentence sideways out of a balloon that could not follow.
+Two halves, and neither works alone: `BubbleInput` draws a **`textarea`** when
 `onDraftChange` is supplied, and supplying it is what the chain does to keep the draft it
-fits against. It is the composer's **height only** — a field is a target, and one that
-shrank to what had been typed would move out from under the pointer between keystrokes.
+fits against. An empty field is a message's narrowest balloon, not a dot, and it is typed
+into from the panel's reveal rather than clicked (see *A field is typed into*), which is
+what lets its width follow the draft.
 
 - **A conversation is made whole or not at all.** `addSmsConversation` (the editor's
   **+ SMS**) establishes both balloons, their linkage, the chain id, the composer content
