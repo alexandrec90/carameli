@@ -253,8 +253,9 @@ export default defineConfig(({ mode }) => {
       // Node >= 22.4 defines `localStorage` on `globalThis` as a getter that returns
       // `undefined` unless `--localstorage-file` is passed, and happy-dom then leaves the
       // key alone because it is already there. This puts a working one back when — and
-      // only when — that has happened. See the file's header for why the fix cannot be
-      // `--no-experimental-webstorage`: that flag is a startup error on CI's Node 20.
+      // only when — that has happened. CI is on Node 24, so this runs there too. See the
+      // file's header for why the fix is a value check and not
+      // `--no-experimental-webstorage`.
       setupFiles: ['./src/tests/setup/webStorage.ts'],
 
       // Vitest stubs every CSS request to an empty string by default, and its idea of a

@@ -160,7 +160,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
         with:
-          python-version: "3.12"
+          python-version-file: .python-version
       - run: python scripts/check-lock-markers.py
 
   codex-sync:
@@ -179,7 +179,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
         with:
-          python-version: "3.12"
+          python-version-file: .python-version
       - name: Regenerate Codex skills and hooks
         run: python scripts/sync-codex-context.py
       - name: Fail if generated Codex context drifted
@@ -207,7 +207,7 @@ jobs:
         uses: actions/checkout@v7
         with:
           repository: alexandrec90/devkit
-          ref: v0.11.21
+          ref: v0.11.23
           path: .devkit-src
       - name: Vendored agent-harness in sync
         env:

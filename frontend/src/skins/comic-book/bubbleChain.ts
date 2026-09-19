@@ -29,14 +29,16 @@ import type { BubbleTransform } from './editor/types'
 // two columns, at most `rows` rows, the composer at the bottom right.
 //
 // **The rows are laid out from the bottom up**, and the bottom is where the author drew
-// it: the newest balloon of each side — the one still talking, the one with the tail —
-// sits on its template's anchor (chainAnchor.ts), the tip the author aimed at a mouth,
-// however wide or tall its words make it. Every older row is placed by what it would
-// collide with (chainLayout.ts): it clears every balloon it overlaps horizontally and
-// tucks partway in beside the one below it otherwise, so a long message pushes the thread
-// up by its own height while a short reply sits alongside the message it answers. Each
-// speaker's rows zig-zag across their column as they climb, so the thread snakes rather
-// than ruling two columns.
+// it: the balloon at the foot of the thread — the newest message, or the composer and the
+// recipient's newest beside it — sits on its template's anchor (chainAnchor.ts), the tip
+// the author aimed at a mouth, however wide or tall its words make it. Every other row is
+// placed by what it would collide with (chainLayout.ts): it clears every balloon it
+// overlaps horizontally and otherwise tucks in beside the newer rows, ending a small step
+// above the bottom of every one of them, so a long message pushes the thread up by its
+// own height while a short reply sits alongside the message it answers — and the bottoms
+// of the balloons, read down the panel, are the transcript in order, whichever column each
+// is in. Each speaker's rows zig-zag across their column as they climb, so the thread
+// snakes rather than ruling two columns.
 //
 // **Bubble size follows the message.** A three-word reply is a small balloon, a longer one
 // fills its column, and a longer one still wraps and grows *tall* — see bubbleFit.ts. The

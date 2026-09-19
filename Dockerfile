@@ -1,9 +1,12 @@
 ### Build stage — compile C extensions, then discard the compiler toolchain
-# This tag is the project's Python version of record: the instruction files point
-# here rather than restating a number. It is coordinated with the uv-compiled locks
-# (scripts/recompile-locks.py --python-version), CI's setup-python,
-# .github/actions/setup-python-env, mypy.ini and ruff.toml — bump all together,
-# deliberately (dependabot.yml ignores bot bumps of this tag).
+# This tag is the project's Python version of record, and `.python-version` is the
+# machine-readable copy of it that everything else reads: the lock compiler, the
+# scripts, and CI's setup-python all take it from there via
+# `script_common.pinned_python()` or `python-version-file`, so this tag and that file
+# are the only two places a number appears. `tests/unit/test_python_version_pin.py`
+# fails if they disagree, or if anything else spells one out. mypy.ini can read no
+# file and is gated by the same test — bump all of them together, deliberately
+# (dependabot.yml ignores bot bumps of this tag).
 FROM python:3.12-slim AS builder
 
 # uv is the installer for every dependency layer here: the same resolver that

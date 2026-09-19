@@ -7,13 +7,13 @@
  * `undefined`. Vitest's happy-dom environment then finds the key already present and
  * leaves it alone, so `'localStorage' in globalThis` is `true` while `localStorage` is
  * `undefined` — and a test that stores a value dies on `Cannot read properties of
- * undefined (reading 'setItem')`. CI runs Node 20 and never sees it; a developer on 22 or
- * newer sees it on every test that touches storage, which reads as a broken test rather
- * than a broken environment.
+ * undefined (reading 'setItem')`. It was a workstation-only failure while CI ran Node 20,
+ * which made it read as a broken test rather than a broken environment; CI is on 24 now,
+ * so this file is what keeps the storage tests green there as well.
  *
- * `--no-experimental-webstorage` fixes it and cannot be used: the flag does not exist on
- * Node 20, where passing it is a startup error. So the repair has to be a value check
- * rather than a version check — install a substitute only when the environment failed to
+ * `--no-experimental-webstorage` fixes it and is still not what this does: a flag is a
+ * claim about which Node is running, and the pin has already moved once. A value check
+ * survives the next move — install a substitute only when the environment failed to
  * provide one, which is a no-op everywhere the environment works.
  */
 

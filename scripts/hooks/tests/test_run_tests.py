@@ -451,7 +451,14 @@ def test_run_scoped_uses_the_host_tier(monkeypatch):
 
 
 def test_run_local_stays_in_the_container_by_default(monkeypatch):
+    # `changed_touches_python` reads the real working tree, so leaving it unstubbed made
+    # this test's verdict a fact about the developer's uncommitted files: with no changed
+    # .py anywhere -- a clean checkout, and therefore CI -- `run_local` took the skip
+    # branch, `run_argv` was never called, and the assertion below died on KeyError
+    # instead of checking anything. It was written before that function existed and was
+    # the one test in this file not updated when it arrived.
     monkeypatch.setattr(rt, "host_db_fallback", lambda root=None: None)
+    monkeypatch.setattr(rt, "changed_touches_python", lambda: True)
     monkeypatch.setattr(rt, "pick_fast_command", lambda: "pytest --testmon")
     seen: dict = {}
     monkeypatch.setattr(

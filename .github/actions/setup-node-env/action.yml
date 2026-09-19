@@ -1,6 +1,6 @@
 name: Set up Node env
 description: >-
-  Set up Node 20 with npm caching keyed on the frontend lockfile. The
+  Set up Node 24 with npm caching keyed on the frontend lockfile. The
   repository must already be checked out. Optionally runs `npm ci` for the
   frontend workspace.
 
@@ -15,7 +15,7 @@ runs:
   steps:
     - uses: actions/setup-node@v6
       with:
-        node-version: "20"
+        node-version: "24"
         cache: npm
         cache-dependency-path: frontend/package-lock.json
     - name: Install Node dependencies

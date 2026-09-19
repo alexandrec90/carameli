@@ -8,6 +8,23 @@ from conftest import REPO_ROOT, load_module
 locks = load_module("scripts/recompile-locks.py")
 
 
+def test_compile_commands_target_the_repo_pin():
+    """The locks must be compiled for the interpreter the image runs, and the version
+    was spelled out here as a literal -- a second pin beside `.python-version` that no
+    bump of the first would ever move. A lock compiled for the wrong minor resolves
+    different wheels and markers, and nothing in CI builds the image to notice."""
+    pin = (REPO_ROOT / ".python-version").read_text(encoding="utf-8").strip()
+
+    for command in locks.compile_commands("python"):
+        assert command[command.index("--python-version") + 1] == pin
+
+
+def test_compile_commands_take_an_explicit_target_for_testing():
+    commands = locks.compile_commands("python", target_version="3.99")
+
+    assert all(c[c.index("--python-version") + 1] == "3.99" for c in commands)
+
+
 def test_compile_commands_preserve_constraint_order():
     commands = locks.compile_commands("python")
 
@@ -133,16 +150,20 @@ def test_dependabot_watches_actions_and_docker_ecosystems():
 
 def test_python_base_image_is_never_bot_bumped():
     # Docker tags make 3.12→3.14 a semver-minor, which auto-merged (PR #43)
-    # against locks compiled for 3.12 with no image build in CI. The runtime
-    # moves with the locks and CI config, deliberately.
+    # against locks compiled for the pinned minor with no image build in CI. The
+    # runtime moves with the locks and CI config, deliberately.
+    #
+    # The expected tag is read from `.python-version` rather than spelled out: a
+    # literal here would have to be edited by the very bump it is meant to describe,
+    # and `tests/unit/test_python_version_pin.py` already owns pin-vs-Dockerfile.
+    pin = (REPO_ROOT / ".python-version").read_text(encoding="utf-8").strip()
     config = (REPO_ROOT / ".github/dependabot.yml").read_text(encoding="utf-8")
     dockerfile = (REPO_ROOT / "Dockerfile").read_text(encoding="utf-8")
 
     docker_block = config[config.index("package-ecosystem: docker") :]
     assert 'dependency-name: "python"' in docker_block
     assert "version-update:semver-minor" in docker_block
-    assert "python:3.14" not in dockerfile
-    assert dockerfile.count("FROM python:3.12-slim") == 2
+    assert dockerfile.count(f"FROM python:{pin}-slim") == 2
 
 
 def test_pr_gate_typechecks_builds_and_runs_hook_tests():

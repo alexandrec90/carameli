@@ -100,16 +100,24 @@ only in the primary worktree because rtpengine uses host networking. That profil
 ships no SBC and no feature server, so a softphone cannot register against it;
 putting a real phone on an extension is `docs/operations/softphone-demo.md`.
 
-**Start the stack with `python scripts/docker-up.py`, not Docker Desktop's start button.**
-That button issues `docker compose start`, which never creates a network, so after the
-daemon loses its network state — Docker Desktop's backend exiting overnight has done it
-twice here — every press fails with `network <hex id> not found` and the stack cannot be
-started from the UI at all. Plain `up -d` does not heal it either: Compose reads the
-config as unchanged, reuses the container, and start fails on the same dead ID.
-`docker-up.py` detects that message and retries once with `--force-recreate`, which
-rebuilds the container objects against the new network. Named volumes are untouched by
-container recreation, so `carameli_pgdata` survives it; the tell that this is what
-happened, rather than a prune, is the built-in `bridge` network coming back with a new ID.
+**A stopped stack starts from Docker Desktop's start button or from
+`python scripts/docker-up.py`; only the script heals `network <hex id> not found`.**
+The button issues `docker compose start`, which starts the containers that exist and
+never creates a network, so it fails when the containers pin a network the daemon no
+longer has. Every occurrence here traced to devkit's 04:00 `devkit-docker-prune` job
+running `docker network prune`, which deletes any network with no *running* container —
+half an hour after `devkit-docker-stop-idle` had parked this stack with `docker stop`.
+It was blamed on Docker Desktop's backend exiting overnight until the prune log was
+read on 2026-09-17; the built-in `bridge` network getting a new ID is not a tell of
+anything, dockerd recreates it on every engine start. devkit no longer prunes
+networks, so a recurrence means something else is deleting them under stopped
+containers. Plain `up -d` does not heal it either: Compose reads the config as
+unchanged, reuses the container, and start fails on the same dead ID. `docker-up.py`
+detects that message and retries once with `--force-recreate`, which rebuilds the
+container objects against the new network. Named volumes are untouched by container
+recreation, so `carameli_pgdata` survives it. "Stop: Docker Stack" runs
+`docker compose stop` for the same reason: `down` deletes the containers, after which
+nothing in Docker Desktop can bring the stack back.
 
 Avoid destructive or disruptive lifecycle commands without confirmation:
 
@@ -182,14 +190,40 @@ across the `FROM python:` tag in `Dockerfile`, the uv-compiled locks, `mypy.ini`
 step of an install anyone types: a bare `uv venv`, and `python -m venv` in any form,
 silently take the machine default and give you a venv the container does not match.
 
+**`.python-version` is the one copy anything else reads.** Scripts take it from
+`script_common.pinned_python()`, workflows from `actions/setup-python`'s
+`python-version-file`, and `mypy.ini` — which can read no file — is gated against it by
+`tests/unit/test_python_version_pin.py`. A version spelled out anywhere else is not a
+duplicate of the pin but a *second* pin, and it is found the way the first one was: a
+lock compiled for an interpreter the image does not run, surfacing as a dependency
+failure. The one deliberate literal is the `FROM python:` tag, which the pin is tested
+against.
+
 **Node is coordinated the same way and had nothing saying so.** The pin is
-`.github/actions/setup-node-env/action.yml`'s `node-version`, mirrored in `.nvmrc` so
-the mismatch is visible before a test run rather than after one. It is not cosmetic:
-Node 22+ ships an experimental built-in `localStorage` global that evaluates to
-`undefined` unless `--localstorage-file` is passed, and under vitest's `globals: true`
-that shadows happy-dom's. A workstation on v26 therefore failed 46 frontend tests
-across 7 files while the same suite was green in CI — and the stop gate then blocked
-every session on failures no branch had caused.
+`.github/actions/setup-node-env/action.yml`'s `node-version`, mirrored in `.nvmrc` and in
+the `frontend` service's `image:` so the mismatch is visible before a test run rather than
+after one. `tests/unit/test_node_version_pin.py` is what keeps the three in step, and it
+checks the pin against the `engines.node` of every package in `frontend/package-lock.json`
+— because the pin is not free to lag: a dependency bump that raises a floor above it takes
+out an `npm run lint` step, and reads as a broken lint rather than a stale pin.
+`frontend/.npmrc` turns `engine-strict` on so `npm ci` refuses that tree outright instead
+of installing it and failing at the point of use.
+
+**`npm run lint` and the gate must be the same set of checks.** They were not: `cspell`
+and `knip` lived only in the npm chain, so they ran when a person typed the command and in
+no CI job, pre-commit hook or ship gate — which is how a cspell that could not start on the
+pinned interpreter merged green. Everything automated goes through `scripts/lint-all.py`,
+so a check absent from its registry is enforced nowhere, and one whose report name has no
+`LINT_SECTIONS` entry in `scripts/diagnostics.py` is worse: it runs, fails, and is dropped
+from the artifact. `scripts/hooks/tests/test_lint_all.py` fails on either.
+
+It is not cosmetic in the other direction either. Node 22+ ships an experimental built-in
+`localStorage` global that evaluates to `undefined` unless `--localstorage-file` is passed,
+and under vitest's `globals: true` that shadows happy-dom's. A workstation on v26 failed 46
+frontend tests across 7 files while the same suite was green on CI's Node 20 — and the stop
+gate then blocked every session on failures no branch had caused. The repair is
+`frontend/src/tests/setup/webStorage.ts`, and now that CI is past 22.4 itself, it is
+load-bearing there too rather than a courtesy to workstations.
 
 `logs/` holds per-run failure artifacts, and `scripts/prune-logs.py` bounds its growth
 from the SessionStart hook. The current artifacts (`lint-errors.log`,
