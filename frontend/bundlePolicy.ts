@@ -439,8 +439,27 @@ export const MAX_LAZY_CHUNK_BYTES = 239 * 1024
  * 969 rather than flush against 968.0 KB for the reason the paragraphs above give — the
  * default branch runs no gate, so the kilobyte of clearance is what lets the next branch
  * measure itself against a ceiling that still holds.
+ *
+ * **This raise (969 → 971) is not a change in this repository:** it is `framer-motion`
+ * 13.1.0 → 13.4.0, arriving with the `minor-and-patch` Dependabot group, and it is the
+ * whole of the group's weight. 2,581 B measured as this branch's build (992,525 B) against
+ * the master it sits on (989,944 B, `c70f5f7`), still 47 chunks either way, and attributed
+ * by installing `framer-motion@13.4.0` alone on that master, which reproduces the total
+ * **to the byte**. The other two runtime bumps move nothing — `lucide-react` 1.45 → 1.47
+ * and `react-router-dom` 7.18.3 → 7.18.4 measure as zero here — and the four dev-only ones
+ * (`cspell`, `eslint`, `jsdom`, `knip`) reach no chunk.
+ *
+ * **All 2,581 bytes are in the lazy `candy-shop` chunk** (145,359 → 147,940 B) and no other
+ * chunk moved a byte, which is what says this is nobody's entry cost: `framer-motion` is
+ * imported by six files and every one of them is under `src/skins/candy-shop/`, so only a
+ * visitor of that skin downloads it. {@link MAX_EAGER_BYTES} does not move, and that is the
+ * number the React 19.3.0 paragraph above had to move — the contrast is the point, since a
+ * Dependabot raise here reads like that one until you check which chunk took it.
+ *
+ * 971 rather than flush against 969.26 KB for the reason above: a kilobyte clear, not
+ * flush. 970 would hold at 0.74 KB, which is less clearance than this file asks for.
  */
-export const MAX_TOTAL_JS_BYTES = 969 * 1024
+export const MAX_TOTAL_JS_BYTES = 971 * 1024
 
 /**
  * Every `.css` file in `dist/assets/`, summed. Today 44.2 KB across 2 files.
