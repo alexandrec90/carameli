@@ -51,8 +51,10 @@ words:
   - Lobster
   - Boogaloo
   - Fugaz
-  # Geometry (the polygon clipping algorithm in callSceneGeometry.ts)
+  # Geometry (the two clipping algorithms: Sutherland-Hodgman in callSceneGeometry.ts,
+  # Liang-Barsky in chainLayout.ts)
   - Hodgman
+  - Liang
   # Design / motion terms
   - maximalism
   - maximalist
@@ -86,12 +88,15 @@ words:
   - rasterised
   - recognisably
   - recognised
-  # Test-fixture shorthand (customer ids, vitest's unstubAllGlobals, distances)
+  # Test-fixture shorthand (customer ids, vitest's unstubAllGlobals, distances, the
+  # shaped-like-a-session-id worktree name in worktreePort.test.ts)
   - cust
   - dists
+  - sessionish
   - unstub
   # Prefixed/compound forms used in the comic-book skin and its editor
   - grabbable
+  - retuned
   - uncrop
   - unclickable
   - unclipped
@@ -100,11 +105,14 @@ words:
   - unpositioned
   - unreviewed
   - unrotated
+  - unstretched
+  - untick
   - unticking
   - unticks
   - unwired
   # Projected-table terms: the geometry's name, the CSS class stem, and the two
   # computing pioneers in the sample rows a new surface is seeded with.
+  - adjugate
   - homography
   - ptable
   - Hedy
