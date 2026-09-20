@@ -1,4 +1,4 @@
-FROM minio/mc:latest AS minio-client
+FROM quay.io/minio/mc:latest AS minio-client
 
 FROM postgres:18-alpine
 
