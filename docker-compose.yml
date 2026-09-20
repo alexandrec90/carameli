@@ -543,7 +543,7 @@ services:
       start_period: 30s
 
   minio:
-    image: minio/minio:latest
+    image: quay.io/minio/minio:latest
     restart: unless-stopped
     ports:
       - "${MINIO_HOST_PORT:-9000}:9000"
@@ -563,8 +563,16 @@ services:
 
   # One-shot: creates the recordings and database-backup buckets, then aligns the
   # recordings lifecycle with RETENTION_DAYS. Backup pruning is handled separately.
+  #
+  # The "already set" check is a shell `case` rather than a `grep`. The mc image
+  # ships bash and coreutils but none of grep, sed or awk, and a missing grep does
+  # not fail the run loudly: the pipeline prints "grep: command not found", the test
+  # reads false, and the rule is torn down and recreated on every single `up`. Keep
+  # this branch to tools coreutils actually provides. `tr -d '[:space:]'` folds the
+  # JSON to one spacing so the literal match holds whether mc prints it compact or
+  # pretty, and the trailing `,`/`}` stops RETENTION_DAYS=7 matching a stored 70.
   minio-init:
-    image: minio/mc:latest
+    image: quay.io/minio/mc:latest
     restart: "no"
     environment:
       RETENTION_DAYS: "${RETENTION_DAYS:-0}"
@@ -574,13 +582,14 @@ services:
       mc mb --ignore-existing local/carameli-recordings &&
       mc mb --ignore-existing local/carameli-backups &&
       if [ \"$$RETENTION_DAYS\" -gt 0 ]; then
-        if mc ilm rule ls --json local/carameli-recordings 2>/dev/null |
-          grep -Eq '\"Days\"[[:space:]]*:[[:space:]]*'\"$$RETENTION_DAYS\"'([,}])'; then
-          echo \"Recording lifecycle already set to $$RETENTION_DAYS days\";
-        else
-          mc ilm rule rm --all --force local/carameli-recordings >/dev/null 2>&1 || true;
-          mc ilm rule add --expire-days \"$$RETENTION_DAYS\" local/carameli-recordings;
-        fi;
+        case \"$$(mc ilm rule ls --json local/carameli-recordings 2>/dev/null |
+          tr -d '[:space:]')\" in
+          *'\"Days\":'\"$$RETENTION_DAYS\"','* | *'\"Days\":'\"$$RETENTION_DAYS\"'}'*)
+            echo \"Recording lifecycle already set to $$RETENTION_DAYS days\";;
+          *)
+            mc ilm rule rm --all --force local/carameli-recordings >/dev/null 2>&1 || true;
+            mc ilm rule add --expire-days \"$$RETENTION_DAYS\" local/carameli-recordings;;
+        esac;
       else
         mc ilm rule rm --all --force local/carameli-recordings >/dev/null 2>&1 || true;
         echo 'Recording lifecycle disabled';
