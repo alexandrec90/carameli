@@ -1,12 +1,17 @@
 """Tests for scripts/run-tests.py pure helpers (testmon selection parsing)."""
 
 import itertools
+import os
 import sys
+from pathlib import Path
 
 import pytest
 from conftest import REPO_ROOT, load_module
 
 rt = load_module("scripts/run-tests.py")
+# The resolver lives beside the spawning, in `host_spawn`; these are assertions
+# about run-tests.py's own declared argvs once they have been through it.
+hs = load_module("scripts/host_spawn.py")
 
 
 def test_parse_testmon_selection_normal():
@@ -197,27 +202,6 @@ def test_run_all_preserves_failure_codes(monkeypatch):
     assert results["pytest"][1] == 0
 
 
-def test_resolve_argv_windows_npm_cmd(monkeypatch):
-    monkeypatch.setattr(rt.os, "name", "nt")
-    monkeypatch.setattr(
-        rt.shutil,
-        "which",
-        lambda name: r"C:\Program Files\nodejs\npm.cmd" if name == "npm.cmd" else None,
-    )
-    assert rt.resolve_argv(["npm", "--prefix", "frontend", "run", "test:run"]) == [
-        r"C:\Program Files\nodejs\npm.cmd",
-        "--prefix",
-        "frontend",
-        "run",
-        "test:run",
-    ]
-
-
-def test_resolve_argv_non_windows_unchanged(monkeypatch):
-    monkeypatch.setattr(rt.os, "name", "posix")
-    assert rt.resolve_argv(["npm", "run", "test:run"]) == ["npm", "run", "test:run"]
-
-
 def test_telnyx_sandbox_argvs_exclude_chargeable_tests():
     # Money guardrail: with live credentials, the chargeable provision test buys
     # a real phone number. Neither routine runner path may ever include it. The
@@ -365,15 +349,6 @@ def test_parse_host_port_variants():
     assert rt.parse_host_port("127.0.0.1:15432") == "15432"
     assert rt.parse_host_port("") is None
     assert rt.parse_host_port("no ports published") is None
-
-
-def test_host_argv_reuses_this_interpreter():
-    argv = rt.host_argv("pytest -v -o addopts='-m \"not paid\"' tests/unit")
-    assert argv[:3] == [rt.sys.executable, "-m", "pytest"]
-    assert argv[-1] == "tests/unit"
-    # shlex keeps `-o addopts=...` as one token, quotes and all -- the paid-tier
-    # exclusion must survive the host tier or a fallback run collects paid tests.
-    assert 'addopts=-m "not paid"' in argv
 
 
 def test_host_db_fallback_declines_while_the_app_container_is_up(monkeypatch):
@@ -769,3 +744,56 @@ def test_a_full_run_never_asks_about_the_changed_set(monkeypatch):
     monkeypatch.setattr(rt, "run_argv", lambda *a, **k: ([], 0))
 
     rt.run_local(False)
+
+
+# ---------------------------------------------------------------------------
+# Every declared argv goes through the resolver -- none spawns a bare `python`
+# ---------------------------------------------------------------------------
+
+
+def _make_venv_python(root: Path) -> Path:
+    """Create a stub venv interpreter at the OS-correct path under `root`."""
+    parts = ("Scripts", "python.exe") if os.name == "nt" else ("bin", "python")
+    exe = root.joinpath(".venv", *parts)
+    exe.parent.mkdir(parents=True, exist_ok=True)
+    exe.touch()
+    return exe
+
+
+def test_the_hook_tests_argv_never_spawns_a_bare_python(tmp_path):
+    """The reported defect, both environments' argv.
+
+    `--target hook-tests` spawned PATH's `python`, which on a provisioned worktree
+    is not `.venv`'s: the target exited 1 with `No module named pytest` and
+    `logs/test-failures.log` reported `[FAIL] hook-tests` -- a missing interpreter
+    presented as a failing test tier.
+    """
+    exe = _make_venv_python(tmp_path)
+    for argv in (rt._LOCAL_HOOK_ARGV, rt._CI_HOOK_ARGV):
+        resolved = hs.resolve_argv(argv, tmp_path)
+        assert resolved[0] == str(exe)
+        assert resolved[1:] == argv[1:]
+
+
+def test_no_argv_constant_is_left_starting_with_a_bare_python(tmp_path):
+    """The guard for the next constant, not just today's two.
+
+    Every module-level `*_ARGV` is a host-side command; each new one is a fresh
+    chance to write `"python"` and get PATH's.
+    """
+    _make_venv_python(tmp_path)
+    constants = {
+        name: value
+        for name, value in vars(rt).items()
+        if name.endswith("_ARGV") and isinstance(value, list)
+    }
+    assert constants, "the argv constants moved; this guard is watching nothing"
+    for name, argv in constants.items():
+        assert hs.resolve_argv(argv, tmp_path)[0] != "python", name
+
+
+def test_the_ci_scoped_argv_is_resolved_too(tmp_path):
+    """Built per-run rather than declared, so the sweep above cannot see it."""
+    exe = _make_venv_python(tmp_path)
+    argv = hs.resolve_argv(rt.ci_scoped_argv(["tests/unit"]), tmp_path)
+    assert argv[:3] == [str(exe), "-m", "pytest"]
