@@ -460,7 +460,6 @@ scripts/run-local-e2e.py::get_fix_hint
 scripts/run-local-e2e.py::main
 scripts/run-local-e2e.py::stream_lines
 scripts/run-tests.py::pick_fast_command
-scripts/run-tests.py::run_argv
 scripts/run-tests.py::run_ci
 scripts/script_common.py::print_suite_header
 scripts/ship.py::backoff_delays

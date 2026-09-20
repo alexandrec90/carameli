@@ -25,7 +25,6 @@ import math
 import os
 import re
 import shlex
-import shutil
 import subprocess
 import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -33,6 +32,7 @@ from pathlib import Path
 
 import diagnostics
 import script_common
+from host_spawn import host_argv, run_argv
 
 # `changed_files` only -- the one definition on this machine of "what changed", shared
 # so `--changed` here and `--changed` there cannot disagree about it. Hyphenated, hence
@@ -219,46 +219,6 @@ _CRITICAL_TARGETS = {"pytest", "webhook-e2e"}
 # a valid opt-in --target) must never be added -- it would hit a live provider on
 # every aggregate run. Paid tiers are opt-in via their own dedicated tasks.
 _ALL_TARGETS = ("pytest", "hook-tests", "frontend-tests", "bundle-budgets")
-_WINDOWS_BATCH_LAUNCHERS = {"npm", "npx", "vite"}
-
-
-def resolve_argv(argv: list[str]) -> list[str]:
-    """Rewrite Windows batch launchers to their `.cmd` shim when available."""
-    if not argv or os.name != "nt":
-        return argv
-
-    exe = argv[0]
-    if exe.lower() not in _WINDOWS_BATCH_LAUNCHERS:
-        return argv
-
-    resolved = shutil.which(f"{exe}.cmd")
-    if not resolved:
-        return argv
-
-    return [resolved, *argv[1:]]
-
-
-def run_argv(argv: list[str], extra_env: dict[str, str] | None = None) -> tuple[list[str], int]:
-    """Run a command from the repo root, merging stdout+stderr in order.
-
-    Argv form (no shell) so multi-line bash passed to `docker compose exec`
-    survives without cross-platform quoting hazards.
-    """
-    env = os.environ.copy()
-    if extra_env:
-        env.update(extra_env)
-    argv = resolve_argv(argv)
-    p = subprocess.run(
-        argv,
-        cwd=REPO_ROOT,
-        env=env,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-    )
-    return (p.stdout or "").splitlines(), p.returncode
 
 
 def _in_container(bash_cmd: str) -> list[str]:
@@ -351,19 +311,6 @@ def host_db_fallback(repo_root: Path = REPO_ROOT) -> dict[str, str] | None:
     if "app" in running or not set(CFG.db.services).issubset(running):
         return None
     return host_db_env(repo_root)
-
-
-def host_argv(bash_cmd: str) -> list[str]:
-    """The in-container `pytest ...` command as host argv. Pure.
-
-    `sys.executable -m pytest`, not a bare `pytest`: the box's venv is not on PATH
-    (provisioning does not activate it), so the interpreter running this script is the
-    only reliable way back to the project's own pytest.
-    """
-    parts = shlex.split(bash_cmd)
-    if parts and parts[0] == "pytest":
-        return [sys.executable, "-m", "pytest", *parts[1:]]
-    return parts
 
 
 def parse_testmon_selection(dual_out: str) -> tuple[int, int]:
