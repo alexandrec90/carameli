@@ -245,3 +245,65 @@ def test_main_stops_at_the_first_failing_step(monkeypatch):
     # The steps are read off the module at call time, so the patches above apply.
     assert bootstrap.main() == 3
     assert calls == ["venv", "python"]
+
+
+def test_main_provisions_node_before_the_frontend_install(monkeypatch):
+    # `engine-strict` makes `npm ci` on the wrong Node refuse the tree, so the runtime
+    # has to be in place before the install that depends on it.
+    calls = []
+
+    def step(name):
+        def run(root):
+            calls.append(name)
+            return 0
+
+        return run
+
+    for attr, name in [
+        ("create_venv", "venv"),
+        ("install_python", "python"),
+        ("provision_node", "node"),
+        ("install_frontend", "frontend"),
+    ]:
+        monkeypatch.setattr(bootstrap, attr, step(name))
+
+    assert bootstrap.main() == 0
+    assert calls == ["venv", "python", "node", "frontend"]
+
+
+# --- the Node runtime ------------------------------------------------------
+
+
+def test_provision_node_fetches_then_activates(tmp_path, monkeypatch):
+    (tmp_path / "frontend").mkdir()
+    calls = []
+    monkeypatch.setattr(
+        bootstrap.node_runtime, "provision", lambda root: calls.append("fetch") or 0
+    )
+    monkeypatch.setattr(bootstrap.node_runtime, "activate", lambda root: calls.append("activate"))
+    cfg = harness_config.Config(frontend=harness_config.FrontendConfig(enabled=True))
+
+    assert bootstrap.provision_node(tmp_path, cfg) == 0
+    assert calls == ["fetch", "activate"]
+
+
+def test_provision_node_propagates_a_failed_fetch(tmp_path, monkeypatch):
+    (tmp_path / "frontend").mkdir()
+    monkeypatch.setattr(bootstrap.node_runtime, "provision", lambda root: 1)
+    monkeypatch.setattr(
+        bootstrap.node_runtime, "activate", lambda root: pytest.fail("activated a failed fetch")
+    )
+    cfg = harness_config.Config(frontend=harness_config.FrontendConfig(enabled=True))
+
+    assert bootstrap.provision_node(tmp_path, cfg) == 1
+
+
+def test_provision_node_skips_a_project_without_a_frontend(tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        bootstrap.node_runtime,
+        "provision",
+        lambda root: pytest.fail("fetched Node for no frontend"),
+    )
+    cfg = harness_config.Config(frontend=harness_config.FrontendConfig(enabled=False))
+
+    assert bootstrap.provision_node(tmp_path, cfg) == 0

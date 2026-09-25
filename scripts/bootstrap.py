@@ -42,6 +42,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent / "hooks"))
 import harness_config
 import toolchain
 
+import node_runtime
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 # `FROM python:3.12-slim` -> `3.12`. Only the leading numeric component of the tag is a
@@ -171,8 +173,24 @@ def install_frontend(root: Path = REPO_ROOT, cfg: harness_config.Config | None =
     return subprocess.run(npm_argv(root, frontend.dir), cwd=root).returncode
 
 
+def provision_node(root: Path = REPO_ROOT, cfg: harness_config.Config | None = None) -> int:
+    """Fetch `.nvmrc`'s Node when PATH has another, and put it first on PATH.
+
+    Before `install_frontend`, because `frontend/.npmrc` sets `engine-strict`: `npm ci`
+    on the wrong major refuses the tree, which is how a Node-18 workstation used to stop
+    here with nothing a session could run to get past it. `node_runtime` owns the how.
+    """
+    config = harness_config.load(root) if cfg is None else cfg
+    if not config.frontend.enabled or not (root / config.frontend.dir).is_dir():
+        return 0
+    code = node_runtime.provision(root)
+    if code == 0:
+        node_runtime.activate(root)
+    return code
+
+
 def main() -> int:
-    for step in (create_venv, install_python, install_frontend):
+    for step in (create_venv, install_python, provision_node, install_frontend):
         code = step(REPO_ROOT)
         if code:
             return code

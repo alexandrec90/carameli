@@ -3,11 +3,20 @@
 import os
 from types import SimpleNamespace
 
+import pytest
 from conftest import REPO_ROOT, load_module
 
 preflight = load_module("scripts/preflight.py")
 failure_class = load_module("scripts/failure_class.py")
 harness_config = load_module("scripts/hooks/harness_config.py")
+
+
+@pytest.fixture(autouse=True)
+def _no_real_node_activation(monkeypatch):
+    """`gaps` puts the provisioned Node on this process's PATH; tests must not."""
+    calls = []
+    monkeypatch.setattr(preflight.node_runtime, "activate", lambda root: calls.append(root))
+    return calls
 
 
 def _cfg(*, frontend=True):
@@ -136,7 +145,7 @@ def test_a_mismatched_node_names_both_versions_and_the_fix(tmp_path):
 
     assert "v20.20.2" in line
     assert ".nvmrc pins 24" in line
-    assert "nvm install 24 && nvm use 24" in line
+    assert "python scripts/bootstrap.py" in line
 
 
 def test_an_absent_node_is_reported_with_the_same_fix(tmp_path):
@@ -144,7 +153,7 @@ def test_an_absent_node_is_reported_with_the_same_fix(tmp_path):
     line = preflight.node_mismatch(tmp_path, _cfg(), which=_which(), run=_node(""))
 
     assert "not on PATH" in line
-    assert "nvm install 24" in line
+    assert "python scripts/bootstrap.py" in line
 
 
 def test_a_node_that_answers_no_version_is_the_uninstalled_pin(tmp_path):
@@ -155,7 +164,7 @@ def test_a_node_that_answers_no_version_is_the_uninstalled_pin(tmp_path):
     line = preflight.node_mismatch(tmp_path, _cfg(), which=_which("node"), run=_node(""))
 
     assert "answers no version" in line
-    assert "nvm install 24 && nvm use 24" in line
+    assert "python scripts/bootstrap.py" in line
     assert "not on PATH" not in line
 
 
@@ -182,7 +191,8 @@ def test_the_fix_never_hard_codes_a_version(tmp_path):
     _pinned(tmp_path, "31")
     line = preflight.node_mismatch(tmp_path, _cfg(), which=_which("node"), run=_node("v24.8.1"))
 
-    assert "nvm install 31 && nvm use 31" in line
+    assert "python scripts/bootstrap.py" in line
+    assert "31" in line
     assert "24" not in line.replace("v24.8.1", "")
 
 
@@ -305,3 +315,12 @@ def test_ensure_venv_on_path_is_a_no_op_without_one(tmp_path):
     env = {"PATH": "/existing"}
     preflight.ensure_venv_on_path(tmp_path, env)
     assert env["PATH"] == "/existing"
+
+
+def test_gaps_activates_the_provisioned_node_before_judging_it(tmp_path, _no_real_node_activation):
+    # lint-all's only pre-run call: without this the check, and every npm step after
+    # it, would judge the machine's own Node rather than the one bootstrap fetched.
+    (tmp_path / "frontend" / "node_modules").mkdir(parents=True)
+    preflight.gaps(tmp_path, _cfg(), which=_which(*preflight.HOST_TOOLS))
+
+    assert _no_real_node_activation == [tmp_path]
