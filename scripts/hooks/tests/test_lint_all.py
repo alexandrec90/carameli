@@ -619,7 +619,49 @@ def test_baseline_diffing_ignores_the_timestamp_and_survives_a_broken_baseline()
     }
 
 
-# --- run(): the shell-command runner every tool above funnels through --------
+def test_absent_is_none_when_installed_and_a_clean_skip_when_not(monkeypatch):
+    monkeypatch.setattr(secrets_mod.shutil, "which", lambda _name: "/usr/bin/detect-secrets")
+    assert secrets_mod.absent() is None
+    monkeypatch.setattr(secrets_mod.shutil, "which", lambda _name: None)
+    assert secrets_mod.absent() == {
+        "detect-secrets": (["detect-secrets is not installed -- skipped"], 0)
+    }
+
+
+def test_report_counts_new_findings_and_says_so_when_there_are_none(capsys):
+    before = '{"results": {"a.py": [{"hashed_secret": "h1"}]}}'
+    after = '{"results": {"a.py": [{"hashed_secret": "h1"}, {"hashed_secret": "h2"}]}}'
+    secrets_mod.report(before, after)
+    assert "1 new finding(s)" in capsys.readouterr().out
+    secrets_mod.report(after, before)
+    assert "removed/relocated" in capsys.readouterr().out
+
+
+def test_scan_takes_its_root_and_runner_as_given(monkeypatch, tmp_path):
+    """`scan` touches no module global: the baseline is under `root`, every command goes
+    through `run`, and a scan that fails keeps the tool's own output ahead of the summary."""
+    monkeypatch.setattr(secrets_mod.shutil, "which", lambda _name: "/usr/bin/detect-secrets")
+    (tmp_path / ".secrets.baseline").write_bytes(b'{"results": {}}\n')
+    seen: list[str] = []
+
+    def failing_run(cmd: str):
+        seen.append(cmd)
+        return (["boom"], 2)
+
+    assert secrets_mod.scan(tmp_path, failing_run) == {
+        "detect-secrets": (["boom", "detect-secrets: scan failed (exit 2)"], 1)
+    }
+    assert seen and "--baseline" in seen[0]
+
+
+def test_scan_writes_a_missing_baseline_with_lf(monkeypatch, tmp_path):
+    monkeypatch.setattr(secrets_mod.shutil, "which", lambda _name: "/usr/bin/detect-secrets")
+    result = secrets_mod.scan(tmp_path, lambda _cmd: (["{", '  "results": {}', "}"], 0))
+    assert result == {"detect-secrets": ([], 0)}
+    assert (tmp_path / ".secrets.baseline").read_bytes() == b'{\n  "results": {}\n}'
+
+
+# --- run():the shell-command runner every tool above funnels through --------
 # Its three contract points are the ones a mock cannot check -- the merge order of
 # stdout and stderr, the working directory, and that non-UTF-8 tool output does not
 # raise -- so these spawn a real child. `"<python>" "<script>"` is the one command
