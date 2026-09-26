@@ -15,6 +15,8 @@ def test_instruction_inventory_is_intentional():
         "authoring",
         "engineering",
         "security",
+        # Vendored from devkit alongside engineering.md; changed there, not here.
+        "session-scope",
         "skin-architecture",
         "skin-barebone",
         "skin-candy-shop",

@@ -216,16 +216,20 @@ def test_automerge_merge_job_only_trusts_dependabot_gate_on_current_head():
     )
     script = (REPO_ROOT / "scripts/merge-dependabot-prs.py").read_text(encoding="utf-8")
 
-    # The event-driven merge still fires only for a real pull_request gate run...
-    assert "github.event.workflow_run.event == 'pull_request'" in workflow
+    # The event-driven merge fires for a pull_request gate run, and since devkit
+    # v0.11.26 for a workflow_dispatch one too: a lock repair pushed with
+    # GITHUB_TOKEN raises no pull_request event, so it dispatches the gate itself...
+    assert "github.event.workflow_run.event" in workflow
+    assert '["pull_request", "workflow_dispatch"]' in workflow
     # ...and hands the script the gated commit, so a head that moved cannot inherit
     # the merge. Both jobs delegate to the script, which re-derives every guard from
     # the PR's current state (pinned upstream by test_merge_dependabot_prs.py).
     assert "RUN_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}" in workflow
     assert "scripts/merge-dependabot-prs.py" in workflow
-    # A hand-dispatched gate run still mints no evidence: the script accepts only a
-    # successful pull_request-event run of the gate on the exact head SHA.
+    # A dispatched gate run is evidence only on the PR's own head branch and exact
+    # head SHA; a pull_request-event run is the PR's by construction.
     assert '"pull_request"' in script and "gate_passed" in script
+    assert '"workflow_dispatch"' in script and 'entry.get("head_branch") == branch' in script
     # There is deliberately no author guard any more -- the automerge label, which
     # only write access can apply, is the whole authorization.
     assert "workflow_run.actor" not in workflow
