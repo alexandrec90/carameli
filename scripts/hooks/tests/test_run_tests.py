@@ -2,6 +2,7 @@
 
 import itertools
 import os
+import subprocess
 import sys
 from pathlib import Path
 
@@ -9,6 +10,8 @@ import pytest
 from conftest import REPO_ROOT, load_module
 
 rt = load_module("scripts/run-tests.py")
+# The instance the runner imported, so a repointed helper is the one it calls.
+host_tier = sys.modules[rt.host_db_fallback.__module__]
 # The resolver lives beside the spawning, in `host_spawn`; these are assertions
 # about run-tests.py's own declared argvs once they have been through it.
 hs = load_module("scripts/host_spawn.py")
@@ -344,46 +347,92 @@ def test_webhook_e2e_target_demands_a_live_tunnel():
 
 
 def test_parse_host_port_variants():
-    assert rt.parse_host_port("0.0.0.0:5432") == "5432"
-    assert rt.parse_host_port("[::]:5433\n") == "5433"
-    assert rt.parse_host_port("127.0.0.1:15432") == "15432"
-    assert rt.parse_host_port("") is None
-    assert rt.parse_host_port("no ports published") is None
+    assert host_tier.parse_host_port("0.0.0.0:5432") == "5432"
+    assert host_tier.parse_host_port("[::]:5433\n") == "5433"
+    assert host_tier.parse_host_port("127.0.0.1:15432") == "15432"
+    assert host_tier.parse_host_port("") is None
+    assert host_tier.parse_host_port("no ports published") is None
 
 
 def test_host_db_fallback_declines_while_the_app_container_is_up(monkeypatch):
-    monkeypatch.setattr(rt, "_compose_running_services", lambda root=None: {"app", "db", "redis"})
-    monkeypatch.setattr(rt, "host_db_env", lambda root=None: {"DATABASE_URL": "x"})
+    monkeypatch.setattr(
+        host_tier, "_compose_running_services", lambda root=None: {"app", "db", "redis"}
+    )
+    monkeypatch.setattr(host_tier, "host_db_env", lambda root=None: {"DATABASE_URL": "x"})
     assert rt.host_db_fallback() is None
 
 
 def test_host_db_fallback_declines_when_the_database_is_down(monkeypatch):
     # No app container AND no database is not a tier to fall back to -- the
     # container's own error is the more useful failure.
-    monkeypatch.setattr(rt, "_compose_running_services", lambda root=None: set())
-    monkeypatch.setattr(rt, "host_db_env", lambda root=None: {"DATABASE_URL": "x"})
+    monkeypatch.setattr(host_tier, "_compose_running_services", lambda root=None: set())
+    monkeypatch.setattr(host_tier, "host_db_env", lambda root=None: {"DATABASE_URL": "x"})
     assert rt.host_db_fallback() is None
 
 
 def test_host_db_fallback_takes_over_when_only_the_app_is_missing(monkeypatch):
     # The ephemeral-box shape the report describes: db+redis up, no app container, and
     # the run used to end at `docker compose exec`'s "No such container".
-    monkeypatch.setattr(rt, "_compose_running_services", lambda root=None: {"db", "redis"})
-    monkeypatch.setattr(rt, "host_db_env", lambda root=None: {"DATABASE_URL": "postgres://x"})
+    monkeypatch.setattr(host_tier, "_compose_running_services", lambda root=None: {"db", "redis"})
+    monkeypatch.setattr(
+        host_tier, "host_db_env", lambda root=None: {"DATABASE_URL": "postgres://x"}
+    )
+    ensured: list[object] = []
+    monkeypatch.setattr(host_tier, "ensure_test_database", lambda root=None: ensured.append(root))
     assert rt.host_db_fallback() == {"DATABASE_URL": "postgres://x"}
+    assert len(ensured) == 1, "the host tier makes sure its database exists"
+
+
+def _createdb(code: int, stderr: str = ""):
+    """A fake `subprocess.run` for `docker compose exec db createdb`, recording its argv."""
+    calls: list[list[str]] = []
+
+    def run(argv, **_kw):
+        calls.append(argv)
+        return subprocess.CompletedProcess(argv, code, "", stderr)
+
+    return run, calls
+
+
+def test_ensure_test_database_creates_it_in_a_fresh_volume():
+    """A worktree's own compose volume starts with only `POSTGRES_DB`, so every host-tier
+    DB test failed with `InvalidCatalogNameError` until `carameli_test` was made by hand."""
+    run, calls = _createdb(0)
+    assert host_tier.ensure_test_database(runner=run) is True
+    db = host_tier.CFG.db
+    assert calls == [
+        ["docker", "compose", "exec", "-T", db.db_service, "createdb", "-U", db.user, db.name]
+    ]
+
+
+def test_ensure_test_database_takes_an_existing_one_as_there():
+    run, _ = _createdb(
+        1, 'createdb: error: database creation failed: ERROR:  database "x" already exists'
+    )
+    assert host_tier.ensure_test_database(runner=run) is True
+
+
+def test_ensure_test_database_fails_open_when_the_db_cannot_be_reached():
+    run, _ = _createdb(1, 'service "db" is not running')
+    assert host_tier.ensure_test_database(runner=run) is False
+
+    def missing_docker(argv, **_kw):
+        raise FileNotFoundError("docker")
+
+    assert host_tier.ensure_test_database(runner=missing_docker) is False
 
 
 def test_host_db_env_points_at_the_published_ports(monkeypatch):
-    monkeypatch.setattr(rt, "_compose_host_port", lambda svc, port, root=None: "15432")
-    env = rt.host_db_env()
-    for name in rt.CFG.db.url_env:
-        assert env[name].endswith(f"@localhost:15432/{rt.CFG.db.name}")
-    assert env[rt.CFG.db.redis_env] == "redis://localhost:15432"
+    monkeypatch.setattr(host_tier, "_compose_host_port", lambda svc, port, root=None: "15432")
+    env = host_tier.host_db_env()
+    for name in host_tier.CFG.db.url_env:
+        assert env[name].endswith(f"@localhost:15432/{host_tier.CFG.db.name}")
+    assert env[host_tier.CFG.db.redis_env] == "redis://localhost:15432"
 
 
 def test_host_db_env_is_none_when_a_port_cannot_be_resolved(monkeypatch):
-    monkeypatch.setattr(rt, "_compose_host_port", lambda svc, port, root=None: None)
-    assert rt.host_db_env() is None
+    monkeypatch.setattr(host_tier, "_compose_host_port", lambda svc, port, root=None: None)
+    assert host_tier.host_db_env() is None
 
 
 def test_run_local_uses_the_host_tier_without_testmon(monkeypatch):
