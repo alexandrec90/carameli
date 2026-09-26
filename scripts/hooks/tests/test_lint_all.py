@@ -13,6 +13,7 @@ import pytest
 from conftest import load_module
 
 la = load_module("scripts/lint-all.py")
+secrets_mod = load_module("scripts/lint_secrets.py")
 diag = load_module("scripts/diagnostics.py")
 
 
@@ -592,7 +593,9 @@ def test_secrets_exclude_matches_pre_commit():
     cfg = (la.REPO_ROOT / ".pre-commit-config.yaml").read_text(encoding="utf-8")
     block = re.search(r"- id: detect-secrets\b(.*?)(?=\n {6}- id: |\Z)", cfg, re.S)
     assert block, "no detect-secrets hook in .pre-commit-config.yaml"
-    assert re.findall(r"^\s+exclude:\s*(\S+)\s*$", block.group(1), re.M) == [la.SECRETS_EXCLUDE_RE]
+    assert re.findall(r"^\s+exclude:\s*(\S+)\s*$", block.group(1), re.M) == [
+        secrets_mod.SECRETS_EXCLUDE_RE
+    ]
 
 
 def test_baseline_has_no_entries_for_excluded_files():
@@ -600,8 +603,20 @@ def test_baseline_has_no_entries_for_excluded_files():
     # (or .env.example) in the committed baseline means the exclusion regressed,
     # even if SECRETS_EXCLUDE_RE still reads correctly.
     data = json.loads((la.REPO_ROOT / ".secrets.baseline").read_text(encoding="utf-8"))
-    excluded = re.compile(la.SECRETS_EXCLUDE_RE)
+    excluded = re.compile(secrets_mod.SECRETS_EXCLUDE_RE)
     assert [f for f in (data.get("results") or {}) if excluded.search(f.replace("\\", "/"))] == []
+
+
+def test_baseline_diffing_ignores_the_timestamp_and_survives_a_broken_baseline():
+    """`lint_secrets`' two pure halves: the timestamp is not a change, and a baseline
+    that does not parse counts as no findings rather than crashing the lint run."""
+    stamped = '{"generated_at": "2026-01-01T00:00:00Z", "results": {}}'
+    restamped = '{"generated_at": "2026-07-01T12:00:00Z", "results": {}}'
+    assert secrets_mod.normalize(stamped) == secrets_mod.normalize(restamped)
+    assert secrets_mod.hashes("not json") == set()
+    assert secrets_mod.hashes('{"results": {"a.py": [{"hashed_secret": "h1"}]}}') == {
+        ("a.py", "h1")
+    }
 
 
 # --- run(): the shell-command runner every tool above funnels through --------
