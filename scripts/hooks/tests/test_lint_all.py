@@ -447,6 +447,50 @@ def test_detect_secrets_restores_timestamp_only_churn(monkeypatch, tmp_path, cap
     assert "detect-secrets" not in capsys.readouterr().out
 
 
+def _crlf_scan(monkeypatch, tmp_path, before: str, after: str):
+    """A baseline committed with LF, and a scan that rewrites it with CRLF -- what
+    detect-secrets does on Windows, where it writes the file in text mode."""
+    baseline = tmp_path / ".secrets.baseline"
+    baseline.write_bytes(before.encode("utf-8"))
+
+    def fake_run(cmd: str):
+        if "scan --baseline" in cmd:
+            baseline.write_bytes(after.replace("\n", "\r\n").encode("utf-8"))
+        return ([], 0)
+
+    monkeypatch.setattr(la, "run", fake_run)
+    monkeypatch.setattr(la, "REPO_ROOT", tmp_path)
+    monkeypatch.setattr(la.shutil, "which", lambda _name: "/usr/bin/detect-secrets")
+    return baseline
+
+
+def test_detect_secrets_restores_a_baseline_the_scan_only_rewrote_with_crlf(monkeypatch, tmp_path):
+    """3 of 4 fixer worktrees on 2026-09-19 showed `.secrets.baseline` modified with an
+    empty diff, and it blocked `git merge`. `read_text` translates CRLF, so the two reads
+    compared equal and the CRLF copy the scan wrote was left on disk."""
+    before = '{\n  "results": {"a.py": [{"hashed_secret": "h1"}]}\n}\n'
+    baseline = _crlf_scan(monkeypatch, tmp_path, before, before)
+    assert la.t_detect_secrets(None) == {"detect-secrets": ([], 0)}
+    assert baseline.read_bytes() == before.encode("utf-8")
+
+
+def test_detect_secrets_timestamp_churn_is_restored_byte_for_byte(monkeypatch, tmp_path):
+    before = '{\n  "generated_at": "2026-01-01T00:00:00Z"\n}\n'
+    after = '{\n  "generated_at": "2026-07-01T12:00:00Z"\n}\n'
+    baseline = _crlf_scan(monkeypatch, tmp_path, before, after)
+    la.t_detect_secrets(None)
+    assert baseline.read_bytes() == before.encode("utf-8")
+
+
+def test_a_baseline_with_new_findings_is_kept_with_lf(monkeypatch, tmp_path, capsys):
+    before = '{\n  "results": {"a.py": [{"hashed_secret": "h1"}]}\n}\n'
+    after = '{\n  "results": {"a.py": [{"hashed_secret": "h1"}, {"hashed_secret": "h2"}]}\n}\n'
+    baseline = _crlf_scan(monkeypatch, tmp_path, before, after)
+    la.t_detect_secrets(None)
+    assert baseline.read_bytes() == after.encode("utf-8")
+    assert "1 new finding(s)" in capsys.readouterr().out
+
+
 def test_detect_secrets_that_is_not_installed_never_reaches_the_scan(monkeypatch, tmp_path):
     """The reported defect, fixed at the question rather than at the wording.
 

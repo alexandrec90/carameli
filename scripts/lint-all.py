@@ -503,10 +503,16 @@ def t_detect_secrets(changed: list[str] | None = None) -> dict:
 
     if not baseline.exists():
         out, _ = run(f"detect-secrets scan {exclude}")
-        baseline.write_text("\n".join(out), encoding="utf-8")
+        baseline.write_text("\n".join(out), encoding="utf-8", newline="\n")
         return {"detect-secrets": ([], 0)}
 
-    before = baseline.read_text(encoding="utf-8")
+    # Bytes, not `read_text`: detect-secrets writes the baseline in text mode, so on
+    # Windows every scan left it CRLF, and `read_text` translates CRLF -- the two reads
+    # compared equal, nothing was restored, and the worktree showed `.secrets.baseline`
+    # modified with an empty diff, which blocked `git merge` (3 of 4 fixer trees on
+    # 2026-09-19). The file is `eol=lf`, so whatever survives this is written LF.
+    before_bytes = baseline.read_bytes()
+    before = before_bytes.decode("utf-8").replace("\r\n", "\n")
     out, code = run(f'detect-secrets scan --baseline ".secrets.baseline" {exclude}')
     if code != 0:
         # Keep the tool's own output ahead of the summary. Dropping it is what made an
@@ -515,16 +521,19 @@ def t_detect_secrets(changed: list[str] | None = None) -> dict:
         # "is not recognized" line, the one that says missing tool rather than broken
         # repo, was thrown away. A genuine scan failure needs the output just as much.
         return {"detect-secrets": ([*out, f"detect-secrets: scan failed (exit {code})"], 1)}
-    after = baseline.read_text(encoding="utf-8")
+    after_bytes = baseline.read_bytes()
+    after = after_bytes.decode("utf-8").replace("\r\n", "\n")
 
     def _normalize(text: str) -> str:
         return re.sub(r'"generated_at":\s*"[^"]*"', '"generated_at": ""', text)
 
     if _normalize(after) == _normalize(before):
-        if after != before:
-            # Timestamp-only churn: restore so the committed baseline stays clean.
-            baseline.write_text(before, encoding="utf-8")
+        if after_bytes != before_bytes:
+            # Timestamp or line-ending churn only: restore so the checkout stays clean.
+            baseline.write_bytes(before_bytes)
         return {"detect-secrets": ([], 0)}
+    if after_bytes != after.encode("utf-8"):
+        baseline.write_text(after, encoding="utf-8", newline="\n")
 
     def _hashes(text: str) -> set[tuple[str, str]]:
         try:
