@@ -6,6 +6,7 @@ import pytest
 
 from app.repositories.extension_repo import ExtensionRepo
 from app.repositories.phone_line_repo import PhoneLineRepo
+from app.services import pointer_service
 from tests.conftest import AUTH_HEADERS
 
 pytestmark = pytest.mark.asyncio(loop_scope="session")
@@ -27,22 +28,23 @@ async def _create_customer(client, vs_id: int) -> dict:
 
 async def _seed_line_and_ext(
     db_session, customer_id: uuid.UUID, phone_number: str, ext_number: str
-) -> None:
+) -> tuple[uuid.UUID, uuid.UUID]:
     """Directly create a phone line and extension, bypassing the carrier mock."""
     line_repo = PhoneLineRepo(db_session)
-    await line_repo.create(
+    line = await line_repo.create(
         customer_id=customer_id,
         phone_number=phone_number,
         provider_sid=f"PN{phone_number[-7:]}",
     )
     ext_repo = ExtensionRepo(db_session)
-    await ext_repo.create(
+    ext = await ext_repo.create(
         customer_id=customer_id,
         extension_number=ext_number,
         sip_username=f"ext{ext_number}_{str(customer_id)[:8]}",
         sip_credential_sid=None,
         sip_domain_sid=None,
     )
+    return line.id, ext.id
 
 
 async def test_add_pointer(client, db_session) -> None:
@@ -156,3 +158,20 @@ async def test_delete_pointer_not_found_returns_404(client, db_session) -> None:
         headers=AUTH_HEADERS,
     )
     assert resp.status_code == 404
+
+
+async def test_pointer_service_delete_removes_only_that_pointer(client, db_session) -> None:
+    data = await _create_customer(client, 7106)
+    customer_id = uuid.UUID(data["id"])
+    line_id, ext_id = await _seed_line_and_ext(db_session, customer_id, "+17165550106", "404")
+    other_line_id, other_ext_id = await _seed_line_and_ext(
+        db_session, customer_id, "+17165550107", "405"
+    )
+    pointer = await pointer_service.create(db_session, line_id, ext_id)
+    await pointer_service.create(db_session, other_line_id, other_ext_id)
+
+    await pointer_service.delete(db_session, pointer)
+
+    assert await pointer_service.get(db_session, line_id, ext_id) is None
+    assert await pointer_service.get_for_phone_line(db_session, line_id) is None
+    assert await pointer_service.get(db_session, other_line_id, other_ext_id) is not None

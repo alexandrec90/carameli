@@ -336,7 +336,6 @@ app/services/phone_line_service.py::update_auto_attendant
 app/services/phone_line_service.py::update_recording_enabled
 app/services/phone_line_service.py::update_sms_enabled
 app/services/pointer_service.py::get_for_extension
-app/services/pointer_service.py::get_for_phone_line
 app/services/providers/base.py::CallEngineProvider
 app/services/providers/base.py::CarrierProvider
 app/services/recording_archive_service.py::call_sid_from_public_url
