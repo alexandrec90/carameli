@@ -15,48 +15,11 @@ ADAPTER = "scripts/hooks/codex-hook-adapter.py"
 EXPECTED_DROPPED_EVENTS = frozenset({"PostToolUseFailure"})
 EXPECTED_DROPPED_MATCHERS = frozenset({("PostToolUse", "^Skill$")})
 EXPECTED_REDUNDANT_HANDLERS = frozenset({("PreToolUse", "scripts/hooks/enforce-capped-bash.py")})
-# An event that survives classification but loses every handler is omitted entirely, so
-# it leaves by a different door than `PostToolUseFailure` and is asserted separately.
-# `PreToolUse` used to leave that way, when the Bash output cap -- redundant under Codex,
-# which caps command output itself -- was its only handler. The worktree-guard launcher
-# adopted with devkit v0.11.14 is a second, non-redundant `PreToolUse` handler, so the
-# event now reaches Codex and nothing is emptied. Drop that handler and this grows again.
-EXPECTED_EMPTIED_EVENTS: frozenset[str] = frozenset()
-EXPECTED_TOPOLOGY = {
-    "SessionStart": (
-        (
-            "",
-            (
-                ("scripts/hooks/codex-session-start.py",),
-                ("scripts/prune-logs.py",),
-            ),
-        ),
-    ),
-    # No `UserPromptSubmit`. It ran `branch-per-task.py`, which devkit retired in
-    # v0.7.0: cutting the task branch *inside* the checkout the session was in is what
-    # let a checkout outlive its task. `worktree-guard.py` routes the same edit into an
-    # ephemeral box instead, so there is no prompt-time handler left to mirror.
-    # `PreToolUse` carries one group, not two: the Bash output cap is classified
-    # redundant and dropped, leaving the worktree-guard launcher as the whole event.
-    "PreToolUse": (
-        (
-            "^(Edit|Write|MultiEdit|NotebookEdit|apply_patch|create_file|Bash|PowerShell)$",
-            (("scripts/hooks/worktree-guard-launch.py",),),
-        ),
-    ),
-    "PostToolUse": (
-        (
-            "^(Edit|Write|MultiEdit|apply_patch|create_file)$",
-            (("scripts/hooks/lint-fix.py",),),
-        ),
-    ),
-    "Stop": (
-        (
-            "",
-            (("scripts/hooks/stop.py",),),
-        ),
-    ),
-}
+# devkit v0.11.25 stopped wiring agent hooks: `.claude/settings.json` carries no `hooks`
+# block and `sync-devkit.py --pull` strips one, so the generated Codex wiring is empty.
+# The snapshot pins that. Wiring a hook again is a deliberate change that must restore
+# the per-event topology here, after reviewing what Codex drops from it.
+EXPECTED_TOPOLOGY: dict = {}
 
 
 def _load_json(path: Path) -> dict:
@@ -101,10 +64,11 @@ def test_real_hook_drops_are_explicitly_allowlisted():
     source = _load_json(CLAUDE_SETTINGS)
     generated = hook.to_codex_hooks(source)
 
-    dropped_events = frozenset(source["hooks"]) - frozenset(generated["hooks"])
+    source_hooks = source.get("hooks", {})
+    dropped_events = frozenset(source_hooks) - frozenset(generated["hooks"])
     source_matchers = {
         (event, group.get("matcher", ""))
-        for event, groups in source["hooks"].items()
+        for event, groups in source_hooks.items()
         if event in hook.SUPPORTED_EVENTS
         for group in groups
     }
@@ -117,10 +81,8 @@ def test_real_hook_drops_are_explicitly_allowlisted():
     assert hook.UNSUPPORTED_EVENTS == EXPECTED_DROPPED_EVENTS
     assert hook.UNSUPPORTED_MATCHERS == EXPECTED_DROPPED_MATCHERS
     assert {(event, path) for event, path in hook.REDUNDANT_HANDLERS} == EXPECTED_REDUNDANT_HANDLERS
-    assert dropped_events == EXPECTED_DROPPED_EVENTS | EXPECTED_EMPTIED_EVENTS
-    assert source_matchers - generated_matchers == EXPECTED_DROPPED_MATCHERS | {
-        ("PreToolUse", "Bash")
-    }
+    assert dropped_events == frozenset(source_hooks) & EXPECTED_DROPPED_EVENTS
+    assert source_matchers <= generated_matchers | EXPECTED_DROPPED_MATCHERS
 
 
 def test_current_hook_topology_requires_compatibility_review():
@@ -131,7 +93,7 @@ def test_current_hook_topology_requires_compatibility_review():
 
 
 def test_generated_handlers_exist_and_use_the_codex_adapter():
-    """Every shared Python/Bash handler is adapted, including the session bridge."""
+    """Every generated handler, if any is wired, is routed through the Codex adapter."""
     generated = hook.to_codex_hooks(_load_json(CLAUDE_SETTINGS))
 
     for event, groups in generated["hooks"].items():
@@ -148,7 +110,3 @@ def test_generated_handlers_exist_and_use_the_codex_adapter():
                 assert paths
                 for relative_path in paths:
                     assert (REPO_ROOT / relative_path).is_file(), relative_path
-
-    session_command = generated["hooks"]["SessionStart"][0]["hooks"][0]["command"]
-    assert hook.CLAUDE_SESSION_START not in session_command
-    assert "scripts/hooks/codex-session-start.py" in session_command
