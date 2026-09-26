@@ -1,22 +1,25 @@
-"""MinIO images come from quay.io, and the mc entrypoint sticks to what mc ships.
+"""MinIO images come from pgsty's pinned rebuild, and the mc entrypoint sticks to what mc ships.
 
-MinIO's `minio/minio` and `minio/mc` repositories stopped being pullable from Docker
-Hub -- an anonymous pull now answers "pull access denied ... repository does not exist",
-which is the same message a typo produces. Nothing in this repo had pinned a digest, so
-the break arrived on its own: the Nightly workflow's `docker compose up -d` died in the
-pull phase for eight consecutive nights, and because compose reports the *first* service
-to error and interrupts the rest, the log named only `minio-init` while `minio` and the
-`db-backup` build (`backup/Dockerfile` copies the mc binary out of the same image) were
-equally broken and simply never got that far. `quay.io/minio/...` is MinIO's own
-registry and carries both images.
+MinIO has withdrawn anonymous pulls twice. First Docker Hub: `minio/minio` and
+`minio/mc` began answering "pull access denied ... repository does not exist", the
+message a typo produces, and the Nightly workflow's `docker compose up -d` died in the
+pull phase for eight nights (issue #354). The repair moved to `quay.io/minio/...`, and
+on 2026-09-25 quay did the same -- the anonymous token for both repositories now grants
+no actions, so every pull is `401 UNAUTHORIZED` (issue #390). The same commit had passed
+the night before: nothing in this repo changed, the registry did.
 
-The second test guards the repair's blast radius rather than the outage. The quay mc
-image is a ubi-micro carrying bash and coreutils, and *not* grep, sed or awk. The old
-`minio-init` entrypoint tested for an already-correct lifecycle rule with a `grep -Eq`,
-which on this image does not fail the container -- it prints "grep: command not found",
-the test reads false, and every `docker compose up` silently deletes the bucket's
-lifecycle rule and writes a fresh one. A broken idempotence check that still exits 0 is
-invisible, so pin the tools instead of the symptom.
+The images now come from `pgsty/minio` and `pgsty/mc` on Docker Hub, the community
+fork that still builds MinIO on the same ubi-micro base -- same entrypoint, `curl` for
+the health check, `mc` at `/usr/bin/mc` for `backup/Dockerfile`'s copy. Because it is a
+third party's rebuild rather than MinIO's own, each reference is pinned to a release
+tag *and* a digest, so a pull either gets the bytes that were verified or fails loudly.
+Compose reports only the *first* service to error, so all three references -- `minio`,
+`minio-init` and the `db-backup` build -- are swept, not just the one a log names.
+
+The last test guards the entrypoint rather than the source. The mc image carries bash
+and coreutils and *not* grep, sed or awk. A `grep -Eq` in `minio-init` does not fail the
+container -- it prints "grep: command not found", the test reads false, and every
+`docker compose up` silently deletes the bucket's lifecycle rule and writes a fresh one.
 """
 
 from __future__ import annotations
@@ -34,10 +37,15 @@ BACKUP_DOCKERFILE = REPO / "backup" / "Dockerfile"
 # `FROM <ref>` with the optional `AS <stage>` and any `--platform=` flags dropped.
 FROM_LINE = re.compile(r"^FROM\s+(?:--\S+\s+)*(\S+)", re.MULTILINE)
 
-# The Docker Hub namespace that went away. `quay.io/minio/...` is deliberately not a
-# match: the pattern is anchored to a bare (registry-less) reference, which Docker
-# resolves against Docker Hub.
-RETIRED_MINIO_HUB_REF = re.compile(r"^minio/\S+")
+# Registries MinIO itself publishes to, both of which now refuse anonymous pulls. The
+# bare form is anchored: Docker resolves a registry-less `minio/...` against Docker Hub.
+RETIRED_MINIO_SOURCES = (
+    re.compile(r"^(?:docker\.io/)?minio/\S+"),
+    re.compile(r"^quay\.io/minio/\S+"),
+)
+
+# The pinned shape every MinIO reference must take: a release tag and a digest.
+PINNED_PGSTY_REF = re.compile(r"^pgsty/(?:minio|mc):RELEASE\.[0-9T-]+Z@sha256:[0-9a-f]{64}$")
 
 # Absent from the mc image. Each would be a silent no-op inside a `&&` pipeline rather
 # than a visible failure, so a reviewer cannot rely on CI going red.
@@ -62,6 +70,14 @@ def _image_references() -> dict[str, str]:
     return refs
 
 
+def _minio_references() -> dict[str, str]:
+    return {
+        where: image
+        for where, image in _image_references().items()
+        if re.search(r"(?:^|/)(?:minio|mc)[:@]", image)
+    }
+
+
 def test_image_references_were_found() -> None:
     """Guard the parsers: an empty sweep would make the checks below vacuous."""
     refs = _image_references()
@@ -69,21 +85,30 @@ def test_image_references_were_found() -> None:
     assert any(r.startswith("backup/Dockerfile::") for r in refs)
 
 
+def test_every_minio_reference_is_swept() -> None:
+    """minio, minio-init and the db-backup build stage all pull a MinIO image."""
+    where = set(_minio_references())
+    assert "docker-compose.yml::minio" in where
+    assert "docker-compose.yml::minio-init" in where
+    assert any(w.startswith("backup/Dockerfile::") for w in where)
+
+
 @pytest.mark.parametrize("where", sorted(_image_references()))
-def test_no_image_comes_from_the_retired_minio_docker_hub_namespace(where: str) -> None:
+def test_no_image_comes_from_a_registry_minio_withdrew(where: str) -> None:
     image = _image_references()[where]
-    assert not RETIRED_MINIO_HUB_REF.match(image), (
-        f"{where} pulls {image!r} from Docker Hub, where MinIO no longer publishes; "
-        f"anonymous pulls fail with 'repository does not exist'. Use quay.io/{image}."
-    )
+    for retired in RETIRED_MINIO_SOURCES:
+        assert not retired.match(image), (
+            f"{where} pulls {image!r}, from a registry where MinIO no longer allows "
+            f"anonymous pulls. Use the pinned pgsty/minio or pgsty/mc rebuild."
+        )
 
 
-def test_every_minio_image_is_pulled_from_quay() -> None:
-    """The positive half: catches a move to some third registry, not just a revert."""
-    minio_refs = {where: image for where, image in _image_references().items() if "minio" in image}
-    assert minio_refs, "no MinIO image references found -- has the stack changed?"
-    for where, image in sorted(minio_refs.items()):
-        assert image.startswith("quay.io/minio/"), f"{where} names {image!r}"
+def test_every_minio_image_is_a_pinned_pgsty_rebuild() -> None:
+    """The positive half: catches a move to some other registry, or an unpinned tag."""
+    for where, image in sorted(_minio_references().items()):
+        assert PINNED_PGSTY_REF.match(image), (
+            f"{where} names {image!r}; expected pgsty/<minio|mc>:RELEASE.<ts>@sha256:<digest>"
+        )
 
 
 @pytest.mark.parametrize("tool", TOOLS_MISSING_FROM_MC_IMAGE)

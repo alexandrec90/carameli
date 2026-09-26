@@ -542,8 +542,11 @@ services:
       retries: 10
       start_period: 30s
 
+  # MinIO withdrew anonymous pulls from Docker Hub and then from quay.io, so both
+  # MinIO images (here, minio-init, backup/Dockerfile) come from pgsty's community
+  # rebuild, pinned by tag and digest. tests/unit/test_minio_image_source.py holds it.
   minio:
-    image: quay.io/minio/minio:latest
+    image: pgsty/minio:RELEASE.2026-08-04T00-00-00Z@sha256:b6bfe7239bfc83fb90d31612d9704d86039dd714f7904b3f1ad68f211e602372
     restart: unless-stopped
     ports:
       - "${MINIO_HOST_PORT:-9000}:9000"
@@ -572,7 +575,7 @@ services:
   # JSON to one spacing so the literal match holds whether mc prints it compact or
   # pretty, and the trailing `,`/`}` stops RETENTION_DAYS=7 matching a stored 70.
   minio-init:
-    image: quay.io/minio/mc:latest
+    image: pgsty/mc:RELEASE.2026-09-16T00-00-00Z@sha256:cfc83108c3abb371f8fb84d99c1fdc88f8c237e022409b0081fb7c0a3be634dd
     restart: "no"
     environment:
       RETENTION_DAYS: "${RETENTION_DAYS:-0}"
