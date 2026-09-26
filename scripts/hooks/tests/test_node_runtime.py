@@ -105,6 +105,18 @@ def test_cached_install_picks_the_newest_complete_build_of_the_major(tmp_path):
     assert node_runtime.cached_install("26", tmp_path, "linux") is None
 
 
+@pytest.mark.parametrize("system", ["win32", "linux"])
+def test_platform_defaults_are_read_at_call_time(tmp_path, monkeypatch, system):
+    # A default bound at import answered for the host, not for `sys.platform` now, so
+    # the provision tests -- which pose as Windows -- missed their cache on Linux CI.
+    build = _fake_build(tmp_path, "node-v24.21.0-x64", system)
+    monkeypatch.setattr(node_runtime.sys, "platform", system)
+
+    assert node_runtime.node_exe_name() == node_runtime.node_exe_name(system)
+    assert node_runtime.bin_dir(build) == node_runtime.bin_dir(build, system)
+    assert node_runtime.cached_install("24", tmp_path) == build
+
+
 def test_path_node_major_reads_the_node_path_resolves(monkeypatch):
     monkeypatch.setattr(node_runtime.shutil, "which", lambda name, path=None: "/bin/node")
     monkeypatch.setattr(

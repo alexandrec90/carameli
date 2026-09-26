@@ -87,13 +87,14 @@ def pick_asset(shasums: str, suffix: str) -> tuple[str, str]:
     raise ValueError(f"the release lists no `{suffix}` build")
 
 
-def cache_root(env: dict[str, str] | None = None, system: str = sys.platform) -> Path:
+def cache_root(env: dict[str, str] | None = None, system: str | None = None) -> Path:
     """Where provisioned builds live: per user, shared by every worktree. Pure.
 
     Outside the checkout on purpose -- a fresh worktree must not download it again,
     and `git clean` must not delete the runtime every other worktree is using.
     """
     env = dict(os.environ) if env is None else env
+    system = sys.platform if system is None else system
     if system.startswith("win") and env.get("LOCALAPPDATA"):
         base = Path(env["LOCALAPPDATA"])
     elif env.get("XDG_CACHE_HOME"):
@@ -103,17 +104,24 @@ def cache_root(env: dict[str, str] | None = None, system: str = sys.platform) ->
     return base / "carameli" / "node"
 
 
-def bin_dir(install: Path, system: str = sys.platform) -> Path:
+def bin_dir(install: Path, system: str | None = None) -> Path:
     """The directory holding `node` and `npm` inside an unpacked build. Pure."""
+    system = sys.platform if system is None else system
     return install if system.startswith("win") else install / "bin"
 
 
-def node_exe_name(system: str = sys.platform) -> str:
+def node_exe_name(system: str | None = None) -> str:
+    system = sys.platform if system is None else system
     return "node.exe" if system.startswith("win") else "node"
 
 
-def cached_install(major: str, root: Path | None = None, system: str = sys.platform) -> Path | None:
-    """The newest cached build of `major` that holds a `node`, or None."""
+def cached_install(major: str, root: Path | None = None, system: str | None = None) -> Path | None:
+    """The newest cached build of `major` that holds a `node`, or None.
+
+    `system` defaults to `sys.platform` as it is at call time, not at import: a
+    default bound once answers for the host even where the caller has said otherwise.
+    """
+    system = sys.platform if system is None else system
     base = cache_root(system=system) if root is None else root
     if not major or not base.is_dir():
         return None
