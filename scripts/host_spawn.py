@@ -23,6 +23,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+import node_runtime
 import script_common
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -54,6 +55,8 @@ def python_fix_hint(root: Path = REPO_ROOT) -> str:
 
 
 _WINDOWS_BATCH_LAUNCHERS = {"npm", "npx", "vite"}
+# What must run on `.nvmrc`'s Node rather than whatever PATH offers.
+_NODE_LAUNCHERS = _WINDOWS_BATCH_LAUNCHERS | {"node"}
 
 
 def python_exe(root: Path = REPO_ROOT) -> str:
@@ -153,6 +156,11 @@ def run_argv(argv: list[str], extra_env: dict[str, str] | None = None) -> tuple[
     Argv form (no shell) so multi-line bash passed to `docker compose exec`
     survives without cross-platform quoting hazards.
     """
+    if argv and argv[0] in _NODE_LAUNCHERS:
+        # Process-wide, not on the copy below: on Windows `resolve_argv` finds the
+        # `.cmd` shim through this process's PATH, and a shim beside the machine's own
+        # Node would run that Node whatever the child's PATH said.
+        node_runtime.activate(REPO_ROOT)
     env = os.environ.copy()
     if extra_env:
         env.update(extra_env)

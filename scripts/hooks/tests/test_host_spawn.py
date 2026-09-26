@@ -14,6 +14,7 @@ The two properties this file exists for:
 import os
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 from conftest import REPO_ROOT, load_module
 
@@ -204,3 +205,16 @@ def test_python_fix_hint_offers_nothing_where_nothing_says_how(tmp_path):
     """An empty directory has no lock and no manifest -- and no remedy to suggest."""
     assert hs.python_fix_hint(tmp_path) == ""
 
+
+def test_run_argv_activates_the_pinned_node_for_node_launchers(monkeypatch):
+    calls = []
+    monkeypatch.setattr(hs.node_runtime, "activate", lambda root: calls.append(root))
+    monkeypatch.setattr(
+        hs.subprocess, "run", lambda *a, **k: SimpleNamespace(stdout="", returncode=0)
+    )
+
+    hs.run_argv(["npm", "--prefix", "frontend", "run", "test:run"])
+    assert calls == [hs.REPO_ROOT]
+
+    hs.run_argv(["python", "-c", "pass"])
+    assert calls == [hs.REPO_ROOT]  # a Python target leaves PATH alone

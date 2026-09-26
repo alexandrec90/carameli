@@ -38,6 +38,7 @@ import sys
 from pathlib import Path
 
 import diagnostics
+import node_runtime
 import script_common
 
 sys.path.insert(0, str(Path(__file__).resolve().parent / "hooks"))
@@ -138,16 +139,18 @@ def running_node(which=shutil.which, run=subprocess.run) -> str:
 def node_gap(pinned: str, running: str, present: bool) -> str:
     """The one line to say about the Node on PATH, or "" when there is nothing. Pure.
 
-    The fix travels inside the line rather than in the shared `fix:` of `report`, which
-    names the Python provisioning command -- a Node mismatch is not fixed by that, and
-    printing it here is how an agent ends up rebuilding the venv over a Node problem.
+    The fix travels inside the line rather than relying on the shared `fix:` of
+    `report`, so a runner that prints only this line still says what to run.
 
     Same wording constraint as `gaps` below: no phrase `failure_class._MISSING_TOOL`
     matches, or a runner passing this through the digest turns the refusal into a skip.
     """
     if not pinned:
         return ""
-    fix = f"run: nvm install {pinned} && nvm use {pinned}"
+    # Bootstrap fetches `.nvmrc`'s line into a per-user cache and the runners put it
+    # first on PATH (`node_runtime`), so the fix is a command this repo owns -- not
+    # `nvm`, which the machine may not have and which a session cannot install.
+    fix = "run: python scripts/bootstrap.py"
     if not present:
         return (
             f"node is not on PATH here, and the frontend gates need Node "
@@ -208,7 +211,14 @@ def gaps(
     which=shutil.which,
     run=subprocess.run,
 ) -> list[str]:
-    """One line per reason the gates cannot run here. Empty when the checkout is ready."""
+    """One line per reason the gates cannot run here. Empty when the checkout is ready.
+
+    Puts bootstrap's provisioned Node first on PATH before judging anything, so the
+    check -- and every npm step the runner then spawns -- sees the runtime `.nvmrc`
+    pins rather than the machine's own. `lint-all.py` has no other entry point to do
+    that from without growing past its structure ceiling.
+    """
+    node_runtime.activate(root)
     config = harness_config.load(root) if cfg is None else cfg
     found: list[str] = []
     absent = missing_host_tools(which=which)

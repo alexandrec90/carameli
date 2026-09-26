@@ -209,6 +209,14 @@ out an `npm run lint` step, and reads as a broken lint rather than a stale pin.
 `frontend/.npmrc` turns `engine-strict` on so `npm ci` refuses that tree outright instead
 of installing it and failing at the point of use.
 
+**A workstation's own Node does not have to match; `bootstrap.py` provisions the pinned
+one.** When PATH's `node` is on another major, it downloads `.nvmrc`'s line from
+nodejs.org, checks it against the release's `SHASUMS256.txt`, and caches it per user
+(`scripts/node_runtime.py`); `lint-all.py` and `run-tests.py` put that build first on
+PATH before anything runs. The system install is never touched. So a Node mismatch is
+fixed by running bootstrap, in the session that hits it — not reported and left, which
+is what happened while the only remedy on offer was an `nvm` the machine did not have.
+
 **`npm run lint` and the gate must be the same set of checks.** They were not: `cspell`
 and `knip` lived only in the npm chain, so they ran when a person typed the command and in
 no CI job, pre-commit hook or ship gate — which is how a cspell that could not start on the
