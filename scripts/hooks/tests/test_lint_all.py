@@ -13,6 +13,7 @@ import pytest
 from conftest import load_module
 
 la = load_module("scripts/lint-all.py")
+secrets_mod = load_module("scripts/lint_secrets.py")
 diag = load_module("scripts/diagnostics.py")
 
 
@@ -447,6 +448,50 @@ def test_detect_secrets_restores_timestamp_only_churn(monkeypatch, tmp_path, cap
     assert "detect-secrets" not in capsys.readouterr().out
 
 
+def _crlf_scan(monkeypatch, tmp_path, before: str, after: str):
+    """A baseline committed with LF, and a scan that rewrites it with CRLF -- what
+    detect-secrets does on Windows, where it writes the file in text mode."""
+    baseline = tmp_path / ".secrets.baseline"
+    baseline.write_bytes(before.encode("utf-8"))
+
+    def fake_run(cmd: str):
+        if "scan --baseline" in cmd:
+            baseline.write_bytes(after.replace("\n", "\r\n").encode("utf-8"))
+        return ([], 0)
+
+    monkeypatch.setattr(la, "run", fake_run)
+    monkeypatch.setattr(la, "REPO_ROOT", tmp_path)
+    monkeypatch.setattr(la.shutil, "which", lambda _name: "/usr/bin/detect-secrets")
+    return baseline
+
+
+def test_detect_secrets_restores_a_baseline_the_scan_only_rewrote_with_crlf(monkeypatch, tmp_path):
+    """3 of 4 fixer worktrees on 2026-09-19 showed `.secrets.baseline` modified with an
+    empty diff, and it blocked `git merge`. `read_text` translates CRLF, so the two reads
+    compared equal and the CRLF copy the scan wrote was left on disk."""
+    before = '{\n  "results": {"a.py": [{"hashed_secret": "h1"}]}\n}\n'
+    baseline = _crlf_scan(monkeypatch, tmp_path, before, before)
+    assert la.t_detect_secrets(None) == {"detect-secrets": ([], 0)}
+    assert baseline.read_bytes() == before.encode("utf-8")
+
+
+def test_detect_secrets_timestamp_churn_is_restored_byte_for_byte(monkeypatch, tmp_path):
+    before = '{\n  "generated_at": "2026-01-01T00:00:00Z"\n}\n'
+    after = '{\n  "generated_at": "2026-07-01T12:00:00Z"\n}\n'
+    baseline = _crlf_scan(monkeypatch, tmp_path, before, after)
+    la.t_detect_secrets(None)
+    assert baseline.read_bytes() == before.encode("utf-8")
+
+
+def test_a_baseline_with_new_findings_is_kept_with_lf(monkeypatch, tmp_path, capsys):
+    before = '{\n  "results": {"a.py": [{"hashed_secret": "h1"}]}\n}\n'
+    after = '{\n  "results": {"a.py": [{"hashed_secret": "h1"}, {"hashed_secret": "h2"}]}\n}\n'
+    baseline = _crlf_scan(monkeypatch, tmp_path, before, after)
+    la.t_detect_secrets(None)
+    assert baseline.read_bytes() == after.encode("utf-8")
+    assert "1 new finding(s)" in capsys.readouterr().out
+
+
 def test_detect_secrets_that_is_not_installed_never_reaches_the_scan(monkeypatch, tmp_path):
     """The reported defect, fixed at the question rather than at the wording.
 
@@ -548,7 +593,9 @@ def test_secrets_exclude_matches_pre_commit():
     cfg = (la.REPO_ROOT / ".pre-commit-config.yaml").read_text(encoding="utf-8")
     block = re.search(r"- id: detect-secrets\b(.*?)(?=\n {6}- id: |\Z)", cfg, re.S)
     assert block, "no detect-secrets hook in .pre-commit-config.yaml"
-    assert re.findall(r"^\s+exclude:\s*(\S+)\s*$", block.group(1), re.M) == [la.SECRETS_EXCLUDE_RE]
+    assert re.findall(r"^\s+exclude:\s*(\S+)\s*$", block.group(1), re.M) == [
+        secrets_mod.SECRETS_EXCLUDE_RE
+    ]
 
 
 def test_baseline_has_no_entries_for_excluded_files():
@@ -556,11 +603,65 @@ def test_baseline_has_no_entries_for_excluded_files():
     # (or .env.example) in the committed baseline means the exclusion regressed,
     # even if SECRETS_EXCLUDE_RE still reads correctly.
     data = json.loads((la.REPO_ROOT / ".secrets.baseline").read_text(encoding="utf-8"))
-    excluded = re.compile(la.SECRETS_EXCLUDE_RE)
+    excluded = re.compile(secrets_mod.SECRETS_EXCLUDE_RE)
     assert [f for f in (data.get("results") or {}) if excluded.search(f.replace("\\", "/"))] == []
 
 
-# --- run(): the shell-command runner every tool above funnels through --------
+def test_baseline_diffing_ignores_the_timestamp_and_survives_a_broken_baseline():
+    """`lint_secrets`' two pure halves: the timestamp is not a change, and a baseline
+    that does not parse counts as no findings rather than crashing the lint run."""
+    stamped = '{"generated_at": "2026-01-01T00:00:00Z", "results": {}}'
+    restamped = '{"generated_at": "2026-07-01T12:00:00Z", "results": {}}'
+    assert secrets_mod.normalize(stamped) == secrets_mod.normalize(restamped)
+    assert secrets_mod.hashes("not json") == set()
+    assert secrets_mod.hashes('{"results": {"a.py": [{"hashed_secret": "h1"}]}}') == {
+        ("a.py", "h1")
+    }
+
+
+def test_absent_is_none_when_installed_and_a_clean_skip_when_not(monkeypatch):
+    monkeypatch.setattr(secrets_mod.shutil, "which", lambda _name: "/usr/bin/detect-secrets")
+    assert secrets_mod.absent() is None
+    monkeypatch.setattr(secrets_mod.shutil, "which", lambda _name: None)
+    assert secrets_mod.absent() == {
+        "detect-secrets": (["detect-secrets is not installed -- skipped"], 0)
+    }
+
+
+def test_report_counts_new_findings_and_says_so_when_there_are_none(capsys):
+    before = '{"results": {"a.py": [{"hashed_secret": "h1"}]}}'
+    after = '{"results": {"a.py": [{"hashed_secret": "h1"}, {"hashed_secret": "h2"}]}}'
+    secrets_mod.report(before, after)
+    assert "1 new finding(s)" in capsys.readouterr().out
+    secrets_mod.report(after, before)
+    assert "removed/relocated" in capsys.readouterr().out
+
+
+def test_scan_takes_its_root_and_runner_as_given(monkeypatch, tmp_path):
+    """`scan` touches no module global: the baseline is under `root`, every command goes
+    through `run`, and a scan that fails keeps the tool's own output ahead of the summary."""
+    monkeypatch.setattr(secrets_mod.shutil, "which", lambda _name: "/usr/bin/detect-secrets")
+    (tmp_path / ".secrets.baseline").write_bytes(b'{"results": {}}\n')
+    seen: list[str] = []
+
+    def failing_run(cmd: str):
+        seen.append(cmd)
+        return (["boom"], 2)
+
+    assert secrets_mod.scan(tmp_path, failing_run) == {
+        "detect-secrets": (["boom", "detect-secrets: scan failed (exit 2)"], 1)
+    }
+    assert seen and "--baseline" in seen[0]
+
+
+def test_scan_writes_a_missing_baseline_with_lf(monkeypatch, tmp_path):
+    monkeypatch.setattr(secrets_mod.shutil, "which", lambda _name: "/usr/bin/detect-secrets")
+    result = secrets_mod.scan(tmp_path, lambda _cmd: (["{", '  "results": {}', "}"], 0))
+    assert result == {"detect-secrets": ([], 0)}
+    assert (tmp_path / ".secrets.baseline").read_bytes() == b'{\n  "results": {}\n}'
+
+
+# --- run():the shell-command runner every tool above funnels through --------
 # Its three contract points are the ones a mock cannot check -- the merge order of
 # stdout and stderr, the working directory, and that non-UTF-8 tool output does not
 # raise -- so these spawn a real child. `"<python>" "<script>"` is the one command
