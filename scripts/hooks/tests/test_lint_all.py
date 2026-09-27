@@ -333,14 +333,17 @@ def test_is_req_matches_lock_and_source_files():
 def test_pip_audit_reports_without_upgrading(monkeypatch):
     calls: list[str] = []
 
-    def fake_run(cmd: str):
+    # Mirror `run()`'s signature: pip-audit passes its own bound as `timeout=`.
+    def fake_run(cmd: str, timeout: float = la.TOOL_TIMEOUT):
         calls.append(cmd)
         return (["requests 2.31.0 CVE-2099-0001 2.32.0"], 1)
 
     monkeypatch.setattr(la, "run", fake_run)
     out = la.t_pip_audit(None)
     assert out == {"pip-audit": (["requests 2.31.0 CVE-2099-0001 2.32.0"], 1)}
-    assert calls == ["pip-audit --ignore-vuln CVE-2026-4539"]
+    assert calls == [la.PIP_AUDIT_CMD]
+    assert calls[0].startswith("pip-audit ")
+    assert "--ignore-vuln CVE-2026-4539" in calls[0]
     assert not any("install" in c for c in calls)
 
 

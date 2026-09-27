@@ -30,6 +30,7 @@ artifact is byte-identical regardless of scope.
 import argparse
 import os
 import shutil
+import signal
 import subprocess
 import sys
 from concurrent.futures import ThreadPoolExecutor
@@ -43,12 +44,47 @@ import script_common
 REPO_ROOT = Path(__file__).resolve().parents[1]
 IS_CI = bool(os.environ.get("CI"))
 
+# Wall-clock bound on one tool, in seconds. A cold whole-tree mypy / tsc / eslint
+# finishes well inside it; it exists for the tool that never finishes. pip-audit once
+# spun CPU-bound for 18+ minutes with no output (see `t_pip_audit`) and the run had
+# nothing to stop it, so the agent waiting on it lost the time and learned nothing.
+TOOL_TIMEOUT = 600.0
 
-def run(cmd: str) -> tuple[list[str], int]:
-    """Run a shell command from the repo root, merging stdout+stderr in order."""
+# How long to wait for the pipe to close once the tree is killed.
+_REAP_TIMEOUT = 10.0
+
+
+def _kill_tree(p: subprocess.Popen) -> None:
+    """Kill `p` and everything it started.
+
+    `shell=True` makes the tool a *grandchild* (cmd.exe / sh is the child), and
+    `Popen.kill` reaches only the child: the tool kept running and kept the pipe open,
+    so the `communicate()` after it blocked exactly as long as the timeout was meant
+    to stop.
+    """
+    if os.name == "nt":
+        subprocess.run(
+            ["taskkill", "/T", "/F", "/PID", str(p.pid)],
+            capture_output=True,
+            check=False,
+        )
+        return
+    try:
+        os.killpg(p.pid, signal.SIGKILL)
+    except ProcessLookupError:
+        pass
+
+
+def run(cmd: str, timeout: float = TOOL_TIMEOUT) -> tuple[list[str], int]:
+    """Run a shell command from the repo root, merging stdout+stderr in order.
+
+    A command still running after `timeout` seconds is killed with its whole process
+    tree and reported as a failure naming the bound -- not as a skip, because a linter
+    that never answered has not passed.
+    """
     # shell=True is intentional: cmd is a trusted first-party tool invocation
     # (ruff/mypy/eslint/...), not external input.
-    p = subprocess.run(  # noqa: S602
+    p = subprocess.Popen(  # noqa: S602
         cmd,
         shell=True,
         cwd=REPO_ROOT,
@@ -57,8 +93,20 @@ def run(cmd: str) -> tuple[list[str], int]:
         text=True,
         encoding="utf-8",
         errors="replace",
+        # Its own process group on POSIX, so `_kill_tree` can take the shell's children.
+        start_new_session=os.name != "nt",
     )
-    return (p.stdout or "").splitlines(), p.returncode
+    try:
+        out, _ = p.communicate(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        _kill_tree(p)
+        try:
+            out, _ = p.communicate(timeout=_REAP_TIMEOUT)
+        except subprocess.TimeoutExpired:
+            out = ""
+        note = f"lint-all: killed `{cmd}` after {timeout:g}s with no result (hung tool)"
+        return [*(out or "").splitlines(), note], 1
+    return (out or "").splitlines(), p.returncode
 
 
 # ---------------------------------------------------------------------------
@@ -280,6 +328,19 @@ def t_vulture(changed: list[str] | None = None) -> dict:
     return {"vulture": run(f"vulture app/ {opts}")}
 
 
+# `--cache-dir` is not tuning. Without it pip-audit shares pip's HTTP cache, which it
+# finds by running `pip cache dir` and stripping only "\n" from the answer -- so on
+# Windows the path keeps its "\r", every cache write fails, and `tempfile` retries the
+# write up to TMP_MAX (2**31 on Windows) times per package: CPU-bound, silent, and
+# endless (pip-audit 2.10.1, pip 26.2). An explicit directory skips that lookup. It is
+# under the gitignored `.cache/`, so a cold one costs a worktree a few seconds.
+PIP_AUDIT_CMD = 'pip-audit --cache-dir ".cache/pip-audit" --ignore-vuln CVE-2026-4539'
+
+# A warm audit takes seconds and a cold one well under a minute; a network stall is the
+# only honest reason to wait longer than this.
+PIP_AUDIT_TIMEOUT = 180.0
+
+
 def t_pip_audit(changed: list[str] | None = None) -> dict:
     # Report-only: never `pip install --upgrade` from here. Unconstrained upgrades
     # (majors included) silently drift the local venv from requirements.txt and CI;
@@ -287,7 +348,7 @@ def t_pip_audit(changed: list[str] | None = None) -> dict:
     # manifest and passes the PR gate, not as a lint side effect.
     if changed is not None and not _sel(changed, _is_req):
         return {"pip-audit": ([], 0)}
-    return {"pip-audit": run("pip-audit --ignore-vuln CVE-2026-4539")}
+    return {"pip-audit": run(PIP_AUDIT_CMD, timeout=PIP_AUDIT_TIMEOUT)}
 
 
 def t_alembic_check(changed: list[str] | None = None) -> dict:
