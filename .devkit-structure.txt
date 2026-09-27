@@ -6,12 +6,13 @@
 # Never add or raise a line to make new code pass; fix the code. `dependency::` is one
 # exception -- adding a package is a line here, so the PR diff shows it.
 #
-# `--record --reason "..."` is the other, and it is the deliberate hole. A module far
-# past `file_lines` cannot gain a line, so a bug whose fix belongs in one has nowhere
-# to go, and the split the finding asks for is a separate body of work. Recording says
+# `--record --reason "..."` is the other, and it is the deliberate hole. A function far
+# past its limit cannot gain a line, so a bug whose fix belongs in one has nowhere to
+# go, and the refactor the finding asks for is a separate body of work. Recording says
 # so out loud: the reason is mandatory, counter rules (`suppressions`, `todos`,
 # `skipped_tests`, ...) are refused because those are always somebody giving up rather
-# than a module's size, and every move is logged below with what it moved and why.
+# than a unit's size, and every move is logged below with what it moved and why.
+# Module size -- `file_lines`, `imports`, `definitions` -- is advisory and never here.
 #
 # Regenerate only when adopting the gate: python scripts/hooks/structure_check.py --seed
 class_lines::app/services/providers/carrier/telnyx.py::TelnyxCarrier = 356
@@ -50,10 +51,6 @@ complexity::scripts/hooks/deps-sync.py::main = 18
 complexity::scripts/lint-all.py::main = 16
 complexity::scripts/run-tests.py::main = 30
 complexity::scripts/run-tests.py::run_named_target = 18
-definitions::frontend/src/skins/comic-book/editor/transforms.ts = 25
-definitions::scripts/diagnostics.py = 32
-definitions::scripts/lint-all.py = 39
-definitions::scripts/local-e2e.py = 21
 dependency::frontend/package.json::@eslint/js = 1
 dependency::frontend/package.json::@fontsource/outfit = 1
 dependency::frontend/package.json::@tailwindcss/postcss = 1
@@ -387,12 +384,6 @@ dependency::requirements.txt::uvloop = 1
 dependency::requirements.txt::watchfiles = 1
 dependency::requirements.txt::websockets = 1
 dependency::requirements.txt::wrapt = 1
-file_lines::app/api/webhooks/call_status.py = 845
-file_lines::frontend/src/api/client.ts = 845
-file_lines::scripts/diagnostics.py = 752
-file_lines::scripts/lint-all.py = 585
-file_lines::scripts/local-e2e.py = 549
-file_lines::scripts/run-tests.py = 621
 function_lines::app/api/vsapi/calls.py::initiate_outbound_call = 99
 function_lines::app/api/webhooks/call_status.py::jambonz_call_status_webhook = 104
 function_lines::app/api/webhooks/call_status.py::jambonz_dtmf_result_webhook = 82
@@ -449,9 +440,6 @@ function_params::frontend/src/skins/comic-book/patternDrawRadial.ts::drawCornerB
 function_params::frontend/src/skins/comic-book/patternDrawRadial.ts::drawRayFan = 8
 function_params::frontend/src/skins/comic-book/patternDrawRadial.ts::drawSunburst = 13
 function_params::scripts/script_common.py::emit_report = 7
-imports::app/main.py = 35
-imports::app/models/__init__.py = 24
-imports::app/services/call_sync.py = 22
 nesting_depth::scripts/diagnostics.py::filter_pytest_output = 9
 nesting_depth::scripts/run-tests.py::parse_cli_args = 6
 orphan::app/services/call_sync.py = 1
