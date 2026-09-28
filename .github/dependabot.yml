@@ -58,6 +58,7 @@ updates:
           - "patch"
 
   - package-ecosystem: pip
+    versioning-strategy: increase-if-necessary
     directory: /
     assignees:
       - alexandrec90
