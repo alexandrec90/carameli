@@ -411,8 +411,8 @@ scripts/hooks/enforce-capped-bash.py::split_top_level
 scripts/hooks/enforce-capped-bash.py::statements
 scripts/hooks/enforce-capped-bash.py::strip_prefixes
 scripts/hooks/enforce-capped-bash.py::strip_quoted
-scripts/hooks/session-sync.py::main
 scripts/hooks/session-sync.py::run_git
+scripts/host_tier.py::host_db_fallback
 scripts/local-e2e.py::ensure_carameli_up
 scripts/local-e2e.py::probe_health
 scripts/local-e2e.py::run_step
