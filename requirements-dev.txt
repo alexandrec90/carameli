@@ -334,9 +334,10 @@ pygments==2.20.0
     #   pytest
     #   rich
     #   textual
-pyjwt==2.13.0
+pyjwt==2.15.1
     # via
     #   -c requirements-test.txt
+    #   -r requirements.in
     #   redis
 pyparsing==3.3.2
     # via pip-requirements-parser
