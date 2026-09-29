@@ -35,10 +35,7 @@ def test_a_root_agents_md_cannot_be_staged() -> None:
 def test_the_repo_carries_no_agents_md() -> None:
     """The other half. The ignore stops it being staged again; this says it is not here
     now -- a file already tracked stays tracked whatever `.gitignore` says."""
-    found = sorted(
-        path.relative_to(REPO_ROOT).as_posix()
-        for path in REPO_ROOT.glob("AGENTS.md")
-    )
+    found = sorted(path.relative_to(REPO_ROOT).as_posix() for path in REPO_ROOT.glob("AGENTS.md"))
     assert found == [], (
         f"delete {found}: a second instruction tree drifts from CLAUDE.md and is the "
         f"copy nothing tests"
