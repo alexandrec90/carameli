@@ -8,9 +8,9 @@ One entrypoint for every environment:
   - **CI (GitHub Actions):** `python scripts/lint-all.py` with `CI=true` set.
     Runs the same host tools directly (no Docker stack); `alembic check` runs
     against the service Postgres. Genuine, unfixable findings fail this run.
-    Auto-fixes land in the working tree but are cosmetic and non-blocking — the
-    lint-fix PostToolUse hook applies them on-edit, so the PR Gate reports any
-    residual drift as a notice rather than failing on it.
+    Auto-fixes land in the working tree, where this run's own re-check cannot see
+    them, so the PR Gate fails on any tracked file this run rewrote: drift that
+    merges is rewritten by the next full run, in a branch that never touched it.
 
 Two scoping modes:
   - **Full (default):** every tool runs over the whole tree.
