@@ -187,9 +187,10 @@ pygments==2.20.0
     # via
     #   pytest
     #   rich
-pyjwt==2.13.0
+pyjwt==2.15.1
     # via
     #   -c requirements.txt
+    #   -r requirements.in
     #   redis
 pyrate-limiter==4.4.0
     # via schemathesis
