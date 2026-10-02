@@ -37,7 +37,7 @@ blinker==1.9.0
     # via flask
 boolean-py==5.0
     # via license-expression
-boto3==1.43.99
+boto3==1.43.102
     # via
     #   -c requirements-test.txt
     #   -r requirements.in
@@ -172,7 +172,7 @@ httpx==0.28.1
     # via
     #   -c requirements-test.txt
     #   -r requirements.in
-hypothesis==6.168.0
+hypothesis==6.168.1
     # via
     #   -c requirements-test.txt
     #   -r requirements-test.in
@@ -203,7 +203,7 @@ jmespath==1.1.0
     #   -c requirements-test.txt
     #   boto3
     #   botocore
-jsonschema-rs==0.56.0
+jsonschema-rs==0.57.1
     # via
     #   -c requirements-test.txt
     #   schemathesis
@@ -448,13 +448,13 @@ rich==15.0.0
     #   pip-audit
     #   schemathesis
     #   textual
-ruff==0.16.8
+ruff==0.16.9
     # via -r requirements-dev.in
 s3transfer==0.19.0
     # via
     #   -c requirements-test.txt
     #   boto3
-schemathesis==4.27.5
+schemathesis==4.28.0
     # via
     #   -c requirements-test.txt
     #   -r requirements-test.in
@@ -479,12 +479,12 @@ sortedcontainers==2.4.0
     #   -c requirements-test.txt
     #   cyclonedx-python-lib
     #   hypothesis
-sqlalchemy==2.0.54
+sqlalchemy==2.1.0
     # via
     #   -c requirements-test.txt
     #   -r requirements.in
     #   alembic
-starlette==1.6.0
+starlette==1.7.0
     # via
     #   -c requirements-test.txt
     #   -r requirements.in
@@ -533,9 +533,9 @@ urllib3==2.8.0
     #   geventhttpclient
     #   requests
     #   sentry-sdk
-uv==0.12.17
+uv==0.12.19
     # via -r requirements-dev.in
-uvicorn==0.53.0
+uvicorn==0.54.0
     # via
     #   -c requirements-test.txt
     #   -r requirements.in

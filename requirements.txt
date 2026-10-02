@@ -18,7 +18,7 @@ arq==0.28.0
     #   sentry-sdk
 asyncpg==0.31.0
     # via -r requirements.in
-boto3==1.43.99
+boto3==1.43.102
     # via -r requirements.in
 botocore==1.43.102
     # via
@@ -116,11 +116,11 @@ six==1.17.0
     # via python-dateutil
 slowapi==0.1.10
     # via -r requirements.in
-sqlalchemy==2.0.54
+sqlalchemy==2.1.0
     # via
     #   -r requirements.in
     #   alembic
-starlette==1.6.0
+starlette==1.7.0
     # via
     #   -r requirements.in
     #   fastapi
@@ -146,7 +146,7 @@ urllib3==2.8.0
     #   -r requirements.in
     #   botocore
     #   sentry-sdk
-uvicorn==0.53.0
+uvicorn==0.54.0
     # via -r requirements.in
 uvloop==0.22.1 ; platform_python_implementation != 'PyPy' and sys_platform != 'cygwin' and sys_platform != 'win32'
     # via uvicorn

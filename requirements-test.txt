@@ -29,7 +29,7 @@ asyncpg==0.31.0
     # via
     #   -c requirements.txt
     #   -r requirements.in
-boto3==1.43.99
+boto3==1.43.102
     # via
     #   -c requirements.txt
     #   -r requirements.in
@@ -108,7 +108,7 @@ httpx==0.28.1
     # via
     #   -c requirements.txt
     #   -r requirements.in
-hypothesis==6.168.0
+hypothesis==6.168.1
     # via
     #   -r requirements-test.in
     #   hypothesis-graphql
@@ -128,7 +128,7 @@ jmespath==1.1.0
     #   -c requirements.txt
     #   boto3
     #   botocore
-jsonschema-rs==0.56.0
+jsonschema-rs==0.57.1
     # via schemathesis
 limits==5.8.0
     # via
@@ -247,7 +247,7 @@ s3transfer==0.19.0
     # via
     #   -c requirements.txt
     #   boto3
-schemathesis==4.27.5
+schemathesis==4.28.0
     # via -r requirements-test.in
 sentry-sdk==2.70.0
     # via
@@ -263,12 +263,12 @@ slowapi==0.1.10
     #   -r requirements.in
 sortedcontainers==2.4.0
     # via hypothesis
-sqlalchemy==2.0.54
+sqlalchemy==2.1.0
     # via
     #   -c requirements.txt
     #   -r requirements.in
     #   alembic
-starlette==1.6.0
+starlette==1.7.0
     # via
     #   -c requirements.txt
     #   -r requirements.in
@@ -301,7 +301,7 @@ urllib3==2.8.0
     #   botocore
     #   requests
     #   sentry-sdk
-uvicorn==0.53.0
+uvicorn==0.54.0
     # via
     #   -c requirements.txt
     #   -r requirements.in
