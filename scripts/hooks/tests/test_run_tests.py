@@ -474,6 +474,55 @@ def test_run_scoped_uses_the_host_tier(monkeypatch):
     assert "tests/unit/test_x.py" in seen["argv"]
 
 
+def _record_scoped(monkeypatch, *, app_up: bool) -> dict:
+    monkeypatch.setattr(rt, "IS_CI", False)
+    monkeypatch.setattr(rt, "host_db_fallback", lambda root=None: None)
+    monkeypatch.setattr(rt, "app_container_running", lambda root=None: app_up)
+    seen: dict = {}
+    monkeypatch.setattr(
+        rt,
+        "run_argv",
+        lambda argv, extra_env=None: (seen.update(argv=argv, env=extra_env), ([], 0))[1],
+    )
+    rt.run_scoped(["tests/unit/test_requirements_lock.py"])
+    return seen
+
+
+def test_run_scoped_runs_on_the_host_when_no_app_container_is_up(monkeypatch, capsys):
+    """With Docker Desktop stopped, `run-tests.py tests/unit/test_requirements_lock.py`
+    went to `docker compose exec` and died on `failed to connect to the docker API`,
+    for a file that never touches a database. Named targets with no container run on
+    the host; a DB test among them fails on its own connection, which says more."""
+    seen = _record_scoped(monkeypatch, app_up=False)
+
+    assert seen["argv"][1:3] == ["-m", "pytest"]
+    assert "docker" not in seen["argv"]
+    assert "tests/unit/test_requirements_lock.py" in seen["argv"]
+    assert seen["env"] is None
+    assert "no app container" in capsys.readouterr().out
+
+
+def test_run_scoped_stays_in_the_container_while_it_is_up(monkeypatch):
+    seen = _record_scoped(monkeypatch, app_up=True)
+
+    assert seen["argv"][:4] == ["docker", "compose", "exec", "-T"]
+
+
+def test_app_container_running_reads_the_compose_services(monkeypatch):
+    monkeypatch.setattr(host_tier, "_compose_running_services", lambda root=None: {"app", "db"})
+    assert host_tier.app_container_running()
+    monkeypatch.setattr(host_tier, "_compose_running_services", lambda root=None: {"db"})
+    assert not host_tier.app_container_running()
+
+
+def test_app_container_running_is_false_with_docker_unreachable(monkeypatch):
+    def unreachable(*_a, **_k):
+        raise OSError("failed to connect to the docker API")
+
+    monkeypatch.setattr(host_tier.subprocess, "run", unreachable)
+    assert not host_tier.app_container_running()
+
+
 def test_run_local_stays_in_the_container_by_default(monkeypatch):
     # `changed_touches_python` reads the real working tree, so leaving it unstubbed made
     # this test's verdict a fact about the developer's uncommitted files: with no changed

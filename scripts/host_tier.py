@@ -10,8 +10,9 @@ redis over their published compose ports, which is what the stop hook's own DB t
 uses. Try that before giving up.
 
 Split out of `run-tests.py`, which was past its `file_lines` and `definitions`
-ceilings with this block as its clearest seam. The runner keeps the one call,
-`host_db_fallback()`, and re-exports it so a test can still repoint it there.
+ceilings with this block as its clearest seam. The runner imports
+`host_db_fallback()` and `app_container_running()` by name, so a test can still
+repoint either there.
 """
 
 import os
@@ -79,6 +80,15 @@ def host_db_env(repo_root: Path = REPO_ROOT) -> dict[str, str] | None:
     for name, default in db.test_env.items():
         env[name] = os.environ.get(name, default)
     return env
+
+
+def app_container_running(repo_root: Path = REPO_ROOT) -> bool:
+    """Whether `docker compose exec app` has a container to reach.
+
+    False with Docker Desktop stopped too: `_compose_running_services` answers an
+    unreachable daemon with an empty set, which is the case this exists for.
+    """
+    return "app" in _compose_running_services(repo_root)
 
 
 def host_db_fallback(repo_root: Path = REPO_ROOT) -> dict[str, str] | None:
