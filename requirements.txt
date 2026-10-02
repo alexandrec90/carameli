@@ -90,8 +90,10 @@ pydantic-core==2.46.5
     # via pydantic
 pydantic-settings==2.15.0
     # via -r requirements.in
-pyjwt==2.13.0
-    # via redis
+pyjwt==2.15.1
+    # via
+    #   -r requirements.in
+    #   redis
 python-dateutil==2.9.0.post0
     # via botocore
 python-dotenv==1.2.2
@@ -139,8 +141,9 @@ typing-inspection==0.4.2
     #   fastapi
     #   pydantic
     #   pydantic-settings
-urllib3==2.7.0
+urllib3==2.8.0
     # via
+    #   -r requirements.in
     #   botocore
     #   sentry-sdk
 uvicorn==0.54.0

@@ -1,6 +1,27 @@
 """Carameli's deliberate project-local instruction inventory."""
 
-from conftest import REPO_ROOT
+from conftest import REPO_ROOT, load_module
+
+manifest = load_module("scripts/devkit_manifest.py")
+
+
+def _vendored_names(prefix: str, suffix: str) -> set[str]:
+    """Names of the devkit-vendored entries under `prefix`: devkit's decision, not ours.
+
+    Pinning them here made every devkit release that added a skill or rule red on its
+    own adoption PR (v0.11.35's `go-nuts` did), for a file this test cannot keep out:
+    `sync-devkit.py --check` already gates their presence and content.
+    """
+    names = set()
+    for path in manifest.MANIFEST:
+        if path.startswith(prefix) and path.endswith(suffix):
+            names.add(path[len(prefix) :].removesuffix(suffix).split("/")[0])
+    return names
+
+
+def test_vendored_names_come_from_the_devkit_manifest():
+    assert {"ship", "go-nuts"} <= _vendored_names(".claude/skills/", "/SKILL.md")
+    assert {"engineering", "authoring", "session-scope"} <= _vendored_names(".claude/rules/", ".md")
 
 
 def test_instruction_inventory_is_intentional():
@@ -10,13 +31,9 @@ def test_instruction_inventory_is_intentional():
     skills = {path.parent.name for path in skill_root.glob("*/SKILL.md")}
     rules = {path.stem for path in rule_root.glob("*.md")}
 
-    assert skills == {"add-skin", "ship"}
-    assert rules == {
-        "authoring",
-        "engineering",
+    assert skills - _vendored_names(".claude/skills/", "/SKILL.md") == {"add-skin"}
+    assert rules - _vendored_names(".claude/rules/", ".md") == {
         "security",
-        # Vendored from devkit alongside engineering.md; changed there, not here.
-        "session-scope",
         "skin-architecture",
         "skin-barebone",
         "skin-candy-shop",

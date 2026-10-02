@@ -266,6 +266,7 @@ packaging==26.0
     #   pip-audit
     #   pip-requirements-parser
     #   pytest
+    #   virtualenv
 pathspec==1.0.4
     # via
     #   mypy
@@ -281,7 +282,6 @@ pip-requirements-parser==32.0.1
 platformdirs==4.9.4
     # via
     #   pip-audit
-    #   python-discovery
     #   textual
     #   virtualenv
 playwright==1.58.0
@@ -334,9 +334,10 @@ pygments==2.20.0
     #   pytest
     #   rich
     #   textual
-pyjwt==2.13.0
+pyjwt==2.15.1
     # via
     #   -c requirements-test.txt
+    #   -r requirements.in
     #   redis
 pyparsing==3.3.2
     # via pip-requirements-parser
@@ -391,7 +392,7 @@ python-dateutil==2.9.0.post0
     # via
     #   -c requirements-test.txt
     #   botocore
-python-discovery==1.1.3
+python-discovery==1.6.1
     # via virtualenv
 python-dotenv==1.2.2
     # via
@@ -524,9 +525,10 @@ typing-inspection==0.4.2
     #   pydantic-settings
 uc-micro-py==2.0.0
     # via linkify-it-py
-urllib3==2.7.0
+urllib3==2.8.0
     # via
     #   -c requirements-test.txt
+    #   -r requirements.in
     #   botocore
     #   geventhttpclient
     #   requests
@@ -541,8 +543,10 @@ uvloop==0.22.1 ; platform_python_implementation != 'PyPy' and sys_platform != 'c
     # via
     #   -c requirements-test.txt
     #   uvicorn
-virtualenv==21.2.0
-    # via pre-commit
+virtualenv==21.14.3
+    # via
+    #   -r requirements-dev.in
+    #   pre-commit
 vulture==2.16
     # via -r requirements-dev.in
 watchfiles==1.1.1

@@ -411,8 +411,8 @@ scripts/hooks/enforce-capped-bash.py::split_top_level
 scripts/hooks/enforce-capped-bash.py::statements
 scripts/hooks/enforce-capped-bash.py::strip_prefixes
 scripts/hooks/enforce-capped-bash.py::strip_quoted
-scripts/hooks/session-sync.py::main
 scripts/hooks/session-sync.py::run_git
+scripts/host_tier.py::host_db_fallback
 scripts/local-e2e.py::ensure_carameli_up
 scripts/local-e2e.py::probe_health
 scripts/local-e2e.py::run_step
@@ -433,7 +433,6 @@ scripts/probe-connectivity.py::ngrok_health_hits
 scripts/probe-connectivity.py::tcp_probe
 scripts/probe-sip-registration.py::build_parser
 scripts/provision-softphone.py::SoftphoneAccount
-scripts/recompile-locks.py::main
 scripts/report-workflow-failure.py::api_workflow_states
 scripts/report-workflow-failure.py::apply
 scripts/report-workflow-failure.py::ensure_label

@@ -1,8 +1,10 @@
 """Tests for universal lock recompilation and its Dependabot workflow."""
 
 import json
+import re
 from types import SimpleNamespace
 
+import pytest
 from conftest import REPO_ROOT, load_module
 
 locks = load_module("scripts/recompile-locks.py")
@@ -61,6 +63,21 @@ def test_run_commands_stops_at_first_failure(monkeypatch):
     assert calls == [["one"], ["two"]]
     assert output == ["first ok", "second failed"]
     assert failed == ["two"]
+
+
+def test_help_and_unknown_flags_exit_before_compiling(monkeypatch, capsys):
+    """`--help` used to be ignored, so asking what the script does rewrote all three
+    locks. Any argument must be parsed before a compile can start."""
+    monkeypatch.setattr(locks, "run_commands", lambda _commands: pytest.fail("compiled"))
+
+    with pytest.raises(SystemExit) as helped:
+        locks.main(["--help"])
+    assert helped.value.code == 0
+    assert "lockfile" in capsys.readouterr().out.lower()
+
+    with pytest.raises(SystemExit) as refused:
+        locks.main(["--upgrade"])
+    assert refused.value.code == 2
 
 
 def test_failure_report_is_actionable_and_bounded():
@@ -185,22 +202,75 @@ def test_pr_gate_typechecks_builds_and_runs_hook_tests():
     assert "pytest scripts/hooks/tests/" in gate
 
 
+def _top_level_disjuncts(expression):
+    """Split a jq boolean expression on `or` outside any parentheses, whitespace-normalised."""
+    parts, depth, current = [], 0, []
+    for token in re.findall(r"\(|\)|[^()\s]+", expression):
+        depth += token == "("
+        depth -= token == ")"
+        if token == "or" and depth == 0:
+            parts.append(" ".join(current))
+            current = []
+        else:
+            current.append(token)
+    parts.append(" ".join(current))
+    return parts
+
+
+def _automerge_predicate(workflow):
+    """The per-dependency predicate inside the classify job's `all(.[]; ...)`."""
+    match = re.search(r"all\(\.\[\];(.*?)\)\s*then \"automerge\"", workflow, re.DOTALL)
+    assert match, "classify job no longer gates `automerge` on all(.[]; ...)"
+    return _top_level_disjuncts(match.group(1))
+
+
+def test_top_level_disjuncts_ignore_or_inside_parentheses():
+    assert _top_level_disjuncts('a == "x" or\n  (b and c or d) or e') == [
+        'a == "x"',
+        "( b and c or d )",
+        "e",
+    ]
+
+
 def test_automerge_classifies_dev_only_majors_as_automergeable():
     # Patch/minor bumps and majors confined to devDependencies auto-merge; a
     # major touching any runtime dependency stays manual. The per-dependency
     # JSON is the only metadata granular enough to decide this for group PRs.
+    #
+    # The workflow is vendored, and devkit v0.11.33 widened the dev clause from
+    # "major and development" to "any development update" -- the same policy for
+    # majors, spelled differently. Pinning the old spelling made that read as the
+    # guard going missing, so assert the disjuncts' meaning, not their layout.
     automerge = (REPO_ROOT / ".github/workflows/dependabot-automerge.yml").read_text(
         encoding="utf-8"
     )
+    disjuncts = _automerge_predicate(automerge)
+    dev = '.dependencyType == "direct:development"'
 
     assert "steps.meta.outputs.updated-dependencies-json" in automerge
-    assert "all(.[];" in automerge
-    assert '.updateType == "version-update:semver-patch"' in automerge
-    assert '.updateType == "version-update:semver-minor"' in automerge
-    assert '.updateType == "version-update:semver-major" and' in automerge
-    assert '.dependencyType == "direct:development"' in automerge
-    assert 'then "automerge"' in automerge
+    assert "if length > 0 and all(.[];" in automerge
+    patch = '.updateType == "version-update:semver-patch"'
+    minor = '.updateType == "version-update:semver-minor"'
+
+    assert patch in disjuncts
+    assert minor in disjuncts
+    # A dev-only major qualifies, through a clause that requires the dev type...
+    assert any(dev in d for d in disjuncts if d not in (patch, minor))
+    # ...and no other clause admits a major, or an unclassified update, without it.
+    assert all(d in (patch, minor) or dev in d for d in disjuncts)
     assert 'else "needs-manual-merge"' in automerge
+
+
+def test_automerge_predicate_rejects_a_runtime_major_clause():
+    widened = '''
+            if length > 0 and all(.[];
+                .updateType == "version-update:semver-patch" or
+                .updateType == "version-update:semver-major")
+            then "automerge"'''
+    dev = '.dependencyType == "direct:development"'
+    patch = '.updateType == "version-update:semver-patch"'
+
+    assert not all(d == patch or dev in d for d in _automerge_predicate(widened))
 
 
 def test_automerge_merge_job_only_trusts_dependabot_gate_on_current_head():

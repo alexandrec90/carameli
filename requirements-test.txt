@@ -187,9 +187,10 @@ pygments==2.20.0
     # via
     #   pytest
     #   rich
-pyjwt==2.13.0
+pyjwt==2.15.1
     # via
     #   -c requirements.txt
+    #   -r requirements.in
     #   redis
 pyrate-limiter==4.4.0
     # via schemathesis
@@ -293,9 +294,10 @@ typing-inspection==0.4.2
     #   fastapi
     #   pydantic
     #   pydantic-settings
-urllib3==2.7.0
+urllib3==2.8.0
     # via
     #   -c requirements.txt
+    #   -r requirements.in
     #   botocore
     #   requests
     #   sentry-sdk
