@@ -29,11 +29,11 @@ asyncpg==0.31.0
     # via
     #   -c requirements.txt
     #   -r requirements.in
-boto3==1.43.102
+boto3==1.43.104
     # via
     #   -c requirements.txt
     #   -r requirements.in
-botocore==1.43.102
+botocore==1.43.107
     # via
     #   -c requirements.txt
     #   boto3
@@ -108,7 +108,7 @@ httpx==0.28.1
     # via
     #   -c requirements.txt
     #   -r requirements.in
-hypothesis==6.168.1
+hypothesis==6.168.3
     # via
     #   -r requirements-test.in
     #   hypothesis-graphql
@@ -208,7 +208,7 @@ pytest-asyncio==1.4.0
     # via -r requirements-test.in
 pytest-benchmark==5.3.0
     # via -r requirements-test.in
-pytest-mock==3.15.1
+pytest-mock==3.16.0
     # via -r requirements-test.in
 pytest-testmon==2.2.0
     # via -r requirements-test.in
@@ -249,7 +249,7 @@ s3transfer==0.19.0
     #   boto3
 schemathesis==4.28.0
     # via -r requirements-test.in
-sentry-sdk==2.70.0
+sentry-sdk==2.71.0
     # via
     #   -c requirements.txt
     #   -r requirements.in
@@ -263,7 +263,7 @@ slowapi==0.1.10
     #   -r requirements.in
 sortedcontainers==2.4.0
     # via hypothesis
-sqlalchemy==2.1.0
+sqlalchemy==2.1.1
     # via
     #   -c requirements.txt
     #   -r requirements.in

@@ -37,12 +37,12 @@ blinker==1.9.0
     # via flask
 boolean-py==5.0
     # via license-expression
-boto3==1.43.102
+boto3==1.43.104
     # via
     #   -c requirements-test.txt
     #   -r requirements.in
     #   -r requirements-dev.in
-botocore==1.43.102
+botocore==1.43.107
     # via
     #   -c requirements-test.txt
     #   boto3
@@ -172,7 +172,7 @@ httpx==0.28.1
     # via
     #   -c requirements-test.txt
     #   -r requirements.in
-hypothesis==6.168.1
+hypothesis==6.168.3
     # via
     #   -c requirements-test.txt
     #   -r requirements-test.in
@@ -370,7 +370,7 @@ pytest-benchmark==5.3.0
     # via
     #   -c requirements-test.txt
     #   -r requirements-test.in
-pytest-mock==3.15.1
+pytest-mock==3.16.0
     # via
     #   -c requirements-test.txt
     #   -r requirements-test.in
@@ -458,7 +458,7 @@ schemathesis==4.28.0
     # via
     #   -c requirements-test.txt
     #   -r requirements-test.in
-sentry-sdk==2.70.0
+sentry-sdk==2.71.0
     # via
     #   -c requirements-test.txt
     #   -r requirements.in
@@ -479,7 +479,7 @@ sortedcontainers==2.4.0
     #   -c requirements-test.txt
     #   cyclonedx-python-lib
     #   hypothesis
-sqlalchemy==2.1.0
+sqlalchemy==2.1.1
     # via
     #   -c requirements-test.txt
     #   -r requirements.in
@@ -533,7 +533,7 @@ urllib3==2.8.0
     #   geventhttpclient
     #   requests
     #   sentry-sdk
-uv==0.12.19
+uv==0.12.20
     # via -r requirements-dev.in
 uvicorn==0.54.0
     # via
