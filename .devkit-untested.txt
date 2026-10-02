@@ -433,7 +433,6 @@ scripts/probe-connectivity.py::ngrok_health_hits
 scripts/probe-connectivity.py::tcp_probe
 scripts/probe-sip-registration.py::build_parser
 scripts/provision-softphone.py::SoftphoneAccount
-scripts/recompile-locks.py::main
 scripts/report-workflow-failure.py::api_workflow_states
 scripts/report-workflow-failure.py::apply
 scripts/report-workflow-failure.py::ensure_label
