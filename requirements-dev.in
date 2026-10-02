@@ -17,3 +17,4 @@ boto3>=1.43.99
 requests>=2.33.0
 win11toast>=0.9; sys_platform == "win32"
 uv>=0.12.17
+virtualenv>=21.7.13  # PYSEC-2026-4011..4014 — 21.7.12 and earlier are vulnerable; transitive via pre-commit

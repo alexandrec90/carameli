@@ -4,6 +4,7 @@ import json
 import re
 from types import SimpleNamespace
 
+import pytest
 from conftest import REPO_ROOT, load_module
 
 locks = load_module("scripts/recompile-locks.py")
@@ -62,6 +63,21 @@ def test_run_commands_stops_at_first_failure(monkeypatch):
     assert calls == [["one"], ["two"]]
     assert output == ["first ok", "second failed"]
     assert failed == ["two"]
+
+
+def test_help_and_unknown_flags_exit_before_compiling(monkeypatch, capsys):
+    """`--help` used to be ignored, so asking what the script does rewrote all three
+    locks. Any argument must be parsed before a compile can start."""
+    monkeypatch.setattr(locks, "run_commands", lambda _commands: pytest.fail("compiled"))
+
+    with pytest.raises(SystemExit) as helped:
+        locks.main(["--help"])
+    assert helped.value.code == 0
+    assert "lockfile" in capsys.readouterr().out.lower()
+
+    with pytest.raises(SystemExit) as refused:
+        locks.main(["--upgrade"])
+    assert refused.value.code == 2
 
 
 def test_failure_report_is_actionable_and_bounded():

@@ -8,6 +8,7 @@ the two environments from producing subtly different locks.
 
 from __future__ import annotations
 
+import argparse
 import subprocess
 import sys
 from pathlib import Path
@@ -85,7 +86,9 @@ def failure_report(command: list[str], output: list[str]) -> str:
     )
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
+    # Takes no options; parsing anyway makes `--help` print instead of recompiling.
+    argparse.ArgumentParser(description=__doc__).parse_args(argv)
     ARTIFACT.parent.mkdir(parents=True, exist_ok=True)
     code, output, failed_command = run_commands(compile_commands(sys.executable))
     if code:
