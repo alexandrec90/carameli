@@ -33,7 +33,7 @@ from pathlib import Path
 import diagnostics
 import script_common
 from host_spawn import host_argv, run_argv
-from host_tier import host_db_fallback
+from host_tier import app_container_running, host_db_fallback
 
 # `changed_files` only -- the one definition on this machine of "what changed", shared
 # so `--changed` here and `--changed` there cannot disagree about it. Hyphenated, hence
@@ -257,7 +257,7 @@ USAGE = """usage: python scripts/run-tests.py [--changed] [--all] [--target <nam
                    webhook-e2e, telnyx-sandbox, telnyx-chargeable, live-e2e
   PATH ...         pytest targets (file, dir, or path::node_id); overrides the
                    suite selection. This is how the vendored Stop hook invokes
-                   the runner.
+                   the runner. With no app container up they run on the host.
 
 Failures are written to logs/test-failures.log (frontend split out on CI)."""
 
@@ -367,12 +367,18 @@ def run_scoped(paths: list[str]) -> dict[str, tuple[list[str], int]]:
     if host_env is not None:
         print(_HOST_TIER_NOTE)
         return {"pytest": run_argv(host_argv(cmd), extra_env=host_env)}
+    if not app_container_running():
+        # Docker stopped, or nothing up: `exec` can only fail, and named targets are
+        # often DB-free. A DB test among them fails on its own connection instead.
+        print(_NO_STACK_NOTE)
+        return {"pytest": run_argv(host_argv(cmd))}
     return {"pytest": run_argv(_in_container(cmd))}
 
 
 _HOST_TIER_NOTE = (
     "  no app container -- running on the host against db+redis over their published ports"
 )
+_NO_STACK_NOTE = "  no app container and no db+redis -- running on the host; DB tests will fail"
 
 
 def changed_touches_python(paths: list[str] | None = None) -> bool:
