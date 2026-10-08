@@ -18,5 +18,8 @@
     "symlinkDirectories": [
       "frontend/node_modules"
     ]
-  }
+  },
+  "enabledMcpjsonServers": [
+    "chrome-devtools"
+  ]
 }
