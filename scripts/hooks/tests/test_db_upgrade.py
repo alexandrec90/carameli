@@ -95,3 +95,46 @@ def test_a_failed_upgrade_says_so_last_on_stderr(docker, capsys):
     err = capsys.readouterr().err.strip().splitlines()
     assert err[-1].startswith("error: alembic upgrade head exited 1")
     assert "DuplicateTable" in docker["artifact"][-1]
+
+
+@pytest.mark.parametrize(
+    ("lines", "expected"),
+    [
+        (["Up 3 minutes (healthy)"], True),
+        (["running"], True),
+        (["Exited (1) 2 minutes ago"], False),
+        ([], False),
+    ],
+)
+def test_app_running_reads_docker_ps_status_lines(lines, expected):
+    assert up.app_running(lines) is expected
+
+
+def test_check_on_its_own_compares_current_with_heads(docker, capsys):
+    assert up.check() == up.BEHIND
+    assert capsys.readouterr().out.strip() == "behind head"
+    docker["answers"]["heads"] = (["INFO  [alembic] noise", "013 (head)"], 0)
+    assert up.check() == up.CURRENT
+    assert docker["artifact"][-1] == "", "a clean check clears the artifact"
+
+
+def test_check_stops_at_a_heads_failure(docker):
+    docker["answers"]["heads"] = (["boom"], 1)
+    assert up.check() == up.FAILED
+    assert docker["ran"] == ["current", "heads"]
+    assert "boom" in docker["artifact"][-1]
+
+
+def test_upgrade_on_its_own_echoes_alembic_and_says_where_it_landed(docker, capsys):
+    assert up.upgrade() == 0
+    out = capsys.readouterr().out
+    assert "Running upgrade 013 -> 014" in out and out.strip().endswith("upgraded to head")
+
+
+def test_fail_writes_the_artifact_and_names_it_last_on_stderr(docker, capsys):
+    assert up.fail("alembic heads exited 4", ["line one"]) == up.FAILED
+    assert "alembic heads exited 4" in docker["artifact"][-1]
+    assert "line one" in docker["artifact"][-1]
+    err = capsys.readouterr().err.strip()
+    assert err.startswith("error: alembic heads exited 4 -- details in ")
+    assert err.endswith(up.ARTIFACT)
