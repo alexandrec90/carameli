@@ -7,6 +7,15 @@ from conftest import load_module
 dc = load_module("scripts/docker_common.py")
 
 
+def test_alembic_in_app_points_past_pgbouncer_inside_the_container():
+    # `alembic/env.py` reads DATABASE_URL, which in the app container is PgBouncer's
+    # transaction pool. The override has to be expanded by the container's shell, the
+    # only place DIRECT_DATABASE_URL is defined.
+    argv = dc.alembic_in_app("upgrade", "head")
+    assert argv[:7] == ["docker", "compose", "exec", "-T", "app", "sh", "-c"]
+    assert argv[7] == 'DATABASE_URL="$DIRECT_DATABASE_URL" alembic upgrade head'
+
+
 def test_service_from_container_strips_project_and_replica():
     assert dc.service_from_container("carameli-app-1", "carameli") == "app"
     assert dc.service_from_container("carameli-postgres-2", "carameli") == "postgres"
