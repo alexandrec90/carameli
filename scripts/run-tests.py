@@ -521,33 +521,47 @@ def run_ci() -> dict[str, tuple[list[str], int]]:
     }
 
 
+def refusal(changed: bool, target: str | None, paths: list[str]) -> str:
+    """Why `main` refuses this combination of parsed arguments, or "" when it does not."""
+    if target and target != "all" and target not in _VALID_TARGETS:
+        return "Unknown --target. Expected one of: " + ", ".join(sorted(_VALID_TARGETS))
+    if target and changed and target != "pytest":
+        return "--changed only applies to the default pytest suite or --target pytest."
+    if paths and target and target != "pytest":
+        return "Explicit test paths only apply to the default pytest suite or --target pytest."
+    return ""
+
+
+def rerun_in_tree_venv(argv: list[str]) -> int | None:
+    """This run's exit code under the tree's `.venv`, or None to carry on here.
+
+    A `claude --worktree` tree arrives with no `.venv` -- Claude Code skips the git hooks
+    that provision every other tree -- so `python scripts/run-tests.py` there ran an
+    interpreter with no pytest and reported "No module named pytest" as a failed target.
+    The vendored `scripts/hooks/toolchain.py` builds the `.venv` with `.devkit.toml`'s
+    install command and runs this script again inside it, as devkit's template runner
+    does. Where this interpreter has pytest, and in CI, nothing changes.
+    """
+    toolchain = script_common.load_script("scripts/hooks/toolchain.py")
+    return toolchain.rerun_in_venv(REPO_ROOT, "pytest", Path(__file__).resolve(), argv)
+
+
 def main() -> int:
     if help_requested(sys.argv[1:]):
         print(USAGE)
         return 0
+    # After `--help`, so asking how to run it installs nothing.
+    rerun = rerun_in_tree_venv(sys.argv[1:])
+    if rerun is not None:
+        return rerun
     try:
         changed, target, paths = parse_cli_args(sys.argv[1:])
     except ValueError as exc:
         print(exc, file=sys.stderr)
         print(USAGE, file=sys.stderr)
         return 2
-    if target and target != "all" and target not in _VALID_TARGETS:
-        print(
-            "Unknown --target. Expected one of: " + ", ".join(sorted(_VALID_TARGETS)),
-            file=sys.stderr,
-        )
-        return 2
-    if target and changed and target != "pytest":
-        print(
-            "--changed only applies to the default pytest suite or --target pytest.",
-            file=sys.stderr,
-        )
-        return 2
-    if paths and target and target != "pytest":
-        print(
-            "Explicit test paths only apply to the default pytest suite or --target pytest.",
-            file=sys.stderr,
-        )
+    if why := refusal(changed, target, paths):
+        print(why, file=sys.stderr)
         return 2
 
     label = "scripts/run-tests.py (CI)" if IS_CI else "scripts/run-tests.py (local)"
