@@ -368,7 +368,6 @@ app/services/webhook_subscription_service.py::list_for_customer
 scripts/backup_restore_test.py::download_command
 scripts/backup_restore_test.py::run_command
 scripts/backup_restore_test.py::validate_arguments
-scripts/db-revision.py::main
 scripts/db-revision.py::parse_args
 scripts/diagnostics.py::build_e2e_artifact
 scripts/diagnostics.py::get_e2e_fix_hint

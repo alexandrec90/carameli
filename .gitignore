@@ -153,3 +153,7 @@ docker-compose.override.yml
 # stranded work` commits `bb9d6d6` and `dd7efc5`. Rooted, so a vendored `AGENTS.md`
 # deeper in the tree is left alone. Pinned by `tests/unit/test_gitignore_contract.py`.
 /AGENTS.md
+
+# Claude Code links these into every `claude --worktree` tree (worktree.symlinkDirectories
+# in .claude/settings.json). A link is a file to git, which a `dir/` pattern never matches.
+/frontend/node_modules
