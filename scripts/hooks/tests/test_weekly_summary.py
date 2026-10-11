@@ -286,15 +286,28 @@ def test_weekly_workflow_fails_when_the_pinned_issue_is_missing():
     text = _weekly_text()
     step = text.split("Post summary to the pinned reliability issue", 1)
     assert len(step) == 2, "weekly.yml has no 'Post summary to the pinned reliability issue' step."
-    body = step[1]
-    assert "exit 1" in body, (
-        "the post-summary step must fail when no pinned issue is found. Printing a "
-        "hint and passing left the job green while the report went nowhere."
+    body = step[1].split("- name:", 1)[0]
+    assert (
+        "set -euo pipefail" in body and "choice=$(python3 scripts/reliability_issue.py" in body
+    ), (
+        "the post-summary step must fail when no issue is found: it takes the issue from "
+        "scripts/reliability_issue.py, which exits 1, under set -e. Printing a hint and "
+        "passing left the job green while the report went nowhere."
     )
     assert "gh issue comment" in body
     assert "gh issue create" not in text, (
         "a failing weekly run is the signal here; this workflow must not raise issues."
     )
+
+
+def test_weekly_workflow_reopens_a_closed_reliability_issue():
+    # Closing the thread by hand turned the 2026-10-11 run red with the thread
+    # still there: the lookup must span closed issues, and the step reopen one.
+    body = _weekly_text().split("Post summary to the pinned reliability issue", 1)[1]
+    body = body.split("- name:", 1)[0]
+    assert "--state all" in body, "the issue lookup must include closed issues."
+    assert "isPinned" in body, "scripts/reliability_issue.py prefers the pinned thread."
+    assert "gh issue reopen" in body
 
 
 def test_weekly_report_job_keeps_least_privilege_issue_scope():
