@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Runs Alembic migrations inside the app container.
+"""Runs Alembic migrations inside the app container, past PgBouncer (`alembic_in_app`).
 
-On failure writes output to logs/docker/migrate.log; on success clears it.
+`db-upgrade.py` is the same upgrade with a `--check`, for devkit's fix pass. On failure writes output to logs/docker/migrate.log; on success clears it.
 Uses `docker ps --filter` for status (not `docker compose ps`) to avoid
 Compose v2 hangs when containers are unhealthy.
 """
@@ -21,7 +21,7 @@ def app_running(status_lines) -> bool:
 def main() -> int:
     print("\n=== Carameli DB Migrations ===")
     print(f"Artifact : {dc.DOCKER_LOG_DIR / ARTIFACT}")
-    print("Command  : docker compose exec app alembic upgrade head\n")
+    print("Command  : docker compose exec app alembic upgrade head (DIRECT_DATABASE_URL)\n")
 
     status, _, _ = dc.docker_ps(
         "{{.Status}}", all_containers=False, extra_filters=[dc.service_filter("app")]
@@ -44,7 +44,7 @@ def main() -> int:
         return 1
 
     print("Running alembic upgrade head...")
-    output, code = dc.run(["docker", "compose", "exec", "-T", "app", "alembic", "upgrade", "head"])
+    output, code = dc.run(dc.alembic_in_app("upgrade", "head"))
     for line in output:
         print(f"  {line}")
 
