@@ -407,8 +407,11 @@ protection ruleset on `master` requiring the four PR Gate checks:
 
 For weekly reporting, create and pin an open GitHub issue titled `Weekly Test Reliability Report`.
 The weekly workflow auto-discovers that issue by title and posts the summary comment there
-(built by `scripts/weekly_summary.py`). **That issue is required**: with no match, the
-`Weekly reliability summary` job fails rather than passing green with the report undelivered.
+(built by `scripts/weekly_summary.py`). **That issue is required**: with no match in any
+state, the `Weekly reliability summary` job fails rather than passing green with the report
+undelivered. A closed one is reopened with a comment and posted to
+(`scripts/reliability_issue.py` picks it), so closing the thread does not stop the summary.
+To stop it, remove the job.
 
 ### Failing checks never open issues
 

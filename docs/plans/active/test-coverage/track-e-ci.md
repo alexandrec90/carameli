@@ -614,7 +614,9 @@ were real, and the job emitted a one-line report of visible `\n` with a permanen
 flake count and a permanently-"N/A" mutation score.
 
 **Both delivery failures are hard failures, by design.** A missing JUnit artifact is not
-counted as zero, and a missing pinned issue fails the job instead of printing a hint. The
+counted as zero, and a pinned issue that does not exist fails the job instead of printing
+a hint. A *closed* one is reopened and posted to (`scripts/reliability_issue.py`): closing
+the thread by hand turned the 2026-10-11 run red with the thread still there. The
 project's stance is that **a failing scheduled run is the alert** — no workflow here opens
 an issue on failure, because an auto-filed issue duplicates a signal that already exists
 and then has to be closed by hand.
