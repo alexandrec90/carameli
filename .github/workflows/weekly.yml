@@ -178,19 +178,24 @@ jobs:
             --mutation-report reports/mutation/mutation-report.txt \
             --baseline docs/evidence/performance-baselines.md \
             --out reports/weekly-summary.md
-      # Fail when the pinned issue is missing. This step is the summary's only
+      # Fail when the issue does not exist. This step is the summary's only
       # delivery path, and printing a hint into a log nobody reads left the job
       # green while the report went nowhere. A red weekly run is the signal that
       # the issue needs creating -- deliberately a failure, not a new issue.
+      # A *closed* thread is reopened instead: closing it is one click, and it
+      # turned the run red on 2026-10-11 with the thread still there.
+      # scripts/reliability_issue.py does the exact-title pick and the failing.
       - name: Post summary to the pinned reliability issue
         run: |
           set -euo pipefail
-          issue=$(gh issue list --state open \
-            --search "Weekly Test Reliability Report in:title" \
-            --limit 1 --json number --jq '.[0].number')
-          if [ -z "$issue" ] || [ "$issue" = "null" ]; then
-            echo "::error::No open issue titled 'Weekly Test Reliability Report' was found. Create and pin one; it is the only delivery path for this summary." >&2
-            exit 1
+          gh issue list --state all \
+            --search '"Weekly Test Reliability Report" in:title' \
+            --limit 100 --json number,title,state,isPinned > reports/reliability-issues.json
+          choice=$(python3 scripts/reliability_issue.py < reports/reliability-issues.json)
+          issue=${choice% *}
+          state=${choice#* }
+          if [ "$state" = "CLOSED" ]; then
+            gh issue reopen "$issue" --comment "Reopened by the Weekly Hardening workflow: this issue is the weekly reliability summary's only delivery path. To stop the summary, remove the job from .github/workflows/weekly.yml instead of closing this issue."
           fi
           gh issue comment "$issue" --body-file reports/weekly-summary.md
       - name: Upload weekly summary

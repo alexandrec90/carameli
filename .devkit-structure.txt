@@ -49,7 +49,7 @@ complexity::scripts/docker-prune.py::main = 20
 complexity::scripts/docker-status.py::main = 19
 complexity::scripts/hooks/deps-sync.py::main = 18
 complexity::scripts/lint-all.py::main = 16
-complexity::scripts/run-tests.py::main = 30
+complexity::scripts/run-tests.py::main = 23
 complexity::scripts/run-tests.py::run_named_target = 18
 dependency::frontend/package.json::@eslint/js = 1
 dependency::frontend/package.json::@fontsource/outfit = 1
@@ -156,6 +156,7 @@ dependency::requirements-dev.txt::mutmut = 1
 dependency::requirements-dev.txt::mypy = 1
 dependency::requirements-dev.txt::mypy-extensions = 1
 dependency::requirements-dev.txt::nodeenv = 1
+dependency::requirements-dev.txt::opentelemetry-api = 1
 dependency::requirements-dev.txt::packageurl-python = 1
 dependency::requirements-dev.txt::packaging = 1
 dependency::requirements-dev.txt::pathspec = 1
@@ -288,6 +289,7 @@ dependency::requirements-test.txt::mako = 1
 dependency::requirements-test.txt::markdown-it-py = 1
 dependency::requirements-test.txt::markupsafe = 1
 dependency::requirements-test.txt::mdurl = 1
+dependency::requirements-test.txt::opentelemetry-api = 1
 dependency::requirements-test.txt::packaging = 1
 dependency::requirements-test.txt::pluggy = 1
 dependency::requirements-test.txt::prometheus-client = 1
@@ -357,6 +359,7 @@ dependency::requirements.txt::jmespath = 1
 dependency::requirements.txt::limits = 1
 dependency::requirements.txt::mako = 1
 dependency::requirements.txt::markupsafe = 1
+dependency::requirements.txt::opentelemetry-api = 1
 dependency::requirements.txt::packaging = 1
 dependency::requirements.txt::prometheus-client = 1
 dependency::requirements.txt::prometheus-fastapi-instrumentator = 1
@@ -416,7 +419,7 @@ function_lines::scripts/docker-prune.py::main = 145
 function_lines::scripts/docker-status.py::main = 112
 function_lines::scripts/docker-up.py::main = 84
 function_lines::scripts/run-e2e.py::main = 83
-function_lines::scripts/run-tests.py::main = 100
+function_lines::scripts/run-tests.py::main = 89
 function_params::app/api/vsapi/sms.py::list_sms_messages = 7
 function_params::app/api/vsapi/voicemail_drop.py::voicemail_drop = 7
 function_params::app/repositories/extension_repo.py::create = 8
@@ -531,3 +534,8 @@ todos::app/api/auth.py = 1
 #   definitions::scripts/lint-all.py -> 40
 #   file_lines::scripts/diagnostics.py -> 752
 #   file_lines::scripts/lint-all.py -> 689
+
+# 2026-10-11  recorded: fastapi 0.142 (dependabot #441) declares opentelemetry-api as a hard dependency; it is transitive in all three locks, not imported by carameli, and only removable by pinning fastapi below 0.142
+#   dependency::requirements-dev.txt::opentelemetry-api -> 1
+#   dependency::requirements-test.txt::opentelemetry-api -> 1
+#   dependency::requirements.txt::opentelemetry-api -> 1

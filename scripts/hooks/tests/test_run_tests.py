@@ -595,6 +595,7 @@ def cli(monkeypatch, tmp_path):
         monkeypatch.setattr(sys, "argv", ["run-tests.py", *args])
         monkeypatch.setattr(rt, "REPO_ROOT", tmp_path)
         monkeypatch.setattr(rt, "IS_CI", is_ci)
+        monkeypatch.setattr(rt, "rerun_in_tree_venv", lambda argv: None)
         for name in ("run_scoped", "run_all", "run_named_target", "run_local", "run_ci"):
             monkeypatch.setattr(
                 rt, name, lambda *a, _n=name: pytest.fail(f"unexpected dispatch to {_n}")
@@ -611,10 +612,51 @@ def routes(monkeypatch, name, results=None):
     return seen
 
 
-def test_main_prints_usage_for_help(cli, capsys):
+def test_main_prints_usage_for_help(cli, capsys, monkeypatch):
     cli("--help")
+    monkeypatch.setattr(rt, "rerun_in_tree_venv", lambda argv: pytest.fail("installed"))
     assert rt.main() == 0
     assert rt.USAGE in capsys.readouterr().out
+
+
+@pytest.mark.parametrize(
+    ("changed", "target", "paths", "refused"),
+    [
+        (False, None, [], ""),
+        (True, None, ["tests/unit/test_x.py"], ""),
+        (True, "pytest", ["tests/unit/test_x.py"], ""),
+        (False, "all", [], ""),
+        (False, "unit", [], "Unknown --target"),
+        (True, "hook-tests", [], "--changed only applies"),
+        (False, "frontend-tests", ["tests/unit/test_x.py"], "Explicit test paths"),
+    ],
+)
+def test_refusal_names_what_main_refuses(changed, target, paths, refused):
+    why = rt.refusal(changed, target, paths)
+    assert why.startswith(refused) and bool(why) == bool(refused)
+
+
+def test_main_hands_a_tree_with_no_venv_to_its_rerun(cli, monkeypatch):
+    """A `claude --worktree` tree has no `.venv`, and the interpreter that ran this has no
+    pytest: the rerun under the provisioned `.venv` is the run, its exit code the answer."""
+    cli("scripts/hooks/tests/test_db_upgrade.py")
+    seen = []
+    monkeypatch.setattr(rt, "rerun_in_tree_venv", lambda argv: (seen.append(argv), 5)[1])
+    assert rt.main() == 5
+    assert seen == [["scripts/hooks/tests/test_db_upgrade.py"]]
+
+
+def test_rerun_in_tree_venv_asks_the_vendored_toolchain_for_pytest(monkeypatch):
+    toolchain = rt.script_common.load_script("scripts/hooks/toolchain.py")
+    asked = []
+
+    def rerun_in_venv(root, module, script, argv):
+        asked.append((root, module, script.name, argv))
+        return None
+
+    monkeypatch.setattr(toolchain, "rerun_in_venv", rerun_in_venv)
+    assert rt.rerun_in_tree_venv(["--changed"]) is None
+    assert asked == [(rt.REPO_ROOT, "pytest", "run-tests.py", ["--changed"])]
 
 
 def test_main_rejects_an_unknown_flag(cli, capsys):

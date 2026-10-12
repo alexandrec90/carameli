@@ -67,11 +67,15 @@ def test_docker_fix_main_reports_a_ready_engine_without_real_side_effects(monkey
 
 
 def test_docker_migrate_main_runs_alembic_for_a_running_app(monkeypatch):
+    ran = []
     monkeypatch.setattr(docker_migrate.dc, "docker_ps", lambda *args, **kwargs: (["Up"], 0, False))
-    monkeypatch.setattr(docker_migrate.dc, "run", lambda _argv: (["done"], 0))
+    monkeypatch.setattr(docker_migrate.dc, "run", lambda argv: ran.append(argv) or (["done"], 0))
     monkeypatch.setattr(docker_migrate.dc, "clear_artifact", lambda _name: None)
 
     assert docker_migrate.main() == 0
+    # Past PgBouncer, as db-revision.py and db-upgrade.py go: it went through the
+    # transaction pool until the fix pass's upgrade script was written beside it.
+    assert ran == [docker_migrate.dc.alembic_in_app("upgrade", "head")]
 
 
 def test_docker_prune_main_uses_the_success_path_without_touching_docker(tmp_path, monkeypatch):

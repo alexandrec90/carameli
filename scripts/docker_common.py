@@ -149,6 +149,28 @@ def run_with_timeout(argv, timeout: int) -> tuple[list[str], int, bool]:
     return (p.stdout or "").splitlines(), p.returncode, False
 
 
+def alembic_in_app(*args: str) -> list[str]:
+    """`alembic <args>` inside the app container, pointed past PgBouncer.
+
+    `alembic/env.py` reads `settings.database_url`, which in the container is the
+    transaction-pooled `pgbouncer:5432`; `DIRECT_DATABASE_URL` is the one for DDL
+    (docker-compose.yml), and the container's environment is its only source. So the
+    override is made inside the container's shell, where that variable exists. The
+    arguments are fixed words, never user text -- `db-revision.py` quotes its message
+    for the same shell.
+    """
+    return [
+        "docker",
+        "compose",
+        "exec",
+        "-T",
+        "app",
+        "sh",
+        "-c",
+        'DATABASE_URL="$DIRECT_DATABASE_URL" alembic ' + " ".join(args),
+    ]
+
+
 def run(argv) -> tuple[list[str], int]:
     """Run a command from the repo root, merging stdout+stderr. (lines, exit_code)."""
     lines, code, _ = run_with_timeout(argv, timeout=600)
