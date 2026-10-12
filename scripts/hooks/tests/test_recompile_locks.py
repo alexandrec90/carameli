@@ -289,8 +289,21 @@ def test_automerge_merge_job_only_trusts_dependabot_gate_on_current_head():
     # The event-driven merge fires for a pull_request gate run, and since devkit
     # v0.11.26 for a workflow_dispatch one too: a lock repair pushed with
     # GITHUB_TOKEN raises no pull_request event, so it dispatches the gate itself...
+    # The list is parsed rather than matched as a string: devkit v0.11.64 added
+    # `push` to it, and a pinned spelling read that arrival as the guard breaking.
     assert "github.event.workflow_run.event" in workflow
-    assert '["pull_request", "workflow_dispatch"]' in workflow
+    trigger_events = re.search(
+        r"contains\(fromJSON\('(\[[^\]]*\])'\), github\.event\.workflow_run\.event\)",
+        workflow,
+    )
+    assert trigger_events, "merge job no longer filters on workflow_run.event"
+    events = set(json.loads(trigger_events.group(1)))
+    assert {"pull_request", "workflow_dispatch"} <= events
+    # A `push` completion is the default branch's own gate, and the script sweeps
+    # every open PR for it only when told which branch that is.
+    if "push" in events:
+        assert "DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}" in workflow
+        assert 'env.get("DEFAULT_BRANCH"' in script
     # ...and hands the script the gated commit, so a head that moved cannot inherit
     # the merge. Both jobs delegate to the script, which re-derives every guard from
     # the PR's current state (pinned upstream by test_merge_dependabot_prs.py).
