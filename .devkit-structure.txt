@@ -184,7 +184,6 @@ dependency::requirements-dev.txt::pyparsing = 1
 dependency::requirements-dev.txt::pyrate-limiter = 1
 dependency::requirements-dev.txt::pytest = 1
 dependency::requirements-dev.txt::pytest-asyncio = 1
-dependency::requirements-dev.txt::pytest-base-url = 1
 dependency::requirements-dev.txt::pytest-benchmark = 1
 dependency::requirements-dev.txt::pytest-mock = 1
 dependency::requirements-dev.txt::pytest-playwright = 1
