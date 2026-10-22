@@ -25,13 +25,24 @@ LOCK_SPECS: tuple[tuple[str, str, str | None], ...] = (
 )
 
 
-def compile_commands(python: str, target_version: str | None = None) -> list[list[str]]:
+def compile_commands(
+    python: str,
+    target_version: str | None = None,
+    upgrade_packages: tuple[str, ...] = (),
+) -> list[list[str]]:
     """Return the ordered universal-compile commands for all lock layers.
 
     `--python-version` is the repo's pin, not the interpreter running this script: a
     workstation on a newer Python must still produce locks the container can install.
+
+    `upgrade_packages` lets a pin move in *every* layer. uv keeps an existing lock's
+    pins, and each layer is constrained by the one before it, so a floor raised in
+    `requirements-dev.in` cannot lift a shared transitive (`packaging`) that the
+    runtime lock already holds lower: the dev compile reports the two as
+    unsatisfiable instead.
     """
     target_version = target_version or script_common.pinned_python(REPO_ROOT)
+    upgrade_args = [arg for package in upgrade_packages for arg in ("--upgrade-package", package)]
     commands: list[list[str]] = []
     for source, output, constraint in LOCK_SPECS:
         command = [
@@ -43,6 +54,7 @@ def compile_commands(python: str, target_version: str | None = None) -> list[lis
             "--universal",
             "--python-version",
             target_version,
+            *upgrade_args,
             source,
             "-o",
             output,
@@ -81,16 +93,27 @@ def failure_report(command: list[str], output: list[str]) -> str:
         "# source: scripts/recompile-locks.py\n"
         "# recompile-locks\n"
         "# fix: python scripts/recompile-locks.py\n"
+        "# hint: unsatisfiable against an earlier lock's pin? add --upgrade-package <name>\n"
         f"requirements.in:1:1: LOCK_COMPILE_FAILED: `{rendered}` failed\n"
         f"{details}\n"
     )
 
 
 def main(argv: list[str] | None = None) -> int:
-    # Takes no options; parsing anyway makes `--help` print instead of recompiling.
-    argparse.ArgumentParser(description=__doc__).parse_args(argv)
+    # Parsing before anything runs makes `--help` print instead of recompiling.
+    # No abbreviations: a bare `--upgrade` must be refused, not read as one package.
+    parser = argparse.ArgumentParser(description=__doc__, allow_abbrev=False)
+    parser.add_argument(
+        "--upgrade-package",
+        action="append",
+        default=[],
+        metavar="NAME",
+        help="let this package's pin move in every lock layer (repeatable)",
+    )
+    args = parser.parse_args(argv)
     ARTIFACT.parent.mkdir(parents=True, exist_ok=True)
-    code, output, failed_command = run_commands(compile_commands(sys.executable))
+    commands = compile_commands(sys.executable, upgrade_packages=tuple(args.upgrade_package))
+    code, output, failed_command = run_commands(commands)
     if code:
         if failed_command is None:
             failed_command = [sys.executable, "-m", "uv", "pip", "compile"]

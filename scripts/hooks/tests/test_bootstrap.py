@@ -243,7 +243,7 @@ def test_main_stops_at_the_first_failing_step(monkeypatch):
     monkeypatch.setattr(bootstrap, "install_frontend", step("frontend", 0))
 
     # The steps are read off the module at call time, so the patches above apply.
-    assert bootstrap.main() == 3
+    assert bootstrap.main([]) == 3
     assert calls == ["venv", "python"]
 
 
@@ -267,8 +267,24 @@ def test_main_provisions_node_before_the_frontend_install(monkeypatch):
     ]:
         monkeypatch.setattr(bootstrap, attr, step(name))
 
-    assert bootstrap.main() == 0
+    assert bootstrap.main([]) == 0
     assert calls == ["venv", "python", "node", "frontend"]
+
+
+def test_help_and_unknown_flags_exit_before_provisioning(monkeypatch, capsys):
+    """`--help` was ignored, so asking what bootstrap does ran a full provision --
+    reinstalling the dev lock into the venv. Arguments must be parsed before any step."""
+    for attr in ("create_venv", "install_python", "provision_node", "install_frontend"):
+        monkeypatch.setattr(bootstrap, attr, lambda root: pytest.fail("provisioned"))
+
+    with pytest.raises(SystemExit) as helped:
+        bootstrap.main(["--help"])
+    assert helped.value.code == 0
+    assert "provision a checkout" in capsys.readouterr().out.lower()
+
+    with pytest.raises(SystemExit) as refused:
+        bootstrap.main(["--force"])
+    assert refused.value.code == 2
 
 
 # --- the Node runtime ------------------------------------------------------
