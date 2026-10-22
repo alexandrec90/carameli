@@ -16,5 +16,5 @@ yamllint>=1.35.0
 boto3>=1.43.99
 requests>=2.33.0
 win11toast>=0.9; sys_platform == "win32"
-uv>=0.12.17
-virtualenv>=21.7.13  # PYSEC-2026-4011..4014 — 21.7.12 and earlier are vulnerable; transitive via pre-commit
+uv>=0.13.4  # PYSEC-2026-4321 — 0.13.3 and earlier are vulnerable
+virtualenv>=21.14.9  # PYSEC-2026-4011..4014, CVE-2026-113722, CVE-2026-113725 — 21.14.8 and earlier are vulnerable; transitive via pre-commit

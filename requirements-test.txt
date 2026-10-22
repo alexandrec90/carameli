@@ -38,9 +38,10 @@ botocore==1.43.114
     #   -c requirements.txt
     #   boto3
     #   s3transfer
-certifi==2026.2.25
+certifi==2026.10.19
     # via
     #   -c requirements.txt
+    #   -r requirements.in
     #   httpcore
     #   httpx
     #   requests
@@ -79,8 +80,10 @@ fastapi==0.148.0
     #   -c requirements.txt
     #   -r requirements.in
     #   sentry-sdk
-graphql-core==3.2.11
-    # via hypothesis-graphql
+graphql-core==3.3.0
+    # via
+    #   -r requirements-test.in
+    #   hypothesis-graphql
 greenlet==3.3.2
     # via
     #   -c requirements.txt
@@ -113,7 +116,7 @@ hypothesis==6.170.2
     #   -r requirements-test.in
     #   hypothesis-graphql
     #   schemathesis
-hypothesis-graphql==0.13.2
+hypothesis-graphql==0.13.5
     # via schemathesis
 idna==3.18
     # via
@@ -152,7 +155,7 @@ opentelemetry-api==1.45.1
     # via
     #   -c requirements.txt
     #   fastapi
-packaging==26.0
+packaging==26.3
     # via
     #   -c requirements.txt
     #   limits

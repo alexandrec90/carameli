@@ -24,8 +24,9 @@ botocore==1.43.114
     # via
     #   boto3
     #   s3transfer
-certifi==2026.2.25
+certifi==2026.10.19
     # via
+    #   -r requirements.in
     #   httpcore
     #   httpx
     #   sentry-sdk
@@ -75,7 +76,7 @@ markupsafe==3.0.3
     # via mako
 opentelemetry-api==1.45.1
     # via fastapi
-packaging==26.0
+packaging==26.3
     # via limits
 prometheus-client==0.24.1
     # via prometheus-fastapi-instrumentator

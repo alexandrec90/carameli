@@ -51,9 +51,10 @@ brotli==1.2.0
     # via geventhttpclient
 cachecontrol==0.14.4
     # via pip-audit
-certifi==2026.2.25
+certifi==2026.10.19
     # via
     #   -c requirements-test.txt
+    #   -r requirements.in
     #   geventhttpclient
     #   httpcore
     #   httpx
@@ -136,9 +137,10 @@ gevent==25.9.1
     #   locust
 geventhttpclient==2.3.9
     # via locust
-graphql-core==3.2.11
+graphql-core==3.3.0
     # via
     #   -c requirements-test.txt
+    #   -r requirements-test.in
     #   hypothesis-graphql
 greenlet==3.3.2
     # via
@@ -178,7 +180,7 @@ hypothesis==6.170.2
     #   -r requirements-test.in
     #   hypothesis-graphql
     #   schemathesis
-hypothesis-graphql==0.13.2
+hypothesis-graphql==0.13.5
     # via
     #   -c requirements-test.txt
     #   schemathesis
@@ -263,7 +265,7 @@ opentelemetry-api==1.45.1
     #   fastapi
 packageurl-python==0.17.6
     # via cyclonedx-python-lib
-packaging==26.0
+packaging==26.3
     # via
     #   -c requirements-test.txt
     #   limits
@@ -312,7 +314,7 @@ py-cpuinfo2==10.1.1
     #   pytest-benchmark
 py-serializable==2.1.0
     # via cyclonedx-python-lib
-pycparser==3.0 ; (implementation_name != 'PyPy' and platform_python_implementation != 'PyPy') or (implementation_name == 'pypy' and platform_python_implementation == 'PyPy')
+pycparser==3.0 ; implementation_name == 'pypy' or (implementation_name != 'PyPy' and implementation_name != 'pypy' and platform_python_implementation != 'PyPy')
     # via
     #   -c requirements-test.txt
     #   cffi
@@ -535,7 +537,7 @@ urllib3==2.8.0
     #   geventhttpclient
     #   requests
     #   sentry-sdk
-uv==0.13.1
+uv==0.13.5
     # via -r requirements-dev.in
 uvicorn==0.54.0
     # via
@@ -545,7 +547,7 @@ uvloop==0.22.1 ; platform_python_implementation != 'PyPy' and sys_platform != 'c
     # via
     #   -c requirements-test.txt
     #   uvicorn
-virtualenv==21.14.5
+virtualenv==21.14.12
     # via
     #   -r requirements-dev.in
     #   pre-commit

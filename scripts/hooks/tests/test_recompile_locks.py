@@ -41,6 +41,36 @@ def test_compile_commands_preserve_constraint_order():
     assert all("--universal" in command for command in commands)
 
 
+def test_compile_commands_upgrade_packages_reach_every_layer():
+    """A dev-only floor (virtualenv>=21.14.9 needing packaging>=26.3) was unsatisfiable
+    while the runtime lock held packaging==26.0 and constrained the dev layer. The
+    upgrade must apply to every layer, before the source, or the chain stays stuck."""
+    commands = locks.compile_commands("python", upgrade_packages=("packaging", "uv"))
+
+    for command, (source, _output, _constraint) in zip(commands, locks.LOCK_SPECS, strict=True):
+        flags = command[: command.index(source)]
+        assert flags[-4:] == ["--upgrade-package", "packaging", "--upgrade-package", "uv"]
+
+
+def test_compile_commands_without_upgrades_add_no_flags():
+    assert not any("--upgrade-package" in command for command in locks.compile_commands("python"))
+
+
+def test_main_passes_repeated_upgrade_packages(monkeypatch, tmp_path):
+    seen = []
+    monkeypatch.setattr(locks, "ARTIFACT", tmp_path / "deps-lock-errors.log")
+    monkeypatch.setattr(
+        locks, "run_commands", lambda commands: seen.extend(commands) or (0, [], None)
+    )
+
+    assert locks.main(["--upgrade-package", "packaging", "--upgrade-package", "certifi"]) == 0
+
+    assert len(seen) == len(locks.LOCK_SPECS)
+    for command in seen:
+        upgrades = [command[i + 1] for i, arg in enumerate(command) if arg == "--upgrade-package"]
+        assert upgrades == ["packaging", "certifi"]
+
+
 def test_run_commands_stops_at_first_failure(monkeypatch):
     calls = []
     results = iter(
@@ -85,6 +115,7 @@ def test_failure_report_is_actionable_and_bounded():
 
     assert report.startswith("# source: scripts/recompile-locks.py")
     assert "# fix: python scripts/recompile-locks.py" in report
+    assert "--upgrade-package" in report
     assert "requirements.in:1:1: LOCK_COMPILE_FAILED" in report
     assert "\n0\n" not in report
     assert "\n99\n" in report

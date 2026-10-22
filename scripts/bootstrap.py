@@ -31,6 +31,7 @@ this runs before anything is installed, by construction.
 
 from __future__ import annotations
 
+import argparse
 import importlib.util
 import re
 import shutil
@@ -189,7 +190,9 @@ def provision_node(root: Path = REPO_ROOT, cfg: harness_config.Config | None = N
     return code
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
+    # Takes no options; parsing anyway makes `--help` print instead of provisioning.
+    argparse.ArgumentParser(description=__doc__.split("\n\n")[0]).parse_args(argv)
     for step in (create_venv, install_python, provision_node, install_frontend):
         code = step(REPO_ROOT)
         if code:
