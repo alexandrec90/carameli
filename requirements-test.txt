@@ -38,7 +38,7 @@ botocore==1.43.114
     #   -c requirements.txt
     #   boto3
     #   s3transfer
-certifi==2026.2.25
+certifi==2026.10.19
     # via
     #   -c requirements.txt
     #   httpcore
@@ -152,7 +152,7 @@ opentelemetry-api==1.45.1
     # via
     #   -c requirements.txt
     #   fastapi
-packaging==26.0
+packaging==26.3
     # via
     #   -c requirements.txt
     #   limits
