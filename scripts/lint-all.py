@@ -334,7 +334,18 @@ def t_vulture(changed: list[str] | None = None) -> dict:
 # write up to TMP_MAX (2**31 on Windows) times per package: CPU-bound, silent, and
 # endless (pip-audit 2.10.1, pip 26.2). An explicit directory skips that lookup. It is
 # under the gitignored `.cache/`, so a cold one costs a worktree a few seconds.
-PIP_AUDIT_CMD = 'pip-audit --cache-dir ".cache/pip-audit" --ignore-vuln CVE-2026-4539'
+#
+# It audits the locks, not the installed `.venv`: the venv lags whatever lock a change
+# just edited until `scripts/bootstrap.py` re-syncs it, so a bump past an advisory still
+# read as vulnerable. The locks are fully pinned and universal (`uv pip compile`), so
+# `--no-deps` loses nothing and `--disable-pip` resolves nothing; pip-audit evaluates
+# each pin's markers against the machine running it, as the installed venv did.
+PIP_AUDIT_LOCKS = ("requirements.txt", "requirements-test.txt", "requirements-dev.txt")
+PIP_AUDIT_CMD = (
+    'pip-audit --cache-dir ".cache/pip-audit" --ignore-vuln CVE-2026-4539 '
+    + " ".join(f"-r {lock}" for lock in PIP_AUDIT_LOCKS)
+    + " --disable-pip --no-deps"
+)
 
 # A warm audit takes seconds and a cold one well under a minute; a network stall is the
 # only honest reason to wait longer than this.

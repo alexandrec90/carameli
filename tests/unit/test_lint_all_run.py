@@ -84,6 +84,16 @@ class TestPipAudit:
         assert seen == {"cmd": script.PIP_AUDIT_CMD, "timeout": script.PIP_AUDIT_TIMEOUT}
         assert script.PIP_AUDIT_TIMEOUT < script.TOOL_TIMEOUT
 
+    def test_audits_the_locks_not_the_installed_venv(self) -> None:
+        """A `requirements-dev.txt` bump past PYSEC-2026-4322 still failed on brotli 1.2.0
+        until `scripts/bootstrap.py` re-synced `.venv`: the audit judged the venv, which
+        lags the lock a change edits. Every lock is named, and pip never resolves them."""
+        locks = sorted(p.name for p in REPO_ROOT.glob("requirements*.txt"))
+        assert locks and sorted(script.PIP_AUDIT_LOCKS) == locks
+        for lock in locks:
+            assert f"-r {lock}" in script.PIP_AUDIT_CMD
+        assert "--disable-pip --no-deps" in script.PIP_AUDIT_CMD
+
     def test_skips_when_no_requirements_file_changed(self, monkeypatch) -> None:
         monkeypatch.setattr(script, "run", lambda *a, **k: (_ for _ in ()).throw(AssertionError))
         assert script.t_pip_audit(["app/main.py"]) == {"pip-audit": ([], 0)}
