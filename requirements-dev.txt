@@ -47,8 +47,10 @@ botocore==1.43.114
     #   -c requirements-test.txt
     #   boto3
     #   s3transfer
-brotli==1.2.0
-    # via geventhttpclient
+brotli==1.2.1
+    # via
+    #   -r requirements-dev.in
+    #   geventhttpclient
 cachecontrol==0.14.4
     # via pip-audit
 certifi==2026.10.19
