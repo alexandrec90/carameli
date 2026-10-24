@@ -119,8 +119,9 @@ fastapi==0.148.0
     #   -c requirements-test.txt
     #   -r requirements.in
     #   sentry-sdk
-filelock==3.25.2
+filelock==4.2.4
     # via
+    #   -r requirements-dev.in
     #   cachecontrol
     #   python-discovery
     #   virtualenv
