@@ -114,7 +114,7 @@ execnet==2.1.2
     # via
     #   -c requirements-test.txt
     #   pytest-xdist
-fastapi==0.148.0
+fastapi==0.161.1
     # via
     #   -c requirements-test.txt
     #   -r requirements.in
@@ -177,7 +177,7 @@ httpx==0.28.1
     # via
     #   -c requirements-test.txt
     #   -r requirements.in
-hypothesis==6.170.2
+hypothesis==6.170.8
     # via
     #   -c requirements-test.txt
     #   -r requirements-test.in
@@ -280,7 +280,7 @@ pathspec==1.0.4
     # via
     #   mypy
     #   yamllint
-pip==26.2.1
+pip==26.2.2
     # via pip-api
 pip-api==0.0.34
     # via pip-audit
@@ -331,7 +331,7 @@ pydantic-core==2.50.1
     # via
     #   -c requirements-test.txt
     #   pydantic
-pydantic-settings==2.16.0
+pydantic-settings==2.16.1
     # via
     #   -c requirements-test.txt
     #   -r requirements.in
@@ -376,7 +376,7 @@ pytest-benchmark==5.3.0
     # via
     #   -c requirements-test.txt
     #   -r requirements-test.in
-pytest-mock==3.16.0
+pytest-mock==3.17.0
     # via
     #   -c requirements-test.txt
     #   -r requirements-test.in
@@ -484,12 +484,12 @@ sortedcontainers==2.4.0
     #   -c requirements-test.txt
     #   cyclonedx-python-lib
     #   hypothesis
-sqlalchemy==2.1.4
+sqlalchemy==2.1.6
     # via
     #   -c requirements-test.txt
     #   -r requirements.in
     #   alembic
-starlette==1.8.0
+starlette==1.9.0
     # via
     #   -c requirements-test.txt
     #   -r requirements.in
