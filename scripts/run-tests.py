@@ -33,7 +33,7 @@ from pathlib import Path
 import diagnostics
 import script_common
 from host_spawn import host_argv, run_argv
-from host_tier import app_container_running, host_db_fallback
+from host_tier import app_container_running, changed_test_files, host_db_fallback
 
 # `changed_files` only -- the one definition on this machine of "what changed", shared
 # so `--changed` here and `--changed` there cannot disagree about it. Hyphenated, hence
@@ -249,8 +249,9 @@ def parse_testmon_selection(dual_out: str) -> tuple[int, int]:
 USAGE = """usage: python scripts/run-tests.py [--changed] [--all] [--target <name>] [PATH ...]
 
   (no args)        full backend suite (in-container xdist locally; direct on CI)
-  --changed        changed-only via testmon, xdist fallback (default suite only)
-                   (--fast is a deprecated alias)
+  --changed        changed-only via testmon, xdist fallback (default suite only);
+                   with no app container up, the changed set's own test files on
+                   the host (--fast is a deprecated alias)
   --all            every FREE target (pytest, hook-tests, frontend-tests,
                    bundle-budgets)
   --target <name>  one of: pytest, hook-tests, frontend-tests, bundle-budgets,
@@ -436,11 +437,37 @@ def run_local(changed: bool) -> dict[str, tuple[list[str], int]]:
     if changed and not changed_touches_python():
         print("\nSkipping pytest -- the changed set holds no Python.")
         return {"pytest": ([], 0)}
+    if changed and not app_container_running():
+        return run_changed_on_host()
     pytest_cmd = pick_fast_command() if changed else _PYTEST_FULL
     mode = "changed-only (testmon)" if changed else "full (parallel, xdist)"
     print(f"\nRunning pytest -- {mode} ...")
     lines, code = run_argv(_in_container(pytest_cmd))
     return {"pytest": (lines, code)}
+
+
+def run_changed_on_host() -> dict[str, tuple[list[str], int]]:
+    """`--changed` with no app container: the changed set's own test files, on the host.
+
+    Where it names none, a red run that says why -- never a green run of nothing, and
+    never `docker compose exec`'s `service "app" is not running` as the only clue.
+    """
+    try:
+        changed = lint_all.changed_files()
+    except (OSError, subprocess.SubprocessError):
+        changed = []
+    targets = changed_test_files(changed)
+    if not targets:
+        why = (
+            "run-tests: no app container is up, so testmon cannot select, and the changed"
+            " set names no test file. Start the stack (python scripts/docker-up.py) or pass"
+            " the test files as arguments."
+        )
+        print(f"\n{why}")
+        return {"pytest": ([why], 1)}
+    print(f"\nRunning pytest -- the changed set's {len(targets)} test file(s), on the host ...")
+    print(_NO_STACK_NOTE)
+    return {"pytest": run_argv(host_argv(scoped_pytest_command(targets)))}
 
 
 def run_named_target(target: str) -> dict[str, tuple[list[str], int]]:
