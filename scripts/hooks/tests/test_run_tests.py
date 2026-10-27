@@ -532,6 +532,7 @@ def test_run_local_stays_in_the_container_by_default(monkeypatch):
     # the one test in this file not updated when it arrived.
     monkeypatch.setattr(rt, "host_db_fallback", lambda root=None: None)
     monkeypatch.setattr(rt, "changed_touches_python", lambda: True)
+    monkeypatch.setattr(rt, "app_container_running", lambda root=None: True)
     monkeypatch.setattr(rt, "pick_fast_command", lambda: "pytest --testmon")
     seen: dict = {}
     monkeypatch.setattr(
@@ -863,6 +864,7 @@ def test_run_local_skips_pytest_for_a_frontend_only_diff(monkeypatch, capsys):
 def test_run_local_still_runs_pytest_when_python_changed(monkeypatch):
     monkeypatch.setattr(rt, "host_db_fallback", lambda: None)
     monkeypatch.setattr(rt, "changed_touches_python", lambda: True)
+    monkeypatch.setattr(rt, "app_container_running", lambda root=None: True)
     monkeypatch.setattr(rt, "pick_fast_command", lambda: "pytest --testmon")
     seen = []
 
@@ -874,6 +876,75 @@ def test_run_local_still_runs_pytest_when_python_changed(monkeypatch):
 
     rt.run_local(True)
     assert seen, "a Python change must still reach pytest"
+
+
+def _no_stack(monkeypatch, changed: list[str]) -> list:
+    """`run_local(True)` with nothing up and `changed` as the working-tree diff."""
+    monkeypatch.setattr(rt, "host_db_fallback", lambda: None)
+    monkeypatch.setattr(rt, "changed_touches_python", lambda: True)
+    monkeypatch.setattr(rt, "app_container_running", lambda root=None: False)
+    monkeypatch.setattr(rt.lint_all, "changed_files", lambda paths=None: changed)
+    monkeypatch.setattr(rt, "pick_fast_command", lambda: pytest.fail("testmon probe, no container"))
+    seen: list = []
+    monkeypatch.setattr(
+        rt, "run_argv", lambda argv, extra_env=None: (seen.append(argv), ([], 0))[1]
+    )
+    return seen
+
+
+def test_changed_with_no_stack_runs_the_changed_sets_tests_on_the_host(monkeypatch, capsys):
+    """The reported run: `run-tests.py --changed` in a fresh worktree with no stack up
+    went to `docker compose exec` and reported `[FAIL] target 'pytest' was skipped
+    (environment error)` over `service "app" is not running`, though `--help` said
+    targets run on the host with no app container. It now runs them there."""
+    seen = _no_stack(monkeypatch, ["scripts/run-tests.py", "frontend/src/App.tsx"])
+
+    assert rt.run_local(True) == {"pytest": ([], 0)}
+
+    (argv,) = seen
+    assert argv[1:3] == ["-m", "pytest"]
+    assert "docker" not in argv
+    assert "scripts/hooks/tests/test_run_tests.py" in argv
+    assert "no app container" in capsys.readouterr().out
+
+
+def test_changed_with_no_stack_and_no_named_test_is_red_and_says_why(monkeypatch):
+    """Never a green run of nothing: a Python change no test file is named for fails
+    with the way out, rather than with the exec error the reporter had to decode."""
+    seen = _no_stack(monkeypatch, ["app/no_such_module_has_a_test.py"])
+
+    ((lines, code),) = rt.run_changed_on_host().values()
+
+    assert code == 1
+    assert "no app container" in lines[0] and "docker-up.py" in lines[0]
+    assert seen == []
+
+
+def test_usage_says_what_changed_does_with_no_container():
+    assert "no app container up, the changed set" in rt.USAGE
+
+
+def test_changed_test_files_maps_modules_to_their_tests(tmp_path):
+    for rel in (
+        "tests/unit/test_calls.py",
+        "scripts/hooks/tests/test_run_tests.py",
+        "tests/live_e2e/test_calls.py",
+    ):
+        (tmp_path / rel).parent.mkdir(parents=True, exist_ok=True)
+        (tmp_path / rel).touch()
+    changed = [
+        "app/api/calls.py",  # -> tests/unit/test_calls.py, never the live_e2e twin
+        "scripts\\run-tests.py",  # hyphen and Windows separator
+        "tests/unit/test_calls.py",  # a changed test is itself, once
+        "tests/unit/test_deleted.py",  # gone from disk: nothing to run
+        "frontend/src/App.tsx",
+        "app/models/orphan.py",  # names no test
+    ]
+
+    assert host_tier.changed_test_files(changed, tmp_path) == [
+        "tests/unit/test_calls.py",
+        "scripts/hooks/tests/test_run_tests.py",
+    ]
 
 
 def test_a_full_run_never_asks_about_the_changed_set(monkeypatch):

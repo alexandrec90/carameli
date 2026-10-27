@@ -7,7 +7,8 @@ run then ended at `docker compose exec`'s "No such container", which
 `diagnostics.get_skip_reason` classifies as an environmental skip. The suite is
 perfectly runnable there: `.devkit.toml [db]` already describes how to reach db and
 redis over their published compose ports, which is what the stop hook's own DB tier
-uses. Try that before giving up.
+uses. Try that before giving up. With nothing up at all, `changed_test_files` is what
+`--changed` can still run on the host.
 
 Split out of `run-tests.py`, which was past its `file_lines` and `definitions`
 ceilings with this block as its clearest seam. The runner imports
@@ -128,3 +129,49 @@ def ensure_test_database(repo_root: Path = REPO_ROOT, runner=subprocess.run) -> 
     except (OSError, subprocess.TimeoutExpired):
         return False
     return done.returncode == 0 or "already exists" in (done.stderr or "")
+
+
+# Where a changed module's test file is looked for, and the trees the default suite never
+# collects (`_ADDOPTS`' `--ignore`s): a paid or live test is not "the changed set's".
+_TEST_ROOTS = ("tests", "scripts/hooks/tests")
+_UNCOLLECTED = (
+    "tests/e2e/",
+    "tests/live_e2e/",
+    "tests/local_e2e/",
+    "tests/load/",
+    "tests/quarantine/",
+)
+
+
+def changed_test_files(paths: list[str], repo_root: Path = REPO_ROOT) -> list[str]:
+    """The test files a changed set names, for `--changed` with no app container up.
+
+    testmon's index lives in the container's tree, so with no container there is nothing
+    to select with -- and `--changed` used to go to `docker compose exec` regardless and
+    die on `service "app" is not running`, reported as a skipped critical target. This is
+    the selection the host can make: a changed `test_*.py` itself, and `test_<stem>.py`
+    under the test roots for any other changed `.py` (`run-tests.py` -> `test_run_tests.py`).
+    """
+    found: list[str] = []
+    for raw in paths:
+        posix = raw.replace("\\", "/")
+        name = posix.rsplit("/", 1)[-1]
+        if not name.endswith(".py"):
+            continue
+        if name.startswith("test_"):
+            hits = [posix]
+        else:
+            pattern = "test_" + name[:-3].replace("-", "_") + ".py"
+            hits = sorted(
+                hit.relative_to(repo_root).as_posix()
+                for test_root in _TEST_ROOTS
+                for hit in (repo_root / test_root).rglob(pattern)
+            )
+        for hit in hits:
+            if (
+                hit not in found
+                and not hit.startswith(_UNCOLLECTED)
+                and (repo_root / hit).is_file()
+            ):
+                found.append(hit)
+    return found
