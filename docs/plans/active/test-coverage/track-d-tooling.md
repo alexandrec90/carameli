@@ -426,6 +426,10 @@ pip install mutmut
 
 ### Configuration — `setup.cfg` or `mutmut` section in `pyproject.toml`
 
+> **Superseded.** This block is mutmut 2 syntax. mutmut 3 splits `setup.cfg` lists on
+> newlines, so the comma-joined path below names one file that does not exist and mutates
+> nothing, and it ignores `runner`. `setup.cfg` holds the working mutmut 3 configuration.
+
 ```ini
 [mutmut]
 paths_to_mutate = app/services/call_sync.py,app/services/agent_status_sync.py,app/api/webhooks/call_status.py,app/api/webhooks/sms_inbound.py,app/core/session.py

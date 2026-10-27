@@ -405,23 +405,18 @@ protection ruleset on `master` requiring the four PR Gate checks:
 - `Frontend unit tests`
 - `Lockfile environment markers`
 
-For weekly reporting, create and pin an open GitHub issue titled `Weekly Test Reliability Report`.
-The weekly workflow auto-discovers that issue by title and posts the summary comment there
-(built by `scripts/weekly_summary.py`). **That issue is required**: with no match in any
-state, the `Weekly reliability summary` job fails rather than passing green with the report
-undelivered. A closed one is reopened with a comment and posted to
-(`scripts/reliability_issue.py` picks it), so closing the thread does not stop the summary.
-To stop it, remove the job.
+The weekly reliability summary (built by `scripts/weekly_summary.py`) is written to the
+`Weekly Hardening` run's summary page: migration and resilience counts, the quarantine
+count, and the mutation score with surviving mutants per module. It needs no issue.
 
-### Failing checks never open issues
+### Only scheduled failures open issues
 
-No workflow in this repo files a GitHub issue when something breaks — **a red run is the
-alert**. On a PR the failing check plus the uploaded `logs/lint-errors.log` /
-`logs/test-failures.log` artifacts are the signal, and the author is already watching; on
-the scheduled `Nightly` / `Weekly Hardening` suites, the failed run itself is what needs
-looking at. Auto-filing duplicates a signal that already exists, needs closing by hand, and
-goes stale the moment the branch is fixed. Issues here are for durable trackers a human
-opens: quarantined tests, and the pinned weekly report above.
+On a PR, the failing check plus the uploaded `logs/lint-errors.log` /
+`logs/test-failures.log` artifacts are the signal, and the author is already watching. For
+the unattended suites, `scheduled-failure-issue.yml` (vendored from devkit) opens one issue
+per scheduled workflow that fails — `Nightly`, `Weekly Hardening` — comments on it while it
+stays red, and closes it when the workflow goes green. Nothing else files issues; issues
+here are otherwise durable trackers a human opens, such as quarantined tests.
 
 The corollary is that a check must actually fail when it has nothing useful to say. A step
 that prints a warning and exits 0 is the failure mode this rule exists to prevent.

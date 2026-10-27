@@ -184,6 +184,12 @@ Add `locust` to `requirements-dev.txt` if it is not already there.
 
 ### Step 0e — Create `scripts/run-mutation.ps1`
 
+> **Superseded.** mutmut 3 has no `runner` key; it copies the tree into `mutants/` and runs
+> pytest in-process, and it needs `fork`, so it does not run on native Windows. The working
+> configuration is `setup.cfg`'s `[mutmut]` section and the `mutation` job in
+> `.github/workflows/weekly.yml`, which gives it a Postgres service. The text below is the
+> original plan.
+
 `mutmut` mutates source files on the host and invokes pytest inside the container as the
 test runner. This means `mutmut` runs from the host `.venv`, but its `runner` command is
 `docker compose exec -T app pytest`.
@@ -546,6 +552,8 @@ jobs:
       - run: pip install -r requirements.txt -r requirements-dev.txt
       - run: pytest tests/integration/test_resilience.py -v
 
+  # Superseded: this job shape never produced a score -- `|| true` and continue-on-error
+  # hid that mutmut mutated nothing. See the `mutation` job in weekly.yml.
   mutation:
     name: Mutation testing report
     runs-on: ubuntu-latest
@@ -590,22 +598,15 @@ async def test_flaky_thing(...):
 
 ### Weekly reliability report
 
-Add a step to the weekly workflow that posts a summary to a GitHub issue or Slack channel
-(using `gh` CLI or a webhook). At minimum, the report should contain:
+The weekly workflow's last job writes a summary to the run's step summary page:
 
-- Total tests: N passed / N failed / N skipped
-- Flake rate: number of tests in `tests/quarantine/`
-- Mutation score: from `mutation-report.txt`
-- P95 latency baseline: from the most recent load test run (if available)
+- Migration round-trip + resilience: N passed / N failed / N skipped
+- Quarantined tests: number of tests in `tests/quarantine/`
+- Mutation score: from `mutmut export-cicd-stats`, with surviving mutants per module
 
-Example using `gh` CLI:
-
-```bash
-gh issue comment <ISSUE_NUMBER> --body "$(cat reports/weekly-summary.md)"
-```
-
-Create a pinned GitHub issue titled "Weekly Test Reliability Report"; the workflow resolves
-it by title, so no number is hard-coded.
+A p95 latency line is deliberately absent until `docs/evidence/performance-baselines.md`
+holds a measurement; while every cell was `TBD`, the old scrape reported the table's
+header row as the baseline.
 
 **The report is built by `scripts/weekly_summary.py`, not by an inline heredoc.** Python
 inside a YAML block scalar is unlinted, untyped and untestable, and the heredoc that used
@@ -613,13 +614,12 @@ to live here had rotted unnoticed: a block scalar is literal, so its doubled bac
 were real, and the job emitted a one-line report of visible `\n` with a permanently-zero
 flake count and a permanently-"N/A" mutation score.
 
-**Both delivery failures are hard failures, by design.** A missing JUnit artifact is not
-counted as zero, and a pinned issue that does not exist fails the job instead of printing
-a hint. A *closed* one is reopened and posted to (`scripts/reliability_issue.py`): closing
-the thread by hand turned the 2026-10-11 run red with the thread still there. The
-project's stance is that **a failing scheduled run is the alert** — no workflow here opens
-an issue on failure, because an auto-filed issue duplicates a signal that already exists
-and then has to be closed by hand.
+**It is not posted to an issue.** Until 2026-10 it was posted to a pinned "Weekly Test
+Reliability Report" issue, and the job failed when that issue was missing and reopened it
+when closed. That left a permanent issue carrying ten identical comments in eight weeks, a
+report that alerted on nothing. A failing weekly run reaches the issue list through
+`scheduled-failure-issue.yml`, which also closes the issue when the run goes green; a
+missing JUnit artifact still fails the summary rather than counting as zero.
 
 ---
 
