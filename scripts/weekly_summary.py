@@ -9,14 +9,31 @@ nothing ever re-escaped it. The report was therefore written as a single line of
 visible ``\n``, the quarantine count was pinned at 0 and the mutation score was
 pinned at "N/A" -- for as long as the job has existed.
 
+Where it lands
+--------------
+The workflow appends this Markdown to the run's step summary. It used to be
+posted as a comment on a standing "Weekly Test Reliability Report" issue, which
+collected ten identical comments between 2026-09-06 and 2026-10-25 and had to be
+kept open by force. A failing weekly run is already filed as an issue by
+``scheduled-failure-issue.yml``, so the summary is reference material, not an
+alert, and the step summary is where reference material for a run belongs.
+
+Mutation figures
+----------------
+Read from ``mutmut export-cicd-stats``'s JSON, not scraped from text. The old
+scrape looked for the first ``NN%`` in ``mutmut results`` output, which prints
+no percentage at all, so the score could never have been anything but "N/A"
+even on a run that worked. The score is mutmut's own badge formula:
+``(killed + timeout) / (total - skipped)``.
+
 Fail-loud contract
 ------------------
 A JUnit report that the workflow's ``needs:`` guarantees is present is
 **required**. Treating a missing one as ``(0, 0, 0)`` printed "0 failed": a
-pass-shaped line manufactured from absent evidence. Genuinely advisory inputs
-(the mutation report, whose job is ``continue-on-error``, and the performance
-baseline) stay optional -- but they resolve to a visible "N/A" / "Not found",
-never to a zero that reads as a pass.
+pass-shaped line manufactured from absent evidence. The mutation stats are
+absent only when the ``mutation`` job failed, which has already turned the run
+red, so they resolve to a visible "N/A" -- never to a zero that reads as a pass.
+Present-but-unparseable stats are corrupt evidence and fail the summary.
 
 Stdlib only, so the hook-tests gate can exercise it before the venv exists.
 """
@@ -24,18 +41,20 @@ Stdlib only, so the hook-tests gate can exercise it before the venv exists.
 from __future__ import annotations
 
 import argparse
+import json
 import re
 import sys
 import xml.etree.ElementTree as ET
+from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
 
 MUTATION_UNAVAILABLE = "N/A"
-BASELINE_UNAVAILABLE = "Not found"
 
 # `def test_x` / `async def test_x` at any indentation.
 TEST_DEF_RE = re.compile(r"^\s*(?:async\s+)?def\s+test_", re.MULTILINE)
-MUTATION_SCORE_RE = re.compile(r"(\d+)%")
+# One `mutmut results` line: `    app.core.session.x_get__mutmut_3: survived`.
+MUTANT_LINE_RE = re.compile(r"^\s*(?P<name>\S+):\s*(?P<status>[\w ]+?)\s*$")
 
 
 class SummaryInputError(RuntimeError):
@@ -59,11 +78,24 @@ class Counts:
 
 
 @dataclass(frozen=True)
-class MutationReport:
-    """Advisory mutation-testing figures; both default to a visible sentinel."""
+class MutationStats:
+    """The fields of ``mutants/mutmut-cicd-stats.json`` the summary reports."""
 
-    score: str = MUTATION_UNAVAILABLE
-    tail: str = MUTATION_UNAVAILABLE
+    killed: int
+    survived: int
+    timeout: int
+    suspicious: int
+    no_tests: int
+    skipped: int
+    total: int
+
+    @property
+    def score(self) -> float | None:
+        """mutmut's badge score, or ``None`` when no mutant was tested."""
+        tested = self.total - self.skipped
+        if tested <= 0:
+            return None
+        return (self.killed + self.timeout) / tested * 100
 
 
 def _suite_counts(attrib: dict[str, str]) -> Counts:
@@ -124,59 +156,83 @@ def count_quarantined_tests(quarantine_dir: Path) -> int:
     return total
 
 
-def read_mutation_report(path: Path, tail_lines: int = 5) -> MutationReport:
-    """Read the advisory mutation report.
+def read_mutation_stats(path: Path) -> MutationStats | None:
+    """Read ``mutmut export-cicd-stats`` output; ``None`` when the job left none."""
+    if not path.is_file():
+        return None
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        return MutationStats(
+            killed=int(data["killed"]),
+            survived=int(data["survived"]),
+            timeout=int(data.get("timeout", 0)),
+            suspicious=int(data.get("suspicious", 0)),
+            no_tests=int(data.get("no_tests", 0)),
+            skipped=int(data.get("skipped", 0)),
+            total=int(data["total"]),
+        )
+    except (json.JSONDecodeError, KeyError, TypeError, ValueError) as exc:
+        raise SummaryInputError(f"{path} is not mutmut CI/CD stats JSON: {exc}") from exc
 
-    The weekly `mutation` job is `continue-on-error` by design, so a missing
-    report is reported as "N/A" instead of failing the summary.
+
+def survivors_by_module(path: Path) -> dict[str, int]:
+    """Count surviving mutants per module from ``mutmut results`` output.
+
+    A mutant is named ``<module>.<mangled function>__mutmut_<n>``, so the module
+    is everything before the last dot. A missing file yields no rows.
     """
     if not path.is_file():
-        return MutationReport()
-    body = path.read_text(encoding="utf-8", errors="ignore")
-    lines = [line for line in body.splitlines() if line.strip()]
-    match = MUTATION_SCORE_RE.search(body)
-    return MutationReport(
-        score=f"{match.group(1)}%" if match else MUTATION_UNAVAILABLE,
-        tail="\n".join(lines[-tail_lines:]) if lines else MUTATION_UNAVAILABLE,
+        return {}
+    counts: Counter[str] = Counter()
+    for line in path.read_text(encoding="utf-8", errors="ignore").splitlines():
+        match = MUTANT_LINE_RE.match(line)
+        if match and match.group("status") == "survived" and "." in match.group("name"):
+            counts[match.group("name").rsplit(".", 1)[0]] += 1
+    return dict(sorted(counts.items(), key=lambda item: (-item[1], item[0])))
+
+
+def format_mutation_line(stats: MutationStats | None) -> str:
+    if stats is None:
+        return f"- Mutation score: {MUTATION_UNAVAILABLE} (the `mutation` job left no stats)"
+    score = stats.score
+    shown = MUTATION_UNAVAILABLE if score is None else f"{score:.1f}%"
+    return (
+        f"- Mutation score: {shown} of {stats.total} mutants -- {stats.killed} killed, "
+        f"{stats.survived} survived, {stats.timeout} timed out, "
+        f"{stats.suspicious} suspicious, {stats.no_tests} with no covering test"
     )
-
-
-def find_p95_baseline(path: Path) -> str:
-    """First line mentioning p95 in the baseline doc, or a visible sentinel."""
-    if not path.is_file():
-        return BASELINE_UNAVAILABLE
-    with path.open(encoding="utf-8", errors="ignore") as handle:
-        for line in handle:
-            if "p95" in line.lower():
-                return line.strip()
-    return BASELINE_UNAVAILABLE
 
 
 def build_summary(
     counts: Counts,
     quarantined: int,
-    mutation: MutationReport,
-    p95_baseline: str,
+    mutation: MutationStats | None,
+    survivors: dict[str, int],
 ) -> str:
-    """Render the Markdown comment body posted to the pinned issue."""
-    return "\n".join(
-        [
-            "# Weekly Test Reliability Report",
+    """Render the Markdown appended to the weekly run's step summary."""
+    lines = [
+        "# Weekly reliability summary",
+        "",
+        f"- Migration round-trip + resilience: {counts.passed} passed / "
+        f"{counts.failed} failed / {counts.skipped} skipped",
+        f"- Quarantined tests: {quarantined} in `tests/quarantine/`",
+        format_mutation_line(mutation),
+        "",
+    ]
+    if survivors:
+        lines += [
+            "## Surviving mutants by module",
             "",
-            f"- Total tests: {counts.passed} passed / {counts.failed} failed / "
-            f"{counts.skipped} skipped",
-            f"- Flake rate: {quarantined} tests in `tests/quarantine/`",
-            f"- Mutation score: {mutation.score}",
-            f"- P95 latency baseline: {p95_baseline}",
+            "| Module | Survived |",
+            "| --- | ---: |",
+            *(f"| `{module}` | {count} |" for module, count in survivors.items()),
             "",
-            "## Mutation report tail",
-            "",
-            "```text",
-            mutation.tail,
-            "```",
+            "Each survivor is named in the `mutation-report` artifact's "
+            "`mutation-survivors.txt`. To see one's diff, run `mutmut run` on Linux or "
+            "WSL (mutmut needs `fork`), then `mutmut show <name>`.",
             "",
         ]
-    )
+    return "\n".join(lines)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -198,16 +254,16 @@ def build_parser() -> argparse.ArgumentParser:
         help="Directory scanned for quarantined test functions.",
     )
     parser.add_argument(
-        "--mutation-report",
-        default=Path("reports/mutation/mutation-report.txt"),
+        "--mutation-stats",
+        default=Path("reports/mutation/mutmut-cicd-stats.json"),
         type=Path,
-        help="Advisory mutation report; missing is reported as N/A.",
+        help="`mutmut export-cicd-stats` JSON; missing is reported as N/A.",
     )
     parser.add_argument(
-        "--baseline",
-        default=Path("docs/evidence/performance-baselines.md"),
+        "--mutation-survivors",
+        default=Path("reports/mutation/mutation-survivors.txt"),
         type=Path,
-        help="Advisory performance-baseline doc scanned for a p95 line.",
+        help="`mutmut results` output, tallied into survivors per module.",
     )
     parser.add_argument(
         "--out",
@@ -225,16 +281,14 @@ def main(argv: list[str] | None = None) -> int:
         for junit in args.junit:
             counts = counts + parse_junit(junit)
         quarantined = count_quarantined_tests(args.quarantine_dir)
+        mutation = read_mutation_stats(args.mutation_stats)
     except SummaryInputError as exc:
         # `::error::` surfaces on the run's summary page, not just in the log.
         print(f"::error::{exc}", file=sys.stderr)
         return 1
 
     summary = build_summary(
-        counts,
-        quarantined,
-        read_mutation_report(args.mutation_report),
-        find_p95_baseline(args.baseline),
+        counts, quarantined, mutation, survivors_by_module(args.mutation_survivors)
     )
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(summary, encoding="utf-8")

@@ -5,8 +5,8 @@ on:
     - cron: "0 3 * * 0"
   workflow_dispatch:
 
-# Read-only by default; the weekly-reliability-report job opts into issues:write
-# for its own steps via a job-level permissions block.
+# Read-only throughout: the summary goes to the run's step summary, which needs
+# no token scope.
 permissions:
   contents: read
 
@@ -80,27 +80,52 @@ jobs:
           path: reports/junit-resilience-weekly.xml
 
   mutation:
+    # Until 2026-10 this job had never produced a score. setup.cfg's comma-joined
+    # paths read as one path that does not exist ("0 files mutated"), mutmut 3
+    # ignores the `runner` key it named, and the selected tests need a database the
+    # job never had. `mutmut run || true` and `continue-on-error` hid all of it, so
+    # the job stayed green. Surviving mutants do not fail `mutmut run`; only a
+    # broken run does, and that now turns the weekly run red, where
+    # scheduled-failure-issue.yml files it.
     name: Mutation testing report
     runs-on: ubuntu-latest
-    continue-on-error: true
+    timeout-minutes: 60
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: carameli
+          POSTGRES_PASSWORD: carameli_local_dev
+          POSTGRES_DB: carameli_test
+        ports: ["5432:5432"]
+        options: --health-cmd="pg_isready -U carameli" --health-interval=5s --health-retries=10
+    env:
+      DATABASE_URL: postgresql+asyncpg://carameli:carameli_local_dev@localhost:5432/carameli_test
+      API_KEY_SECRET: weekly-test-key
+      SESSION_SECRET: weekly-session-secret
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-python-env
-        with:
-          extra-packages: mutmut
       - run: mkdir -p reports
+      # One worker: every worker shares this one database, and tests/conftest.py
+      # TRUNCATEs it per session, so parallel workers wipe each other's rows. On
+      # 2026-10-25 that "killed" 65 of 965 mutants that one worker lets survive
+      # (74.2% against 67.5%). One worker takes about 15 minutes.
       - name: Run mutation tests
-        run: mutmut run || true
+        run: mutmut run --max-children 1
       - name: Export report
+        if: always()
         run: |
-          mutmut results > reports/mutation-report.txt
-          echo "Mutation score:" >> reports/mutation-report.txt
-          mutmut results | tail -5 >> reports/mutation-report.txt
+          mutmut export-cicd-stats
+          cp mutants/mutmut-cicd-stats.json reports/
+          mutmut results > reports/mutation-survivors.txt
       - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: mutation-report
-          path: reports/mutation-report.txt
+          path: |
+            reports/mutmut-cicd-stats.json
+            reports/mutation-survivors.txt
 
   node-pin:
     # The runtime pin is the one dependency nothing else watches. npm's floors are
@@ -145,11 +170,6 @@ jobs:
     runs-on: ubuntu-latest
     needs: [migration-round-trip, resilience, mutation]
     if: always()
-    permissions:
-      contents: read
-      issues: write
-    env:
-      GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/download-artifact@v8
@@ -160,7 +180,10 @@ jobs:
         with:
           name: weekly-resilience-results
           path: reports/resilience
+      # A failed mutation job may have uploaded nothing; the summary then shows
+      # N/A for the score, and the run is already red.
       - uses: actions/download-artifact@v8
+        continue-on-error: true
         with:
           name: mutation-report
           path: reports/mutation
@@ -175,29 +198,16 @@ jobs:
             --junit reports/migration/junit-migration-weekly.xml \
             --junit reports/resilience/junit-resilience-weekly.xml \
             --quarantine-dir tests/quarantine \
-            --mutation-report reports/mutation/mutation-report.txt \
-            --baseline docs/evidence/performance-baselines.md \
+            --mutation-stats reports/mutation/mutmut-cicd-stats.json \
+            --mutation-survivors reports/mutation/mutation-survivors.txt \
             --out reports/weekly-summary.md
-      # Fail when the issue does not exist. This step is the summary's only
-      # delivery path, and printing a hint into a log nobody reads left the job
-      # green while the report went nowhere. A red weekly run is the signal that
-      # the issue needs creating -- deliberately a failure, not a new issue.
-      # A *closed* thread is reopened instead: closing it is one click, and it
-      # turned the run red on 2026-10-11 with the thread still there.
-      # scripts/reliability_issue.py does the exact-title pick and the failing.
-      - name: Post summary to the pinned reliability issue
-        run: |
-          set -euo pipefail
-          gh issue list --state all \
-            --search '"Weekly Test Reliability Report" in:title' \
-            --limit 100 --json number,title,state,isPinned > reports/reliability-issues.json
-          choice=$(python3 scripts/reliability_issue.py < reports/reliability-issues.json)
-          issue=${choice% *}
-          state=${choice#* }
-          if [ "$state" = "CLOSED" ]; then
-            gh issue reopen "$issue" --comment "Reopened by the Weekly Hardening workflow: this issue is the weekly reliability summary's only delivery path. To stop the summary, remove the job from .github/workflows/weekly.yml instead of closing this issue."
-          fi
-          gh issue comment "$issue" --body-file reports/weekly-summary.md
+      # The run's own summary page, not an issue. This used to comment on a
+      # standing "Weekly Test Reliability Report" issue that had to be held open
+      # by failing the job when it was missing and reopening it when closed: a
+      # permanent issue carrying a report that alerts on nothing. A failed weekly
+      # run already reaches the issue list through scheduled-failure-issue.yml.
+      - name: Publish summary to the run page
+        run: cat reports/weekly-summary.md >> "$GITHUB_STEP_SUMMARY"
       - name: Upload weekly summary
         if: always()
         uses: actions/upload-artifact@v7

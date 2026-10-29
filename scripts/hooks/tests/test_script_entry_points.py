@@ -188,21 +188,35 @@ def test_run_load_main_returns_the_load_runner_status(tmp_path, monkeypatch):
     assert (tmp_path / "reports").is_dir()
 
 
-def test_run_mutation_main_writes_the_results_report(tmp_path, monkeypatch):
+def _fake_mutmut(monkeypatch, tmp_path, run_returncode):
     calls = []
 
     def fake_run(argv, **kwargs):
         calls.append(argv)
-        if argv[-1] == "results":
+        if argv[1] == "results":
             return SimpleNamespace(returncode=0, stdout="survived: 2\n")
-        return SimpleNamespace(returncode=1, stdout=None)
+        return SimpleNamespace(returncode=run_returncode, stdout=None)
 
     monkeypatch.setattr(run_mutation, "REPO_ROOT", tmp_path)
     monkeypatch.setattr(run_mutation, "venv_exe", lambda _name: Path("mutmut"))
     monkeypatch.setattr(run_mutation.subprocess, "run", fake_run)
+    return calls
+
+
+def test_run_mutation_main_writes_the_results_report(tmp_path, monkeypatch):
+    calls = _fake_mutmut(monkeypatch, tmp_path, run_returncode=0)
 
     assert run_mutation.main() == 0
-    assert calls == [["mutmut", "run"], ["mutmut", "results"]]
+    # One worker: parallel workers share the test database and inflate the score.
+    assert calls == [["mutmut", "run", "--max-children", "1"], ["mutmut", "results"]]
     assert (tmp_path / "reports" / "mutation-report.txt").read_text(encoding="utf-8") == (
         "survived: 2\n"
     )
+
+
+def test_run_mutation_main_passes_a_broken_run_through(tmp_path, monkeypatch):
+    # Survivors exit 0 in mutmut 3; non-zero is a broken run, not "mutants survived".
+    _fake_mutmut(monkeypatch, tmp_path, run_returncode=1)
+
+    assert run_mutation.main() == 1
+    assert (tmp_path / "reports" / "mutation-report.txt").exists()

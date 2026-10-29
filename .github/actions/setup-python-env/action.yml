@@ -16,8 +16,8 @@ description: >-
 inputs:
   extra-packages:
     description: >-
-      Space-separated extra packages to install after the locks (e.g. "mutmut"
-      for the weekly mutation job). Empty by default.
+      Space-separated extra packages to install after the locks, for a tool the
+      dev lock does not carry. Empty by default; mutmut is in the dev lock.
     required: false
     default: ""
 
