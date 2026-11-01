@@ -53,3 +53,70 @@ def test_locks_cover_linux_only_packages() -> None:
         "uvloop missing from requirements.txt — the lock was likely compiled "
         "without --universal on Windows; run python scripts/recompile-locks.py"
     )
+
+
+# The first Playwright release whose `install --with-deps` knows each runner's OS.
+# An older one refuses outright on an OS it has no host-platform entry for
+# ("Playwright does not support chromium on ubuntu26.04-x64"), so a runner image
+# moving under `ubuntu-latest` turns the nightly's E2E job red with no change here.
+# `ubuntu-latest` is whatever GitHub currently points it at: when GitHub moves it
+# again, update its entry and raise the `playwright` floor in requirements-dev.in.
+PLAYWRIGHT_FLOOR_BY_RUNNER: dict[str, tuple[int, ...]] = {
+    "ubuntu-latest": (1, 61, 0),  # Ubuntu 26.04
+    "ubuntu-26.04": (1, 61, 0),
+    "ubuntu-24.04": (1, 45, 0),
+}
+
+
+def _version(text: str) -> tuple[int, ...]:
+    return tuple(int(part) for part in re.findall(r"\d+", text)[:3])
+
+
+def _locked_version(lock: Path, package: str) -> tuple[int, ...]:
+    match = re.search(rf"^{re.escape(package)}==(\S+)", lock.read_text(encoding="utf-8"), re.M)
+    assert match, f"{package} is not pinned in {lock.name}"
+    return _version(match.group(1))
+
+
+def _playwright_install_runners() -> dict[str, str]:
+    """Map `<workflow>:<job>` to `runs-on` for every job that runs `playwright install`."""
+    import yaml
+
+    runners: dict[str, str] = {}
+    for workflow in sorted((REPO_ROOT / ".github" / "workflows").glob("*.yml")):
+        jobs = (yaml.safe_load(workflow.read_text(encoding="utf-8")) or {}).get("jobs") or {}
+        for job_id, job in jobs.items():
+            steps = job.get("steps") or []
+            if any("playwright install" in str(step.get("run", "")) for step in steps):
+                runners[f"{workflow.name}:{job_id}"] = str(job.get("runs-on"))
+    return runners
+
+
+def test_some_workflow_installs_playwright() -> None:
+    """Keep the runner check below from passing vacuously after a workflow edit."""
+    assert _playwright_install_runners(), "no workflow job runs `playwright install`"
+
+
+def test_locked_playwright_supports_every_runner_that_installs_it() -> None:
+    locked = _locked_version(REPO_ROOT / "requirements-dev.txt", "playwright")
+    for job, runner in _playwright_install_runners().items():
+        assert runner in PLAYWRIGHT_FLOOR_BY_RUNNER, (
+            f"{job} runs `playwright install` on {runner!r}, which has no entry in "
+            "PLAYWRIGHT_FLOOR_BY_RUNNER; add the first Playwright release supporting it"
+        )
+        floor = PLAYWRIGHT_FLOOR_BY_RUNNER[runner]
+        assert locked >= floor, (
+            f"{job} runs `playwright install --with-deps` on {runner}, which needs "
+            f"playwright>={'.'.join(map(str, floor))}; requirements-dev.txt locks "
+            f"{'.'.join(map(str, locked))}. Raise the floor in requirements-dev.in and "
+            "run python scripts/recompile-locks.py --upgrade-package playwright"
+        )
+
+
+def test_dev_floor_keeps_playwright_at_the_runner_minimum() -> None:
+    """The lock alone is not enough: a recompile may move it, the .in floor holds it."""
+    text = (REPO_ROOT / "requirements-dev.in").read_text(encoding="utf-8")
+    match = re.search(r"^playwright>=(\S+)", text, re.M)
+    assert match, "requirements-dev.in has no `playwright>=` floor"
+    needed = max(PLAYWRIGHT_FLOOR_BY_RUNNER[r] for r in _playwright_install_runners().values())
+    assert _version(match.group(1)) >= needed
