@@ -5,6 +5,7 @@
 # container; the in-container test toolchain lives in requirements-test.in)
 pre-commit>=4.6.2
 pytest-playwright>=0.9.0
+playwright>=1.61.0  # first release whose `install --with-deps` supports Ubuntu 26.04 (ubuntu-latest); transitive via pytest-playwright, named so Dependabot tracks it — see tests/unit/test_requirements_lock.py
 locust>=2.46.6
 mutmut>=3.8.0
 detect-secrets>=1.5.0
