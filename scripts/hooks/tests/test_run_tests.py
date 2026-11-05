@@ -920,6 +920,31 @@ def test_changed_with_no_stack_and_no_named_test_is_red_and_says_why(monkeypatch
     assert seen == []
 
 
+def test_changed_with_no_stack_and_no_python_says_so_and_stays_green(monkeypatch, capsys):
+    """ba07bc13: a UI rewrite that also moved `docker-compose.yml` and `.env.example` -- so
+    "could touch Python" -- printed `[FAIL] pytest` and TESTS FAILED with no test having
+    failed. With no `.py` in the set and no index to select with, nothing was skipped
+    that the host could have chosen to run: the gate runs it, and the line says so."""
+    seen = _no_stack(monkeypatch, ["frontend/src/App.tsx", "docker-compose.yml", ".env.example"])
+
+    ((lines, code),) = rt.run_changed_on_host().values()
+
+    assert (lines, code) == ([], 0)
+    assert "holds no Python" in capsys.readouterr().out
+    assert seen == []
+
+
+def test_an_unreadable_changed_set_with_no_stack_stays_red(monkeypatch):
+    """Nothing detected is not nothing changed, as `changed_touches_python` holds."""
+    seen = _no_stack(monkeypatch, [])
+
+    ((lines, code),) = rt.run_changed_on_host().values()
+
+    assert code == 1
+    assert "docker-up.py" in lines[0]
+    assert seen == []
+
+
 def test_usage_says_what_changed_does_with_no_container():
     assert "no app container up, the changed set" in rt.USAGE
 
