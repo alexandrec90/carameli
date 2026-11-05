@@ -5,6 +5,7 @@ import { isComposerContent } from '../../skins/comic-book/bubbleChain'
 import { linkedPairs } from '../../skins/comic-book/bubbleTube'
 import { BUBBLE_TYPES, BUBBLE_TYPE_KEYS } from '../../skins/comic-book/editor/bubbleTypes'
 import { layoutViolations, violationLines } from '../../skins/comic-book/editor/configParity'
+import { newCallArt } from '../../skins/comic-book/editor/configSeed'
 import {
   PANEL_IMG_TRANSFORMS,
   PANEL_BUBBLE_TRANSFORMS,
@@ -619,8 +620,8 @@ describe('default config parity', () => {
     // What `+ Call` leaves for an author to reframe: a picture over the whole of its
     // half, anchored in the middle of it rather than standing on the panel's floor. The
     // half it goes in is its role's, and the roles are what the layout switch reads.
-    const figures = PANEL_IMG_TRANSFORMS.filter(t => t.call !== undefined)
-    expect(figures.length).toBeGreaterThan(0)
+    // The call the skin ships has been reframed from this: callSceneFraming.test.ts.
+    const figures = (['ringing', 'remote', 'local'] as const).map(newCallArt)
     figures.forEach(t => {
       expect(t.anchor).toBe('center center')
       expect(t.left).toBe(0)
