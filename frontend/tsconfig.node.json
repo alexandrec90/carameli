@@ -52,6 +52,7 @@
     "shipLayout.integration.test.ts",
     "src/worktreePort.ts",
     "src/worktreePort.test.ts",
-    "vitePort.test.ts"
+    "vitePort.test.ts",
+    "viteProxy.test.ts"
   ]
 }

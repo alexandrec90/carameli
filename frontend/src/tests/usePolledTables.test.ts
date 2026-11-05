@@ -2,13 +2,12 @@ import { act, renderHook, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { CallEvent, SmsMessage } from '../api/client'
-import { LIVE_TABLE_LIMIT } from '../lib/liveTables'
 
 const callsList = vi.fn()
 const smsList = vi.fn()
 
-vi.mock('../api/client', () => ({
-  api: {
+vi.mock('../api/liveClient', () => ({
+  liveApi: {
     calls: { list: (...args: unknown[]) => callsList(...args) },
     sms: { list: (...args: unknown[]) => smsList(...args) },
   },
@@ -17,7 +16,7 @@ vi.mock('../lib/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }))
 
-import { useLiveTables } from '../hooks/useLiveTables'
+import { usePolledTables } from '../hooks/usePolledTables'
 
 function call(over: Partial<CallEvent> = {}): CallEvent {
   return {
@@ -60,7 +59,7 @@ async function settle() {
   })
 }
 
-describe('useLiveTables', () => {
+describe('usePolledTables', () => {
   beforeEach(() => {
     callsList.mockReset()
     smsList.mockReset()
@@ -73,7 +72,7 @@ describe('useLiveTables', () => {
   })
 
   it('asks for nothing when no surface names a feed', async () => {
-    const { result } = renderHook(() => useLiveTables([]))
+    const { result } = renderHook(() => usePolledTables([]))
     await settle()
     expect(callsList).not.toHaveBeenCalled()
     expect(smsList).not.toHaveBeenCalled()
@@ -81,7 +80,7 @@ describe('useLiveTables', () => {
   })
 
   it('loads only the feeds it was asked for', async () => {
-    const { result } = renderHook(() => useLiveTables(['calls']))
+    const { result } = renderHook(() => usePolledTables(['calls']))
     await waitFor(() => expect(result.current.calls).toBeDefined())
     expect(result.current.calls).toEqual([
       ['+14155550000', '14:30', '', 'In progress'],
@@ -91,7 +90,7 @@ describe('useLiveTables', () => {
   })
 
   it('loads both feeds when both are on the page', async () => {
-    const { result } = renderHook(() => useLiveTables(['calls', 'sms']))
+    const { result } = renderHook(() => usePolledTables(['calls', 'sms']))
     await waitFor(() => expect(result.current.sms).toBeDefined())
     expect(result.current.calls).toHaveLength(1)
     expect(result.current.sms?.[0]?.[4]).toBe('hi')
@@ -99,7 +98,7 @@ describe('useLiveTables', () => {
 
   it('picks up a new record without the page being reloaded', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
-    const { result } = renderHook(() => useLiveTables(['calls'], 1000))
+    const { result } = renderHook(() => usePolledTables(['calls'], 1000))
     await waitFor(() => expect(result.current.calls).toHaveLength(1))
 
     callsList.mockResolvedValue({
@@ -117,7 +116,7 @@ describe('useLiveTables', () => {
     // The poll runs whether or not anything happened; a fresh array every interval would
     // repaint every panel on the page for a notepad that says what it already said.
     vi.useFakeTimers({ shouldAdvanceTime: true })
-    const { result } = renderHook(() => useLiveTables(['calls'], 1000))
+    const { result } = renderHook(() => usePolledTables(['calls'], 1000))
     await waitFor(() => expect(result.current.calls).toHaveLength(1))
     const first = result.current
 
@@ -130,7 +129,7 @@ describe('useLiveTables', () => {
 
   it('keeps the rows already on the surface when a refresh fails', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
-    const { result } = renderHook(() => useLiveTables(['calls'], 1000))
+    const { result } = renderHook(() => usePolledTables(['calls'], 1000))
     await waitFor(() => expect(result.current.calls).toHaveLength(1))
 
     callsList.mockRejectedValue(new Error('503 upstream'))
@@ -142,14 +141,14 @@ describe('useLiveTables', () => {
 
   it('renders an empty feed rather than nothing when the very first load fails', async () => {
     callsList.mockRejectedValue(new Error('503 upstream'))
-    const { result } = renderHook(() => useLiveTables(['calls']))
+    const { result } = renderHook(() => usePolledTables(['calls']))
     await waitFor(() => expect(result.current.calls).toEqual([]))
   })
 
   it('does not poll a hidden tab, and catches up when it comes back', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
     const hidden = vi.spyOn(document, 'hidden', 'get').mockReturnValue(false)
-    const { result } = renderHook(() => useLiveTables(['calls'], 1000))
+    const { result } = renderHook(() => usePolledTables(['calls'], 1000))
     await waitFor(() => expect(result.current.calls).toHaveLength(1))
 
     hidden.mockReturnValue(true)
@@ -170,7 +169,7 @@ describe('useLiveTables', () => {
   it('does not restart the poll when the caller rebuilds an equivalent source array', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
     const { result, rerender } = renderHook(({ s }: { s: string[] }) =>
-      useLiveTables(s as Parameters<typeof useLiveTables>[0], 1000),
+      usePolledTables(s as Parameters<typeof usePolledTables>[0], 1000),
     { initialProps: { s: ['calls'] } })
     await waitFor(() => expect(result.current.calls).toHaveLength(1))
 
@@ -183,55 +182,12 @@ describe('useLiveTables', () => {
 
   it('stops polling once the surface is gone', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
-    const { result, unmount } = renderHook(() => useLiveTables(['calls'], 1000))
+    const { result, unmount } = renderHook(() => usePolledTables(['calls'], 1000))
     await waitFor(() => expect(result.current.calls).toHaveLength(1))
     unmount()
     await act(async () => {
       await vi.advanceTimersByTimeAsync(5000)
     })
     expect(callsList).toHaveBeenCalledTimes(1)
-  })
-
-  describe('under ?sim=1', () => {
-    beforeEach(() => {
-      window.localStorage.setItem('live-tables:sim', '1')
-    })
-
-    afterEach(() => {
-      window.localStorage.clear()
-    })
-
-    it('fills every surface on the page with a full table', async () => {
-      const { result } = renderHook(() => useLiveTables(['calls', 'sms']))
-      await settle()
-      expect(result.current.calls).toHaveLength(LIVE_TABLE_LIMIT)
-      expect(result.current.sms).toHaveLength(LIVE_TABLE_LIMIT)
-    })
-
-    // Not merely wasteful: the first reply would replace the hundred made-up rows with the
-    // two calls a development database holds, which is the state ?sim=1 exists to get out of.
-    it('asks the API for nothing at all', async () => {
-      vi.useFakeTimers({ shouldAdvanceTime: true })
-      renderHook(() => useLiveTables(['calls', 'sms'], 1000))
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(5000)
-      })
-      expect(callsList).not.toHaveBeenCalled()
-      expect(smsList).not.toHaveBeenCalled()
-    })
-
-    it('hands back the identical arrays across renders, so nothing repaints', async () => {
-      const { result, rerender } = renderHook(() => useLiveTables(['calls']))
-      await settle()
-      const first = result.current
-      rerender()
-      expect(result.current).toBe(first)
-    })
-
-    it('still answers with nothing for a page that has no live surface', async () => {
-      const { result } = renderHook(() => useLiveTables([]))
-      await settle()
-      expect(result.current).toEqual({})
-    })
   })
 })

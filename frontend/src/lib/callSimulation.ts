@@ -1,17 +1,9 @@
-import { logger } from './logger'
-import { resolveSimFlag } from './smsSimulation'
 import type { CallSpeaker } from './callTranscript'
 
-// The pure half of the dev-only call simulation: the flag that turns it on, the timing
-// of a simulated call, and the conversation it plays. The hook that owns the timers and
-// state is `hooks/useCallSimulation.ts`; everything here is a function of its arguments,
-// so the pauses and the fillers are testable with a seeded rng.
-//
-// Why it exists: the comic-book skin draws a call as a scene — the panel with the
-// telephone splits in two and the parties' words fill two speech bubbles — and there is
-// no way to *look at* that without ringing somebody and paying for the minutes. The
-// simulation swaps the telephone and nothing else: the skin renders the same
-// `UseSoftphoneResult` shape and cannot tell the call is fake.
+// The pure half of the call simulation: the timing of a simulated call and the
+// conversation it plays. The hook that owns the timers and state is
+// `hooks/useSoftphone.ts`; everything here is a function of its arguments, so the pauses
+// and the fillers are testable with a seeded rng.
 
 /** The extension the simulated phone claims to be registered as. */
 export const SIM_EXTENSION = '101'
@@ -86,30 +78,4 @@ export function simLineAt(index: number, rng: () => number): SimLine | null {
   const pool = SIM_FILLERS[speaker]
   const at = Math.min(pool.length - 1, Math.floor(rng() * pool.length))
   return { speaker, text: pool[at] }
-}
-
-const FLAG_KEY = 'call:sim'
-
-/**
- * True when this load should simulate calls instead of placing them. Same contract as
- * `detectSmsSim`, on its own flag: `?callSim=1` on, `?callSim=0` off, persisted in
- * `localStorage['call:sim']` so it survives client-side navigation. Dev-only twice
- * over: false outside `import.meta.env.DEV`, and App.tsx repeats that test inline so a
- * production build tree-shakes the simulation out entirely.
- */
-export function detectCallSim(): boolean {
-  if (!import.meta.env.DEV || typeof window === 'undefined') return false
-  const param = new URLSearchParams(window.location.search).get('callSim')
-  try {
-    const stored = window.localStorage.getItem(FLAG_KEY)
-    const { active, storedFlag } = resolveSimFlag(param, stored)
-    if (storedFlag !== stored) {
-      if (storedFlag === null) window.localStorage.removeItem(FLAG_KEY)
-      else window.localStorage.setItem(FLAG_KEY, storedFlag)
-    }
-    return active
-  } catch (err) {
-    logger.warn('Could not persist the call simulation flag', { key: FLAG_KEY, err: String(err) })
-    return resolveSimFlag(param, null).active
-  }
 }

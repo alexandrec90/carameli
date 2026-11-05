@@ -17,15 +17,15 @@ import { logger } from './logger'
 // `localStorage['loading:slow']`, so switching skins from the picker — which reloads
 // nothing and drops no query, but does re-run the chunk gate — stays slow too.
 //
-// Three gates share the flag: the skin chunk (`skins/context.tsx`), the session
-// (`App.tsx`), and the comic-book page's pictures (`skins/comic-book/pageReveal.ts`).
+// Three gates share the flag: the skin chunk (`skins/context.tsx`), a live build's session
+// (`SessionGate.tsx`), and the comic-book page's pictures (`skins/comic-book/pageReveal.ts`).
 // Each holds for its own second rather than sharing one deadline, because the point is
 // to watch them one at a time — a shared deadline would be spent by the first gate and
 // the last one, the only one with a transition, would never hold at all. For the
 // comic-book skin the three hold one screen (`hooks/useLoadingHold.ts`), so what you
 // see is three seconds of the same paper and legend, then the wipe.
 //
-// Dev-only twice over, like the simulation flags: this resolves to 0 outside
+// Dev-only twice over: this resolves to 0 outside
 // `import.meta.env.DEV`, and {@link SLOW_LOADING_MS} repeats the test inline so a
 // production build folds it to the constant and drops everything below.
 
@@ -52,8 +52,7 @@ function parseSlow(value: string | null): number | null {
 /**
  * How long this load should hold its loading screens, and what the persisted flag should
  * become (`null` = removed) so the outcome survives client-side navigation that drops the
- * query. Same contract as the simulation flags' `resolveSimFlag` — `1` on, `0` off, the
- * stored value deciding when the query says nothing — and it stores the resolved
+ * query: `1` on, `0` off, the stored value deciding when the query says nothing. It stores the resolved
  * milliseconds rather than `1`, so re-reading it is a fixed point.
  */
 export function resolveSlowFlag(
@@ -84,7 +83,7 @@ export function detectSlowLoading(): number {
 
 /**
  * Milliseconds every loading gate holds this load, 0 when the brake is off. Resolved once
- * at module load, like the simulation flags, so three gates cannot disagree about it.
+ * at module load, so three gates cannot disagree about it.
  */
 export const SLOW_LOADING_MS = import.meta.env.DEV ? detectSlowLoading() : 0
 

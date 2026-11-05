@@ -8,7 +8,7 @@
  *
  * The live softphone hands out {@link EMPTY_TRANSCRIPT} today: nothing transcribes a
  * real call yet, and this type is what a transcription will fill in when it exists.
- * The simulation (`hooks/useCallSimulation.ts`) fills it with a scripted conversation.
+ * The demo phone (`hooks/useDemoSoftphone.ts`) fills it with a scripted conversation.
  */
 export type CallSpeaker = 'local' | 'remote'
 

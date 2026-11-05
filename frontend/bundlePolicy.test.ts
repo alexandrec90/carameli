@@ -15,6 +15,10 @@
  * it took someone to notice `dist/` was never being written in CI.
  */
 
+import { readFileSync } from 'node:fs'
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
+
 import { describe, expect, it } from 'vitest'
 
 import { CONFIG_KEY } from './src/skins/comic-book/editor/configOps'
@@ -24,6 +28,7 @@ import {
   DEV_ONLY_MARKERS,
   DIST_ASSETS_DIR,
   FORBIDDEN_DIST_EXTENSIONS,
+  LIVE_ONLY_MARKERS,
   MAX_EAGER_BYTES,
   MAX_FONT_BYTES,
   MAX_LAZY_CHUNK_BYTES,
@@ -220,6 +225,23 @@ describe('devOnlyMarkersIn', () => {
   })
 })
 
+describe('LIVE_ONLY_MARKERS', () => {
+  // The same vacuity guard, against the files each literal was copied from. They are read as
+  // text because this test belongs to the config project, which cannot import `src/`.
+  const here = dirname(fileURLToPath(import.meta.url))
+  const read = (path: string) => readFileSync(resolve(here, path), 'utf8')
+
+  it.each([
+    ['/auth/session', 'src/hooks/useAuth.ts'],
+    ['/vg/1.0.0/frontend-logs', 'src/lib/logShipping.ts'],
+    ['/webphone-credential', 'src/api/liveClient.ts'],
+    ['Registerer', 'node_modules/sip.js/lib/api/registerer.js'],
+  ])('%s is still in %s', (marker, file) => {
+    expect(LIVE_ONLY_MARKERS).toContain(marker)
+    expect(read(file)).toContain(marker)
+  })
+})
+
 describe('DEV_ONLY_MARKERS', () => {
   // The vacuity guard. A marker is a copy of a string that lives in `src/`, and a copy
   // that stops matching its original is a grep for something no build contains — which
@@ -368,6 +390,19 @@ describe('the build', () => {
         '`import.meta.env.DEV` gate, because a hook has to be called unconditionally. ' +
         'Read state from `editor/editorContext.ts` instead, which is inert without a ' +
         'provider, and let `editor/EditorProvider.tsx` stay the only way in.',
+    ).toEqual([])
+  })
+
+  it('ships no part of the live backend by default', () => {
+    const found = distExists() ? devOnlyMarkersIn(readBuiltJs(), LIVE_ONLY_MARKERS) : []
+    expect(
+      found,
+      'The default build contains a string only the live app needs, so the demo is carrying ' +
+        'it. Choose an implementation with an inline test of the switch, as `api/client.ts` ' +
+        'does, so the build folds the live side away; an import of one of the live files ' +
+        'from anywhere but such a selector defeats that. A marker for SIP.js means ' +
+        '`omitSipJs` in `vite.config.ts` stopped matching. If this is running with ' +
+        'VITE_LIVE_BACKEND=true in the environment, unset it: the budgets are the demo\'s.',
     ).toEqual([])
   })
 

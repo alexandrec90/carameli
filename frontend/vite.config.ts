@@ -54,6 +54,16 @@ export function portFrom(
   return Number.isInteger(value) && value > 0 && value < 65536 ? value : fallback
 }
 
+/**
+ * What the dev server forwards to the backend stack: a live build's API, and the stack's
+ * own E2E checks of `/health`. The default demo build calls none of it.
+ *
+ * A pattern anchored on the whole first segment, because a plain key is a string prefix:
+ * `/api` also took the app's own `/api-tokens` page, so reloading it asked the backend.
+ * Vite reads a key starting with `^` as a regular expression.
+ */
+export const BACKEND_PROXY_PATTERN = '^/(api|auth|vsapi|vg|health)(/|$)'
+
 /** Repo-relative because git wants it that way — see `editorConfigPath.ts`. */
 const CONFIG_PATH = CONFIG_IN_REPO
 
@@ -164,6 +174,26 @@ function comicEditorPlugin(): Plugin {
   }
 }
 
+/**
+ * Leaves SIP.js out of a demo build.
+ *
+ * Folding the switch removes the code that calls `import('sip.js/...')`, but the bundler
+ * has already put the import's target in the graph by then, and it emits a module with
+ * side effects whether or not anything still reaches it. So the demo's `dist/` carried a
+ * 240 KB chunk nothing could load. Answering the import with an empty module stops it.
+ * `apply: 'build'` keeps the tests' mock of that path pointing at the real one.
+ */
+function omitSipJs(): Plugin {
+  const EMPTY = '\0carameli:no-sip'
+  return {
+    name: 'carameli:omit-sip',
+    apply: 'build',
+    enforce: 'pre',
+    resolveId: source => (source.startsWith('sip.js') ? EMPTY : null),
+    load: id => (id === EMPTY ? 'export {}' : null),
+  }
+}
+
 export default defineConfig(({ mode }) => {
   // Load .env / .env.local so the proxy target is available even when
   // VITE_PROXY_TARGET is not injected via docker-compose environment:.
@@ -193,7 +223,13 @@ export default defineConfig(({ mode }) => {
     // comicAssetsPlugin keeps the editor's picture dropdown level with the served
     // directory while the server runs — art dropped in appears without a script or a
     // restart. ./comicAssetsWatch.ts.
-    plugins: [react(), comicEditorPlugin(), comicAssetsPlugin(rootDir)],
+    plugins: [
+      react(),
+      comicEditorPlugin(),
+      comicAssetsPlugin(rootDir),
+      // The same test the app makes, and the same precedence as Vite's own.
+      ...(env.VITE_LIVE_BACKEND === 'true' ? [] : [omitSipJs()]),
+    ],
 
     // A down backend logs one concise line instead of a stack trace per proxied
     // request — the normal state for host-Vite branch previews. ./proxyErrorPolicy.ts.
@@ -225,19 +261,7 @@ export default defineConfig(({ mode }) => {
       // see devWatchPolicy.ts's closing section. Pre-transforming the skin graph looks
       // like the answer to this app's 6.6 s render delay and is not: the delay was
       // traced with the transform cache already warm.
-      proxy: {
-        // `/api` is the app's own REST surface (`/api/v1/...`). It was missing
-        // here for as long as every dev path set VITE_API_BASE_URL to an absolute
-        // backend URL and never used the proxy for it — but a host-Vite branch
-        // preview forces that base empty, so those calls arrived here and Vite,
-        // owning the path, answered its own 404. That reads as a broken endpoint
-        // rather than as the absent backend it is.
-        '/api': backendUrl,
-        '/auth': backendUrl,
-        '/vsapi': backendUrl,
-        '/vg': backendUrl,
-        '/health': backendUrl,
-      },
+      proxy: { [BACKEND_PROXY_PATTERN]: backendUrl },
     },
     preview: {
       // `npm run preview` serves the built `dist/`, and it collides exactly the way the
@@ -274,8 +298,11 @@ export default defineConfig(({ mode }) => {
       // Pin the API base to empty so URL assertions stay hermetic regardless of
       // any ambient VITE_API_BASE_URL in the shell/CI. The app talks to the
       // backend through the dev-server proxy (relative paths), so '' is correct.
+      // The suite runs as the demo whatever the shell says, for the same reason: a test
+      // of the live side turns it on for itself with `vi.stubEnv`.
       env: {
         VITE_API_BASE_URL: '',
+        VITE_LIVE_BACKEND: '',
       },
     },
   }

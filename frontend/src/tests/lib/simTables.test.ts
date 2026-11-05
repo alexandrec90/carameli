@@ -1,74 +1,36 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 
 import { LIVE_TABLE_FEEDS, LIVE_TABLE_LIMIT, TABLE_SOURCES } from '../../lib/liveTables'
-import { detectSimTables, resolveSimFlag, simFeedRows } from '../../lib/simTables'
+import { simCalls, simCallSummary, simFeedRows, simMessages } from '../../lib/simTables'
 
-vi.mock('../../lib/logger', () => ({
-  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
-}))
-
-const FLAG_KEY = 'live-tables:sim'
-
-/** Put the tab on a URL, the way `?sim=1` reaches `detectSimTables`. */
-function visit(search: string) {
-  window.history.replaceState({}, '', `/${search}`)
-}
-
-describe('resolveSimFlag', () => {
-  it('switches on from the query string and remembers it', () => {
-    expect(resolveSimFlag('1', null)).toEqual({ active: true, storedFlag: '1' })
+describe('simCallSummary', () => {
+  it.each(['extension', 'number'] as const)('accounts for every call by %s', groupBy => {
+    const rows = simCallSummary(groupBy)
+    expect(rows.reduce((sum, row) => sum + row.call_count, 0)).toBe(LIVE_TABLE_LIMIT)
+    expect(new Set(rows.map(row => row.group_key)).size).toBe(rows.length)
   })
 
-  // The off switch has to clear the flag rather than merely returning false: the query
-  // string is gone on the next client-side navigation, and a flag left set would turn the
-  // made-up rows back on at the first link.
-  it('switches off from the query string and forgets it', () => {
-    expect(resolveSimFlag('0', '1')).toEqual({ active: false, storedFlag: null })
+  it('counts answered calls and rolls up their talk time', () => {
+    const answered = simCalls().filter(call => call.status === 'completed')
+    const rows = simCallSummary('extension')
+    expect(rows.reduce((sum, row) => sum + row.answered_count, 0)).toBe(answered.length)
+    expect(rows.reduce((sum, row) => sum + row.total_duration_seconds, 0)).toBe(
+      answered.reduce((sum, call) => sum + (call.duration_seconds ?? 0), 0),
+    )
   })
 
-  it('stays on across a load with no parameter at all', () => {
-    expect(resolveSimFlag(null, '1')).toEqual({ active: true, storedFlag: '1' })
-  })
-
-  it('is off by default, and stores nothing for a tab that never asked', () => {
-    expect(resolveSimFlag(null, null)).toEqual({ active: false, storedFlag: null })
-  })
-
-  it('reads a stored value that is not the flag as off', () => {
-    expect(resolveSimFlag(null, 'yes')).toEqual({ active: false, storedFlag: null })
+  it('reports the success rate as a ratio', () => {
+    for (const row of simCallSummary('number')) {
+      expect(row.success_rate).toBe(row.answered_count / row.call_count)
+    }
   })
 })
 
-describe('detectSimTables', () => {
-  afterEach(() => {
-    window.localStorage.clear()
-    visit('')
-  })
-
-  it('persists the flag so it survives navigation away from ?sim=1', () => {
-    visit('?sim=1')
-    expect(detectSimTables()).toBe(true)
-    visit('')
-    expect(window.localStorage.getItem(FLAG_KEY)).toBe('1')
-    expect(detectSimTables()).toBe(true)
-  })
-
-  it('clears the stored flag on ?sim=0', () => {
-    window.localStorage.setItem(FLAG_KEY, '1')
-    visit('?sim=0')
-    expect(detectSimTables()).toBe(false)
-    expect(window.localStorage.getItem(FLAG_KEY)).toBeNull()
-  })
-
-  // A tab with storage denied still gets the preview it asked for in the address bar; only
-  // the memory of it is lost, which is the half that can fail.
-  it('still honours the query string when localStorage throws', () => {
-    const getItem = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
-      throw new Error('denied')
-    })
-    visit('?sim=1')
-    expect(detectSimTables()).toBe(true)
-    getItem.mockRestore()
+describe('simMessages', () => {
+  it('gives every message its own id, newest first', () => {
+    const messages = simMessages()
+    expect(new Set(messages.map(m => m.id)).size).toBe(messages.length)
+    expect(messages[0].created_at > messages[1].created_at).toBe(true)
   })
 })
 
@@ -86,7 +48,7 @@ describe('simFeedRows', () => {
     for (const row of simFeedRows(source)) expect(row).toHaveLength(width)
   })
 
-  it('is deterministic, so the poll-free answer can be handed back by identity', () => {
+  it('is deterministic, so the answer can be memoized and handed back by identity', () => {
     expect(simFeedRows('calls')).toEqual(simFeedRows('calls'))
     expect(simFeedRows('sms')).toEqual(simFeedRows('sms'))
   })

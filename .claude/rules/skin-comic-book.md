@@ -184,7 +184,7 @@ reply rather than holding its anchor level with it. Rows zig-zag by message ordi
 | `grow` | plays the transcript a message at a time, `stepMs` apart. Render-time; **not an editor control** |
 | `rows` | how many rows are on screen at once, counting the composer's |
 | `messages` | oldest first; a leading `> ` marks the sender's side. **Empty = speak the two balloons' own `text`** |
-| `sms` | binds to real SMS history — see below |
+| `sms` | binds to the app's SMS threads, real in a live build — see below |
 
 A chain *is* a window over a transcript, so the wheel always moves it and **the window
 keeps its size while it moves** — twenty messages through six rows is six at every scroll
@@ -218,10 +218,13 @@ what lets its width follow the draft.
   through stationary balloons. Arrival is a `@keyframes` animation (`bubbleChains.css`),
   not a transition: a node mounting with `is-visible` has no previous value.
 
-### A chain bound to real SMS
+### A chain bound to an SMS thread
 
-`sms: true` stops a chain being a drawing: the transcript comes from the carrier, Enter in
-the composer **sends for real**, and the account is billed. There is no safe mode.
+`sms: true` stops a chain being a drawing: the transcript comes from `useSmsConversations`,
+and Enter in the composer sends into that thread. In the default demo threads are simulated
+and a peer answers a coin flip of messages, with typing dots first. **In a live build
+(`VITE_LIVE_BACKEND=true`) the transcript comes from the carrier, Enter sends for real, and
+the account is billed.** There is no safe mode there.
 
 **Which conversation is not stored on the chain.** It is whichever number the panel's
 picker balloon carries: `peerPickerOn` takes the first `content: 'wheel'` **or** `'dial'`
@@ -230,10 +233,11 @@ choosing what to *say*, not who to say it to. Options resolve through `toE164`
 (`phoneInput.ts`), so one number written three ways is one thread and a name binds nothing.
 
 The skin never fetches: `App.tsx` owns `useSmsConversations()` and passes it as
-`LayoutProps.sms`; `PanelBubbles` calls `subscribe(peer)`. The hook polls (`SMS_POLL_MS`)
-only while somebody is subscribed and shares one request between subscribers, so a page
-binding nothing costs nothing, which lets `App` mount it for every skin. A sent message
-draws optimistically as `is-sending` and retires when its row returns; a refusal is `is-failed`.
+`LayoutProps.sms`; `PanelBubbles` calls `subscribe(peer)`. The live hook polls
+(`SMS_POLL_MS`) only while somebody is subscribed and shares one request between
+subscribers, so a page binding nothing costs nothing, which lets `App` mount it for every
+skin. A sent message draws optimistically as `is-sending` and retires when its row returns;
+a refusal is `is-failed`.
 
 ## Motion
 
@@ -290,9 +294,9 @@ neighbours would read as a blot, not as halftone swelling.
 legend on top — under the app while the chunk is in flight and *keeps it there* once the chunk
 lands: the page sits on it, and it shows in the letterbox around the page sheet (`.cb-page-sheet`,
 the frame plus `OUTER_M` from `pageSheet` in `usePageFrame.ts`; `.cb-root` paints no background).
-The session gate and the pictures gate say they are still loading through
-`hooks/useLoadingHold.ts` rather than drawing a screen of their own — one legend across three
-gates, on one grid that never re-lights. The earlier design drew a screen per gate and handed the
+The pictures gate, and a live build's session gate, say they are still loading through
+`hooks/useLoadingHold.ts` rather than drawing a screen of their own — one legend across every
+gate, on one grid that never re-lights. The earlier design drew a screen per gate and handed the
 grid between them cell for cell, and the handoffs still read as freezes and reloads; a skin-side
 loading sheet or a letterbox canvas brings them back. That is why `benDayGrid.ts`, `spotlight.ts`
 and `pageAccent.ts` are small and import nothing else from the skin: being on the eager path,
@@ -476,8 +480,9 @@ to drag back; and **Save is never refused**, mid-design being when it matters mo
 18. **Never give a projected table a scroll container, scrollbar or chrome outside edit mode.**
 19. **Never size anything inside a cell in `em`** — use `tableData.ts`'s band fractions.
 20. **Never let a bound (`sms: true`) chain fall back to its authored `messages`, and never
-    bind one in edit mode** — the first puts the author's lettering into somebody's real
-    thread, the second spends money from the editor (`PanelBubblesSms.test.tsx` holds both).
+    bind one in edit mode** — in a live build the first puts the author's lettering into
+    somebody's real thread and the second spends money from the editor
+    (`PanelBubblesSms.test.tsx` holds both).
 21. **Never fetch from a skin, and never save a live surface's rows.**
 22. **Never read the window's size outside `usePageFrame.ts`, and never size balloon
     lettering in `px`, `vw` or `vh`** — everything on the page is a share of the frame.

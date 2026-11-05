@@ -1,30 +1,21 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
-import {
-  SIM_SENDER,
-  SIM_TYPING_DELAY_MS,
-  SIM_TYPING_MS,
-  simReply,
-} from '../lib/smsSimulation'
-import type { SmsConversationMessage } from '../lib/smsConversation'
-import type { UseSmsConversationsResult } from './useSmsConversations'
+import type { SmsConversationMessage, UseSmsConversationsResult } from '../lib/smsConversation'
+import { SIM_SENDER, SIM_TYPING_DELAY_MS, SIM_TYPING_MS, simReply } from '../lib/smsSimulation'
 
 /**
- * A stand-in for `useSmsConversations` that talks to nobody, for looking at the
- * conversation UI without a carrier bill. Dev-only, switched on with `?smsSim=1`
- * (see `lib/smsSimulation.ts`); App picks it instead of the live hook behind an
- * `import.meta.env.DEV` test, so a production build does not carry it.
+ * SMS conversations for views that render a thread rather than a table, with nobody on
+ * the other end.
  *
- * Same contract, so the skin cannot tell: transcripts are keyed by peer and kept for the
- * life of the page, which is what lets the wheel move to another number and come back to
- * the conversation it left. What is different is where messages come from — `send`
- * appends locally, and the peer answers a coin flip ({@link SIM_REPLY_CHANCE}) of them:
- * a pause, then the typing dots ({@link SIM_TYPING_DELAY_MS}), then a canned reply
+ * Transcripts are keyed by peer and kept for the life of the page, which is what lets the
+ * wheel move to another number and come back to the conversation it left. `send` appends
+ * locally, and the peer answers a coin flip ({@link SIM_REPLY_CHANCE}) of them: a pause,
+ * then the typing dots ({@link SIM_TYPING_DELAY_MS}), then a canned reply
  * ({@link SIM_TYPING_MS} later). The timers run per send, against whichever peer was
  * written to, so a reply still lands in its own thread when the reader has already
  * turned the wheel elsewhere.
  */
-export function useSmsSimulation(): UseSmsConversationsResult {
+export function useDemoSmsConversations(): UseSmsConversationsResult {
   const [conversations, setConversations] = useState<
     Record<string, readonly SmsConversationMessage[]>
   >({})
@@ -40,7 +31,7 @@ export function useSmsSimulation(): UseSmsConversationsResult {
     }
   }, [])
 
-  // The simulation has no server to poll, so interest costs nothing to register.
+  // There is no server to poll, so interest costs nothing to register.
   const subscribe = useCallback(() => () => undefined, [])
 
   const send = useCallback(async (peer: string, text: string) => {

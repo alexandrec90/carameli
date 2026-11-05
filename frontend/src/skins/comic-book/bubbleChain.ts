@@ -98,10 +98,10 @@ export interface BubbleChain {
    */
   messages: string[]
   /**
-   * Bind this conversation to the account's real SMS history. The transcript then comes
-   * from the carrier rather than from {@link BubbleChain.messages}, and the composer sends
-   * for real: Enter posts to `VsMessaging/Sms/Send` and the message reappears from the
-   * server on the next poll.
+   * Bind this conversation to the app's SMS thread for a number. The transcript then
+   * comes from `useSmsConversations` rather than from {@link BubbleChain.messages}, and
+   * Enter in the composer sends into that thread. In the demo the thread is simulated; in
+   * a live build it is the carrier's, and Enter posts to `VsMessaging/Sms/Send` for real.
    *
    * **Which conversation is not stored here.** It is whichever number the panel's picker
    * balloon carries — a `wheel` turned to a row, or a `dial` typed into (see

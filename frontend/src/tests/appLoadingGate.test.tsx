@@ -2,11 +2,15 @@ import { act, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-// The session gate in `App`. On a skin with a persistent loading screen it draws
-// nothing — the screen is already up beneath it — and holds that screen instead; on
+// The session gate in a live build's `App`. On a skin with a persistent loading screen it
+// draws nothing — the screen is already up beneath it — and holds that screen instead; on
 // every other skin it draws the skin's loading config as before.
 
 const auth = vi.hoisted(() => ({ ready: false }))
+
+vi.hoisted(() => {
+  vi.stubEnv('VITE_LIVE_BACKEND', 'true')
+})
 
 vi.mock('../hooks/useAuth', () => ({
   useAuth: () => ({ ready: auth.ready }),

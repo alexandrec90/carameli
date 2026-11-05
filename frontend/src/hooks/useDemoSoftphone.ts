@@ -10,19 +10,15 @@ import {
 } from '../lib/callSimulation'
 import { EMPTY_TRANSCRIPT } from '../lib/callTranscript'
 import type { CallTranscript, CallTranscriptLine } from '../lib/callTranscript'
-import { normalizeTarget } from './useSoftphone'
-import type { CallStatus, UseSoftphoneResult } from './useSoftphone'
+import { normalizeTarget } from '../lib/softphone'
+import type { CallStatus, UseSoftphoneResult } from '../lib/softphone'
 
 const settled = (): Promise<void> => Promise.resolve()
 const noop = (): void => undefined
 
 /**
- * A stand-in for `useSoftphone` that rings nobody, for looking at the call UI without a
- * carrier bill. Dev-only, switched on with `?callSim=1` (see `lib/callSimulation.ts`);
- * App picks it instead of the shared softphone behind an `import.meta.env.DEV` test, so
- * a production build does not carry it.
+ * A telephone that rings nobody: the UI's whole call path, with no carrier behind it.
  *
- * Same contract, so the skin cannot tell. What is different is where the call goes:
  * `dial` rings for {@link SIM_RING_MS}, the far end picks up, and the two parties then
  * say `SIM_SCRIPT` a line at a time — each line lands in `transcript` with its speaker
  * marked as talking for as long as the words last, then a silence of random length, then
@@ -30,7 +26,7 @@ const noop = (): void => undefined
  * whatever was about to be said. The phone reports itself registered throughout, as
  * `SIM_EXTENSION`, so nothing asks it to connect first.
  */
-export function useCallSimulation(): UseSoftphoneResult {
+export function useDemoSoftphone(): UseSoftphoneResult {
   const [callStatus, setCallStatus] = useState<CallStatus>('idle')
   const [dialTarget, setDialTarget] = useState('')
   const [remoteParty, setRemoteParty] = useState('')
@@ -81,8 +77,8 @@ export function useCallSimulation(): UseSoftphoneResult {
     return settled()
   }, [clearTimers])
 
-  // One call at a time, like the phone it stands in for: a second dial while one is up
-  // is ignored, the way `softphoneActions` disables the green key for it.
+  // One call at a time: a second dial while one is up is ignored, the way
+  // `softphoneActions` disables the green key for it.
   const startCall = useCallback(
     (target: string): Promise<void> => {
       const number = normalizeTarget(target)
@@ -106,8 +102,7 @@ export function useCallSimulation(): UseSoftphoneResult {
     [dialTarget, startCall],
   )
 
-  // A key press types another digit; mid-call the real phone sends a tone, and the
-  // simulation has nobody to send one to.
+  // A key press types another digit; mid-call there is nobody to send a tone to.
   const pressDigit = useCallback(
     (digit: string): void => {
       if (callStatus === 'idle') setDialTarget(current => current + digit)

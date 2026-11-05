@@ -5,8 +5,8 @@ import type { Extension, WebphoneCredential } from '../api/client'
 const listMock = vi.fn()
 const credentialMock = vi.fn()
 
-vi.mock('../api/client', () => ({
-  api: {
+vi.mock('../api/liveClient', () => ({
+  liveApi: {
     extensions: {
       list: (...args: unknown[]) => listMock(...args),
       webphoneCredential: (...args: unknown[]) => credentialMock(...args),
@@ -54,7 +54,8 @@ class FakeSessionManager {
 
 vi.mock('sip.js/lib/platform/web', () => ({ SessionManager: FakeSessionManager }))
 
-import { normalizeTarget, useSoftphone } from '../hooks/useSoftphone'
+import { useLiveSoftphone } from '../hooks/useLiveSoftphone'
+import { normalizeTarget } from '../lib/softphone'
 
 function makeExtension(over: Partial<Extension> = {}): Extension {
   return {
@@ -88,7 +89,7 @@ const remoteSession = {
 
 /** Render the hook and get past the initial extension load. */
 async function readyPhone() {
-  const view = renderHook(() => useSoftphone())
+  const view = renderHook(() => useLiveSoftphone())
   await waitFor(() => {
     expect(view.result.current.selectedId).toBe('ext-1')
   })
@@ -107,7 +108,7 @@ async function registered() {
   return view
 }
 
-describe('useSoftphone', () => {
+describe('useLiveSoftphone', () => {
   beforeEach(() => {
     managers.length = 0
     listMock.mockReset()

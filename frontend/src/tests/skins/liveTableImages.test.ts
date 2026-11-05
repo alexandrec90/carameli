@@ -1,19 +1,7 @@
-import { renderHook, waitFor } from '@testing-library/react'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { renderHook } from '@testing-library/react'
+import { describe, expect, it } from 'vitest'
 
-const callsList = vi.fn()
-const smsList = vi.fn()
-
-vi.mock('../../api/client', () => ({
-  api: {
-    calls: { list: (...args: unknown[]) => callsList(...args) },
-    sms: { list: (...args: unknown[]) => smsList(...args) },
-  },
-}))
-vi.mock('../../lib/logger', () => ({
-  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
-}))
-
+import { simFeedRows } from '../../lib/simTables'
 import { seedConfig } from '../../skins/comic-book/editor/configSeed'
 import { newTable, liveTable } from '../../skins/comic-book/editor/tableValidate'
 import type { ImgTransform } from '../../skins/comic-book/editor/types'
@@ -99,48 +87,15 @@ describe('withLiveRows', () => {
 })
 
 describe('useLiveTableImages', () => {
-  beforeEach(() => {
-    callsList.mockReset()
-    smsList.mockReset()
-    callsList.mockResolvedValue({
-      events: [
-        {
-          id: 'id-1',
-          call_sid: 'CA1',
-          direction: 'outbound',
-          from_number: '+14155550000',
-          to_number: '+14155550001',
-          started_at: '2026-08-25T16:45:00',
-          ended_at: null,
-          duration_seconds: null,
-          recording_url: null,
-          status: 'ringing',
-          posted: false,
-          created_at: '2026-08-25T16:45:00',
-        },
-      ],
-      vs_customer_id: 1,
-    })
-    smsList.mockResolvedValue({ messages: [], vs_customer_id: 1 })
-  })
-
-  it('fetches nothing for a page whose surfaces are all authored', async () => {
+  it('hands back the same pictures for a page whose surfaces are all authored', () => {
     const images = [img({ table: newTable() })]
     const { result } = renderHook(() => useLiveTableImages(images))
-    await waitFor(() => expect(result.current).toBe(images))
-    expect(callsList).not.toHaveBeenCalled()
+    expect(result.current).toBe(images)
   })
 
-  it('fills a live surface from the records', async () => {
+  it('fills a live surface from the records', () => {
     const images = [img({ table: liveTable(newTable(), 'calls') })]
     const { result } = renderHook(() => useLiveTableImages(images))
-    await waitFor(() => expect(result.current[0]?.table?.data).toHaveLength(1))
-    expect(result.current[0]?.table?.data[0]).toEqual([
-      '+14155550001',
-      '16:45',
-      '',
-      'In progress',
-    ])
-    expect(smsList).not.toHaveBeenCalled()
+    expect(result.current[0]?.table?.data).toEqual(simFeedRows('calls'))
   })
 })

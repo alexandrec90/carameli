@@ -6,8 +6,8 @@ const listMock = vi.fn()
 const sendMock = vi.fn()
 const phoneLinesMock = vi.fn()
 
-vi.mock('../api/client', () => ({
-  api: {
+vi.mock('../api/liveClient', () => ({
+  liveApi: {
     sms: {
       list: (...args: unknown[]) => listMock(...args),
       send: (...args: unknown[]) => sendMock(...args),
@@ -19,7 +19,7 @@ vi.mock('../lib/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }))
 
-import { SMS_POLL_MS, useSmsConversations } from '../hooks/useSmsConversations'
+import { SMS_POLL_MS, useLiveSmsConversations } from '../hooks/useLiveSmsConversations'
 
 const PEER = '+14155551111'
 const MINE = '+14155550000'
@@ -52,7 +52,7 @@ function smsLine(): PhoneLine {
   }
 }
 
-describe('useSmsConversations', () => {
+describe('useLiveSmsConversations', () => {
   beforeEach(() => {
     listMock.mockReset()
     sendMock.mockReset()
@@ -67,7 +67,7 @@ describe('useSmsConversations', () => {
   })
 
   it('makes no requests at all until something subscribes', async () => {
-    renderHook(() => useSmsConversations())
+    renderHook(() => useLiveSmsConversations())
     await Promise.resolve()
     expect(listMock).not.toHaveBeenCalled()
     // The reason App can mount this for every skin: three of the four show no threads.
@@ -76,7 +76,7 @@ describe('useSmsConversations', () => {
 
   it('fetches the subscribed conversation, scoped by peer', async () => {
     listMock.mockResolvedValue({ messages: [message()] })
-    const { result } = renderHook(() => useSmsConversations())
+    const { result } = renderHook(() => useLiveSmsConversations())
 
     act(() => {
       result.current.subscribe(PEER)
@@ -90,7 +90,7 @@ describe('useSmsConversations', () => {
 
   it('shares one poll between two subscribers and stops when the last leaves', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
-    const { result } = renderHook(() => useSmsConversations())
+    const { result } = renderHook(() => useLiveSmsConversations())
 
     let dropA = () => undefined as void
     let dropB = () => undefined as void
@@ -127,7 +127,7 @@ describe('useSmsConversations', () => {
   })
 
   it('shows a sent message before the carrier has confirmed it', async () => {
-    const { result } = renderHook(() => useSmsConversations())
+    const { result } = renderHook(() => useLiveSmsConversations())
     act(() => {
       result.current.subscribe(PEER)
     })
@@ -151,7 +151,7 @@ describe('useSmsConversations', () => {
 
   it('marks the message failed and reports the error when the send throws', async () => {
     sendMock.mockRejectedValue(new Error('carrier down'))
-    const { result } = renderHook(() => useSmsConversations())
+    const { result } = renderHook(() => useLiveSmsConversations())
     act(() => {
       result.current.subscribe(PEER)
     })
@@ -167,7 +167,7 @@ describe('useSmsConversations', () => {
 
   it('refuses to send with no SMS-enabled number configured', async () => {
     phoneLinesMock.mockResolvedValue([])
-    const { result } = renderHook(() => useSmsConversations())
+    const { result } = renderHook(() => useLiveSmsConversations())
     act(() => {
       result.current.subscribe(PEER)
     })
@@ -182,7 +182,7 @@ describe('useSmsConversations', () => {
   })
 
   it('refuses a destination the backend would reject anyway', async () => {
-    const { result } = renderHook(() => useSmsConversations())
+    const { result } = renderHook(() => useLiveSmsConversations())
     act(() => {
       result.current.subscribe('+442071838750')
     })
@@ -197,7 +197,7 @@ describe('useSmsConversations', () => {
   })
 
   it('ignores an empty composer', async () => {
-    const { result } = renderHook(() => useSmsConversations())
+    const { result } = renderHook(() => useLiveSmsConversations())
     act(() => {
       result.current.subscribe(PEER)
     })
@@ -213,7 +213,7 @@ describe('useSmsConversations', () => {
   it('keeps the transcript’s identity when a poll changes nothing', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
     listMock.mockResolvedValue({ messages: [message()] })
-    const { result } = renderHook(() => useSmsConversations())
+    const { result } = renderHook(() => useLiveSmsConversations())
     act(() => {
       result.current.subscribe(PEER)
     })
@@ -234,7 +234,7 @@ describe('useSmsConversations', () => {
     // advancing the clock later moves a clock the hook is not on.
     vi.useFakeTimers({ shouldAdvanceTime: true })
     listMock.mockResolvedValueOnce({ messages: [message()] })
-    const { result } = renderHook(() => useSmsConversations())
+    const { result } = renderHook(() => useLiveSmsConversations())
     act(() => {
       result.current.subscribe(PEER)
     })

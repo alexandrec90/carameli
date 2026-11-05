@@ -1,7 +1,8 @@
 import { act, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { useCallSimulation } from '../hooks/useCallSimulation'
+import { useDemoSoftphone } from '../hooks/useDemoSoftphone'
+import { normalizeTarget } from '../lib/softphone'
 import {
   SIM_EXTENSION,
   SIM_FIRST_LINE_MS,
@@ -14,8 +15,16 @@ import {
 const NUMBER = '(514) 555-0199'
 const DIGITS = '5145550199'
 
+describe('normalizeTarget', () => {
+  it('keeps digits and the three dialable symbols', () => {
+    expect(normalizeTarget('+1 (514) 555-0100')).toBe('+15145550100')
+    expect(normalizeTarget('*97')).toBe('*97')
+    expect(normalizeTarget('abc')).toBe('')
+  })
+})
+
 /** Dial, and let the far end pick up. */
-function connect(phone: ReturnType<typeof renderHook<ReturnType<typeof useCallSimulation>, void>>) {
+function connect(phone: ReturnType<typeof renderHook<ReturnType<typeof useDemoSoftphone>, void>>) {
   act(() => {
     void phone.result.current.autoDial(NUMBER)
   })
@@ -24,7 +33,7 @@ function connect(phone: ReturnType<typeof renderHook<ReturnType<typeof useCallSi
   })
 }
 
-describe('useCallSimulation', () => {
+describe('useDemoSoftphone', () => {
   beforeEach(() => {
     vi.useFakeTimers()
     // Every silence the shortest one, so the test can step from line to line.
@@ -37,7 +46,7 @@ describe('useCallSimulation', () => {
   })
 
   it('is a registered phone with nobody on the line', () => {
-    const { result } = renderHook(() => useCallSimulation())
+    const { result } = renderHook(() => useDemoSoftphone())
     expect(result.current.status).toBe('registered')
     expect(result.current.registeredAs).toBe(SIM_EXTENSION)
     expect(result.current.callStatus).toBe('idle')
@@ -45,7 +54,7 @@ describe('useCallSimulation', () => {
   })
 
   it('rings the number as dialled, then the far end picks up', () => {
-    const { result } = renderHook(() => useCallSimulation())
+    const { result } = renderHook(() => useDemoSoftphone())
 
     act(() => {
       void result.current.autoDial(NUMBER)
@@ -66,7 +75,7 @@ describe('useCallSimulation', () => {
   })
 
   it('dials the typed number with no argument, the way the green key does', () => {
-    const { result } = renderHook(() => useCallSimulation())
+    const { result } = renderHook(() => useDemoSoftphone())
     act(() => {
       result.current.pressDigit('9')
       result.current.pressDigit('1')
@@ -80,7 +89,7 @@ describe('useCallSimulation', () => {
   })
 
   it('says the script a line at a time, lighting the speaker for as long as the words last', () => {
-    const phone = renderHook(() => useCallSimulation())
+    const phone = renderHook(() => useDemoSoftphone())
     connect(phone)
     const [first, second] = SIM_SCRIPT
 
@@ -110,7 +119,7 @@ describe('useCallSimulation', () => {
   })
 
   it('hangs up: idle, nobody on the line, the transcript gone and nothing left to say', () => {
-    const phone = renderHook(() => useCallSimulation())
+    const phone = renderHook(() => useDemoSoftphone())
     connect(phone)
     act(() => {
       vi.advanceTimersByTime(SIM_FIRST_LINE_MS)
@@ -129,7 +138,7 @@ describe('useCallSimulation', () => {
   })
 
   it('declines mid-ring the same way', () => {
-    const { result } = renderHook(() => useCallSimulation())
+    const { result } = renderHook(() => useDemoSoftphone())
     act(() => {
       void result.current.autoDial(NUMBER)
     })
@@ -141,7 +150,7 @@ describe('useCallSimulation', () => {
   })
 
   it('places no call for a blank number, and no second call over a first', () => {
-    const { result } = renderHook(() => useCallSimulation())
+    const { result } = renderHook(() => useDemoSoftphone())
     act(() => {
       void result.current.autoDial('---')
     })
@@ -159,7 +168,7 @@ describe('useCallSimulation', () => {
   })
 
   it('types digits only while idle — mid-call a key is a tone, and there is nobody to hear it', () => {
-    const phone = renderHook(() => useCallSimulation())
+    const phone = renderHook(() => useDemoSoftphone())
     act(() => {
       phone.result.current.pressDigit('4')
     })
@@ -172,7 +181,7 @@ describe('useCallSimulation', () => {
   })
 
   it('toggles mute both ways', () => {
-    const { result } = renderHook(() => useCallSimulation())
+    const { result } = renderHook(() => useDemoSoftphone())
     act(() => {
       result.current.toggleMute()
     })
@@ -184,7 +193,7 @@ describe('useCallSimulation', () => {
   })
 
   it('takes its timers with it on unmount', () => {
-    const phone = renderHook(() => useCallSimulation())
+    const phone = renderHook(() => useDemoSoftphone())
     connect(phone)
     expect(vi.getTimerCount()).toBe(1)
     phone.unmount()
