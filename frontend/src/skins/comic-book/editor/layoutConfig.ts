@@ -106,8 +106,8 @@ export const PANEL_IMG_TRANSFORMS: ImgTransform[] = [
   { panel: 11, src: '/comic-book/conversation.webp', alt: 'Phone conversation', left: 24, top: 42.9, width: 64.1, height: 61.7, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center bottom', spill: false, z: 0 },
   { panel: 12, src: '/comic-book/pensive-woman.webp', alt: 'A woman waiting for the phone to ring', left: 0.1, top: 0, width: 105, height: 100, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center bottom', spill: true, z: 0 },
   { panel: 9, src: '/comic-book/ringing-phone.webp', alt: 'A telephone ringing at the far end', left: 0, top: 0, width: 100, height: 100, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center center', spill: false, z: 0, call: 'ringing' },
-  { panel: 9, src: '/comic-book/cheating-man.webp', alt: 'The man who answered', left: 0, top: 0, width: 100, height: 100, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center center', spill: false, z: 0, call: 'remote' },
-  { panel: 9, src: '/comic-book/despondent-wife.webp', alt: 'The woman placing the call', left: 0, top: 0, width: 100, height: 100, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center center', spill: false, z: 0, call: 'local' },
+  { panel: 9, src: '/comic-book/cheating-man.webp', alt: 'The man who answered', left: -8.8, top: 30.8, width: 116.7, height: 151.6, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center top', spill: false, z: 0, call: 'remote' },
+  { panel: 9, src: '/comic-book/despondent-wife.webp', alt: 'The woman placing the call', left: -17.2, top: 19.1, width: 120, height: 109.2, scale: 1, offsetX: 0, offsetY: 0, anchor: 'left top', spill: false, z: 0, call: 'local' },
   { panel: 10, src: '/comic-book/raw%20hand.webp', alt: 'Hand writing with a pen', left: 64.2, top: 79.8, width: 37, height: 78.1, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center top', spill: false, z: 1 },
 ]
 
@@ -164,9 +164,9 @@ export const PANEL_BUBBLE_TRANSFORMS: BubbleTransform[] = [
   { panel: 11, top: 30, right: 48, width: 28, rotate: -5, spill: true, type: 'soft', tail: 'down-right', content: 'text', text: 'recipient sms', linkTo: null, hoverType: null, clickType: null, hoverBold: true, chain: 'chain-1' },
   { panel: 11, top: 56, right: 67, width: 27, rotate: -5, spill: true, type: 'cloud', tail: 'right', content: 'dial', text: '4388762750', linkTo: null, hoverType: null, clickType: null, hoverBold: true, chain: '' },
   { panel: 11, top: 23, right: 24, width: 28, rotate: -5, spill: true, type: 'soft', tail: 'down-left', content: 'input', text: '', linkTo: null, hoverType: null, clickType: null, hoverBold: true, chain: 'chain-1' },
-  { panel: 9, top: 2, right: 12, width: 76, rotate: 0, spill: true, type: 'soft', tail: 'down', content: 'transcript', text: '', linkTo: null, hoverType: null, clickType: null, hoverBold: true, chain: '', call: 'remote' },
-  { panel: 9, top: 2, right: 12, width: 76, rotate: 0, spill: true, type: 'soft', tail: 'down', content: 'transcript', text: '', linkTo: null, hoverType: null, clickType: null, hoverBold: true, chain: '', call: 'local' },
-  { panel: 9, top: 62, right: 12, width: 76, rotate: 0, spill: true, type: 'cloud', tail: 'none', content: 'number-hangup', text: '', linkTo: null, hoverType: null, clickType: null, hoverBold: true, chain: '', call: 'local' },
+  { panel: 9, top: 1, right: 25, width: 76, rotate: 0, spill: true, type: 'soft', tail: 'down', content: 'transcript', text: '', linkTo: null, hoverType: null, clickType: null, hoverBold: true, chain: '', call: 'remote' },
+  { panel: 9, top: -4, right: -2, width: 80, rotate: 0, spill: true, type: 'soft', tail: 'down-left', content: 'transcript', text: '', linkTo: null, hoverType: null, clickType: null, hoverBold: true, chain: '', call: 'local' },
+  { panel: 9, top: 71, right: -6, width: 72, rotate: 0, spill: true, type: 'cloud', tail: 'none', content: 'number-hangup', text: '', linkTo: null, hoverType: null, clickType: null, hoverBold: true, chain: '', call: 'local' },
 ]
 
 // One entry per chain id the bubbles above carry — the list is derived from them, not

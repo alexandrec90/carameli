@@ -1,6 +1,7 @@
 """Tests for scripts/run-tests.py pure helpers (testmon selection parsing)."""
 
 import itertools
+import json
 import os
 import subprocess
 import sys
@@ -438,6 +439,7 @@ def test_host_db_env_is_none_when_a_port_cannot_be_resolved(monkeypatch):
 def test_run_local_uses_the_host_tier_without_testmon(monkeypatch):
     # testmon's index lives inside the container's tree, so a host run must not claim
     # a changed-only selection off somebody else's timings.
+    monkeypatch.setattr(rt, "run_changed_frontend", dict)
     monkeypatch.setattr(rt, "host_db_fallback", lambda root=None: {"DATABASE_URL": "postgres://x"})
     monkeypatch.setattr(
         rt, "pick_fast_command", lambda: pytest.fail("testmon probe on the host tier")
@@ -530,6 +532,7 @@ def test_run_local_stays_in_the_container_by_default(monkeypatch):
     # branch, `run_argv` was never called, and the assertion below died on KeyError
     # instead of checking anything. It was written before that function existed and was
     # the one test in this file not updated when it arrived.
+    monkeypatch.setattr(rt, "run_changed_frontend", dict)
     monkeypatch.setattr(rt, "host_db_fallback", lambda root=None: None)
     monkeypatch.setattr(rt, "changed_touches_python", lambda: True)
     monkeypatch.setattr(rt, "app_container_running", lambda root=None: True)
@@ -851,6 +854,7 @@ def test_run_local_skips_pytest_for_a_frontend_only_diff(monkeypatch, capsys):
 
     Reversion check: delete the guard in `run_local` and this spawns the suite.
     """
+    monkeypatch.setattr(rt, "run_changed_frontend", dict)
     monkeypatch.setattr(rt, "host_db_fallback", lambda: None)
     monkeypatch.setattr(rt, "changed_touches_python", lambda: False)
     monkeypatch.setattr(
@@ -861,7 +865,129 @@ def test_run_local_skips_pytest_for_a_frontend_only_diff(monkeypatch, capsys):
     assert "holds no Python" in capsys.readouterr().out
 
 
+def _frontend_diff(monkeypatch, changed: list[str], result=([], 0)) -> list:
+    """`run_local(True)` over a diff with no Python in it; what `run_argv` was handed."""
+    monkeypatch.setattr(rt, "host_db_fallback", lambda: None)
+    monkeypatch.setattr(rt, "changed_touches_python", lambda: False)
+    monkeypatch.setattr(rt.lint_all, "changed_files", lambda paths=None: changed)
+    seen: list = []
+    monkeypatch.setattr(rt, "run_argv", lambda argv, extra_env=None: (seen.append(argv), result)[1])
+    return seen
+
+
+def test_a_frontend_only_diff_runs_the_vitest_files_that_reach_it(monkeypatch):
+    """fdc90a49: seven frontend and rule files printed "Skipping pytest" and TESTS PASSED
+    with no vitest file run, and ba07bc13 had only moved which line said so. The chain's
+    tests were run by hand with `npx vitest run`, which is this runner's job."""
+    seen = _frontend_diff(
+        monkeypatch, ["frontend/src/chain.ts", "frontend/src/a.css", ".claude/rules/x.md"]
+    )
+
+    results = rt.run_local(True)
+
+    assert results == {"pytest": ([], 0), "frontend-tests": ([], 0)}
+    (argv,) = seen
+    assert argv[argv.index("--") + 1 :] == ["src/chain.ts", "src/a.css"]
+
+
+def test_a_red_vitest_turns_a_frontend_only_diff_red(monkeypatch):
+    _frontend_diff(monkeypatch, ["frontend/src/chain.ts"], (["FAIL src/chain.test.ts"], 1))
+
+    assert rt.run_local(True)["frontend-tests"] == (["FAIL src/chain.test.ts"], 1)
+
+
+def test_vitest_runs_inside_frontend_and_never_installs_itself():
+    """`npm --prefix frontend exec` moves npm and leaves vitest at the repo root, with no
+    config and no tests to find: it said "No affected test files found" and exited 0 for
+    any path. `--root frontend` found them, but `process.cwd()` stayed at the repo root, so
+    `assetPolicy.test.ts` and `editorConfigStamp.test.ts` failed for any change reaching
+    them, while the same files passed under `npm run test:run`. `npm run` starts its script
+    in the package, as the full-suite target does, and cannot fetch a vitest `node_modules`
+    lacks, which `npm exec` would, from whatever the registry serves today, on no lock."""
+    argv = rt.frontend_related_argv(["src/App.tsx"])
+
+    assert argv == ["npm", "--prefix", "frontend", "run", "test:related", "--", "src/App.tsx"]
+
+
+def test_the_related_script_the_runner_names_is_a_finite_related_run():
+    package = json.loads((REPO_ROOT / "frontend" / "package.json").read_text("utf-8"))
+    script = package["scripts"]["test:related"].split()
+
+    assert script[:2] == ["vitest", "related"]
+    assert "--run" in script, "a bare `vitest related` watches, and never exits"
+    assert "--passWithNoTests" in script, "a stylesheet no test imports failed nothing"
+    assert "--root" not in script, "the cwd is the point: `--root` moves vitest and not it"
+
+
+def test_changed_frontend_sources_are_what_vitest_can_trace_from_its_root():
+    paths = ["frontend\\src\\App.tsx", "frontend/vite.config.ts", "frontend/package.json"]
+    paths += ["app/models.py", "docs/frontend.md", "scripts/x.ts"]
+
+    assert rt.changed_frontend_sources(paths) == ["src/App.tsx", "vite.config.ts"]
+
+
+def test_a_diff_with_no_frontend_file_runs_no_vitest(monkeypatch):
+    seen = _frontend_diff(monkeypatch, ["README.md"])
+
+    assert rt.run_local(True) == {"pytest": ([], 0)}
+    assert seen == []
+
+
+def test_changed_set_too_long_for_a_cmd_shim_runs_the_whole_frontend_suite(monkeypatch):
+    """`npm.cmd` goes through `cmd.exe`, whose line stops at 8191 characters."""
+    paths = [f"frontend/src/generated/file_{n}.ts" for n in range(rt._RELATED_LIMIT + 1)]
+    seen = _frontend_diff(monkeypatch, paths)
+
+    rt.run_changed_frontend()
+
+    assert seen == [rt._LOCAL_FRONTEND_ARGV]
+
+
+def test_a_source_no_test_reaches_says_none_ran(monkeypatch, capsys):
+    """Green is right, since nothing failed, but not silently: this is the state fdc90a49
+    reported, on a set where it is true."""
+    _frontend_diff(monkeypatch, ["frontend/src/a.css"], (["No affected test files found"], 0))
+
+    assert rt.run_changed_frontend()["frontend-tests"][1] == 0
+    assert "none ran" in capsys.readouterr().out
+
+
+def test_a_run_that_passed_tests_does_not_say_none_ran(monkeypatch, capsys):
+    _frontend_diff(monkeypatch, ["frontend/src/a.ts"], (["      Tests  52 passed (52)"], 0))
+
+    rt.run_changed_frontend()
+
+    assert "none ran" not in capsys.readouterr().out
+
+
+def test_an_unreadable_git_runs_no_vitest_on_a_guess(monkeypatch):
+    def explode(_paths=None):
+        raise OSError("git is not on PATH")
+
+    monkeypatch.setattr(rt.lint_all, "changed_files", explode)
+
+    assert rt.run_changed_frontend() == {}
+
+
+def test_the_host_tier_still_runs_the_changed_frontend(monkeypatch):
+    """Its full pytest answers for the backend only, so a frontend change is still owed."""
+    seen = _frontend_diff(monkeypatch, ["frontend/src/chain.ts"])
+    monkeypatch.setattr(rt, "host_db_fallback", lambda: {"DATABASE_URL": "postgres://x"})
+
+    assert sorted(rt.run_local(True)) == ["frontend-tests", "pytest"]
+    assert len(seen) == 2
+
+
+def test_a_named_pytest_target_runs_no_vitest(monkeypatch):
+    seen = _frontend_diff(monkeypatch, ["frontend/src/chain.ts"])
+    monkeypatch.setattr(rt, "app_container_running", lambda root=None: True)
+
+    assert sorted(rt.run_local(False)) == ["pytest"]
+    assert len(seen) == 1
+
+
 def test_run_local_still_runs_pytest_when_python_changed(monkeypatch):
+    monkeypatch.setattr(rt, "run_changed_frontend", dict)
     monkeypatch.setattr(rt, "host_db_fallback", lambda: None)
     monkeypatch.setattr(rt, "changed_touches_python", lambda: True)
     monkeypatch.setattr(rt, "app_container_running", lambda root=None: True)
@@ -899,9 +1025,10 @@ def test_changed_with_no_stack_runs_the_changed_sets_tests_on_the_host(monkeypat
     targets run on the host with no app container. It now runs them there."""
     seen = _no_stack(monkeypatch, ["scripts/run-tests.py", "frontend/src/App.tsx"])
 
-    assert rt.run_local(True) == {"pytest": ([], 0)}
+    assert rt.run_local(True) == {"pytest": ([], 0), "frontend-tests": ([], 0)}
 
-    (argv,) = seen
+    argv, vitest = seen
+    assert "test:related" in vitest
     assert argv[1:3] == ["-m", "pytest"]
     assert "docker" not in argv
     assert "scripts/hooks/tests/test_run_tests.py" in argv
