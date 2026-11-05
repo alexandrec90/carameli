@@ -251,7 +251,8 @@ USAGE = """usage: python scripts/run-tests.py [--changed] [--all] [--target <nam
   (no args)        full backend suite (in-container xdist locally; direct on CI)
   --changed        changed-only via testmon, xdist fallback (default suite only);
                    with no app container up, the changed set's own test files on
-                   the host (--fast is a deprecated alias)
+                   the host, and nothing if it holds no Python (--fast is a
+                   deprecated alias)
   --all            every FREE target (pytest, hook-tests, frontend-tests,
                    bundle-budgets)
   --target <name>  one of: pytest, hook-tests, frontend-tests, bundle-budgets,
@@ -451,12 +452,20 @@ def run_changed_on_host() -> dict[str, tuple[list[str], int]]:
 
     Where it names none, a red run that says why -- never a green run of nothing, and
     never `docker compose exec`'s `service "app" is not running` as the only clue.
+
+    The one green is a set with no `.py` in it at all. A `docker-compose.yml` beside a UI
+    rewrite still counts as touching Python, rightly, but no test failed and no file names
+    one for the host to run, so red there read as a failure nobody could fix and sent the
+    session after the stack for a change the gate checks anyway. It says what it skipped.
     """
     try:
         changed = lint_all.changed_files()
     except (OSError, subprocess.SubprocessError):
         changed = []
     targets = changed_test_files(changed)
+    if changed and not any(path.endswith(".py") for path in changed):
+        print("\nSkipping pytest -- no app container is up and the changed set holds no Python.")
+        return {"pytest": ([], 0)}
     if not targets:
         why = (
             "run-tests: no app container is up, so testmon cannot select, and the changed"
