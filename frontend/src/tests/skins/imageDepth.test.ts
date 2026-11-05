@@ -156,17 +156,19 @@ describe('a depth read back from a saved working copy', () => {
     expect(hydrateConfig(payload(4)).images[0].z).toBe(4)
   })
 
-  // A payload predating the field at all: every picture comes back at the back of its
-  // panel, which is the order the page already drew them in.
+  // A payload predating the field at all: a picture merges over the shipped entry at its
+  // index, so it takes that entry's depth. That is what keeps a hand in front of the
+  // notepad through an older working copy. A picture with no shipped entry to take one
+  // from goes to the back of its panel, which is where the page already drew it.
   it('defaults a payload written before depth existed', () => {
     const config = seedConfig()
-    const images = config.images.map(t => {
+    const images = [...config.images, config.images[0]].map(t => {
       const older: Partial<ImgTransform> = { ...t }
       delete older.z
       return older
     })
     const hydrated = hydrateConfig(JSON.stringify({ ...config, images }))
-    expect(hydrated.images.map(t => t.z)).toEqual(config.images.map(() => 0))
+    expect(hydrated.images.map(t => t.z)).toEqual([...config.images.map(t => t.z), DEPTH_MIN])
   })
 
   it('repairs a hand-edited depth rather than handing sort a value it cannot order', () => {

@@ -86,9 +86,11 @@
   /* Bands, not content: every row is exactly one band tall so it stays on the line
      drawn in the picture, whatever is written in it. A row height in CSS is a minimum,
      so that only holds while everything inside the cell fits inside a band — which is
-     what --cb-ptable-sit (a fraction of the band, from ProjectedTable.tsx) is for. */
+     what --cb-ptable-sit (a fraction of the band, from ProjectedTable.tsx) is for.
+     The side gutters are narrow because the call log's four columns only just fit the
+     notepad's width at the size its rows are lettered. */
   height: var(--cb-ptable-row);
-  padding: 0 0.5em var(--cb-ptable-sit);
+  padding: 0 0.2em var(--cb-ptable-sit);
 
   /* Sitting the lettering on the bottom of its band is what puts it *on* a ruled line
      rather than floating between two. */
@@ -118,7 +120,6 @@
 
 .cb-ptable thead .cb-ptable-cell {
   text-transform: uppercase;
-  letter-spacing: 0.04em;
   opacity: 0.85;
 }
 
