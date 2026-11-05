@@ -251,7 +251,8 @@ USAGE = """usage: python scripts/run-tests.py [--changed] [--all] [--target <nam
   (no args)        full backend suite (in-container xdist locally; direct on CI)
   --changed        changed-only via testmon, xdist fallback (default suite only);
                    with no app container up, the changed set's own test files on
-                   the host, and nothing if it holds no Python (--fast is a
+                   the host, and nothing if it holds no Python; then the vitest
+                   files that reach any changed frontend file (--fast is a
                    deprecated alias)
   --all            every FREE target (pytest, hook-tests, frontend-tests,
                    bundle-budgets)
@@ -424,7 +425,62 @@ def changed_touches_python(paths: list[str] | None = None) -> bool:
 _NO_PYTHON_SUFFIXES = (".ts", ".tsx", ".js", ".jsx", ".css", ".scss", ".md", ".svg")
 
 
+# Past this many paths `vitest related` is the whole suite's cost anyway, and the argv is
+# heading for `cmd.exe`'s 8191-character line through `npm.cmd`.
+_RELATED_LIMIT = 100
+_FRONTEND_PREFIX = "frontend/"
+_FRONTEND_SOURCE_SUFFIXES = (".ts", ".tsx", ".js", ".jsx", ".css", ".scss")
+
+
+def changed_frontend_sources(paths: list[str]) -> list[str]:
+    """The `paths` vitest can trace to a test, relative to `frontend/`, vitest's root."""
+    unix = (path.replace("\\", "/") for path in paths)
+    return [
+        path.removeprefix(_FRONTEND_PREFIX)
+        for path in unix
+        if path.startswith(_FRONTEND_PREFIX) and path.endswith(_FRONTEND_SOURCE_SUFFIXES)
+    ]
+
+
+def frontend_related_argv(sources: list[str]) -> list[str]:
+    """`vitest related` over `sources`, given `frontend/` as `--root`: `npm --prefix` moves
+    npm and leaves vitest at the repo root, with no config and no tests to find. `--no`
+    stops `npm exec` fetching a vitest `node_modules` lacks, so an unprovisioned tree is
+    red rather than tested by whatever the registry serves."""
+    command = ["vitest", "related", "--run", "--root", "frontend", "--passWithNoTests"]
+    return ["npm", "--prefix", "frontend", "exec", "--no", "--", *command, *sources]
+
+
+def run_changed_frontend() -> dict[str, tuple[list[str], int]]:
+    """`--changed`'s frontend half: the vitest files that reach the changed set, on the host
+    (`--passWithNoTests`, since a stylesheet no test imports failed nothing).
+
+    The pytest half asks only whether Python changed, so a frontend diff printed "Skipping
+    pytest" and TESTS PASSED with nothing run at all (fdc90a49). Nothing here says "not
+    run": a set with no frontend file in it owes vitest nothing, and git not answering is
+    the pytest half's to report.
+    """
+    try:
+        sources = changed_frontend_sources(lint_all.changed_files())
+    except (OSError, subprocess.SubprocessError):
+        return {}
+    if not sources:
+        return {}
+    print(f"\nRunning vitest -- what reaches the {len(sources)} changed frontend file(s) ...")
+    within_limit = len(sources) <= _RELATED_LIMIT
+    argv = frontend_related_argv(sources) if within_limit else _LOCAL_FRONTEND_ARGV
+    lines, code = run_argv(argv)
+    if code == 0 and not diagnostics.count_test_summary(lines)[0]:
+        print("  no test reaches those files, so none ran")
+    return {"frontend-tests": (lines, code)}
+
+
 def run_local(changed: bool) -> dict[str, tuple[list[str], int]]:
+    results = _run_local_pytest(changed)
+    return {**results, **run_changed_frontend()} if changed else results
+
+
+def _run_local_pytest(changed: bool) -> dict[str, tuple[list[str], int]]:
     host_env = host_db_fallback()
     if host_env is not None:
         # Always the full free suite here, never testmon: `.testmondata` is written
