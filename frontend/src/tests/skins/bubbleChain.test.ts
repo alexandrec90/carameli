@@ -22,7 +22,7 @@ import {
   visibleWindow,
 } from '../../skins/comic-book/bubbleChain'
 import type { BubbleChain, ChainRow } from '../../skins/comic-book/bubbleChain'
-import { fitMessage } from '../../skins/comic-book/bubbleFit'
+import { fitMessage, glyphsPerLine } from '../../skins/comic-book/bubbleFit'
 import { anchorOf } from '../../skins/comic-book/chainAnchor'
 import {
   CHAIN_ORDER_STEP,
@@ -276,13 +276,35 @@ describe('conversationRows', () => {
     return found
   }
 
-  // The zig-zag: a speaker's stacked balloons alternate between the column's outer edge
-  // and a lean inward, by the message's ordinal on that side.
-  it('leans every other row of a speaker inward from the column’s edge', () => {
-    const flush = (r: ChainRow) => Math.abs(leftOf(r) - THEM_LEFT) < 1e-9
+  /** A row's right edge, which is the side of the left column facing the other speaker. */
+  const rightOf = (r: ChainRow) => 100 - r.bubble.right
+  // The left column's inner edge: 100 - 55.
+  const THEM_INNER = 45
+
+  // The zig-zag: a speaker's stacked balloons alternate between the column's inner edge
+  // and a small lean away from it, by the message's ordinal on that side.
+  it('leans every other row of a speaker outward from the column’s inner edge', () => {
+    const flush = (r: ChainRow) => Math.abs(rightOf(r) - THEM_INNER) < 1e-9
     expect(flush(at(table, '0'))).toBe(true) // their first
     expect(flush(at(table, '1'))).toBe(false) // their second
     expect(flush(at(table, '3'))).toBe(true) // their third
+  })
+
+  // Tails point inward at the characters, so the foot of the thread sits at the inner side
+  // of its column. Rows hung from the outer edge left a gap the width of the column's slack
+  // between the foot and the row above it, which is what lost the reader's place.
+  it('keeps a side’s rows lined up with the balloon at the foot of the thread', () => {
+    const theirs = table.filter(r => r.side === 'in').map(rightOf)
+    expect(theirs.length).toBeGreaterThan(2)
+    expect(Math.max(...theirs) - Math.min(...theirs)).toBeLessThan(cols.them.width * 0.25)
+  })
+
+  // The opening exchange is short messages in the narrowest balloon. A reply of this length
+  // on one line is what that balloon has to hold, on the shipped panel's proportions.
+  it('opens with a balloon wide enough to letter a short reply on one line', () => {
+    const shipped: ChainMetrics = { aspect: 1.74, boxW: 1009, lettering: 16 }
+    const narrowest = 28 * CHAIN_MIN_WIDTH_RATIO
+    expect(glyphsPerLine(narrowest, 'soft', shipped)).toBeGreaterThanOrEqual('On my way!'.length)
   })
 
   it('leans by the message’s place in the transcript, not its row on screen', () => {
@@ -320,11 +342,11 @@ describe('conversationRows', () => {
       expect(row.stretch).toBeCloseTo(fit.stretch, 6)
       expect(row.bubble.width).toBeLessThan(template.width)
       expect(row.bubble.rotate).toBe(template.rotate)
-      expect(row.bubble.tail).toBe(template.tail)
     }
-    // Only the foot of the thread hangs on its template's tip. Theirs is older than mine
-    // here, so it climbs above it instead — the case below.
+    // Only the foot of the thread hangs on its template's tip, tail and all. Theirs is older
+    // than mine here, so it climbs above it instead — the case below.
     expectSamePoint(anchorOfRow(mine), anchorOf(cols.me, 1))
+    expect(mine.bubble.tail).toBe(cols.me.tail)
   })
 
   // A live chain's foot is two balloons: the composer, and the recipient's newest beside
@@ -353,7 +375,19 @@ describe('conversationRows', () => {
     expect(bottom('2')).toBeGreaterThan(bottom('1'))
     // Not on its anchor: level with the sender's newest would say nothing about the order.
     expect(anchorOfRow(at(placed, '2'))[1]).toBeLessThan(anchorOf(cols.them, 1)[1])
-    expect(at(placed, '2').bubble.tail).toBe(cols.them.tail)
+  })
+
+  // A tail is aimed at a character from the anchor. A balloon that has climbed off the
+  // anchor would carry its tail up with it and point at a patch of empty panel.
+  it('draws a tail only on a balloon sitting on its anchor', () => {
+    const thread = readTranscript(['> a1', '> a2', 'b1', '> a3'])
+    const placed = conversationRows(visibleWindow(3, 6), thread, cols, null, M)
+    expect(at(placed, '3').bubble.tail).toBe(cols.me.tail)
+    expect(at(placed, '2').bubble.tail).toBe('none') // their newest, climbed above a3
+
+    const me = tpl({ ...cols.me, content: 'input' })
+    const live = conversationRows(visibleWindow(1, 6), readTranscript(['b1', '> a1']), { ...cols, me }, composerOn(me), M)
+    expect(live.map(r => r.bubble.tail)).toEqual([me.tail, 'none', 'none'])
   })
 
   it('grows the newest row taller for a message that wraps, holding its tail tip still', () => {
@@ -397,7 +431,7 @@ describe('conversationRows', () => {
 
   it('climbs from the anchored row, every older row ending a step above every newer one', () => {
     expectOrdered(table, 1)
-    expect(table.filter(r => r.bubble.tail === 'none').length).toBe(table.length - 2)
+    expect(table.filter(r => r.bubble.tail === 'none').length).toBe(table.length - 1)
   })
 
   // Rows may tuck in beside each other but never over each other: two ellipses that share
@@ -458,9 +492,9 @@ describe('conversationRows', () => {
     ])
   })
 
-  it('leaves the tail on the newest balloon of each column and nowhere else', () => {
-    expect(rows[0].bubble.tail).toBe('down-left') // newest of the sender's
-    expect(rows[1].bubble.tail).toBe('down-right') // newest of the recipient's
+  it('leaves the tail on the foot of the thread and nowhere else', () => {
+    expect(rows[0].bubble.tail).toBe('down-left') // the sender's, on its anchor
+    expect(rows[1].bubble.tail).toBe('none') // the recipient's newest, climbed above it
     expect(rows[2].bubble.tail).toBe('none') // an older one on the same side
   })
 
@@ -688,7 +722,7 @@ describe('fitRow', () => {
   })
 
   it('inflates with the draft, wider and taller, and shrinks back when it empties', () => {
-    const short = fitRow('hi there', me, M)
+    const short = fitRow('hi there, are you still around?', me, M)
     const long = fitRow(draft, me, M)
     expect(short.width).toBeGreaterThan(MIN)
     expect(short.stretch).toBeGreaterThan(1)
