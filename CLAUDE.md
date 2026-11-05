@@ -3,6 +3,12 @@
 Self-hosted VoIP service for phone lines, extensions, SMS, call control, recordings,
 and CRM-compatible APIs.
 
+**The frontend runs as a UI proof of concept by default.** The paid provider accounts are
+cancelled, so it makes no requests and every call, SMS and table is simulated; it runs
+with `npm --prefix frontend run dev` alone. The real app is kept and tested, one setting
+away: `VITE_LIVE_BACKEND=true` turns it on, and `frontend/CLAUDE.md` says how. The backend
+below is unchanged, and only a live build depends on it.
+
 ## Stack
 
 | Layer | Choice |

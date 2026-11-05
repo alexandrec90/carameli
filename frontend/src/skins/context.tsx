@@ -14,7 +14,7 @@ import type { SkinName } from './registry'
 // `comic-book/benDayGrid.ts` under the shared pointer spotlight, with a legend on top
 // while anything is still loading. It is mounted here, under the app, for the skin's
 // whole life — never by the skin. Three things load one after another (this chunk, the
-// session in `App.tsx`, the page's pictures in `comic-book/Layout.tsx`), and a screen
+// session in `SessionGate.tsx`, the page's pictures in `comic-book/Layout.tsx`), and a screen
 // drawn per gate was three screens: each popped a legend of its own, re-lit a grid of
 // its own, and left a bare frame between them. Now the grid is one canvas that outlives
 // all three, the gates below say what is still loading through

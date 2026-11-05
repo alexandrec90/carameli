@@ -143,10 +143,9 @@ const CHAIN_HEADER = `// One entry per chain id the bubbles above carry — the 
 // live: the bottom-right row becomes a composer, Enter sends what is in it as the sender's
 // next message, and the table grows by one row. See ../bubbleChain.ts.
 //
-// \`sms\` binds the chain to a **real** thread. The transcript above is then ignored and the
-// balloons are messages the carrier actually has; Enter in the composer sends one, for
-// money. Which thread is not stored here — it is whichever number the panel's own
-// wheel-picker balloon (a \`content: 'wheel'\` bubble outside the chain, its \`text\` the
+// \`sms\` binds the chain to a thread: simulated in the demo, **real** in a live build. The
+// transcript above is then ignored and the balloons are that thread's messages; Enter in
+// the composer sends one, in a live build for money. Which thread is not stored here — it is whichever number the panel's own wheel-picker balloon (a \`content: 'wheel'\` bubble outside the chain, its \`text\` the
 // comma-delimited list of numbers) is turned to, so a panel with \`sms\` and no picker shows
 // an empty conversation rather than guessing at one.`
 

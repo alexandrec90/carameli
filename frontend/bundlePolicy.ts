@@ -15,8 +15,7 @@
  *
  * The app splits per skin and per route: `src/skins/registry.ts` loads each skin through
  * a dynamic `import()`, and the routes do the same. So most of what `dist/assets/` holds
- * is *conditional* — the 243 KB `sip.js` web chunk reaches only a visitor who opens the
- * softphone, and a skin's chunk reaches only visitors of that skin.
+ * is *conditional* — a skin's chunk reaches only visitors of that skin.
  *
  * That makes total build size a weak signal and the **eager set** — the scripts and
  * stylesheets `index.html` names directly, plus anything Vite decides to `modulepreload`
@@ -61,10 +60,14 @@ export const DIST_INDEX_HTML = path.join(DIST_DIR, 'index.html')
  * Everything `index.html` loads before it can render: the entry script, the entry
  * stylesheet, and any `modulepreload` Vite emits for the entry's static import graph.
  *
- * Today that is three files totalling 311.2 KB: the entry JS chunk, the entry CSS, and
- * one `modulepreload` for `logger`, which `src/lib/logger.ts` earns by being imported
- * on the entry path. A skin or a route becoming a static import is what moves this, and
- * moving this is what the whole file is for.
+ * Today that is four files totalling 304.00 KB: the entry JS chunk, the entry CSS, and
+ * `modulepreload`s for `jsx-runtime` and the small chunk the entry shares with the skins.
+ * A skin or a route becoming a static import is
+ * what moves this, and moving this is what the whole file is for.
+ *
+ * This cut (316 → 306) is the frontend becoming a UI with no backend behind it: the
+ * session request, the log shipper, the live phone and the live SMS poll all left the
+ * entry path, which outweighs the simulations that replaced them.
  *
  * This raise (300 → 316) is not a change in this repository: it is React 19.2.8 →
  * 19.3.0, arriving with the `minor-and-patch` Dependabot group. 28.6 KB measured as this
@@ -82,23 +85,19 @@ export const DIST_INDEX_HTML = path.join(DIST_DIR, 'index.html')
  * standing. So the cost is upstream and the only way to decline it is to decline the
  * upgrade.
  */
-export const MAX_EAGER_BYTES = 316 * 1024
+export const MAX_EAGER_BYTES = 306 * 1024
 
 /**
  * Ceiling for any single lazily-loaded chunk.
  *
- * Today's largest is `sip.js`'s web platform at 237.11 KB, well ahead of the `comic-book`
- * skin at 205.65 KB — the pair have swapped places twice, so read the build rather than
- * this sentence when it matters. A lazy chunk is allowed to be much larger than an eager
- * one — that is the whole trade the code splitting buys — but not unboundedly so: past a
- * point the route that owns it is slow enough to feel broken, and the honest fix is to
- * split it again.
+ * Today's largest is the `comic-book` skin at 201.38 KB. A lazy chunk is allowed to be
+ * much larger than an eager one — that is the whole trade the code splitting buys — but
+ * not unboundedly so: past a point the route that owns it is slow enough to feel broken,
+ * and the honest fix is to split it again.
  *
- * **Which chunk this number is about changed with the cut recorded at the bottom of this
- * comment.** Every raise below is a comic-book raise, because comic-book was the binding
- * chunk for all of them; it is not any more, and the next branch to find this failing
- * should check which chunk failed before reading the history as though it were still
- * about the skin. A softphone change now moves this and a skin change may not.
+ * **This number is about comic-book again.** The paragraphs below were written while
+ * `sip.js`'s 237 KB web chunk was the binding one; leaving the browser SIP stack out of
+ * the default build took the cap from 239 to 204, and the skin is what moves it now.
  *
  * This raise (260 → 261) is 0.77 KB of `benDayTint.ts`, the lava-lamp colour drift through
  * the comic-book skin's Ben-Day ripple: a three-sine field and an RGB↔HSL round trip, so
@@ -198,7 +197,7 @@ export const MAX_EAGER_BYTES = 316 * 1024
  * the skin's budget any more. A comic-book branch now has 33 KB of room here and should
  * check {@link MAX_TOTAL_JS_BYTES}, which is where its weight still shows.
  */
-export const MAX_LAZY_CHUNK_BYTES = 239 * 1024
+export const MAX_LAZY_CHUNK_BYTES = 204 * 1024
 
 /**
  * Every `.js` file in `dist/assets/`, summed. Today 956.6 KB across 46 chunks; the
@@ -244,10 +243,8 @@ export const MAX_LAZY_CHUNK_BYTES = 239 * 1024
  * (969.6 KB) against the master it branches from (965.7 KB): `PanelCallScene` splits the
  * handset's panel in two while a call is up, `callSceneGeometry.ts` cuts its polygon
  * along a vertical line a gutter apart, and `CallBubble` is a balloon holding a scrolling
- * transcript and the red key. The dev-only call simulation (`useCallSimulation`,
- * `callSimulation.ts`) is behind an `import.meta.env.DEV` test in App.tsx and is not in
- * the build — its script text does not appear in `dist/`. Same lazy comic-book chunk,
- * still 46 of them, `package.json` untouched, so nothing new was pulled in.
+ * transcript and the red key. Same lazy comic-book chunk, still 46 of them,
+ * `package.json` untouched, so nothing new was pulled in.
  *
  * This raise (970 → 971) is the scrollable call-records table, 0.48 KB measured as this
  * branch's merge (970.2 KB) against the master it merges (969.7 KB): `liveTables.ts`
@@ -458,8 +455,13 @@ export const MAX_LAZY_CHUNK_BYTES = 239 * 1024
  *
  * 971 rather than flush against 969.26 KB for the reason above: a kilobyte clear, not
  * flush. 970 would hold at 0.74 KB, which is less clearance than this file asks for.
+ *
+ * This cut (971 → 728) is the default build becoming a UI with no backend behind it,
+ * measured at 725.7 KB: `sip.js` and the live hooks stay in the tree behind
+ * `VITE_LIVE_BACKEND` and leave the bundle. The simulations now ship, which they did not
+ * while they were dev-only.
  */
-export const MAX_TOTAL_JS_BYTES = 971 * 1024
+export const MAX_TOTAL_JS_BYTES = 728 * 1024
 
 /**
  * Every `.css` file in `dist/assets/`, summed. Today 44.2 KB across 2 files.
@@ -545,6 +547,22 @@ export const STRAY_UTILITIES: readonly string[] = ['ordinal']
  * `configSeed.ts` → `configOps.ts` → the engine.
  */
 export const DEV_ONLY_MARKERS: readonly string[] = ['comic-book:editConfig']
+
+/**
+ * Strings only the live side of `VITE_LIVE_BACKEND` needs, so a default build holding one
+ * has the real app in it: the session request, the log sink, the softphone's credential
+ * call, and a name SIP.js keeps through minification. The same idea as
+ * {@link DEV_ONLY_MARKERS}, with the same tie from each literal back to its source.
+ *
+ * Every budget in this file measures that default build. A live build runs about 240 KB
+ * over {@link MAX_TOTAL_JS_BYTES}, nearly all of it SIP.js, and nothing gates one today.
+ */
+export const LIVE_ONLY_MARKERS: readonly string[] = [
+  '/auth/session',
+  '/vg/1.0.0/frontend-logs',
+  '/webphone-credential',
+  'Registerer',
+]
 
 /**
  * Every webfont in `dist/assets/`, summed. Today 231 KB: five weights of Outfit, each

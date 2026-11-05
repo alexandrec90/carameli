@@ -188,12 +188,9 @@ next Save. It is what happened to the call log when #274 replaced its five colum
 four and #287 put them back. `configParity.ts` reports the mismatch after the fact;
 repairing it on the way in is what stops the next tab causing it.
 
-**`?sim=1` fills every live surface with made-up records** (`lib/simTables.ts`, dev only,
-`?sim=0` to stop and the flag persisted in `localStorage['live-tables:sim']` in between).
-A development database holds two calls and no messages, so the notepad you are lining up
-is three lines long and the wheel does nothing — which is the state every decision about
-band height, ink and column width would otherwise be made in. Simulated rows replace the
-poll rather than seeding it, so nothing is fetched while it is on, and they are built as
+**In the default demo every live surface is filled with made-up records** (`lib/simTables.ts`), so the notepad
+you are lining up always has enough rows to overflow its window, which is the state every
+decision about band height, ink and column width has to be made in. They are built as
 records run through the feed's own mapper, which is what keeps them index-parallel to the
 columns with no second list to update.
 
@@ -670,8 +667,8 @@ PanelActions.tsx    what a selected panel can have done to it: split, hide, show
 ../table.css        surface + cell styles, the hovered row's band, and the editor-only band guides
 ../TableRowBand.tsx the flat wash behind the row under the pointer, placed by band arithmetic
 ../useLiveTableImages.ts hook + PURE: which feeds a page needs, and the rows dropped onto its surfaces
-../../../lib/liveTables.ts PURE: the feeds, their columns, and record -> row (shared, no fetching)
-../../../hooks/useLiveTables.ts hook: the only place a surface's rows are fetched, and the poll
+../../../lib/liveTables.ts PURE: the feeds, their columns, and record -> row (shared)
+../../../hooks/useLiveTables.ts hook: the only place a surface's rows come from; demo or polled
 ../ProjectedNumberPad.tsx fixed 3 × 4 telephone keys on a projected surface; live buttons outside edit mode
 ../number-pad.css   number-pad lettering, surface layout, and the live key's press states
 ../BubbleActions.tsx action buttons inside a balloon, one per comma-delimited entry

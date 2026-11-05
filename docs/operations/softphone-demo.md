@@ -1,5 +1,10 @@
 # Softphone demo — registering a real phone against Carameli
 
+> **Not currently usable.** The Telnyx and Jambonz accounts this runbook needs have been
+> cancelled, and the frontend now defaults to a simulated softphone. With those accounts
+> back, start the frontend with `VITE_LIVE_BACKEND=true` to get the browser softphone this
+> runbook describes; `frontend/CLAUDE.md` has the switch.
+
 How to put a working softphone on a Carameli extension so an end-to-end demo — dial out
 from CRM, ring in on a Telnyx DID, hear both legs, get the recording back — runs
 on real audio rather than on webhook logs.

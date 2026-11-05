@@ -1,7 +1,7 @@
 import { act, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { useSmsSimulation } from '../hooks/useSmsSimulation'
+import { useDemoSmsConversations } from '../hooks/useDemoSmsConversations'
 import {
   SIM_REPLIES,
   SIM_SENDER,
@@ -21,7 +21,7 @@ const rig = (...values: number[]) => {
   vi.spyOn(Math, 'random').mockImplementation(() => values[i++] ?? 0.99)
 }
 
-describe('useSmsSimulation', () => {
+describe('useDemoSmsConversations', () => {
   beforeEach(() => {
     vi.useFakeTimers()
   })
@@ -33,7 +33,7 @@ describe('useSmsSimulation', () => {
 
   it('shows a sent message immediately, as the sender, delivered', () => {
     rig(0.9)
-    const { result } = renderHook(() => useSmsSimulation())
+    const { result } = renderHook(() => useDemoSmsConversations())
     act(() => void result.current.send(PEER, 'hello'))
 
     const msgs = result.current.conversations[PEER]
@@ -43,14 +43,14 @@ describe('useSmsSimulation', () => {
   })
 
   it('ignores a blank send', () => {
-    const { result } = renderHook(() => useSmsSimulation())
+    const { result } = renderHook(() => useDemoSmsConversations())
     act(() => void result.current.send(PEER, '   '))
     expect(result.current.conversations[PEER]).toBeUndefined()
   })
 
   it('stays silent forever when the coin says no', () => {
     rig(0.9)
-    const { result } = renderHook(() => useSmsSimulation())
+    const { result } = renderHook(() => useDemoSmsConversations())
     act(() => void result.current.send(PEER, 'anyone there?'))
     act(() => vi.advanceTimersByTime(SIM_TYPING_DELAY_MS + SIM_TYPING_MS + 10_000))
 
@@ -60,7 +60,7 @@ describe('useSmsSimulation', () => {
 
   it('types for a while, visibly, before the reply lands', () => {
     rig(0.1, 0)
-    const { result } = renderHook(() => useSmsSimulation())
+    const { result } = renderHook(() => useDemoSmsConversations())
     act(() => void result.current.send(PEER, 'hello'))
 
     // The pause before the dots: they read the message first.
@@ -78,7 +78,7 @@ describe('useSmsSimulation', () => {
 
   it('keeps each peer’s conversation while the wheel is elsewhere', () => {
     rig(0.9, 0.9)
-    const { result } = renderHook(() => useSmsSimulation())
+    const { result } = renderHook(() => useDemoSmsConversations())
     act(() => void result.current.send(PEER, 'first thread'))
     act(() => void result.current.send(OTHER, 'second thread'))
 
@@ -89,7 +89,7 @@ describe('useSmsSimulation', () => {
   it('lands a reply in its own thread even after sending to another peer', () => {
     // First send earns a reply; the second, to another peer, does not.
     rig(0.1, 0, 0.9)
-    const { result } = renderHook(() => useSmsSimulation())
+    const { result } = renderHook(() => useDemoSmsConversations())
     act(() => void result.current.send(PEER, 'hello'))
     act(() => void result.current.send(OTHER, 'unrelated'))
     act(() => vi.advanceTimersByTime(SIM_TYPING_DELAY_MS + SIM_TYPING_MS))
@@ -101,7 +101,7 @@ describe('useSmsSimulation', () => {
 
   it('gives every message its own id', () => {
     rig(0.1, 0)
-    const { result } = renderHook(() => useSmsSimulation())
+    const { result } = renderHook(() => useDemoSmsConversations())
     act(() => void result.current.send(PEER, 'hello'))
     act(() => vi.advanceTimersByTime(SIM_TYPING_DELAY_MS + SIM_TYPING_MS))
 
@@ -112,7 +112,7 @@ describe('useSmsSimulation', () => {
   it('cancels a pending reply when the hook unmounts', () => {
     rig(0.1, 0)
     const clear = vi.spyOn(window, 'clearTimeout')
-    const { result, unmount } = renderHook(() => useSmsSimulation())
+    const { result, unmount } = renderHook(() => useDemoSmsConversations())
     act(() => void result.current.send(PEER, 'hello'))
     unmount()
     expect(clear).toHaveBeenCalled()

@@ -13,13 +13,8 @@ vi.mock('../../lib/logger', () => ({
   },
 }))
 
-import {
-  api,
-  BackendOfflineError,
-  type AddExtensionBody,
-  type AddPhoneLineBody,
-  type CustomerCreate,
-} from '../../api/client'
+import { liveApi as api, BackendOfflineError } from '../../api/liveClient'
+import type { AddExtensionBody, AddPhoneLineBody, CustomerCreate } from '../../api/types'
 import { resetBackendReachability } from '../../lib/backendReachability'
 
 function mockFetch(status: number, body: unknown) {

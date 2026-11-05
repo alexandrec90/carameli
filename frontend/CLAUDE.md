@@ -1,18 +1,57 @@
 # Frontend
 
-Vite proxies `/api`, `/auth`, `/vsapi`, `/vg`, and `/health` to the backend.
-Browser authentication uses the HttpOnly session cookie from `/auth/session`; never put
-an API key or provider credential in the bundle.
+**The frontend is a UI proof of concept by default: it makes no requests to anything.**
+The carrier and call-engine accounts are gone, so the default build may not reach for them.
+All data is simulated, with no URL argument. The real app is kept, compiled and tested, and
+`VITE_LIVE_BACKEND=true` selects it at build time:
 
-- Hooks own API access and state. Pages select a hook and a skin view. Skins render the
+| Surface | Selector | Demo (default) | Live |
+| --- | --- | --- | --- |
+| Every `api.*` call | `src/api/client.ts` | `demoClient.ts`, in memory until a reload | `liveClient.ts` |
+| The telephone, on every skin | `hooks/useSoftphone.ts` | `useDemoSoftphone.ts` | `useLiveSoftphone.ts` (SIP.js) |
+| SMS threads | `hooks/useSmsConversations.ts` | `useDemoSmsConversations.ts` | `useLiveSmsConversations.ts` |
+| Projected tables | `hooks/useLiveTables.ts` | `useDemoTables.ts` | `usePolledTables.ts` |
+| Session gate | `src/App.tsx` | none | `SessionGate.tsx` |
+| Logs | `lib/logger.ts` | the browser console | also `lib/logShipping.ts` |
+
+**To turn it on**, set `VITE_LIVE_BACKEND=true` in `frontend/.env.local` for a host
+`npm run dev`, or in the repo's `.env` for the compose stack, and restart Vite: it is read
+at startup and cannot be flipped from a URL or a running page. Anything else means the
+demo. A live build needs the backend and the provider accounts behind it, and with `sms`
+chains and the softphone it sends and dials for real, at the account's expense.
+
+**The live side stays out of a demo build, it is not merely unused.** Pick an
+implementation with `import.meta.env.VITE_LIVE_BACKEND === 'true' ? live : demo`, spelled
+inline at every use, and import a live file from nowhere but such a selector. The
+repetition is load-bearing: Rolldown folds that literal before deciding what to keep, but
+folds a `LIVE_BACKEND` constant imported from another module only afterwards, so a shared
+constant leaves dead exports holding the live client in the entry chunk, 8 KB on every
+visitor's first load. `noBackend.test.tsx` refuses the constant, and `LIVE_ONLY_MARKERS` in
+`bundlePolicy.ts` fails `test:bundle` if live code ships. SIP.js takes a second step,
+`omitSipJs` in `vite.config.ts`, because the bundler emits a dynamic import's target even
+after folding removes the caller. The budgets measure the demo build only; a live build
+runs about 240 KB over the total.
+
+`demoApi` is declared as the live client's own type, so a new or changed endpoint fails
+the compiler until the demo answers it too. A new endpoint is a method on both.
+
+`src/tests/noBackend.test.tsx` holds the demo to its promise: it scans the source for
+network calls, exempting only the live files and the comic-book editor's Save and Ship
+(which post to the Vite dev server's own middleware), and renders every route with
+`fetch` and `console.error` watched. `src/tests/backendSwitch.test.ts` holds the selectors.
+Tests run as the demo; a test of the live side uses `vi.stubEnv` or imports the live file
+directly. Nothing has run the live side against a real backend since the
+accounts went, so expect to re-test it end to end when turning it back on.
+
+- Hooks own data access and state. Pages select a hook and a skin view. Skins render the
   supplied data and must not fetch it themselves.
 - Shared helpers/constants belong in `src/lib/`; do not duplicate formatters or wire
   literals across hooks/components.
 - Keep frontend variables `camelCase`; map external wire shapes explicitly at the API
   boundary.
 - Prefer derived values over effects that mirror state.
-- Use `src/lib/logger.ts` for unexpected states and caught failures. It already batches
-  authenticated entries to `/vg/1.0.0/frontend-logs`; never log secrets or message bodies.
+- Use `src/lib/logger.ts` for unexpected states and caught failures; never log secrets
+  or message bodies.
 - Follow `.claude/rules/skin-architecture.md` and the active skin's scoped rule for skin
   work. Use the `add-skin` skill only when creating an entirely new skin.
 
@@ -57,14 +96,14 @@ had accumulated two type errors that only showed to whoever opened it in an edit
 ## `?slow=1` is how you look at a loading screen
 
 **Every loading screen in the app is invisible on a warm dev machine, and that is by
-design.** Each of the three gates — the skin chunk (`skins/context.tsx`), the session
-(`App.tsx`), the comic-book page's pictures (`skins/comic-book/pageReveal.ts`) — draws
-nothing for the first 200–400 ms, so a cached load opens the gate inside its own debounce
+design.** Each of the two gates — the skin chunk (`skins/context.tsx`) and the comic-book
+page's pictures (`skins/comic-book/pageReveal.ts`) — draws nothing for the first
+200–400 ms, so a cached load opens the gate inside its own debounce
 and the screen never paints at all. The exit is where that bites: the comic-book page
 wipes in over the paper it was loading on, and a transition you cannot see run is a
 transition you cannot tune.
 
-`?slow=1` drops all three debounces to zero and holds each gate for a second, so each
+`?slow=1` drops both debounces to zero and holds each gate for a second, so each
 screen paints and each transition plays at a cold visitor's pace. `?slow=<ms>` picks a
 different hold (capped at 30 s) when a second is not long enough; `?slow=0` turns it off,
 and in between it is remembered in `localStorage['loading:slow']` so switching skins from
@@ -74,24 +113,19 @@ Each gate holds for its *own* second rather than sharing one deadline. A shared 
 would be spent by the first gate, and the last one, the only one with a transition to
 show, would never hold at all.
 
-**On the comic-book skin the three gates share one screen, so what `?slow=1` shows is
-three seconds of the same paper, then the wipe.** The paper — the pointer-lit Ben-Day
+**On the comic-book skin the two gates share one screen, so what `?slow=1` shows is
+two seconds of the same paper, then the wipe.** The paper — the pointer-lit Ben-Day
 grid with the LOADING legend — is mounted by `SkinProvider` under the app for the skin's
-whole life (`persistent` in `skins/registry.ts`), and the session gate and the pictures
-gate say they are still loading through `hooks/useLoadingHold.ts` rather than drawing a
-screen of their own. Before that, each gate drew its own: under `?slow=1` the legend
-popped three times with a bare frame between each, the session gate's screen was a CSS
-dot pattern that did not follow the pointer, and the exit was a halftone wash whose paper
-dots read as giant Ben-Day dots over the page. A gate that draws its own screen again
-brings all of that back — hold instead.
+whole life (`persistent` in `skins/registry.ts`), and the pictures gate says it is still
+loading through `hooks/useLoadingHold.ts` rather than drawing a screen of its own. A gate
+that draws its own screen brings back the legend popping once per gate with a bare frame
+between each — hold instead.
 
 `lib/slowLoading.ts` is the flag and the promise-side hold; `hooks/useSlowLoading.ts` is
-the hook the two boolean gates report through. **It costs a production build nothing**,
-which is the bar `?sim=1`, `?smsSim=1` and `?callSim=1` already meet: the flag is behind
-`import.meta.env.DEV` and folds away, and because a hook cannot be called conditionally,
-`useSlowReady` is *chosen* at build time — the real hook in development, the identity on
-`ready` in a build. Reverting that fold is not free and not invisible: it puts the total
-JavaScript 12 bytes over `bundlePolicy.ts`'s ratchet, so `npm run test:bundle` fails.
+the hook the boolean gate reports through. **It costs a production build nothing**: the
+flag is behind `import.meta.env.DEV` and folds away, and because a hook cannot be called
+conditionally, `useSlowReady` is *chosen* at build time — the real hook in development,
+the identity on `ready` in a build.
 
 ## What a visitor downloads has three budgets, and they do not overlap
 

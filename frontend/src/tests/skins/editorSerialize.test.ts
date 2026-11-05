@@ -408,13 +408,13 @@ describe('serializeConfig chains', () => {
     // The things a hand-editor cannot infer from the data: that the two linked balloons
     // are stamped from rather than drawn, which end is newest, what decides the column a
     // message lands in, that a composer is spelled as a content kind, and — the one that
-    // costs money to get wrong — that `sms` sends for real and reads its number off a
-    // balloon that is not in the chain at all.
+    // costs money to get wrong — that `sms` sends for real in a live build and reads its
+    // number off a balloon that is not in the chain at all.
     expect(ts).toContain('are *templates*, not slots')
     expect(ts).toContain('the newest sit at the bottom')
     expect(ts).toContain('deciding which column a message lands in')
     expect(ts).toContain("content: 'input'")
-    expect(ts).toContain('binds the chain to a **real** thread')
+    expect(ts).toContain('**real** in a live build')
     expect(ts).toContain('wheel-picker balloon')
   })
 

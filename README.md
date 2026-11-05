@@ -3,6 +3,12 @@
 Self-hosted VoIP microservice powered by Telnyx + Jambonz. Drop-in replacement for the
 legacy carrier integration it supersedes.
 
+> **The UI runs by default as a proof of concept with nothing behind it.** Calls, SMS and
+> tables are simulated in the browser, with no backend, no provider account and no URL
+> arguments. To see it, run `npm --prefix frontend ci` once, then
+> `npm --prefix frontend run dev`. The rest of this guide describes the full stack, which
+> the UI uses when started with `VITE_LIVE_BACKEND=true`.
+
 ---
 
 ## Prerequisites

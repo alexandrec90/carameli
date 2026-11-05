@@ -1,7 +1,6 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
 
 import {
-  detectCallSim,
   SIM_FILLERS,
   SIM_GAP_MAX_MS,
   SIM_GAP_MIN_MS,
@@ -87,42 +86,5 @@ describe('linesBy', () => {
     expect(linesBy(transcript, 'remote').map(l => l.id)).toEqual(['a', 'c'])
     expect(linesBy(transcript, 'local').map(l => l.id)).toEqual(['b'])
     expect(linesBy(EMPTY_TRANSCRIPT, 'local')).toEqual([])
-  })
-})
-
-describe('detectCallSim', () => {
-  const FLAG = 'call:sim'
-  const visit = (search: string) => window.history.replaceState(null, '', `/${search}`)
-
-  afterEach(() => {
-    visit('')
-    window.localStorage.removeItem(FLAG)
-  })
-
-  it('is off with nothing asked for and nothing remembered', () => {
-    expect(detectCallSim()).toBe(false)
-    expect(window.localStorage.getItem(FLAG)).toBeNull()
-  })
-
-  it('turns on from ?callSim=1 and remembers it for the next page', () => {
-    visit('?callSim=1')
-    expect(detectCallSim()).toBe(true)
-    expect(window.localStorage.getItem(FLAG)).toBe('1')
-
-    visit('')
-    expect(detectCallSim()).toBe(true)
-  })
-
-  it('turns off from ?callSim=0 and forgets', () => {
-    window.localStorage.setItem(FLAG, '1')
-    visit('?callSim=0')
-    expect(detectCallSim()).toBe(false)
-    expect(window.localStorage.getItem(FLAG)).toBeNull()
-  })
-
-  it('keeps its own flag apart from the SMS one', () => {
-    visit('?smsSim=1')
-    expect(detectCallSim()).toBe(false)
-    expect(window.localStorage.getItem(FLAG)).toBeNull()
   })
 })

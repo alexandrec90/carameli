@@ -4,7 +4,7 @@ import { useLayoutEffect, useSyncExternalStore } from 'react'
 //
 // A skin whose loading config is `persistent` (`skins/registry.ts`) has its screen
 // mounted by `SkinProvider` under the app for the skin's whole life, rather than one
-// screen per thing that loads. The gates below it — the session in `App.tsx`, a page's
+// screen per thing that loads. The gates below it — the session in `SessionGate.tsx`, a page's
 // pictures in the comic-book Layout — say what is still loading through this store, and
 // the screen keeps its legend up while any of them holds.
 //

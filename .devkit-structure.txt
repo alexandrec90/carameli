@@ -24,9 +24,9 @@ complexity::app/api/webhooks/sms_inbound.py::_handle_inbound_message = 20
 complexity::app/repositories/call_event_repo.py::create_from_webhook = 17
 complexity::app/services/agent_status_sync.py::poll_agent_status = 25
 complexity::frontend/src/components/DataView.tsx::DataView = 33
+complexity::frontend/src/hooks/useLiveSmsConversations.ts::useLiveSmsConversations = 20
+complexity::frontend/src/hooks/useLiveSoftphone.ts::useLiveSoftphone = 39
 complexity::frontend/src/hooks/useSms.ts::useSms = 21
-complexity::frontend/src/hooks/useSmsConversations.ts::useSmsConversations = 20
-complexity::frontend/src/hooks/useSoftphone.ts::useSoftphone = 39
 complexity::frontend/src/skins/barebone/views/DataPage.tsx::DataPage = 24
 complexity::frontend/src/skins/barebone/views/Softphone.tsx::Softphone = 17
 complexity::frontend/src/skins/carameli/views/Softphone.tsx::SoftphoneView = 16
@@ -394,18 +394,18 @@ function_lines::frontend/src/hooks/useAgentSkills.ts::useAgentSkills = 124
 function_lines::frontend/src/hooks/useAgents.ts::useAgents = 118
 function_lines::frontend/src/hooks/useAudioAssets.ts::useAudioAssets = 118
 function_lines::frontend/src/hooks/useCallQueues.ts::useCallQueues = 122
-function_lines::frontend/src/hooks/useCallSimulation.ts::useCallSimulation = 113
 function_lines::frontend/src/hooks/useCallSummary.ts::useCallSummary = 92
 function_lines::frontend/src/hooks/useConferences.ts::useConferences = 127
+function_lines::frontend/src/hooks/useDemoSoftphone.ts::useDemoSoftphone = 112
 function_lines::frontend/src/hooks/useExemptionCodes.ts::useExemptionCodes = 135
 function_lines::frontend/src/hooks/useExpansionModules.ts::useExpansionModules = 124
 function_lines::frontend/src/hooks/useGroupExtensions.ts::useGroupExtensions = 127
 function_lines::frontend/src/hooks/useIntercomGroups.ts::useIntercomGroups = 131
+function_lines::frontend/src/hooks/useLiveSmsConversations.ts::useLiveSmsConversations = 135
+function_lines::frontend/src/hooks/useLiveSoftphone.ts::useLiveSoftphone = 310
 function_lines::frontend/src/hooks/useMulticastGroups.ts::useMulticastGroups = 133
 function_lines::frontend/src/hooks/useParkingLots.ts::useParkingLots = 127
 function_lines::frontend/src/hooks/useSms.ts::useSms = 151
-function_lines::frontend/src/hooks/useSmsConversations.ts::useSmsConversations = 135
-function_lines::frontend/src/hooks/useSoftphone.ts::useSoftphone = 310
 function_lines::frontend/src/hooks/useSpeedDials.ts::useSpeedDials = 135
 function_lines::frontend/src/hooks/useWebhooks.ts::useWebhooks = 130
 function_lines::frontend/src/skins/comic-book/editor/configHydrate.ts::hydrateConfig = 87
@@ -534,3 +534,10 @@ todos::app/api/auth.py = 1
 #   dependency::requirements-dev.txt::opentelemetry-api -> 1
 #   dependency::requirements-test.txt::opentelemetry-api -> 1
 #   dependency::requirements.txt::opentelemetry-api -> 1
+
+# 2026-11-05  recorded: Moves, not growth: this PR split each hook behind a demo/live selector, so the bodies changed path and name and the keys followed them. useSoftphone became useLiveSoftphone (complexity 39, 310 lines, both unchanged), useSmsConversations became useLiveSmsConversations (20, 135, unchanged), and useCallSimulation became useDemoSoftphone (113 -> 112 lines). The tighten in this same call drops all five old keys, so the debt total is one line lower. The split the two live findings ask for is owed, but not on this branch: the provider accounts are cancelled, so a reshaped SIP call path could not be run end to end, and that hook is what comes back when the real app is turned on.
+#   complexity::frontend/src/hooks/useLiveSmsConversations.ts::useLiveSmsConversations -> 20
+#   complexity::frontend/src/hooks/useLiveSoftphone.ts::useLiveSoftphone -> 39
+#   function_lines::frontend/src/hooks/useDemoSoftphone.ts::useDemoSoftphone -> 112
+#   function_lines::frontend/src/hooks/useLiveSmsConversations.ts::useLiveSmsConversations -> 135
+#   function_lines::frontend/src/hooks/useLiveSoftphone.ts::useLiveSoftphone -> 310

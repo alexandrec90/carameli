@@ -12,16 +12,16 @@ import '@fontsource/outfit/700.css'
 import '@fontsource/outfit/800.css'
 import './index.css'
 
-// Capture uncaught JS errors and unhandled promise rejections into the log file.
+// Capture uncaught JS errors and unhandled promise rejections through the logger.
 installGlobalErrorHandlers()
 
 // Put the session request on the wire before React renders, because nothing below this
 // line can. `SkinProvider` withholds its children until the skin's chunk has loaded and
-// `App` withholds its own until this request returns, so a fetch issued from inside the
-// tree waits out the entire skin first — two independent delays taken one after the
+// `SessionGate` withholds its own until this request returns, so a fetch issued from inside
+// the tree waits out the entire skin first — two independent delays taken one after the
 // other, for a request that never needed the skin. Started here they overlap. See
 // `hooks/useAuth.ts`; calling it twice is free, so the hook still owns the state.
-startSession()
+if (import.meta.env.VITE_LIVE_BACKEND === 'true') startSession()
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

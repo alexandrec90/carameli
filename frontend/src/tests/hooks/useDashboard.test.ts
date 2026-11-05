@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 vi.mock('../../api/client', () => ({
   api: {
     health: vi.fn(),
+    signedIn: vi.fn(),
     customers: {
       get: vi.fn(),
       create: vi.fn(),
@@ -48,6 +49,7 @@ const demoLines: PhoneLine[] = [
 beforeEach(() => {
   vi.clearAllMocks()
   vi.stubGlobal('fetch', vi.fn())
+  vi.mocked(api.signedIn).mockResolvedValue(true)
 })
 
 afterEach(() => {
@@ -65,8 +67,6 @@ describe('useDashboard', () => {
   })
 
   it('populates dashboard state on success', async () => {
-    const fetchMock = vi.mocked(fetch)
-    fetchMock.mockResolvedValue({ ok: true } as Response)
     vi.mocked(api.health).mockResolvedValue({ status: 'ok' })
     vi.mocked(api.customers.get).mockResolvedValue(demoCustomer)
     vi.mocked(api.customers.getPhoneLines).mockResolvedValue(demoLines)
@@ -83,9 +83,31 @@ describe('useDashboard', () => {
     expect(result.current.customer).toEqual(demoCustomer)
     expect(result.current.phoneLines).toEqual(demoLines)
     expect(result.current.lineCount).toBe(1)
-    expect(fetchMock).toHaveBeenCalledWith('/auth/me', {
-      credentials: 'include',
-    })
+    expect(fetch).not.toHaveBeenCalled()
+  })
+
+  it('asks for no customer data without a session', async () => {
+    vi.mocked(api.health).mockResolvedValue({ status: 'ok' })
+    vi.mocked(api.signedIn).mockResolvedValue(false)
+
+    const { result } = renderHook(() => useDashboard())
+
+    await waitFor(() => expect(result.current.loading).toBe(false))
+
+    expect(result.current.apiOnline).toBe(true)
+    expect(api.customers.get).not.toHaveBeenCalled()
+  })
+
+  it('stays online when the customer has not been seeded', async () => {
+    vi.mocked(api.health).mockResolvedValue({ status: 'ok' })
+    vi.mocked(api.customers.get).mockRejectedValue(new Error('404'))
+
+    const { result } = renderHook(() => useDashboard())
+
+    await waitFor(() => expect(result.current.loading).toBe(false))
+
+    expect(result.current.apiOnline).toBe(true)
+    expect(result.current.customer).toBeNull()
   })
 
   it('sets apiOnline=false when health check fails', async () => {

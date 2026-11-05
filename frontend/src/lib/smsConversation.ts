@@ -26,6 +26,31 @@ export interface SmsConversationMessage {
   status: SmsSendStatus
 }
 
+/** SMS threads as a view draws them, whichever source `useSmsConversations` picked. */
+export interface UseSmsConversationsResult {
+  /** Transcripts, keyed by the counterparty's E.164 number, oldest message first. */
+  conversations: Readonly<Record<string, readonly SmsConversationMessage[]>>
+  /** The account's outgoing number. Empty until the phone lines have loaded. */
+  sender: string
+  /** The last failure worth surfacing, or '' — a view may render it or ignore it. */
+  error: string
+  /**
+   * Register interest in one conversation and get its transcript polled. Returns the
+   * unsubscribe, so a caller spells the whole subscription as an effect body.
+   * Reference-counted: two views watching one number share a single poll, and the
+   * poll stops when the last of them goes away.
+   */
+  subscribe: (peer: string) => () => void
+  /** Send to `peer` from the account's number, showing the message before it lands. */
+  send: (peer: string, text: string) => Promise<void>
+  /**
+   * Peers currently composing a message, for the chain's typing dots. Always empty on
+   * the live source — SMS has no typing signal for a carrier to relay — but part of the
+   * contract so the demo can show one without the skin knowing which it is rendering.
+   */
+  typing: Readonly<Record<string, boolean>>
+}
+
 /** The prefix that marks a local, not-yet-acknowledged row. */
 const PENDING_PREFIX = 'pending:'
 

@@ -40,7 +40,7 @@ export interface SkinLoadingConfig {
       `loadingScreen.test.tsx` keeps this in step with `--cb-cursor-default`. */
   cursor?: string
   /** The screen outlives the load: `SkinProvider` keeps it mounted under the app for
-      the skin's whole life, and the gates below it — the session in `App.tsx`, a page's
+      the skin's whole life, and the gates below it — the session in `SessionGate.tsx`, a page's
       pictures — say what is still loading through `hooks/useLoadingHold.ts` instead of
       drawing a screen of their own. One legend spans every gate, where one screen per
       gate was three legends popping in turn with a bare frame between them. */

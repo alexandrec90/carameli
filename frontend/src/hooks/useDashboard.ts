@@ -26,8 +26,7 @@ export function useDashboard(): UseDashboardResult {
 
         // Only load customer data when authenticated to avoid console errors
         // when the session cookie is absent (e.g. E2E tests, first load).
-        const authRes = await fetch('/auth/me', { credentials: 'include' })
-        if (authRes.ok) {
+        if (await api.signedIn()) {
           try {
             const c = await api.customers.get(DEMO_VS_CUSTOMER_ID)
             setCustomer(c)

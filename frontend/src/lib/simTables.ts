@@ -1,64 +1,21 @@
-import type { CallEvent, SmsMessage } from '../api/client'
-import { logger } from './logger'
+import type { CallEvent, CallSummaryGroupBy, CallSummaryRow, SmsMessage } from '../api/client'
 import { callRows, LIVE_TABLE_LIMIT, smsRows, type TableSource } from './liveTables'
 
 /**
- * Made-up records for the live feeds, so a surface can be framed against a full table.
+ * The made-up call and SMS records behind every table in the app.
  *
  * A projected table is drawn on a photograph and scrolled a row at a time, and both of
- * those are only judgeable against enough rows to fill the window and overflow it. A
- * development database holds two calls and no messages, so the notepad an author is
- * lining up is three lines long and the wheel does nothing — which is exactly the state
- * in which every decision about band height, ink and column width has to be made.
- *
- * `?sim=1` fills every live surface on the page with {@link LIVE_TABLE_LIMIT} rows
- * instead, the same number a real feed asks for, and `?sim=0` puts the real feed back.
- * **It is dev-only**, on the same terms as the editor: fabricated call history on a page
- * a customer can reach is a support call, not a preview.
+ * those are only judgeable against enough rows to fill the window and overflow it, so a
+ * feed is always {@link LIVE_TABLE_LIMIT} rows. `api/client.ts` serves the same records
+ * to the Call Events, SMS and CDR Summary pages.
  *
  * The rows are built as records and run through the feed's own mapper rather than written
  * out as cells. That is what keeps them index-parallel to the columns for free — a feed
  * that gains or loses a column changes these too, and there is no second list to update.
  */
 
-const FLAG_KEY = 'live-tables:sim'
-
-/**
- * Resolve the simulation flag for this load. `?sim=1` switches it on and `?sim=0` off;
- * either way `storedFlag` is what the persisted flag should become (`null` = removed) so
- * the outcome survives client-side navigation, which drops the query string.
- *
- * Deliberately the same shape as the editor's `resolveEditFlag`: they are two dev toggles
- * an author flips in the same address bar, and a second spelling of "on" would be one to
- * remember.
- */
-export function resolveSimFlag(
-  param: string | null,
-  stored: string | null,
-): { active: boolean; storedFlag: '1' | null } {
-  if (param === '1') return { active: true, storedFlag: '1' }
-  if (param === '0') return { active: false, storedFlag: null }
-  const active = stored === '1'
-  return { active, storedFlag: active ? '1' : null }
-}
-
-/** True when live surfaces should show made-up rows for this load. Persists the outcome. */
-export function detectSimTables(): boolean {
-  if (!import.meta.env.DEV || typeof window === 'undefined') return false
-  const param = new URLSearchParams(window.location.search).get('sim')
-  try {
-    const stored = window.localStorage.getItem(FLAG_KEY)
-    const { active, storedFlag } = resolveSimFlag(param, stored)
-    if (storedFlag !== stored) {
-      if (storedFlag === null) window.localStorage.removeItem(FLAG_KEY)
-      else window.localStorage.setItem(FLAG_KEY, storedFlag)
-    }
-    return active
-  } catch (err) {
-    logger.warn('Could not persist live-table simulation flag', { key: FLAG_KEY, err: String(err) })
-    return resolveSimFlag(param, null).active
-  }
-}
+/** The account's own number on every made-up record, and its one phone line. */
+export const SIM_LINE = '+14388762750'
 
 /**
  * The instant the made-up log ends. A fixed one rather than `Date.now()`: two calls a
@@ -107,8 +64,8 @@ function simCall(i: number): CallEvent {
     id: `sim-call-${i}`,
     call_sid: `CA${String(i).padStart(6, '0')}`,
     direction: outbound ? 'outbound' : 'inbound',
-    from_number: outbound ? '+14388762750' : simNumber(i),
-    to_number: outbound ? simNumber(i) : '+14388762750',
+    from_number: outbound ? SIM_LINE : simNumber(i),
+    to_number: outbound ? simNumber(i) : SIM_LINE,
     started_at: stamp,
     ended_at: status === 'completed' ? stamp : null,
     // A call that never connected has no duration, and the blank cell under a row that is
@@ -126,8 +83,8 @@ function simSms(i: number): SmsMessage {
   return {
     id: `sim-sms-${i}`,
     direction: outbound ? 'outbound' : 'inbound',
-    from_number: outbound ? '+14388762750' : simNumber(i),
-    to_number: outbound ? simNumber(i) : '+14388762750',
+    from_number: outbound ? SIM_LINE : simNumber(i),
+    to_number: outbound ? simNumber(i) : SIM_LINE,
     body: BODIES[i % BODIES.length],
     message_sid: `SM${String(i).padStart(6, '0')}`,
     delivery_status: 'delivered',
@@ -136,13 +93,51 @@ function simSms(i: number): SmsMessage {
   }
 }
 
+function indexes(count: number): number[] {
+  return Array.from({ length: Math.max(0, count) }, (_, i) => i)
+}
+
+/** `count` made-up call records, newest first. */
+export function simCalls(count: number = LIVE_TABLE_LIMIT): CallEvent[] {
+  return indexes(count).map(simCall)
+}
+
+/** `count` made-up SMS records, newest first. */
+export function simMessages(count: number = LIVE_TABLE_LIMIT): SmsMessage[] {
+  return indexes(count).map(simSms)
+}
+
 /**
- * `count` made-up rows for `source`, newest first — the order a real feed arrives in.
+ * `count` made-up rows for `source`, newest first.
  *
- * Pure and deterministic: index 7 is the same record on every call, so the poll-free
- * simulated answer can be memoized and handed back by identity like a quiet poll's.
+ * Pure and deterministic: index 7 is the same record on every call, so the answer can be
+ * memoized and handed back by identity.
  */
 export function simFeedRows(source: TableSource, count: number = LIVE_TABLE_LIMIT): string[][] {
-  const indexes = Array.from({ length: Math.max(0, count) }, (_, i) => i)
-  return source === 'calls' ? callRows(indexes.map(simCall)) : smsRows(indexes.map(simSms))
+  return source === 'calls' ? callRows(simCalls(count)) : smsRows(simMessages(count))
+}
+
+/** How many distinct extensions and numbers the made-up log is grouped into. */
+const SUMMARY_GROUPS = 6
+
+/** The made-up log rolled up for the CDR Summary page. */
+export function simCallSummary(groupBy: CallSummaryGroupBy): CallSummaryRow[] {
+  const groups = new Map<string, CallEvent[]>()
+  simCalls().forEach((call, i) => {
+    const bucket = i % SUMMARY_GROUPS
+    const key = groupBy === 'extension' ? String(101 + bucket) : simNumber(bucket)
+    groups.set(key, [...(groups.get(key) ?? []), call])
+  })
+  return [...groups].map(([group_key, calls]) => {
+    const answered = calls.filter(call => call.status === 'completed')
+    const total = answered.reduce((sum, call) => sum + (call.duration_seconds ?? 0), 0)
+    return {
+      group_key,
+      call_count: calls.length,
+      answered_count: answered.length,
+      total_duration_seconds: total,
+      avg_duration_seconds: Math.round(total / Math.max(1, answered.length)),
+      success_rate: answered.length / calls.length,
+    }
+  })
 }

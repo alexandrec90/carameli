@@ -72,8 +72,11 @@ test and the editor keeps holding the authored surface.
   alignment and headings stay the author's, but the editor hides **+ Column** / **−**, and
   `feedColumns` (`editor/tableValidate.ts`) replaces any list that is not the feed's length on the
   way out — for one reason, a tab older than the feed's shape.
-- **Live means polling** — `useLiveTables` re-asks every `LIVE_TABLE_POLL_MS`, skips a hidden tab
-  and refreshes on `visibilitychange`, returning the *identical* row array when nothing changed so
-  a quiet poll repaints no canvas; a failed refresh keeps the rows on screen. `?sim=1` frames a
-  surface against a full table instead (`lib/simTables.ts`, dev-only, `localStorage['live-tables:sim']`),
-  built through the feed's own mapper so no cell drifts out from under its heading.
+- **The demo's feed is simulated** — `useLiveTables` hands a surface a full table of made-up
+  records (`lib/simTables.ts`), built through the feed's own mapper so no cell drifts out from
+  under its heading, and returns the *identical* object while the feed names are unchanged, so
+  nothing repaints.
+- **Live means polling** — in a live build it re-asks every `LIVE_TABLE_POLL_MS`
+  (`hooks/usePolledTables.ts`), skips a hidden tab and refreshes on `visibilitychange`, returning
+  the *identical* row array when nothing changed so a quiet poll repaints no canvas; a failed
+  refresh keeps the rows on screen.

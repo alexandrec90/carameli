@@ -4,7 +4,7 @@ import { SLOW_LOADING_MS } from '../lib/slowLoading'
 /**
  * The React half of the `?slow=1` brake (`lib/slowLoading.ts` is the flag and the
  * promise-side hold). A gate whose answer is a boolean rather than a promise — the
- * session in `App.tsx`, a page's pictures in the comic-book Layout — reports ready
+ * session in `SessionGate.tsx`, a page's pictures in the comic-book Layout — reports ready
  * through this instead, and it withholds that for `ms` from mount.
  *
  * Held from mount, not from the moment `ready` last went false: each of these gates is
@@ -29,10 +29,8 @@ function useSlowReadyDev(ready: boolean, ms: number = SLOW_LOADING_MS): boolean 
 /**
  * {@link useSlowReadyDev} in development, the identity on `ready` in a production build.
  *
- * The indirection is what keeps a debugging aid off a visitor's wire, which is the bar
- * `?sim=1`, `?smsSim=1` and `?callSim=1` already meet by being inline
- * `import.meta.env.DEV` tests at their call sites. A hook cannot be called conditionally,
- * so the test moves here: `import.meta.env.DEV` is a literal `false` in a production
+ * The indirection is what keeps a debugging aid off a visitor's wire. A hook cannot be
+ * called conditionally, so the test moves here: `import.meta.env.DEV` is a literal `false` in a production
  * build, so this is the arrow below and the hook above — `useState`, `useEffect` and a
  * timer, all of them doing nothing — is dropped as unreachable. It is chosen once at
  * build time rather than per render, so the hook order every caller reports is fixed for
