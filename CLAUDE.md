@@ -190,6 +190,12 @@ The default pytest configuration excludes every `paid` test. Sandbox, chargeable
 and live-provider tiers require explicit opt-in; never broaden a free aggregate to
 include them.
 
+**`python scripts/e2e.py` is the tier only this machine can run**: Playwright and MinIO
+against a stack it starts, migrates and deletes itself, as the Compose project
+`carameli-e2e`, on free ports, with `.env` and its credentials kept out. It leaves a
+running stack alone. devkit's nightly job runs it; `.claude/rules/local-e2e.md` is the
+contract.
+
 The host venv must run **the same Python the image runs** — that version is coordinated
 across the `FROM python:` tag in `Dockerfile`, the uv-compiled locks, `mypy.ini`,
 `ruff.toml`, and CI. `scripts/bootstrap.py` reads the tag and creates the venv with

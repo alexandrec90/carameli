@@ -1,13 +1,15 @@
 """Integration tests for S3-compatible (MinIO) recording storage.
 
-These tests hit a real MinIO instance. They are skipped automatically when
-MinIO is not reachable (e.g. Docker is not running).
+These tests hit a real MinIO instance, so they carry the `local` marker: no hosted job
+starts MinIO, and scripts/e2e.py is what runs them. They skip when MinIO is not
+reachable (e.g. Docker is not running), which that tier reports as a failure.
 
 Run:
-    docker compose exec app pytest tests/integration/test_s3_storage.py -v
+    python scripts/e2e.py tests/integration/test_s3_storage.py
 
-Or from the host (MinIO must be reachable at localhost:9000):
-    S3_ENDPOINT=http://localhost:9000 pytest tests/integration/test_s3_storage.py -v
+Or against a running stack, naming the tier because addopts deselects it:
+    docker compose exec app pytest tests/integration/test_s3_storage.py -m local -v
+    S3_ENDPOINT=http://localhost:9000 pytest tests/integration/test_s3_storage.py -m local -v
 """
 
 from __future__ import annotations
@@ -18,7 +20,7 @@ import uuid
 
 import pytest
 
-pytestmark = pytest.mark.asyncio(loop_scope="session")
+pytestmark = pytest.mark.local
 
 # ---------------------------------------------------------------------------
 # Resolve MinIO endpoint: tests on host use localhost, inside Docker use minio

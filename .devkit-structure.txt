@@ -449,7 +449,6 @@ orphan::frontend/src/components/SkinSwitcher.tsx = 1
 skipped_tests::scripts/hooks/tests/test_codex_hooks_live.py = 1
 skipped_tests::scripts/hooks/tests/test_crm_preflight_tool.py = 1
 skipped_tests::scripts/hooks/tests/test_encode_comic_art.py = 3
-skipped_tests::tests/e2e/test_smoke.py = 3
 skipped_tests::tests/integration/test_s3_storage.py = 1
 skipped_tests::tests/integration/test_telnyx_sandbox.py = 4
 skipped_tests::tests/integration/test_webhook_e2e.py = 3

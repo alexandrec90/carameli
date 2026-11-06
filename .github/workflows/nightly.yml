@@ -48,8 +48,9 @@ jobs:
       - name: Full integration suite
         # -m "not paid" excludes every paid tier (sandbox/chargeable/live_e2e) by
         # marker -- robust where the old -k "not sandbox" name-match was not, and
-        # the guarantee that no automated pipeline ever hits a live provider.
-        run: pytest tests/integration/ -q --tb=short -m "not paid" --junit-xml=reports/junit-integration-nightly.xml
+        # the guarantee that no automated pipeline ever hits a live provider. An
+        # explicit -m replaces addopts' own, so `local` is excluded again here.
+        run: pytest tests/integration/ -q --tb=short -m "not paid and not local" --junit-xml=reports/junit-integration-nightly.xml
       - name: Adversarial webhook tests
         run: pytest tests/unit/test_webhooks.py -q -k "403 or sig or tamper or replay"
       - name: Upload results
@@ -137,7 +138,8 @@ jobs:
             -H "Authorization: Bearer ${api_key}" \
             -d '{"vs_customer_id": 1}' -o /dev/null
       - name: Run cross-browser E2E
-        run: pytest tests/e2e/ --browser=chromium --browser=firefox --browser=webkit -q
+        # `-m` because addopts deselects `local`, which all of tests/e2e carries.
+        run: pytest tests/e2e/ -m "local and not paid" --browser=chromium --browser=firefox --browser=webkit -q
       # A backend fault reaches these tests only as an opaque CORS message. An
       # unhandled exception is rendered by Starlette's ServerErrorMiddleware, which
       # sits OUTSIDE CORSMiddleware, so the 500 carries no Access-Control-Allow-Origin

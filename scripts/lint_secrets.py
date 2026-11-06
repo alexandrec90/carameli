@@ -36,7 +36,7 @@ def absent() -> Result | None:
     `detect-secrets` that is not installed -- the normal state of a fresh worktree,
     which checks out tracked files only and has no `.venv` -- says the machine does.
     Both printed `detect-secrets: scan failed (exit 1)`, so the second read as the
-    first, and this pass's own promise never to block the suite read as broken.
+    first.
 
     "not installed" is the exact phrase `failure_class.get_skip_reason` classifies as
     environmental, which is what keeps it out of the failure artifact. That is the
@@ -56,42 +56,70 @@ def normalize(text: str) -> str:
     return re.sub(r'"generated_at":\s*"[^"]*"', '"generated_at": ""', text)
 
 
-def hashes(text: str) -> set[tuple[str, str]]:
-    """`(file, hashed_secret)` for every finding a baseline records; empty if unparsable."""
+def entries(text: str) -> dict[tuple[str, str], dict]:
+    """Each finding a baseline records, by `(file, hashed_secret)`; empty if unparsable."""
     try:
         data = json.loads(text)
     except ValueError:
-        return set()
+        return {}
     return {
-        (file, s.get("hashed_secret", ""))
+        (file, s.get("hashed_secret", "")): s
         for file, secrets in (data.get("results") or {}).items()
         for s in secrets
     }
 
 
-def report(before: str, after: str) -> None:
-    """Say what a scan that really changed the baseline changed, for `git diff` review."""
-    added = hashes(after) - hashes(before)
-    if added:
-        print(
-            f"  [auto-fix] detect-secrets: {len(added)} new finding(s) added to "
-            ".secrets.baseline -- review with: git diff .secrets.baseline"
+def hashes(text: str) -> set[tuple[str, str]]:
+    """`(file, hashed_secret)` for every finding a baseline records; empty if unparsable."""
+    return set(entries(text))
+
+
+def refusal(before: str, after: str) -> list[str]:
+    """What the pre-commit hook would refuse: the findings `after` has and `before` lacks.
+
+    Empty when there are none. Each line opens with a word `_keep_detect_secrets` in
+    `scripts/diagnostics.py` keeps, or the failure runs and is dropped from the artifact.
+    """
+    known = hashes(before)
+    new = {key: entry for key, entry in entries(after).items() if key not in known}
+    lines: list[str] = []
+    for (file, _), entry in sorted(new.items(), key=lambda item: item[0]):
+        kind = entry.get("type", "Secret")
+        lines += [
+            f"ERROR: Potential secret not in .secrets.baseline: {kind}",
+            f"Location: {file}:{entry.get('line_number', '?')}",
+        ]
+    if lines:
+        lines.append(
+            "ERROR: the commit stage refuses this. Move a real secret out of the source; "
+            "mark a false positive with an inline `pragma: allowlist secret` comment."
         )
-    else:
-        print(
-            "  [auto-fix] detect-secrets: baseline entries updated (removed/relocated)"
-            " -- review with: git diff .secrets.baseline"
-        )
+    return lines
+
+
+def report() -> None:
+    """Say that a scan moved known findings in the baseline, for `git diff` review."""
+    print(
+        "  [auto-fix] detect-secrets: baseline entries updated (removed/relocated)"
+        " -- review with: git diff .secrets.baseline"
+    )
 
 
 def scan(root: Path, run: Run) -> Result:
-    """Scan for secrets; auto-acknowledge new findings into the baseline.
+    """Scan for secrets; fail on a new finding, keep the baseline current on a moved one.
 
-    detect-secrets never blocks the suite -- real secrets surface in
-    `git diff .secrets.baseline` for review. New findings are detected by whether
-    `scan --baseline` actually changed the baseline's results (ignoring the
-    `generated_at` timestamp, which churns every run and is restored when it is the
-    only change), so a reported count always matches what `git diff` will show.
+    A finding the baseline does not hold fails this pass with its `file:line`, and the
+    baseline is put back. It used to be written in and reported green, which is the one
+    answer the pre-commit hook does not give: the hook refuses that finding at the commit
+    stage unless the acknowledgement is part of the change, so a lint run could pass what
+    the commit then refused. And an acknowledgement nobody chose is what the note on the
+    hook in `.pre-commit-config.yaml` warns about, re-baselining on autopilot.
+
+    A finding is new by `(file, hashed_secret)`, which is how the hook matches too; only
+    a line number moving, or a finding going away, rewrites the baseline. Changes are
+    read from the baseline's results, ignoring the `generated_at` timestamp, which churns
+    every run and is restored when it is the only change. CI drops this pass, and the
+    Stop path passes `--no-secrets`, so this runs when `lint-all.py` is asked to.
     NB: the update flag is `--baseline`; `--update` does not exist in detect-secrets
     1.5 -- the old call using it failed silently, which is why findings were
     re-reported as "new" on every run without ever landing in the baseline.
@@ -134,7 +162,10 @@ def scan(root: Path, run: Run) -> Result:
             # Timestamp or line-ending churn only: restore so the checkout stays clean.
             baseline.write_bytes(before_bytes)
         return {"detect-secrets": ([], 0)}
+    if refused := refusal(before, after):
+        baseline.write_bytes(before_bytes)
+        return {"detect-secrets": (refused, 1)}
     if after_bytes != after.encode("utf-8"):
         baseline.write_text(after, encoding="utf-8", newline="\n")
-    report(before, after)
+    report()
     return {"detect-secrets": ([], 0)}
