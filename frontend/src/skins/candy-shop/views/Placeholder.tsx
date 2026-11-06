@@ -1,10 +1,10 @@
-import { motion } from 'framer-motion'
+import { m } from 'framer-motion'
 import type { PlaceholderProps } from '../../types'
 
 export default function Placeholder({ title, description }: PlaceholderProps) {
   return (
     <div className="flex items-center justify-center min-h-[60vh]">
-      <motion.div
+      <m.div
         initial={{ opacity: 0, y: 24 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ type: 'spring', stiffness: 200, damping: 20 }}
@@ -56,7 +56,7 @@ export default function Placeholder({ title, description }: PlaceholderProps) {
             {description}
           </p>
         </div>
-      </motion.div>
+      </m.div>
     </div>
   )
 }

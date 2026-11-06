@@ -1,4 +1,4 @@
-import { motion } from 'framer-motion'
+import { m } from 'framer-motion'
 import type { UsePhoneLinesResult } from '../../../hooks/usePhoneLines'
 
 function DrippingOverlay({ color = '#C15A10' }: { color?: string }) {
@@ -52,7 +52,7 @@ function LineRow({
   onDeactivate: () => void
 }) {
   return (
-    <motion.div
+    <m.div
       whileHover={{ y: -2, boxShadow: '0 8px 20px rgba(92,51,23,0.2)' }}
       transition={{ type: 'spring', stiffness: 250, damping: 18 }}
       className="flex items-center justify-between px-5 py-3 rounded-2xl"
@@ -64,7 +64,7 @@ function LineRow({
       <span className="font-bold" style={{ color: '#5C3317' }}>
         {number}
       </span>
-      <motion.button
+      <m.button
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.95 }}
         transition={{ type: 'spring', stiffness: 300, damping: 20 }}
@@ -78,8 +78,8 @@ function LineRow({
         }}
       >
         Deactivate
-      </motion.button>
-    </motion.div>
+      </m.button>
+    </m.div>
   )
 }
 
@@ -126,7 +126,7 @@ export default function PhoneLines({
               boxShadow: 'inset 0 2px 6px rgba(255,255,255,0.5)',
             }}
           />
-          <motion.button
+          <m.button
             whileHover={{ scale: 1.04 }}
             whileTap={{ scale: 0.95 }}
             transition={{ type: 'spring', stiffness: 300, damping: 20 }}
@@ -144,7 +144,7 @@ export default function PhoneLines({
             }}
           >
             {adding ? 'Adding…' : '+ Add Line'}
-          </motion.button>
+          </m.button>
         </div>
         {error && (
           <p className="mt-3 text-sm font-medium" style={{ color: '#C15A10' }}>
@@ -160,7 +160,7 @@ export default function PhoneLines({
         </h2>
         {loading ? (
           <div className="flex justify-center py-8">
-            <motion.div
+            <m.div
               animate={{ rotate: 360 }}
               transition={{ repeat: Infinity, duration: 1, ease: 'linear' }}
               style={{
