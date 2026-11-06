@@ -22,11 +22,11 @@ import type { BubbleTransform } from './editor/types'
 //   what lets the two columns be drawn *close* — overlapping, even — without any two
 //   balloons overlapping, and without two balloons on opposite sides sitting level, which
 //   would leave nothing to say which was said first.
-// - **Each speaker's rows zig-zag.** A row alternates between its column's outer edge
-//   and a lean inward ({@link CHAIN_ZIGZAG}), by its ordinal among that speaker's
+// - **Each speaker's rows zig-zag.** A row alternates between its column's inner edge
+//   and a small lean outward ({@link CHAIN_ZIGZAG}), by its ordinal among that speaker's
 //   messages in the whole transcript — not its row on screen, or every balloon would
 //   jump sideways at each turn of the wheel. The two sides alternate in opposite phase,
-//   so a back-and-forth snakes across the panel instead of both columns leaning at once.
+//   so a back-and-forth snakes up the panel instead of both columns leaning at once.
 
 /** Gap between one row's ellipse and the next it must clear, in % of the box height. */
 export const CHAIN_ROW_GAP = 1.5
@@ -50,9 +50,11 @@ export const CHAIN_ORDER_STEP = 0.25
 /**
  * How far into its column's slack a leaning row moves, as a fraction of that slack — the
  * room between the row's width and its column's. 1 would put a short balloon against the
- * column's inner edge; a little less keeps the lean a lean.
+ * column's outer edge. A quarter is enough to read as hand-placed: at three quarters a
+ * short message jumped most of a column's width from its neighbours, and the eye lost
+ * which balloon followed which.
  */
-export const CHAIN_ZIGZAG = 0.75
+export const CHAIN_ZIGZAG = 0.25
 
 /** What the layout resolves against: the fit's px, plus the box's own aspect. */
 export interface ChainMetrics extends FitMetrics {
@@ -102,7 +104,7 @@ export function rowEllipse(row: PlacedRow, panelAspect: number): PctBox {
 }
 
 /**
- * How far inward from its column's outer edge the `ordinal`-th message of a side leans,
+ * How far outward from its column's inner edge the `ordinal`-th message of a side leans,
  * given `slack` — the column's width less the balloon's. The sender's odd messages lean
  * and the recipient's even ones do, so the thread snakes rather than both sides leaning
  * together; a balloon filling its column has no slack and leans nowhere.
