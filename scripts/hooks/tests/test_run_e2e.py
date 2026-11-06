@@ -123,6 +123,12 @@ def test_build_pytest_cmd_default_runs_host_pytest():
     assert not any(arg.startswith("--browser") for arg in cmd)
 
 
+def test_build_pytest_cmd_selects_the_tier_addopts_deselects():
+    # Without its own `-m` this runner collects tests/e2e and deselects all of it.
+    cmd = mod.build_pytest_cmd("/venv/python", headed=False, cross_browser=False)
+    assert cmd[cmd.index("-m", 3) + 1] == "local and not paid"
+
+
 def test_build_pytest_cmd_cross_browser_stays_on_host():
     # Regression: the container image has no playwright, so cross-browser must
     # run on the host venv like every other mode — never via docker compose exec.

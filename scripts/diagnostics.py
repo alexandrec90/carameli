@@ -199,7 +199,11 @@ LINT_SECTIONS = [
         _keep_pip_audit,
     ),
     ("vulture", "# remove unused code at the reported locations", _keep_vulture),
-    ("detect-secrets", "detect-secrets scan --baseline .secrets.baseline", _keep_detect_secrets),
+    (
+        "detect-secrets",
+        "# move a real secret out; mark a false positive with an inline allowlist pragma",
+        _keep_detect_secrets,
+    ),
     ("dotenv-linter", "# fix ordering / quoting in the reported .env file", _keep_dotenv),
     ("yamllint", "yamllint --strict -f parsable <file>", _keep_yamllint),
     ("actionlint", "actionlint", _keep_actionlint),

@@ -44,11 +44,11 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 IS_CI = bool(os.environ.get("CI"))
 
 # Mirrors pytest.ini's addopts: the `-o addopts=` override below REPLACES the ini
-# value, so the paid-tier exclusion (-m "not paid") and the dir ignores must be
-# repeated here or testmon fast-mode would silently collect paid tests.
+# value, so the tier exclusions (-m "not paid and not local") and the dir ignores must
+# be repeated here or testmon fast-mode would silently collect paid tests.
 _ADDOPTS = (
     "--ignore=tests/e2e --ignore=tests/live_e2e --ignore=tests/local_e2e "
-    '--ignore=tests/load --ignore=tests/quarantine -m "not paid"'
+    '--ignore=tests/load --ignore=tests/quarantine -m "not paid and not local"'
 )
 _PYTEST_FULL = "pytest -v --tb=short --no-header --color=no --durations=20 -n auto --dist=worksteal"
 _PYTEST_TESTMON = (

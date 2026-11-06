@@ -395,7 +395,7 @@ def test_alembic_fresh_db_reports_broken_migrations(monkeypatch):
     assert out == ["FAILED: boom in migration 007"]
 
 
-# --- detect-secrets: report only what actually changed the baseline ---------
+# --- detect-secrets: fail what the hook would refuse, report what really moved
 
 
 def test_detect_secrets_silent_when_baseline_unchanged(monkeypatch, capsys):
@@ -407,10 +407,19 @@ def test_detect_secrets_silent_when_baseline_unchanged(monkeypatch, capsys):
     assert "detect-secrets" not in capsys.readouterr().out
 
 
-def test_detect_secrets_reports_new_findings_from_baseline_diff(monkeypatch, tmp_path, capsys):
+def test_a_new_finding_fails_the_lint_and_leaves_the_baseline_alone(monkeypatch, tmp_path):
+    """The scan used to write a new finding into the baseline and report green.
+
+    `scripts/hooks/tests/test_e2e.py:155` went through that way: `lint-all.py --changed`
+    passed over it, and the commit stage then refused the same line, because the hook
+    reads the committed baseline and nothing had put the acknowledgement into the change.
+    A lint that passes what the commit refuses is no check at all, and an
+    acknowledgement nobody chose is how a real secret gets waved through.
+    """
     baseline = tmp_path / ".secrets.baseline"
     before = '{"results": {"a.py": [{"hashed_secret": "h1"}]}}'
-    after = '{"results": {"a.py": [{"hashed_secret": "h1"}, {"hashed_secret": "h2"}]}}'
+    new = '{"hashed_secret": "h2", "type": "Secret Keyword", "line_number": 7}'  # pragma: allowlist secret - test fixture value
+    after = f'{{"results": {{"a.py": [{{"hashed_secret": "h1"}}, {new}]}}}}'
     baseline.write_text(before, encoding="utf-8")
 
     def fake_run(cmd: str):
@@ -421,8 +430,24 @@ def test_detect_secrets_reports_new_findings_from_baseline_diff(monkeypatch, tmp
     monkeypatch.setattr(la, "run", fake_run)
     monkeypatch.setattr(la, "REPO_ROOT", tmp_path)
     monkeypatch.setattr(la.shutil, "which", lambda _name: "/usr/bin/detect-secrets")
-    assert la.t_detect_secrets(None) == {"detect-secrets": ([], 0)}
-    assert "1 new finding(s)" in capsys.readouterr().out
+
+    lines, code = la.t_detect_secrets(None)["detect-secrets"]
+
+    assert code == 1
+    assert "Location: a.py:7" in lines
+    assert any("Secret Keyword" in line for line in lines)
+    assert any("pragma: allowlist secret" in line for line in lines)
+    assert baseline.read_text(encoding="utf-8") == before, "the choice is not the scan's"
+    # Everything said has to reach the artifact and read as a failure, not a skip.
+    assert all(diag._keep_detect_secrets(line) for line in lines)
+    assert diag.get_skip_reason(lines) is None
+
+
+def test_the_artifact_does_not_send_a_finding_back_to_the_baseline():
+    """The section's `# fix:` line is what an agent acts on, and it said to re-baseline."""
+    hint = next(hint for name, hint, _ in diag.LINT_SECTIONS if name == "detect-secrets")
+    assert "scan --baseline" not in hint
+    assert "allowlist" in hint
 
 
 def test_detect_secrets_restores_timestamp_only_churn(monkeypatch, tmp_path, capsys):
@@ -486,13 +511,23 @@ def test_detect_secrets_timestamp_churn_is_restored_byte_for_byte(monkeypatch, t
     assert baseline.read_bytes() == before.encode("utf-8")
 
 
-def test_a_baseline_with_new_findings_is_kept_with_lf(monkeypatch, tmp_path, capsys):
+def test_a_relocated_finding_updates_the_baseline_with_lf_and_passes(monkeypatch, tmp_path, capsys):
+    """A known secret whose line moved is not a new one: the hook accepts it too."""
+    before = '{\n  "results": {"a.py": [{"hashed_secret": "h1", "line_number": 1}]}\n}\n'
+    after = '{\n  "results": {"a.py": [{"hashed_secret": "h1", "line_number": 9}]}\n}\n'
+    baseline = _crlf_scan(monkeypatch, tmp_path, before, after)
+    assert la.t_detect_secrets(None) == {"detect-secrets": ([], 0)}
+    assert baseline.read_bytes() == after.encode("utf-8")
+    assert "removed/relocated" in capsys.readouterr().out
+
+
+def test_a_new_finding_restores_the_baseline_byte_for_byte(monkeypatch, tmp_path):
     before = '{\n  "results": {"a.py": [{"hashed_secret": "h1"}]}\n}\n'
     after = '{\n  "results": {"a.py": [{"hashed_secret": "h1"}, {"hashed_secret": "h2"}]}\n}\n'
     baseline = _crlf_scan(monkeypatch, tmp_path, before, after)
-    la.t_detect_secrets(None)
-    assert baseline.read_bytes() == after.encode("utf-8")
-    assert "1 new finding(s)" in capsys.readouterr().out
+    _, code = la.t_detect_secrets(None)["detect-secrets"]
+    assert code == 1
+    assert baseline.read_bytes() == before.encode("utf-8")
 
 
 def test_detect_secrets_that_is_not_installed_never_reaches_the_scan(monkeypatch, tmp_path):
@@ -501,8 +536,7 @@ def test_detect_secrets_that_is_not_installed_never_reaches_the_scan(monkeypatch
     In a fresh worktree detect-secrets is not there. The scan ran anyway, the shell
     said "'detect-secrets' is not recognized...", and this reported
     `detect-secrets: scan failed (exit 1)` -- a missing tool arriving as a repository
-    problem, and this pass's own promise never to block the suite reading as broken.
-    An earlier fix kept the shell's own words so `get_skip_reason` could classify them;
+    problem. An earlier fix kept the shell's own words so `get_skip_reason` could classify them;
     the answer now is not to ask the shell at all.
 
     Reversion check: delete the `_detect_secrets_absent` call and this spawns a scan.
@@ -631,13 +665,32 @@ def test_absent_is_none_when_installed_and_a_clean_skip_when_not(monkeypatch):
     }
 
 
-def test_report_counts_new_findings_and_says_so_when_there_are_none(capsys):
-    before = '{"results": {"a.py": [{"hashed_secret": "h1"}]}}'
-    after = '{"results": {"a.py": [{"hashed_secret": "h1"}, {"hashed_secret": "h2"}]}}'
-    secrets_mod.report(before, after)
-    assert "1 new finding(s)" in capsys.readouterr().out
-    secrets_mod.report(after, before)
+def test_report_says_known_findings_moved(capsys):
+    secrets_mod.report()
     assert "removed/relocated" in capsys.readouterr().out
+
+
+def test_refusal_names_each_new_finding_and_no_known_one():
+    before = '{"results": {"a.py": [{"hashed_secret": "h1", "line_number": 1}]}}'
+    after = (
+        '{"results": {"a.py": [{"hashed_secret": "h1", "line_number": 1},'
+        ' {"hashed_secret": "h2", "line_number": 2, "type": "Secret Keyword"}],'  # pragma: allowlist secret - test fixture value
+        ' "b.py": [{"hashed_secret": "h3"}]}}'  # pragma: allowlist secret - test fixture value
+    )
+    lines = secrets_mod.refusal(before, after)
+    assert "Location: a.py:2" in lines
+    assert "Location: b.py:?" in lines
+    assert "Location: a.py:1" not in lines
+    assert secrets_mod.refusal(after, after) == []
+
+
+def test_entries_keeps_each_findings_record_and_survives_a_broken_baseline():
+    entry = {"hashed_secret": "h1", "line_number": 3}
+    assert secrets_mod.entries('{"results": {"a.py": [' + json.dumps(entry) + "]}}") == {
+        ("a.py", "h1"): entry
+    }
+    assert secrets_mod.entries("not json") == {}
+    assert secrets_mod.entries("{}") == {}
 
 
 def test_scan_takes_its_root_and_runner_as_given(monkeypatch, tmp_path):

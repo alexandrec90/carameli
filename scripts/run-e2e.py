@@ -117,6 +117,9 @@ def build_pytest_cmd(venv_python: str, headed: bool, cross_browser: bool) -> lis
         "-m",
         "pytest",
         "tests/e2e/",
+        # `addopts` deselects `local`, which is every test in this directory.
+        "-m",
+        "local and not paid",
         "-v",
         "--tb=short",
         "--no-header",

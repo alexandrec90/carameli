@@ -42,13 +42,21 @@ Every test requiring paid/live infrastructure carries `paid` plus its tier marke
 The default `-m "not paid"` exclusion must remain the single global safety gate. Opt in
 to paid tiers explicitly; never add them to `--all` or CI aggregates.
 
+`local` is the free tier that needs this workstation: a browser and a Docker stack, with
+every provider credential kept out. `addopts` deselects it and `python scripts/e2e.py`
+runs it, starting everything it needs. Everything in `tests/e2e/` carries it, by a hook in
+that `conftest.py`; a file elsewhere marks itself and is added to `SUITES` in the script. A
+test that wants MinIO or the real stack belongs here, and a skip here is a failure. An
+explicit `-m` replaces `addopts`' own, so one that means the default run spells
+`not paid and not local`. `.claude/rules/local-e2e.md` is the contract.
+
 Run the smallest relevant target, for example:
 
 ```text
 pytest tests/unit/test_<module>.py
 pytest tests/integration/test_contract.py
 pytest -m slow
-pytest tests/e2e/
+python scripts/e2e.py tests/e2e/test_smoke.py
 ```
 
 Full-suite runs belong to CI or an explicit maintainer request.

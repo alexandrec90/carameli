@@ -1,25 +1,31 @@
 """Playwright E2E test configuration.
 
-Requires both backend and frontend running:
+Everything here carries the `local` marker, applied below, which `addopts` deselects.
+
+`python scripts/e2e.py` needs nothing running: it starts its own stack and dev server,
+and passes `E2E_BASE_URL`, `E2E_BACKEND_URL` and `E2E_API_KEY` in.
+
+Against a stack you started yourself, name the tier:
     docker compose up          # backend on :8000
     cd frontend && npm run dev # Vite on :5173
+    pytest tests/e2e/ -m local --headed   # watch in browser
+    pytest tests/e2e/ -m local            # headless
 
 Install browser binaries once after adding pytest-playwright:
     playwright install --with-deps chromium
-
-Run E2E tests:
-    pytest tests/e2e/ --headed   # watch in browser
-    pytest tests/e2e/            # headless (CI default)
 """
 
 from __future__ import annotations
 
 import os
 from collections.abc import Generator
+from pathlib import Path
 from typing import TypedDict, cast
 
 import pytest
 from playwright.sync_api import Page, Playwright
+
+HERE = Path(__file__).resolve().parent
 
 # Base URL for the frontend dev server. A worktree does not get :5173 -- each box
 # leases its own ports -- so this is overridable, and both spellings work:
@@ -31,6 +37,18 @@ DEFAULT_BASE_URL = "http://localhost:5173"
 BASE_URL = os.environ.get("E2E_BASE_URL", DEFAULT_BASE_URL)
 
 BROWSERS = ["chromium", "firefox", "webkit"]
+
+
+@pytest.hookimpl(tryfirst=True)
+def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
+    """Mark this directory `local`, so a new module here cannot miss the tier.
+
+    `tryfirst` because `-m` deselects in a later implementation of this same hook, and a
+    marker added after that would be selected by nothing.
+    """
+    for item in items:
+        if HERE in item.path.parents:
+            item.add_marker(pytest.mark.local)
 
 
 class Viewport(TypedDict):

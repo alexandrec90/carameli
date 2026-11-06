@@ -133,7 +133,7 @@ def test_scoped_pytest_command_includes_targets_and_addopts():
     assert "tests/unit/test_a.py" in cmd
     # -o addopts= REPLACES pytest.ini, so the paid-tier exclusion must be repeated
     # or a scoped run would silently collect paid tests.
-    assert '-m "not paid"' in cmd
+    assert '-m "not paid and not local"' in cmd
 
 
 def test_scoped_pytest_command_normalises_windows_separators():
@@ -316,7 +316,7 @@ def test_run_named_target_routes_webhook_e2e(monkeypatch):
 def test_addopts_excludes_paid_by_default():
     # The testmon `-o addopts=` override REPLACES pytest.ini's addopts, so the
     # paid-tier exclusion must be repeated here or fast mode collects paid tests.
-    assert '-m "not paid"' in rt._ADDOPTS
+    assert '-m "not paid and not local"' in rt._ADDOPTS
 
 
 def test_addopts_mirrors_every_ignore_in_pytest_ini():
