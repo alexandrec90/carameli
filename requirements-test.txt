@@ -12,7 +12,7 @@ annotated-types==0.7.0
     # via
     #   -c requirements.txt
     #   pydantic
-anyio==4.15.1
+anyio==4.16.0
     # via
     #   -c requirements.txt
     #   -r requirements.in
@@ -186,7 +186,7 @@ pydantic-core==2.50.1
     # via
     #   -c requirements.txt
     #   pydantic
-pydantic-settings==2.16.1
+pydantic-settings==2.16.2
     # via
     #   -c requirements.txt
     #   -r requirements.in
@@ -201,7 +201,7 @@ pyjwt==2.15.1
     #   redis
 pyrate-limiter==4.4.0
     # via schemathesis
-pytest==9.1.1
+pytest==9.2.0
     # via
     #   -r requirements-test.in
     #   pytest-asyncio
@@ -211,13 +211,13 @@ pytest==9.1.1
     #   pytest-timeout
     #   pytest-xdist
     #   schemathesis
-pytest-asyncio==1.4.1
+pytest-asyncio==1.4.1.post1
     # via -r requirements-test.in
-pytest-benchmark==5.3.0
+pytest-benchmark==5.3.1
     # via -r requirements-test.in
 pytest-mock==3.17.0
     # via -r requirements-test.in
-pytest-testmon==2.2.0
+pytest-testmon==2.3.0
     # via -r requirements-test.in
 pytest-timeout==2.4.0
     # via -r requirements-test.in
@@ -232,7 +232,7 @@ python-dotenv==1.2.2
     #   -c requirements.txt
     #   pydantic-settings
     #   uvicorn
-python-multipart==0.0.32
+python-multipart==0.0.33
     # via
     #   -c requirements.txt
     #   -r requirements.in

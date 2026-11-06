@@ -12,7 +12,7 @@ annotated-types==0.7.0
     # via
     #   -c requirements-test.txt
     #   pydantic
-anyio==4.15.1
+anyio==4.16.0
     # via
     #   -c requirements-test.txt
     #   -r requirements.in
@@ -119,7 +119,7 @@ fastapi==0.162.0
     #   -c requirements-test.txt
     #   -r requirements.in
     #   sentry-sdk
-filelock==4.2.4
+filelock==4.2.9
     # via
     #   -r requirements-dev.in
     #   cachecontrol
@@ -254,9 +254,9 @@ msgpack==1.2.4
     # via
     #   cachecontrol
     #   locust
-mutmut==3.8.0
+mutmut==3.8.1
     # via -r requirements-dev.in
-mypy==2.4.0
+mypy==2.4.1
     # via -r requirements-dev.in
 mypy-extensions==1.1.0
     # via mypy
@@ -280,7 +280,7 @@ pathspec==1.0.4
     # via
     #   mypy
     #   yamllint
-pip==26.2.2
+pip==26.3
     # via pip-api
 pip-api==0.0.34
     # via pip-audit
@@ -333,7 +333,7 @@ pydantic-core==2.50.1
     # via
     #   -c requirements-test.txt
     #   pydantic
-pydantic-settings==2.16.1
+pydantic-settings==2.16.2
     # via
     #   -c requirements-test.txt
     #   -r requirements.in
@@ -356,7 +356,7 @@ pyrate-limiter==4.4.0
     # via
     #   -c requirements-test.txt
     #   schemathesis
-pytest==9.1.1
+pytest==9.2.0
     # via
     #   -c requirements-test.txt
     #   -r requirements-test.in
@@ -370,11 +370,11 @@ pytest==9.1.1
     #   pytest-timeout
     #   pytest-xdist
     #   schemathesis
-pytest-asyncio==1.4.1
+pytest-asyncio==1.4.1.post1
     # via
     #   -c requirements-test.txt
     #   -r requirements-test.in
-pytest-benchmark==5.3.0
+pytest-benchmark==5.3.1
     # via
     #   -c requirements-test.txt
     #   -r requirements-test.in
@@ -384,7 +384,7 @@ pytest-mock==3.17.0
     #   -r requirements-test.in
 pytest-playwright==0.10.0
     # via -r requirements-dev.in
-pytest-testmon==2.2.0
+pytest-testmon==2.3.0
     # via
     #   -c requirements-test.txt
     #   -r requirements-test.in
@@ -411,7 +411,7 @@ python-engineio==4.13.3
     # via
     #   locust
     #   python-socketio
-python-multipart==0.0.32
+python-multipart==0.0.33
     # via
     #   -c requirements-test.txt
     #   -r requirements.in
@@ -542,7 +542,7 @@ urllib3==2.8.0
     #   geventhttpclient
     #   requests
     #   sentry-sdk
-uv==0.13.6
+uv==0.13.7
     # via -r requirements-dev.in
 uvicorn==0.54.0
     # via
@@ -552,7 +552,7 @@ uvloop==0.22.1 ; platform_python_implementation != 'PyPy' and sys_platform != 'c
     # via
     #   -c requirements-test.txt
     #   uvicorn
-virtualenv==21.15.1
+virtualenv==21.15.5
     # via
     #   -r requirements-dev.in
     #   pre-commit
@@ -579,7 +579,7 @@ werkzeug==3.1.9
     #   schemathesis
 win11toast==0.36.3 ; sys_platform == 'win32'
     # via -r requirements-dev.in
-winrt-runtime==4.0.3 ; sys_platform == 'win32'
+winrt-runtime==4.1.0 ; sys_platform == 'win32'
     # via
     #   winrt-windows-data-xml-dom
     #   winrt-windows-foundation
@@ -593,9 +593,9 @@ winrt-runtime==4.0.3 ; sys_platform == 'win32'
     #   winrt-windows-storage
     #   winrt-windows-storage-streams
     #   winrt-windows-ui-notifications
-winrt-windows-data-xml-dom==4!10.0.28000.2705 ; sys_platform == 'win32'
+winrt-windows-data-xml-dom==4!10.0.28000.2957 ; sys_platform == 'win32'
     # via win11toast
-winrt-windows-foundation==4!10.0.28000.2705 ; sys_platform == 'win32'
+winrt-windows-foundation==4!10.0.28000.2957 ; sys_platform == 'win32'
     # via
     #   win11toast
     #   winrt-windows-data-xml-dom
@@ -609,7 +609,7 @@ winrt-windows-foundation==4!10.0.28000.2705 ; sys_platform == 'win32'
     #   winrt-windows-storage
     #   winrt-windows-storage-streams
     #   winrt-windows-ui-notifications
-winrt-windows-foundation-collections==4!10.0.28000.2705 ; sys_platform == 'win32'
+winrt-windows-foundation-collections==4!10.0.28000.2957 ; sys_platform == 'win32'
     # via
     #   win11toast
     #   winrt-windows-data-xml-dom
@@ -623,21 +623,21 @@ winrt-windows-foundation-collections==4!10.0.28000.2705 ; sys_platform == 'win32
     #   winrt-windows-storage
     #   winrt-windows-storage-streams
     #   winrt-windows-ui-notifications
-winrt-windows-globalization==4!10.0.28000.2705 ; sys_platform == 'win32'
+winrt-windows-globalization==4!10.0.28000.2957 ; sys_platform == 'win32'
     # via win11toast
-winrt-windows-graphics-imaging==4!10.0.28000.2705 ; sys_platform == 'win32'
+winrt-windows-graphics-imaging==4!10.0.28000.2957 ; sys_platform == 'win32'
     # via win11toast
-winrt-windows-media-core==4!10.0.28000.2705 ; sys_platform == 'win32'
+winrt-windows-media-core==4!10.0.28000.2957 ; sys_platform == 'win32'
     # via win11toast
-winrt-windows-media-ocr==4!10.0.28000.2705 ; sys_platform == 'win32'
+winrt-windows-media-ocr==4!10.0.28000.2957 ; sys_platform == 'win32'
     # via win11toast
-winrt-windows-media-playback==4!10.0.28000.2705 ; sys_platform == 'win32'
+winrt-windows-media-playback==4!10.0.28000.2957 ; sys_platform == 'win32'
     # via win11toast
-winrt-windows-media-speechsynthesis==4!10.0.28000.2705 ; sys_platform == 'win32'
+winrt-windows-media-speechsynthesis==4!10.0.28000.2957 ; sys_platform == 'win32'
     # via win11toast
-winrt-windows-storage==4!10.0.28000.2705 ; sys_platform == 'win32'
+winrt-windows-storage==4!10.0.28000.2957 ; sys_platform == 'win32'
     # via win11toast
-winrt-windows-storage-streams==4!10.0.28000.2705 ; sys_platform == 'win32'
+winrt-windows-storage-streams==4!10.0.28000.2957 ; sys_platform == 'win32'
     # via
     #   win11toast
     #   winrt-windows-data-xml-dom
@@ -646,7 +646,7 @@ winrt-windows-storage-streams==4!10.0.28000.2705 ; sys_platform == 'win32'
     #   winrt-windows-media-playback
     #   winrt-windows-media-speechsynthesis
     #   winrt-windows-storage
-winrt-windows-ui-notifications==4!10.0.28000.2705 ; sys_platform == 'win32'
+winrt-windows-ui-notifications==4!10.0.28000.2957 ; sys_platform == 'win32'
     # via win11toast
 wrapt==2.1.2
     # via

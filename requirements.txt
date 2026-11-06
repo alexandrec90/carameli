@@ -6,7 +6,7 @@ annotated-doc==0.0.4
     # via fastapi
 annotated-types==0.7.0
     # via pydantic
-anyio==4.15.1
+anyio==4.16.0
     # via
     #   -r requirements.in
     #   httpx
@@ -91,7 +91,7 @@ pydantic==2.14.1
     #   pydantic-settings
 pydantic-core==2.50.1
     # via pydantic
-pydantic-settings==2.16.1
+pydantic-settings==2.16.2
     # via -r requirements.in
 pyjwt==2.15.1
     # via
@@ -103,7 +103,7 @@ python-dotenv==1.2.2
     # via
     #   pydantic-settings
     #   uvicorn
-python-multipart==0.0.32
+python-multipart==0.0.33
     # via -r requirements.in
 pyyaml==6.0.3
     # via uvicorn
