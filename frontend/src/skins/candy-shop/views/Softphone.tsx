@@ -1,4 +1,4 @@
-import { motion } from 'framer-motion'
+import { m } from 'framer-motion'
 import type { UseSoftphoneResult } from '../../../hooks/useSoftphone'
 import { DIALPAD_ROWS, callLabel, canHangup, statusLabel } from '../../../lib/softphone'
 
@@ -36,7 +36,7 @@ function Sweet({
   title?: string
 }) {
   return (
-    <motion.button
+    <m.button
       whileHover={{ scale: disabled ? 1 : 1.04 }}
       whileTap={{ scale: disabled ? 1 : 0.95 }}
       transition={{ type: 'spring', stiffness: 300, damping: 20 }}
@@ -53,7 +53,7 @@ function Sweet({
       }}
     >
       {children}
-    </motion.button>
+    </m.button>
   )
 }
 
@@ -158,7 +158,7 @@ export default function Softphone({
 
         <div className="mt-5 grid grid-cols-3 gap-2 max-w-[15rem]">
           {DIALPAD_ROWS.flatMap((row) => row).map((key) => (
-            <motion.button
+            <m.button
               key={key}
               whileHover={{ scale: 1.08, y: -2 }}
               whileTap={{ scale: 0.94 }}
@@ -168,7 +168,7 @@ export default function Softphone({
               style={{ ...FIELD, cursor: 'pointer' }}
             >
               {key}
-            </motion.button>
+            </m.button>
           ))}
         </div>
       </CandyCard>

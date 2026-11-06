@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { AnimatePresence, LazyMotion, domAnimation, m } from 'framer-motion'
 import { useNavigate, useLocation } from 'react-router-dom'
 import type { LayoutProps } from '../types'
 
@@ -88,7 +88,7 @@ function NavCircle({ label, path, icon }: { label: string; path: string; icon: s
   const active = location.pathname === path
 
   return (
-    <motion.div
+    <m.div
       onHoverStart={() => setHovered(true)}
       onHoverEnd={() => setHovered(false)}
       onClick={() => navigate(path)}
@@ -111,7 +111,7 @@ function NavCircle({ label, path, icon }: { label: string; path: string; icon: s
       <span className="text-2xl flex-shrink-0">{icon}</span>
       <AnimatePresence>
         {hovered && (
-          <motion.span
+          <m.span
             key="label"
             initial={{ opacity: 0, x: -8 }}
             animate={{ opacity: 1, x: 0 }}
@@ -121,10 +121,10 @@ function NavCircle({ label, path, icon }: { label: string; path: string; icon: s
             style={{ color: active ? '#FFF8E7' : '#5C3317' }}
           >
             {label}
-          </motion.span>
+          </m.span>
         )}
       </AnimatePresence>
-    </motion.div>
+    </m.div>
   )
 }
 
@@ -204,7 +204,7 @@ function Header({ navItems }: { navItems: { path: string; label: string; icon: s
         {/* Mobile dropdown nav */}
         <AnimatePresence>
           {menuOpen && (
-            <motion.nav
+            <m.nav
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: 'auto', opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
@@ -233,7 +233,7 @@ function Header({ navItems }: { navItems: { path: string; label: string; icon: s
                   )
                 })}
               </div>
-            </motion.nav>
+            </m.nav>
           )}
         </AnimatePresence>
 
@@ -249,12 +249,16 @@ function Header({ navItems }: { navItems: { path: string; label: string; icon: s
 export function Layout({ children, navItems: rawNavItems }: LayoutProps) {
   const navItems = mapNavItems(rawNavItems)
   return (
-    <div
-      className="min-h-screen"
-      style={{ background: 'linear-gradient(160deg, #FFF8E7 0%, #F0D9AE 100%)' }}
-    >
-      <Header navItems={navItems} />
-      <main className="max-w-7xl mx-auto px-4 md:px-8 pt-12 md:pt-20 pb-12">{children}</main>
-    </div>
+    // `strict` makes a stray `motion.*` throw: it would drag every feature back in, and
+    // the `m.*` components animate nothing outside this provider.
+    <LazyMotion features={domAnimation} strict>
+      <div
+        className="min-h-screen"
+        style={{ background: 'linear-gradient(160deg, #FFF8E7 0%, #F0D9AE 100%)' }}
+      >
+        <Header navItems={navItems} />
+        <main className="max-w-7xl mx-auto px-4 md:px-8 pt-12 md:pt-20 pb-12">{children}</main>
+      </div>
+    </LazyMotion>
   )
 }

@@ -200,7 +200,7 @@ export const MAX_EAGER_BYTES = 306 * 1024
 export const MAX_LAZY_CHUNK_BYTES = 204 * 1024
 
 /**
- * Every `.js` file in `dist/assets/`, summed. Today 956.6 KB across 46 chunks; the
+ * Every `.js` file in `dist/assets/`, summed. Today 691.4 KB across 46 chunks; the
  * regional phone formatter lives in the lazy comic-book skin rather than the eager
  * entry graph, and so do the projected surfaces (table and number pad) and the bubble
  * chains — none of them is downloaded by a visitor who never opens that skin, which is
@@ -460,8 +460,25 @@ export const MAX_LAZY_CHUNK_BYTES = 204 * 1024
  * measured at 725.7 KB: `sip.js` and the live hooks stay in the tree behind
  * `VITE_LIVE_BACKEND` and leave the bundle. The simulations now ship, which they did not
  * while they were dev-only.
+ *
+ * **A third cut, 728 → 693, and it answers a raise this file was about to take.** The
+ * `minor-and-patch` Dependabot group went over the 728 by 10.7 KB, and the whole of that
+ * was `framer-motion` 14.0.0 → 14.10.0, 12,595 B in the lazy `candy-shop` chunk (146,739 →
+ * 159,334 B); putting that one package back on the same tree moved no other chunk. The
+ * other seven bumps cost 96 B, in the entry chunk.
+ *
+ * The 969 → 971 paragraph above took a bump of this package as a raise. This one did not
+ * need to be: importing `motion` ships every gesture and layout feature the library has,
+ * and this skin uses `animate`, `exit`, `whileHover` and `whileTap`. `LazyMotion` with
+ * `domAnimation` and the smaller `m` component, in the skin's own `Layout`, takes the chunk
+ * to 110,864 B, 48,470 B down, for the same animations (hover, press, enter and exit each
+ * watched in Chromium against this build); `src/tests/skins/candyShopMotion.test.tsx` holds
+ * it there. Measured at 691.4 KB (707,988 B), still 46 chunks, and no other chunk moved a
+ * byte.
+ *
+ * 693 rather than 692, which would hold at 0.6 KB: a kilobyte clear, not flush.
  */
-export const MAX_TOTAL_JS_BYTES = 728 * 1024
+export const MAX_TOTAL_JS_BYTES = 693 * 1024
 
 /**
  * Every `.css` file in `dist/assets/`, summed. Today 44.2 KB across 2 files.

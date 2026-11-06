@@ -1,4 +1,4 @@
-import { motion } from 'framer-motion'
+import { m } from 'framer-motion'
 import type { UseExtensionsResult } from '../../../hooks/useExtensions'
 
 function DrippingOverlay({ color = '#8B4513' }: { color?: string }) {
@@ -46,7 +46,7 @@ function CandyCard({ children }: { children: React.ReactNode }) {
 
 function ExtBadge({ ext }: { ext: string }) {
   return (
-    <motion.span
+    <m.span
       whileHover={{ scale: 1.08, y: -2 }}
       transition={{ type: 'spring', stiffness: 300, damping: 20 }}
       className="inline-block px-4 py-2 font-bold text-sm rounded-full cursor-default"
@@ -57,7 +57,7 @@ function ExtBadge({ ext }: { ext: string }) {
       }}
     >
       {ext}
-    </motion.span>
+    </m.span>
   )
 }
 
@@ -102,7 +102,7 @@ export default function Extensions({
               boxShadow: 'inset 0 2px 6px rgba(255,255,255,0.5)',
             }}
           />
-          <motion.button
+          <m.button
             whileHover={{ scale: 1.04 }}
             whileTap={{ scale: 0.95 }}
             transition={{ type: 'spring', stiffness: 300, damping: 20 }}
@@ -120,7 +120,7 @@ export default function Extensions({
             }}
           >
             {adding ? 'Adding…' : '+ Add Extension'}
-          </motion.button>
+          </m.button>
         </div>
         {error && (
           <p className="mt-3 text-sm font-medium" style={{ color: '#C15A10' }}>
@@ -141,7 +141,7 @@ export default function Extensions({
         </h2>
         {!available ? (
           <div className="flex justify-center py-8">
-            <motion.div
+            <m.div
               animate={{ rotate: 360 }}
               transition={{ repeat: Infinity, duration: 1, ease: 'linear' }}
               style={{

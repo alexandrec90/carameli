@@ -18,7 +18,7 @@ gradients and shadows, never via flat colors. Think mobile game meets high-end c
 
 **Renderer:** React DOM
 **Styling:** Tailwind CSS + inline CSS for custom properties (text-shadow stacks, clip-paths)
-**Animation:** Framer Motion — `motion.div` components with spring physics
+**Animation:** Framer Motion — `m.div` components with spring physics, under `Layout`'s `LazyMotion`
 **No R3F, no Three.js, no canvas elements**
 
 ---
@@ -147,6 +147,10 @@ the "rounded and polished" effect — do not omit it.
 ## Motion & Animation
 
 **Library:** Framer Motion only. No CSS `transition:`, no `@keyframes` for interactive states.
+
+Import `m`, never `motion`: `motion` ships every feature the library has, about 48 KB of this
+skin's chunk, and `strict` on the `LazyMotion` makes it throw. `layout`, `layoutId` and `drag`
+are outside `domAnimation` and silently do nothing.
 
 | Interaction | Animation |
 |---|---|

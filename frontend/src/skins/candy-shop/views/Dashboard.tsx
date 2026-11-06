@@ -1,4 +1,4 @@
-import { motion } from 'framer-motion'
+import { m } from 'framer-motion'
 import type { UseDashboardResult } from '../../../hooks/useDashboard'
 
 // ─── Shared primitives ───────────────────────────────────────────────────────
@@ -38,7 +38,7 @@ function CandyCard({
   dripColor?: string
 }) {
   return (
-    <motion.div
+    <m.div
       whileHover={{ y: -4, boxShadow: 'inset 0 4px 10px rgba(255,255,255,0.5), 0 16px 40px rgba(92,51,23,0.3)' }}
       transition={{ type: 'spring', stiffness: 250, damping: 18 }}
       className={`relative overflow-hidden ${className}`}
@@ -52,7 +52,7 @@ function CandyCard({
       <div className="relative pt-16 px-6 pb-6" style={{ zIndex: 2 }}>
         {children}
       </div>
-    </motion.div>
+    </m.div>
   )
 }
 
@@ -88,7 +88,7 @@ export default function Dashboard({
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <motion.div
+        <m.div
           animate={{ rotate: 360 }}
           transition={{ repeat: Infinity, duration: 1, ease: 'linear' }}
           style={{
@@ -148,7 +148,7 @@ export default function Dashboard({
               <p className="text-sm" style={{ color: '#8B4513' }}>
                 No customer seeded yet.
               </p>
-              <motion.button
+              <m.button
                 whileHover={{ scale: 1.03 }}
                 whileTap={{ scale: 0.95 }}
                 transition={{ type: 'spring', stiffness: 300, damping: 20 }}
@@ -163,7 +163,7 @@ export default function Dashboard({
                 }}
               >
                 Seed Demo Customer
-              </motion.button>
+              </m.button>
             </div>
           )}
         </CandyCard>
