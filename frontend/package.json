@@ -13,6 +13,7 @@
     "gen:phone-metadata": "node phoneMetadataGen.ts",
     "test": "vitest",
     "test:run": "vitest run",
+    "test:related": "vitest related --run --passWithNoTests",
     "test:bundle": "npm run build && vitest run --config vitest.bundle.config.ts",
     "lint": "npm run lint:eslint && npm run lint:types && npm run lint:css && npm run lint:spelling && npm run lint:deadweight",
     "lint:deadweight": "knip",

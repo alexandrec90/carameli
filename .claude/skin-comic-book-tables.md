@@ -44,7 +44,9 @@ notepad, a whiteboard, a screen. The field is **absent** on a picture that is no
   rows backed by records wash; `visibleRows` padding stays blank.
 - **The quad is what puts the rows on the drawn lines**: the bottom edge belongs *on* the last ruled
   line and the top edge one band above the first (`notepadRuling.test.ts` holds the shipped
-  notepad's to `hand-notepad.webp`; a new picture moves those constants in the same commit).
+  notepad's to `raw notepad.webp`; a new picture moves those constants in the same commit).
+  **The hand is a second picture at depth 1, not part of the notepad**, so rows pass behind it,
+  and it takes no pointer (`.cb-img-clip`), so the rows it covers still wash and scroll.
   **Measure, don't drag**: a drawn ruling is not evenly spaced and no four corners put equal bands
   on it, so *Fit to ruled lines* (`editor/ruledLines.ts`, pure; `editor/fitRuledLines.ts` the canvas
   edge) reads the rules off the picture, sets the corners and `rows`, and records `table.lines`,

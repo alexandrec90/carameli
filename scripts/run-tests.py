@@ -443,12 +443,12 @@ def changed_frontend_sources(paths: list[str]) -> list[str]:
 
 
 def frontend_related_argv(sources: list[str]) -> list[str]:
-    """`vitest related` over `sources`, given `frontend/` as `--root`: `npm --prefix` moves
-    npm and leaves vitest at the repo root, with no config and no tests to find. `--no`
-    stops `npm exec` fetching a vitest `node_modules` lacks, so an unprovisioned tree is
-    red rather than tested by whatever the registry serves."""
-    command = ["vitest", "related", "--run", "--root", "frontend", "--passWithNoTests"]
-    return ["npm", "--prefix", "frontend", "exec", "--no", "--", *command, *sources]
+    """`vitest related` over `sources` through `frontend/package.json`'s `test:related`:
+    `npm run` starts a script in the package, which is where the suite's tests expect
+    `process.cwd()` to be, and `npm --prefix frontend exec` would leave it at the repo root.
+    A vitest `node_modules` lacks stays missing, so an unprovisioned tree is red rather
+    than tested by whatever the registry serves."""
+    return ["npm", "--prefix", "frontend", "run", "test:related", "--", *sources]
 
 
 def run_changed_frontend() -> dict[str, tuple[list[str], int]]:

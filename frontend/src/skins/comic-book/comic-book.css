@@ -213,10 +213,18 @@
    frame) and the panel's polygon as a clip-path (supplied inline, so the picture is cut
    where the panel's ink runs). Its box comes from the inline style too: a picture's
    frame is its own rectangle over the panel, not the panel itself, so there is no
-   `inset: 0` to fall back on. */
+   `inset: 0` to fall back on.
+
+   **It takes no pointer, and neither does the picture in it.** The frame is a rectangle
+   and most of what a cut-out picture draws in it is nothing, so a hand stood in front of
+   a notepad would otherwise lay a dead rectangle over the live rows behind it: no wash
+   and no wheel across the whole of the hand's frame, transparent pixels included. A
+   surface that wants the pointer says so on itself (ProjectedTable, ProjectedNumberPad),
+   and that re-enables it through this. */
 .cb-img-clip {
   position: absolute;
   overflow: hidden;
+  pointer-events: none;
 }
 
 /* Positioning, sizing, object-fit and transform are set via inline style in JSX.
