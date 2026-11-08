@@ -89,15 +89,16 @@ export const PANEL_IMG_TRANSFORMS: ImgTransform[] = [
     quad: [[36, 26.28], [48.57, 22.95], [53.74, 43.84], [40.38, 48.85]],
     fontScale: 0.55, ink: '#1b3a8f',
   } },
-  { panel: 10, src: '/comic-book/hand-notepad.webp', alt: 'Hand writing on notepad', left: -47, top: 4.2, width: 203.5, height: 147.4, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center bottom', spill: false, z: 0, table: {
-    quad: [[13.71, 6.52], [80.77, 6.22], [81.78, 57.32], [12.72, 57.79]],
-    rows: 22, header: true, fontScale: 0.5, ink: '#1b3a8f',
+  { panel: 10, src: '/comic-book/raw%20notepad.webp', alt: 'Notepad', left: -12.6, top: 1.1, width: 108.9, height: 103, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center bottom', spill: false, z: 0, table: {
+    quad: [[13.5, 9.55], [93.33, 9.54], [94.72, 89.75], [13.1, 89.95]],
+    rows: 18, header: true, fontScale: 0.55, ink: '#1b3a8f',
+    lines: [0, 0.0563, 0.1124, 0.1685, 0.2248, 0.28, 0.3362, 0.3917, 0.4476, 0.5041, 0.5604, 0.6157, 0.6716, 0.7258, 0.781, 0.8362, 0.891, 0.946, 1],
     source: 'calls',
     columns: [
-      { label: 'Number', width: 2, align: 'left' },
-      { label: 'Start time', width: 1.4, align: 'left' },
-      { label: 'Duration', width: 1, align: 'left' },
-      { label: 'Status', width: 1.2, align: 'center' },
+      { label: 'Number', width: 2.13, align: 'left' },
+      { label: 'Start time', width: 1.91, align: 'left' },
+      { label: 'Duration', width: 1.66, align: 'left' },
+      { label: 'Status', width: 1.66, align: 'center' },
     ],
     data: [
     ],
@@ -107,6 +108,7 @@ export const PANEL_IMG_TRANSFORMS: ImgTransform[] = [
   { panel: 9, src: '/comic-book/ringing-phone.webp', alt: 'A telephone ringing at the far end', left: 0, top: 0, width: 100, height: 100, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center center', spill: false, z: 0, call: 'ringing' },
   { panel: 9, src: '/comic-book/cheating-man.webp', alt: 'The man who answered', left: -8.8, top: 30.8, width: 116.7, height: 151.6, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center top', spill: false, z: 0, call: 'remote' },
   { panel: 9, src: '/comic-book/despondent-wife.webp', alt: 'The woman placing the call', left: -17.2, top: 19.1, width: 120, height: 109.2, scale: 1, offsetX: 0, offsetY: 0, anchor: 'left top', spill: false, z: 0, call: 'local' },
+  { panel: 10, src: '/comic-book/raw%20hand.webp', alt: 'Hand writing with a pen', left: 64.2, top: 79.8, width: 37, height: 78.1, scale: 1, offsetX: 0, offsetY: 0, anchor: 'center top', spill: false, z: 1 },
 ]
 
 // Not parallel to PANELS either: each bubble names its `panel`, a panel may own any

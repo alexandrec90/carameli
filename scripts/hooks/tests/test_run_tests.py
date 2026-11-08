@@ -1,6 +1,7 @@
 """Tests for scripts/run-tests.py pure helpers (testmon selection parsing)."""
 
 import itertools
+import json
 import os
 import subprocess
 import sys
@@ -886,7 +887,7 @@ def test_a_frontend_only_diff_runs_the_vitest_files_that_reach_it(monkeypatch):
 
     assert results == {"pytest": ([], 0), "frontend-tests": ([], 0)}
     (argv,) = seen
-    assert argv[argv.index("related") :][-2:] == ["src/chain.ts", "src/a.css"]
+    assert argv[argv.index("--") + 1 :] == ["src/chain.ts", "src/a.css"]
 
 
 def test_a_red_vitest_turns_a_frontend_only_diff_red(monkeypatch):
@@ -895,16 +896,27 @@ def test_a_red_vitest_turns_a_frontend_only_diff_red(monkeypatch):
     assert rt.run_local(True)["frontend-tests"] == (["FAIL src/chain.test.ts"], 1)
 
 
-def test_vitest_is_told_its_root_and_never_to_install_itself():
-    """`npm --prefix` moves npm and leaves vitest at the repo root, with no config and no
-    tests to find: it said "No affected test files found" and exited 0 for any path. And
-    `npm exec` fetches what `node_modules` lacks, so an unprovisioned tree would run
-    whatever vitest the registry serves today, on no lock."""
+def test_vitest_runs_inside_frontend_and_never_installs_itself():
+    """`npm --prefix frontend exec` moves npm and leaves vitest at the repo root, with no
+    config and no tests to find: it said "No affected test files found" and exited 0 for
+    any path. `--root frontend` found them, but `process.cwd()` stayed at the repo root, so
+    `assetPolicy.test.ts` and `editorConfigStamp.test.ts` failed for any change reaching
+    them, while the same files passed under `npm run test:run`. `npm run` starts its script
+    in the package, as the full-suite target does, and cannot fetch a vitest `node_modules`
+    lacks, which `npm exec` would, from whatever the registry serves today, on no lock."""
     argv = rt.frontend_related_argv(["src/App.tsx"])
 
-    assert argv[: argv.index("--")] == ["npm", "--prefix", "frontend", "exec", "--no"]
-    assert argv[argv.index("--root") + 1] == "frontend"
-    assert "--run" in argv, "a bare `vitest related` watches, and never exits"
+    assert argv == ["npm", "--prefix", "frontend", "run", "test:related", "--", "src/App.tsx"]
+
+
+def test_the_related_script_the_runner_names_is_a_finite_related_run():
+    package = json.loads((REPO_ROOT / "frontend" / "package.json").read_text("utf-8"))
+    script = package["scripts"]["test:related"].split()
+
+    assert script[:2] == ["vitest", "related"]
+    assert "--run" in script, "a bare `vitest related` watches, and never exits"
+    assert "--passWithNoTests" in script, "a stylesheet no test imports failed nothing"
+    assert "--root" not in script, "the cwd is the point: `--root` moves vitest and not it"
 
 
 def test_changed_frontend_sources_are_what_vitest_can_trace_from_its_root():
@@ -1016,7 +1028,7 @@ def test_changed_with_no_stack_runs_the_changed_sets_tests_on_the_host(monkeypat
     assert rt.run_local(True) == {"pytest": ([], 0), "frontend-tests": ([], 0)}
 
     argv, vitest = seen
-    assert "related" in vitest
+    assert "test:related" in vitest
     assert argv[1:3] == ["-m", "pytest"]
     assert "docker" not in argv
     assert "scripts/hooks/tests/test_run_tests.py" in argv

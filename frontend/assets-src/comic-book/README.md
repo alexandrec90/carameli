@@ -66,12 +66,13 @@ each of those calls was an `npx` fetch over the network, while `sharp` itself is
 `frontend/package.json` already. `scripts/hooks/tests/test_encode_comic_art.py` pins
 the call the script makes.
 
-`conversation.png` and `hand-notepad.png` are at that stage today — they are the two
-the command above names because they are the two it was first run on — and so are
-`monogram.png` and the four bubble drawings, registered as selectable art by the change
-that added this sentence (see *The traced references*). `logo2.png`,
-`man-woman-talking.png`, `notepad.png` and `push-button-phone.png` were, until the
-home page's four panels landed and started drawing them. A file leaves this list when
+`hand-notepad.png` is at that stage today, back there since `raw notepad.png` and
+`raw hand.png` replaced it on the home page as two pictures so that a table's rows can
+pass behind the hand — and so are `monogram.png` and the four bubble drawings,
+registered as selectable art by the change that added this sentence (see *The traced
+references*). `conversation.png`, `logo2.png`, `man-woman-talking.png`, `notepad.png` and
+`push-button-phone.png` were, until the home page's four panels landed and started
+drawing them. A file leaves this list when
 its layout lands, not when its `.webp` is written; nothing fails if the paragraph is
 left stale, which is exactly why it has to be edited by hand in the same change.
 

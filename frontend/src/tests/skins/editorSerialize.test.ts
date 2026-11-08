@@ -244,8 +244,10 @@ describe('serializeConfig', () => {
     const ts = serializeConfig(cfg)
     // Transform values only. A vertex is a *fraction* of the frame, so its own rounding
     // is four places (about a tenth of a pixel), and asserting "no three-decimal number
-    // anywhere" would now be asserting that the grid is rounded to a whole percent.
-    expect(transformsOf(ts)).not.toMatch(/\d\.\d{3,}/)
+    // anywhere" would now be asserting that the grid is rounded to a whole percent. A
+    // fitted surface's `lines` are fractions on the same terms, so that row is left out.
+    const placed = transformsOf(ts).replace(/^\s*lines: \[.*$/gm, '')
+    expect(placed).not.toMatch(/\d\.\d{3,}/)
     expect(ts).toContain(
       'left: 20, top: 20, width: 55.1, height: 55.9, scale: 1, offsetX: 12.4, offsetY: -8.7,',
     )

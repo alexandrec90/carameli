@@ -611,7 +611,11 @@ describe('default config parity', () => {
     // Page art only. A picture carrying a `call` role is not on the page: it stands in
     // half of a panel, framed by the author against that half, so the placement the page
     // shares has nothing to say about it — see the call layout's own assertions below.
-    PANEL_IMG_TRANSFORMS.filter(t => t.call === undefined).forEach(t => {
+    //
+    // The back of the stack only, too. A picture at a greater depth stands on the picture
+    // behind it rather than on the panel's floor: the hand holds `center top` so its pen
+    // stays on the notepad in a tall panel, which notepadRuling.test.ts checks directly.
+    PANEL_IMG_TRANSFORMS.filter(t => t.call === undefined && t.z === 0).forEach(t => {
       expect(t.anchor).toBe(PANELS[t.panel].isLogo ? 'center center' : 'center bottom')
     })
   })
@@ -651,14 +655,14 @@ describe('default config parity', () => {
   // teaches whoever hits it to paste the new numbers in without reading them.
   it('keeps the replacement phone and notepad bound to their matching surfaces', () => {
     const phone = PANEL_IMG_TRANSFORMS.find(t => t.src.endsWith('push-button-phone.webp'))
-    const notepad = PANEL_IMG_TRANSFORMS.find(t => t.src.endsWith('hand-notepad.webp'))
+    const notepad = PANEL_IMG_TRANSFORMS.find(t => t.src.endsWith('raw%20notepad.webp'))
 
     expect(phone?.alt).toBe('Push-button phone')
     expect(phone?.numberPad?.quad).toHaveLength(4)
     expect(phone?.table).toBeUndefined()
     expect(PANELS[phone!.panel].label).toBe('Phone')
 
-    expect(notepad?.alt).toBe('Hand writing on notepad')
+    expect(notepad?.alt).toBe('Notepad')
     expect(notepad?.table?.quad).toHaveLength(4)
     expect(notepad?.numberPad).toBeUndefined()
     expect(PANELS[notepad!.panel].label).toBe('Notepad')
@@ -671,7 +675,7 @@ describe('default config parity', () => {
   // two PRs labelled Time/Dir/From/To with the number under 'Time' and the status art
   // under 'To'.
   it('shows the call record headings on the notepad, in the feed’s own order', () => {
-    const notepad = PANEL_IMG_TRANSFORMS.find(t => t.src.endsWith('hand-notepad.webp'))
+    const notepad = PANEL_IMG_TRANSFORMS.find(t => t.src.endsWith('raw%20notepad.webp'))
     expect(notepad?.table?.source).toBe('calls')
     expect(notepad?.table?.columns.map(c => c.label)).toEqual([
       'Number', 'Start time', 'Duration', 'Status',
