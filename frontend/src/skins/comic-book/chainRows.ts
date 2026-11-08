@@ -41,18 +41,18 @@ export function fitRow(text: string, template: BubbleTransform, m: FitMetrics): 
 }
 
 /**
- * Cut a row from its side's template: fitted to `text`, leaning inward by its ordinal
- * from its column's outer edge, and still at its template's `top` — {@link placeRows}
+ * Cut a row from its side's template: fitted to `text`, leaning outward by its ordinal
+ * from its column's inner edge, and still at its template's `top` — {@link placeRows}
  * decides that, once every row of the table is cut.
  *
  * The `newest` row of a side keeps its template's edge — no lean — and its tail; its size
  * is its words', like every other row's. The template the author drew is the column: the
  * widest a balloon on that side can be, and where its tip points. Where it sits is
  * {@link placeRows}'s: on its template's anchor at the foot of the thread, above the
- * other side's newer messages otherwise.
+ * other side's newer messages otherwise — and there it loses the tail.
  *
- * The tail follows from `newest` rather than being passed in: one per side is the rule
- * (see {@link conversationRows}), and a second argument saying so is one that can
+ * The tail follows from `newest` rather than being passed in: at most one per side is the
+ * rule (see {@link conversationRows}), and a second argument saying so is one that can
  * disagree with the first.
  */
 function stampRow(
@@ -61,15 +61,15 @@ function stampRow(
   { out, text, ordinal, newest }: Stamp,
 ): Pick<ChainRow, 'bubble' | 'stretch'> {
   const template = out ? cols.me : cols.them
-  // The left column's left edge, which is what its balloons are aligned against.
-  const themLeft = 100 - cols.them.right - cols.them.width
+  // The right column's left edge, which is what its balloons are aligned against.
+  const meLeft = 100 - cols.me.right - cols.me.width
   const fit = fitRow(text, template, metrics)
   const shift = newest ? 0 : zigzagShift(ordinal, out, template.width - fit.width)
   return {
     bubble: {
       ...template,
       width: fit.width,
-      right: out ? cols.me.right + shift : 100 - themLeft - shift - fit.width,
+      right: out ? 100 - meLeft - shift - fit.width : cols.them.right + shift,
       tail: newest ? template.tail : 'none',
       // A message is lettering, whatever the template it was stamped from does: the
       // sender's template is routinely an input, and cloning that would put a field in
@@ -107,11 +107,15 @@ function anchored(rows: readonly ChainRow[], i: number): boolean {
  * bottom of every newer balloon, clear of every balloon it would overlap. Which rows are
  * anchored is {@link anchored}; they are always the first, so the rows already placed when
  * a row's turn comes are exactly the rows newer than it.
+ *
+ * **A row off its anchor has no tail.** The tail is what the author aimed at a character,
+ * and it reaches a fixed distance in a fixed direction, so on a balloon that has climbed
+ * away from that point it would be pointing at a patch of empty panel.
  */
 function placeRows(rows: readonly ChainRow[], cols: ChainColumns, aspect: number): ChainRow[] {
   const out = [...rows]
   const placed: PlacedRow[] = []
-  const settle = (i: number, at: Pick<BubbleTransform, 'top' | 'right'>): void => {
+  const settle = (i: number, at: Partial<BubbleTransform>): void => {
     out[i] = { ...out[i], bubble: { ...out[i].bubble, ...at } }
     placed.push({ bubble: out[i].bubble, stretch: out[i].stretch })
   }
@@ -122,7 +126,7 @@ function placeRows(rows: readonly ChainRow[], cols: ChainColumns, aspect: number
       return
     }
     const top = stackedTop(placed, { ...row.bubble, stretch: row.stretch }, aspect)
-    settle(i, { top, right: row.bubble.right })
+    settle(i, { top, tail: 'none' })
   })
   return out
 }
@@ -141,18 +145,20 @@ function placeRows(rows: readonly ChainRow[], cols: ChainColumns, aspect: number
  *
  * Three details are what make it read as a conversation rather than as a list:
  *
- * - **Alignment.** The sender's balloons hang from their column's right edge and the
- *   recipient's from its left, so a short message stays on its own side of the panel
- *   instead of drifting toward the middle as it shrinks — leaning inward every other
- *   message (`zigzagShift`), so the column is a zig-zag rather than a rule.
+ * - **Alignment.** Each side's balloons hang from their column's inner edge, the one
+ *   facing the other speaker: tails point inward at the characters, so that is where the
+ *   foot of the thread sits, and a side hung from its outer edge jumped the column's whole
+ *   slack between the foot and the row above it. Every other message leans a little way
+ *   out (`zigzagShift`), so the column is a zig-zag rather than a rule.
  * - **Size.** Every balloon is fitted to its own message (`fitRow`): it inflates from
  *   its narrowest, wider and taller together, up to its column and then taller alone, so
  *   long words wrap and long messages stretch the balloon. The composer is fitted the
  *   same way to the draft in it, so a message being typed grows the field it is being
  *   typed into, and is drawn as that same balloon once it is sent.
- * - **One tail per side.** Only the newest balloon of each column keeps its template's
- *   tail — the one still being said. A tail on every balloon reads as a crowd all talking
- *   at once, which is exactly what a thread is not.
+ * - **At most one tail per side.** Only the newest balloon of each column can keep its
+ *   template's tail — the one still being said — and only while it sits on its anchor
+ *   ({@link placeRows}). A tail on every balloon reads as a crowd all talking at once,
+ *   which is exactly what a thread is not.
  *
  * `typing` adds one extra row at the foot of the recipient's column — the peer
  * mid-composition, drawn as dots by the shell (see {@link TYPING_KEY}). It is the

@@ -37,8 +37,8 @@ import type { BubbleTransform } from './editor/types'
 // above the bottom of every one of them, so a long message pushes the thread up by its
 // own height while a short reply sits alongside the message it answers — and the bottoms
 // of the balloons, read down the panel, are the transcript in order, whichever column each
-// is in. Each speaker's rows zig-zag across their column as they climb, so the thread
-// snakes rather than ruling two columns.
+// is in. Each speaker's rows hang from their column's inner edge and zig-zag a little way
+// out from it as they climb, so the thread snakes rather than ruling two columns.
 //
 // **Bubble size follows the message.** A three-word reply is a small balloon, a longer one
 // fills its column, and a longer one still wraps and grows *tall* — see bubbleFit.ts. The
@@ -128,8 +128,12 @@ export const CHAIN_ROWS = { min: 2, max: 12, step: 1 }
  */
 export const DEFAULT_CHAIN_ROWS = 6
 
-/** Narrowest a balloon gets, as a fraction of its column's full width. */
-export const CHAIN_MIN_WIDTH_RATIO = 0.42
+/**
+ * Narrowest a balloon gets, as a fraction of its column's full width. This is the size a
+ * conversation opens at — the empty composer and the first short messages — and its tail
+ * scales with it, so it has to be big enough for that tail to reach past the balloon.
+ */
+export const CHAIN_MIN_WIDTH_RATIO = 0.55
 
 /**
  * What marks a transcript line as the *sender's*. A conversation is written the way a

@@ -174,8 +174,11 @@ composer with the recipient's newest beside it. Every other row lays out bottom-
 collision (`chainLayout.ts`): clear of what it would overlap, tucked in beside what it
 would not, and **ending a small step above every newer balloon** (`CHAIN_ORDER_STEP`) so
 the bottoms read in transcript order — a side's newest climbs above the other side's newer
-reply rather than holding its anchor level with it. Rows zig-zag by message ordinal
-(`zigzagShift`).
+reply rather than holding its anchor level with it, and **a row off its anchor has no
+tail**, since a tail reaches a fixed distance and would point at empty panel. Rows hang from
+their column's **inner** edge, where the anchored foot sits (tails point inward at the
+characters), and lean out a little by message ordinal (`zigzagShift`): hung from the outer
+edge, a side jumped its column's whole slack between the foot and the row above it.
 `PANEL_BUBBLE_CHAINS` holds one entry per id in use and is **derived, not authored**
 (`syncChains`), so a chain with no members and a member with no chain are unreachable.
 

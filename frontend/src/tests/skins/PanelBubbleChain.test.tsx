@@ -149,8 +149,8 @@ describe('PanelBubbleChain', () => {
   })
 
   // The zig-zag: consecutive stacked rows of one speaker do not line up on their column's
-  // edge. The bottom row is the exception — it sits on its template's tail tip instead.
-  it('leans every other row of a speaker in from the column’s edge', () => {
+  // inner edge. The bottom row is the exception — it sits on its template's tail tip instead.
+  it('leans every other row of a speaker out from the column’s inner edge', () => {
     const { container } = render(
       <PanelBubbleChain box={BOX} lettering={LETTERING}
         chain={chain({ rows: 6, messages: ['hey', 'you around?', 'any luck?', 'still there?'] })}
@@ -159,10 +159,10 @@ describe('PanelBubbleChain', () => {
         interactive
       />,
     )
-    const [, ...lefts] = drawn(container).map(el => edges(el).left)
-    expect(lefts[0]).not.toBeCloseTo(lefts[1], 6)
-    expect(lefts[1]).not.toBeCloseTo(lefts[2], 6)
-    expect(lefts[0]).toBeCloseTo(lefts[2], 6)
+    const [, ...rights] = drawn(container).map(el => edges(el).right)
+    expect(rights[0]).not.toBeCloseTo(rights[1], 6)
+    expect(rights[1]).not.toBeCloseTo(rights[2], 6)
+    expect(rights[0]).toBeCloseTo(rights[2], 6)
   })
 
   // A message that wraps is drawn taller than the balloon's fixed aspect: the outline SVG
