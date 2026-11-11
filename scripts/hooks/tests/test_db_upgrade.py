@@ -12,9 +12,14 @@ up = load_module("scripts/db-upgrade.py")
 
 @pytest.fixture
 def docker(monkeypatch):
-    """The app container up, Alembic answering from `answers`, and every call kept."""
+    """The app and db containers up, Alembic answering from `answers`, and every call kept.
+
+    `status` is what `docker ps` prints for a service; `ps` is its (exit, timed_out),
+    which a stopped Docker engine turns non-zero."""
     world = {
         "status": ["Up 3 minutes (healthy)"],
+        "db_status": ["Up 3 minutes (healthy)"],
+        "ps": (0, False),
         "answers": {
             "current": (
                 ["INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.", "013"],
@@ -32,7 +37,13 @@ def docker(monkeypatch):
         world["ran"].append(verb)
         return world["answers"][verb]
 
-    monkeypatch.setattr(up.dc, "docker_ps", lambda *a, **k: (world["status"], 0, False))
+    def docker_ps(fmt, **kwargs):
+        service = kwargs["extra_filters"][0].rsplit("=", 1)[1]
+        world["probed"].append(service)
+        return (world["db_status"] if service == "db" else world["status"], *world["ps"])
+
+    world["probed"] = []
+    monkeypatch.setattr(up.dc, "docker_ps", docker_ps)
     monkeypatch.setattr(up.dc, "run", run)
     monkeypatch.setattr(up.dc, "write_artifact", lambda name, text: world["artifact"].append(text))
     monkeypatch.setattr(up.dc, "clear_artifact", lambda name: world["artifact"].append(""))
@@ -75,6 +86,56 @@ def test_a_stopped_app_is_unknown_not_a_failure(docker):
     assert docker["ran"] == []
 
 
+ENGINE_DOWN = (
+    "failed to connect to the docker API at npipe:////./pipe/dockerDesktopLinuxEngine; "
+    "check if the path is correct and if the daemon is running: open "
+    "//./pipe/dockerDesktopLinuxEngine: The system cannot find the file specified."
+)
+
+
+def test_a_stopped_docker_engine_is_unknown_not_a_failure(docker, capsys):
+    """Regression (devkit ledger 1acb14c3): with Docker Desktop stopped, `docker ps`
+    exits 1 and its merged stderr ends "...if the daemon is running", which the old
+    substring probe read as a running app; `alembic current` then failed the same way
+    and the pass filed a FAILED that was only "cannot tell"."""
+    docker["status"] = [ENGINE_DOWN]
+    docker["ps"] = (1, False)
+    assert up.main(["--check"]) == up.UNKNOWN
+    assert up.main([]) == up.UNKNOWN
+    assert docker["ran"] == [], "no alembic command runs against an engine that is down"
+    assert docker["artifact"] == [], "cannot tell is not a failure, so no artifact"
+    assert "docker engine is not answering" in capsys.readouterr().out
+
+
+def test_unreachable_is_empty_only_when_the_engine_app_and_db_all_answer(docker):
+    assert up.unreachable() == ""
+    assert docker["probed"] == list(up.NEEDED)
+    docker["ps"] = (1, False)
+    docker["status"] = ["", ENGINE_DOWN, ""]
+    assert up.unreachable() == f"the docker engine is not answering: {ENGINE_DOWN}"
+    docker["status"] = []
+    assert up.unreachable() == "the docker engine is not answering: exit 1"
+    docker["ps"] = (1, True)
+    assert up.unreachable() == "the docker engine did not answer `docker ps` in time"
+
+
+def test_a_docker_ps_that_times_out_is_unknown(docker):
+    """A wedged engine: `run_with_timeout` gives ([], 1, True)."""
+    docker["status"] = []
+    docker["ps"] = (1, True)
+    assert up.main(["--check"]) == up.UNKNOWN
+    assert docker["ran"] == []
+
+
+def test_a_stopped_database_is_unknown_not_a_failure(docker, capsys):
+    """Alembic connects from `app` straight to `db`; with `db` down it could only fail."""
+    docker["db_status"] = []
+    assert up.main(["--check"]) == up.UNKNOWN
+    assert docker["probed"] == ["app", "db"]
+    assert docker["ran"] == []
+    assert "service 'db' is not running" in capsys.readouterr().out
+
+
 def test_a_check_alembic_could_not_answer_is_a_failure_with_its_artifact(docker, capsys):
     docker["answers"]["current"] = (["Can't locate revision identified by '015'"], 255)
     assert up.main(["--check"]) == up.FAILED
@@ -104,6 +165,7 @@ def test_a_failed_upgrade_says_so_last_on_stderr(docker, capsys):
         (["running"], True),
         (["Exited (1) 2 minutes ago"], False),
         ([], False),
+        ([ENGINE_DOWN], False),
     ],
 )
 def test_app_running_reads_docker_ps_status_lines(lines, expected):

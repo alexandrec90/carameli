@@ -6,7 +6,7 @@ database `db-revision.py` diffs against is never left behind the merged migratio
 ibkr_trader's runs Alembic on the host; this one runs it inside the app container, past
 PgBouncer (`docker_common.alembic_in_app`). What is shared is the CLI:
 
-  python scripts/db-upgrade.py --check   # 0 at head, 1 behind, 2 app not up; writes nothing
+  python scripts/db-upgrade.py --check   # 0 at head, 1 behind, 2 engine/app/db not up
   python scripts/db-upgrade.py           # apply every pending revision; 0 applied
 
 Any other exit is a failure the pass files. Which branch the checkout is on is the
@@ -45,10 +45,38 @@ def verdict(current: set[str], heads: set[str]) -> int:
     return CURRENT if current == heads else BEHIND
 
 
+# Alembic runs in `app` and connects straight to `db` (DIRECT_DATABASE_URL skips
+# PgBouncer), so these two being up is what "the database can be reached" means here.
+NEEDED = ("app", "db")
+
+
 def app_running(status_lines: list[str]) -> bool:
-    """True if any app-container status line shows it Up/running (`docker-migrate.py`'s
-    probe, through `docker ps --filter` for its reason)."""
-    return any("Up" in s or "running" in s for s in status_lines)
+    """True if any container status line shows it Up/running (`docker-migrate.py`'s
+    probe, through `docker ps --filter` for its reason). Pure.
+
+    Matched at the start of the line, never as a substring: `docker ps` merges its
+    stderr in, and the engine-down error ends "...if the daemon is running", which a
+    substring match read as a running app."""
+    return any(s.strip().startswith("Up") or s.strip() == "running" for s in status_lines)
+
+
+def unreachable() -> str:
+    """Why the database cannot be reached, or "" when the engine answers and every
+    `NEEDED` service is up. A non-zero or timed-out `docker ps` is the engine not
+    answering (Docker Desktop stopped), which is the pass's "cannot tell", not a
+    failure."""
+    for service in NEEDED:
+        status, code, timed_out = dc.docker_ps(
+            "{{.Status}}", all_containers=False, extra_filters=[dc.service_filter(service)]
+        )
+        if timed_out:
+            return "the docker engine did not answer `docker ps` in time"
+        if code != 0:
+            said = next((s.strip() for s in reversed(status) if s.strip()), f"exit {code}")
+            return f"the docker engine is not answering: {said}"
+        if not app_running(status):
+            return f"service '{service}' is not running"
+    return ""
 
 
 def fail(what: str, output: list[str]) -> int:
@@ -88,11 +116,9 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--check", action="store_true", help="report, apply nothing")
     args = parser.parse_args(argv)
-    status, _, _ = dc.docker_ps(
-        "{{.Status}}", all_containers=False, extra_filters=[dc.service_filter("app")]
-    )
-    if not app_running(status):
-        print("service 'app' is not running; nothing to check or apply")
+    why = unreachable()
+    if why:
+        print(f"{why}; nothing to check or apply")
         return UNKNOWN
     return check() if args.check else upgrade()
 
