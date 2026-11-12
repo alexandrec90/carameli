@@ -168,3 +168,133 @@ def test_setup_preamble_is_not_duplicated_inline():
             f"{name}: inline lock-install preamble reintroduced; use the "
             "setup-python-env composite instead."
         )
+
+
+# A step calling one of this repository's composite actions: `- uses: ./.github/actions/x`
+# or, after a `name:` line, `  uses: ./.github/actions/x`.
+_LOCAL_ACTION_STEP = re.compile(r"^[ -]*uses:\s*\./\.github/actions/(?P<name>[\w.-]+)\s*$")
+_MAPPING_KEY = re.compile(r"^(?P<key>[\w-]+):")
+
+
+def _indent(line: str) -> int:
+    return len(line) - len(line.lstrip(" "))
+
+
+def _key_column(line: str) -> int:
+    """Column of the first mapping key on a step line, past any `- ` list marker."""
+    return len(line) - len(line.lstrip(" -"))
+
+
+def _passed_inputs(text: str) -> list[tuple[str, str]]:
+    """`(action, input)` for every `with:` key a step hands a local composite action."""
+    lines = text.splitlines()
+    found = []
+    for index, line in enumerate(lines):
+        match = _LOCAL_ACTION_STEP.match(line)
+        if not match:
+            continue
+        column = _key_column(line)
+        in_with = False
+        for following in lines[index + 1 :]:
+            stripped = following.strip()
+            if not stripped or stripped.startswith("#"):
+                continue
+            depth = _indent(following)
+            if depth < column or (stripped.startswith("- ") and depth <= column):
+                break
+            if depth == column:
+                in_with = stripped == "with:"
+                continue
+            key = _MAPPING_KEY.match(stripped)
+            if in_with and key:
+                found.append((match["name"], key["key"]))
+    return found
+
+
+def _declared_inputs(action_text: str) -> set[str]:
+    """The keys under an action.yml's top-level `inputs:` block."""
+    declared: set[str] = set()
+    in_inputs = False
+    for line in action_text.splitlines():
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        if _indent(line) == 0:
+            in_inputs = line.rstrip() == "inputs:"
+            continue
+        key = _MAPPING_KEY.match(line.strip())
+        if in_inputs and _indent(line) == 2 and key:
+            declared.add(key["key"])
+    return declared
+
+
+def test_passed_inputs_reads_both_step_shapes():
+    text = (
+        "    steps:\n"
+        "      - uses: ./.github/actions/setup-python-env\n"
+        "        with:\n"
+        "          # a comment is not an input\n"
+        "          python-version: '3.12'\n"
+        "      - name: Second\n"
+        "        uses: ./.github/actions/setup-node-env\n"
+        "        with:\n"
+        "          cache: npm\n"
+        "        env:\n"
+        "          NOT_AN_INPUT: x\n"
+        "      - uses: actions/checkout@v7\n"
+        "        with:\n"
+        "          ref: main\n"
+    )
+    assert _passed_inputs(text) == [
+        ("setup-python-env", "python-version"),
+        ("setup-node-env", "cache"),
+    ]
+
+
+def test_declared_inputs_reads_only_the_inputs_block():
+    text = (
+        "name: x\n"
+        "inputs:\n"
+        "  extra-packages:\n"
+        "    description: d\n"
+        "    default: ''\n"
+        "  python-version:\n"
+        "    required: false\n"
+        "runs:\n"
+        "  using: composite\n"
+    )
+    assert _declared_inputs(text) == {"extra-packages", "python-version"}
+
+
+def test_every_input_passed_to_a_local_action_is_declared():
+    # The composite actions are this project's own, but some workflows calling them are
+    # vendored from devkit, written against devkit's template of the action. The
+    # auto-merge workflow passed `python-version` to a setup-python-env that declared
+    # only `extra-packages`, and actionlint turned the PR Gate red on master. Holding
+    # every call site to its action's declared inputs catches that here as well.
+    passed = [
+        (path.name, action, key)
+        for path in _workflow_files()
+        for action, key in _passed_inputs(_read(path))
+    ]
+    assert passed, "no step passes an input to a local action; the scan is vacuous"
+    undeclared = [
+        f"{name}: {action} has no input {key!r}"
+        for name, action, key in passed
+        if key not in _declared_inputs(_read(ACTIONS_DIR / action / "action.yml"))
+    ]
+    assert not undeclared, undeclared
+
+
+def test_setup_python_env_takes_the_interpreter_from_the_pin_only():
+    # `.python-version` is the one copy (CLAUDE.md, "Local workflow"). The vendored
+    # caller's `python-version` comes from `.devkit.toml` with a hard-coded fallback, so
+    # letting it reach setup-python would provision a second, unenforced pin.
+    text = _read(ACTIONS_DIR / "setup-python-env" / "action.yml")
+    assert "python-version" in _declared_inputs(text)
+    assert "python-version-file: .python-version" in text
+    assert "python-version: ${{ inputs.python-version }}" not in text, (
+        "setup-python-env must never hand the caller's version to actions/setup-python."
+    )
+    assert "disagrees with .python-version" in text, (
+        "a caller's version that is not the pin should fail the step, not be ignored."
+    )
