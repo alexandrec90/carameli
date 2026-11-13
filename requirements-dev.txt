@@ -16,6 +16,7 @@ anyio==4.16.0
     # via
     #   -c requirements-test.txt
     #   -r requirements.in
+    #   fastapi
     #   httpx
     #   schemathesis
     #   starlette
@@ -114,12 +115,12 @@ execnet==2.1.2
     # via
     #   -c requirements-test.txt
     #   pytest-xdist
-fastapi==0.162.0
+fastapi==0.162.6
     # via
     #   -c requirements-test.txt
     #   -r requirements.in
     #   sentry-sdk
-filelock==4.2.9
+filelock==4.2.10
     # via
     #   -r requirements-dev.in
     #   cachecontrol
@@ -140,7 +141,7 @@ gevent==25.9.1
     #   locust
 geventhttpclient==2.3.9
     # via locust
-graphql-core==3.3.1
+graphql-core==3.3.2
     # via
     #   -c requirements-test.txt
     #   -r requirements-test.in
@@ -177,7 +178,7 @@ httpx==0.28.1
     # via
     #   -c requirements-test.txt
     #   -r requirements.in
-hypothesis==6.170.14
+hypothesis==6.170.15
     # via
     #   -c requirements-test.txt
     #   -r requirements-test.in
@@ -293,7 +294,7 @@ platformdirs==4.9.4
     #   pip-audit
     #   textual
     #   virtualenv
-playwright==1.64.1
+playwright==1.65.1
     # via
     #   -r requirements-dev.in
     #   pytest-playwright
@@ -337,8 +338,6 @@ pydantic-settings==2.16.2
     # via
     #   -c requirements-test.txt
     #   -r requirements.in
-pyee==13.0.1
-    # via playwright
 pygments==2.20.0
     # via
     #   -c requirements-test.txt
@@ -455,7 +454,7 @@ rich==15.0.0
     #   pip-audit
     #   schemathesis
     #   textual
-ruff==0.17.3
+ruff==0.17.5
     # via -r requirements-dev.in
 s3transfer==0.19.0
     # via
@@ -465,7 +464,7 @@ schemathesis==4.31.1
     # via
     #   -c requirements-test.txt
     #   -r requirements-test.in
-sentry-sdk==2.73.0
+sentry-sdk==2.75.0
     # via
     #   -c requirements-test.txt
     #   -r requirements.in
@@ -486,7 +485,7 @@ sortedcontainers==2.4.0
     #   -c requirements-test.txt
     #   cyclonedx-python-lib
     #   hypothesis
-sqlalchemy==2.1.6
+sqlalchemy==2.1.8
     # via
     #   -c requirements-test.txt
     #   -r requirements.in
@@ -518,7 +517,6 @@ typing-extensions==4.16.0
     #   pydantic
     #   pydantic-core
     #   pydantic-settings
-    #   pyee
     #   pytest-asyncio
     #   schemathesis
     #   sqlalchemy
@@ -552,7 +550,7 @@ uvloop==0.22.1 ; platform_python_implementation != 'PyPy' and sys_platform != 'c
     # via
     #   -c requirements-test.txt
     #   uvicorn
-virtualenv==21.15.5
+virtualenv==21.15.6
     # via
     #   -r requirements-dev.in
     #   pre-commit
