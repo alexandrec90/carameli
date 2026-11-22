@@ -48,7 +48,8 @@ IS_CI = bool(os.environ.get("CI"))
 # be repeated here or testmon fast-mode would silently collect paid tests.
 _ADDOPTS = (
     "--ignore=tests/e2e --ignore=tests/live_e2e --ignore=tests/local_e2e "
-    '--ignore=tests/load --ignore=tests/quarantine -m "not paid and not local"'
+    '--ignore=tests/load --ignore=tests/quarantine -m "not paid and not local" '
+    "-p devkit_temproot"
 )
 _PYTEST_FULL = "pytest -v --tb=short --no-header --color=no --durations=20 -n auto --dist=worksteal"
 _PYTEST_TESTMON = (

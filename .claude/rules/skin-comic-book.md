@@ -492,4 +492,4 @@ to drag back; and **Save is never refused**, mid-design being when it matters mo
 23. **Never import a *value* from `editor/useEditorMode.ts` or a mutator hook into what
     the page draws** — read `editor/editorContext.ts`. Types are free; one value edge
     ships the whole engine past the DEV gate.
-24. **Never hand-edit `src/lib/phoneMetadata.json`** — `npm run gen:phone-metadata`.
+24. **Never hand-edit `src/lib/phoneMetadata.json`** — `python scripts/npm.py run gen:phone-metadata`.
