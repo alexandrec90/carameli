@@ -5,7 +5,8 @@
  * from ./comicAssets.ts and for the same reason: the subsetting is pure and tested
  * against objects built in the test, and this is the part that needs a disk.
  *
- * Run it with `npm run gen:phone-metadata`. You need to when the country list changes and
+ * Run it with `python scripts/npm.py run gen:phone-metadata` from the repo root, which
+ * runs `npm run gen:phone-metadata` on the Node `.nvmrc` pins. You need to when the country list changes and
  * when `libphonenumber-js` is upgraded — and you will be told rather than having to
  * remember, because `phoneMetadata.test.ts` regenerates in memory and fails when the
  * committed file is not what this would write. That check is the point of committing a

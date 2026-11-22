@@ -332,6 +332,18 @@ def test_addopts_mirrors_every_ignore_in_pytest_ini():
     assert ignores <= {tok for tok in rt._ADDOPTS.split() if tok.startswith("--ignore=")}
 
 
+def test_addopts_mirrors_every_plugin_in_pytest_ini():
+    # The same replacement dropped `-p devkit_temproot`, so every scoped run used the
+    # user-wide %TEMP%\pytest-of-<user> root, and once that went unreadable each test
+    # taking `tmp_path` errored with "PermissionError: [WinError 5]" (2026-11-22).
+    ini = (REPO_ROOT / "pytest.ini").read_text(encoding="utf-8")
+    line = next(ln for ln in ini.splitlines() if ln.startswith("addopts")).split()
+    plugins = {line[i + 1] for i, tok in enumerate(line) if tok == "-p"}
+    assert plugins, "pytest.ini loads no plugin; this test is asserting nothing"
+    ours = rt._ADDOPTS.split()
+    assert plugins <= {ours[i + 1] for i, tok in enumerate(ours) if tok == "-p"}
+
+
 def test_webhook_e2e_target_demands_a_live_tunnel():
     # The suite skips itself when NGROK_URL names a tunnel that does not answer --
     # that is what keeps a worktree box's inherited NGROK_URL out of the free
