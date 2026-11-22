@@ -164,7 +164,8 @@ describe(METADATA_IN_FRONTEND, () => {
       `${METADATA_IN_FRONTEND} is not what \`npm run gen:phone-metadata\` produces from ` +
         'the installed libphonenumber-js. Either FORMATTED_COUNTRIES changed without the ' +
         'file being regenerated, the package was upgraded and revised a numbering plan, ' +
-        'or the file was hand-edited. Run the generator and review the diff — it is a ' +
+        'or the file was hand-edited. Run the generator on the pinned Node — ' +
+        '`python scripts/npm.py run gen:phone-metadata` from the repo root — and review the diff — it is a ' +
         'diff of what visitors download, and of which numbers still parse.',
     ).toBe(expectedMetadata())
   })

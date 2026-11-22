@@ -82,6 +82,9 @@ port meeting a leased `FRONTEND_HOST_PORT`) is a startup error, and
 `npm run preview`, which takes the same offset over base 4173.
 
 Verify frontend changes with `npm run test:run` and `npm run lint` from this directory.
+Typed in a shell, an npm script runs PATH's `node`, which may not be the one `.nvmrc`
+pins: `bootstrap.py` caches that build, and only the runners put it on PATH. From the
+repo root, `python scripts/npm.py <npm args>` runs any of them on the pinned build.
 
 Run the whole of `lint`, not one of its parts. It chains five checks —
 `lint:eslint`, `lint:types`, `lint:css`, `lint:spelling`, `lint:deadweight` — and
@@ -170,7 +173,7 @@ through five consecutive ceiling raises — the raises were all anyone saw.
 
 `libphonenumber-js` carries every numbering plan on earth and the skin needs a few.
 `phoneMetadata.ts` says which and why, `phoneMetadataGen.ts` writes the table, and
-`npm run gen:phone-metadata` is how you regenerate it — after changing the country list,
+`python scripts/npm.py run gen:phone-metadata` is how you regenerate it — after changing the country list,
 and after any upgrade of the package. `phoneMetadata.test.ts` fails when the committed
 file is not what the generator would write, so a Dependabot bump that revises a plan
 shows up as a reviewable diff instead of as numbers that quietly stop parsing.
