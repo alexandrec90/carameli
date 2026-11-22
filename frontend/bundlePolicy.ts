@@ -477,8 +477,23 @@ export const MAX_LAZY_CHUNK_BYTES = 204 * 1024
  * byte.
  *
  * 693 rather than 692, which would hold at 0.6 KB: a kilobyte clear, not flush.
+ *
+ * **This raise (693 → 695) is the next `minor-and-patch` group, not a change here.** 1,631
+ * B: 709,884 B on this branch against 708,253 B for the master it sits on (`2cfaabd`),
+ * still 46 chunks. `framer-motion` 14.10.0 → 14.14.0 is 1,152 B of it, all in the lazy
+ * `candy-shop` chunk (110,864 → 112,016 B), attributed by installing that one package on
+ * master, which reproduces the chunk to the byte and moves no other. The remaining 479 B is
+ * the other runtime bumps (`react-router-dom`, `lucide-react`, `libphonenumber-js`) across
+ * the `jsx-runtime` (+238), `carameli` (+156) and `comic-book` (+85) chunks; the dev-only
+ * ones reach no chunk. {@link MAX_EAGER_BYTES} does not move.
+ *
+ * The skin is already on `LazyMotion` with `domAnimation` and `m`, the cut the paragraph
+ * above made, so there is no cheaper import left to take; an async `features` loader would
+ * move those bytes to another chunk, not out of this sum. The 1,059 B the last cut left was
+ * spent by master (265 B) and this group together. 695 rather than 694, which would hold at
+ * 0.75 KB: a kilobyte clear, not flush.
  */
-export const MAX_TOTAL_JS_BYTES = 693 * 1024
+export const MAX_TOTAL_JS_BYTES = 695 * 1024
 
 /**
  * Every `.css` file in `dist/assets/`, summed. Today 44.2 KB across 2 files.
