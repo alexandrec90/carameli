@@ -67,6 +67,14 @@ jobs:
       - name: Validate repaired environment markers
         run: python scripts/check-lock-markers.py
 
+      # A bump that drops a transitive package leaves its `dependency::` line stale,
+      # which fails the gate. --tighten only drops and lowers, and still exits non-zero
+      # over a *new* dependency: that one is the gate's to refuse, not this step's.
+      - name: Drop baseline lines for packages the locks no longer hold
+        run: >-
+          python scripts/hooks/structure_check.py --tighten
+          || echo "::notice::structure-check is not clean; PR Gate reports it."
+
       - name: Commit repaired locks
         id: commit
         shell: bash
@@ -74,20 +82,21 @@ jobs:
           HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
         run: |
           set -euo pipefail
-          unexpected=$(git status --short | awk '$2 !~ /^requirements(-test|-dev)?\.txt$/ {print}')
+          repaired=(requirements.txt requirements-test.txt requirements-dev.txt .devkit-structure.txt)
+          unexpected=$(git status --short | awk '$2 !~ /^(requirements(-test|-dev)?|\.devkit-structure)\.txt$/ {print}')
           if [[ -n "$unexpected" ]]; then
             echo "Lock repair changed unexpected files:" >&2
             echo "$unexpected" >&2
             exit 1
           fi
-          if git diff --quiet -- requirements.txt requirements-test.txt requirements-dev.txt; then
+          if git diff --quiet -- "${repaired[@]}"; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
             echo "Universal locks already match; no repair commit needed."
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add requirements.txt requirements-test.txt requirements-dev.txt
+          git add -- "${repaired[@]}"
           git commit -m "chore(deps): repair universal Python lockfiles"
           git push origin "HEAD:$HEAD_BRANCH"
           echo "changed=true" >> "$GITHUB_OUTPUT"

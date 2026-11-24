@@ -177,7 +177,6 @@ dependency::requirements-dev.txt::pycparser = 1
 dependency::requirements-dev.txt::pydantic = 1
 dependency::requirements-dev.txt::pydantic-core = 1
 dependency::requirements-dev.txt::pydantic-settings = 1
-dependency::requirements-dev.txt::pyee = 1
 dependency::requirements-dev.txt::pygments = 1
 dependency::requirements-dev.txt::pyjwt = 1
 dependency::requirements-dev.txt::pyparsing = 1
