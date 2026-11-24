@@ -135,6 +135,30 @@ def test_dependabot_workflow_repairs_then_gates_and_merges():
     assert 'gh workflow run pr-gate.yml --repo "$REPO" --ref "$HEAD_BRANCH"' in workflow
 
 
+def test_lock_repair_tightens_the_structure_baseline_and_commits_it():
+    # Playwright dropped `pyee`, and the repaired lock left its baseline line behind:
+    # the gate went red on every PR whose bump lost a transitive package (#527).
+    workflow = yaml.safe_load(
+        (REPO_ROOT / ".github/workflows/dependabot-lock-repair.yml").read_text(encoding="utf-8")
+    )
+    runs = [step.get("run", "") for step in workflow["jobs"]["repair"]["steps"]]
+    recompile = next(i for i, run in enumerate(runs) if "recompile-locks.py" in run)
+    tighten = next(i for i, run in enumerate(runs) if "structure_check.py --tighten" in run)
+    commit = next(i for i, run in enumerate(runs) if "git commit" in run)
+
+    assert recompile < tighten < commit
+    # A new dependency must not stop the repaired locks from being pushed.
+    assert "||" in runs[tighten]
+    repaired = re.search(r"repaired=\(([^)]*)\)", runs[commit])
+    assert repaired and ".devkit-structure.txt" in repaired.group(1).split()
+    assert 'git diff --quiet -- "${repaired[@]}"' in runs[commit]
+    assert 'git add -- "${repaired[@]}"' in runs[commit]
+    allowed = re.search(r"awk '\$2 !~ /(.+?)/ ", runs[commit])
+    assert allowed
+    assert all(re.match(allowed.group(1), path) for path in repaired.group(1).split())
+    assert not re.match(allowed.group(1), "app/main.py")
+
+
 def test_lock_repair_watches_its_dispatched_gate_and_merges_itself():
     # A PR Gate run dispatched with GITHUB_TOKEN emits no workflow_run event
     # (GitHub recursion guard), so the auto-merge workflow can never see it.
