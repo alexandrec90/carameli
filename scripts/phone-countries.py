@@ -125,7 +125,8 @@ def report_lines(
         lines += [
             "",
             f"in use but not formatted ({len(missing)}): {' '.join(missing)}",
-            "Add them to FORMATTED_COUNTRIES and run `npm run gen:phone-metadata`.",
+            "Add them to FORMATTED_COUNTRIES and run"
+            " `python scripts/npm.py run gen:phone-metadata`.",
         ]
     return lines, missing
 
