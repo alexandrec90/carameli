@@ -19,9 +19,31 @@ def _vendored_names(prefix: str, suffix: str) -> set[str]:
     return names
 
 
-def test_vendored_names_come_from_the_devkit_manifest():
-    assert {"ship", "go-nuts"} <= _vendored_names(".claude/skills/", "/SKILL.md")
-    assert {"engineering", "authoring", "session-scope"} <= _vendored_names(".claude/rules/", ".md")
+def test_vendored_names_come_from_the_devkit_manifest(monkeypatch):
+    """Against a manifest of its own: naming devkit's real entries pins devkit's decisions.
+
+    The literal `ship` here turned v0.11.101's adoption red when devkit renamed that skill.
+    """
+    monkeypatch.setattr(
+        manifest,
+        "MANIFEST",
+        (
+            ".claude/rules/some-rule.md",
+            ".claude/skills/some-skill/SKILL.md",
+            ".claude/skills/some-skill/helper.py",
+            ".agents/skills/elsewhere/SKILL.md",
+            "scripts/some-script.py",
+        ),
+    )
+
+    assert _vendored_names(".claude/skills/", "/SKILL.md") == {"some-skill"}
+    assert _vendored_names(".claude/rules/", ".md") == {"some-rule"}
+
+
+def test_the_real_manifest_vendors_skills_and_rules():
+    """A manifest layout the helper cannot read would yield nothing to subtract."""
+    assert _vendored_names(".claude/skills/", "/SKILL.md")
+    assert _vendored_names(".claude/rules/", ".md")
 
 
 def test_instruction_inventory_is_intentional():
