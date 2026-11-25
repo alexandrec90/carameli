@@ -34,8 +34,8 @@ and gets defended as one.
 ## Instruction ownership
 
 DevKit owns every path in `scripts/devkit_manifest.py`'s `MANIFEST` — among them
-`.claude/rules/engineering.md`, `.claude/rules/authoring.md`, and the `ship` and
-`go-nuts` skills. Carameli owns this file, nested `CLAUDE.md` files, the `add-skin`
+`.claude/rules/engineering.md`, `.claude/rules/authoring.md`, and every skill it
+names. Carameli owns this file, nested `CLAUDE.md` files, the `add-skin`
 skill, and its domain rules.
 
 Read the scoped rules when touching their paths:
